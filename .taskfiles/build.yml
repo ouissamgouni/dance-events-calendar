@@ -1,0 +1,208 @@
+version: "3"
+
+vars:
+  WORKTREE_DIR: .worktrees
+  WORKTREE_MAIN: .worktrees/main
+  WORKTREE_DEVELOP: .worktrees/develop
+
+tasks:
+  staging:
+    desc: Build both backend and frontend images from develop branch
+    deps: [":git:worktree:setup", staging:backend, staging:frontend]
+    cmds:
+      - echo "✅ All staging images built (:develop)"
+
+  staging:backend:
+    desc: Build backend image from develop branch
+    deps: [":git:worktree:setup"]
+    cmds:
+      - |
+        echo "Updating develop worktree..."
+        cd {{.WORKTREE_DEVELOP}} && git pull origin develop
+      - |
+        echo "Building backend from develop..."
+        docker build -t salsa-calendar-backend:develop -f {{.WORKTREE_DEVELOP}}/backend/Dockerfile {{.WORKTREE_DEVELOP}}
+        echo "✅ Backend image built: :develop"
+
+  staging:frontend:
+    desc: Build frontend image from develop branch
+    deps: [":git:worktree:setup"]
+    cmds:
+      - |
+        echo "Updating develop worktree..."
+        cd {{.WORKTREE_DEVELOP}} && git pull origin develop
+      - |
+        echo "Building frontend from develop..."
+        docker build -t salsa-calendar-frontend:develop \
+          --build-arg VITE_API_URL=http://localhost:${BACKEND_PORT:-8002} \
+          {{.WORKTREE_DEVELOP}}/frontend
+        echo "✅ Frontend image built: :develop"
+
+  prod:
+    desc: "Build images from main branch (e.g., task build:prod -- v1.0.0)"
+    cmds:
+      - task: prod:backend
+        vars: { VERSION: "{{.CLI_ARGS}}" }
+      - task: prod:frontend
+        vars: { VERSION: "{{.CLI_ARGS}}" }
+      - cmd: echo "✅ All prod images built{{if .CLI_ARGS}} :{{.CLI_ARGS}} and :latest{{end}}"
+
+  prod:backend:
+    desc: Build backend image from main branch
+    deps: [":git:worktree:setup"]
+    cmds:
+      - |
+        VERSION={{.VERSION}}{{.CLI_ARGS}}
+        if [ -z "$VERSION" ]; then
+          echo "❌ Usage: task build:prod -- v1.2.0"
+          exit 1
+        fi
+      - |
+        VERSION={{.VERSION}}{{.CLI_ARGS}}
+        echo "Updating main worktree..."
+        cd {{.WORKTREE_MAIN}} && git pull origin main
+      - |
+        VERSION={{.VERSION}}{{.CLI_ARGS}}
+        echo "Building backend from main as $VERSION..."
+        docker build -t salsa-calendar-backend:$VERSION -f {{.WORKTREE_MAIN}}/backend/Dockerfile {{.WORKTREE_MAIN}}
+        docker tag salsa-calendar-backend:$VERSION salsa-calendar-backend:latest
+        echo "✅ Backend image built: :$VERSION and :latest"
+
+  prod:frontend:
+    desc: Build frontend image from main branch
+    deps: [":git:worktree:setup"]
+    cmds:
+      - |
+        VERSION={{.VERSION}}{{.CLI_ARGS}}
+        if [ -z "$VERSION" ]; then
+          echo "❌ Usage: task build:prod:frontend -- v1.2.0"
+          exit 1
+        fi
+      - |
+        VERSION={{.VERSION}}{{.CLI_ARGS}}
+        echo "Updating main worktree..."
+        cd {{.WORKTREE_MAIN}} && git pull origin main
+      - |
+        VERSION={{.VERSION}}{{.CLI_ARGS}}
+        echo "Building frontend from main as $VERSION..."
+        docker build -t salsa-calendar-frontend:$VERSION \
+          --build-arg VITE_API_URL=http://localhost:${BACKEND_PORT:-8080} \
+          {{.WORKTREE_MAIN}}/frontend
+        docker tag salsa-calendar-frontend:$VERSION salsa-calendar-frontend:latest
+        echo "✅ Frontend image built: :$VERSION and :latest"
+
+  ref:
+    desc: "Build images from any git ref (e.g., task build:ref -- feature/my-branch)"
+    vars:
+      REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+    prompt: |
+      Build Docker images from git ref: {{.REF}}
+
+      This will:
+        • Create temporary worktree
+        • Build backend and frontend images
+        • Tag images as :ref-{sha}
+
+      Continue?
+    cmds:
+      - |
+        REF="{{.REF}}"
+        if [ -z "$REF" ]; then
+          echo "❌ Usage:"
+          echo "   task build:ref -- feature/my-branch"
+          echo "   task build:ref REF=feature/my-branch"
+          exit 1
+        fi
+      - task: :git:worktree:setup:ref
+        vars: { REF: "{{.REF}}" }
+      - |
+        REF="{{.REF}}"
+        SHA=$(git rev-parse --short=7 "$REF")
+        WORKTREE_PATH="{{.WORKTREE_DIR}}/ref-$SHA"
+        TAG="ref-$SHA"
+
+        echo ""
+        echo "Building from $REF ($SHA)..."
+        echo "Image tag: :$TAG"
+        echo ""
+
+        echo "Building backend..."
+        docker build -t salsa-calendar-backend:$TAG -f $WORKTREE_PATH/backend/Dockerfile $WORKTREE_PATH
+
+        echo "Building frontend..."
+        docker build -t salsa-calendar-frontend:$TAG \
+          --build-arg VITE_API_URL=http://localhost:${BACKEND_PORT:-8002} \
+          $WORKTREE_PATH/frontend
+
+        echo ""
+        echo "✅ Images built from $REF"
+        echo "   Backend:  salsa-calendar-backend:$TAG"
+        echo "   Frontend: salsa-calendar-frontend:$TAG"
+
+  dirty:
+    desc: Build images from current working directory (uncommitted changes)
+    prompt: |
+      ⚠️  BUILD FROM WORKING DIRECTORY
+
+      This will build Docker images from your CURRENT working directory,
+      including any uncommitted changes.
+
+      These images are NOT traceable to any git commit.
+      Use only for quick local testing.
+
+      Continue?
+    cmds:
+      - |
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        TAG="dirty-$TIMESTAMP"
+
+        echo ""
+        echo "Building from current working directory..."
+        echo "Image tag: :$TAG"
+        echo ""
+
+        echo "Building backend..."
+        docker build -t salsa-calendar-backend:$TAG -f backend/Dockerfile .
+
+        echo "Building frontend..."
+        docker build -t salsa-calendar-frontend:$TAG \
+          --build-arg VITE_API_URL=http://localhost:${BACKEND_PORT:-8001} \
+          ./frontend
+
+        echo ""
+        echo "✅ Images built from working directory"
+        echo "   Backend:  salsa-calendar-backend:$TAG"
+        echo "   Frontend: salsa-calendar-frontend:$TAG"
+        echo ""
+        echo "Deploy with: task deploy:staging:dirty"
+
+  list:
+    desc: List all salsa-calendar Docker images
+    cmds:
+      - docker images salsa-calendar-* --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedSince}}"
+
+  clean:
+    desc: Remove old/dangling Docker images
+    cmds:
+      - |
+        echo "Current images:"
+        docker images salsa-calendar-* --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+        echo ""
+        echo "Removing dangling images..."
+        docker image prune -f
+        echo "✅ Cleanup complete"
+
+  clean:all:
+    desc: "Remove ALL salsa-calendar Docker images"
+    vars:
+      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+    prompt: "This will remove ALL salsa-calendar Docker images. Continue?"
+    cmds:
+      - |
+        if [ "{{.DRY_RUN}}" = "1" ]; then
+          echo "🔍 DRY RUN — would remove these images:"
+          docker images salsa-calendar-* --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+          exit 0
+        fi
+        docker images salsa-calendar-* -q | xargs -r docker rmi -f
+        echo "✅ All salsa-calendar images removed"

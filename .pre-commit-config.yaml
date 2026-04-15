@@ -1,0 +1,16 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+
+  - repo: local
+    hooks:
+      - id: forbid-secrets
+        name: Forbid secrets.env files
+        entry: "Found secrets.env — these must never be committed"
+        language: fail
+        files: '(^|/)secrets(\..*)?\.env$'
+        exclude: 'secrets\.env\.example$'

@@ -1,0 +1,166 @@
+version: "3"
+
+vars:
+  SCENARIO_PORTS_SH: .taskfiles/scenario_ports.sh
+
+tasks:
+  # ════════════════════════════════════════════════════════════════
+  # Dev
+  # ════════════════════════════════════════════════════════════════
+
+  dev:
+    desc: Stop all dev services (DB + backend + frontend)
+    deps: [dev:db, dev:backend, dev:frontend]
+    cmds:
+      - echo "✅ All dev services stopped"
+
+  dev:db:
+    desc: Stop dev database only
+    cmds:
+      - |
+        docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.dev.yml down
+        echo "✅ Dev database stopped"
+
+  dev:backend:
+    desc: Stop dev backend
+    cmds:
+      - |
+        if pkill -f "uvicorn backend.api.main" 2>/dev/null; then
+          echo "✅ Backend stopped"
+          sleep 1
+          if pgrep -f "uvicorn backend.api.main" > /dev/null 2>&1; then
+            pkill -9 -f "uvicorn backend.api.main" 2>/dev/null
+          fi
+        else
+          echo "ℹ️  Backend not running"
+        fi
+
+  dev:frontend:
+    desc: Stop dev frontend
+    cmds:
+      - |
+        if pkill -f "vite" 2>/dev/null; then
+          echo "✅ Frontend stopped"
+        else
+          echo "ℹ️  Frontend not running"
+        fi
+
+  dev:volumes:
+    desc: "Stop dev and remove volumes (⚠️ destroys data). DRY_RUN=1 to preview."
+    vars:
+      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+    cmds:
+      - |
+        if [ "{{.DRY_RUN}}" = "1" ]; then
+          echo "🔍 DRY RUN — would remove:"
+          echo "  • calendar_db_dev container"
+          echo "  • calendar_dev_data volume"
+        fi
+      - task: _dev:volumes:exec
+        vars: { DRY_RUN: "{{.DRY_RUN}}" }
+
+  _dev:volumes:exec:
+    internal: true
+    status:
+      - '[ "{{.DRY_RUN}}" = "1" ]'
+    prompt: "This will destroy all dev database data. Continue?"
+    cmds:
+      - docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.dev.yml down -v
+      - echo "✅ Dev containers and volumes removed"
+
+  # ════════════════════════════════════════════════════════════════
+  # Staging
+  # ════════════════════════════════════════════════════════════════
+
+  staging:
+    desc: Stop staging stack
+    cmds:
+      - ENV_NAME=staging docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p salsa-calendar-staging down
+      - echo "✅ Staging stopped"
+
+  staging:volumes:
+    desc: "Stop staging and remove volumes (⚠️ destroys data). DRY_RUN=1 to preview."
+    vars:
+      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+    prompt: "This will destroy all staging data. Continue?"
+    cmds:
+      - |
+        if [ "{{.DRY_RUN}}" = "1" ]; then
+          echo "🔍 DRY RUN — would remove staging containers + volumes"
+          exit 0
+        fi
+      - ENV_NAME=staging docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p salsa-calendar-staging down -v
+      - echo "✅ Staging containers and volumes removed"
+
+  # ════════════════════════════════════════════════════════════════
+  # Prod
+  # ════════════════════════════════════════════════════════════════
+
+  prod:
+    desc: Stop prod stack
+    cmds:
+      - ENV_NAME=prod docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p salsa-calendar-prod down
+      - echo "✅ Prod stopped"
+
+  prod:volumes:
+    desc: "Stop prod and remove volumes (🚨 destroys data). DRY_RUN=1 to preview."
+    vars:
+      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+    prompt: "🚨 This will destroy all PRODUCTION data. Are you sure?"
+    cmds:
+      - |
+        if [ "{{.DRY_RUN}}" = "1" ]; then
+          echo "🔍 DRY RUN — would remove prod containers + volumes"
+          exit 0
+        fi
+      - ENV_NAME=prod docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p salsa-calendar-prod down -v
+      - echo "✅ Prod containers and volumes removed"
+
+  # ════════════════════════════════════════════════════════════════
+  # Scenario
+  # ════════════════════════════════════════════════════════════════
+
+  scenario:
+    desc: "Stop a scenario instance (SCENARIO=name)"
+    vars:
+      SCENARIO: '{{.SCENARIO | default "default"}}'
+    prompt: "Stop scenario '{{.SCENARIO}}'?"
+    cmds:
+      - |
+        source {{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
+
+        echo "Stopping scenario: $SCENARIO_NAME..."
+
+        # Stop Docker DB
+        docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.scenario-db.yml -p $SC_PROJECT_NAME down -v 2>/dev/null || true
+
+        # Also try unified compose (for :ref mode)
+        docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p $SC_PROJECT_NAME down -v 2>/dev/null || true
+
+        # Kill local processes on scenario ports
+        lsof -ti:$SC_API_PORT | xargs kill -9 2>/dev/null || true
+        lsof -ti:$SC_WEB_PORT | xargs kill -9 2>/dev/null || true
+
+        echo "✅ Scenario '$SCENARIO_NAME' stopped"
+
+  scenario:all:
+    desc: Stop ALL running scenario instances
+    prompt: "Stop ALL scenario instances?"
+    cmds:
+      - |
+        echo "Stopping all scenario instances..."
+
+        # Stop all calendar_db_scenario* containers
+        docker ps --filter "name=calendar_db_scenario" --format '{{`{{.Names}}`}}' 2>/dev/null | while read CONTAINER; do
+          PROJECT=$(docker inspect --format '{{`{{index .Config.Labels "com.docker.compose.project"}}`}}' "$CONTAINER" 2>/dev/null || echo "")
+          if [ -n "$PROJECT" ]; then
+            docker compose -p "$PROJECT" down -v 2>/dev/null || true
+            echo "  Stopped: $PROJECT"
+          else
+            docker stop "$CONTAINER" 2>/dev/null || true
+            docker rm "$CONTAINER" 2>/dev/null || true
+            echo "  Stopped: $CONTAINER"
+          fi
+        done
+
+        echo "✅ All scenario instances stopped"

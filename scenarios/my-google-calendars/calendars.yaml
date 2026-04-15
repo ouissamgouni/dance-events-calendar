@@ -1,0 +1,9 @@
+calendars:
+  - id: "sse34geighk20sbt1kuo12r4bg@group.calendar.google.com"
+    name: "Salsa"
+    color: "#e11d48"
+    enabled: true
+  - id: "evrpds0rvercm3ugjpgjia2kds@group.calendar.google.com"
+    name: "Salsa - Going !"
+    color: "#7c3aed"
+    enabled: true

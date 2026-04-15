@@ -1,0 +1,533 @@
+base_week: 0
+
+events:
+  # ═══════════════════════════════════════════════════════════
+  #  JANUARY 2026
+  # ═══════════════════════════════════════════════════════════
+  - id: "evt-jan-paris"
+    calendar_id: "salsa-cal-001"
+    title: "New Year Salsa Bash – Paris"
+    description: "Kick off the year at Le Balajo with salsa cubana all night."
+    location: "Le Balajo, 9 Rue de Lappe, 75011 Paris, France"
+    latitude: 48.8533
+    longitude: 2.3716
+    start: "w-14 Sat 21:00"
+    end: "w-14 Sun 03:00"
+
+  - id: "evt-jan-budapest"
+    calendar_id: "bachata-cal-002"
+    title: "Winter Bachata Festival – Budapest"
+    description: "3-day festival with international instructors. Thermal bath party included!"
+    location: "Akvárium Klub, Erzsébet tér 12, Budapest, Hungary"
+    latitude: 47.4979
+    longitude: 19.0510
+    start: "w-13 Fri 18:00"
+    end: "w-13 Sun 23:00"
+
+  - id: "evt-jan-london"
+    calendar_id: "kizomba-cal-003"
+    title: "Kizomba Fuego – London"
+    description: "Two floors of dancing in Soho. Guest DJs from Angola & Cape Verde."
+    location: "Bar Salsa, 96 Charing Cross Rd, London, UK"
+    latitude: 51.5142
+    longitude: -0.1300
+    start: "w-12 Sat 21:00"
+    end: "w-12 Sun 03:00"
+
+  # ═══════════════════════════════════════════════════════════
+  #  FEBRUARY 2026
+  # ═══════════════════════════════════════════════════════════
+  - id: "evt-feb-rome"
+    calendar_id: "salsa-cal-001"
+    title: "Valentine Salsa Night – Rome"
+    description: "Romantic salsa evening near the Tiber at sunset."
+    location: "Terrazza Trastevere, Piazza Trilussa, Rome, Italy"
+    latitude: 41.8892
+    longitude: 12.4691
+    start: "w-9 Sat 19:00"
+    end: "w-9 Sat 23:30"
+
+  - id: "evt-feb-berlin"
+    calendar_id: "bachata-cal-002"
+    title: "Berlin Bachata Vibes"
+    description: "Berlin's biggest monthly bachata gathering. 3 rooms: sensual, moderna, dominicana."
+    location: "Tanzhaus Berlin, Friedrichstraße 112, Berlin, Germany"
+    latitude: 52.5244
+    longitude: 13.3884
+    start: "w-8 Sat 21:00"
+    end: "w-8 Sun 03:00"
+
+  - id: "evt-feb-lisbon"
+    calendar_id: "kizomba-cal-003"
+    title: "Carnaval Kizomba – Lisbon"
+    description: "Carnival-themed kizomba party in Belém. Costumes encouraged!"
+    location: "Centro Cultural de Belém, Praça do Império, Lisbon, Portugal"
+    latitude: 38.6960
+    longitude: -9.2092
+    start: "w-7 Sat 22:00"
+    end: "w-7 Sun 04:00"
+
+  # ═══════════════════════════════════════════════════════════
+  #  MARCH 2026
+  # ═══════════════════════════════════════════════════════════
+  - id: "evt-mar-athens"
+    calendar_id: "salsa-cal-001"
+    title: "Spring Salsa Workshop – Athens"
+    description: "Rooftop salsa workshop with a view of the Parthenon."
+    location: "Cine Paris Rooftop, Kidathineon 22, Plaka, Athens, Greece"
+    latitude: 37.9720
+    longitude: 23.7290
+    start: "w-6 Sat 14:00"
+    end: "w-6 Sat 18:00"
+
+  - id: "evt-mar-barcelona"
+    calendar_id: "bachata-cal-002"
+    title: "Bachata Cubana Party – Barcelona"
+    description: "Bachata & timba all night on the beach. Live band Havana Sound System."
+    location: "Mojito Club, Carrer del Rosselló 217, Barcelona, Spain"
+    latitude: 41.3925
+    longitude: 2.1568
+    start: "w-5 Sat 22:00"
+    end: "w-5 Sun 03:00"
+
+  - id: "evt-mar-paris"
+    calendar_id: "kizomba-cal-003"
+    title: "Kizomba Bootcamp – Paris"
+    description: "2-day intro to kizomba & semba. No partner needed."
+    location: "Centre de Danse du Marais, 41 Rue du Temple, Paris, France"
+    latitude: 48.8600
+    longitude: 2.3530
+    start: "w-4 Sat 10:00"
+    end: "w-4 Sun 17:00"
+
+  - id: "evt-mar-amsterdam"
+    calendar_id: "salsa-cal-001"
+    title: "Latin Night Amsterdam"
+    description: "Salsa, bachata & merengue in the canal district. Free class at 21:00."
+    location: "Melkweg, Lijnbaansgracht 234A, 1017 PH Amsterdam, Netherlands"
+    latitude: 52.3651
+    longitude: 4.8821
+    start: "w-3 Sat 21:00"
+    end: "w-3 Sun 02:30"
+
+  # ═══════════════════════════════════════════════════════════
+  #  APRIL 2026
+  # ═══════════════════════════════════════════════════════════
+  - id: "evt-apr-paris"
+    calendar_id: "salsa-cal-001"
+    title: "Salsa Social Night – Paris"
+    description: "Weekly social at the heart of Paris. All levels welcome. DJ set + live percussion."
+    location: "Studio Latina, 15 Rue de la Roquette, Paris, France"
+    latitude: 48.8534
+    longitude: 2.3741
+    start: "w0 Fri 20:30"
+    end: "w0 Sat 01:00"
+
+  - id: "evt-apr-vienna"
+    calendar_id: "bachata-cal-002"
+    title: "Wien Bachata Congress"
+    description: "Annual Vienna bachata congress. 4 days of workshops, shows, and parties."
+    location: "Wiener Stadthalle, Roland-Rainer-Platz 1, Vienna, Austria"
+    latitude: 48.2024
+    longitude: 16.3310
+    start: "w1 Thu 18:00"
+    end: "w1 Sun 04:00"
+
+  - id: "evt-apr-athens"
+    calendar_id: "kizomba-cal-003"
+    title: "Kizomba Under the Acropolis – Athens"
+    description: "Rooftop kizomba party with DJ from Lisbon."
+    location: "Cine Paris Rooftop, Kidathineon 22, Plaka, Athens, Greece"
+    latitude: 37.9720
+    longitude: 23.7290
+    start: "w1 Wed 21:00"
+    end: "w1 Thu 02:30"
+
+  # ═══════════════════════════════════════════════════════════
+  #  MAY 2026
+  # ═══════════════════════════════════════════════════════════
+  - id: "evt-may-lisbon"
+    calendar_id: "salsa-cal-001"
+    title: "Salsa & Kizomba Festival – Lisbon"
+    description: "3-day festival with international instructors. Workshops + pool party."
+    location: "Centro Cultural de Belém, Praça do Império, Lisbon, Portugal"
+    latitude: 38.6960
+    longitude: -9.2092
+    start: "w2 Fri 10:00"
+    end: "w2 Sun 23:00"
+
+  - id: "evt-may-prague"
+    calendar_id: "bachata-cal-002"
+    title: "Bachata en Praga"
+    description: "Monthly bachata social in the Old Town. Taster class at 20:00."
+    location: "SaSaZu, Bubenské nábřeží 306, Prague, Czech Republic"
+    latitude: 50.1025
+    longitude: 14.4400
+    start: "w3 Sat 20:00"
+    end: "w3 Sun 01:00"
+
+  - id: "evt-may-london"
+    calendar_id: "salsa-cal-001"
+    title: "London Salsa Splash"
+    description: "Massive outdoor salsa event in Brixton. Live band + DJs."
+    location: "Brixton Academy, 211 Stockwell Rd, London SW9 9SL, UK"
+    latitude: 51.4652
+    longitude: -0.1152
+    start: "w5 Sat 14:00"
+    end: "w6 Mon 22:00"
+
+  - id: "evt-may-milan"
+    calendar_id: "kizomba-cal-003"
+    title: "Kizomba al Lago – Milan"
+    description: "Open-air kizomba by the Navigli canals. Aperitivo + dancing."
+    location: "Navigli District, Alzaia Naviglio Grande, Milan, Italy"
+    latitude: 45.4500
+    longitude: 9.1700
+    start: "w5 Sat 19:30"
+    end: "w5 Sat 23:30"
+
+  # ═══════════════════════════════════════════════════════════
+  #  JUNE 2026
+  # ═══════════════════════════════════════════════════════════
+  - id: "evt-jun-paris"
+    calendar_id: "salsa-cal-001"
+    title: "Fête de la Musique Salsa – Paris"
+    description: "Free outdoor salsa in Place de la République. All-night dancing!"
+    location: "Place de la République, Paris, France"
+    latitude: 48.8676
+    longitude: 2.3639
+    start: "w9 Sun 18:00"
+    end: "w10 Mon 04:00"
+
+  - id: "evt-jun-dubrovnik"
+    calendar_id: "bachata-cal-002"
+    title: "Bachata Night Dubrovnik"
+    description: "Dancing in the Old Town. Rooftop terrace with Adriatic views."
+    location: "Revelin Fortress, Dubrovnik, Croatia"
+    latitude: 42.6407
+    longitude: 18.1113
+    start: "w8 Sat 21:00"
+    end: "w8 Sun 02:00"
+
+  - id: "evt-jun-stockholm"
+    calendar_id: "kizomba-cal-003"
+    title: "Midsommar Kizomba – Stockholm"
+    description: "Scandinavia's hottest kizomba night. Warm up the Nordic summer."
+    location: "Debaser Strand, Hornstulls Strand 4, Stockholm, Sweden"
+    latitude: 59.3170
+    longitude: 18.0340
+    start: "w9 Sat 20:00"
+    end: "w9 Sun 02:00"
+
+  - id: "evt-jun-barcelona"
+    calendar_id: "salsa-cal-001"
+    title: "Salsa on the Beach – Barcelona"
+    description: "Barefoot salsa on Barceloneta. Sunset session with live percussion."
+    location: "Platja de la Barceloneta, Barcelona, Spain"
+    latitude: 41.3784
+    longitude: 2.1920
+    start: "w10 Sat 19:00"
+    end: "w10 Sat 23:00"
+
+  # ═══════════════════════════════════════════════════════════
+  #  JULY 2026
+  # ═══════════════════════════════════════════════════════════
+  - id: "evt-jul-budapest"
+    calendar_id: "salsa-cal-001"
+    title: "Budapest Summer Salsa Open"
+    description: "Outdoor salsa on the Danube. Ruin bar pre-party from 20:00."
+    location: "Szimpla Kert, Kazinczy u. 14, Budapest, Hungary"
+    latitude: 47.4965
+    longitude: 19.0620
+    start: "w11 Sat 20:00"
+    end: "w11 Sun 02:00"
+
+  - id: "evt-jul-santorini"
+    calendar_id: "bachata-cal-002"
+    title: "Santorini Bachata Retreat"
+    description: "4-day island retreat with workshops, sunset socials, and caldera views."
+    location: "Santo Wines, Pyrgos, Santorini, Greece"
+    latitude: 36.3730
+    longitude: 25.4370
+    start: "w12 Thu 10:00"
+    end: "w12 Sun 22:00"
+
+  - id: "evt-jul-london"
+    calendar_id: "kizomba-cal-003"
+    title: "Kizomba Summer – London"
+    description: "Outdoor terrace party in Shoreditch. BBQ + dancing."
+    location: "Rich Mix, 35-47 Bethnal Green Rd, London, UK"
+    latitude: 51.5244
+    longitude: -0.0725
+    start: "w13 Sat 20:00"
+    end: "w13 Sun 02:00"
+
+  # ═══════════════════════════════════════════════════════════
+  #  AUGUST 2026
+  # ═══════════════════════════════════════════════════════════
+  - id: "evt-aug-naples"
+    calendar_id: "salsa-cal-001"
+    title: "Salsa al Tramonto – Napoli"
+    description: "Open-air dancing on the lungomare with Vesuvius in the background."
+    location: "Lungomare Caracciolo, Naples, Italy"
+    latitude: 40.8328
+    longitude: 14.2350
+    start: "w15 Sat 20:00"
+    end: "w15 Sun 00:30"
+
+  - id: "evt-aug-porto"
+    calendar_id: "bachata-cal-002"
+    title: "Porto Bachata & Wine Night"
+    description: "Bachata social in the Ribeira district. Port wine tasting + dancing."
+    location: "Maus Hábitos, Rua de Passos Manuel 178, Porto, Portugal"
+    latitude: 41.1480
+    longitude: -8.6060
+    start: "w16 Sat 21:00"
+    end: "w16 Sun 02:00"
+
+  - id: "evt-aug-berlin"
+    calendar_id: "kizomba-cal-003"
+    title: "Berlin Open Air Kizomba"
+    description: "Kizomba in the park – Mauerpark edition. Free entry, BYO drinks."
+    location: "Mauerpark, Gleimstraße 55, Berlin, Germany"
+    latitude: 52.5434
+    longitude: 13.4020
+    start: "w17 Sat 17:00"
+    end: "w17 Sat 22:00"
+
+  - id: "evt-aug-lisbon"
+    calendar_id: "kizomba-cal-003"
+    title: "Lisbon Kizomba Festival"
+    description: "The birthplace of kizomba. 5-day festival at LX Factory."
+    location: "LX Factory, Rua Rodrigues de Faria 103, 1300-501 Lisboa, Portugal"
+    latitude: 38.7035
+    longitude: -9.1780
+    start: "w16 Wed 10:00"
+    end: "w16 Sun 23:00"
+
+  # ═══════════════════════════════════════════════════════════
+  #  SEPTEMBER 2026
+  # ═══════════════════════════════════════════════════════════
+  - id: "evt-sep-paris"
+    calendar_id: "salsa-cal-001"
+    title: "Rentrée Salsa – Paris"
+    description: "Back-to-school salsa marathon. 12 hours of non-stop dancing."
+    location: "La Bellevilloise, 19 Rue Boyer, Paris, France"
+    latitude: 48.8686
+    longitude: 2.3920
+    start: "w20 Sat 14:00"
+    end: "w20 Sun 02:00"
+
+  - id: "evt-sep-barcelona"
+    calendar_id: "bachata-cal-002"
+    title: "Bachata Sensual Intensive – Barcelona"
+    description: "Weekend bootcamp with instructor Carlos Vega. Intermediate level."
+    location: "Escola de Dansa, Carrer de Balmes 50, Barcelona, Spain"
+    latitude: 41.3900
+    longitude: 2.1630
+    start: "w21 Sat 10:00"
+    end: "w21 Sun 17:00"
+
+  - id: "evt-sep-thessaloniki"
+    calendar_id: "kizomba-cal-003"
+    title: "Thessaloniki Kizomba Weekend"
+    description: "2-day event on the waterfront. Workshops + social + live music."
+    location: "Aristotelous Square, Thessaloniki, Greece"
+    latitude: 40.6323
+    longitude: 22.9417
+    start: "w22 Sat 18:00"
+    end: "w22 Sun 23:00"
+
+  # ═══════════════════════════════════════════════════════════
+  #  OCTOBER 2026
+  # ═══════════════════════════════════════════════════════════
+  - id: "evt-oct-rome"
+    calendar_id: "salsa-cal-001"
+    title: "Salsa Congress – Rome"
+    description: "3-day Italian salsa congress. International artists & shows."
+    location: "Auditorium Parco della Musica, Viale Pietro de Coubertin 30, Rome, Italy"
+    latitude: 41.9280
+    longitude: 12.4740
+    start: "w24 Fri 18:00"
+    end: "w24 Sun 23:00"
+
+  - id: "evt-oct-amsterdam"
+    calendar_id: "bachata-cal-002"
+    title: "Amsterdam Bachata Weekender"
+    description: "Bachata & kizomba. 3 rooms, 20 workshops, nonstop socials."
+    location: "Melkweg, Lijnbaansgracht 234A, 1017 PH Amsterdam, Netherlands"
+    latitude: 52.3651
+    longitude: 4.8821
+    start: "w26 Fri 19:00"
+    end: "w26 Sun 03:00"
+
+  - id: "evt-oct-madrid"
+    calendar_id: "kizomba-cal-003"
+    title: "Kizomba Noche – Madrid"
+    description: "Kizomba night in the heart of Malasaña. Mojitos & semba."
+    location: "Café Central, Plaza del Ángel 10, Madrid, Spain"
+    latitude: 40.4150
+    longitude: -3.7003
+    start: "w27 Sat 22:00"
+    end: "w27 Sun 03:00"
+
+  # ═══════════════════════════════════════════════════════════
+  #  NOVEMBER 2026
+  # ═══════════════════════════════════════════════════════════
+  - id: "evt-nov-paris"
+    calendar_id: "salsa-cal-001"
+    title: "Salsa & Jazz – Paris"
+    description: "Salsa meets jazz at Le Duc des Lombards. Live band + social."
+    location: "Le Duc des Lombards, 42 Rue des Lombards, Paris, France"
+    latitude: 48.8602
+    longitude: 2.3487
+    start: "w29 Sat 20:00"
+    end: "w29 Sun 01:00"
+
+  - id: "evt-nov-london"
+    calendar_id: "bachata-cal-002"
+    title: "London Bachata Marathon"
+    description: "24-hour non-stop dancing. Shifts of DJs from around Europe."
+    location: "The Coronet Theatre, 28 New Kent Rd, London, UK"
+    latitude: 51.4953
+    longitude: -0.0982
+    start: "w30 Sat 12:00"
+    end: "w30 Sun 12:00"
+
+  - id: "evt-nov-budapest"
+    calendar_id: "kizomba-cal-003"
+    title: "Budapest Autumn Kizomba Social"
+    description: "Cozy indoor kizomba in a historic bath house. Thermal pool after-party."
+    location: "Rudas Baths, Döbrentei tér 9, Budapest, Hungary"
+    latitude: 47.4870
+    longitude: 19.0460
+    start: "w31 Sat 20:00"
+    end: "w31 Sun 02:00"
+
+  # ═══════════════════════════════════════════════════════════
+  #  DECEMBER 2026
+  # ═══════════════════════════════════════════════════════════
+  - id: "evt-dec-vienna"
+    calendar_id: "salsa-cal-001"
+    title: "Christmas Salsa Ball – Vienna"
+    description: "Formal salsa gala in a Viennese palace. Black tie optional."
+    location: "Palais Ferstel, Strauchgasse 4, Vienna, Austria"
+    latitude: 48.2115
+    longitude: 16.3660
+    start: "w34 Sat 19:00"
+    end: "w34 Sun 01:00"
+
+  - id: "evt-dec-seville"
+    calendar_id: "bachata-cal-002"
+    title: "Bachata de Navidad – Seville"
+    description: "Flamenco meets bachata in Andalucía. Tapas + dancing in the barrio."
+    location: "La Carbonería, Calle Céspedes 21, Seville, Spain"
+    latitude: 37.3886
+    longitude: -5.9870
+    start: "w35 Sat 21:00"
+    end: "w35 Sun 03:00"
+
+  - id: "evt-dec-lisbon"
+    calendar_id: "kizomba-cal-003"
+    title: "NYE Kizomba Countdown – Lisbon"
+    description: "Ring in 2027 with kizomba by the river. Fireworks at midnight."
+    location: "Doca de Santo Amaro, Lisbon, Portugal"
+    latitude: 38.7050
+    longitude: -9.1650
+    start: "w37 Thu 22:00"
+    end: "w37 Fri 05:00"
+
+  # ═══════════════════════════════════════════════════════════
+  #  UNRESOLVABLE / MISSING LOCATIONS — tests location editing
+  # ═══════════════════════════════════════════════════════════
+
+  # No location at all — online event
+  - id: "evt-online-001"
+    calendar_id: "bachata-cal-002"
+    title: "Online Bachata Styling Workshop"
+    description: "Zoom class — no physical location. Should not appear on map."
+    start: "w1 Wed 18:00"
+    end: "w1 Wed 20:00"
+
+  # Vague / unresolvable location — needs admin to fix via editing
+  - id: "evt-vague-001"
+    calendar_id: "salsa-cal-001"
+    title: "Salsa Social @ Dave's Place"
+    description: "Private venue — address not public. Admin must edit location."
+    location: "Dave's Place"
+    start: "w3 Fri 20:00"
+    end: "w3 Sat 01:00"
+
+  - id: "evt-vague-002"
+    calendar_id: "kizomba-cal-003"
+    title: "Kizomba Jam — TBA"
+    description: "Location to be announced. Placeholder for admin to update."
+    location: "TBA"
+    start: "w8 Fri 19:00"
+    end: "w8 Fri 23:00"
+
+  - id: "evt-vague-003"
+    calendar_id: "bachata-cal-002"
+    title: "Bachata Brunch"
+    description: "Venue name only — no city, no address. Geocoding will fail."
+    location: "Studio 54"
+    start: "w11 Sun 11:00"
+    end: "w11 Sun 15:00"
+
+  # Has lat/lng at (0, 0) — null-island edge case
+  - id: "evt-nullisland"
+    calendar_id: "salsa-cal-001"
+    title: "Mystery Salsa Night"
+    description: "Coords set to 0,0 — map should treat as missing."
+    location: "Secret Location, Paris"
+    latitude: 0.0
+    longitude: 0.0
+    start: "w5 Wed 21:00"
+    end: "w5 Thu 02:00"
+
+  # Location text exists but no coords — backend geocodes on sync
+  - id: "evt-geocode-me"
+    calendar_id: "kizomba-cal-003"
+    title: "Kizomba by the River"
+    description: "Real address, no coords — tests backend geocoding on sync."
+    location: "Pont Alexandre III, Paris, France"
+    start: "w7 Mon 17:00"
+    end: "w7 Mon 21:00"
+
+  # ═══════════════════════════════════════════════════════════
+  #  EDGE CASES
+  # ═══════════════════════════════════════════════════════════
+
+  # All-day multi-day event
+  - id: "evt-allday-001"
+    calendar_id: "salsa-cal-001"
+    title: "Lyon Salsa Summer Camp"
+    description: "All-day event spanning 3 days."
+    location: "Halle Tony Garnier, 20 Place Docteurs Mérieux, 69007 Lyon, France"
+    latitude: 45.7320
+    longitude: 4.8260
+    start: "w13 Fri 00:00"
+    end: "w13 Sun 23:59"
+    all_day: true
+
+  # Very early in the 2-year range
+  - id: "evt-early-2025"
+    calendar_id: "bachata-cal-002"
+    title: "Marseille Bachata Kick-off"
+    description: "Early 2025 — near the start of the 2-year window."
+    location: "Le Moulin, 47 Boulevard Perrin, 13013 Marseille, France"
+    latitude: 43.3130
+    longitude: 5.4230
+    start: "w-65 Sat 18:00"
+    end: "w-65 Sun 23:00"
+
+  # Very late in the range
+  - id: "evt-late-2026"
+    calendar_id: "kizomba-cal-003"
+    title: "New Year Kizomba Gala 2026"
+    description: "Last event of the year — near end of 2-year window."
+    location: "Le Trianon, 80 Boulevard de Rochechouart, 75018 Paris, France"
+    latitude: 48.8830
+    longitude: 2.3400
+    start: "w37 Thu 21:00"
+    end: "w37 Fri 04:00"

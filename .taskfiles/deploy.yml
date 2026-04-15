@@ -1,0 +1,180 @@
+version: "3"
+
+tasks:
+  staging:
+    desc: "Build from develop and deploy to staging. DRY_RUN=1 to preview."
+    dotenv: [.env.staging]
+    vars:
+      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+    cmds:
+      - |
+        if [ "{{.DRY_RUN}}" = "1" ]; then
+          echo "🔍 DRY RUN — would deploy to STAGING (from develop)"
+          echo ""
+          echo "Steps:"
+          echo "  1. Build images from develop (task build:staging)"
+          echo "  2. docker compose down (salsa-calendar-staging)"
+          echo "  3. docker compose up -d"
+          echo ""
+          echo "Compose config:"
+          ENV_NAME=staging IMAGE_TAG=develop docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-staging config
+          exit 0
+        fi
+      - task: :build:staging
+      - ENV_NAME=staging IMAGE_TAG=develop docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-staging down
+      - ENV_NAME=staging IMAGE_TAG=develop docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-staging up -d
+      - sleep 5
+      - |
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "✅ Deployed to STAGING (from develop branch)"
+        echo ""
+        echo "   Frontend: http://localhost:${FRONTEND_PORT:-3001}"
+        echo "   Backend:  http://localhost:${BACKEND_PORT:-8002}"
+        echo "   Database: localhost:${POSTGRES_PORT:-5436}"
+        echo ""
+        echo "Next steps:"
+        echo "   task logs:staging         → View logs"
+        echo "═══════════════════════════════════════════════════════════════"
+
+  staging:ref:
+    desc: "Build from any git ref and deploy to staging. DRY_RUN=1 to preview."
+    dotenv: [.env.staging]
+    vars:
+      REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+    cmds:
+      - |
+        REF="{{.REF}}"
+        if [ -z "$REF" ]; then
+          echo "❌ Usage:"
+          echo "   task deploy:staging:ref -- feature/my-branch"
+          exit 1
+        fi
+      - |
+        if [ "{{.DRY_RUN}}" = "1" ]; then
+          REF="{{.REF}}"
+          SHA=$(git rev-parse --short=7 "$REF" 2>/dev/null || echo "unknown")
+          TAG="ref-$SHA"
+          echo "🔍 DRY RUN — would deploy to STAGING (from $REF)"
+          echo ""
+          echo "Steps:"
+          echo "  1. Build images from $REF (task build:ref)"
+          echo "  2. docker compose down (salsa-calendar-staging)"
+          echo "  3. docker compose up -d with tag :$TAG"
+          exit 0
+        fi
+      - task: :build:ref
+        vars: { REF: "{{.REF}}" }
+      - |
+        REF="{{.REF}}"
+        SHA=$(git rev-parse --short=7 "$REF")
+        TAG="ref-$SHA"
+
+        ENV_NAME=staging IMAGE_TAG=$TAG docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-staging down
+        ENV_NAME=staging IMAGE_TAG=$TAG docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-staging up -d
+        sleep 5
+
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "✅ Deployed to STAGING (from $REF)"
+        echo ""
+        echo "   Git ref:  $REF"
+        echo "   SHA:      $SHA"
+        echo "   Tag:      :$TAG"
+        echo ""
+        echo "   Frontend: http://localhost:${FRONTEND_PORT:-3001}"
+        echo "   Backend:  http://localhost:${BACKEND_PORT:-8002}"
+        echo "═══════════════════════════════════════════════════════════════"
+
+  staging:dirty:
+    desc: "Build from current working directory and deploy to staging. DRY_RUN=1 to preview."
+    dotenv: [.env.staging]
+    vars:
+      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+    cmds:
+      - |
+        if [ "{{.DRY_RUN}}" = "1" ]; then
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          TAG="dirty-$TIMESTAMP"
+          echo "🔍 DRY RUN — would deploy to STAGING (from working directory)"
+          echo ""
+          echo "Steps:"
+          echo "  1. Build images from current directory (task build:dirty)"
+          echo "  2. docker compose down (salsa-calendar-staging)"
+          echo "  3. docker compose up -d with tag :$TAG"
+          exit 0
+        fi
+      - task: :build:dirty
+      - |
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        TAG="dirty-$TIMESTAMP"
+
+        ENV_NAME=staging IMAGE_TAG=$TAG docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-staging down
+        ENV_NAME=staging IMAGE_TAG=$TAG docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-staging up -d
+        sleep 5
+
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "✅ Deployed to STAGING (from working directory)"
+        echo ""
+        echo "   ⚠️  Built from uncommitted changes"
+        echo "   Tag: :$TAG"
+        echo ""
+        echo "   Frontend: http://localhost:${FRONTEND_PORT:-3001}"
+        echo "   Backend:  http://localhost:${BACKEND_PORT:-8002}"
+        echo "═══════════════════════════════════════════════════════════════"
+
+  prod:
+    desc: "Deploy to prod. DRY_RUN=1 to preview. (e.g., task deploy:prod -- v1.2.0)"
+    prompt: "This will deploy to PRODUCTION. Continue?"
+    dotenv: [.env.prod]
+    vars:
+      REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+    cmds:
+      - |
+        REF="{{.REF}}"
+        if [ -z "$REF" ]; then
+          REF="latest"
+        fi
+
+        if [ "{{.DRY_RUN}}" = "1" ]; then
+          echo "🔍 DRY RUN — would deploy to PROD: $REF"
+          echo ""
+          if docker image inspect salsa-calendar-backend:$REF > /dev/null 2>&1; then
+            echo "Image found: salsa-calendar-backend:$REF"
+          else
+            echo "No image found for :$REF — would attempt to build from git ref"
+          fi
+          echo ""
+          echo "Steps:"
+          echo "  1. docker compose down (salsa-calendar-prod)"
+          echo "  2. docker compose up -d with tag :$REF"
+          echo ""
+          echo "Compose config:"
+          ENV_NAME=prod IMAGE_TAG=$REF docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-prod config
+          exit 0
+        fi
+
+        if docker image inspect salsa-calendar-backend:$REF > /dev/null 2>&1; then
+          VERSION="$REF"
+          echo "Deploying existing image: $VERSION"
+        else
+          echo "No image found for :$REF — attempting to build from git ref..."
+          task build:ref -- "$REF" || { echo "❌ Failed to build from $REF"; exit 1; }
+          SHA=$(git rev-parse --short=7 "$REF")
+          VERSION="ref-$SHA"
+          echo "Built $REF → :$VERSION"
+        fi
+
+        ENV_NAME=prod IMAGE_TAG=$VERSION docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-prod down
+        ENV_NAME=prod IMAGE_TAG=$VERSION docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-prod up -d
+        sleep 5
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "✅ Deployed to PROD: $VERSION"
+        echo ""
+        echo "   Frontend: http://localhost:${FRONTEND_PORT:-3000}"
+        echo "   Backend:  http://localhost:${BACKEND_PORT:-8080}"
+        echo "═══════════════════════════════════════════════════════════════"

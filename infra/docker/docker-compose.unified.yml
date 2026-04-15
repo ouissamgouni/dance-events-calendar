@@ -1,0 +1,69 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: calendar_db_${ENV_NAME}
+    env_file:
+      - path: ../../.env
+        required: false
+      - ../../.env.${ENV_NAME}
+    ports:
+      - "${POSTGRES_PORT:-5436}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app_network
+
+  backend:
+    image: salsa-calendar-backend:${IMAGE_TAG:-latest}
+    container_name: calendar_backend_${ENV_NAME}
+    env_file:
+      - path: ../../.env
+        required: false
+      - ../../.env.${ENV_NAME}
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    ports:
+      - "${BACKEND_PORT:-8002}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - app_network
+
+  frontend:
+    image: salsa-calendar-frontend:${IMAGE_TAG:-latest}
+    container_name: calendar_frontend_${ENV_NAME}
+    ports:
+      - "${FRONTEND_PORT:-3001}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:80/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - app_network
+
+volumes:
+  pgdata:
+    name: calendar_${ENV_NAME}_data
+
+networks:
+  app_network:
+    name: calendar_${ENV_NAME}_network

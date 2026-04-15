@@ -1,0 +1,196 @@
+version: "3"
+
+dotenv: [".env"]
+
+vars:
+  ROOT_DIR:
+    sh: pwd
+  BACKEND_DIR: "{{.ROOT_DIR}}/backend"
+  FRONTEND_DIR: "{{.ROOT_DIR}}/frontend"
+  WORKTREE_DIR: .worktrees
+  WORKTREE_MAIN: .worktrees/main
+  WORKTREE_DEVELOP: .worktrees/develop
+  SCENARIO_PORTS_SH: .taskfiles/scenario_ports.sh
+
+includes:
+  build:
+    taskfile: .taskfiles/build.yml
+    dir: "{{.ROOT_DIR}}"
+  deploy:
+    taskfile: .taskfiles/deploy.yml
+    dir: "{{.ROOT_DIR}}"
+  git:
+    taskfile: .taskfiles/git.yml
+    dir: "{{.ROOT_DIR}}"
+  logs:
+    taskfile: .taskfiles/logs.yml
+    dir: "{{.ROOT_DIR}}"
+  release:
+    taskfile: .taskfiles/release.yml
+    dir: "{{.ROOT_DIR}}"
+  start:
+    taskfile: .taskfiles/start.yml
+    vars:
+      ROOT_DIR: "{{.ROOT_DIR}}"
+      BACKEND_DIR: "{{.BACKEND_DIR}}"
+      FRONTEND_DIR: "{{.FRONTEND_DIR}}"
+  stop:
+    taskfile: .taskfiles/stop.yml
+    vars:
+      ROOT_DIR: "{{.ROOT_DIR}}"
+  db:
+    taskfile: .taskfiles/db.yml
+    vars:
+      ROOT_DIR: "{{.ROOT_DIR}}"
+      BACKEND_DIR: "{{.BACKEND_DIR}}"
+  test:
+    taskfile: .taskfiles/test.yml
+    dir: "{{.ROOT_DIR}}"
+    vars:
+      ROOT_DIR: "{{.ROOT_DIR}}"
+      BACKEND_DIR: "{{.BACKEND_DIR}}"
+      FRONTEND_DIR: "{{.FRONTEND_DIR}}"
+
+tasks:
+  default:
+    desc: Show help
+    cmds:
+      - task: help
+
+  install:
+    desc: Install all dependencies (backend + frontend)
+    cmds:
+      - task: install:backend
+      - task: install:frontend
+
+  install:backend:
+    desc: Install backend Python dependencies
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - "{{.ROOT_DIR}}/.venv/bin/pip install -r requirements.txt"
+    sources:
+      - requirements.txt
+
+  install:frontend:
+    desc: Install frontend Node dependencies
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - npm install
+    sources:
+      - package.json
+
+  status:
+    desc: Show all running containers across all environments
+    cmds:
+      - |
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "  Environment Status"
+        echo "═══════════════════════════════════════════════════════════════"
+        echo ""
+        docker ps --filter "name=calendar_" --format 'table {{`{{.Names}}`}}\t{{`{{.Status}}`}}\t{{`{{.Ports}}`}}' 2>/dev/null || echo "  No containers running"
+        echo ""
+
+  scenarios:
+    desc: List all scenarios with hash-based ports and running status
+    cmds:
+      - |
+        SCENARIOS_DIR="{{.ROOT_DIR}}/scenarios"
+
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "  Scenarios"
+        echo "═══════════════════════════════════════════════════════════════"
+        echo ""
+        printf "  %-34s  %6s  %-5s  %-5s  %-5s  %s\n" "Name" "Offset" "DB" "API" "WEB" "Status"
+        printf "  %-34s  %6s  %-5s  %-5s  %-5s  %s\n" "──────────────────────────────────" "──────" "─────" "─────" "─────" "──────────"
+
+        RUNNING_DOCKER=$(docker ps --filter "name=calendar_db_qa" --format '{{`{{.Names}}`}}' 2>/dev/null || true)
+
+        # Default scenario
+        STATUS="—"
+        if echo "$RUNNING_DOCKER" | grep -qx "calendar_db_qa" 2>/dev/null; then
+          STATUS="🟢 docker"
+        elif lsof -iTCP:8003 -sTCP:LISTEN >/dev/null 2>&1; then
+          STATUS="🟢 local"
+        fi
+        printf "  %-34s  %6s  %-5s  %-5s  %-5s  %s\n" "default" "0" "5437" "8003" "3002" "$STATUS"
+
+        # Named scenarios from seed directories
+        if [ -d "$SCENARIOS_DIR" ]; then
+          for DIR in "$SCENARIOS_DIR"/*/; do
+            NAME=$(basename "$DIR")
+            [ "$NAME" = "default" ] && continue
+            OFFSET=$(printf '%s' "$NAME" | cksum | awk '{print ($1 % 9999) + 1}')
+            DB=$((5437 + OFFSET))
+            API=$((8003 + OFFSET))
+            WEB=$((3002 + OFFSET))
+            STATUS="—"
+            CONTAINER="calendar_db_qa-${NAME}"
+            if echo "$RUNNING_DOCKER" | grep -qx "$CONTAINER" 2>/dev/null; then
+              STATUS="🟢 docker"
+            elif lsof -iTCP:$API -sTCP:LISTEN >/dev/null 2>&1; then
+              STATUS="🟢 local"
+            fi
+            printf "  %-34s  %6s  %-5s  %-5s  %-5s  %s\n" "$NAME" "$OFFSET" "$DB" "$API" "$WEB" "$STATUS"
+          done
+        fi
+        echo ""
+
+  help:
+    desc: Show quick reference of available commands
+    cmds:
+      - |
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "  Salsa Events Calendar — Task Commands"
+        echo "═══════════════════════════════════════════════════════════════"
+        echo ""
+        echo "  ── Development ──────────────────────────────────────────"
+        echo "  task start:dev              Start full dev (DB + API + Web)"
+        echo "  task start:dev:debug        Start with debugger (port 5678)"
+        echo "  task start:dev:mock         Start with mock calendar"
+        echo "  task start:dev:db           Start database only"
+        echo "  task stop:dev               Stop all dev services"
+        echo "  task status                 Show running containers"
+        echo ""
+        echo "  ── Database ─────────────────────────────────────────────"
+        echo "  task db:migrate             Run migrations (dev)"
+        echo "  task db:seed                Seed database (dev)"
+        echo "  task db:reset               Reset database (dev) ⚠️"
+        echo "  task db:status:dev          Migration status"
+        echo ""
+        echo "  ── Testing ──────────────────────────────────────────────"
+        echo "  task test                   Quick unit tests"
+        echo "  task test:unit:backend      Backend tests only"
+        echo "  task test:unit:frontend     Frontend type check + build"
+        echo "  task test:all               All tests (unit + integration)"
+        echo ""
+        echo "  ── Git Workflow ─────────────────────────────────────────"
+        echo "  task git:feature -- <name>  Create feature branch"
+        echo "  task git:fix -- <name>      Create fix branch"
+        echo "  task git:hotfix -- <name>   Create hotfix branch"
+        echo "  task git:pr                 Push + create draft PR"
+        echo "  task git:pr:ready           Mark PR ready for review"
+        echo "  task git:pr:merge           Merge PR (squash)"
+        echo ""
+        echo "  ── Staging ──────────────────────────────────────────────"
+        echo "  task deploy:staging         Build from develop + deploy"
+        echo "  task deploy:staging:dirty   Build from working dir + deploy"
+        echo "  task stop:staging           Stop staging stack"
+        echo ""
+        echo "  ── Scenario ─────────────────────────────────────────────"
+        echo "  task start:scenario         Local code + Docker DB"
+        echo "  task stop:scenario          Stop scenario instance"
+        echo "  task scenarios              List all scenario ports"
+        echo ""
+        echo "  ── Production ─────────────────────────────────────────  "
+        echo "  task deploy:prod -- v1.2.0  Deploy to prod"
+        echo "  task release -- v1.2.0      Tag + deploy combined"
+        echo ""
+        echo "  ── Build ────────────────────────────────────────────────"
+        echo "  task build:staging          Build images from develop"
+        echo "  task build:prod -- v1.0.0   Build images from main"
+        echo "  task build:dirty            Build from working directory"
+        echo "  task build:list             List Docker images"
+        echo ""
+        echo "  ── Safety ───────────────────────────────────────────────"
+        echo "  DRY_RUN=1 task <cmd>        Preview without executing"
+        echo "═══════════════════════════════════════════════════════════════"

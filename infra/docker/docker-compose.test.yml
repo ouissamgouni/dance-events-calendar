@@ -1,0 +1,17 @@
+services:
+  postgres_test:
+    image: postgres:16-alpine
+    container_name: calendar_db_test
+    environment:
+      POSTGRES_USER: calendar_user
+      POSTGRES_PASSWORD: calendar_password
+      POSTGRES_DB: calendar_db_test
+    ports:
+      - "5435:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U calendar_user"]
+      interval: 2s
+      timeout: 2s
+      retries: 5

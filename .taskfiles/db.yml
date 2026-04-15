@@ -1,0 +1,417 @@
+version: "3"
+
+vars:
+  SCENARIO_PORTS_SH: .taskfiles/scenario_ports.sh
+
+tasks:
+  # ════════════════════════════════════════════════════════════════
+  # Dev (default targets)
+  # ════════════════════════════════════════════════════════════════
+
+  migrate:
+    desc: Run Alembic migrations on dev (alias for migrate:dev)
+    cmds:
+      - task: migrate:dev
+
+  migrate:dev:
+    desc: Run Alembic migrations (dev)
+    dir: backend
+    dotenv: [".env.dev"]
+    cmds:
+      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini upgrade head
+
+  seed:
+    desc: "Seed dev database (alias for seed:dev). Usage: task db:seed -- --scenario default"
+    cmds:
+      - task: seed:dev
+
+  seed:dev:
+    desc: "Seed dev database. Usage: task db:seed:dev -- --scenario default"
+    dir: backend
+    dotenv: [".env.dev"]
+    cmds:
+      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.seed {{.CLI_ARGS}}
+
+  reset:
+    desc: "Drop all tables, re-migrate, re-seed dev (alias for reset:dev)"
+    cmds:
+      - task: reset:dev
+
+  reset:dev:
+    desc: "Drop all tables, re-migrate, re-seed (DESTRUCTIVE). DRY_RUN=1 to preview."
+    dir: backend
+    dotenv: [".env.dev"]
+    vars:
+      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+    cmds:
+      - |
+        if [ "{{.DRY_RUN}}" = "1" ]; then
+          echo "🔍 DRY RUN — would reset dev database:"
+          echo "  1. Drop all tables in calendar_db_dev"
+          echo "  2. Run Alembic migrations"
+          echo "  3. Seed with default data"
+        fi
+      - task: _reset:dev:confirm
+        vars: { DRY_RUN: "{{.DRY_RUN}}" }
+
+  _reset:dev:confirm:
+    internal: true
+    status:
+      - '[ "{{.DRY_RUN}}" = "1" ]'
+    prompt: "This will drop all tables and re-seed dev database. Continue?"
+    cmds:
+      - task: _reset:dev:exec
+
+  _reset:dev:exec:
+    internal: true
+    dir: backend
+    dotenv: [".env.dev"]
+    cmds:
+      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.reset
+      - task: migrate:dev
+      - task: seed:dev
+
+  # ════════════════════════════════════════════════════════════════
+  # Staging
+  # ════════════════════════════════════════════════════════════════
+
+  migrate:staging:
+    desc: Run Alembic migrations (staging)
+    dir: backend
+    dotenv: [".env.staging"]
+    cmds:
+      - |
+        DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5436}/${POSTGRES_DB}" \
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini upgrade head
+
+  seed:staging:
+    desc: Seed staging database
+    dir: backend
+    dotenv: [".env.staging"]
+    cmds:
+      - |
+        DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5436}/${POSTGRES_DB}" \
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.seed {{.CLI_ARGS}}
+
+  reset:staging:
+    desc: "Reset staging database (DESTRUCTIVE). DRY_RUN=1 to preview."
+    dir: backend
+    dotenv: [".env.staging"]
+    vars:
+      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+    prompt: "This will drop all tables and re-seed staging database. Continue?"
+    cmds:
+      - |
+        if [ "{{.DRY_RUN}}" = "1" ]; then
+          echo "🔍 DRY RUN — would reset staging database"
+          exit 0
+        fi
+      - |
+        DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5436}/${POSTGRES_DB}" \
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.reset
+      - task: migrate:staging
+      - task: seed:staging
+
+  # ════════════════════════════════════════════════════════════════
+  # Prod
+  # ════════════════════════════════════════════════════════════════
+
+  migrate:prod:
+    desc: Run Alembic migrations (prod)
+    dir: backend
+    dotenv: [".env.prod"]
+    cmds:
+      - |
+        DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5438}/${POSTGRES_DB}" \
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini upgrade head
+
+  reset:prod:
+    desc: "Reset prod database (🚨 DESTRUCTIVE). DRY_RUN=1 to preview."
+    dir: backend
+    dotenv: [".env.prod"]
+    vars:
+      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+    prompt: "🚨 This will DESTROY ALL PRODUCTION DATA. Are you absolutely sure?"
+    cmds:
+      - |
+        if [ "{{.DRY_RUN}}" = "1" ]; then
+          echo "🔍 DRY RUN — would reset prod database"
+          exit 0
+        fi
+      - |
+        DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5438}/${POSTGRES_DB}" \
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.reset
+      - task: migrate:prod
+
+  # ════════════════════════════════════════════════════════════════
+  # Scenario
+  # ════════════════════════════════════════════════════════════════
+
+  seed:scenario:
+    desc: "Seed scenario database (SCENARIO=name)"
+    dir: backend
+    dotenv: [".env.scenario"]
+    vars:
+      SCENARIO: '{{.SCENARIO | default "default"}}'
+    cmds:
+      - |
+        source {{.ROOT_DIR}}/{{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
+        SEED_ARG=""
+        if [ "{{.SCENARIO}}" != "default" ] && [ -d "{{.ROOT_DIR}}/scenarios/{{.SCENARIO}}" ]; then
+          SEED_ARG="--scenario {{.SCENARIO}}"
+        fi
+        DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${SC_DB_PORT}/${SC_DB_NAME}" \
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.seed $SEED_ARG
+
+  reset:scenario:
+    desc: "Reset scenario database (SCENARIO=name). DRY_RUN=1 to preview."
+    dir: backend
+    dotenv: [".env.scenario"]
+    vars:
+      SCENARIO: '{{.SCENARIO | default "default"}}'
+      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+    prompt: "This will drop all tables and re-seed scenario '{{.SCENARIO}}'. Continue?"
+    cmds:
+      - |
+        source {{.ROOT_DIR}}/{{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
+        if [ "{{.DRY_RUN}}" = "1" ]; then
+          echo "🔍 DRY RUN — would reset scenario '$SCENARIO_NAME' (DB:$SC_DB_PORT)"
+          exit 0
+        fi
+        DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${SC_DB_PORT}/${SC_DB_NAME}" \
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.reset
+      - task: migrate:scenario
+        vars: { SCENARIO: "{{.SCENARIO}}" }
+      - task: seed:scenario
+        vars: { SCENARIO: "{{.SCENARIO}}" }
+
+  migrate:scenario:
+    desc: "Run migrations on scenario database (SCENARIO=name)"
+    dir: backend
+    dotenv: [".env.scenario"]
+    vars:
+      SCENARIO: '{{.SCENARIO | default "default"}}'
+    cmds:
+      - |
+        source {{.ROOT_DIR}}/{{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
+        DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${SC_DB_PORT}/${SC_DB_NAME}" \
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini upgrade head
+
+  # ════════════════════════════════════════════════════════════════
+  # Integration Test DB
+  # ════════════════════════════════════════════════════════════════
+
+  setup:integ:
+    desc: Create isolated test database, migrate, and seed
+    dir: backend
+    dotenv: [".env.test"]
+    cmds:
+      - |
+        docker exec calendar_db_dev psql -U $POSTGRES_USER -d postgres -c \
+          "SELECT 1 FROM pg_database WHERE datname = 'calendar_db_test'" | grep -q 1 || \
+        docker exec calendar_db_dev psql -U $POSTGRES_USER -d postgres -c \
+          "CREATE DATABASE calendar_db_test OWNER $POSTGRES_USER"
+      - PYTHONPATH={{.ROOT_DIR}} DATABASE_URL=$TEST_DATABASE_URL {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini upgrade head
+      - PYTHONPATH={{.ROOT_DIR}} DATABASE_URL=$TEST_DATABASE_URL {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.seed
+
+  # ════════════════════════════════════════════════════════════════
+  # Status / Health
+  # ════════════════════════════════════════════════════════════════
+
+  status:dev:
+    desc: Show migration status for dev database
+    dir: backend
+    dotenv: [".env.dev"]
+    cmds:
+      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini current
+      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini history
+      - |
+        HEAD_COUNT=$(PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini heads 2>/dev/null | grep -c "(head)" || echo "0")
+        if [ "$HEAD_COUNT" -gt 1 ]; then
+          echo ""
+          echo "⚠️  WARNING: $HEAD_COUNT migration heads detected!"
+          echo "   This usually means two branches added migrations independently."
+          echo "   Fix with: task db:merge:dev"
+        fi
+
+  status:staging:
+    desc: Show migration status for staging database
+    dir: backend
+    dotenv: [".env.staging"]
+    cmds:
+      - |
+        DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5436}/${POSTGRES_DB}" \
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini current
+      - |
+        DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5436}/${POSTGRES_DB}" \
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini history
+
+  check:dev:
+    desc: Validate migration health for dev database
+    dir: backend
+    dotenv: [".env.dev"]
+    cmds:
+      - |
+        echo "Checking migration status..."
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini check 2>&1 && \
+          echo "✅ Migrations are up to date" || \
+          echo "⚠️  Migrations need attention"
+
+  # ════════════════════════════════════════════════════════════════
+  # Migration Recovery Tools
+  # ════════════════════════════════════════════════════════════════
+
+  merge:dev:
+    desc: Merge multiple Alembic migration heads
+    dir: backend
+    dotenv: [".env.dev"]
+    cmds:
+      - |
+        HEAD_COUNT=$(PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini heads 2>/dev/null | grep -c "(head)" || echo "0")
+        if [ "$HEAD_COUNT" -le 1 ]; then
+          echo "✅ No merge needed — only one head exists"
+          exit 0
+        fi
+        echo "🔀 Merging $HEAD_COUNT migration heads..."
+        MSG="{{.CLI_ARGS}}"
+        if [ -z "$MSG" ]; then MSG="merge_heads"; fi
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini merge heads -m "$MSG"
+        echo "✅ Heads merged. Run 'task db:migrate:dev' to apply."
+
+  stamp:dev:
+    desc: "⚠️ Stamp database to a revision (recovery tool)"
+    dir: backend
+    dotenv: [".env.dev"]
+    prompt: "This will update alembic_version without running migrations. Continue?"
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          echo "Usage: task db:stamp:dev -- <revision>"
+          echo "       task db:stamp:dev -- head"
+          exit 1
+        fi
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini stamp {{.CLI_ARGS}}
+        echo "✅ Database stamped to {{.CLI_ARGS}}"
+
+  downgrade:dev:
+    desc: "⚠️ Rollback migrations (use with caution)"
+    dir: backend
+    dotenv: [".env.dev"]
+    prompt: "This will rollback migrations. Continue?"
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          echo "Usage: task db:downgrade:dev -- <revision>"
+          echo "       task db:downgrade:dev -- -1  (rollback 1 step)"
+          exit 1
+        fi
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini downgrade {{.CLI_ARGS}}
+        echo "✅ Rolled back to {{.CLI_ARGS}}"
+
+  # ════════════════════════════════════════════════════════════════
+  # Data Promotion (copy between environments)
+  # ════════════════════════════════════════════════════════════════
+
+  copy:dev-to-staging:
+    desc: "🔄 Copy dev database → staging. DRY_RUN=1 to preview."
+    dotenv: [".env.dev"]
+    prompt: "This will REPLACE the staging database with dev data. Continue?"
+    vars:
+      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+    cmds:
+      - |
+        # Load staging env
+        set -a; source {{.ROOT_DIR}}/.env.staging; set +a
+        DST_PORT=${POSTGRES_PORT}
+        DST_DB=${POSTGRES_DB}
+        # Reload dev env
+        set -a; source {{.ROOT_DIR}}/.env.dev; set +a
+        SRC_PORT=${POSTGRES_PORT}
+        SRC_DB=${POSTGRES_DB}
+
+        if [ "{{.DRY_RUN}}" = "1" ]; then
+          echo "🔍 DRY RUN — would copy:"
+          echo "  FROM: $SRC_DB (port $SRC_PORT)"
+          echo "  TO:   $DST_DB (port $DST_PORT)"
+          exit 0
+        fi
+
+        echo "Dumping $SRC_DB..."
+        docker exec calendar_db_dev pg_dump -U $POSTGRES_USER -d $SRC_DB --clean --if-exists > /tmp/calendar_db_dump.sql
+
+        echo "Restoring to staging ($DST_DB)..."
+        docker exec -i calendar_db_staging psql -U $POSTGRES_USER -d $DST_DB < /tmp/calendar_db_dump.sql
+
+        rm -f /tmp/calendar_db_dump.sql
+        echo "✅ Dev → Staging copy complete"
+
+  copy:staging-to-dev:
+    desc: "🔄 Copy staging database → dev. DRY_RUN=1 to preview."
+    dotenv: [".env.staging"]
+    prompt: "This will REPLACE the dev database with staging data. Continue?"
+    vars:
+      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+    cmds:
+      - |
+        # Load dev env
+        set -a; source {{.ROOT_DIR}}/.env.dev; set +a
+        DST_PORT=${POSTGRES_PORT}
+        DST_DB=${POSTGRES_DB}
+        # Reload staging env
+        set -a; source {{.ROOT_DIR}}/.env.staging; set +a
+        SRC_PORT=${POSTGRES_PORT}
+        SRC_DB=${POSTGRES_DB}
+
+        if [ "{{.DRY_RUN}}" = "1" ]; then
+          echo "🔍 DRY RUN — would copy:"
+          echo "  FROM: $SRC_DB (port $SRC_PORT)"
+          echo "  TO:   $DST_DB (port $DST_PORT)"
+          exit 0
+        fi
+
+        echo "Dumping $SRC_DB..."
+        docker exec calendar_db_staging pg_dump -U $POSTGRES_USER -d $SRC_DB --clean --if-exists > /tmp/calendar_db_dump.sql
+
+        echo "Restoring to dev ($DST_DB)..."
+        docker exec -i calendar_db_dev psql -U $POSTGRES_USER -d $DST_DB < /tmp/calendar_db_dump.sql
+
+        # Run migrations to align schema if dev has newer migrations
+        echo "Running migrations to align schema..."
+        set -a; source {{.ROOT_DIR}}/.env.dev; set +a
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini upgrade head
+
+        rm -f /tmp/calendar_db_dump.sql
+        echo "✅ Staging → Dev copy complete (with schema migration)"
+
+  copy:staging-to-prod:
+    desc: "🚨 Copy staging database → prod (promotes to production). DRY_RUN=1 to preview."
+    dotenv: [".env.staging"]
+    prompt: "🚨 This will REPLACE the PRODUCTION database with staging data. Continue?"
+    vars:
+      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+    cmds:
+      - |
+        # Load prod env
+        set -a; source {{.ROOT_DIR}}/.env.prod; set +a
+        DST_PORT=${POSTGRES_PORT}
+        DST_DB=${POSTGRES_DB}
+        # Reload staging env
+        set -a; source {{.ROOT_DIR}}/.env.staging; set +a
+        SRC_PORT=${POSTGRES_PORT}
+        SRC_DB=${POSTGRES_DB}
+
+        if [ "{{.DRY_RUN}}" = "1" ]; then
+          echo "🔍 DRY RUN — would copy:"
+          echo "  FROM: $SRC_DB (port $SRC_PORT)"
+          echo "  TO:   $DST_DB (port $DST_PORT)"
+          exit 0
+        fi
+
+        echo "Dumping $SRC_DB..."
+        docker exec calendar_db_staging pg_dump -U $POSTGRES_USER -d $SRC_DB --clean --if-exists > /tmp/calendar_db_dump.sql
+
+        echo "Restoring to prod ($DST_DB)..."
+        docker exec -i calendar_db_prod psql -U $POSTGRES_USER -d $DST_DB < /tmp/calendar_db_dump.sql
+
+        rm -f /tmp/calendar_db_dump.sql
+        echo "✅ Staging → Prod copy complete"

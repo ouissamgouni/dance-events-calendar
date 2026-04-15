@@ -1,0 +1,25 @@
+base_week: 0
+
+events:
+  - id: "example-evt-001"
+    calendar_id: "example-salsa-calendar"
+    title: "Example Salsa Social"
+    description: |
+      This is an example event to test the scenario mechanism.
+      All secrets and config layering can be verified here.
+    location: "Dance Studio, 10 Rue Example, Paris"
+    latitude: 48.8566
+    longitude: 2.3522
+    start: "w1 Mon 20:00"
+    end: "w1 Tue 00:00"
+
+  - id: "example-evt-002"
+    calendar_id: "example-bachata-calendar"
+    title: "Example Bachata Night"
+    description: |
+      Another example event on the second calendar.
+    location: "Club Bachata, 5 Avenue Test, Paris"
+    latitude: 48.8600
+    longitude: 2.3400
+    start: "w1 Wed 21:00"
+    end: "w1 Thu 02:00"

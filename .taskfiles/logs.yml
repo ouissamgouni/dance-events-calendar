@@ -1,0 +1,38 @@
+version: "3"
+
+vars:
+  SCENARIO_PORTS_SH: .taskfiles/scenario_ports.sh
+
+tasks:
+  dev:
+    desc: View dev container logs
+    cmds:
+      - docker compose -f infra/docker/docker-compose.dev.yml logs -f
+
+  staging:
+    desc: View staging container logs
+    cmds:
+      - ENV_NAME=staging docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-staging logs -f
+
+  prod:
+    desc: View prod container logs
+    cmds:
+      - ENV_NAME=prod docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-prod logs -f
+
+  scenario:
+    desc: "View scenario container logs (SCENARIO=name)"
+    vars:
+      SCENARIO: '{{.SCENARIO | default "default"}}'
+    cmds:
+      - |
+        source {{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
+        echo "Tailing logs for scenario: $SCENARIO_NAME (DB:$SC_DB_PORT API:$SC_API_PORT WEB:$SC_WEB_PORT)"
+        echo ""
+
+        # Check if running in Docker mode
+        if docker ps --filter "name=$SC_DB_CONTAINER" --format '{{`{{.Names}}`}}' 2>/dev/null | grep -q "$SC_DB_CONTAINER"; then
+          ENV_NAME=$ENV_NAME docker compose -f infra/docker/docker-compose.scenario-db.yml -p $SC_PROJECT_NAME logs -f
+        else
+          echo "No Docker containers found for scenario: {{.SCENARIO}}"
+          echo "Is the scenario running? Try: task start:scenario SCENARIO={{.SCENARIO}}"
+        fi

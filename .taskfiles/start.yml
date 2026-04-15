@@ -1,0 +1,319 @@
+version: "3"
+
+vars:
+  RELOAD_FLAG: '{{if eq (env "DONT_RELOAD") "true"}}{{else}}--reload{{end}}'
+  LOG_LEVEL: '{{.LOG_LEVEL | default "INFO"}}'
+  UVICORN_ACCESS_LOG_EXCLUDE_PATHS: '{{.UVICORN_ACCESS_LOG_EXCLUDE_PATHS | default ""}}'
+  SCENARIO_PORTS_SH: .taskfiles/scenario_ports.sh
+
+tasks:
+  dev:db:
+    desc: Start database only (RESET=1 to teardown first)
+    vars:
+      RESET: '{{.RESET | default "0"}}'
+    cmds:
+      - |
+        if [ "{{.RESET}}" = "1" ]; then
+          echo "🔄 RESET: tearing down dev database..."
+          docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.dev.yml down -v 2>/dev/null || true
+        fi
+        docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.dev.yml up -d
+
+  dev:db:check:
+    internal: true
+    desc: Check if dev database is running
+    preconditions:
+      - sh: docker ps --filter "name=calendar_db_dev" --filter "status=running" --format '{{`{{.Names}}`}}' | grep -q calendar_db_dev
+        msg: |
+          ❌ Dev database not running. Start it first:
+             task start:dev:db
+
+  dev:
+    desc: "Start all: DB + backend (reload) + frontend (vite)"
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/secrets.env",
+        "{{.ROOT_DIR}}/secrets.dev.env",
+        "{{.ROOT_DIR}}/.env.dev",
+      ]
+    deps: [dev:db]
+    cmds:
+      - task: dev:db:check
+      - |
+        npx concurrently \
+          --names "API,WEB" \
+          --prefix-colors "blue,green" \
+          --kill-others-on-fail \
+          "cd {{.BACKEND_DIR}} && PYTHONPATH={{.ROOT_DIR}} LOG_LEVEL={{.LOG_LEVEL}} UVICORN_ACCESS_LOG_EXCLUDE_PATHS={{.UVICORN_ACCESS_LOG_EXCLUDE_PATHS}} {{.ROOT_DIR}}/.venv/bin/uvicorn backend.api.main:app {{.RELOAD_FLAG}} --host 0.0.0.0 --port $BACKEND_PORT" \
+          "cd {{.FRONTEND_DIR}} && npm run dev -- --port $FRONTEND_PORT --open"
+
+  dev:debug:
+    desc: "Start all with debugger on port 5678 (attach from VSCode)"
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/secrets.env",
+        "{{.ROOT_DIR}}/secrets.dev.env",
+        "{{.ROOT_DIR}}/.env.dev",
+      ]
+    deps: [dev:db]
+    cmds:
+      - task: dev:db:check
+      - |
+        npx concurrently \
+          --names "API,WEB" \
+          --prefix-colors "blue,green" \
+          --kill-others-on-fail \
+          "cd {{.BACKEND_DIR}} && PYTHONPATH={{.ROOT_DIR}} LOG_LEVEL={{.LOG_LEVEL}} UVICORN_ACCESS_LOG_EXCLUDE_PATHS={{.UVICORN_ACCESS_LOG_EXCLUDE_PATHS}} {{.ROOT_DIR}}/.venv/bin/python -m debugpy --listen 0.0.0.0:5678 -m uvicorn backend.api.main:app {{.RELOAD_FLAG}} --host 0.0.0.0 --port $BACKEND_PORT" \
+          "cd {{.FRONTEND_DIR}} && npm run dev -- --port $FRONTEND_PORT --open"
+
+  dev:backend:
+    desc: Start backend only (no frontend)
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/secrets.env",
+        "{{.ROOT_DIR}}/secrets.dev.env",
+        "{{.ROOT_DIR}}/.env.dev",
+      ]
+    deps: [dev:db]
+    cmds:
+      - task: dev:db:check
+      - cd {{.BACKEND_DIR}} && PYTHONPATH={{.ROOT_DIR}} LOG_LEVEL={{.LOG_LEVEL}} UVICORN_ACCESS_LOG_EXCLUDE_PATHS={{.UVICORN_ACCESS_LOG_EXCLUDE_PATHS}} {{.ROOT_DIR}}/.venv/bin/uvicorn backend.api.main:app {{.RELOAD_FLAG}} --host 0.0.0.0 --port $BACKEND_PORT
+
+  dev:backend:debug:
+    desc: Start backend only with debugger
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/secrets.env",
+        "{{.ROOT_DIR}}/secrets.dev.env",
+        "{{.ROOT_DIR}}/.env.dev",
+      ]
+    deps: [dev:db]
+    cmds:
+      - task: dev:db:check
+      - cd {{.BACKEND_DIR}} && PYTHONPATH={{.ROOT_DIR}} LOG_LEVEL={{.LOG_LEVEL}} UVICORN_ACCESS_LOG_EXCLUDE_PATHS={{.UVICORN_ACCESS_LOG_EXCLUDE_PATHS}} {{.ROOT_DIR}}/.venv/bin/python -m debugpy --listen 0.0.0.0:5678 -m uvicorn backend.api.main:app {{.RELOAD_FLAG}} --host 0.0.0.0 --port $BACKEND_PORT
+
+  dev:frontend:
+    desc: Start frontend only (no backend)
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/secrets.env",
+        "{{.ROOT_DIR}}/secrets.dev.env",
+        "{{.ROOT_DIR}}/.env.dev",
+      ]
+    cmds:
+      - cd {{.FRONTEND_DIR}} && npm run dev -- --port $FRONTEND_PORT --open
+
+  dev:mock:
+    desc: "Start all with mock calendar service (no Google creds needed)"
+    dotenv: ["{{.ROOT_DIR}}/.env.mock"]
+    deps: [dev:db]
+    cmds:
+      - task: dev:db:check
+      - |
+        npx concurrently \
+          --names "API,WEB" \
+          --prefix-colors "blue,green" \
+          --kill-others-on-fail \
+          "cd {{.BACKEND_DIR}} && PYTHONPATH={{.ROOT_DIR}} LOG_LEVEL={{.LOG_LEVEL}} CALENDAR_SERVICE=mock {{.ROOT_DIR}}/.venv/bin/uvicorn backend.api.main:app {{.RELOAD_FLAG}} --host 0.0.0.0 --port $BACKEND_PORT" \
+          "cd {{.FRONTEND_DIR}} && npm run dev -- --port $FRONTEND_PORT --open"
+
+  # ════════════════════════════════════════════════════════════════
+  # Staging & Prod (start from existing images)
+  # ════════════════════════════════════════════════════════════════
+
+  staging:
+    desc: Start staging stack (RESET=1 to teardown first)
+    dotenv: ["{{.ROOT_DIR}}/.env.staging"]
+    vars:
+      RESET: '{{.RESET | default "0"}}'
+    cmds:
+      - |
+        if [ "{{.RESET}}" = "1" ]; then
+          echo "🔄 RESET: tearing down staging stack..."
+          ENV_NAME=staging docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p salsa-calendar-staging down -v 2>/dev/null || true
+        fi
+        ENV_NAME=staging IMAGE_TAG=develop docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p salsa-calendar-staging up -d
+      - |
+        echo ""
+        echo "✅ Staging started"
+        echo "   Frontend: http://localhost:${FRONTEND_PORT:-3001}"
+        echo "   Backend:  http://localhost:${BACKEND_PORT:-8002}"
+
+  prod:
+    desc: Start prod stack (RESET=1 FORCE=1 to teardown first)
+    dotenv: ["{{.ROOT_DIR}}/.env.prod"]
+    vars:
+      RESET: '{{.RESET | default "0"}}'
+      FORCE: '{{.FORCE | default "0"}}'
+    cmds:
+      - |
+        if [ "{{.RESET}}" = "1" ]; then
+          if [ "{{.FORCE}}" != "1" ]; then
+            echo "🚨 RESET on prod requires FORCE=1. Usage: task start:prod RESET=1 FORCE=1"
+            exit 1
+          fi
+          echo "🚨 RESET: tearing down PRODUCTION stack..."
+          ENV_NAME=prod docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p salsa-calendar-prod down -v 2>/dev/null || true
+        fi
+        ENV_NAME=prod IMAGE_TAG=latest docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p salsa-calendar-prod up -d
+      - |
+        echo ""
+        echo "✅ Prod started"
+        echo "   Frontend: http://localhost:${FRONTEND_PORT:-3000}"
+        echo "   Backend:  http://localhost:${BACKEND_PORT:-8080}"
+
+  # ════════════════════════════════════════════════════════════════
+  # Scenario (isolated manual testing)
+  # ════════════════════════════════════════════════════════════════
+
+  scenario:
+    desc: "Start scenario: local code + Docker DB (SCENARIO=name, RESET=1 to teardown first)"
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/secrets.env",
+        "{{.ROOT_DIR}}/secrets.scenario.env",
+        "{{.ROOT_DIR}}/.env.scenario",
+      ]
+    vars:
+      SCENARIO: '{{.SCENARIO | default "default"}}'
+      SEED_DIR: '{{.SEED_DIR | default ""}}'
+      RESET: '{{.RESET | default "0"}}'
+    cmds:
+      - |
+        source {{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
+
+        # ── RESET cleanup ──
+        if [ "{{.RESET}}" = "1" ]; then
+          echo "🔄 Restarting: stopping existing scenario environment ($ENV_NAME) first..."
+          docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.scenario-db.yml -p $SC_PROJECT_NAME down -v 2>/dev/null || true
+          pkill -f "uvicorn.*--port $SC_API_PORT" 2>/dev/null || true
+          pkill -f "vite.*--port $SC_WEB_PORT" 2>/dev/null || true
+          echo "✅ Previous environment cleaned"
+        fi
+
+        # Read calendar_service from scenario config.yaml (default: mock)
+        SCENARIO_DIR="{{.ROOT_DIR}}/scenarios/{{.SCENARIO}}"
+        CALENDAR_SVC="mock"
+        if [ -f "$SCENARIO_DIR/config.yaml" ]; then
+          CALENDAR_SVC=$({{.ROOT_DIR}}/.venv/bin/python -c "import yaml; print(yaml.safe_load(open('$SCENARIO_DIR/config.yaml')).get('calendar_service', 'mock'))")
+        fi
+
+        # Load per-scenario secrets.env if it exists (overrides root secrets.env)
+        if [ -f "$SCENARIO_DIR/secrets.env" ]; then
+          set -a
+          source "$SCENARIO_DIR/secrets.env"
+          set +a
+        fi
+
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "  Starting scenario: $SCENARIO_NAME"
+        echo "  DB:$SC_DB_PORT  API:$SC_API_PORT  WEB:$SC_WEB_PORT"
+        echo "  Calendar service: $CALENDAR_SVC"
+        echo "═══════════════════════════════════════════════════════════════"
+        echo ""
+
+        # Start scenario database
+        POSTGRES_USER=${POSTGRES_USER} \
+        POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \
+        POSTGRES_DB=$SC_DB_NAME \
+        ENV_NAME=$ENV_NAME \
+        SC_DB_PORT=$SC_DB_PORT \
+        docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.scenario-db.yml -p $SC_PROJECT_NAME up -d
+
+        echo "Waiting for database..."
+        sleep 3
+
+        # Run migrations
+        DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${SC_DB_PORT}/${SC_DB_NAME}" \
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini upgrade head
+
+        # Seed data
+        SEED_ARG=""
+        if [ -n "{{.SEED_DIR}}" ]; then
+          SEED_ARG="--scenario {{.SEED_DIR}}"
+        elif [ "{{.SCENARIO}}" != "default" ] && [ -d "{{.ROOT_DIR}}/scenarios/{{.SCENARIO}}" ]; then
+          SEED_ARG="--scenario {{.SCENARIO}}"
+        fi
+        DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${SC_DB_PORT}/${SC_DB_NAME}" \
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.seed $SEED_ARG
+
+        echo ""
+        echo "Starting backend + frontend..."
+      - |
+        source {{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
+
+        # Read calendar_service from scenario config.yaml (default: mock)
+        SCENARIO_DIR="{{.ROOT_DIR}}/scenarios/{{.SCENARIO}}"
+        CALENDAR_SVC="mock"
+        if [ -f "$SCENARIO_DIR/config.yaml" ]; then
+          CALENDAR_SVC=$({{.ROOT_DIR}}/.venv/bin/python -c "import yaml; print(yaml.safe_load(open('$SCENARIO_DIR/config.yaml')).get('calendar_service', 'mock'))")
+        fi
+
+        # Load per-scenario secrets.env if it exists
+        if [ -f "$SCENARIO_DIR/secrets.env" ]; then
+          set -a
+          source "$SCENARIO_DIR/secrets.env"
+          set +a
+        fi
+
+        npx concurrently \
+          --names "API,WEB" \
+          --prefix-colors "blue,green" \
+          "cd {{.BACKEND_DIR}} && PYTHONPATH={{.ROOT_DIR}} ENV_NAME=$ENV_NAME DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${SC_DB_PORT}/${SC_DB_NAME} CALENDAR_SERVICE=$CALENDAR_SVC GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-} GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-} ADMIN_EMAIL=${ADMIN_EMAIL:-} SESSION_SECRET=${SESSION_SECRET:-scenario-secret} GOOGLE_SERVICE_ACCOUNT_FILE=${GOOGLE_SERVICE_ACCOUNT_FILE:-} {{.ROOT_DIR}}/.venv/bin/uvicorn backend.api.main:app --reload --host 0.0.0.0 --port $SC_API_PORT" \
+          "cd {{.FRONTEND_DIR}} && VITE_API_URL=http://localhost:$SC_API_PORT npm run dev -- --port $SC_WEB_PORT"
+
+  scenario:ref:
+    desc: "Start scenario from git ref (all Docker). Usage: task start:scenario:ref -- <ref> SCENARIO=name"
+    dotenv: ["{{.ROOT_DIR}}/.env.scenario"]
+    vars:
+      REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+      SCENARIO: '{{.SCENARIO | default "default"}}'
+    cmds:
+      - |
+        REF="{{.REF}}"
+        if [ -z "$REF" ]; then
+          echo "❌ Usage: task start:scenario:ref -- feature/my-branch"
+          exit 1
+        fi
+      - task: :build:ref
+        vars: { REF: "{{.REF}}" }
+      - |
+        source {{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
+        REF="{{.REF}}"
+        SHA=$(git rev-parse --short=7 "$REF")
+        TAG="ref-$SHA"
+
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "  Starting scenario: $SCENARIO_NAME (from $REF)"
+        echo "  DB:$SC_DB_PORT  API:$SC_API_PORT  WEB:$SC_WEB_PORT"
+        echo "═══════════════════════════════════════════════════════════════"
+
+        POSTGRES_USER=${POSTGRES_USER} \
+        POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \
+        POSTGRES_DB=$SC_DB_NAME \
+        ENV_NAME=$ENV_NAME \
+        IMAGE_TAG=$TAG \
+        SC_DB_PORT=$SC_DB_PORT \
+        BACKEND_PORT=$SC_API_PORT \
+        FRONTEND_PORT=$SC_WEB_PORT \
+        docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p $SC_PROJECT_NAME up -d
+
+        # Wait for backend health check
+        echo "Waiting for backend health check on port $SC_API_PORT..."
+        for i in $(seq 1 30); do
+          if curl -sf http://localhost:$SC_API_PORT/api/health > /dev/null 2>&1; then
+            echo "✅ Backend is healthy"
+            break
+          fi
+          echo "  Attempt $i/30 — waiting..."
+          sleep 2
+          if [ "$i" = "30" ]; then
+            echo "⚠️  Backend did not become healthy after 30 attempts"
+          fi
+        done
+
+        echo ""
+        echo "✅ Scenario running from $REF"
+        echo "   Frontend: http://localhost:$SC_WEB_PORT"
+        echo "   Backend:  http://localhost:$SC_API_PORT"

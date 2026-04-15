@@ -1,0 +1,70 @@
+# ── Dependencies ──────────────────────────────────────
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.pip-audit-cache/
+
+# ── Environment / Secrets ─────────────────────────────
+# Only .env.example and secrets.env.example are committed
+.env
+.env.*
+!.env.example
+secrets.env
+secrets.*.env
+scenarios/*/secrets.env
+!secrets.env.example
+
+# Google service-account keys & other credentials
+credentials/
+*.json.bak
+
+# ── Build artifacts ───────────────────────────────────
+dist/
+build/
+*.egg-info/
+*.whl
+*.tar.gz
+
+# ── IDE / Editor ──────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+
+# ── OS junk ───────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+._*
+
+# ── Worktrees ─────────────────────────────────────────
+.worktrees/
+
+# ── Docker / Infra ────────────────────────────────────
+postgres_data/
+docker-compose.override.yml
+
+# ── Python tooling ────────────────────────────────────
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# ── Frontend tooling ──────────────────────────────────
+*.tsbuildinfo
+.eslintcache
+
+# ── Alembic ───────────────────────────────────────────
+backend/db/alembic/versions/__pycache__/
+
+# ── Misc ──────────────────────────────────────────────
+*.log
+tmp/

@@ -1,0 +1,66 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Run unit tests (fast, default)"
+    cmds:
+      - task: unit
+
+  unit:
+    desc: Run all unit tests (backend + frontend)
+    cmds:
+      - task: unit:backend
+      - task: unit:frontend
+
+  unit:backend:
+    desc: Run backend unit tests
+    dir: backend
+    dotenv: [".env.test"]
+    cmds:
+      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/pytest tests/unit/ tests/api/ -m "not integration" -v
+
+  unit:frontend:
+    desc: Frontend type check + build validation
+    dir: frontend
+    cmds:
+      - npx tsc --noEmit
+      - npm run build
+      - echo "✅ Frontend type check and build passed"
+
+  int:
+    desc: Run integration tests (requires test DB)
+    dir: backend
+    dotenv: [".env.test"]
+    cmds:
+      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/pytest tests/integration/ -m "integration" -v
+
+  int:full:
+    desc: "Full integration cycle: setup → test → cleanup"
+    cmds:
+      - task: :db:setup:integ
+      - task: int
+
+  all:
+    desc: "Run all tests: unit → integration"
+    cmds:
+      - task: unit
+      - task: int
+
+  e2e:
+    desc: Run end-to-end tests (requires running database)
+    dir: backend
+    dotenv: [".env.test"]
+    cmds:
+      - echo "⚠️  E2E tests not yet implemented"
+      - echo "   Placeholder for future Playwright/Cypress tests"
+
+  ci:
+    desc: Simulate CI pipeline locally (requires act)
+    cmds:
+      - |
+        if ! command -v act &>/dev/null; then
+          echo "❌ 'act' is not installed. Install with:"
+          echo "   brew install act"
+          exit 1
+        fi
+        act push -j test --container-architecture linux/amd64

@@ -1,0 +1,16 @@
+{
+    "name": "Salsa Events Calendar",
+    "short_name": "Salsa Events",
+    "description": "Discover upcoming salsa classes, socials, and workshops near you.",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0f172a",
+    "theme_color": "#e11d48",
+    "icons": [
+        {
+            "src": "/favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml"
+        }
+    ]
+}

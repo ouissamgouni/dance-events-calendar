@@ -1,0 +1,62 @@
+# Mock Scenario — QA Test Plan
+# ================================
+# Validates core features of the Salsa Events Calendar using
+# mock calendar data (no Google API required).
+
+test_plan:
+  name: "Mock Scenario — Core Features QA"
+  description: >
+    Verify that the calendar renders events correctly, the map shows
+    pins for geolocated events, calendar toggling works, and the event
+    detail modal displays all expected information.
+
+  steps:
+    - id: 1
+      title: "Verify calendar renders events"
+      description: >
+        Open the home page. Check that the FullCalendar component
+        displays events from enabled mock calendars.
+      expected: >
+        Calendar view loads with coloured event blocks matching the
+        mock seed data. Events appear on their correct dates.
+      verification: "Events visible in month/week/day views"
+
+    - id: 2
+      title: "Verify map pins for geolocated events"
+      description: >
+        Scroll down to the map section. Confirm that events with
+        latitude/longitude values show pins on the Leaflet map.
+      expected: >
+        Map renders with marker pins at the correct locations.
+        Clicking a pin shows the event title in a popup.
+      verification: "Pins match events that have lat/lng in seed data"
+
+    - id: 3
+      title: "Verify event detail modal"
+      description: >
+        Click on any event in the calendar or map. The event detail
+        modal should open with full information.
+      expected: >
+        Modal displays: title, date/time, location, description.
+        Close button dismisses the modal.
+      verification: "All fields populated, modal opens and closes cleanly"
+
+    - id: 4
+      title: "Verify calendar toggle in admin"
+      description: >
+        Log in to the admin panel. Toggle a calendar off, then verify
+        its events disappear from the public calendar view.
+      expected: >
+        After disabling a calendar, its events no longer appear on the
+        home page calendar or map. Re-enabling restores them.
+      verification: "Toggle state persists and filters events correctly"
+
+    - id: 5
+      title: "Verify sync trigger"
+      description: >
+        In the admin panel, click the manual sync button. Check that
+        the sync log updates with a new entry.
+      expected: >
+        A new sync log entry appears with status 'success' and correct
+        event counts. The sync completes without errors.
+      verification: "Sync log table shows new entry after manual trigger"

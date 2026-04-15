@@ -1,0 +1,479 @@
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import type { CalendarSetting, CalendarEvent } from '../types';
+import type { SyncLogEntry } from '../api';
+import {
+    fetchAdminCalendars, updateCalendar, discoverCalendars, triggerSync, addCalendar,
+    fetchSettings, updateSettings, fetchSyncLogs, fetchPendingEvents, reviewEvent, markAllReviewed,
+} from '../api';
+import { useAuth } from '../context/AuthContext';
+import SyncHistoryPanel from '../components/SyncHistoryPanel';
+import PendingReviewPanel from '../components/PendingReviewPanel';
+
+export default function Admin() {
+    const [calendars, setCalendars] = useState<CalendarSetting[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [busy, setBusy] = useState('');
+    const [message, setMessage] = useState('');
+    const [newCalId, setNewCalId] = useState('');
+    const [sinceDate, setSinceDate] = useState('');
+    const [syncInterval, setSyncInterval] = useState(15);
+    const [showPrices, setShowPrices] = useState(false);
+    const [showPopularity, setShowPopularity] = useState(false);
+    const [syncLogs, setSyncLogs] = useState<SyncLogEntry[]>([]);
+    const [pendingEvents, setPendingEvents] = useState<CalendarEvent[]>([]);
+    const [editingCalId, setEditingCalId] = useState<string | null>(null);
+    const [editingName, setEditingName] = useState('');
+    const [syncPanelOpen, setSyncPanelOpen] = useState(false);
+    const [pendingPanelOpen, setPendingPanelOpen] = useState(false);
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
+
+    const loadCalendars = () => {
+        fetchAdminCalendars()
+            .then(setCalendars)
+            .catch(() => { })
+            .finally(() => setLoading(false));
+    };
+
+    useEffect(() => {
+        loadCalendars();
+        fetchSettings().then((s) => {
+            setSinceDate(s.since_date);
+            setSyncInterval(s.sync_interval_minutes);
+            setShowPrices(s.show_prices);
+            setShowPopularity(s.show_popularity);
+        }).catch(() => { });
+        fetchSyncLogs().then(setSyncLogs).catch(() => { });
+        fetchPendingEvents().then(setPendingEvents).catch(() => { });
+    }, []);
+
+    const handleToggle = async (cal: CalendarSetting) => {
+        const updated = await updateCalendar(cal.calendar_id, { enabled: !cal.enabled });
+        setCalendars((prev) =>
+            prev.map((c) => (c.calendar_id === updated.calendar_id ? updated : c)),
+        );
+    };
+
+    const handleColorChange = async (cal: CalendarSetting, color: string) => {
+        const updated = await updateCalendar(cal.calendar_id, { color });
+        setCalendars((prev) =>
+            prev.map((c) => (c.calendar_id === updated.calendar_id ? updated : c)),
+        );
+    };
+
+    const handleNameEdit = (cal: CalendarSetting) => {
+        setEditingCalId(cal.calendar_id);
+        setEditingName(cal.name);
+    };
+
+    const handleNameSave = async (cal: CalendarSetting) => {
+        const trimmed = editingName.trim();
+        setEditingCalId(null);
+        if (!trimmed || trimmed === cal.name) return;
+        const updated = await updateCalendar(cal.calendar_id, { name: trimmed });
+        setCalendars((prev) =>
+            prev.map((c) => (c.calendar_id === updated.calendar_id ? updated : c)),
+        );
+    };
+
+    const handleDiscover = async () => {
+        setBusy('discover');
+        setMessage('');
+        try {
+            const result = await discoverCalendars();
+            setMessage(
+                result.discovered > 0
+                    ? `Found ${result.discovered} new calendar(s). ${result.total} total.`
+                    : `No new calendars found. ${result.total} total.`,
+            );
+            loadCalendars();
+        } catch {
+            setMessage('Failed to discover calendars.');
+        } finally {
+            setBusy('');
+        }
+    };
+
+    const handleAddCalendar = async () => {
+        const id = newCalId.trim();
+        if (!id) return;
+        setBusy('add');
+        setMessage('');
+        try {
+            await addCalendar(id);
+            setNewCalId('');
+            setMessage(`Calendar added: ${id}`);
+            loadCalendars();
+        } catch (err: any) {
+            setMessage(err.message || 'Failed to add calendar.');
+        } finally {
+            setBusy('');
+        }
+    };
+
+    const handleSync = async () => {
+        setBusy('sync');
+        setMessage('');
+        try {
+            const stats = await triggerSync();
+            setMessage(
+                `Synced ${stats.calendars_synced} calendar(s): ${stats.events_upserted} upserted, ${stats.events_deleted} deleted.`,
+            );
+            fetchSyncLogs().then(setSyncLogs).catch(() => { });
+            fetchPendingEvents().then(setPendingEvents).catch(() => { });
+        } catch {
+            setMessage('Failed to sync.');
+        } finally {
+            setBusy('');
+        }
+    };
+
+    const handleLogout = async () => {
+        await logout();
+        navigate('/login', { replace: true });
+    };
+
+    const handleSinceDateSave = async () => {
+        setBusy('since');
+        setMessage('');
+        try {
+            const result = await updateSettings({ since_date: sinceDate });
+            setSinceDate(result.since_date);
+            setMessage('Display cutoff date saved.');
+        } catch {
+            setMessage('Failed to save setting.');
+        } finally {
+            setBusy('');
+        }
+    };
+
+    const handleSyncIntervalSave = async () => {
+        setBusy('interval');
+        setMessage('');
+        try {
+            const result = await updateSettings({ sync_interval_minutes: syncInterval });
+            setSyncInterval(result.sync_interval_minutes);
+            setMessage('Sync interval saved.');
+        } catch {
+            setMessage('Failed to save setting.');
+        } finally {
+            setBusy('');
+        }
+    };
+
+    const handleTogglePrices = async () => {
+        const newVal = !showPrices;
+        setShowPrices(newVal);
+        try {
+            await updateSettings({ show_prices: newVal } as any);
+            setMessage(`Price display ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setShowPrices(!newVal);
+            setMessage('Failed to update feature flag.');
+        }
+    };
+
+    const handleTogglePopularity = async () => {
+        const newVal = !showPopularity;
+        setShowPopularity(newVal);
+        try {
+            await updateSettings({ show_popularity: newVal } as any);
+            setMessage(`Popularity display ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setShowPopularity(!newVal);
+            setMessage('Failed to update feature flag.');
+        }
+    };
+
+    const handleReviewEvent = async (eventId: string) => {
+        try {
+            await reviewEvent(eventId);
+            setPendingEvents((prev) => prev.filter((e) => e.event_id !== eventId));
+        } catch {
+            setMessage('Failed to mark event as reviewed.');
+        }
+    };
+
+    const handleMarkAllReviewed = async () => {
+        setBusy('review-all');
+        try {
+            await markAllReviewed();
+            setPendingEvents([]);
+            setMessage('All events marked as reviewed.');
+        } catch {
+            setMessage('Failed to mark all reviewed.');
+        } finally {
+            setBusy('');
+        }
+    };
+
+    const handleEventSaved = (updated: CalendarEvent) => {
+        setPendingEvents((prev) =>
+            prev.map((e) => (e.event_id === updated.event_id ? updated : e))
+                .filter((e) => e.review_status === 'pending'),
+        );
+    };
+
+    const enabledCount = calendars.filter((c) => c.enabled).length;
+
+    return (
+        <div className="mx-auto max-w-7xl px-5 py-6">
+            {/* ── Header ── */}
+            <div className="mb-5 flex items-center justify-between">
+                <h1 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                    Admin
+                </h1>
+                <div className="flex items-center gap-2">
+                    {user && (
+                        <span className="text-[11px] text-gray-400">{user.email}</span>
+                    )}
+                    <button
+                        onClick={handleLogout}
+                        className="bg-gray-100 text-gray-600 text-[11px] font-medium px-2.5 py-1 hover:bg-gray-200 transition border border-gray-200"
+                    >
+                        Logout
+                    </button>
+                </div>
+            </div>
+
+            {/* ── Action Bar ── */}
+            <div className="mb-4 flex items-center gap-2 flex-wrap">
+                <button
+                    onClick={handleDiscover}
+                    disabled={!!busy}
+                    className="bg-gray-800 text-white text-[11px] font-medium px-3 py-1.5 hover:bg-gray-700 disabled:opacity-50 transition"
+                >
+                    {busy === 'discover' ? 'Discovering…' : 'Discover'}
+                </button>
+                <button
+                    onClick={handleSync}
+                    disabled={!!busy || enabledCount === 0}
+                    className="bg-blue-600 text-white text-[11px] font-medium px-3 py-1.5 hover:bg-blue-700 disabled:opacity-50 transition"
+                >
+                    {busy === 'sync' ? 'Syncing…' : `Sync Now (${enabledCount})`}
+                </button>
+
+                <div className="w-px h-4 bg-gray-200 mx-1" />
+
+                <button
+                    onClick={() => setSyncPanelOpen(true)}
+                    className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
+                >
+                    Sync History
+                    {syncLogs.length > 0 && (
+                        <span className="inline-flex items-center justify-center bg-gray-200 text-gray-600 text-[10px] font-semibold px-1.5 py-0 min-w-[16px]">
+                            {syncLogs.length}
+                        </span>
+                    )}
+                </button>
+                <button
+                    onClick={() => setPendingPanelOpen(true)}
+                    className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
+                >
+                    Pending Review
+                    {pendingEvents.length > 0 && (
+                        <span className="inline-flex items-center justify-center bg-amber-500 text-white text-[10px] font-semibold px-1.5 py-0 min-w-[16px]">
+                            {pendingEvents.length}
+                        </span>
+                    )}
+                </button>
+            </div>
+
+            {message && (
+                <p className="mb-4 bg-blue-50 border border-blue-100 px-3 py-1.5 text-[11px] text-blue-700">{message}</p>
+            )}
+
+            {/* ── 3-Column Grid ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+                {/* Card 1: Calendar Sources */}
+                <div className="border border-gray-200 bg-white">
+                    <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+                        <h2 className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Calendar Sources</h2>
+                    </div>
+                    <div className="p-4">
+                        {/* Add Calendar Input */}
+                        <div className="flex gap-1.5 mb-3">
+                            <input
+                                type="text"
+                                value={newCalId}
+                                onChange={(e) => setNewCalId(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleAddCalendar()}
+                                placeholder="Calendar ID (e.g. user@gmail.com)"
+                                className="flex-1 border border-gray-200 px-2.5 py-1.5 text-[11px] text-gray-700 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            />
+                            <button
+                                onClick={handleAddCalendar}
+                                disabled={!!busy || !newCalId.trim()}
+                                className="bg-gray-800 text-white text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-700 disabled:opacity-50 transition shrink-0"
+                            >
+                                {busy === 'add' ? 'Adding…' : 'Add'}
+                            </button>
+                        </div>
+
+                        {/* Calendar List */}
+                        {loading ? (
+                            <p className="text-[11px] text-gray-400">Loading…</p>
+                        ) : calendars.length === 0 ? (
+                            <p className="text-[11px] text-gray-400">
+                                No calendars. Use "Discover" to find them.
+                            </p>
+                        ) : (
+                            <ul className="divide-y divide-gray-100">
+                                {calendars.map((cal) => (
+                                    <li key={cal.calendar_id} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <input
+                                                type="color"
+                                                value={cal.color || '#3b82f6'}
+                                                onChange={(e) => handleColorChange(cal, e.target.value)}
+                                                className="h-4 w-4 cursor-pointer border-0 p-0 shrink-0"
+                                                title="Change color"
+                                            />
+                                            <div className="min-w-0">
+                                                {editingCalId === cal.calendar_id ? (
+                                                    <input
+                                                        type="text"
+                                                        value={editingName}
+                                                        onChange={(e) => setEditingName(e.target.value)}
+                                                        onBlur={() => handleNameSave(cal)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') handleNameSave(cal);
+                                                            if (e.key === 'Escape') setEditingCalId(null);
+                                                        }}
+                                                        autoFocus
+                                                        className="text-[11px] font-medium text-gray-700 border border-blue-400 px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 w-full"
+                                                    />
+                                                ) : (
+                                                    <span
+                                                        className="text-[11px] font-medium text-gray-700 cursor-pointer hover:text-blue-600 transition block truncate"
+                                                        onClick={() => handleNameEdit(cal)}
+                                                        title={cal.calendar_id}
+                                                    >
+                                                        {cal.name}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => handleToggle(cal)}
+                                            className={`text-[10px] font-medium px-2 py-0.5 shrink-0 transition ${cal.enabled
+                                                ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                                }`}
+                                        >
+                                            {cal.enabled ? 'On' : 'Off'}
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                </div>
+
+                {/* Card 2: Settings */}
+                <div className="border border-gray-200 bg-white">
+                    <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+                        <h2 className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Settings</h2>
+                    </div>
+                    <div className="p-4 space-y-3">
+                        <div>
+                            <label className="text-[11px] font-medium text-gray-500 block mb-1">
+                                Show events since
+                            </label>
+                            <div className="flex gap-1.5">
+                                <input
+                                    type="date"
+                                    value={sinceDate}
+                                    onChange={(e) => setSinceDate(e.target.value)}
+                                    className="flex-1 border border-gray-200 px-2.5 py-1.5 text-[11px] text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                                <button
+                                    onClick={handleSinceDateSave}
+                                    disabled={!!busy || !sinceDate}
+                                    className="bg-gray-800 text-white text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-700 disabled:opacity-50 transition"
+                                >
+                                    {busy === 'since' ? '…' : 'Save'}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="text-[11px] font-medium text-gray-500 block mb-1">
+                                Sync interval
+                            </label>
+                            <div className="flex items-center gap-1.5">
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={1440}
+                                    value={syncInterval}
+                                    onChange={(e) => setSyncInterval(Number(e.target.value))}
+                                    className="w-16 border border-gray-200 px-2.5 py-1.5 text-[11px] text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                                <span className="text-[11px] text-gray-400">min</span>
+                                <button
+                                    onClick={handleSyncIntervalSave}
+                                    disabled={!!busy || syncInterval < 1 || syncInterval > 1440}
+                                    className="bg-gray-800 text-white text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-700 disabled:opacity-50 transition"
+                                >
+                                    {busy === 'interval' ? '…' : 'Save'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Card 3: Feature Flags */}
+                <div className="border border-gray-200 bg-white">
+                    <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+                        <h2 className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Feature Flags</h2>
+                    </div>
+                    <div className="p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <span className="text-[11px] font-medium text-gray-700">Show prices</span>
+                                <p className="text-[10px] text-gray-400">Price badges on events</p>
+                            </div>
+                            <button
+                                onClick={handleTogglePrices}
+                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${showPrices ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                            >
+                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${showPrices ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                            </button>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <span className="text-[11px] font-medium text-gray-700">Show popularity</span>
+                                <p className="text-[10px] text-gray-400">View counts and badges</p>
+                            </div>
+                            <button
+                                onClick={handleTogglePopularity}
+                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${showPopularity ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                            >
+                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${showPopularity ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Slide-Out Panels */}
+            <SyncHistoryPanel
+                isOpen={syncPanelOpen}
+                onClose={() => setSyncPanelOpen(false)}
+                syncLogs={syncLogs}
+            />
+            <PendingReviewPanel
+                isOpen={pendingPanelOpen}
+                onClose={() => setPendingPanelOpen(false)}
+                pendingEvents={pendingEvents}
+                onReview={handleReviewEvent}
+                onMarkAllReviewed={handleMarkAllReviewed}
+                onEventSaved={handleEventSaved}
+                busy={busy}
+            />
+        </div>
+    );
+}

@@ -1,0 +1,12 @@
+version: "3"
+
+tasks:
+  default:
+    desc: "Tag release + deploy to prod (e.g., task release -- v1.2.0)"
+    vars:
+      VERSION: "{{if .VERSION}}{{.VERSION}}{{else}}{{.CLI_ARGS}}{{end}}"
+    cmds:
+      - task: :git:release:tag
+        vars: { VERSION: "{{.VERSION}}" }
+      - task: :deploy:prod
+        vars: { REF: "{{.VERSION}}" }
