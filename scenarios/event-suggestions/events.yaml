@@ -1,0 +1,52 @@
+base_week: 0
+
+events:
+  - id: "mock-sug-001"
+    calendar_id: "salsa-cal-001"
+    title: "Weekly Salsa Social – Berlin"
+    description: "Every Friday salsa social at Tanzhaus. All levels welcome."
+    location: "Tanzhaus Berlin, Friedrichstraße 112, Berlin, Germany"
+    latitude: 52.5244
+    longitude: 13.3884
+    start: "w0 Fri 20:00"
+    end: "w0 Fri 23:30"
+
+  - id: "mock-sug-002"
+    calendar_id: "bachata-cal-002"
+    title: "Bachata Sensual Workshop – Paris"
+    description: "Intensive 3-hour workshop with guest instructor from Dominican Republic."
+    location: "Studio Latina, 15 Rue de la Roquette, Paris, France"
+    latitude: 48.8534
+    longitude: 2.3741
+    start: "w1 Sat 14:00"
+    end: "w1 Sat 17:00"
+
+  - id: "mock-sug-003"
+    calendar_id: "salsa-cal-001"
+    title: "Salsa on the Rooftop – Barcelona"
+    description: "Open-air salsa night with live band. Tickets: https://example.com/tickets"
+    location: "Hotel Pulitzer, Carrer de Bergara 8, Barcelona, Spain"
+    latitude: 41.3879
+    longitude: 2.1699
+    start: "w1 Fri 21:00"
+    end: "w1 Sat 02:00"
+
+  - id: "mock-sug-004"
+    calendar_id: "bachata-cal-002"
+    title: "Bachata Stars Night – Amsterdam"
+    description: "Top bachata DJs. Pre-party workshop included."
+    location: "Panama Club, Oostelijke Handelskade 4, Amsterdam, Netherlands"
+    latitude: 52.3738
+    longitude: 4.9150
+    start: "w2 Sat 20:00"
+    end: "w2 Sun 03:00"
+
+  - id: "mock-sug-005"
+    calendar_id: "salsa-cal-001"
+    title: "Havana Nights – London"
+    description: "Cuban salsa party in Soho. Live band + DJs."
+    location: "Bar Salsa, 96 Charing Cross Rd, London, UK"
+    latitude: 51.5142
+    longitude: -0.1300
+    start: "w2 Fri 21:00"
+    end: "w2 Sat 03:00"

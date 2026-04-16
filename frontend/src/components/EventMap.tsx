@@ -157,7 +157,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                     <Popup>
                         <div className="space-y-1 text-xs">
                             <p
-                                className="font-semibold text-sm cursor-pointer hover:text-rose-600"
+                                className="font-semibold text-sm cursor-pointer hover:text-slate-600"
                                 onClick={() => onEventClick?.(e)}
                             >
                                 {e.title}

@@ -1,0 +1,179 @@
+test_plan:
+  name: "My Calendar — Save, View, Export"
+  description: >
+    Verify the My Calendar feature: saving/unsaving events, FAB counter,
+    My Calendar explorer page (list + map), .ics and .xlsx exports,
+    clear all, and admin most-saved analytics. Uses mock calendar service
+    with 5 events across 2 calendars.
+  steps:
+    # ── Saving Events ───────────────────────────────────────────
+    - id: 1
+      title: "FAB is hidden when no events saved"
+      description: >
+        Open the home page in Explorer view. The floating action button (heart
+        with counter) should NOT be visible since no events are saved.
+      expected: >
+        No heart FAB visible in the bottom-right corner.
+
+    - id: 2
+      title: "Save event from event list"
+      description: >
+        In Explorer view, find "Friday Salsa Social" in the event list panel.
+        Click the heart icon (🤍) on the event card.
+      expected: >
+        Heart turns red (❤️). FAB appears in bottom-right with count "1".
+
+    - id: 3
+      title: "Save event from modal"
+      description: >
+        Click on "Bachata Sensual Workshop" to open the modal.
+        Click the heart icon in the modal header (next to close button).
+      expected: >
+        Heart turns red. FAB count updates to "2".
+
+    - id: 4
+      title: "Save event from detail page"
+      description: >
+        Navigate to /event/evt-save-003 (Salsa on the Rooftop).
+        Click the "🤍 Save" button in the share bar.
+      expected: >
+        Button changes to "❤️ Saved". FAB count is "3".
+
+    - id: 5
+      title: "Unsave event from list"
+      description: >
+        Go back to home page. Find "Friday Salsa Social" in the list.
+        Click the red heart (❤️) to unsave it.
+      expected: >
+        Heart turns back to 🤍. FAB count drops to "2".
+
+    - id: 6
+      title: "Re-save the event"
+      description: >
+        Click the 🤍 on "Friday Salsa Social" again to re-save.
+      expected: >
+        Heart is red again. FAB count is "3".
+
+    # ── FAB Dropdown ────────────────────────────────────────────
+    - id: 7
+      title: "FAB dropdown shows options"
+      description: >
+        Click the FAB (heart with "3" badge).
+        A dropdown should appear with three options.
+      expected: >
+        Dropdown shows: "View My Calendar", "Export .ics", "Export .xlsx".
+
+    - id: 8
+      title: "FAB dropdown closes on outside click"
+      description: >
+        With the dropdown open, click anywhere outside it.
+      expected: >
+        Dropdown closes.
+
+    - id: 9
+      title: "FAB dropdown closes on Escape"
+      description: >
+        Open the dropdown again, then press Escape.
+      expected: >
+        Dropdown closes.
+
+    # ── My Calendar Page ────────────────────────────────────────
+    - id: 10
+      title: "Navigate to My Calendar via FAB"
+      description: >
+        Click the FAB, then click "View My Calendar".
+      expected: >
+        Navigated to /my-calendar. Page shows header "❤️ My Calendar (3 events)"
+        with export buttons, clear all button, and back link.
+
+    - id: 11
+      title: "My Calendar shows saved events in list"
+      description: >
+        Check the left panel (event list) on the My Calendar page.
+      expected: >
+        List shows 3 saved events: "Friday Salsa Social", "Bachata Sensual Workshop",
+        "Salsa on the Rooftop". Each has title, date, location. Events not saved
+        (Bachata Weekender, Rueda de Casino Night) are NOT shown.
+
+    - id: 12
+      title: "My Calendar map shows markers"
+      description: >
+        Check the map on the right side.
+      expected: >
+        Map shows markers for Paris, Berlin, and Brussels (the 3 saved events
+        with coordinates). Map auto-fits to show all markers.
+
+    - id: 13
+      title: "Click event in My Calendar list"
+      description: >
+        Click "Bachata Sensual Workshop" in the list.
+      expected: >
+        Event modal opens with full details, heart icon is red (saved).
+
+    - id: 14
+      title: "Unsave from modal updates My Calendar"
+      description: >
+        In the modal, click the red heart to unsave.
+        Close the modal.
+      expected: >
+        Event disappears from the list. Counter updates to "2 events".
+        Map updates (Berlin marker removed).
+
+    # ── Export ──────────────────────────────────────────────────
+    - id: 15
+      title: "Export .ics from My Calendar page"
+      description: >
+        On the My Calendar page, click "📅 Export .ics".
+      expected: >
+        Browser downloads "my-salsa-events.ics". File contains VCALENDAR
+        with 2 VEVENT entries (the remaining saved events).
+
+    - id: 16
+      title: "Export .xlsx from My Calendar page"
+      description: >
+        Click "📊 Export .xlsx".
+      expected: >
+        Browser downloads "my-salsa-events.xlsx". File opens in a spreadsheet
+        app with columns: Title, Date, Start Time, End Time, Location,
+        Description, Price. Contains 2 rows of event data.
+
+    - id: 17
+      title: "Export .ics from FAB dropdown"
+      description: >
+        Go back to home page. Click the FAB, then "Export .ics".
+      expected: >
+        Downloads "my-salsa-events.ics" with the 2 saved events.
+
+    # ── Clear All ───────────────────────────────────────────────
+    - id: 18
+      title: "Clear all saved events"
+      description: >
+        Navigate to /my-calendar. Click "Clear all" button.
+      expected: >
+        All events cleared. Page shows empty state: "No events saved yet"
+        with "Browse events" link. FAB disappears from screen.
+
+    - id: 19
+      title: "Empty state links back to browse"
+      description: >
+        Click "← Browse events" link in the empty state.
+      expected: >
+        Navigated back to home page (/).
+
+    # ── Persistence ─────────────────────────────────────────────
+    - id: 20
+      title: "Saved events persist across reload"
+      description: >
+        Save 2 events. Reload the page (F5).
+      expected: >
+        FAB shows count "2". Navigate to /my-calendar — saved events still listed.
+
+    # ── Admin Analytics ─────────────────────────────────────────
+    - id: 21
+      title: "Admin shows most-saved events"
+      description: >
+        Log in as admin (dev login). Check admin page for
+        "❤️ Most Saved Events" section.
+      expected: >
+        Section appears showing events ranked by net saves.
+        Events that were saved appear with their save count.

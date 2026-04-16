@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { fetchEvent, trackEventView } from '../api';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
+import { useSavedEvents } from '../context/SavedEventsContext';
 import { parseLinks } from '../utils/parseLinks';
 import { deriveLinkLabel } from '../utils/deriveLinkLabel';
 import LocationBadge from '../components/LocationBadge';
@@ -14,6 +15,7 @@ export default function EventDetailPage() {
     const [error, setError] = useState(false);
     const [loading, setLoading] = useState(true);
     const { showPrices, showPopularity } = useFeatureFlags();
+    const { isSaved, toggleSave } = useSavedEvents();
 
     useEffect(() => {
         if (!eventId) return;
@@ -213,6 +215,15 @@ export default function EventDetailPage() {
                         {/* Share bar */}
                         <div className="border-t border-slate-100 px-6 py-3 flex items-center gap-3">
                             <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Share</span>
+                            <button
+                                onClick={() => toggleSave(event.event_id)}
+                                className={`text-xs rounded-full px-3 py-1 transition flex items-center gap-1 ${isSaved(event.event_id) ? 'text-slate-800 bg-slate-200 hover:bg-slate-300' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'}`}
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                                    <path d="M5 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14l-5-2.5L5 18V4Z" />
+                                </svg>
+                                {isSaved(event.event_id) ? 'Saved' : 'Save'}
+                            </button>
                             <button
                                 onClick={handleCopyLink}
                                 className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-full px-3 py-1 transition"

@@ -171,7 +171,9 @@ def list_suggestions(
     return suggestions
 
 
-@router.get("/api/admin/suggestions/{suggestion_id}", response_model=EventSuggestionResponse)
+@router.get(
+    "/api/admin/suggestions/{suggestion_id}", response_model=EventSuggestionResponse
+)
 def get_suggestion(
     suggestion_id: UUID,
     session: Session = Depends(get_session),
@@ -183,7 +185,9 @@ def get_suggestion(
     return suggestion
 
 
-@router.patch("/api/admin/suggestions/{suggestion_id}", response_model=EventSuggestionResponse)
+@router.patch(
+    "/api/admin/suggestions/{suggestion_id}", response_model=EventSuggestionResponse
+)
 def update_suggestion(
     suggestion_id: UUID,
     body: SuggestionUpdateRequest,
@@ -196,7 +200,10 @@ def update_suggestion(
 
     update_data = body.model_dump(exclude_unset=True)
     if "links" in update_data and update_data["links"] is not None:
-        update_data["links"] = [link if isinstance(link, dict) else link.model_dump() for link in update_data["links"]]
+        update_data["links"] = [
+            link if isinstance(link, dict) else link.model_dump()
+            for link in update_data["links"]
+        ]
 
     for field, value in update_data.items():
         setattr(suggestion, field, value)
@@ -207,7 +214,10 @@ def update_suggestion(
     return suggestion
 
 
-@router.post("/api/admin/suggestions/{suggestion_id}/approve", response_model=EventSuggestionResponse)
+@router.post(
+    "/api/admin/suggestions/{suggestion_id}/approve",
+    response_model=EventSuggestionResponse,
+)
 def approve_suggestion(
     suggestion_id: UUID,
     body: SuggestionApproveRequest,
@@ -218,7 +228,9 @@ def approve_suggestion(
     if not suggestion:
         raise HTTPException(status_code=404, detail="Suggestion not found")
     if suggestion.status != "pending":
-        raise HTTPException(status_code=400, detail=f"Suggestion is already {suggestion.status}")
+        raise HTTPException(
+            status_code=400, detail=f"Suggestion is already {suggestion.status}"
+        )
 
     # Verify calendar exists
     calendar = session.get(CalendarSetting, body.calendar_id)
@@ -265,7 +277,10 @@ def approve_suggestion(
     return suggestion
 
 
-@router.post("/api/admin/suggestions/{suggestion_id}/reject", response_model=EventSuggestionResponse)
+@router.post(
+    "/api/admin/suggestions/{suggestion_id}/reject",
+    response_model=EventSuggestionResponse,
+)
 def reject_suggestion(
     suggestion_id: UUID,
     body: SuggestionRejectRequest,
@@ -276,7 +291,9 @@ def reject_suggestion(
     if not suggestion:
         raise HTTPException(status_code=404, detail="Suggestion not found")
     if suggestion.status != "pending":
-        raise HTTPException(status_code=400, detail=f"Suggestion is already {suggestion.status}")
+        raise HTTPException(
+            status_code=400, detail=f"Suggestion is already {suggestion.status}"
+        )
 
     suggestion.status = "rejected"
     suggestion.admin_notes = body.admin_notes or suggestion.admin_notes
@@ -288,7 +305,10 @@ def reject_suggestion(
     return suggestion
 
 
-@router.post("/api/admin/suggestions/{suggestion_id}/sync-to-google", response_model=EventSuggestionResponse)
+@router.post(
+    "/api/admin/suggestions/{suggestion_id}/sync-to-google",
+    response_model=EventSuggestionResponse,
+)
 def sync_suggestion_to_google(
     suggestion_id: UUID,
     request: Request,
@@ -299,7 +319,9 @@ def sync_suggestion_to_google(
     if not suggestion:
         raise HTTPException(status_code=404, detail="Suggestion not found")
     if suggestion.status != "approved":
-        raise HTTPException(status_code=400, detail="Only approved suggestions can be synced")
+        raise HTTPException(
+            status_code=400, detail="Only approved suggestions can be synced"
+        )
     if suggestion.synced_to_google:
         raise HTTPException(status_code=400, detail="Already synced to Google Calendar")
     if not suggestion.assigned_calendar_id:
@@ -318,7 +340,9 @@ def sync_suggestion_to_google(
         )
     except Exception as exc:
         logger.exception("Failed to sync suggestion to Google Calendar")
-        raise HTTPException(status_code=502, detail=f"Google Calendar error: {exc}") from exc
+        raise HTTPException(
+            status_code=502, detail=f"Google Calendar error: {exc}"
+        ) from exc
 
     suggestion.synced_to_google = True
     suggestion.google_event_id = google_event_id
