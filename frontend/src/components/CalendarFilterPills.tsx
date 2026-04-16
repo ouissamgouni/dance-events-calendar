@@ -10,7 +10,7 @@ export default function CalendarFilterPills({ calendars, activeIds, onToggle }: 
     if (calendars.length === 0) return null;
 
     return (
-        <div className="flex flex-wrap gap-1.5 items-end">
+        <div className="flex flex-nowrap gap-1.5 items-end overflow-x-auto scrollbar-hide">
             {calendars.map((cal) => {
                 const active = activeIds.has(cal.calendar_id);
                 const color = cal.color || '#3b82f6';

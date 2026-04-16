@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { FeatureFlagsProvider } from './context/FeatureFlagsContext';
@@ -6,6 +7,7 @@ import { QaTestPlanProvider } from './components/QaTestPlanPanel';
 import { StatusBar } from './components/StatusBar';
 import InstagramBadge from './components/InstagramBadge';
 import SavedEventsFab from './components/SavedEventsFab';
+import SuggestEventModal from './components/SuggestEventModal';
 import ProtectedRoute from './components/ProtectedRoute';
 import Home from './pages/Home';
 import Admin from './pages/Admin';
@@ -14,6 +16,8 @@ import EventDetailPage from './pages/EventDetailPage';
 import MyCalendar from './pages/MyCalendar';
 
 export default function App() {
+  const [showSuggestModal, setShowSuggestModal] = useState(false);
+
   return (
     <AuthProvider>
       <FeatureFlagsProvider>
@@ -24,6 +28,13 @@ export default function App() {
                 <span className="text-sm font-bold text-white tracking-tight">🔥 Salsa Events</span>
                 <div className="flex items-center gap-3">
                   <SavedEventsFab />
+                  <button
+                    onClick={() => setShowSuggestModal(true)}
+                    className="bg-gray-700 px-2.5 py-1 text-xs font-medium text-white rounded hover:bg-gray-600 transition"
+                  >
+                    <span className="sm:hidden">Suggest</span>
+                    <span className="hidden sm:inline">Suggest an Event</span>
+                  </button>
                   <InstagramBadge />
                 </div>
               </div>
@@ -45,6 +56,9 @@ export default function App() {
               </main>
               <StatusBar />
             </div>
+            {showSuggestModal && (
+              <SuggestEventModal onClose={() => setShowSuggestModal(false)} />
+            )}
           </QaTestPlanProvider>
         </SavedEventsProvider>
       </FeatureFlagsProvider>

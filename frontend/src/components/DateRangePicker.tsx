@@ -43,11 +43,11 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
         const nextSummerEnd = today > summerEnd ? new Date(year + 1, 7, 31) : summerEnd;
 
         return [
-            { label: 'This weekend', start: formatDate(weekend), end: formatDate(sunday) },
+            { label: 'Weekend', start: formatDate(weekend), end: formatDate(sunday) },
             { label: 'Next week', start: formatDate(today), end: formatDate(nextWeek) },
             { label: 'Next month', start: formatDate(today), end: formatDate(nextMonth) },
-            { label: 'Next 6 months', start: formatDate(today), end: formatDate(next6Months) },
-            { label: 'Next summer', start: formatDate(nextSummerStart), end: formatDate(nextSummerEnd) },
+            { label: '6 months', start: formatDate(today), end: formatDate(next6Months) },
+            { label: 'Summer', start: formatDate(nextSummerStart), end: formatDate(nextSummerEnd) },
         ];
     }, []);
 

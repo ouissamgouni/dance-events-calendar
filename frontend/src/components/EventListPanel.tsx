@@ -115,14 +115,14 @@ export default function EventListPanel({
                         className={`sort-btn ${sortBy === 'date' ? 'active' : ''}`}
                         onClick={() => onSortChange('date')}
                     >
-                        Date
+                        Date {sortBy === 'date' && '↓'}
                     </button>
                     {showPopularity && (
                         <button
                             className={`sort-btn ${sortBy === 'popularity' ? 'active' : ''}`}
                             onClick={() => onSortChange('popularity')}
                         >
-                            Popular
+                            Popular {sortBy === 'popularity' && '↓'}
                         </button>
                     )}
                 </div>

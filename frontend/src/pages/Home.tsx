@@ -9,7 +9,6 @@ import EventMap from '../components/EventMap';
 import type { MapBounds } from '../components/EventMap';
 import EventModal from '../components/EventModal';
 import EventEditModal from '../components/EventEditModal';
-import SuggestEventModal from '../components/SuggestEventModal';
 import CalendarFilterPills from '../components/CalendarFilterPills';
 import DateRangePicker from '../components/DateRangePicker';
 import EventListPanel from '../components/EventListPanel';
@@ -29,7 +28,6 @@ export default function Home() {
     const [error, setError] = useState<string | null>(null);
     const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
     const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
-    const [showSuggestModal, setShowSuggestModal] = useState(false);
     const [calendars, setCalendars] = useState<CalendarSetting[]>([]);
     const [activeCalendarIds, setActiveCalendarIds] = useState<Set<string> | null>(null);
     const [viewMode, setViewMode] = useState<ViewMode>('explorer');
@@ -147,8 +145,8 @@ export default function Home() {
         <div className="min-h-screen bg-[#f8fafc]">
             <main className="mx-auto max-w-7xl px-4 py-4">
                 {!loading && !error && (
-                    <div className="mb-4 flex flex-wrap items-center gap-3">
-                        <div className="flex gap-1 bg-slate-200 p-1 shrink-0">
+                    <div className="mb-4 flex flex-col gap-2">
+                        <div className="flex gap-1 bg-slate-200 p-1 shrink-0 w-fit">
                             <button
                                 className={`px-3 py-1 text-sm transition ${viewMode === 'explorer' ? 'bg-white text-slate-900 font-medium shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                                 onClick={() => setViewMode('explorer')}
@@ -169,12 +167,6 @@ export default function Home() {
                                 onToggle={handleToggleCalendar}
                             />
                         )}
-                        <button
-                            onClick={() => setShowSuggestModal(true)}
-                            className="ml-auto bg-gray-800 px-4 py-1.5 text-sm font-medium text-white shadow hover:bg-gray-700 transition"
-                        >
-                            Suggest an Event
-                        </button>
                     </div>
                 )}
                 {loading && (
@@ -206,7 +198,7 @@ export default function Home() {
                             </div>
                         </div>
                         {/* Map: order-2 on mobile, right column on desktop */}
-                        <div className="order-2 lg:order-2 h-[400px] lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
+                        <div className="order-2 lg:order-2 h-[250px] lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
                             <EventMap
                                 events={filteredEvents}
                                 focusedEvent={selectedEvent}
@@ -301,9 +293,6 @@ export default function Home() {
                     onClose={() => setEditingEvent(null)}
                     onSaved={handleEventSaved}
                 />
-            )}
-            {showSuggestModal && (
-                <SuggestEventModal onClose={() => setShowSuggestModal(false)} />
             )}
         </div>
     );
