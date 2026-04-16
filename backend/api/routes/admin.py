@@ -16,7 +16,7 @@ from backend.api.schemas import (
     SyncLogResponse,
 )
 from backend.db.database import get_session
-from backend.db.models import CachedEvent, CalendarSetting, EventView, SyncLog
+from backend.db.models import CachedEvent, CalendarSetting, EventSave, EventView, SyncLog
 from backend.services.geocoding import geocode_location
 from backend.services.sync_service import SyncService
 
@@ -184,6 +184,71 @@ def most_viewed_events(
         .limit(limit)
     ).all()
     return [{"event_id": r[0], "view_count": r[1]} for r in results]
+
+
+@router.get("/most-saved-events")
+def most_saved_events(
+    limit: int = 20,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Top events by net save count (saves minus unsaves per device)."""
+    from sqlalchemy import case, literal_column
+
+    # Count net saves: for each (event_id, device_id), check if latest action is "save"
+    # Simpler approach: count saves minus unsaves per event
+    save_counts = session.exec(
+        select(
+            EventSave.event_id,
+            func.sum(
+                case(
+                    (EventSave.action == "save", 1),
+                    (EventSave.action == "unsave", -1),
+                    else_=0,
+                )
+            ).label("save_count"),
+        )
+        .group_by(EventSave.event_id)
+        .having(
+            func.sum(
+                case(
+                    (EventSave.action == "save", 1),
+                    (EventSave.action == "unsave", -1),
+                    else_=0,
+                )
+            )
+            > 0
+        )
+        .order_by(
+            func.sum(
+                case(
+                    (EventSave.action == "save", 1),
+                    (EventSave.action == "unsave", -1),
+                    else_=0,
+                )
+            ).desc()
+        )
+        .limit(limit)
+    ).all()
+
+    # Enrich with event titles
+    event_ids = [r[0] for r in save_counts]
+    events_map: dict[str, CachedEvent] = {}
+    if event_ids:
+        evts = session.exec(
+            select(CachedEvent).where(CachedEvent.event_id.in_(event_ids))
+        ).all()
+        events_map = {e.event_id: e for e in evts}
+
+    return [
+        {
+            "event_id": r[0],
+            "title": events_map[r[0]].title if r[0] in events_map else "Unknown",
+            "start": events_map[r[0]].start.isoformat() if r[0] in events_map else None,
+            "save_count": r[1],
+        }
+        for r in save_counts
+    ]
 
 
 @router.get("/sync-logs", response_model=list[SyncLogResponse])

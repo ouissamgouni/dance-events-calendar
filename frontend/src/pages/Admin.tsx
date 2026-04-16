@@ -1,14 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { CalendarSetting, CalendarEvent } from '../types';
+import type { CalendarSetting, CalendarEvent, EventSuggestion } from '../types';
 import type { SyncLogEntry } from '../api';
 import {
     fetchAdminCalendars, updateCalendar, discoverCalendars, triggerSync, addCalendar,
     fetchSettings, updateSettings, fetchSyncLogs, fetchPendingEvents, reviewEvent, markAllReviewed,
+    fetchSuggestions, fetchMostSavedEvents,
 } from '../api';
+import type { MostSavedEvent } from '../api';
 import { useAuth } from '../context/AuthContext';
 import SyncHistoryPanel from '../components/SyncHistoryPanel';
 import PendingReviewPanel from '../components/PendingReviewPanel';
+import SuggestionsPanel from '../components/SuggestionsPanel';
+import UnsyncedSuggestionsPanel from '../components/UnsyncedSuggestionsPanel';
 
 export default function Admin() {
     const [calendars, setCalendars] = useState<CalendarSetting[]>([]);
@@ -26,6 +30,10 @@ export default function Admin() {
     const [editingName, setEditingName] = useState('');
     const [syncPanelOpen, setSyncPanelOpen] = useState(false);
     const [pendingPanelOpen, setPendingPanelOpen] = useState(false);
+    const [suggestionsPanelOpen, setSuggestionsPanelOpen] = useState(false);
+    const [unsyncedPanelOpen, setUnsyncedPanelOpen] = useState(false);
+    const [suggestions, setSuggestions] = useState<EventSuggestion[]>([]);
+    const [mostSaved, setMostSaved] = useState<MostSavedEvent[]>([]);
     const { user, logout } = useAuth();
     const navigate = useNavigate();
 
@@ -46,6 +54,8 @@ export default function Admin() {
         }).catch(() => { });
         fetchSyncLogs().then(setSyncLogs).catch(() => { });
         fetchPendingEvents().then(setPendingEvents).catch(() => { });
+        fetchSuggestions().then(setSuggestions).catch(() => { });
+        fetchMostSavedEvents().then(setMostSaved).catch(() => { });
     }, []);
 
     const handleToggle = async (cal: CalendarSetting) => {
@@ -278,6 +288,28 @@ export default function Admin() {
                         </span>
                     )}
                 </button>
+                <button
+                    onClick={() => setSuggestionsPanelOpen(true)}
+                    className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
+                >
+                    Suggestions
+                    {suggestions.filter((s) => s.status === 'pending').length > 0 && (
+                        <span className="inline-flex items-center justify-center bg-amber-500 text-white text-[10px] font-semibold px-1.5 py-0 min-w-[16px]">
+                            {suggestions.filter((s) => s.status === 'pending').length}
+                        </span>
+                    )}
+                </button>
+                <button
+                    onClick={() => { setUnsyncedPanelOpen(true); }}
+                    className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
+                >
+                    Unsynced
+                    {suggestions.filter((s) => s.status === 'approved' && !s.synced_to_google).length > 0 && (
+                        <span className="inline-flex items-center justify-center bg-orange-500 text-white text-[10px] font-semibold px-1.5 py-0 min-w-[16px]">
+                            {suggestions.filter((s) => s.status === 'approved' && !s.synced_to_google).length}
+                        </span>
+                    )}
+                </button>
             </div>
 
             {message && (
@@ -459,6 +491,24 @@ export default function Admin() {
                 </div>
             </div>
 
+            {/* Most Saved Events */}
+            {mostSaved.length > 0 && (
+                <div className="mt-6 bg-white border border-gray-200 p-4">
+                    <h2 className="text-sm font-bold text-gray-800 mb-3">📌 Most Saved Events</h2>
+                    <div className="space-y-2">
+                        {mostSaved.map((item, i) => (
+                            <div key={item.event_id} className="flex items-center justify-between text-xs">
+                                <span className="text-gray-700 truncate flex-1">
+                                    <span className="text-gray-400 mr-2">#{i + 1}</span>
+                                    {item.title || item.event_id}
+                                </span>
+                                <span className="text-rose-600 font-medium ml-2">{item.save_count} save{item.save_count !== 1 ? 's' : ''}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Slide-Out Panels */}
             <SyncHistoryPanel
                 isOpen={syncPanelOpen}
@@ -473,6 +523,28 @@ export default function Admin() {
                 onMarkAllReviewed={handleMarkAllReviewed}
                 onEventSaved={handleEventSaved}
                 busy={busy}
+            />
+            <SuggestionsPanel
+                isOpen={suggestionsPanelOpen}
+                onClose={() => setSuggestionsPanelOpen(false)}
+                suggestions={suggestions}
+                calendars={calendars}
+                onUpdated={(updated) => {
+                    setSuggestions((prev) =>
+                        prev.map((s) => (s.id === updated.id ? updated : s)),
+                    );
+                }}
+            />
+            <UnsyncedSuggestionsPanel
+                isOpen={unsyncedPanelOpen}
+                onClose={() => setUnsyncedPanelOpen(false)}
+                suggestions={suggestions}
+                calendars={calendars}
+                onUpdated={(updated) => {
+                    setSuggestions((prev) =>
+                        prev.map((s) => (s.id === updated.id ? updated : s)),
+                    );
+                }}
             />
         </div>
     );

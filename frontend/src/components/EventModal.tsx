@@ -2,6 +2,7 @@ import type { CalendarEvent } from '../types';
 import { parseLinks } from '../utils/parseLinks';
 import { deriveLinkLabel } from '../utils/deriveLinkLabel';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
+import { useSavedEvents } from '../context/SavedEventsContext';
 import LocationBadge from './LocationBadge';
 
 interface Props {
@@ -12,6 +13,8 @@ interface Props {
 
 export default function EventModal({ event, onClose, onEdit }: Props) {
     const { showPrices, showPopularity } = useFeatureFlags();
+    const { isSaved, toggleSave } = useSavedEvents();
+    const saved = isSaved(event.event_id);
     const fallbackLinks = parseLinks(event.description);
     const structuredLinks = event.links && event.links.length > 0 ? event.links : null;
     const start = new Date(event.start);
@@ -48,19 +51,29 @@ export default function EventModal({ event, onClose, onEdit }: Props) {
                                 : `${formatDate(start)} · ${formatTime(start)} – ${formatTime(end)}`}
                         </p>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="ml-4 shrink-0 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
-                        aria-label="Close"
-                    >
-                        ✕
-                    </button>
+                    <div className="ml-4 flex items-center gap-1 shrink-0">
+                        <button
+                            onClick={(e) => { e.stopPropagation(); toggleSave(event.event_id); }}
+                            className={`rounded-full p-1.5 transition ${saved ? 'text-slate-700 hover:text-slate-900' : 'text-slate-300 hover:text-slate-500'}`}
+                            aria-label={saved ? 'Unsave event' : 'Save event'}
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                                <path d="M5 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14l-5-2.5L5 18V4Z" />
+                            </svg>
+                        </button>
+                        <button
+                            onClick={onClose}
+                            className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+                            aria-label="Close"
+                        >
+                            ✕
+                        </button>
+                    </div>
                 </div>
 
                 {/* Scrollable body */}
                 <div className="modal-scroll overflow-y-auto overscroll-contain px-6 py-4 space-y-4 text-sm text-slate-600">
                     <div className="flex items-center gap-2">
-                        <LocationBadge location={event.location} latitude={event.latitude} longitude={event.longitude} />
                         {showPrices && event.price_is_free && (
                             <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
                                 Free
@@ -82,7 +95,10 @@ export default function EventModal({ event, onClose, onEdit }: Props) {
 
                     {event.location && (
                         <p className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2 text-slate-700">
-                            <span className="mt-0.5">📍</span>
+                            <span className="mt-0.5 flex items-center gap-1">
+                                📍
+                                <LocationBadge size="sm" location={event.location} latitude={event.latitude} longitude={event.longitude} />
+                            </span>
                             <span>{event.location}</span>
                         </p>
                     )}

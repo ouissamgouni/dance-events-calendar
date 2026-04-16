@@ -1,0 +1,148 @@
+# Event Suggestions — QA Test Plan
+# ===================================
+# Validates the full event suggestion workflow: public submission,
+# admin review, approve/reject, and Google Calendar sync.
+
+test_plan:
+  name: "Event Suggestions — Full Workflow QA"
+  description: >
+    End-to-end test of the event suggestion feature: public form submission
+    with honeypot, admin review panel, approve/reject flows, structured links,
+    and sync-to-Google (mock).
+
+  steps:
+    - id: 1
+      title: "Home page loads with Suggest button"
+      description: >
+        Open the home page. Verify events load and the "Suggest an Event"
+        button is visible in the toolbar area.
+      expected: >
+        Calendar/explorer view renders with seed events. A rose-coloured
+        "Suggest an Event" button appears near the view mode toggle.
+      verification: "Button is visible and clickable"
+
+    - id: 2
+      title: "Suggest modal opens with full form"
+      description: >
+        Click "Suggest an Event". Verify the modal opens with all form fields.
+      expected: >
+        Modal shows: title, description, location (with autocomplete),
+        links (dynamic rows), start, end, all_day checkbox, name, email.
+      verification: "All fields present, modal renders cleanly"
+
+    - id: 3
+      title: "Submit empty form shows validation"
+      description: >
+        Click Submit without filling in any fields.
+      expected: >
+        Title field shows required validation error. Form does not submit.
+      verification: "Client-side validation triggers for title"
+
+    - id: 4
+      title: "Location autocomplete works"
+      description: >
+        Type a location like "Berlin" in the location field.
+      expected: >
+        Address suggestions appear in a dropdown after a short debounce.
+        Selecting one populates the field.
+      verification: "Nominatim geocode endpoint responds, suggestions show"
+
+    - id: 5
+      title: "Submit full suggestion"
+      description: >
+        Fill in: title "Salsa Open Air", dates, description, select location
+        from autocomplete, add a link (https://example.com, "Tickets"),
+        fill name and email. Submit.
+      expected: >
+        Success message "Thank you! Your suggestion is under review."
+        appears. Form resets or closes.
+      verification: "201 response, success UI shown"
+
+    - id: 6
+      title: "Submit minimal suggestion"
+      description: >
+        Open suggest modal again. Fill only title + start + end. Submit.
+      expected: >
+        Success message appears. Only required fields needed.
+      verification: "Minimal submission succeeds"
+
+    - id: 7
+      title: "Admin login"
+      description: >
+        Use dev login to access the admin panel.
+      expected: >
+        Admin page loads with calendar sources, settings, feature flags.
+      verification: "Admin page renders with action bar"
+
+    - id: 8
+      title: "Suggestions panel shows pending items"
+      description: >
+        Click the "Suggestions" button in the admin action bar.
+      expected: >
+        Slide-out panel opens. Two pending suggestions are listed (from
+        steps 5 and 6). Pending tab is active with count badge.
+      verification: "Panel shows 2 suggestions with amber pending badges"
+
+    - id: 9
+      title: "Review modal shows details + metadata"
+      description: >
+        Click the first suggestion (Salsa Open Air) in the panel.
+      expected: >
+        Review modal opens showing all event fields, the link, and
+        submitter metadata section (IP, timezone, screen size, etc.).
+      verification: "All fields + metadata section visible"
+
+    - id: 10
+      title: "Edit suggestion title"
+      description: >
+        In the review modal, change the title to "Salsa Open Air Festival".
+        Click "Save Changes".
+      expected: >
+        Title updates. No error shown.
+      verification: "PATCH request succeeds, title reflected in panel"
+
+    - id: 11
+      title: "Approve suggestion to Salsa Events calendar"
+      description: >
+        Select "Salsa Events" from the calendar dropdown. Click "Approve".
+      expected: >
+        Status badge changes to green "approved". assigned_calendar_id set.
+        A CachedEvent is created (visible on Home page).
+      verification: "Status approved, event appears in public calendar"
+
+    - id: 12
+      title: "Approved event visible on Home page"
+      description: >
+        Navigate back to the Home page.
+      expected: >
+        The approved event "Salsa Open Air Festival" appears in the
+        calendar/explorer view alongside the seed events.
+      verification: "Event shows in event list/calendar"
+
+    - id: 13
+      title: "Sync to Google button on approved suggestion"
+      description: >
+        Go back to Admin → Suggestions. Click the approved suggestion.
+      expected: >
+        "Sync to Google" button is visible. Click it.
+        Status shows "✓ Synced to Google" after success (mock returns ID).
+      verification: "Sync button works, synced_to_google=true"
+
+    - id: 14
+      title: "Reject second suggestion"
+      description: >
+        Click the second suggestion (minimal one). Click "Reject".
+        Add notes "Duplicate event" and confirm.
+      expected: >
+        Status changes to red "rejected". Admin notes saved.
+        reviewed_at timestamp set.
+      verification: "Status rejected with notes"
+
+    - id: 15
+      title: "Status filter tabs work"
+      description: >
+        Use the filter tabs at the top of the Suggestions panel.
+      expected: >
+        All: 2 suggestions. Pending: 0. Approved: 1. Rejected: 1.
+        Counts in tab labels match.
+      verification: "Filter tabs correctly filter and show counts"

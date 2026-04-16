@@ -5,6 +5,3 @@ calendars:
   - id: "bachata-cal-002"
     name: "Bachata"
     color: "#7c3aed"
-  - id: "kizomba-cal-003"
-    name: "Kizomba"
-    color: "#2563eb"

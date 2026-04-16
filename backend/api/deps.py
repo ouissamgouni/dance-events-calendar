@@ -4,7 +4,11 @@ import logging
 from fastapi import Cookie, Depends, HTTPException, Request
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 
-from backend.config.loader import get_admin_email, get_session_secret, get_trusted_proxies
+from backend.config.loader import (
+    get_admin_email,
+    get_session_secret,
+    get_trusted_proxies,
+)
 
 logger = logging.getLogger(__name__)
 

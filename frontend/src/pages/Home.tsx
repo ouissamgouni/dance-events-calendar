@@ -171,7 +171,7 @@ export default function Home() {
                         )}
                         <button
                             onClick={() => setShowSuggestModal(true)}
-                            className="ml-auto rounded-full bg-rose-600 px-4 py-1.5 text-sm font-medium text-white shadow hover:bg-rose-700 transition"
+                            className="ml-auto bg-gray-800 px-4 py-1.5 text-sm font-medium text-white shadow hover:bg-gray-700 transition"
                         >
                             Suggest an Event
                         </button>

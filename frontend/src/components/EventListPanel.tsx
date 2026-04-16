@@ -1,4 +1,5 @@
 import type { CalendarEvent } from '../types';
+import { useSavedEvents } from '../context/SavedEventsContext';
 
 interface MapBounds {
     north: number;
@@ -85,6 +86,8 @@ export default function EventListPanel({
     sortBy,
     onSortChange,
 }: EventListPanelProps) {
+    const { isSaved, toggleSave } = useSavedEvents();
+
     // Filter to events within map bounds
     const visibleEvents = mapBounds
         ? events.filter((e) => isInBounds(e, mapBounds))
@@ -141,7 +144,7 @@ export default function EventListPanel({
                                 onClick={() => onEventClick(event)}
                             >
                                 <div className="event-card-color" style={{ backgroundColor: event.color || '#6b7280' }} />
-                                <div className="event-card-content">
+                                <div className="event-card-content relative">
                                     <h4 className="event-card-title">{event.title}</h4>
                                     <p className="event-card-date">
                                         {event.all_day ? formatDate(start) : `${formatDate(start)} · ${formatTime(start)}`}
@@ -155,6 +158,18 @@ export default function EventListPanel({
                                             <PopularityBadge viewCount={event.view_count} allViewCounts={allViewCounts} />
                                         )}
                                     </div>
+                                    <span
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={(e) => { e.stopPropagation(); toggleSave(event.event_id); }}
+                                        onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); toggleSave(event.event_id); } }}
+                                        className={`absolute top-0 right-0 cursor-pointer transition ${isSaved(event.event_id) ? 'text-slate-700' : 'text-slate-300 hover:text-slate-500'}`}
+                                        aria-label={isSaved(event.event_id) ? 'Unsave event' : 'Save event'}
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                                            <path d="M5 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14l-5-2.5L5 18V4Z" />
+                                        </svg>
+                                    </span>
                                 </div>
                             </button>
                         );

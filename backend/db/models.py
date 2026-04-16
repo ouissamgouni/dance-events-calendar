@@ -49,6 +49,16 @@ class EventView(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class EventSave(SQLModel, table=True):
+    __tablename__ = "event_saves"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    event_id: str = Field(index=True)
+    device_id: str = Field(index=True)
+    action: str = Field(default="save")  # save | unsave
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class SiteSetting(SQLModel, table=True):
     __tablename__ = "site_settings"
 

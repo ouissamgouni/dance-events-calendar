@@ -322,3 +322,69 @@ export async function syncSuggestionToGoogle(id: string): Promise<EventSuggestio
     }
     return res.json();
 }
+
+// --- Event Save Tracking ---
+
+export async function trackEventSave(
+    eventId: string,
+    deviceId: string,
+    action: 'save' | 'unsave',
+): Promise<void> {
+    await fetch(`${BASE}/track/event-save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_id: eventId, device_id: deviceId, action }),
+    });
+}
+
+// --- Batch Fetch Events ---
+
+export async function fetchEventsByIds(eventIds: string[]): Promise<CalendarEvent[]> {
+    if (eventIds.length === 0) return [];
+    const res = await fetch(`${BASE}/events/by-ids`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_ids: eventIds }),
+    });
+    if (!res.ok) throw new Error('Failed to fetch events by IDs');
+    return res.json();
+}
+
+// --- Export ---
+
+export async function exportIcs(eventIds: string[]): Promise<Blob> {
+    const res = await fetch(`${BASE}/events/export/ics`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_ids: eventIds }),
+    });
+    if (!res.ok) throw new Error('Failed to export ICS');
+    return res.blob();
+}
+
+export async function exportXlsx(eventIds: string[]): Promise<Blob> {
+    const res = await fetch(`${BASE}/events/export/xlsx`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_ids: eventIds }),
+    });
+    if (!res.ok) throw new Error('Failed to export XLSX');
+    return res.blob();
+}
+
+// --- Admin: Most Saved ---
+
+export interface MostSavedEvent {
+    event_id: string;
+    title: string;
+    start: string | null;
+    save_count: number;
+}
+
+export async function fetchMostSavedEvents(limit = 20): Promise<MostSavedEvent[]> {
+    const res = await fetch(`${BASE}/admin/most-saved-events?limit=${limit}`, {
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to fetch most saved events');
+    return res.json();
+}

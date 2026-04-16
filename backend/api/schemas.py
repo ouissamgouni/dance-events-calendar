@@ -52,6 +52,20 @@ class EventViewRequest(BaseModel):
     event_id: str
 
 
+class EventSaveRequest(BaseModel):
+    event_id: str
+    device_id: str = Field(..., min_length=1, max_length=64)
+    action: str = Field(..., pattern="^(save|unsave)$")
+
+
+class EventBatchRequest(BaseModel):
+    event_ids: list[str] = Field(..., min_length=1, max_length=100)
+
+
+class ExportRequest(BaseModel):
+    event_ids: list[str] = Field(..., min_length=1, max_length=100)
+
+
 class HealthResponse(BaseModel):
     status: str
     env: str

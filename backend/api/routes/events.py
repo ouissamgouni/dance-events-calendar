@@ -9,7 +9,7 @@ from sqlalchemy import func
 from sqlmodel import Session, select
 
 from backend.api.routes.settings import _get_since_date
-from backend.api.schemas import CalendarSettingResponse, EventResponse
+from backend.api.schemas import CalendarSettingResponse, EventBatchRequest, EventResponse
 from backend.db.database import get_session
 from backend.db.models import CachedEvent, CalendarSetting, EventView
 
@@ -111,6 +111,65 @@ def get_events(
     response = JSONResponse(content=[d.model_dump(mode="json") for d in data])
     response.headers["Cache-Control"] = "public, max-age=60"
     return response
+
+
+@router.post("/by-ids", response_model=list[EventResponse])
+@limiter.limit("30/minute")
+def get_events_by_ids(
+    request: Request,
+    payload: EventBatchRequest,
+    session: Session = Depends(get_session),
+):
+    """Fetch events by a list of IDs (for saved events / My Calendar page)."""
+    enabled_calendars = session.exec(
+        select(CalendarSetting).where(CalendarSetting.enabled == True)
+    ).all()
+    calendar_ids = [c.calendar_id for c in enabled_calendars]
+    color_map = {c.calendar_id: c.color for c in enabled_calendars}
+
+    if not calendar_ids:
+        return []
+
+    events = session.exec(
+        select(CachedEvent).where(
+            CachedEvent.event_id.in_(payload.event_ids),
+            CachedEvent.calendar_id.in_(calendar_ids),
+            CachedEvent.deleted_at == None,
+        )
+    ).all()
+
+    event_ids = [e.event_id for e in events]
+    view_counts: dict[str, int] = {}
+    if event_ids:
+        rows = session.exec(
+            select(EventView.event_id, func.count(EventView.id))
+            .where(EventView.event_id.in_(event_ids))
+            .group_by(EventView.event_id)
+        ).all()
+        view_counts = {row[0]: row[1] for row in rows}
+
+    return [
+        EventResponse(
+            event_id=e.event_id,
+            calendar_id=e.calendar_id,
+            title=e.title,
+            description=e.description,
+            location=e.location,
+            start=e.start,
+            end=e.end,
+            all_day=e.all_day,
+            latitude=e.latitude,
+            longitude=e.longitude,
+            color=color_map.get(e.calendar_id),
+            view_count=view_counts.get(e.event_id, 0),
+            price_min=e.price_min,
+            price_max=e.price_max,
+            price_currency=e.price_currency,
+            price_is_free=e.price_is_free,
+            links=e.links,
+        )
+        for e in events
+    ]
 
 
 @router.get("/{event_id}", response_model=EventResponse)
