@@ -37,6 +37,7 @@ export default function SyncHistoryPanel({ isOpen, onClose, syncLogs }: SyncHist
                             const duration = log.finished_at
                                 ? `${((new Date(log.finished_at).getTime() - new Date(log.started_at).getTime()) / 1000).toFixed(1)}s`
                                 : '—';
+                            const ep = log.enrichment_progress;
                             return (
                                 <div key={log.id} className="px-4 py-2.5 hover:bg-gray-50/50 transition">
                                     <div className="flex items-center justify-between mb-0.5">
@@ -54,6 +55,19 @@ export default function SyncHistoryPanel({ isOpen, onClose, syncLogs }: SyncHist
                                     <div className="text-[11px] text-gray-500 ml-3.5">
                                         {log.calendars_synced} cal · {log.events_upserted} upserted · {log.events_deleted} deleted
                                     </div>
+                                    {ep && (
+                                        <div className="ml-3.5 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                                            {Object.entries(ep).map(([stage, stats]) => (
+                                                <span key={stage} className="text-[10px] text-gray-400">
+                                                    {stage}: <span className="text-emerald-600">{stats.processed}</span>
+                                                    {stats.failed > 0 && <> / <span className="text-red-500">{stats.failed}f</span></>}
+                                                </span>
+                                            ))}
+                                            {log.enrichment_status === 'running' && (
+                                                <span className="text-[10px] text-blue-500 animate-pulse">enriching…</span>
+                                            )}
+                                        </div>
+                                    )}
                                     <div className="text-[10px] text-gray-400 ml-3.5 mt-0.5">
                                         {new Date(log.started_at).toLocaleString()}
                                     </div>

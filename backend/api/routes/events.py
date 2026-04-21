@@ -9,9 +9,14 @@ from sqlalchemy import func
 from sqlmodel import Session, select
 
 from backend.api.routes.settings import _get_since_date
-from backend.api.schemas import CalendarSettingResponse, EventBatchRequest, EventResponse
+from backend.api.schemas import (
+    CalendarSettingResponse,
+    EventBatchRequest,
+    EventResponse,
+)
+from backend.api.routes.tags import get_event_tags
 from backend.db.database import get_session
-from backend.db.models import CachedEvent, CalendarSetting, EventView
+from backend.db.models import CachedEvent, CalendarSetting, EventTag, EventView
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 
@@ -41,6 +46,9 @@ def get_events(
     ),
     end_date: Optional[str] = Query(
         None, description="Filter events up to this date (YYYY-MM-DD)"
+    ),
+    tag_ids: Optional[str] = Query(
+        None, description="Comma-separated tag IDs to filter by (AND logic)"
     ),
 ):
     since_date = _get_since_date(session)
@@ -72,6 +80,19 @@ def get_events(
         end_dt = end_dt.replace(hour=23, minute=59, second=59)
         query = query.where(CachedEvent.start <= end_dt)
 
+    # AND-filter by tags: event must have ALL specified tag_ids
+    if tag_ids:
+        try:
+            tid_list = [int(t.strip()) for t in tag_ids.split(",") if t.strip()]
+        except ValueError:
+            tid_list = []
+        for tid in tid_list:
+            query = query.where(
+                CachedEvent.event_id.in_(
+                    select(EventTag.event_id).where(EventTag.tag_id == tid)
+                )
+            )
+
     events = session.exec(query).all()
 
     # Batch-fetch view counts to avoid N+1
@@ -84,6 +105,9 @@ def get_events(
             .group_by(EventView.event_id)
         ).all()
         view_counts = {row[0]: row[1] for row in rows}
+
+    # Batch-fetch tags
+    tags_map = get_event_tags(session, event_ids)
 
     data = [
         EventResponse(
@@ -104,6 +128,7 @@ def get_events(
             price_currency=e.price_currency,
             price_is_free=e.price_is_free,
             links=e.links,
+            tags=tags_map.get(e.event_id, []),
         )
         for e in events
     ]
@@ -148,6 +173,8 @@ def get_events_by_ids(
         ).all()
         view_counts = {row[0]: row[1] for row in rows}
 
+    tags_map = get_event_tags(session, event_ids)
+
     return [
         EventResponse(
             event_id=e.event_id,
@@ -167,6 +194,7 @@ def get_events_by_ids(
             price_currency=e.price_currency,
             price_is_free=e.price_is_free,
             links=e.links,
+            tags=tags_map.get(e.event_id, []),
         )
         for e in events
     ]
@@ -203,6 +231,8 @@ def get_event(
         select(func.count(EventView.id)).where(EventView.event_id == event_id)
     ).one()
 
+    tags_map = get_event_tags(session, [event_id])
+
     data = EventResponse(
         event_id=event.event_id,
         calendar_id=event.calendar_id,
@@ -221,6 +251,7 @@ def get_event(
         price_currency=event.price_currency,
         price_is_free=event.price_is_free,
         links=event.links,
+        tags=tags_map.get(event_id, []),
     )
     response = JSONResponse(content=data.model_dump(mode="json"))
     response.headers["Cache-Control"] = "public, max-age=60"

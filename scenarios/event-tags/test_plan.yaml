@@ -1,0 +1,297 @@
+test_plan:
+  name: "Event Tags — Filter, Display, Suggest, Admin, Categories & Colors"
+  description: >
+    Verify the event tagging system: browsing tags, filtering events by tags,
+    displaying tag badges on events, suggesting tags (predefined + free-text),
+    admin tag management, admin tag categories card with group colors, and
+    color propagation across all tag components. Uses mock calendar service
+    with 12 events across 3 calendars, 34 predefined tags in 7 groups
+    (each with a distinct color), and 3 tag suggestions.
+  steps:
+    # ── Tag Display ─────────────────────────────────────────────
+    - id: 1
+      title: "Tag badges visible on event cards"
+      description: >
+        Open the home page in Explorer view. Find "Friday Salsa Social" in the
+        event list. Check that tag badges are displayed on the event card.
+      expected: >
+        Tags like "Social", "Salsa", "Beginner-friendly" appear as small
+        colored badges on the event card.
+
+    - id: 2
+      title: "Tags visible in event modal"
+      description: >
+        Click on "Paris Salsa Congress 2025" to open the event modal.
+      expected: >
+        Tags are displayed in the modal: Congress, Salsa, Bachata, Kizomba,
+        All Levels, Large, International, Indoor, Crowded, High-level Dancers.
+
+    - id: 3
+      title: "Tags visible on event detail page"
+      description: >
+        Navigate to /event/evt-tag-007 (Salsa on the Rooftop).
+      expected: >
+        Tags displayed: Social, Salsa, All Levels, Rooftop, Medium,
+        Live Band, Good Music, Spacious.
+
+    - id: 4
+      title: "Event without tags shows no badges"
+      description: >
+        Find "Sunday Kizomba Class" (evt-tag-012) in the event list.
+      expected: >
+        No tag badges are displayed on this event card.
+
+    # ── Tag Filtering ───────────────────────────────────────────
+    - id: 5
+      title: "Tag filter pills visible"
+      description: >
+        Check the filter area above the event list.
+      expected: >
+        Tag groups are shown as collapsible filter sections (Format, Scale,
+        Scope, Venue, Dance Style, Level, Vibe).
+
+    - id: 6
+      title: "Filter by single tag"
+      description: >
+        Click the "Workshop" pill under Format.
+      expected: >
+        Only events tagged 'workshop' appear: "Salsa On2 Intermediate Workshop"
+        and "Advanced Salsa Shines". Other events are hidden.
+
+    - id: 7
+      title: "Filter by multiple tags (AND logic)"
+      description: >
+        With "Workshop" still active, also click "Salsa" under Dance Style.
+      expected: >
+        Only events matching BOTH workshop AND salsa appear:
+        "Salsa On2 Intermediate Workshop" and "Advanced Salsa Shines".
+
+    - id: 8
+      title: "Filter narrows further with level"
+      description: >
+        Additionally click "Advanced" under Level.
+      expected: >
+        Only "Advanced Salsa Shines" remains (workshop + salsa + advanced).
+
+    - id: 9
+      title: "Clear filters"
+      description: >
+        Click the "Clear filters" button or deselect all active pills.
+      expected: >
+        All 12 events are shown again.
+
+    - id: 10
+      title: "Filter by vibe tag"
+      description: >
+        Click "Live Band" under Vibe.
+      expected: >
+        Only "Salsa on the Rooftop" appears (only event with live-band tag).
+
+    # ── Tag Suggestions (Public) ────────────────────────────────
+    - id: 11
+      title: "Suggest tag button visible"
+      description: >
+        Open the modal for "Sunday Kizomba Class" (untagged event).
+      expected: >
+        A "Suggest Tags" button is visible in the modal.
+
+    - id: 12
+      title: "Suggest predefined tag"
+      description: >
+        Click "Suggest Tags". Select "Beginner-friendly" from the Level group.
+        Submit the suggestion.
+      expected: >
+        Success message: "Thank you! Your tag suggestion has been submitted."
+
+    - id: 13
+      title: "Suggest free-text tag"
+      description: >
+        Open suggest tags for "Bachata Night". Type "cozy venue" in the
+        free-text field. Submit.
+      expected: >
+        Success message shown. Free-text suggestion submitted.
+
+    - id: 14
+      title: "Honeypot rejects bots"
+      description: >
+        (Developer test) Submit a tag suggestion with the honeypot 'website'
+        field filled in.
+      expected: >
+        Request returns 200 (silent rejection). No suggestion created in DB.
+
+    # ── Admin Tag Management ────────────────────────────────────
+    - id: 15
+      title: "Admin sees tag suggestions"
+      description: >
+        Log in as admin. Navigate to the tag suggestions panel.
+      expected: >
+        3 pending suggestions visible: "vibe:good-music" for Friday Salsa Social,
+        "romantic atmosphere" (free-text) for Bachata Night, "vibe:crowded"
+        for Salsa on the Rooftop.
+
+    - id: 16
+      title: "Approve predefined tag suggestion"
+      description: >
+        Approve the "vibe:good-music" suggestion for Friday Salsa Social.
+      expected: >
+        Suggestion status changes to "approved". The tag "Good Music" now
+        appears on "Friday Salsa Social".
+
+    - id: 17
+      title: "Approve free-text suggestion (assign to tag)"
+      description: >
+        For the "romantic atmosphere" suggestion, select an existing tag
+        (e.g., "Social Atmosphere" from Vibe) and approve.
+      expected: >
+        Suggestion approved. "Social Atmosphere" tag added to "Bachata Night".
+
+    - id: 18
+      title: "Reject tag suggestion"
+      description: >
+        Reject the "vibe:crowded" suggestion for Salsa on the Rooftop.
+        Add admin note: "Rooftop venue is spacious, not crowded."
+      expected: >
+        Suggestion status changes to "rejected" with admin note shown.
+
+    - id: 19
+      title: "Admin edits event tags directly"
+      description: >
+        Open "Sunday Kizomba Class" in the admin event editor.
+        Add tags: Class, Kizomba, All Levels, Indoor.
+      expected: >
+        Tags saved. Event now displays those 4 tag badges.
+
+    - id: 20
+      title: "Admin removes a tag from event"
+      description: >
+        On "Friday Salsa Social", remove the "Indoor" tag.
+      expected: >
+        "Indoor" tag badge disappears from the event. Other tags remain.
+
+    # ── Group Colors — Propagation ──────────────────────────────
+    - id: 21
+      title: "Tag badges use group color"
+      description: >
+        Open the home page. Find "Friday Salsa Social" and check the tag
+        badge colors.
+      expected: >
+        Each badge uses its group color: "Social" uses Format red (#e11d48),
+        "Salsa" uses Dance Style amber (#d97706), "Beginner-Friendly" uses
+        Level blue (#2563eb), "Indoor" uses Venue green (#059669), etc.
+
+    - id: 22
+      title: "Tag filter pills use group color"
+      description: >
+        Check the tag filter pills above the event list. Click "Workshop".
+      expected: >
+        The "Workshop" pill activates with Format red (#e11d48) background.
+        Inactive pills show the group color as text/border color.
+
+    - id: 23
+      title: "Event modal tags use group color"
+      description: >
+        Click on "Paris Salsa Congress 2025" to open the event modal.
+      expected: >
+        Tag badges in the modal use their respective group colors (e.g.
+        "Congress" in red, "Large" in cyan, "International" in purple).
+
+    - id: 24
+      title: "Suggest tags modal uses group color"
+      description: >
+        Open suggest tags for any event. Check the tag pill colors in the
+        selection grid.
+      expected: >
+        Tags are grouped and colored by group: Dance Style tags in amber,
+        Level tags in blue, Vibe tags in magenta, etc.
+
+    - id: 25
+      title: "Event tag editor uses group color"
+      description: >
+        Open the admin event editor for any event and check the tag toggle
+        buttons.
+      expected: >
+        Active tags show group color as background. Inactive tags show group
+        color as border/text.
+
+    # ── Admin Tag Categories Card ───────────────────────────────
+    - id: 26
+      title: "Tag Categories section visible in admin"
+      description: >
+        Log in as admin. Scroll to the Tag Categories section below the
+        3-column settings grid.
+      expected: >
+        A "Tag Categories" card is visible with a header and "+" button.
+        7 category cards are shown in a responsive grid.
+
+    - id: 27
+      title: "Category cards show color and label"
+      description: >
+        Inspect the "Dance Style" category card.
+      expected: >
+        Card header has a color swatch (#d97706 amber), the label
+        "Dance Style", and tag pills for Salsa, Bachata, Kizomba, Semba,
+        Zouk, Rueda, Cha-Cha, Son.
+
+    - id: 28
+      title: "Tag pills show event counts"
+      description: >
+        Check the tag pills inside the "Format" category card.
+      expected: >
+        Each tag pill displays its event count as a small badge, e.g.
+        "Social 4", "Workshop 2", "Congress 1", "Festival 1", etc.
+
+    - id: 29
+      title: "Change category color via color picker"
+      description: >
+        On the "Vibe" category card, click the color swatch and change the
+        color from magenta (#c026d3) to teal (#0d9488).
+      expected: >
+        The color swatch updates immediately. All tag pills in the Vibe
+        category change to teal. Navigating back to the event list, Vibe
+        tags (Good Music, Spacious, etc.) now appear in teal.
+
+    - id: 30
+      title: "Edit category label"
+      description: >
+        Click on the "Scope" category label text. Change it to "Reach".
+      expected: >
+        An inline text input appears. After typing "Reach" and pressing
+        Enter, the label updates. The filter pills section also shows
+        "Reach" as the group name.
+
+    - id: 31
+      title: "Add new tag to existing category"
+      description: >
+        On the "Venue" category card, click the "+" button. Type "Beach"
+        and press Enter.
+      expected: >
+        A new "Beach" tag pill appears in the Venue category with event
+        count 0. The tag is now available in filter pills and tag editors.
+
+    - id: 32
+      title: "Add new tag category"
+      description: >
+        Click the "+" button in the Tag Categories header. Type "Pricing"
+        and click Add.
+      expected: >
+        A new "Pricing" category card appears with no tags and no color.
+        The "+" button inside the card allows adding tags.
+
+    - id: 33
+      title: "Add tags to new category"
+      description: >
+        In the new "Pricing" category, click "+", add "Budget-Friendly",
+        then add "Premium".
+      expected: >
+        Two tag pills appear: "Budget-Friendly 0" and "Premium 0".
+        Set a color (#16a34a green) via the color picker. Both pills
+        turn green.
+
+    - id: 34
+      title: "New category appears in filters and editors"
+      description: >
+        Navigate back to the event list. Check filter pills and open the
+        tag editor on any event.
+      expected: >
+        "Pricing" group appears in the filter pills area and in the tag
+        editor modal, with "Budget-Friendly" and "Premium" as options.

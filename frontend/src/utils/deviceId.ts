@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'salsa_device_id';
+const STORAGE_KEY = 'movida_device_id';
 
 export function getDeviceId(): string {
     let id = localStorage.getItem(STORAGE_KEY);

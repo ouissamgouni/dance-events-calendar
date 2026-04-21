@@ -140,7 +140,7 @@ tasks:
     cmds:
       - |
         echo "═══════════════════════════════════════════════════════════════"
-        echo "  Salsa Events Calendar — Task Commands"
+        echo "  Movida — Task Commands"
         echo "═══════════════════════════════════════════════════════════════"
         echo ""
         echo "  ── Development ──────────────────────────────────────────"

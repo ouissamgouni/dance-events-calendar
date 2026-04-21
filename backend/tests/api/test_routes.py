@@ -268,42 +268,6 @@ class TestGeocodeEndpoint:
 
 @pytest.mark.unit
 class TestPendingReviewEndpoints:
-    def test_list_pending_events(self, sample_calendar):
-        pending_event = CachedEvent(
-            event_id="evt-pending",
-            calendar_id="cal-1",
-            title="Pending Event",
-            start=datetime(2099, 6, 1, 20, 0),
-            end=datetime(2099, 6, 1, 23, 0),
-            review_status="pending",
-        )
-
-        def mock_exec(stmt):
-            result = MagicMock()
-            sql_text = str(stmt)
-            if "calendar_settings" in sql_text:
-                result.all.return_value = [sample_calendar]
-            elif "cached_events" in sql_text:
-                result.all.return_value = [pending_event]
-            else:
-                result.all.return_value = []
-            return result
-
-        mock_session = MagicMock(spec=Session)
-        mock_session.exec = mock_exec
-        app.dependency_overrides[get_session] = lambda: mock_session
-        app.dependency_overrides[require_admin] = _fake_admin
-        try:
-            client = TestClient(app)
-            resp = client.get("/api/admin/events/pending")
-            assert resp.status_code == 200
-            data = resp.json()
-            assert len(data) == 1
-            assert data[0]["review_status"] == "pending"
-            assert data[0]["title"] == "Pending Event"
-        finally:
-            app.dependency_overrides.clear()
-
     def test_review_event_marks_reviewed(self):
         event = CachedEvent(
             event_id="evt-1",
@@ -342,41 +306,8 @@ class TestPendingReviewEndpoints:
         finally:
             app.dependency_overrides.clear()
 
-    def test_mark_all_reviewed(self):
-        pending = [
-            CachedEvent(
-                event_id=f"evt-{i}",
-                calendar_id="cal-1",
-                title=f"Event {i}",
-                start=datetime(2099, 6, 1, 20, 0),
-                end=datetime(2099, 6, 1, 23, 0),
-                review_status="pending",
-            )
-            for i in range(3)
-        ]
-
-        def mock_exec(stmt):
-            result = MagicMock()
-            result.all.return_value = pending
-            return result
-
-        mock_session = MagicMock(spec=Session)
-        mock_session.exec = mock_exec
-        app.dependency_overrides[get_session] = lambda: mock_session
-        app.dependency_overrides[require_admin] = _fake_admin
-        try:
-            client = TestClient(app)
-            resp = client.post("/api/admin/events/mark-all-reviewed")
-            assert resp.status_code == 200
-            data = resp.json()
-            assert data["marked_reviewed"] == 3
-            for evt in pending:
-                assert evt.review_status == "reviewed"
-        finally:
-            app.dependency_overrides.clear()
-
-    def test_pending_events_requires_auth(self):
+    def test_events_requires_auth(self):
         app.dependency_overrides.clear()
         client = TestClient(app)
-        resp = client.get("/api/admin/events/pending")
+        resp = client.get("/api/admin/events")
         assert resp.status_code in (401, 403)

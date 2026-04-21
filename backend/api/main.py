@@ -18,6 +18,7 @@ from backend.api.routes.events import router as events_router
 from backend.api.routes.export import router as export_router
 from backend.api.routes.settings import router as settings_router
 from backend.api.routes.suggestions import router as suggestions_router
+from backend.api.routes.tags import router as tags_router
 from backend.api.routes.tracking import router as tracking_router
 from backend.api.schemas import HealthResponse
 from backend.config.loader import get_calendar_service_type, get_cors_origins
@@ -56,7 +57,7 @@ async def lifespan(app: FastAPI):
         pass
 
 
-app = FastAPI(title="Salsa Events Calendar", lifespan=lifespan)
+app = FastAPI(title="Movida", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
 
@@ -82,6 +83,7 @@ app.include_router(admin_router)
 app.include_router(settings_router)
 app.include_router(config_router)
 app.include_router(suggestions_router)
+app.include_router(tags_router)
 
 
 @app.get("/health", response_model=HealthResponse)

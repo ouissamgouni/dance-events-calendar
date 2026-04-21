@@ -16,7 +16,7 @@ def main():
     parser = argparse.ArgumentParser(description="Seed the database")
     parser.add_argument(
         "--scenario",
-        default="mock",
+        required=True,
         help="Scenario name (folder under scenarios/)",
     )
     args = parser.parse_args()

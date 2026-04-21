@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 
 interface DateRangePickerProps {
     startDate: string;
@@ -11,43 +11,102 @@ function formatDate(date: Date): string {
 }
 
 export default function DateRangePicker({ startDate, endDate, onChange }: DateRangePickerProps) {
+    const toInputRef = useRef<HTMLInputElement>(null);
+
     const presets = useMemo(() => {
         const today = new Date();
+        const year = today.getFullYear();
+        const dayOfWeek = today.getDay(); // 0=Sun, 6=Sat
 
-        // This weekend
-        const weekend = new Date(today);
-        const dayOfWeek = today.getDay();
-        const daysUntilSat = dayOfWeek === 6 ? 0 : (6 - dayOfWeek);
-        weekend.setDate(today.getDate() + daysUntilSat);
-        const sunday = new Date(weekend);
-        sunday.setDate(weekend.getDate() + 1);
+        // ── Weekend (contextual "This" / "Next") ─────────────
+        let weekendSat: Date;
+        let weekendLabel: string;
+        if (dayOfWeek === 0) {
+            // Sunday → weekend is over, target next Sat–Sun
+            weekendSat = new Date(today);
+            weekendSat.setDate(today.getDate() + 6);
+            weekendLabel = 'Next weekend';
+        } else {
+            // Mon–Sat → upcoming (or current) Sat–Sun
+            const daysUntilSat = dayOfWeek === 6 ? 0 : 6 - dayOfWeek;
+            weekendSat = new Date(today);
+            weekendSat.setDate(today.getDate() + daysUntilSat);
+            weekendLabel = 'This weekend';
+        }
+        const weekendSun = new Date(weekendSat);
+        weekendSun.setDate(weekendSat.getDate() + 1);
 
-        // Next week: 7 days from today
+        // ── Next week ─────────────────────────────────────────
         const nextWeek = new Date(today);
         nextWeek.setDate(today.getDate() + 7);
 
-        // Next month: same day next month
+        // ── Next month ────────────────────────────────────────
         const nextMonth = new Date(today);
         nextMonth.setMonth(nextMonth.getMonth() + 1);
 
-        // Next 6 months
+        // ── Next 6 months ─────────────────────────────────────
         const next6Months = new Date(today);
         next6Months.setMonth(next6Months.getMonth() + 6);
 
-        // Next summer: June 1 – August 31 of the nearest upcoming summer
-        const year = today.getFullYear();
-        const summerStart = new Date(year, 5, 1); // June 1
-        const summerEnd = new Date(year, 7, 31); // Aug 31
-        // If we're past Aug 31, use next year's summer
-        const nextSummerStart = today > summerEnd ? new Date(year + 1, 5, 1) : summerStart;
-        const nextSummerEnd = today > summerEnd ? new Date(year + 1, 7, 31) : summerEnd;
+        // ── Seasons (meteorological) ──────────────────────────
+        const seasons = [
+            { icon: '🌸', startMonth: 2, endMonth: 4 },   // Spring: Mar–May
+            { icon: '☀️', startMonth: 5, endMonth: 7 },   // Summer: Jun–Aug
+            { icon: '🍂', startMonth: 8, endMonth: 10 },  // Fall:   Sep–Nov
+            { icon: '❄️', startMonth: 11, endMonth: 1 },  // Winter: Dec–Feb
+        ];
 
+        function seasonRange(idx: number, baseYear: number) {
+            const s = seasons[idx];
+            if (s.startMonth > s.endMonth) {
+                // Winter crosses year boundary
+                const start = new Date(baseYear, s.startMonth, 1);
+                const end = new Date(baseYear + 1, s.endMonth + 1, 0); // last day of Feb
+                return { start, end };
+            }
+            const start = new Date(baseYear, s.startMonth, 1);
+            const end = new Date(baseYear, s.endMonth + 1, 0); // last day of end month
+            return { start, end };
+        }
+
+        // Determine current season index
+        const month = today.getMonth();
+        let currentIdx: number;
+        if (month >= 2 && month <= 4) currentIdx = 0;       // Spring
+        else if (month >= 5 && month <= 7) currentIdx = 1;   // Summer
+        else if (month >= 8 && month <= 10) currentIdx = 2;  // Fall
+        else currentIdx = 3;                                   // Winter
+
+        // "This {season}" — remainder of current season
+        const currentBaseYear = (currentIdx === 3 && month <= 1) ? year - 1 : year;
+        const currentRange = seasonRange(currentIdx, currentBaseYear);
+        const thisSeasonStart = today > currentRange.start ? today : currentRange.start;
+
+        // Generate current season + next 3 seasons
+        const seasonPresets = Array.from({ length: 4 }, (_, offset) => {
+            const seasonIdx = (currentIdx + offset) % 4;
+            const seasonBaseYear = currentBaseYear + Math.floor((currentIdx + offset) / 4);
+            const range = seasonRange(seasonIdx, seasonBaseYear);
+
+            const label =
+                offset === 0
+                    ? `This ${seasons[seasonIdx].icon}`
+                    : `Next ${seasons[seasonIdx].icon}`;
+
+            return {
+                label,
+                start: formatDate(offset === 0 ? thisSeasonStart : range.start),
+                end: formatDate(range.end),
+            };
+        });
+
+        // ── Build in fixed display order ─────────────────────
         return [
-            { label: 'Weekend', start: formatDate(weekend), end: formatDate(sunday) },
+            { label: weekendLabel, start: formatDate(weekendSat), end: formatDate(weekendSun) },
             { label: 'Next week', start: formatDate(today), end: formatDate(nextWeek) },
             { label: 'Next month', start: formatDate(today), end: formatDate(nextMonth) },
-            { label: '6 months', start: formatDate(today), end: formatDate(next6Months) },
-            { label: 'Summer', start: formatDate(nextSummerStart), end: formatDate(nextSummerEnd) },
+            { label: 'Next 6 months', start: formatDate(today), end: formatDate(next6Months) },
+            ...seasonPresets,
         ];
     }, []);
 
@@ -59,12 +118,21 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
                     <input
                         type="date"
                         value={startDate}
-                        onChange={(e) => onChange(e.target.value, endDate)}
+                        onChange={(e) => {
+                            onChange(e.target.value, endDate);
+                            const toInput = toInputRef.current;
+                            if (!toInput) return;
+                            toInput.focus();
+                            if ('showPicker' in toInput && typeof toInput.showPicker === 'function') {
+                                toInput.showPicker();
+                            }
+                        }}
                     />
                 </label>
                 <label>
                     <span className="date-label">To</span>
                     <input
+                        ref={toInputRef}
                         type="date"
                         value={endDate}
                         onChange={(e) => onChange(startDate, e.target.value)}

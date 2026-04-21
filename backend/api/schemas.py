@@ -10,6 +10,19 @@ class LinkItem(BaseModel):
     label: Optional[str] = None
 
 
+class TagResponse(BaseModel):
+    id: int
+    slug: str
+    label: str
+    color: Optional[str] = None
+    ordinal: int = 0
+    group_slug: str
+    group_label: str
+    group_color: Optional[str] = None
+    event_count: Optional[int] = None
+    enabled: bool = True
+
+
 class EventResponse(BaseModel):
     event_id: str
     calendar_id: str
@@ -29,6 +42,7 @@ class EventResponse(BaseModel):
     price_is_free: bool = False
     review_status: str = "reviewed"
     links: Optional[list[LinkItem]] = None
+    tags: list[TagResponse] = []
 
 
 class CalendarSettingResponse(BaseModel):
@@ -50,12 +64,26 @@ class CalendarAddRequest(BaseModel):
 
 class EventViewRequest(BaseModel):
     event_id: str
+    device_id: Optional[str] = Field(default=None, max_length=64)
+    source: Optional[str] = Field(default=None, pattern="^(calendar|list|map|direct)$")
 
 
 class EventSaveRequest(BaseModel):
     event_id: str
     device_id: str = Field(..., min_length=1, max_length=64)
     action: str = Field(..., pattern="^(save|unsave)$")
+
+
+class EventLinkClickRequest(BaseModel):
+    event_id: str
+    url: str = Field(..., min_length=1, max_length=2048)
+    device_id: Optional[str] = Field(default=None, max_length=64)
+
+
+class EventExportRequest(BaseModel):
+    format: str = Field(..., pattern="^(ics|xlsx)$")
+    event_count: int = Field(..., ge=0, le=10000)
+    device_id: Optional[str] = Field(default=None, max_length=64)
 
 
 class EventBatchRequest(BaseModel):
@@ -95,6 +123,8 @@ class SyncLogResponse(BaseModel):
     events_upserted: int
     events_deleted: int
     error_message: Optional[str] = None
+    enrichment_status: str = "pending"
+    enrichment_progress: Optional[dict] = None
 
 
 class EventUpdateRequest(BaseModel):
@@ -111,6 +141,7 @@ class EventUpdateRequest(BaseModel):
     price_currency: Optional[str] = None
     price_is_free: Optional[bool] = None
     links: Optional[list[LinkItem]] = None
+    tag_ids: Optional[list[int]] = None
 
 
 class GeocodeSuggestion(BaseModel):
@@ -145,6 +176,7 @@ class EventSuggestionCreate(BaseModel):
     website: str = ""  # honeypot
     screen_size: Optional[str] = None
     timezone: Optional[str] = None
+    suggested_tag_ids: list[int] = Field(default_factory=list)
 
 
 class EventSuggestionResponse(BaseModel):
@@ -203,3 +235,112 @@ class SuggestionUpdateRequest(BaseModel):
     end: Optional[datetime] = None
     all_day: Optional[bool] = None
     admin_notes: Optional[str] = None
+
+
+# --- Tags / Categorization ---
+
+
+class TagGroupResponse(BaseModel):
+    id: int
+    slug: str
+    label: str
+    color: Optional[str] = None
+    ordinal: int = 0
+    allow_multiple: bool = True
+    enabled: bool = True
+    tags: list[TagResponse] = []
+
+
+class TagGroupCreate(BaseModel):
+    label: str = Field(..., min_length=1, max_length=100)
+    slug: Optional[str] = Field(default=None, max_length=100)
+    color: Optional[str] = None
+
+
+class TagGroupUpdate(BaseModel):
+    label: Optional[str] = Field(default=None, max_length=100)
+    ordinal: Optional[int] = None
+    allow_multiple: Optional[bool] = None
+    color: Optional[str] = None
+    enabled: Optional[bool] = None
+
+
+class TagCreate(BaseModel):
+    group_id: int
+    label: str = Field(..., min_length=1, max_length=100)
+    slug: Optional[str] = Field(default=None, max_length=100)
+    color: Optional[str] = None
+
+
+class TagUpdate(BaseModel):
+    label: Optional[str] = Field(default=None, max_length=100)
+    color: Optional[str] = None
+    ordinal: Optional[int] = None
+    enabled: Optional[bool] = None
+
+
+class EventTagAssignment(BaseModel):
+    tag_ids: list[int]
+
+
+class TagSuggestionCreate(BaseModel):
+    event_id: str
+    tag_id: Optional[int] = None
+    free_text: Optional[str] = Field(default=None, max_length=100)
+    group_slug: Optional[str] = Field(default=None, max_length=64)
+    device_id: Optional[str] = Field(default=None, max_length=64)
+    website: str = ""  # honeypot
+
+
+class TagSuggestionResponse(BaseModel):
+    id: int
+    event_id: str
+    event_title: Optional[str] = None
+    tag: Optional[TagResponse] = None
+    free_text: Optional[str] = None
+    status: str = "pending"
+    submitter_device_id: Optional[str] = None
+    admin_notes: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
+    created_at: datetime
+
+
+class TagSuggestionApproveRequest(BaseModel):
+    tag_id: Optional[int] = (
+        None  # required if free_text suggestion — admin picks/creates a tag
+    )
+
+
+class TagSuggestionRejectRequest(BaseModel):
+    admin_notes: Optional[str] = None
+
+
+# --- Admin Events: Paginated List & Filter Options ---
+
+
+class PaginatedEventsResponse(BaseModel):
+    items: list[EventResponse]
+    total: int
+
+
+class FilterOption(BaseModel):
+    value: str
+    label: str
+    count: int = 0
+
+
+class EventFilterOptionsResponse(BaseModel):
+    calendars: list[FilterOption] = []
+    review_statuses: list[FilterOption] = []
+    geo_statuses: list[FilterOption] = []
+    tags: list[FilterOption] = []
+    total_count: int = 0
+
+
+class BulkEventIdsRequest(BaseModel):
+    event_ids: list[str] = Field(..., min_length=1, max_length=200)
+
+
+class BulkTagAssignRequest(BaseModel):
+    event_ids: list[str] = Field(..., min_length=1, max_length=200)
+    tag_ids: list[int] = Field(..., min_length=1, max_length=50)

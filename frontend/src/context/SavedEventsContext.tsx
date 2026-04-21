@@ -1,9 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { trackEventSave } from '../api';
-import { getDeviceId } from '../utils/deviceId';
+import { trackSave } from '../utils/tracking';
 
-const STORAGE_KEY = 'salsa_saved_events';
+const STORAGE_KEY = 'movida_saved_events';
 
 interface SavedEventsContextValue {
     savedEventIds: string[];
@@ -46,8 +45,8 @@ export function SavedEventsProvider({ children }: { children: ReactNode }) {
             } else {
                 next.add(eventId);
             }
-            // Fire-and-forget server tracking
-            trackEventSave(eventId, getDeviceId(), action as 'save' | 'unsave').catch(() => { });
+            // Fire-and-forget consent-gated server tracking
+            trackSave(eventId, action as 'save' | 'unsave');
             return next;
         });
     }, []);
@@ -55,10 +54,9 @@ export function SavedEventsProvider({ children }: { children: ReactNode }) {
     const isSaved = useCallback((eventId: string) => savedIds.has(eventId), [savedIds]);
 
     const clearAll = useCallback(() => {
-        // Track unsave for each
-        const deviceId = getDeviceId();
+        // Track unsave for each (consent-gated)
         savedIds.forEach((id) => {
-            trackEventSave(id, deviceId, 'unsave').catch(() => { });
+            trackSave(id, 'unsave');
         });
         setSavedIds(new Set());
     }, [savedIds]);

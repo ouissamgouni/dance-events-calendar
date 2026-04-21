@@ -2,7 +2,7 @@ base_week: 0
 
 events:
   - id: "example-evt-001"
-    calendar_id: "example-salsa-calendar"
+    calendar_id: "example-movida-calendar"
     title: "Example Salsa Social"
     description: |
       This is an example event to test the scenario mechanism.

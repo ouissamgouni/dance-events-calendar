@@ -92,20 +92,18 @@ class TestResolveRelativeDt:
 @pytest.mark.unit
 class TestDatabaseSeeder:
     def test_seed_default_scenario_path_exists(self):
-        from backend.db.seed import DEFAULT_SCENARIO
+        from backend.db.seed import SCENARIOS_DIR
 
-        assert DEFAULT_SCENARIO.exists(), (
-            f"Default scenario dir does not exist: {DEFAULT_SCENARIO}"
-        )
-        assert (DEFAULT_SCENARIO / "calendars.yaml").exists()
-        assert (DEFAULT_SCENARIO / "events.yaml").exists()
-        assert DEFAULT_SCENARIO.name == "calendar-service-mock"
+        scenario = SCENARIOS_DIR / "calendar-service-mock"
+        assert scenario.exists(), f"Scenario dir does not exist: {scenario}"
+        assert (scenario / "calendars.yaml").exists()
+        assert (scenario / "events.yaml").exists()
 
     def test_seed_calendars_yaml_has_expected_structure(self):
         import yaml
-        from backend.db.seed import DEFAULT_SCENARIO
+        from backend.db.seed import SCENARIOS_DIR
 
-        with open(DEFAULT_SCENARIO / "calendars.yaml") as f:
+        with open(SCENARIOS_DIR / "calendar-service-mock" / "calendars.yaml") as f:
             data = yaml.safe_load(f)
 
         assert "calendars" in data
@@ -115,9 +113,9 @@ class TestDatabaseSeeder:
 
     def test_seed_events_yaml_has_expected_structure(self):
         import yaml
-        from backend.db.seed import DEFAULT_SCENARIO
+        from backend.db.seed import SCENARIOS_DIR
 
-        with open(DEFAULT_SCENARIO / "events.yaml") as f:
+        with open(SCENARIOS_DIR / "calendar-service-mock" / "events.yaml") as f:
             data = yaml.safe_load(f)
 
         assert "events" in data

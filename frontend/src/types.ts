@@ -1,3 +1,49 @@
+export interface Tag {
+    id: number;
+    slug: string;
+    label: string;
+    color: string | null;
+    ordinal: number;
+    group_slug: string;
+    group_label: string;
+    group_color: string | null;
+    event_count?: number;
+    enabled: boolean;
+}
+
+export interface TagGroup {
+    id: number;
+    slug: string;
+    label: string;
+    color: string | null;
+    ordinal: number;
+    allow_multiple: boolean;
+    enabled: boolean;
+    tags: Tag[];
+}
+
+export interface TagSuggestionCreate {
+    event_id: string;
+    tag_id?: number;
+    free_text?: string;
+    group_slug?: string;
+    device_id: string;
+    website?: string; // honeypot
+}
+
+export interface TagSuggestionResponse {
+    id: number;
+    event_id: string;
+    event_title: string | null;
+    tag: Tag | null;
+    free_text: string | null;
+    status: string;
+    submitter_device_id: string | null;
+    admin_notes: string | null;
+    reviewed_at: string | null;
+    created_at: string;
+}
+
 export interface LinkItem {
     url: string;
     label: string | null;
@@ -22,6 +68,7 @@ export interface CalendarEvent {
     price_is_free: boolean;
     review_status?: string;
     links: LinkItem[] | null;
+    tags: Tag[];
 }
 
 export interface CalendarSetting {
@@ -66,6 +113,7 @@ export interface EventSuggestionCreate {
     all_day?: boolean;
     submitter_name?: string;
     submitter_email?: string;
+    suggested_tag_ids?: number[];
     website?: string; // honeypot
     screen_size?: string;
     timezone?: string;

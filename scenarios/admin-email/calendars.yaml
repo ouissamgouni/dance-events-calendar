@@ -1,6 +1,6 @@
 calendars:
-  - id: "example-salsa-calendar"
-    name: "Example Salsa Events"
+  - id: "example-movida-calendar"
+    name: "Example Movida Events"
     color: "#f59e0b"
   - id: "example-bachata-calendar"
     name: "Example Bachata Events"

@@ -1,11 +1,12 @@
-import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion } from './types';
+import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse } from './types';
 
 const BASE = '/api';
 
-export async function fetchEvents(params?: { startDate?: string; endDate?: string }): Promise<CalendarEvent[]> {
+export async function fetchEvents(params?: { startDate?: string; endDate?: string; tagIds?: number[] }): Promise<CalendarEvent[]> {
     const searchParams = new URLSearchParams();
     if (params?.startDate) searchParams.set('start_date', params.startDate);
     if (params?.endDate) searchParams.set('end_date', params.endDate);
+    if (params?.tagIds?.length) searchParams.set('tag_ids', params.tagIds.join(','));
     const qs = searchParams.toString();
     const res = await fetch(`${BASE}/events${qs ? `?${qs}` : ''}`, { cache: 'no-cache' });
     if (!res.ok) throw new Error('Failed to fetch events');
@@ -42,11 +43,14 @@ export async function updateSettings(settings: Partial<SiteSettings>): Promise<S
     return res.json();
 }
 
-export async function trackEventView(eventId: string): Promise<void> {
+export async function trackEventView(eventId: string, deviceId?: string, source?: string): Promise<void> {
+    const body: Record<string, string> = { event_id: eventId };
+    if (deviceId) body.device_id = deviceId;
+    if (source) body.source = source;
     await fetch(`${BASE}/track/event-view`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event_id: eventId }),
+        body: JSON.stringify(body),
     });
 }
 
@@ -159,6 +163,8 @@ export interface SyncLogEntry {
     events_upserted: number;
     events_deleted: number;
     error_message: string | null;
+    enrichment_status: string;
+    enrichment_progress: Record<string, { processed: number; skipped: number; failed: number }> | null;
 }
 
 export async function fetchSyncLogs(limit = 20, offset = 0): Promise<SyncLogEntry[]> {
@@ -171,9 +177,94 @@ export async function fetchSyncLogs(limit = 20, offset = 0): Promise<SyncLogEntr
 
 // --- Admin Events ---
 
-export async function fetchAdminEvents(): Promise<CalendarEvent[]> {
-    const res = await fetch(`${BASE}/admin/events`, { credentials: 'include' });
+export interface PaginatedEventsResponse {
+    items: CalendarEvent[];
+    total: number;
+}
+
+export interface EventFilterParams {
+    limit?: number;
+    offset?: number;
+    search?: string;
+    review_status?: string;
+    calendar_id?: string;
+    tag_ids?: string;
+    ungeolocated?: boolean;
+    future_only?: boolean;
+}
+
+export interface FilterOption {
+    value: string;
+    label: string;
+    count: number;
+}
+
+export interface EventFilterOptionsResponse {
+    calendars: FilterOption[];
+    review_statuses: FilterOption[];
+    geo_statuses: FilterOption[];
+    tags: FilterOption[];
+    total_count: number;
+}
+
+export async function fetchAdminEvents(params: EventFilterParams = {}): Promise<PaginatedEventsResponse> {
+    const qs = new URLSearchParams();
+    if (params.limit != null) qs.set('limit', String(params.limit));
+    if (params.offset != null) qs.set('offset', String(params.offset));
+    if (params.search) qs.set('search', params.search);
+    if (params.review_status) qs.set('review_status', params.review_status);
+    if (params.calendar_id) qs.set('calendar_id', params.calendar_id);
+    if (params.tag_ids) qs.set('tag_ids', params.tag_ids);
+    if (params.ungeolocated) qs.set('ungeolocated', 'true');
+    if (params.future_only) qs.set('future_only', 'true');
+    const res = await fetch(`${BASE}/admin/events?${qs}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch events');
+    return res.json();
+}
+
+export async function fetchEventFilterOptions(params: EventFilterParams = {}): Promise<EventFilterOptionsResponse> {
+    const qs = new URLSearchParams();
+    if (params.search) qs.set('search', params.search);
+    if (params.review_status) qs.set('review_status', params.review_status);
+    if (params.calendar_id) qs.set('calendar_id', params.calendar_id);
+    if (params.tag_ids) qs.set('tag_ids', params.tag_ids);
+    if (params.ungeolocated) qs.set('ungeolocated', 'true');
+    if (params.future_only) qs.set('future_only', 'true');
+    const res = await fetch(`${BASE}/admin/events/filter-options?${qs}`, { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to fetch filter options');
+    return res.json();
+}
+
+export async function bulkReviewEvents(eventIds: string[]): Promise<{ marked_reviewed: number }> {
+    const res = await fetch(`${BASE}/admin/events/bulk-review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_ids: eventIds }),
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to bulk review events');
+    return res.json();
+}
+
+export async function bulkRetryGeocoding(eventIds: string[]): Promise<{ geocoded: number; failed: number; total: number }> {
+    const res = await fetch(`${BASE}/admin/events/bulk-retry-geocoding`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_ids: eventIds }),
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to bulk retry geocoding');
+    return res.json();
+}
+
+export async function bulkAssignTags(eventIds: string[], tagIds: number[]): Promise<{ assigned: number }> {
+    const res = await fetch(`${BASE}/admin/events/bulk-tags`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_ids: eventIds, tag_ids: tagIds }),
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to bulk assign tags');
     return res.json();
 }
 
@@ -221,13 +312,7 @@ export async function fetchTestPlan(scenario: string): Promise<TestPlan> {
     return res.json();
 }
 
-// --- Pending Review ---
-
-export async function fetchPendingEvents(): Promise<CalendarEvent[]> {
-    const res = await fetch(`${BASE}/admin/events/pending`, { credentials: 'include' });
-    if (!res.ok) throw new Error('Failed to fetch pending events');
-    return res.json();
-}
+// --- Review ---
 
 export async function reviewEvent(eventId: string): Promise<CalendarEvent> {
     const res = await fetch(`${BASE}/admin/events/${eventId}/review`, {
@@ -235,15 +320,6 @@ export async function reviewEvent(eventId: string): Promise<CalendarEvent> {
         credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to review event');
-    return res.json();
-}
-
-export async function markAllReviewed(): Promise<{ marked_reviewed: number }> {
-    const res = await fetch(`${BASE}/admin/events/mark-all-reviewed`, {
-        method: 'POST',
-        credentials: 'include',
-    });
-    if (!res.ok) throw new Error('Failed to mark all reviewed');
     return res.json();
 }
 
@@ -386,5 +462,175 @@ export async function fetchMostSavedEvents(limit = 20): Promise<MostSavedEvent[]
         credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to fetch most saved events');
+    return res.json();
+}
+
+// --- Link Click Tracking ---
+
+export async function trackLinkClick(eventId: string, url: string, deviceId?: string): Promise<void> {
+    const body: Record<string, string> = { event_id: eventId, url };
+    if (deviceId) body.device_id = deviceId;
+    await fetch(`${BASE}/track/link-click`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+}
+
+// --- Export Tracking ---
+
+export async function trackExport(format: string, eventCount: number, deviceId?: string): Promise<void> {
+    const body: Record<string, string | number> = { format, event_count: eventCount };
+    if (deviceId) body.device_id = deviceId;
+    await fetch(`${BASE}/track/export`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+}
+
+// --- GDPR Data Deletion ---
+
+export async function deleteUserData(deviceId: string): Promise<{ deleted: Record<string, number> }> {
+    const res = await fetch(`${BASE}/user-data/${encodeURIComponent(deviceId)}`, {
+        method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete user data');
+    return res.json();
+}
+
+// --- Tags ---
+
+export async function fetchTagGroups(): Promise<TagGroup[]> {
+    const res = await fetch(`${BASE}/tags`, { cache: 'no-cache' });
+    if (!res.ok) throw new Error('Failed to fetch tags');
+    return res.json();
+}
+
+export async function submitTagSuggestion(body: TagSuggestionCreate): Promise<void> {
+    const res = await fetch(`${BASE}/tags/suggestions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error('Failed to submit tag suggestion');
+}
+
+export async function fetchAdminTagSuggestions(status?: string): Promise<TagSuggestionResponse[]> {
+    const qs = status ? `?status=${status}` : '';
+    const res = await fetch(`${BASE}/admin/tags/suggestions${qs}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('admin_token') || ''}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch tag suggestions');
+    return res.json();
+}
+
+export async function approveTagSuggestion(id: number, tagId?: number): Promise<void> {
+    const res = await fetch(`${BASE}/admin/tags/suggestions/${id}/approve`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('admin_token') || ''}`,
+        },
+        body: JSON.stringify(tagId ? { tag_id: tagId } : {}),
+    });
+    if (!res.ok) throw new Error('Failed to approve tag suggestion');
+}
+
+export async function rejectTagSuggestion(id: number, adminNotes?: string): Promise<void> {
+    const res = await fetch(`${BASE}/admin/tags/suggestions/${id}/reject`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('admin_token') || ''}`,
+        },
+        body: JSON.stringify(adminNotes ? { admin_notes: adminNotes } : {}),
+    });
+    if (!res.ok) throw new Error('Failed to reject tag suggestion');
+}
+
+export async function updateEventTags(eventId: string, tagIds: number[]): Promise<void> {
+    const res = await fetch(`${BASE}/admin/events/${encodeURIComponent(eventId)}/tags`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('admin_token') || ''}`,
+        },
+        body: JSON.stringify({ tag_ids: tagIds }),
+    });
+    if (!res.ok) throw new Error('Failed to update event tags');
+}
+
+// --- Admin Tag Group/Tag CRUD ---
+
+export interface AdminTag extends Tag {
+    event_count: number;
+}
+
+export interface AdminTagGroup extends Omit<TagGroup, 'tags'> {
+    tags: AdminTag[];
+}
+
+const adminHeaders = () => ({
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${localStorage.getItem('admin_token') || ''}`,
+});
+
+export async function fetchAdminTagGroups(): Promise<AdminTagGroup[]> {
+    const res = await fetch(`${BASE}/admin/tags/groups`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('admin_token') || ''}` },
+    });
+    if (!res.ok) throw new Error('Failed to fetch admin tag groups');
+    return res.json();
+}
+
+export async function createTagGroup(data: { label: string; color?: string }): Promise<TagGroup> {
+    const res = await fetch(`${BASE}/admin/tags/groups`, {
+        method: 'POST',
+        headers: adminHeaders(),
+        body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to create tag group');
+    return res.json();
+}
+
+export async function updateTagGroup(groupId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean }): Promise<TagGroup> {
+    const res = await fetch(`${BASE}/admin/tags/groups/${groupId}`, {
+        method: 'PATCH',
+        headers: adminHeaders(),
+        body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to update tag group');
+    return res.json();
+}
+
+export async function createTag(data: { group_id: number; label: string; color?: string }): Promise<Tag> {
+    const res = await fetch(`${BASE}/admin/tags`, {
+        method: 'POST',
+        headers: adminHeaders(),
+        body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to create tag');
+    return res.json();
+}
+
+export async function updateTag(tagId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean }): Promise<Tag> {
+    const res = await fetch(`${BASE}/admin/tags/${tagId}`, {
+        method: 'PATCH',
+        headers: adminHeaders(),
+        body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to update tag');
+    return res.json();
+}
+
+// --- Single Event Geocoding ---
+
+export async function retryGeocodingSingle(eventId: string): Promise<{ geocoded: number; failed: number }> {
+    const res = await fetch(`${BASE}/admin/events/${encodeURIComponent(eventId)}/retry-geocoding`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to retry geocoding');
     return res.json();
 }

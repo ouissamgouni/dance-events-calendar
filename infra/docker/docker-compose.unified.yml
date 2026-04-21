@@ -20,7 +20,7 @@ services:
       - app_network
 
   backend:
-    image: salsa-calendar-backend:${IMAGE_TAG:-latest}
+    image: movida-backend:${IMAGE_TAG:-latest}
     container_name: calendar_backend_${ENV_NAME}
     env_file:
       - path: ../../.env
@@ -44,7 +44,7 @@ services:
       - app_network
 
   frontend:
-    image: salsa-calendar-frontend:${IMAGE_TAG:-latest}
+    image: movida-frontend:${IMAGE_TAG:-latest}
     container_name: calendar_frontend_${ENV_NAME}
     ports:
       - "${FRONTEND_PORT:-3001}:80"

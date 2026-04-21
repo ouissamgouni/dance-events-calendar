@@ -19,7 +19,13 @@ from backend.api.schemas import (
 )
 from backend.config.loader import get_admin_email
 from backend.db.database import get_session
-from backend.db.models import CachedEvent, CalendarSetting, EventSuggestion
+from backend.db.models import (
+    CachedEvent,
+    CalendarSetting,
+    EventSuggestion,
+    EventTag,
+    Tag,
+)
 from backend.services.email import send_suggestion_notification
 from backend.services.geocoding import geocode_location
 from backend.services.ip_geolocation import geolocate_ip
@@ -105,6 +111,7 @@ def submit_suggestion(
         submitter_referrer=request.headers.get("referer"),
         submitter_screen_size=body.screen_size,
         submitter_timezone=body.timezone,
+        suggested_tag_ids=body.suggested_tag_ids if body.suggested_tag_ids else None,
     )
 
     session.add(suggestion)
@@ -131,7 +138,7 @@ def suggestion_geocode(
     from geopy.exc import GeocoderServiceError, GeocoderTimedOut
     from geopy.geocoders import Nominatim
 
-    geocoder = Nominatim(user_agent="salsa-events-calendar", timeout=5)
+    geocoder = Nominatim(user_agent="movida", timeout=5)
     try:
         results = geocoder.geocode(q, exactly_one=False, limit=5)
     except (GeocoderTimedOut, GeocoderServiceError) as e:
@@ -263,6 +270,13 @@ def approve_suggestion(
         review_status="reviewed",
     )
     session.add(cached_event)
+
+    # Create EventTags from suggested_tag_ids
+    if suggestion.suggested_tag_ids:
+        for tid in suggestion.suggested_tag_ids:
+            tag = session.get(Tag, tid)
+            if tag:
+                session.add(EventTag(event_id=event_id, tag_id=tid))
 
     # Update suggestion
     suggestion.status = "approved"

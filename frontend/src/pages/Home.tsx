@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import type { CalendarEvent, CalendarSetting } from '../types';
-import { fetchEvents, fetchCalendars, fetchSettings, updateEvent } from '../api';
+import { Link, useLocation } from 'react-router-dom';
+import type { CalendarEvent, CalendarSetting, TagGroup } from '../types';
+import { fetchEvents, fetchCalendars, fetchSettings, fetchTagGroups } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import type FullCalendar from '@fullcalendar/react';
@@ -12,6 +13,11 @@ import EventEditModal from '../components/EventEditModal';
 import CalendarFilterPills from '../components/CalendarFilterPills';
 import DateRangePicker from '../components/DateRangePicker';
 import EventListPanel from '../components/EventListPanel';
+import TagFilterPills from '../components/TagFilterPills';
+import SavedEventsFab from '../components/SavedEventsFab';
+import SuggestEventModal from '../components/SuggestEventModal';
+import EventAnchoredDetailPanel from '../components/EventAnchoredDetailPanel';
+import EventDetailsPanel from '../components/EventDetailsPanel';
 
 type ViewMode = 'explorer' | 'calendar';
 
@@ -22,6 +28,9 @@ function formatDate(date: Date): string {
 export default function Home() {
     const { user } = useAuth();
     const { showPrices, showPopularity } = useFeatureFlags();
+    const [showSuggestModal, setShowSuggestModal] = useState(false);
+    const location = useLocation();
+    const viewMode: ViewMode = location.pathname === '/calendar' ? 'calendar' : 'explorer';
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [sinceDate, setSinceDate] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -30,12 +39,27 @@ export default function Home() {
     const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
     const [calendars, setCalendars] = useState<CalendarSetting[]>([]);
     const [activeCalendarIds, setActiveCalendarIds] = useState<Set<string> | null>(null);
-    const [viewMode, setViewMode] = useState<ViewMode>('explorer');
     const [sortBy, setSortBy] = useState<'date' | 'popularity'>('date');
+    const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
+    const [activeTagIds, setActiveTagIds] = useState<Set<number>>(new Set());
 
     // Calendar view section visibility
     const [showCalendarGrid, setShowCalendarGrid] = useState(true);
     const [showCalendarMap, setShowCalendarMap] = useState(true);
+
+    // Shared selection anchor for calendar desktop details
+    const [selectedEventRect, setSelectedEventRect] = useState<DOMRect | null>(null);
+
+    // Explorer list scroll position preservation
+    const listScrollRef = useRef(0);
+
+    // Responsive: detect desktop for explorer detail swap
+    const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 1024);
+    useEffect(() => {
+        const handler = () => setIsDesktop(window.innerWidth >= 1024);
+        window.addEventListener('resize', handler);
+        return () => window.removeEventListener('resize', handler);
+    }, []);
 
     // Explorer state
     const today = formatDate(new Date());
@@ -45,26 +69,53 @@ export default function Home() {
     const [endDate, setEndDate] = useState(formatDate(defaultEndDate));
     const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
 
+    // Calendar mode map bounds (for off-map styling in the calendar grid)
+    const [calMapBounds, setCalMapBounds] = useState<MapBounds | null>(null);
+
+    // Cross-component hover highlight
+    const [hoveredEventId, setHoveredEventId] = useState<string | null>(null);
+    const handleEventHover = useCallback((eventId: string | null) => {
+        setHoveredEventId(eventId);
+    }, []);
+
     // Calendar state
     const [visibleRange, setVisibleRange] = useState<{ start: Date; end: Date } | null>(null);
 
-    // Fetch events when date range changes (explorer mode) or on mount
+    // Fetch events when date range changes (explorer mode) or visible range changes (calendar mode)
+    const initialLoadDone = useRef(false);
     useEffect(() => {
-        setLoading(true);
-        const params = viewMode === 'explorer' ? { startDate, endDate } : undefined;
-        Promise.all([fetchEvents(params), fetchSettings(), fetchCalendars()])
-            .then(([evts, settings, cals]) => {
+        // Only show full loading spinner on first load — subsequent fetches
+        // must NOT unmount the Calendar (which resets FullCalendar's month).
+        if (!initialLoadDone.current) setLoading(true);
+        let params: { startDate?: string; endDate?: string } | undefined;
+        if (viewMode === 'explorer') {
+            params = { startDate, endDate };
+        } else if (visibleRange) {
+            params = {
+                startDate: formatDate(visibleRange.start),
+                endDate: formatDate(visibleRange.end),
+            };
+        } else {
+            // Calendar mode initial load: use same default as explorer
+            params = { startDate, endDate };
+        }
+        Promise.all([fetchEvents(params), fetchSettings(), fetchCalendars(), fetchTagGroups()])
+            .then(([evts, settings, cals, groups]) => {
                 setEvents(evts);
                 setSinceDate(settings.since_date);
                 setCalendars(cals);
+                setTagGroups(groups);
                 setActiveCalendarIds((prev) => {
                     if (prev !== null) return prev;
                     return new Set(cals.map((c) => c.calendar_id));
                 });
             })
             .catch((e) => setError(e.message))
-            .finally(() => setLoading(false));
-    }, [viewMode, startDate, endDate]);
+            .finally(() => {
+                setLoading(false);
+                initialLoadDone.current = true;
+            });
+    }, [viewMode, startDate, endDate, visibleRange]);
 
     const handleDateRangeChange = useCallback((start: string, end: string) => {
         setStartDate(start);
@@ -83,10 +134,31 @@ export default function Home() {
         });
     }, []);
 
+    const handleToggleTag = useCallback((tagId: number) => {
+        setActiveTagIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(tagId)) next.delete(tagId);
+            else next.add(tagId);
+            return next;
+        });
+    }, []);
+
+    const handleClearTags = useCallback(() => {
+        setActiveTagIds(new Set());
+    }, []);
+
     const filteredEvents = useMemo(() => {
-        if (!activeCalendarIds || activeCalendarIds.size === calendars.length) return events;
-        return events.filter((e) => activeCalendarIds.has(e.calendar_id));
-    }, [events, activeCalendarIds, calendars.length]);
+        let result = events;
+        if (activeCalendarIds && activeCalendarIds.size !== calendars.length) {
+            result = result.filter((e) => activeCalendarIds.has(e.calendar_id));
+        }
+        if (activeTagIds.size > 0) {
+            result = result.filter((e) =>
+                [...activeTagIds].every((tagId) => e.tags?.some((t) => t.id === tagId))
+            );
+        }
+        return result;
+    }, [events, activeCalendarIds, calendars.length, activeTagIds]);
 
     const handleDatesChange = useCallback((start: Date, end: Date) => {
         setVisibleRange((prev) => {
@@ -106,15 +178,39 @@ export default function Home() {
         });
     }, [filteredEvents, visibleRange]);
 
-    const handleEventClick = useCallback((evt: CalendarEvent) => {
-        setSelectedEvent(evt);
-    }, []);
+    const handleEventClick = useCallback((evt: CalendarEvent, clickRect?: DOMRect) => {
+        if (viewMode === 'explorer') {
+            // Desktop: swap left column to detail view
+            // Mobile: set selectedEvent for overlay modal
+            if (isDesktop) {
+                // Save scroll position of the list panel
+                const listEl = document.querySelector('[data-event-list-scroll]');
+                if (listEl) listScrollRef.current = listEl.scrollTop;
+            }
+            setSelectedEventRect(null);
+            setSelectedEvent(evt);
+        } else {
+            setSelectedEventRect(clickRect ?? null);
+            setSelectedEvent(evt);
+        }
+    }, [viewMode, isDesktop]);
 
     const handleCloseModal = useCallback(() => {
-        setSelectedEvent(null);
-    }, []);
+        setSelectedEventRect(null);
+        if (viewMode === 'explorer' && isDesktop) {
+            // Restore list view + scroll position
+            setSelectedEvent(null);
+            requestAnimationFrame(() => {
+                const listEl = document.querySelector('[data-event-list-scroll]');
+                if (listEl) listEl.scrollTop = listScrollRef.current;
+            });
+        } else {
+            setSelectedEvent(null);
+        }
+    }, [viewMode, isDesktop]);
 
     const handleEditEvent = useCallback((evt: CalendarEvent) => {
+        setSelectedEventRect(null);
         setSelectedEvent(null);
         setEditingEvent(evt);
     }, []);
@@ -127,6 +223,28 @@ export default function Home() {
     const handleBoundsChange = useCallback((bounds: MapBounds) => {
         setMapBounds(bounds);
     }, []);
+
+    const handleCalBoundsChange = useCallback((bounds: MapBounds) => {
+        setCalMapBounds(bounds);
+    }, []);
+
+    // Set of event IDs not visible on the calendar-mode map
+    const offMapEventIds = useMemo(() => {
+        if (!calMapBounds || !showCalendarMap) return new Set<string>();
+        return new Set(
+            calendarVisibleEvents
+                .filter((e) => {
+                    if (e.latitude == null || e.longitude == null) return true;
+                    return !(
+                        e.latitude >= calMapBounds.south &&
+                        e.latitude <= calMapBounds.north &&
+                        e.longitude >= calMapBounds.west &&
+                        e.longitude <= calMapBounds.east
+                    );
+                })
+                .map((e) => e.event_id),
+        );
+    }, [calendarVisibleEvents, calMapBounds, showCalendarMap]);
 
     // Calendar ref + navigation (FC is always mounted in calendar mode)
     const calendarRef = useRef<FullCalendar>(null);
@@ -146,19 +264,31 @@ export default function Home() {
             <main className="mx-auto max-w-7xl px-4 py-4">
                 {!loading && !error && (
                     <div className="mb-4 flex flex-col gap-2">
-                        <div className="flex gap-1 bg-slate-200 p-1 shrink-0 w-fit">
-                            <button
-                                className={`px-3 py-1 text-sm transition ${viewMode === 'explorer' ? 'bg-white text-slate-900 font-medium shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                onClick={() => setViewMode('explorer')}
-                            >
-                                Explorer
-                            </button>
-                            <button
-                                className={`px-3 py-1 text-sm transition ${viewMode === 'calendar' ? 'bg-white text-slate-900 font-medium shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                onClick={() => setViewMode('calendar')}
-                            >
-                                Calendar
-                            </button>
+                        <div className="flex items-center gap-3">
+                            <div className="flex gap-1 bg-slate-200 p-1 shrink-0 w-fit">
+                                <Link
+                                    to="/"
+                                    className={`px-3 py-1 text-sm transition ${viewMode === 'explorer' ? 'bg-white text-slate-900 font-medium shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    Explorer
+                                </Link>
+                                <Link
+                                    to="/calendar"
+                                    className={`px-3 py-1 text-sm transition ${viewMode === 'calendar' ? 'bg-white text-slate-900 font-medium shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    Calendar
+                                </Link>
+                            </div>
+                            <div className="flex gap-1 bg-slate-200 p-1 shrink-0 w-fit">
+                                <SavedEventsFab />
+                                <button
+                                    onClick={() => setShowSuggestModal(true)}
+                                    className="px-3 py-1 text-sm transition bg-white text-slate-900 font-medium shadow-sm hover:bg-slate-50"
+                                >
+                                    <span className="sm:hidden">Submit</span>
+                                    <span className="hidden sm:inline">Submit Event</span>
+                                </button>
+                            </div>
                         </div>
                         {calendars.length > 1 && activeCalendarIds && (
                             <CalendarFilterPills
@@ -176,26 +306,58 @@ export default function Home() {
                     <p className="text-center text-red-500">Error: {error}</p>
                 )}
                 {!loading && !error && viewMode === 'explorer' && (
-                    <div className="flex flex-col lg:flex-row gap-6">
-                        {/* Filters: order-1 on mobile, part of left column on desktop */}
-                        <div className="order-1 lg:order-1 lg:w-[350px] lg:shrink-0 flex flex-col gap-4">
-                            <DateRangePicker
-                                startDate={startDate}
-                                endDate={endDate}
-                                onChange={handleDateRangeChange}
-                            />
-                            {/* Event list: hidden on mobile until after map, visible on desktop */}
-                            <div className="hidden lg:block lg:h-[calc(100vh-320px)] lg:overflow-hidden">
-                                <EventListPanel
-                                    events={filteredEvents}
-                                    mapBounds={mapBounds}
-                                    onEventClick={handleEventClick}
-                                    showPrices={showPrices}
-                                    showPopularity={showPopularity}
-                                    sortBy={sortBy}
-                                    onSortChange={setSortBy}
-                                />
-                            </div>
+                    <div className="flex flex-col lg:flex-row gap-6 lg:items-start">
+                        {/* Left column on desktop: swaps between list and detail */}
+                        <div className="order-1 lg:order-1 lg:w-[350px] lg:shrink-0 flex flex-col gap-4 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
+                            {selectedEvent && isDesktop ? (
+                                /* ── Event detail view (Google Maps pattern) ── */
+                                <>
+                                    <button
+                                        onClick={handleCloseModal}
+                                        className="flex items-center gap-1 text-sm text-rose-600 hover:text-rose-700 font-medium"
+                                    >
+                                        ← Back to list
+                                    </button>
+                                    <EventDetailsPanel
+                                        event={selectedEvent}
+                                        onEdit={user ? handleEditEvent : undefined}
+                                        surface="plain"
+                                        className="flex-1 min-h-0"
+                                        bodyClassName="flex-1 min-h-0"
+                                    />
+                                </>
+                            ) : (
+                                /* ── Filters + list view ── */
+                                <>
+                                    <DateRangePicker
+                                        startDate={startDate}
+                                        endDate={endDate}
+                                        onChange={handleDateRangeChange}
+                                    />
+                                    {tagGroups.length > 0 && (
+                                        <TagFilterPills
+                                            tagGroups={tagGroups}
+                                            activeTagIds={activeTagIds}
+                                            onToggle={handleToggleTag}
+                                            onClear={handleClearTags}
+                                        />
+                                    )}
+                                    {/* Event list: hidden on mobile until after map, fills remaining height on desktop */}
+                                    <div className="hidden lg:block lg:flex-1 lg:min-h-0 lg:overflow-hidden">
+                                        <EventListPanel
+                                            events={filteredEvents}
+                                            mapBounds={mapBounds}
+                                            onEventClick={handleEventClick}
+                                            showPrices={showPrices}
+                                            showPopularity={showPopularity}
+                                            sortBy={sortBy}
+                                            onSortChange={setSortBy}
+                                            hoveredEventId={hoveredEventId}
+                                            onEventHover={handleEventHover}
+                                        />
+                                    </div>
+                                </>
+                            )}
                         </div>
                         {/* Map: order-2 on mobile, right column on desktop */}
                         <div className="order-2 lg:order-2 h-[250px] lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
@@ -204,9 +366,11 @@ export default function Home() {
                                 focusedEvent={selectedEvent}
                                 onEventClick={handleEventClick}
                                 onBoundsChange={handleBoundsChange}
+                                hoveredEventId={hoveredEventId}
+                                onEventHover={handleEventHover}
                             />
                         </div>
-                        {/* Event list on mobile: order-3, hidden on desktop (already shown in left column) */}
+                        {/* Event list on mobile: order-3, hidden on desktop */}
                         <div className="order-3 lg:hidden">
                             <EventListPanel
                                 events={filteredEvents}
@@ -216,6 +380,8 @@ export default function Home() {
                                 showPopularity={showPopularity}
                                 sortBy={sortBy}
                                 onSortChange={setSortBy}
+                                hoveredEventId={hoveredEventId}
+                                onEventHover={handleEventHover}
                             />
                         </div>
                     </div>
@@ -247,6 +413,16 @@ export default function Home() {
                                 <h2 className="text-lg font-semibold text-slate-800">{calendarTitle}</h2>
                             </div>
                         </div>
+                        {tagGroups.length > 0 && (
+                            <div className="mb-4">
+                                <TagFilterPills
+                                    tagGroups={tagGroups}
+                                    activeTagIds={activeTagIds}
+                                    onToggle={handleToggleTag}
+                                    onClear={handleClearTags}
+                                />
+                            </div>
+                        )}
                         <div className="flex flex-col lg:flex-row gap-6">
                             {/* Calendar always mounted — CSS-hidden when toggled off */}
                             <div className={showCalendarGrid ? 'min-w-0 flex-1' : 'calendar-hide-grid h-0 overflow-hidden'}>
@@ -256,6 +432,9 @@ export default function Home() {
                                     sinceDate={sinceDate ?? undefined}
                                     onDatesChange={handleDatesChange}
                                     onEventClick={handleEventClick}
+                                    hoveredEventId={hoveredEventId}
+                                    onEventHover={handleEventHover}
+                                    offMapEventIds={offMapEventIds}
                                 />
                             </div>
                             {showCalendarMap && (
@@ -268,6 +447,9 @@ export default function Home() {
                                         events={calendarVisibleEvents}
                                         focusedEvent={selectedEvent}
                                         onEventClick={handleEventClick}
+                                        onBoundsChange={handleCalBoundsChange}
+                                        hoveredEventId={hoveredEventId}
+                                        onEventHover={handleEventHover}
                                     />
                                 </div>
                             )}
@@ -279,9 +461,19 @@ export default function Home() {
                 )}
             </main>
 
-            {selectedEvent && (
+            {/* Overlay modal — explorer mobile only */}
+            {selectedEvent && !(viewMode === 'explorer' && isDesktop) && !(viewMode === 'calendar' && isDesktop) && (
                 <EventModal
                     event={selectedEvent}
+                    onClose={handleCloseModal}
+                    onEdit={user ? handleEditEvent : undefined}
+                />
+            )}
+
+            {selectedEvent && viewMode === 'calendar' && isDesktop && (
+                <EventAnchoredDetailPanel
+                    event={selectedEvent}
+                    anchorRect={selectedEventRect}
                     onClose={handleCloseModal}
                     onEdit={user ? handleEditEvent : undefined}
                 />
@@ -293,6 +485,9 @@ export default function Home() {
                     onClose={() => setEditingEvent(null)}
                     onSaved={handleEventSaved}
                 />
+            )}
+            {showSuggestModal && (
+                <SuggestEventModal onClose={() => setShowSuggestModal(false)} />
             )}
         </div>
     );

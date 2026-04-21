@@ -5,8 +5,10 @@ from sqlmodel import Session, select
 
 from backend.db.models import CachedEvent, CalendarSetting, SyncLog
 from backend.services.calendar.base import BaseCalendarService
-from backend.services.geocoding import geocode_location
-from backend.services.price_extractor import extract_price
+from backend.services.pipeline.base import EnrichmentPipeline
+from backend.services.pipeline.stages.geocoding import GeocodingStage
+from backend.services.pipeline.stages.link_extraction import LinkExtractionStage
+from backend.services.pipeline.stages.price_extraction import PriceExtractionStage
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +16,13 @@ logger = logging.getLogger(__name__)
 class SyncService:
     def __init__(self, calendar_service: BaseCalendarService):
         self.calendar_service = calendar_service
+        self.pipeline = EnrichmentPipeline(
+            [
+                LinkExtractionStage(),
+                PriceExtractionStage(),
+                GeocodingStage(),
+            ]
+        )
 
     def discover_calendars(self, session: Session, color_fn=None) -> int:
         """Discover calendars from source and upsert into DB. New ones default to disabled."""
@@ -45,6 +54,7 @@ class SyncService:
         session.refresh(log)
 
         stats = {"calendars_synced": 0, "events_upserted": 0, "events_deleted": 0}
+        all_needs_enrichment: list[str] = []
 
         enabled = session.exec(
             select(CalendarSetting).where(CalendarSetting.enabled == True)
@@ -57,6 +67,7 @@ class SyncService:
                     stats["calendars_synced"] += 1
                     stats["events_upserted"] += cal_stats["upserted"]
                     stats["events_deleted"] += cal_stats["deleted"]
+                    all_needs_enrichment.extend(cal_stats.get("needs_enrichment", []))
                 except Exception:
                     logger.exception("Failed to sync calendar %s", cal.calendar_id)
 
@@ -70,6 +81,19 @@ class SyncService:
             log.calendars_synced = stats["calendars_synced"]
             log.events_upserted = stats["events_upserted"]
             log.events_deleted = stats["events_deleted"]
+            session.add(log)
+            session.commit()
+
+        # Phase 2: Run enrichment pipeline on all events that need it
+        if all_needs_enrichment:
+            log.enrichment_status = "running"
+            session.add(log)
+            session.commit()
+
+            progress = self.pipeline.run(session, all_needs_enrichment)
+
+            log.enrichment_status = "completed"
+            log.enrichment_progress = progress.to_dict()
             session.add(log)
             session.commit()
 
@@ -93,11 +117,15 @@ class SyncService:
                 sync_token=None,
             )
 
+        # Phase 1: Upsert events immediately (no enrichment) so they are
+        # visible to GET /events right away.
         upserted = 0
+        needs_enrichment: list[str] = []
+
         for event in result.events:
             existing = session.get(CachedEvent, event.event_id)
             if existing:
-                # Check if user-visible fields changed before overwriting
+                # Check if user-visible fields changed BEFORE overwriting
                 fields_changed = (
                     existing.title != event.title
                     or existing.description != event.description
@@ -116,18 +144,13 @@ class SyncService:
                 existing.deleted_at = None  # un-delete if re-appeared
                 if fields_changed:
                     existing.review_status = "pending"
-                if event.location and existing.latitude is None:
-                    coords = geocode_location(event.location)
-                    if coords:
-                        existing.latitude, existing.longitude = coords
-                # Extract price only if not already set (don't overwrite admin edits)
-                if existing.price_min is None:
-                    price = extract_price(event.description)
-                    if price:
-                        existing.price_min = price["min"]
-                        existing.price_max = price["max"]
-                        existing.price_currency = price["currency"]
-                        existing.price_is_free = price["is_free"]
+                # Mark for enrichment if any field is missing
+                if (
+                    (event.location and existing.latitude is None)
+                    or (event.description and existing.price_min is None)
+                    or (event.description and existing.links is None)
+                ):
+                    needs_enrichment.append(event.event_id)
                 session.add(existing)
             else:
                 new_event = CachedEvent(
@@ -140,17 +163,9 @@ class SyncService:
                     end=event.end,
                     all_day=event.all_day,
                 )
-                if event.location:
-                    coords = geocode_location(event.location)
-                    if coords:
-                        new_event.latitude, new_event.longitude = coords
-                price = extract_price(event.description)
-                if price:
-                    new_event.price_min = price["min"]
-                    new_event.price_max = price["max"]
-                    new_event.price_currency = price["currency"]
-                    new_event.price_is_free = price["is_free"]
                 session.add(new_event)
+                if event.location or event.description:
+                    needs_enrichment.append(event.event_id)
             upserted += 1
 
         deleted = 0
@@ -166,6 +181,7 @@ class SyncService:
             cal.updated_at = datetime.utcnow()
             session.add(cal)
 
+        # Commit events immediately — visible to API consumers now
         session.commit()
         logger.info(
             "Synced calendar %s: %d upserted, %d deleted",
@@ -173,4 +189,9 @@ class SyncService:
             upserted,
             deleted,
         )
-        return {"upserted": upserted, "deleted": deleted}
+
+        return {
+            "upserted": upserted,
+            "deleted": deleted,
+            "needs_enrichment": needs_enrichment,
+        }

@@ -122,6 +122,24 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
+/* ── Compact calendar on mobile ────────────────────── */
+@media (max-width: 639px) {
+  .fc .fc-daygrid-day-number {
+    font-size: 0.7rem;
+    padding: 2px 4px;
+  }
+
+  .fc .fc-col-header-cell-cushion {
+    font-size: 0.65rem;
+    padding: 4px 0;
+  }
+
+  .fc .fc-daygrid-event {
+    padding: 1px 4px;
+    font-size: 0.65rem;
+  }
+}
+
 /* ── Past events ───────────────────────────────────── */
 .fc .fc-event-past {
   opacity: 0.45;
@@ -129,6 +147,21 @@ body {
 
 .fc .fc-event-past:hover {
   opacity: 0.7;
+}
+
+/* ── Off-map events (not visible on the accompanying map) ── */
+.fc .fc-event-offmap {
+  opacity: 0.35;
+}
+
+.fc .fc-event-offmap:hover {
+  opacity: 0.7;
+}
+
+/* ── Highlighted event (cross-component hover) ───────────── */
+.fc .fc-event-highlighted {
+  box-shadow: 0 0 0 2px #6366f1;
+  z-index: 1;
 }
 
 /* ── List view ─────────────────────────────────────── */
@@ -213,19 +246,20 @@ body {
 .date-range-presets {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.375rem;
-  margin-top: 0.75rem;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
 }
 
 .preset-btn {
-  font-size: 0.75rem;
-  padding: 0.25rem 0.75rem;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
   border-radius: 9999px;
   border: 1px solid #e2e8f0;
   background: white;
   color: #64748b;
   cursor: pointer;
   transition: all 0.15s;
+  white-space: nowrap;
 }
 
 .preset-btn:hover {
@@ -292,7 +326,6 @@ body {
 }
 
 .event-list-scroll {
-  flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -314,6 +347,28 @@ body {
 
 .event-list-scroll::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+.event-list-scroll-wrapper {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.event-list-scroll-wrapper>.event-list-scroll {
+  height: 100%;
+}
+
+.event-list-fade {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: linear-gradient(transparent, white);
+  pointer-events: none;
+  z-index: 1;
 }
 
 .event-list-empty {
@@ -338,6 +393,10 @@ body {
 
 .event-card:hover {
   background: #f8fafc;
+}
+
+.event-card-highlighted {
+  background: #eef2ff !important;
 }
 
 .event-card-color {

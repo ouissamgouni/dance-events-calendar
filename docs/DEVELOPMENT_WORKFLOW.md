@@ -1,6 +1,6 @@
 # Development Workflow
 
-This document describes the CI/CD workflow for the salsa-events-calendar project.
+This document describes the CI/CD workflow for the Movida project.
 
 ## Table of Contents
 

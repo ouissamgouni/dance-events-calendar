@@ -75,7 +75,7 @@ tasks:
   staging:
     desc: Stop staging stack
     cmds:
-      - ENV_NAME=staging docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p salsa-calendar-staging down
+      - ENV_NAME=staging docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p movida-staging down
       - echo "✅ Staging stopped"
 
   staging:volumes:
@@ -89,7 +89,7 @@ tasks:
           echo "🔍 DRY RUN — would remove staging containers + volumes"
           exit 0
         fi
-      - ENV_NAME=staging docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p salsa-calendar-staging down -v
+      - ENV_NAME=staging docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p movida-staging down -v
       - echo "✅ Staging containers and volumes removed"
 
   # ════════════════════════════════════════════════════════════════
@@ -99,7 +99,7 @@ tasks:
   prod:
     desc: Stop prod stack
     cmds:
-      - ENV_NAME=prod docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p salsa-calendar-prod down
+      - ENV_NAME=prod docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p movida-prod down
       - echo "✅ Prod stopped"
 
   prod:volumes:
@@ -113,7 +113,7 @@ tasks:
           echo "🔍 DRY RUN — would remove prod containers + volumes"
           exit 0
         fi
-      - ENV_NAME=prod docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p salsa-calendar-prod down -v
+      - ENV_NAME=prod docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p movida-prod down -v
       - echo "✅ Prod containers and volumes removed"
 
   # ════════════════════════════════════════════════════════════════

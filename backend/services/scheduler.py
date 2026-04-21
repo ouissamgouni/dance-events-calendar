@@ -1,4 +1,5 @@
 import asyncio
+import functools
 import logging
 
 from backend.config.loader import get_sync_interval_minutes
@@ -23,16 +24,25 @@ def _get_effective_interval(session: Session) -> int:
     return get_sync_interval_minutes()
 
 
+def _run_sync(sync_service: SyncService) -> tuple[dict, int]:
+    """Run a single sync iteration (called in a thread)."""
+    engine = get_engine()
+    with Session(engine) as session:
+        interval = _get_effective_interval(session) * 60
+        stats = sync_service.sync_all(session)
+    return stats, interval
+
+
 async def run_sync_loop(calendar_service: BaseCalendarService) -> None:
     """Background loop that syncs calendars on a configurable interval."""
     sync_service = SyncService(calendar_service)
+    loop = asyncio.get_running_loop()
 
     while True:
         try:
-            engine = get_engine()
-            with Session(engine) as session:
-                interval = _get_effective_interval(session) * 60
-                stats = sync_service.sync_all(session)
+            stats, interval = await loop.run_in_executor(
+                None, functools.partial(_run_sync, sync_service)
+            )
             logger.info("Sync completed: %s", stats)
         except Exception:
             logger.exception("Sync loop iteration failed")

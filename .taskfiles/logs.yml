@@ -12,12 +12,12 @@ tasks:
   staging:
     desc: View staging container logs
     cmds:
-      - ENV_NAME=staging docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-staging logs -f
+      - ENV_NAME=staging docker compose -f infra/docker/docker-compose.unified.yml -p movida-staging logs -f
 
   prod:
     desc: View prod container logs
     cmds:
-      - ENV_NAME=prod docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-prod logs -f
+      - ENV_NAME=prod docker compose -f infra/docker/docker-compose.unified.yml -p movida-prod logs -f
 
   scenario:
     desc: "View scenario container logs (SCENARIO=name)"

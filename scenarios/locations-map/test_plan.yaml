@@ -17,14 +17,20 @@ test_plan:
         Map zooms to fit all markers (not stuck on Paris default).
 
     - id: 2
-      title: "Map markers show event popup"
+      title: "Map markers show event popup and interact with explorer list"
       description: >
         Click a marker on the map (e.g. Paris Salsa Congress).
         A popup should appear with event title, date, and location.
-        Click the title in the popup.
+        While the popup is still open, click on a different event in the
+        explorer list on the left (e.g. Madrid event). The map should zoom to
+        the newly selected event and close the previous popup cleanly.
+        Finally, click the title in the new event's popup to verify it opens
+        the event detail modal.
       expected: >
-        Popup shows event info. Clicking title opens the event detail modal
-        with full description, location, and dates.
+        Initial popup shows event info. Clicking a different event in the explorer
+        list causes the map to zoom to that event without reverting focus.
+        Previous popup closes automatically. New event detail modal opens when
+        clicking the title in the popup, showing full description, location, and dates.
 
     - id: 3
       title: "Calendar date navigation filters map"

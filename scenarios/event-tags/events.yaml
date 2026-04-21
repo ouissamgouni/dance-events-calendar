@@ -1,0 +1,264 @@
+base_week: 0
+
+events:
+  # ── Socials ─────────────────────────────────────────────────
+  - id: "evt-tag-001"
+    calendar_id: "salsa-cal-001"
+    title: "Friday Salsa Social"
+    description: "Weekly social dance night with DJ Mambo. Beginners welcome!"
+    location: "Dance Studio, 10 Rue de Rivoli, Paris, France"
+    latitude: 48.8566
+    longitude: 2.3522
+    start: "w0 Fri 21:00"
+    end: "w0 Sat 01:00"
+    price_is_free: true
+    tags:
+      - "format:social"
+      - "dance-style:salsa"
+      - "level:beginner-friendly"
+      - "venue:indoor"
+      - "scale:medium"
+      - "vibe:social-atmosphere"
+
+  - id: "evt-tag-002"
+    calendar_id: "bachata-cal-002"
+    title: "Bachata Night"
+    description: "Sensual bachata social with classes beforehand."
+    location: "Tanzhaus, Friedrichstr. 100, Berlin, Germany"
+    latitude: 52.5200
+    longitude: 13.4050
+    start: "w0 Sat 21:00"
+    end: "w0 Sun 02:00"
+    price_is_free: false
+    price_min: 10
+    price_currency: "EUR"
+    tags:
+      - "format:social"
+      - "dance-style:bachata"
+      - "level:all-levels"
+      - "venue:indoor"
+      - "vibe:good-music"
+
+  # ── Workshops ───────────────────────────────────────────────
+  - id: "evt-tag-003"
+    calendar_id: "salsa-cal-001"
+    title: "Salsa On2 Intermediate Workshop"
+    description: "Intensive salsa on2 workshop with Carlos & Maria."
+    location: "Salsero Studio, Calle Gran Vía, Madrid, Spain"
+    latitude: 40.4200
+    longitude: -3.7038
+    start: "w0 Sat 14:00"
+    end: "w0 Sat 17:00"
+    price_is_free: false
+    price_min: 25
+    price_max: 35
+    price_currency: "EUR"
+    tags:
+      - "format:workshop"
+      - "dance-style:salsa"
+      - "level:intermediate"
+      - "venue:indoor"
+      - "scale:small"
+
+  - id: "evt-tag-004"
+    calendar_id: "kizomba-cal-003"
+    title: "Kizomba Fundamentals"
+    description: "Learn the basics of kizomba in a relaxed setting."
+    location: "Move Studio, Damrak 1, Amsterdam, Netherlands"
+    latitude: 52.3738
+    longitude: 4.8910
+    start: "w0 Sun 15:00"
+    end: "w0 Sun 17:00"
+    price_is_free: false
+    price_min: 15
+    price_currency: "EUR"
+    tags:
+      - "format:class"
+      - "dance-style:kizomba"
+      - "level:beginner-friendly"
+      - "venue:indoor"
+      - "scale:small"
+
+  # ── Festival / Congress ────────────────────────────────────
+  - id: "evt-tag-005"
+    calendar_id: "salsa-cal-001"
+    title: "Paris Salsa Congress 2025"
+    description: "3-day congress with international artists, 4 rooms, live bands."
+    location: "Palais des Congrès, Paris, France"
+    latitude: 48.8784
+    longitude: 2.2830
+    start: "w1 Fri 18:00"
+    end: "w1 Sun 23:00"
+    price_is_free: false
+    price_min: 90
+    price_max: 150
+    price_currency: "EUR"
+    tags:
+      - "format:congress"
+      - "dance-style:salsa"
+      - "dance-style:bachata"
+      - "dance-style:kizomba"
+      - "level:all-levels"
+      - "scale:large"
+      - "scope:international"
+      - "venue:indoor"
+      - "vibe:crowded"
+      - "vibe:high-level-dancers"
+
+  - id: "evt-tag-006"
+    calendar_id: "bachata-cal-002"
+    title: "Bachata Beach Festival"
+    description: "Open-air bachata festival on the beach. Workshops + parties."
+    location: "Playa de la Barceloneta, Barcelona, Spain"
+    latitude: 41.3784
+    longitude: 2.1925
+    start: "w1 Sat 12:00"
+    end: "w1 Sun 22:00"
+    price_is_free: false
+    price_min: 60
+    price_max: 100
+    price_currency: "EUR"
+    tags:
+      - "format:festival"
+      - "dance-style:bachata"
+      - "level:all-levels"
+      - "scale:large"
+      - "scope:international"
+      - "venue:outdoor"
+      - "vibe:social-atmosphere"
+
+  # ── Rooftop / Live Band ────────────────────────────────────
+  - id: "evt-tag-007"
+    calendar_id: "salsa-cal-001"
+    title: "Salsa on the Rooftop"
+    description: "Open-air salsa party with live band Orquesta del Sol."
+    location: "Skybar, Av. de la Liberté, Brussels, Belgium"
+    latitude: 50.8503
+    longitude: 4.3517
+    start: "w1 Sat 20:00"
+    end: "w1 Sun 00:00"
+    price_is_free: false
+    price_min: 10
+    price_currency: "EUR"
+    tags:
+      - "format:social"
+      - "dance-style:salsa"
+      - "level:all-levels"
+      - "venue:rooftop"
+      - "scale:medium"
+      - "vibe:live-band"
+      - "vibe:good-music"
+      - "vibe:spacious"
+
+  # ── Practice / Rueda ───────────────────────────────────────
+  - id: "evt-tag-008"
+    calendar_id: "salsa-cal-001"
+    title: "Rueda de Casino Practice"
+    description: "Group rueda practice. No partner needed."
+    location: "Community Hall, Rue Neuve 50, Brussels, Belgium"
+    latitude: 50.8512
+    longitude: 4.3550
+    start: "w0 Sun 11:00"
+    end: "w0 Sun 13:00"
+    price_is_free: true
+    tags:
+      - "format:practice"
+      - "dance-style:rueda"
+      - "dance-style:salsa"
+      - "level:beginner-friendly"
+      - "venue:indoor"
+      - "scale:small"
+      - "scope:local"
+
+  # ── Kizomba social ────────────────────────────────────────
+  - id: "evt-tag-009"
+    calendar_id: "kizomba-cal-003"
+    title: "Kizomba & Semba Night"
+    description: "Kizomba and semba social with guest DJ from Lisbon."
+    location: "Casa Latina, Lisbon, Portugal"
+    latitude: 38.7223
+    longitude: -9.1393
+    start: "w0 Fri 22:00"
+    end: "w0 Sat 03:00"
+    price_is_free: false
+    price_min: 8
+    price_currency: "EUR"
+    tags:
+      - "format:social"
+      - "dance-style:kizomba"
+      - "dance-style:semba"
+      - "level:all-levels"
+      - "venue:indoor"
+      - "vibe:good-music"
+
+  # ── Advanced workshop ──────────────────────────────────────
+  - id: "evt-tag-010"
+    calendar_id: "salsa-cal-001"
+    title: "Advanced Salsa Shines"
+    description: "Solo footwork masterclass for advanced dancers."
+    location: "Latin Motion, Via Roma 42, Milan, Italy"
+    latitude: 45.4642
+    longitude: 9.1900
+    start: "w1 Sun 16:00"
+    end: "w1 Sun 18:00"
+    price_is_free: false
+    price_min: 30
+    price_currency: "EUR"
+    tags:
+      - "format:workshop"
+      - "dance-style:salsa"
+      - "level:advanced"
+      - "venue:indoor"
+      - "scale:small"
+      - "vibe:high-level-dancers"
+
+  # ── Bootcamp ───────────────────────────────────────────────
+  - id: "evt-tag-011"
+    calendar_id: "bachata-cal-002"
+    title: "Bachata Bootcamp Weekend"
+    description: "Intensive 2-day training. Covers modern and sensual bachata."
+    location: "Dance Academy, Königstraße, Stuttgart, Germany"
+    latitude: 48.7758
+    longitude: 9.1829
+    start: "w2 Sat 10:00"
+    end: "w2 Sun 18:00"
+    price_is_free: false
+    price_min: 70
+    price_max: 90
+    price_currency: "EUR"
+    tags:
+      - "format:bootcamp"
+      - "dance-style:bachata"
+      - "level:intermediate"
+      - "scale:small"
+      - "scope:regional"
+      - "venue:indoor"
+
+  # ── Event with no tags (for testing filter) ────────────────
+  - id: "evt-tag-012"
+    calendar_id: "kizomba-cal-003"
+    title: "Sunday Kizomba Class"
+    description: "Drop-in kizomba class, all levels."
+    location: "Dance Lab, Corso Vittorio, Rome, Italy"
+    latitude: 41.8967
+    longitude: 12.4822
+    start: "w0 Sun 18:00"
+    end: "w0 Sun 19:30"
+    price_is_free: true
+
+# ── Tag Suggestions (for admin review) ─────────────────────
+tag_suggestions:
+  - event_id: "evt-tag-001"
+    tag: "vibe:good-music"
+    status: "pending"
+    device_id: "user-device-abc"
+
+  - event_id: "evt-tag-002"
+    free_text: "romantic atmosphere"
+    status: "pending"
+    device_id: "user-device-def"
+
+  - event_id: "evt-tag-007"
+    tag: "vibe:crowded"
+    status: "pending"
+    device_id: "user-device-ghi"

@@ -1,0 +1,103 @@
+# Enrichment Pipeline Scenario — QA Test Plan
+# =============================================
+# Validates that events are fetched and displayed immediately,
+# then enriched progressively through the pipeline stages
+# (link extraction → price extraction → geocoding).
+
+test_plan:
+  name: "Enrichment Pipeline — Progressive Enrichment QA"
+  description: >
+    Verify that after a sync, events appear on the calendar right away
+    (without waiting for enrichment), then the pipeline stages run in
+    order — link extraction, price extraction, and finally geocoding —
+    gradually adding metadata to events. The admin panel should show
+    enrichment progress and allow retrying failed geocoding.
+
+  steps:
+    - id: 1
+      title: "Trigger sync and verify events appear immediately"
+      description: >
+        Open the admin panel, trigger a manual sync. Switch to the
+        public calendar view. All 10 events should appear right away,
+        even though enrichment hasn't finished yet.
+      expected: >
+        Calendar shows all 10 events with titles and times.
+        Events with locations show the location text.
+        No coordinates on the map yet (pins appear later).
+      verification: "10 events in calendar view, 0 map pins initially"
+
+    - id: 2
+      title: "Verify link extraction runs first"
+      description: >
+        After sync completes, check the sync log enrichment progress
+        in the admin panel. Link extraction should complete quickly.
+      expected: >
+        Sync log shows link_extraction stage: 4 processed (enrich-001,
+        002, 007, 008), 6 skipped (rest). Events 001, 002, 007, 008
+        now have extracted links visible in the event detail.
+      verification: "link_extraction: 4 processed, 6 skipped, 0 failed"
+
+    - id: 3
+      title: "Verify price extraction runs second"
+      description: >
+        Check enrichment progress for the price_extraction stage.
+      expected: >
+        price_extraction: 5 processed (enrich-001, 002, 007, 008, 009),
+        5 skipped. Events now show price badges (e.g. "45€" on 001).
+      verification: "price_extraction: 5 processed, 5 skipped, 0 failed"
+
+    - id: 4
+      title: "Verify geocoding runs last (slowest stage)"
+      description: >
+        Geocoding processes at ~1 req/sec. Watch the enrichment progress
+        update. Events with locations should gradually get coordinates.
+        Locations use street addresses / well-known places for reliable
+        Nominatim resolution.
+      expected: >
+        geocoding: 6 processed (enrich-001 through 006), 4 skipped
+        (007-010 have no location). Map pins appear one by one as
+        each event gets geocoded.
+      verification: "geocoding: 6 processed, 4 skipped, 0 failed"
+
+    - id: 5
+      title: "Verify enrichment progress in sync history"
+      description: >
+        In the admin panel, open the sync history. The latest sync log
+        should show enrichment_status and per-stage progress.
+      expected: >
+        Status shows "completed". Progress shows all three stages with
+        processed/skipped/failed counts. The "enriching…" animation
+        should have stopped.
+      verification: "enrichment_status=completed, all stages shown"
+
+    - id: 6
+      title: "Verify ungeolocated events panel (before geocoding)"
+      description: >
+        If geocoding fails for some events (e.g. due to rate limiting
+        or network issues), the ungeolocated panel should list them.
+        Click 'Retry' on an individual event or 'Retry All'.
+      expected: >
+        Panel shows events with location but no coordinates.
+        Single retry geocodes one event. Bulk retry processes all.
+        After successful retry, events disappear from the panel.
+      verification: "Retry updates coordinates, event leaves the list"
+
+    - id: 7
+      title: "Verify event detail shows enriched data"
+      description: >
+        Click on enrich-001 (Salsa Congress – Paris). Check that it
+        has: coordinates (map pin), extracted price, and extracted links.
+      expected: >
+        Event detail shows location on map, price badge (~45€),
+        and clickable links to example.com and facebook.com.
+      verification: "All three enrichment fields populated"
+
+    - id: 8
+      title: "Verify skip-all event is untouched"
+      description: >
+        Click on enrich-010 (TBD – Details Coming Soon). It has no
+        location and no description, so all stages should skip it.
+      expected: >
+        Event shows only title and time. No price, no links, no map pin.
+        Enrichment progress counts it as skipped in every stage.
+      verification: "No enrichment metadata on the event"

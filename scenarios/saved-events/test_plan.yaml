@@ -125,7 +125,7 @@ test_plan:
       description: >
         On the My Calendar page, click "📅 Export .ics".
       expected: >
-        Browser downloads "my-salsa-events.ics". File contains VCALENDAR
+        Browser downloads "my-movida-events.ics". File contains VCALENDAR
         with 2 VEVENT entries (the remaining saved events).
 
     - id: 16
@@ -133,7 +133,7 @@ test_plan:
       description: >
         Click "📊 Export .xlsx".
       expected: >
-        Browser downloads "my-salsa-events.xlsx". File opens in a spreadsheet
+        Browser downloads "my-movida-events.xlsx". File opens in a spreadsheet
         app with columns: Title, Date, Start Time, End Time, Location,
         Description, Price. Contains 2 rows of event data.
 
@@ -142,7 +142,7 @@ test_plan:
       description: >
         Go back to home page. Click the FAB, then "Export .ics".
       expected: >
-        Downloads "my-salsa-events.ics" with the 2 saved events.
+        Downloads "my-movida-events.ics" with the 2 saved events.
 
     # ── Clear All ───────────────────────────────────────────────
     - id: 18

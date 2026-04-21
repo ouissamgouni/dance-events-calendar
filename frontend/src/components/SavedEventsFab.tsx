@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import { exportIcs, exportXlsx } from '../api';
+import { trackExportAction } from '../utils/tracking';
 
 function downloadBlob(blob: Blob, filename: string) {
     const url = URL.createObjectURL(blob);
@@ -50,7 +51,8 @@ export default function SavedEventsFab() {
             const blob = format === 'ics'
                 ? await exportIcs(savedEventIds)
                 : await exportXlsx(savedEventIds);
-            downloadBlob(blob, `my-salsa-events.${format}`);
+            downloadBlob(blob, `my-movida-events.${format}`);
+            trackExportAction(format, savedEventIds.length);
         } catch {
             // silently fail
         } finally {
@@ -63,12 +65,16 @@ export default function SavedEventsFab() {
 
     return (
         <div ref={menuRef} className="relative">
-            {/* Nav bar button */}
+            {/* Bookmarks button */}
             <button
                 onClick={() => setOpen((v) => !v)}
-                className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-colors text-xs"
-                aria-label={`My Calendar: ${savedCount} events saved`}
+                className={`flex items-center gap-1 px-2 py-1 text-sm transition ${open
+                    ? 'bg-white text-slate-900 font-medium shadow-sm'
+                    : 'bg-white text-slate-900 font-medium shadow-sm hover:bg-slate-50'
+                    }`}
+                aria-label={`Bookmarks: ${savedCount} events saved`}
             >
+                <span className="font-medium">Saved</span>
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
                     <path d="M5 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14l-5-2.5L5 18V4Z" />
                 </svg>
@@ -80,7 +86,7 @@ export default function SavedEventsFab() {
 
             {/* Dropdown menu */}
             {open && (
-                <div className="absolute top-7 right-0 w-36 bg-white rounded-md shadow-xl border border-slate-200 py-0.5 z-[9000]">
+                <div className="absolute top-10 right-0 w-36 bg-white rounded-md shadow-xl border border-slate-200 py-0.5 z-[9000]">
                     <button
                         onClick={() => { navigate('/my-calendar'); setOpen(false); }}
                         className="w-full text-left px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-50 transition"

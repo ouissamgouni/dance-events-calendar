@@ -35,13 +35,13 @@ def _build_ics(events: list[CachedEvent]) -> str:
     lines = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
-        "PRODID:-//SalsaEventsCalendar//EN",
+        "PRODID:-//Movida//EN",
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
     ]
     for e in events:
         lines.append("BEGIN:VEVENT")
-        lines.append(f"UID:{e.event_id}@salsa-events")
+        lines.append(f"UID:{e.event_id}@movida")
         if e.all_day:
             lines.append(f"DTSTART;VALUE=DATE:{e.start.strftime('%Y%m%d')}")
             lines.append(f"DTEND;VALUE=DATE:{e.end.strftime('%Y%m%d')}")
@@ -81,7 +81,7 @@ def export_ics(
     return StreamingResponse(
         io.BytesIO(ics_content.encode("utf-8")),
         media_type="text/calendar",
-        headers={"Content-Disposition": "attachment; filename=my-salsa-events.ics"},
+        headers={"Content-Disposition": "attachment; filename=my-movida-events.ics"},
     )
 
 
@@ -99,7 +99,7 @@ def export_xlsx(
 
     wb = Workbook()
     ws = wb.active
-    ws.title = "My Salsa Events"
+    ws.title = "My Movida Events"
     ws.append(
         ["Title", "Date", "Start Time", "End Time", "Location", "Description", "Price"]
     )
@@ -142,5 +142,5 @@ def export_xlsx(
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=my-salsa-events.xlsx"},
+        headers={"Content-Disposition": "attachment; filename=my-movida-events.xlsx"},
     )

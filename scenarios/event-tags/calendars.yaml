@@ -1,0 +1,10 @@
+calendars:
+  - id: "salsa-cal-001"
+    name: "Salsa"
+    color: "#e11d48"
+  - id: "bachata-cal-002"
+    name: "Bachata"
+    color: "#7c3aed"
+  - id: "kizomba-cal-003"
+    name: "Kizomba"
+    color: "#059669"

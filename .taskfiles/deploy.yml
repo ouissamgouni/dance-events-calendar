@@ -13,16 +13,16 @@ tasks:
           echo ""
           echo "Steps:"
           echo "  1. Build images from develop (task build:staging)"
-          echo "  2. docker compose down (salsa-calendar-staging)"
+          echo "  2. docker compose down (movida-staging)"
           echo "  3. docker compose up -d"
           echo ""
           echo "Compose config:"
-          ENV_NAME=staging IMAGE_TAG=develop docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-staging config
+          ENV_NAME=staging IMAGE_TAG=develop docker compose -f infra/docker/docker-compose.unified.yml -p movida-staging config
           exit 0
         fi
       - task: :build:staging
-      - ENV_NAME=staging IMAGE_TAG=develop docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-staging down
-      - ENV_NAME=staging IMAGE_TAG=develop docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-staging up -d
+      - ENV_NAME=staging IMAGE_TAG=develop docker compose -f infra/docker/docker-compose.unified.yml -p movida-staging down
+      - ENV_NAME=staging IMAGE_TAG=develop docker compose -f infra/docker/docker-compose.unified.yml -p movida-staging up -d
       - sleep 5
       - |
         echo ""
@@ -60,7 +60,7 @@ tasks:
           echo ""
           echo "Steps:"
           echo "  1. Build images from $REF (task build:ref)"
-          echo "  2. docker compose down (salsa-calendar-staging)"
+          echo "  2. docker compose down (movida-staging)"
           echo "  3. docker compose up -d with tag :$TAG"
           exit 0
         fi
@@ -71,8 +71,8 @@ tasks:
         SHA=$(git rev-parse --short=7 "$REF")
         TAG="ref-$SHA"
 
-        ENV_NAME=staging IMAGE_TAG=$TAG docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-staging down
-        ENV_NAME=staging IMAGE_TAG=$TAG docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-staging up -d
+        ENV_NAME=staging IMAGE_TAG=$TAG docker compose -f infra/docker/docker-compose.unified.yml -p movida-staging down
+        ENV_NAME=staging IMAGE_TAG=$TAG docker compose -f infra/docker/docker-compose.unified.yml -p movida-staging up -d
         sleep 5
 
         echo ""
@@ -101,7 +101,7 @@ tasks:
           echo ""
           echo "Steps:"
           echo "  1. Build images from current directory (task build:dirty)"
-          echo "  2. docker compose down (salsa-calendar-staging)"
+          echo "  2. docker compose down (movida-staging)"
           echo "  3. docker compose up -d with tag :$TAG"
           exit 0
         fi
@@ -110,8 +110,8 @@ tasks:
         TIMESTAMP=$(date +%Y%m%d-%H%M%S)
         TAG="dirty-$TIMESTAMP"
 
-        ENV_NAME=staging IMAGE_TAG=$TAG docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-staging down
-        ENV_NAME=staging IMAGE_TAG=$TAG docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-staging up -d
+        ENV_NAME=staging IMAGE_TAG=$TAG docker compose -f infra/docker/docker-compose.unified.yml -p movida-staging down
+        ENV_NAME=staging IMAGE_TAG=$TAG docker compose -f infra/docker/docker-compose.unified.yml -p movida-staging up -d
         sleep 5
 
         echo ""
@@ -142,22 +142,22 @@ tasks:
         if [ "{{.DRY_RUN}}" = "1" ]; then
           echo "🔍 DRY RUN — would deploy to PROD: $REF"
           echo ""
-          if docker image inspect salsa-calendar-backend:$REF > /dev/null 2>&1; then
-            echo "Image found: salsa-calendar-backend:$REF"
+          if docker image inspect movida-backend:$REF > /dev/null 2>&1; then
+            echo "Image found: movida-backend:$REF"
           else
             echo "No image found for :$REF — would attempt to build from git ref"
           fi
           echo ""
           echo "Steps:"
-          echo "  1. docker compose down (salsa-calendar-prod)"
+          echo "  1. docker compose down (movida-prod)"
           echo "  2. docker compose up -d with tag :$REF"
           echo ""
           echo "Compose config:"
-          ENV_NAME=prod IMAGE_TAG=$REF docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-prod config
+          ENV_NAME=prod IMAGE_TAG=$REF docker compose -f infra/docker/docker-compose.unified.yml -p movida-prod config
           exit 0
         fi
 
-        if docker image inspect salsa-calendar-backend:$REF > /dev/null 2>&1; then
+        if docker image inspect movida-backend:$REF > /dev/null 2>&1; then
           VERSION="$REF"
           echo "Deploying existing image: $VERSION"
         else
@@ -168,8 +168,8 @@ tasks:
           echo "Built $REF → :$VERSION"
         fi
 
-        ENV_NAME=prod IMAGE_TAG=$VERSION docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-prod down
-        ENV_NAME=prod IMAGE_TAG=$VERSION docker compose -f infra/docker/docker-compose.unified.yml -p salsa-calendar-prod up -d
+        ENV_NAME=prod IMAGE_TAG=$VERSION docker compose -f infra/docker/docker-compose.unified.yml -p movida-prod down
+        ENV_NAME=prod IMAGE_TAG=$VERSION docker compose -f infra/docker/docker-compose.unified.yml -p movida-prod up -d
         sleep 5
         echo ""
         echo "═══════════════════════════════════════════════════════════════"

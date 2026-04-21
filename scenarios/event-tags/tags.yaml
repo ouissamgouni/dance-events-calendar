@@ -1,0 +1,117 @@
+tag_groups:
+  - slug: format
+    label: Format
+    ordinal: 0
+    allow_multiple: true
+    color: "#f472b6"
+    tags:
+      - slug: social
+        label: Social
+      - slug: class
+        label: Class
+      - slug: workshop
+        label: Workshop
+      - slug: festival
+        label: Festival
+      - slug: bootcamp
+        label: Bootcamp
+      - slug: congress
+        label: Congress
+      - slug: practice
+        label: Practice
+
+  - slug: scale
+    label: Scale
+    ordinal: 1
+    allow_multiple: false
+    color: "#38bdf8"
+    tags:
+      - slug: small
+        label: Small (<50)
+      - slug: medium
+        label: Medium (50-200)
+      - slug: large
+        label: Large (200+)
+
+  - slug: scope
+    label: Scope
+    ordinal: 2
+    allow_multiple: true
+    color: "#a78bfa"
+    tags:
+      - slug: local
+        label: Local
+      - slug: regional
+        label: Regional
+      - slug: international
+        label: International
+
+  - slug: venue
+    label: Venue
+    ordinal: 3
+    allow_multiple: true
+    color: "#34d399"
+    tags:
+      - slug: indoor
+        label: Indoor
+      - slug: outdoor
+        label: Outdoor
+      - slug: rooftop
+        label: Rooftop
+
+  - slug: dance-style
+    label: Dance Style
+    ordinal: 4
+    allow_multiple: true
+    color: "#fb923c"
+    tags:
+      - slug: salsa
+        label: Salsa
+      - slug: bachata
+        label: Bachata
+      - slug: kizomba
+        label: Kizomba
+      - slug: semba
+        label: Semba
+      - slug: zouk
+        label: Zouk
+      - slug: rueda
+        label: Rueda
+      - slug: cha-cha
+        label: Cha-Cha
+      - slug: son
+        label: Son
+
+  - slug: level
+    label: Level
+    ordinal: 5
+    allow_multiple: true
+    color: "#60a5fa"
+    tags:
+      - slug: beginner-friendly
+        label: Beginner-Friendly
+      - slug: intermediate
+        label: Intermediate
+      - slug: advanced
+        label: Advanced
+      - slug: all-levels
+        label: All Levels
+
+  - slug: vibe
+    label: Vibe
+    ordinal: 6
+    allow_multiple: true
+    color: "#e879f9"
+    tags:
+      - slug: good-music
+        label: Good Music
+      - slug: crowded
+        label: Crowded
+      - slug: spacious
+        label: Spacious
+      - slug: high-level-dancers
+        label: High-Level Dancers
+      - slug: social-atmosphere
+        label: Social Atmosphere
+      - slug: live-band
+        label: Live Band

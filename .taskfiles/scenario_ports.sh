@@ -21,7 +21,7 @@ BASE_WEB_PORT=3002
 if [ "$SCENARIO_NAME" = "default" ] || [ -z "$SCENARIO_NAME" ]; then
   SC_PORT_OFFSET=0
   ENV_NAME="scenario"
-  SC_PROJECT_NAME="salsa-calendar-scenario"
+  SC_PROJECT_NAME="movida-scenario"
   SC_DB_CONTAINER="calendar_db_scenario"
   SC_BACKEND_CONTAINER="calendar_backend_scenario"
   SC_FRONTEND_CONTAINER="calendar_frontend_scenario"
@@ -33,7 +33,7 @@ else
     SC_PORT_OFFSET=$(printf '%s' "$SCENARIO_NAME" | cksum | awk '{print ($1 % 9999) + 1}')
   fi
   ENV_NAME="scenario-${SCENARIO_NAME}"
-  SC_PROJECT_NAME="salsa-calendar-scenario-${SCENARIO_NAME}"
+  SC_PROJECT_NAME="movida-scenario-${SCENARIO_NAME}"
   SC_DB_CONTAINER="calendar_db_scenario-${SCENARIO_NAME}"
   SC_BACKEND_CONTAINER="calendar_backend_scenario-${SCENARIO_NAME}"
   SC_FRONTEND_CONTAINER="calendar_frontend_scenario-${SCENARIO_NAME}"

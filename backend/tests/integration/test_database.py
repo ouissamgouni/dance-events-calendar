@@ -113,8 +113,10 @@ class TestDatabaseModels:
 @pytest.mark.integration
 class TestSeederIntegration:
     def test_seed_default_scenario(self, session):
+        from backend.db.seed import SCENARIOS_DIR
+
         seeder = DatabaseSeeder(session)
-        seeder.seed()
+        seeder.seed(SCENARIOS_DIR / "calendar-service-mock")
 
         calendars = session.exec(select(CalendarSetting)).all()
         assert len(calendars) >= 2
@@ -123,9 +125,11 @@ class TestSeederIntegration:
         assert len(events) >= 8
 
     def test_seed_is_idempotent(self, session):
+        from backend.db.seed import SCENARIOS_DIR
+
         seeder = DatabaseSeeder(session)
-        seeder.seed()
-        seeder.seed()  # run again
+        seeder.seed(SCENARIOS_DIR / "calendar-service-mock")
+        seeder.seed(SCENARIOS_DIR / "calendar-service-mock")  # run again
 
         calendars = session.exec(select(CalendarSetting)).all()
         # Should still be 2 (not 4) due to upsert

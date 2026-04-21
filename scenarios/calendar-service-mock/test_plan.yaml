@@ -1,6 +1,6 @@
 # Mock Scenario — QA Test Plan
 # ================================
-# Validates core features of the Salsa Events Calendar using
+# Validates core features of the Movida calendar using
 # mock calendar data (no Google API required).
 
 test_plan:

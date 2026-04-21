@@ -21,7 +21,7 @@ tasks:
         cd {{.WORKTREE_DEVELOP}} && git pull origin develop
       - |
         echo "Building backend from develop..."
-        docker build -t salsa-calendar-backend:develop -f {{.WORKTREE_DEVELOP}}/backend/Dockerfile {{.WORKTREE_DEVELOP}}
+        docker build -t movida-backend:develop -f {{.WORKTREE_DEVELOP}}/backend/Dockerfile {{.WORKTREE_DEVELOP}}
         echo "✅ Backend image built: :develop"
 
   staging:frontend:
@@ -33,7 +33,7 @@ tasks:
         cd {{.WORKTREE_DEVELOP}} && git pull origin develop
       - |
         echo "Building frontend from develop..."
-        docker build -t salsa-calendar-frontend:develop \
+        docker build -t movida-frontend:develop \
           --build-arg VITE_API_URL=http://localhost:${BACKEND_PORT:-8002} \
           {{.WORKTREE_DEVELOP}}/frontend
         echo "✅ Frontend image built: :develop"
@@ -64,8 +64,8 @@ tasks:
       - |
         VERSION={{.VERSION}}{{.CLI_ARGS}}
         echo "Building backend from main as $VERSION..."
-        docker build -t salsa-calendar-backend:$VERSION -f {{.WORKTREE_MAIN}}/backend/Dockerfile {{.WORKTREE_MAIN}}
-        docker tag salsa-calendar-backend:$VERSION salsa-calendar-backend:latest
+        docker build -t movida-backend:$VERSION -f {{.WORKTREE_MAIN}}/backend/Dockerfile {{.WORKTREE_MAIN}}
+        docker tag movida-backend:$VERSION movida-backend:latest
         echo "✅ Backend image built: :$VERSION and :latest"
 
   prod:frontend:
@@ -85,10 +85,10 @@ tasks:
       - |
         VERSION={{.VERSION}}{{.CLI_ARGS}}
         echo "Building frontend from main as $VERSION..."
-        docker build -t salsa-calendar-frontend:$VERSION \
+        docker build -t movida-frontend:$VERSION \
           --build-arg VITE_API_URL=http://localhost:${BACKEND_PORT:-8080} \
           {{.WORKTREE_MAIN}}/frontend
-        docker tag salsa-calendar-frontend:$VERSION salsa-calendar-frontend:latest
+        docker tag movida-frontend:$VERSION movida-frontend:latest
         echo "✅ Frontend image built: :$VERSION and :latest"
 
   ref:
@@ -127,17 +127,17 @@ tasks:
         echo ""
 
         echo "Building backend..."
-        docker build -t salsa-calendar-backend:$TAG -f $WORKTREE_PATH/backend/Dockerfile $WORKTREE_PATH
+        docker build -t movida-backend:$TAG -f $WORKTREE_PATH/backend/Dockerfile $WORKTREE_PATH
 
         echo "Building frontend..."
-        docker build -t salsa-calendar-frontend:$TAG \
+        docker build -t movida-frontend:$TAG \
           --build-arg VITE_API_URL=http://localhost:${BACKEND_PORT:-8002} \
           $WORKTREE_PATH/frontend
 
         echo ""
         echo "✅ Images built from $REF"
-        echo "   Backend:  salsa-calendar-backend:$TAG"
-        echo "   Frontend: salsa-calendar-frontend:$TAG"
+        echo "   Backend:  movida-backend:$TAG"
+        echo "   Frontend: movida-frontend:$TAG"
 
   dirty:
     desc: Build images from current working directory (uncommitted changes)
@@ -162,47 +162,47 @@ tasks:
         echo ""
 
         echo "Building backend..."
-        docker build -t salsa-calendar-backend:$TAG -f backend/Dockerfile .
+        docker build -t movida-backend:$TAG -f backend/Dockerfile .
 
         echo "Building frontend..."
-        docker build -t salsa-calendar-frontend:$TAG \
+        docker build -t movida-frontend:$TAG \
           --build-arg VITE_API_URL=http://localhost:${BACKEND_PORT:-8001} \
           ./frontend
 
         echo ""
         echo "✅ Images built from working directory"
-        echo "   Backend:  salsa-calendar-backend:$TAG"
-        echo "   Frontend: salsa-calendar-frontend:$TAG"
+        echo "   Backend:  movida-backend:$TAG"
+        echo "   Frontend: movida-frontend:$TAG"
         echo ""
         echo "Deploy with: task deploy:staging:dirty"
 
   list:
-    desc: List all salsa-calendar Docker images
+    desc: List all movida Docker images
     cmds:
-      - docker images salsa-calendar-* --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedSince}}"
+      - docker images movida-* --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedSince}}"
 
   clean:
     desc: Remove old/dangling Docker images
     cmds:
       - |
         echo "Current images:"
-        docker images salsa-calendar-* --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+        docker images movida-* --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
         echo ""
         echo "Removing dangling images..."
         docker image prune -f
         echo "✅ Cleanup complete"
 
   clean:all:
-    desc: "Remove ALL salsa-calendar Docker images"
+    desc: "Remove ALL movida Docker images"
     vars:
       DRY_RUN: '{{.DRY_RUN | default "0"}}'
-    prompt: "This will remove ALL salsa-calendar Docker images. Continue?"
+    prompt: "This will remove ALL movida Docker images. Continue?"
     cmds:
       - |
         if [ "{{.DRY_RUN}}" = "1" ]; then
           echo "🔍 DRY RUN — would remove these images:"
-          docker images salsa-calendar-* --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+          docker images movida-* --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
           exit 0
         fi
-        docker images salsa-calendar-* -q | xargs -r docker rmi -f
-        echo "✅ All salsa-calendar images removed"
+        docker images movida-* -q | xargs -r docker rmi -f
+        echo "✅ All movida images removed"

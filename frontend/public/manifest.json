@@ -1,6 +1,6 @@
 {
-    "name": "Salsa Events Calendar",
-    "short_name": "Salsa Events",
+    "name": "Movida",
+    "short_name": "Movida",
     "description": "Discover upcoming salsa classes, socials, and workshops near you.",
     "start_url": "/",
     "display": "standalone",

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { fetchEventsByIds, exportIcs, exportXlsx } from '../api';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
+import { trackExportAction } from '../utils/tracking';
 import EventListPanel from '../components/EventListPanel';
 import EventMap from '../components/EventMap';
 import type { MapBounds } from '../components/EventMap';
@@ -56,7 +57,8 @@ export default function MyCalendar() {
         setExporting('ics');
         try {
             const blob = await exportIcs(savedEventIds);
-            downloadBlob(blob, 'my-salsa-events.ics');
+            downloadBlob(blob, 'my-movida-events.ics');
+            trackExportAction('ics', savedEventIds.length);
         } catch { /* ignore */ }
         finally { setExporting(''); }
     }, [savedEventIds]);
@@ -66,7 +68,8 @@ export default function MyCalendar() {
         setExporting('xlsx');
         try {
             const blob = await exportXlsx(savedEventIds);
-            downloadBlob(blob, 'my-salsa-events.xlsx');
+            downloadBlob(blob, 'my-movida-events.xlsx');
+            trackExportAction('xlsx', savedEventIds.length);
         } catch { /* ignore */ }
         finally { setExporting(''); }
     }, [savedEventIds]);

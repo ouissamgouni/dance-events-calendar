@@ -4,6 +4,7 @@ import type { GeocodeSuggestion } from '../api';
 import { updateEvent } from '../api';
 import AddressAutocomplete from './AddressAutocomplete';
 import LocationBadge from './LocationBadge';
+import EventTagEditor from './EventTagEditor';
 
 interface Props {
     event: CalendarEvent;
@@ -100,11 +101,11 @@ export default function EventEditModal({ event, onClose, onSaved }: Props) {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className="mx-4 w-full max-w-lg rounded-xl bg-white p-6 shadow-xl">
-                <h2 className="mb-4 text-lg font-semibold text-slate-800">Edit Event</h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-lg rounded-xl bg-white shadow-xl flex flex-col max-h-[90vh]">
+                <h2 className="px-6 pt-6 pb-4 text-lg font-semibold text-slate-800 shrink-0">Edit Event</h2>
 
-                <div className="space-y-3">
+                <div className="px-6 pb-6 overflow-y-auto space-y-3">
                     <div>
                         <label className="mb-1 block text-xs font-medium text-slate-600">Title</label>
                         <input
@@ -233,6 +234,15 @@ export default function EventEditModal({ event, onClose, onSaved }: Props) {
                         )}
                     </div>
 
+                    {/* Tags section */}
+                    <div className="border-t border-slate-200 pt-3">
+                        <EventTagEditor
+                            eventId={event.event_id}
+                            currentTags={event.tags || []}
+                            onUpdated={() => { }}
+                        />
+                    </div>
+
                     {/* Links section */}
                     <div className="border-t border-slate-200 pt-3">
                         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Links</p>
@@ -277,9 +287,9 @@ export default function EventEditModal({ event, onClose, onSaved }: Props) {
                     </div>
                 </div>
 
-                {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+                {error && <p className="px-6 pt-3 text-sm text-red-600 shrink-0">{error}</p>}
 
-                <div className="mt-5 flex justify-end gap-2">
+                <div className="px-6 py-4 flex justify-end gap-2 border-t border-slate-100 shrink-0">
                     <button
                         onClick={onClose}
                         className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 transition"

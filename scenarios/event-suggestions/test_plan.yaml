@@ -102,9 +102,9 @@ test_plan:
       verification: "PATCH request succeeds, title reflected in panel"
 
     - id: 11
-      title: "Approve suggestion to Salsa Events calendar"
+      title: "Approve suggestion to Movida calendar"
       description: >
-        Select "Salsa Events" from the calendar dropdown. Click "Approve".
+        Select "Movida" from the calendar dropdown. Click "Approve".
       expected: >
         Status badge changes to green "approved". assigned_calendar_id set.
         A CachedEvent is created (visible on Home page).

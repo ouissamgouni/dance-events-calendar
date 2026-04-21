@@ -1,28 +1,43 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { fetchEvent, trackEventView } from '../api';
-import { useFeatureFlags } from '../context/FeatureFlagsContext';
+import { MapContainer, TileLayer, Marker } from 'react-leaflet';
+import L from 'leaflet';
+import { fetchEvent } from '../api';
 import { useSavedEvents } from '../context/SavedEventsContext';
-import { parseLinks } from '../utils/parseLinks';
-import { deriveLinkLabel } from '../utils/deriveLinkLabel';
-import LocationBadge from '../components/LocationBadge';
+import { useAuth } from '../context/AuthContext';
+import { trackView } from '../utils/tracking';
+import EventDetailContent from '../components/EventDetailContent';
+import EventEditModal from '../components/EventEditModal';
 import type { CalendarEvent } from '../types';
+
+function makePin(color: string): L.DivIcon {
+    return L.divIcon({
+        className: '',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+        html: `<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="14" cy="14" r="11" fill="${color}" stroke="white" stroke-width="2.5" />
+            <circle cx="14" cy="14" r="4" fill="white" opacity="0.9" />
+        </svg>`,
+    });
+}
 
 export default function EventDetailPage() {
     const { eventId } = useParams<{ eventId: string }>();
     const [event, setEvent] = useState<CalendarEvent | null>(null);
+    const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
     const [error, setError] = useState(false);
     const [loading, setLoading] = useState(true);
-    const { showPrices, showPopularity } = useFeatureFlags();
     const { isSaved, toggleSave } = useSavedEvents();
+    const { user } = useAuth();
 
     useEffect(() => {
         if (!eventId) return;
         fetchEvent(eventId)
             .then((e) => {
                 setEvent(e);
-                trackEventView(eventId);
+                trackView(eventId, 'direct');
             })
             .catch(() => setError(true))
             .finally(() => setLoading(false));
@@ -46,14 +61,11 @@ export default function EventDetailPage() {
     }
 
     const start = new Date(event.start);
-    const end = new Date(event.end);
-    const fallbackLinks = parseLinks(event.description);
-    const structuredLinks = event.links && event.links.length > 0 ? event.links : null;
-
     const formatDate = (d: Date) =>
         d.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const formatTime = (d: Date) =>
         d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    const end = new Date(event.end);
 
     const pageTitle = `${event.title} — ${formatDate(start)}`;
     const pageDescription = [
@@ -102,12 +114,9 @@ export default function EventDetailPage() {
 
     const shareUrl = window.location.href;
 
-    const handleCopyLink = async () => {
-        try {
-            await navigator.clipboard.writeText(shareUrl);
-        } catch {
-            // fallback ignored
-        }
+    const handleEventSaved = (updated: CalendarEvent) => {
+        setEvent(updated);
+        setEditingEvent(null);
     };
 
     return (
@@ -134,83 +143,36 @@ export default function EventDetailPage() {
                             <h1 className="text-2xl font-bold text-slate-900 leading-tight">
                                 {event.title}
                             </h1>
-                            <p className="mt-2 text-sm text-slate-500">
-                                🗓 {event.all_day
-                                    ? formatDate(start)
-                                    : `${formatDate(start)} · ${formatTime(start)} – ${formatTime(end)}`}
-                            </p>
                         </div>
 
-                        {/* Body */}
-                        <div className="px-6 py-5 space-y-4">
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <LocationBadge location={event.location} latitude={event.latitude} longitude={event.longitude} />
-                                {showPrices && event.price_is_free && (
-                                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                                        Free
-                                    </span>
-                                )}
-                                {showPrices && !event.price_is_free && event.price_min != null && event.price_currency && (
-                                    <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-                                        {event.price_max != null && event.price_max !== event.price_min
-                                            ? `${event.price_currency} ${event.price_min}–${event.price_max}`
-                                            : `${event.price_currency} ${event.price_min}`}
-                                    </span>
-                                )}
-                                {showPopularity && event.view_count > 0 && (
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-                                        {event.view_count >= 10 ? '🔥' : '👁'} {event.view_count} view{event.view_count !== 1 ? 's' : ''}
-                                    </span>
-                                )}
+                        {/* Body — shared content */}
+                        <div className="px-6 py-5">
+                            <EventDetailContent
+                                event={event}
+                                onEdit={user ? (evt) => setEditingEvent(evt) : undefined}
+                            />
+                        </div>
+
+                        {/* Mini map */}
+                        {event.latitude != null && event.longitude != null && (
+                            <div className="h-48 border-t border-slate-100">
+                                <MapContainer
+                                    center={[event.latitude, event.longitude]}
+                                    zoom={14}
+                                    className="h-full w-full"
+                                    scrollWheelZoom={false}
+                                    dragging={false}
+                                    zoomControl={false}
+                                    attributionControl={false}
+                                >
+                                    <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
+                                    <Marker
+                                        position={[event.latitude, event.longitude]}
+                                        icon={makePin(event.color ?? '#e11d48')}
+                                    />
+                                </MapContainer>
                             </div>
-
-                            {event.location && (
-                                <p className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                    <span className="mt-0.5">📍</span>
-                                    <span>{event.location}</span>
-                                </p>
-                            )}
-
-                            {event.description && (
-                                <div className="whitespace-pre-line leading-relaxed text-sm text-slate-600">
-                                    {event.description}
-                                </div>
-                            )}
-
-                            {structuredLinks ? (
-                                <div className="space-y-1.5 border-t border-slate-100 pt-3">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Links</p>
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {structuredLinks.map((link, i) => (
-                                            <a
-                                                key={i}
-                                                href={link.url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-3 py-1 text-xs font-medium text-rose-600 hover:bg-rose-100 transition"
-                                            >
-                                                🔗 {link.label || deriveLinkLabel(link.url)}
-                                            </a>
-                                        ))}
-                                    </div>
-                                </div>
-                            ) : fallbackLinks.length > 0 && (
-                                <div className="space-y-1.5 border-t border-slate-100 pt-3">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Links</p>
-                                    {fallbackLinks.map((url) => (
-                                        <a
-                                            key={url}
-                                            href={url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="block truncate text-rose-600 hover:text-rose-700 hover:underline text-xs"
-                                        >
-                                            {url}
-                                        </a>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                        )}
 
                         {/* Share bar */}
                         <div className="border-t border-slate-100 px-6 py-3 flex items-center gap-3">
@@ -225,7 +187,7 @@ export default function EventDetailPage() {
                                 {isSaved(event.event_id) ? 'Saved' : 'Save'}
                             </button>
                             <button
-                                onClick={handleCopyLink}
+                                onClick={() => navigator.clipboard.writeText(shareUrl).catch(() => { })}
                                 className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-full px-3 py-1 transition"
                             >
                                 📋 Copy link
@@ -242,6 +204,13 @@ export default function EventDetailPage() {
                     </article>
                 </div>
             </div>
+            {editingEvent && (
+                <EventEditModal
+                    event={editingEvent}
+                    onClose={() => setEditingEvent(null)}
+                    onSaved={handleEventSaved}
+                />
+            )}
         </>
     );
 }

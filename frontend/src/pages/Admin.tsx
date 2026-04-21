@@ -1,18 +1,21 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import type { CalendarSetting, CalendarEvent, EventSuggestion } from '../types';
+import { useNavigate, Link } from 'react-router-dom';
+import type { CalendarSetting, EventSuggestion } from '../types';
 import type { SyncLogEntry } from '../api';
 import {
     fetchAdminCalendars, updateCalendar, discoverCalendars, triggerSync, addCalendar,
-    fetchSettings, updateSettings, fetchSyncLogs, fetchPendingEvents, reviewEvent, markAllReviewed,
+    fetchSettings, updateSettings, fetchSyncLogs,
     fetchSuggestions, fetchMostSavedEvents,
 } from '../api';
 import type { MostSavedEvent } from '../api';
 import { useAuth } from '../context/AuthContext';
 import SyncHistoryPanel from '../components/SyncHistoryPanel';
-import PendingReviewPanel from '../components/PendingReviewPanel';
+import EventsPanel from '../components/EventsPanel';
+import type { EventsPanelPreset } from '../components/EventsPanel';
 import SuggestionsPanel from '../components/SuggestionsPanel';
 import UnsyncedSuggestionsPanel from '../components/UnsyncedSuggestionsPanel';
+import TagSuggestionsPanel from '../components/TagSuggestionsPanel';
+import AdminTagCategories from '../components/AdminTagCategories';
 
 export default function Admin() {
     const [calendars, setCalendars] = useState<CalendarSetting[]>([]);
@@ -25,13 +28,14 @@ export default function Admin() {
     const [showPrices, setShowPrices] = useState(false);
     const [showPopularity, setShowPopularity] = useState(false);
     const [syncLogs, setSyncLogs] = useState<SyncLogEntry[]>([]);
-    const [pendingEvents, setPendingEvents] = useState<CalendarEvent[]>([]);
     const [editingCalId, setEditingCalId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
     const [syncPanelOpen, setSyncPanelOpen] = useState(false);
-    const [pendingPanelOpen, setPendingPanelOpen] = useState(false);
+    const [eventsPanelOpen, setEventsPanelOpen] = useState(false);
+    const [eventsPanelPreset, setEventsPanelPreset] = useState<EventsPanelPreset>('all');
     const [suggestionsPanelOpen, setSuggestionsPanelOpen] = useState(false);
     const [unsyncedPanelOpen, setUnsyncedPanelOpen] = useState(false);
+    const [tagSuggestionsPanelOpen, setTagSuggestionsPanelOpen] = useState(false);
     const [suggestions, setSuggestions] = useState<EventSuggestion[]>([]);
     const [mostSaved, setMostSaved] = useState<MostSavedEvent[]>([]);
     const { user, logout } = useAuth();
@@ -53,7 +57,6 @@ export default function Admin() {
             setShowPopularity(s.show_popularity);
         }).catch(() => { });
         fetchSyncLogs().then(setSyncLogs).catch(() => { });
-        fetchPendingEvents().then(setPendingEvents).catch(() => { });
         fetchSuggestions().then(setSuggestions).catch(() => { });
         fetchMostSavedEvents().then(setMostSaved).catch(() => { });
     }, []);
@@ -131,7 +134,6 @@ export default function Admin() {
                 `Synced ${stats.calendars_synced} calendar(s): ${stats.events_upserted} upserted, ${stats.events_deleted} deleted.`,
             );
             fetchSyncLogs().then(setSyncLogs).catch(() => { });
-            fetchPendingEvents().then(setPendingEvents).catch(() => { });
         } catch {
             setMessage('Failed to sync.');
         } finally {
@@ -196,44 +198,23 @@ export default function Admin() {
         }
     };
 
-    const handleReviewEvent = async (eventId: string) => {
-        try {
-            await reviewEvent(eventId);
-            setPendingEvents((prev) => prev.filter((e) => e.event_id !== eventId));
-        } catch {
-            setMessage('Failed to mark event as reviewed.');
-        }
-    };
-
-    const handleMarkAllReviewed = async () => {
-        setBusy('review-all');
-        try {
-            await markAllReviewed();
-            setPendingEvents([]);
-            setMessage('All events marked as reviewed.');
-        } catch {
-            setMessage('Failed to mark all reviewed.');
-        } finally {
-            setBusy('');
-        }
-    };
-
-    const handleEventSaved = (updated: CalendarEvent) => {
-        setPendingEvents((prev) =>
-            prev.map((e) => (e.event_id === updated.event_id ? updated : e))
-                .filter((e) => e.review_status === 'pending'),
-        );
-    };
-
     const enabledCount = calendars.filter((c) => c.enabled).length;
 
     return (
         <div className="mx-auto max-w-7xl px-5 py-6">
             {/* ── Header ── */}
             <div className="mb-5 flex items-center justify-between">
-                <h1 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                    Admin
-                </h1>
+                <div className="flex items-center gap-3">
+                    <h1 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                        Admin
+                    </h1>
+                    <Link
+                        to="/"
+                        className="bg-gray-100 text-gray-600 text-[11px] font-medium px-2.5 py-1 hover:bg-gray-200 transition border border-gray-200 rounded"
+                    >
+                        Explorer
+                    </Link>
+                </div>
                 <div className="flex items-center gap-2">
                     {user && (
                         <span className="text-[11px] text-gray-400">{user.email}</span>
@@ -278,15 +259,16 @@ export default function Admin() {
                     )}
                 </button>
                 <button
-                    onClick={() => setPendingPanelOpen(true)}
+                    onClick={() => { setEventsPanelPreset('all'); setEventsPanelOpen(true); }}
+                    className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
+                >
+                    Events
+                </button>
+                <button
+                    onClick={() => { setEventsPanelPreset('pending'); setEventsPanelOpen(true); }}
                     className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
                 >
                     Pending Review
-                    {pendingEvents.length > 0 && (
-                        <span className="inline-flex items-center justify-center bg-amber-500 text-white text-[10px] font-semibold px-1.5 py-0 min-w-[16px]">
-                            {pendingEvents.length}
-                        </span>
-                    )}
                 </button>
                 <button
                     onClick={() => setSuggestionsPanelOpen(true)}
@@ -309,6 +291,18 @@ export default function Admin() {
                             {suggestions.filter((s) => s.status === 'approved' && !s.synced_to_google).length}
                         </span>
                     )}
+                </button>
+                <button
+                    onClick={() => setTagSuggestionsPanelOpen(true)}
+                    className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
+                >
+                    Tag Suggestions
+                </button>
+                <button
+                    onClick={() => { setEventsPanelPreset('ungeolocated'); setEventsPanelOpen(true); }}
+                    className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
+                >
+                    Ungeolocated
                 </button>
             </div>
 
@@ -489,6 +483,11 @@ export default function Admin() {
                         </div>
                     </div>
                 </div>
+
+                {/* Card 4: Tag Categories (inside grid) */}
+                <div className="border border-gray-200 bg-white lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto">
+                    <AdminTagCategories />
+                </div>
             </div>
 
             {/* Most Saved Events */}
@@ -515,14 +514,10 @@ export default function Admin() {
                 onClose={() => setSyncPanelOpen(false)}
                 syncLogs={syncLogs}
             />
-            <PendingReviewPanel
-                isOpen={pendingPanelOpen}
-                onClose={() => setPendingPanelOpen(false)}
-                pendingEvents={pendingEvents}
-                onReview={handleReviewEvent}
-                onMarkAllReviewed={handleMarkAllReviewed}
-                onEventSaved={handleEventSaved}
-                busy={busy}
+            <EventsPanel
+                isOpen={eventsPanelOpen}
+                onClose={() => setEventsPanelOpen(false)}
+                preset={eventsPanelPreset}
             />
             <SuggestionsPanel
                 isOpen={suggestionsPanelOpen}
@@ -546,6 +541,20 @@ export default function Admin() {
                     );
                 }}
             />
+
+            {/* Tag Suggestions Panel */}
+            {tagSuggestionsPanelOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                    <div className="mx-4 w-full max-w-lg rounded-xl bg-white p-6 shadow-xl max-h-[80vh] overflow-y-auto">
+                        <div className="flex items-center justify-between mb-4">
+                            <h2 className="text-sm font-semibold text-gray-900">Tag Suggestions</h2>
+                            <button onClick={() => setTagSuggestionsPanelOpen(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+                        </div>
+                        <TagSuggestionsPanel />
+                    </div>
+                </div>
+            )}
+
         </div>
     );
 }

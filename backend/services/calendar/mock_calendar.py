@@ -19,13 +19,11 @@ class MockCalendarService(BaseCalendarService):
 
     def __init__(self, scenario_dir: Optional[str] = None):
         if scenario_dir is None:
-            scenario_dir = os.path.join(
-                os.path.dirname(__file__),
-                "..",
-                "..",
-                "..",
-                "scenarios",
-                "calendar-service-mock",
+            scenario_dir = os.getenv("SCENARIO_DIR")
+        if scenario_dir is None:
+            raise ValueError(
+                "MockCalendarService requires a scenario_dir argument or "
+                "SCENARIO_DIR environment variable"
             )
         self.scenario_dir = Path(scenario_dir)
 
