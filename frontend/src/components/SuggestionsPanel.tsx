@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { EventSuggestion, CalendarSetting } from '../types';
 import SuggestionReviewModal from './SuggestionReviewModal';
+import AdminEventDetailPanel from './AdminEventDetailPanel';
 
 interface Props {
     isOpen: boolean;
@@ -16,6 +17,7 @@ type Tab = typeof TABS[number];
 export default function SuggestionsPanel({ isOpen, onClose, suggestions, calendars, onUpdated }: Props) {
     const [activeTab, setActiveTab] = useState<Tab>('pending');
     const [reviewingSuggestion, setReviewingSuggestion] = useState<EventSuggestion | null>(null);
+    const [adminDetailEventId, setAdminDetailEventId] = useState<string | null>(null);
 
     const filtered = activeTab === 'all'
         ? suggestions
@@ -101,14 +103,25 @@ export default function SuggestionsPanel({ isOpen, onClose, suggestions, calenda
                                     onClick={() => setReviewingSuggestion(s)}
                                 >
                                     <div className="flex items-start justify-between gap-2">
-                                        <div className="min-w-0">
+                                        <div className="min-w-0 flex-1">
                                             <p className="text-[12px] font-medium text-gray-800 truncate">{s.title}</p>
                                             <p className="text-[10px] text-gray-400 mt-0.5">
                                                 {fmtDate(s.start)}
                                                 {s.submitter_name && ` • ${s.submitter_name}`}
                                             </p>
                                         </div>
-                                        {statusBadge(s.status)}
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            {s.status === 'approved' && s.created_event_id && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setAdminDetailEventId(s.created_event_id!); }}
+                                                    className="text-[10px] font-mono text-rose-500 hover:text-rose-700 hover:underline"
+                                                    title="View linked event"
+                                                >
+                                                    #{s.created_event_id.slice(0, 8)}
+                                                </button>
+                                            )}
+                                            {statusBadge(s.status)}
+                                        </div>
                                     </div>
                                 </li>
                             ))}
@@ -128,6 +141,10 @@ export default function SuggestionsPanel({ isOpen, onClose, suggestions, calenda
                     }}
                 />
             )}
+            <AdminEventDetailPanel
+                eventId={adminDetailEventId}
+                onClose={() => setAdminDetailEventId(null)}
+            />
         </>
     );
 }

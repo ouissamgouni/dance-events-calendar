@@ -60,9 +60,44 @@ services:
     networks:
       - app_network
 
+  postgres_umami:
+    image: postgres:16-alpine
+    container_name: umami_db_${ENV_NAME}
+    environment:
+      POSTGRES_DB: umami
+      POSTGRES_USER: ${UMAMI_DB_USER:-umami}
+      POSTGRES_PASSWORD: ${UMAMI_DB_PASSWORD:-umami}
+    volumes:
+      - umami_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${UMAMI_DB_USER:-umami} -d umami"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app_network
+
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    container_name: umami_${ENV_NAME}
+    environment:
+      DATABASE_URL: postgresql://${UMAMI_DB_USER:-umami}:${UMAMI_DB_PASSWORD:-umami}@postgres_umami:5432/umami
+      APP_SECRET: ${UMAMI_APP_SECRET:-change-me-in-production}
+    ports:
+      - "${UMAMI_PORT:-3100}:3000"
+    depends_on:
+      postgres_umami:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app_network
+
 volumes:
   pgdata:
     name: calendar_${ENV_NAME}_data
+  umami_data:
+    name: umami_${ENV_NAME}_data
 
 networks:
   app_network:

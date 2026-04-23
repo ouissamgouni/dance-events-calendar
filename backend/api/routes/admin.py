@@ -198,7 +198,24 @@ def most_viewed_events(
         .order_by(func.count(EventView.id).desc())
         .limit(limit)
     ).all()
-    return [{"event_id": r[0], "view_count": r[1]} for r in results]
+
+    # Enrich with event titles
+    event_ids = [r[0] for r in results]
+    events_map: dict[str, CachedEvent] = {}
+    if event_ids:
+        evts = session.exec(
+            select(CachedEvent).where(CachedEvent.event_id.in_(event_ids))
+        ).all()
+        events_map = {e.event_id: e for e in evts}
+
+    return [
+        {
+            "event_id": r[0],
+            "title": events_map[r[0]].title if r[0] in events_map else "Unknown",
+            "view_count": r[1],
+        }
+        for r in results
+    ]
 
 
 @router.get("/most-saved-events")

@@ -65,7 +65,10 @@ class CalendarAddRequest(BaseModel):
 class EventViewRequest(BaseModel):
     event_id: str
     device_id: Optional[str] = Field(default=None, max_length=64)
-    source: Optional[str] = Field(default=None, pattern="^(calendar|list|map|direct)$")
+    source: Optional[str] = Field(
+        default=None,
+        pattern="^(calendar|calendar-map|explorer-list|explorer-map|my-calendar|direct)$",
+    )
 
 
 class EventSaveRequest(BaseModel):
@@ -96,7 +99,6 @@ class ExportRequest(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str
-    env: str
 
 
 class SiteSettingsResponse(BaseModel):
@@ -104,6 +106,7 @@ class SiteSettingsResponse(BaseModel):
     sync_interval_minutes: int
     show_prices: bool = False
     show_popularity: bool = False
+    popularity_threshold: int = 10
 
 
 class SiteSettingsUpdateRequest(BaseModel):
@@ -111,6 +114,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     sync_interval_minutes: Optional[int] = Field(default=None, ge=1, le=1440)
     show_prices: Optional[bool] = None
     show_popularity: Optional[bool] = None
+    popularity_threshold: Optional[int] = Field(default=None, ge=1, le=10000)
 
 
 class SyncLogResponse(BaseModel):
@@ -298,6 +302,7 @@ class TagSuggestionResponse(BaseModel):
     event_title: Optional[str] = None
     tag: Optional[TagResponse] = None
     free_text: Optional[str] = None
+    group_slug: Optional[str] = None
     status: str = "pending"
     submitter_device_id: Optional[str] = None
     admin_notes: Optional[str] = None

@@ -438,6 +438,105 @@ events:
     end: "w37 Fri 05:00"
 
   # ═══════════════════════════════════════════════════════════
+  #  ADDITIONAL SPRING 2026 (May–June)
+  # ═══════════════════════════════════════════════════════════
+  - id: "evt-spring-copenhagen"
+    calendar_id: "salsa-cal-001"
+    title: "Copenhagen Salsa Spring Night"
+    description: "Salsa social in Nørrebro. DJ set + taster class at 20:30."
+    location: "Rust, Guldbergsgade 8, 2200 Copenhagen, Denmark"
+    latitude: 55.6897
+    longitude: 12.5510
+    start: "w2 Sat 20:30"
+    end: "w2 Sun 02:00"
+
+  - id: "evt-spring-warsaw"
+    calendar_id: "bachata-cal-002"
+    title: "Warsaw Bachata Spring Social"
+    description: "Monthly bachata gathering in Praga district. 3 rooms of music."
+    location: "Skład Butelek, ul. Inżynierska 3, Warsaw, Poland"
+    latitude: 52.2488
+    longitude: 21.0446
+    start: "w4 Sat 21:00"
+    end: "w4 Sun 03:00"
+
+  - id: "evt-spring-brussels"
+    calendar_id: "kizomba-cal-003"
+    title: "Brussels Kizomba Garden Social"
+    description: "Outdoor kizomba in the Cinquantenaire park. Free entry."
+    location: "Parc du Cinquantenaire, Brussels, Belgium"
+    latitude: 50.8413
+    longitude: 4.3950
+    start: "w6 Sat 17:00"
+    end: "w6 Sat 22:00"
+
+  # ═══════════════════════════════════════════════════════════
+  #  ADDITIONAL SUMMER 2026 (July–September)
+  # ═══════════════════════════════════════════════════════════
+  - id: "evt-sum-nice"
+    calendar_id: "salsa-cal-001"
+    title: "Côte d'Azur Salsa Night – Nice"
+    description: "Sunset salsa on the Promenade des Anglais with live percussionists."
+    location: "Promenade des Anglais, Nice, France"
+    latitude: 43.6956
+    longitude: 7.2659
+    start: "w10 Sat 19:30"
+    end: "w10 Sun 01:00"
+
+  - id: "evt-sum-valencia"
+    calendar_id: "bachata-cal-002"
+    title: "Valencia Bachata Nights"
+    description: "Summer outdoor bachata in the Ciudad de las Artes. DJ + live bass."
+    location: "Ciudad de las Artes y las Ciencias, Valencia, Spain"
+    latitude: 39.4545
+    longitude: -0.3516
+    start: "w13 Fri 21:00"
+    end: "w13 Sat 03:00"
+
+  - id: "evt-sum-edinburgh"
+    calendar_id: "kizomba-cal-003"
+    title: "Edinburgh Kizomba Fringe Social"
+    description: "Kizomba night during the Edinburgh Festival. Intimate warehouse venue."
+    location: "Summerhall, 1 Summerhall, Edinburgh, Scotland, UK"
+    latitude: 55.9397
+    longitude: -3.1817
+    start: "w17 Sat 21:00"
+    end: "w17 Sun 02:30"
+
+  # ═══════════════════════════════════════════════════════════
+  #  ADDITIONAL FALL 2026 (October–November)
+  # ═══════════════════════════════════════════════════════════
+  - id: "evt-fall-dublin"
+    calendar_id: "salsa-cal-001"
+    title: "Dublin Salsa Autumn Fiesta"
+    description: "Latin night in the Docklands. Live band + 3 DJs."
+    location: "Vicar Street, 58-59 Thomas St, Dublin, Ireland"
+    latitude: 53.3418
+    longitude: -6.2817
+    start: "w23 Sat 21:00"
+    end: "w23 Sun 03:00"
+
+  - id: "evt-fall-warsaw"
+    calendar_id: "bachata-cal-002"
+    title: "Warsaw Bachata Autumn Congress"
+    description: "Eastern Europe's biggest bachata weekend. 4 rooms, 30+ workshops."
+    location: "Palac Kultury i Nauki, Plac Defilad 1, Warsaw, Poland"
+    latitude: 52.2317
+    longitude: 21.0059
+    start: "w27 Fri 18:00"
+    end: "w27 Sun 23:00"
+
+  - id: "evt-fall-copenhagen"
+    calendar_id: "kizomba-cal-003"
+    title: "Copenhagen Kizomba Autumn Social"
+    description: "Nordic kizomba gathering in a cosy Vesterbro basement club."
+    location: "Vega Lille, Enghavevej 40, Copenhagen, Denmark"
+    latitude: 55.6689
+    longitude: 12.5490
+    start: "w31 Sat 21:00"
+    end: "w31 Sun 03:00"
+
+  # ═══════════════════════════════════════════════════════════
   #  UNRESOLVABLE / MISSING LOCATIONS — tests location editing
   # ═══════════════════════════════════════════════════════════
 

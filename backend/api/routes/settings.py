@@ -53,6 +53,17 @@ def _get_bool_setting(session: Session, key: str, default: bool = False) -> bool
     return default
 
 
+def _get_int_setting(session: Session, key: str, default: int) -> int:
+    """Get an integer setting from the DB."""
+    try:
+        row = session.get(SiteSetting, key)
+        if row and row.value.isdigit():
+            return int(row.value)
+    except Exception:
+        pass
+    return default
+
+
 def _set_bool_setting(session: Session, key: str, value: bool) -> None:
     """Set a boolean setting in the DB."""
     row = session.get(SiteSetting, key)
@@ -71,6 +82,7 @@ def get_settings(session: Session = Depends(get_session)):
         sync_interval_minutes=_get_sync_interval(session),
         show_prices=_get_bool_setting(session, "show_prices"),
         show_popularity=_get_bool_setting(session, "show_popularity"),
+        popularity_threshold=_get_int_setting(session, "popularity_threshold", 10),
     )
 
 
@@ -107,6 +119,16 @@ def update_settings(
     if body.show_popularity is not None:
         _set_bool_setting(session, "show_popularity", body.show_popularity)
 
+    if body.popularity_threshold is not None:
+        row = session.get(SiteSetting, "popularity_threshold")
+        if row:
+            row.value = str(body.popularity_threshold)
+        else:
+            row = SiteSetting(
+                key="popularity_threshold", value=str(body.popularity_threshold)
+            )
+        session.add(row)
+
     session.commit()
 
     return SiteSettingsResponse(
@@ -114,4 +136,5 @@ def update_settings(
         sync_interval_minutes=_get_sync_interval(session),
         show_prices=_get_bool_setting(session, "show_prices"),
         show_popularity=_get_bool_setting(session, "show_popularity"),
+        popularity_threshold=_get_int_setting(session, "popularity_threshold", 10),
     )

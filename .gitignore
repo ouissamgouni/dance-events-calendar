@@ -21,6 +21,9 @@ scenarios/*/secrets.env
 credentials/
 *.json.bak
 
+# ── Runtime state ─────────────────────────────────────
+.taskfiles/.scenario-state/
+
 # ── Build artifacts ───────────────────────────────────
 dist/
 build/

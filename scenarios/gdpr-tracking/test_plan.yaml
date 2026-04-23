@@ -1,17 +1,24 @@
 # GDPR Tracking — QA Test Plan
 # ================================
 # Validates the full GDPR consent + tracking pipeline: cookie banner UX,
-# consent-gated analytics, personalization (device_id), admin analytics,
-# data deletion, and edge cases around consent changes.
+# consent-gated analytics with source attribution, Umami page view tracking,
+# personalization (device_id), admin analytics, data deletion, and edge
+# cases around consent changes.
+#
+# Phase 1 additions (steps 8–14 extended, new Group 2b steps 8a–8d):
+#   Source attribution — explorer-list, explorer-map, calendar-map, my-calendar
+# Phase 2 additions (new Group 8, steps 33–40):
+#   Umami analytics — consent-gated script load, page views, custom events
 
 test_plan:
   name: "GDPR Tracking — Consent & Analytics"
   description: >
     End-to-end test of the GDPR-compliant tracking feature: cookie consent
-    banner, consent-gated event views/link clicks/exports, personalization
-    (device_id), admin analytics views, GDPR data deletion endpoint, and
-    edge cases around consent changes. Uses mock calendar service with 5
-    events (4 with structured links, 1 with fallback link in description).
+    banner, consent-gated event views/link clicks/exports with source
+    attribution, Umami page-level analytics, personalization (device_id),
+    admin analytics views, GDPR data deletion endpoint, and edge cases
+    around consent changes. Uses mock calendar service with 5 events
+    (4 with structured links, 1 with fallback link in description).
 
   steps:
     # ── Group 1: Consent Banner UX ─────────────────────────────
@@ -94,15 +101,17 @@ test_plan:
 
     # ── Group 2: Analytics Tracking — Consent Granted ──────────
     - id: 8
-      title: "Accept all, click event on calendar"
+      title: "Accept all, click event on calendar grid"
       description: >
         Clear cookies, reload page. Accept all cookies. Switch to calendar
-        view. Click "Friday Salsa Night" on the calendar grid. Open browser
-        DevTools → Network tab and filter for "track".
+        view. Click "Friday Salsa Night" on the FullCalendar grid (not the
+        map). Open browser DevTools → Network tab and filter for "track".
       expected: >
         A POST request to /api/track/event-view is sent with body:
         {"event_id": "evt-gdpr-001", "device_id": "<uuid>", "source": "calendar"}.
         Response: 201.
+        Note: source="calendar" is set by Calendar.tsx before passing the
+        click to Home.tsx — not by Home.tsx itself.
       verification: "Network shows event-view POST with source=calendar"
 
     - id: 9
@@ -113,6 +122,7 @@ test_plan:
       expected: >
         A POST to /api/track/event-view with event_id "evt-gdpr-002"
         and source "direct". device_id is present (personalization accepted).
+        The URL has no ?src= param — EventDetailPage falls back to "direct".
       verification: "event-view tracked with source=direct"
 
     - id: 10
@@ -163,6 +173,64 @@ test_plan:
         POST to /api/track/event-save with event_id "evt-gdpr-004",
         device_id (present because personalization accepted), action "save".
       verification: "event-save POST with action=save and device_id"
+
+    # ── Group 2b: Source Attribution ───────────────────────────
+    - id: 33
+      title: "Explorer list click — source=explorer-list"
+      description: >
+        Ensure analytics consent is granted. Go to the home page (/ or
+        explorer mode). In the event list panel on the left (desktop) or
+        below the map (mobile), click "Kizomba Social".
+      expected: >
+        Browser navigates to /event/evt-gdpr-003?src=explorer-list.
+        A POST to /api/track/event-view is sent with source "explorer-list".
+        The ?src= query param is consumed by EventDetailPage — it does NOT
+        appear in the page title or UI.
+      verification: "event-view POST with source=explorer-list"
+
+    - id: 34
+      title: "Explorer map marker click — source=explorer-map"
+      description: >
+        Stay in explorer mode. On the map, click the marker for
+        "Salsa Congress 2026" (Amsterdam). Check Network tab.
+      expected: >
+        Browser navigates to /event/evt-gdpr-004?src=explorer-map.
+        POST /api/track/event-view with source "explorer-map". Response 201.
+      verification: "event-view POST with source=explorer-map"
+
+    - id: 35
+      title: "Calendar map marker click — source=calendar-map"
+      description: >
+        Switch to calendar view. Enable the 📍 Map toggle if it is off.
+        Click a map marker (e.g. Friday Salsa Night in Paris).
+        Note: the calendar map opens a modal — it does NOT navigate.
+      expected: >
+        An event modal opens in-page.
+        POST /api/track/event-view with source "calendar-map". Response 201.
+        (This is fired by handleCalMapEventClick in Home.tsx, not Calendar.tsx,
+        so no double-fire with the source="calendar" path.)
+      verification: "event-view POST with source=calendar-map, modal shown"
+
+    - id: 36
+      title: "My Calendar modal open — source=my-calendar"
+      description: >
+        Save at least one event. Navigate to /my-calendar. Click a saved
+        event in the list or on the map.
+      expected: >
+        Event modal opens. POST /api/track/event-view with source "my-calendar".
+        Response 201.
+      verification: "event-view POST with source=my-calendar"
+
+    - id: 37
+      title: "All four sources are distinct in backend"
+      description: >
+        Perform all four actions above (steps 33–36) in one session.
+        Check the Network tab requests side by side.
+      expected: >
+        Four separate /api/track/event-view POSTs, each with a different
+        source value: "explorer-list", "explorer-map", "calendar-map",
+        "my-calendar". All return 201.
+      verification: "Four distinct source values in tracking requests"
 
     # ── Group 3: Analytics Tracking — Consent Denied ───────────
     - id: 15
@@ -352,3 +420,139 @@ test_plan:
         (Too Many Requests). App handles the 429 gracefully (no error
         shown to user, fire-and-forget pattern swallows the error).
       verification: "429 on 31st request, no user-visible error"
+
+    # ── Group 8: Umami Page & Event Analytics ──────────────────
+    # Prerequisites: Umami running (docker compose up umami_dev),
+    # VITE_UMAMI_WEBSITE_ID set in secrets.dev.env, dev server restarted.
+    # Umami dashboard at http://localhost:3100 (admin/umami).
+    - id: 38
+      title: "Umami script not loaded before consent"
+      description: >
+        Clear cookies, reload. Before accepting any cookies, open
+        DevTools → Network tab. Filter for "script.js" or "umami".
+      expected: >
+        No request to http://localhost:3100/script.js. Umami is NOT loaded
+        until analytics consent is granted. The window.umami object does
+        not exist (check: typeof window.umami === "undefined" in console).
+      verification: "No Umami script loaded, window.umami undefined"
+
+    - id: 39
+      title: "Umami script loads after accepting analytics"
+      description: >
+        With no prior consent, accept all cookies (or analytics only via
+        Customize). Check DevTools → Network tab.
+      expected: >
+        A GET request to http://localhost:3100/script.js fires immediately
+        after consent. window.umami is defined in browser console shortly
+        after. The Umami dashboard shows a new active session.
+      verification: "script.js loaded, window.umami defined, session in dashboard"
+
+    - id: 40
+      title: "Page views tracked in Umami on navigation"
+      description: >
+        With analytics consent and Umami loaded: navigate between /, /calendar,
+        /my-calendar, and /event/evt-gdpr-001. Check DevTools Network tab
+        for POST requests to http://localhost:3100/api/send.
+      expected: >
+        Each route change fires a POST to /api/send with a page view payload.
+        After navigating 4 pages, the Umami dashboard → Pages section shows
+        entries for /, /calendar, /my-calendar, and /event/evt-gdpr-001.
+      verification: "4 pageview POSTs to Umami, all pages visible in dashboard"
+
+    - id: 41
+      title: "Umami receives custom event-view event"
+      description: >
+        With analytics consent and Umami loaded: click an event on the
+        calendar grid. Check Network tab for POST to /api/send.
+      expected: >
+        Two tracking requests fire simultaneously:
+        1. POST /api/track/event-view → backend (201)
+        2. POST http://localhost:3100/api/send → Umami with event name
+           "event-view" and property source="calendar"
+        Umami dashboard → Events shows the "event-view" entry.
+      verification: "Both backend and Umami receive event-view, source prop visible"
+
+    - id: 42
+      title: "Umami receives export and save events"
+      description: >
+        Save an event (save heart). Export .ics from the FAB. Check Network.
+      expected: >
+        POST to Umami /api/send with event name "event-save", action="save".
+        POST to Umami /api/send with event name "export", format="ics".
+        Both visible in Umami dashboard → Events tab.
+      verification: "event-save and export events in Umami dashboard"
+
+    - id: 43
+      title: "No Umami requests when analytics consent denied"
+      description: >
+        Clear cookies, reload. Click "Refuser tout". Navigate between pages.
+        Click an event. Check Network for any request to localhost:3100.
+      expected: >
+        Zero requests to http://localhost:3100. Umami script was never
+        loaded. window.umami is still undefined.
+      verification: "Zero Umami network requests with analytics denied"
+
+    - id: 44
+      title: "Umami no-ops gracefully with no WEBSITE_ID"
+      description: >
+        This tests the fallback mode (VITE_UMAMI_WEBSITE_ID not set or empty).
+        Set VITE_UMAMI_WEBSITE_ID= (empty) in secrets.dev.env and restart
+        the dev server. Accept all cookies.
+      expected: >
+        No request to localhost:3100/script.js is made. In DevTools console,
+        a debug message "[umami] VITE_UMAMI_WEBSITE_ID or VITE_UMAMI_URL not
+        set — tracking calls will be logged only" appears. When clicking an
+        event, "[umami] track event-view {...}" appears in console. No errors.
+      verification: "Console debug logs only, no network requests, no JS errors"
+
+    - id: 45
+      title: "Umami dashboard shows populated data"
+      description: >
+        Prerequisites: complete steps 38–42 (Umami loaded, several page views
+        and custom events sent). Open http://localhost:3100 in a new tab.
+        Log in (admin / umami). Navigate to the website created during setup.
+      expected: >
+        The Umami dashboard shows:
+        - "Pageviews" time-series chart with a non-zero value for today.
+        - "Pages" table listing at least: /, /calendar, /my-calendar,
+          and /event/evt-gdpr-001 (or whichever event pages were visited).
+        - "Events" tab listing: event-view, event-save, export custom events
+          with counts matching the actions performed in steps 41–42.
+        - "Referrers" section visible (may be empty if navigated directly).
+        - "Devices" and "Browsers" sections populated with at least one entry.
+      verification: "Dashboard shows pageviews, pages, events, devices — all non-empty"
+
+    - id: 46
+      title: "UTM / referrer captured by Umami"
+      description: >
+        Clear cookies. Open a new tab and navigate to:
+        http://localhost:10209/?utm_source=instagram&utm_campaign=test
+        Accept all cookies. Navigate to at least one other page (/calendar).
+      expected: >
+        In Umami dashboard → Referrers (or Sources): an entry for "instagram"
+        appears (Umami reads utm_source automatically). The pageview count
+        for the session is recorded.
+        Note: this requires no code changes — Umami auto-captures UTM params
+        from the URL on each page view POST.
+      verification: "Umami Sources/Referrers shows 'instagram' from utm_source"
+
+    - id: 47
+      title: "Funnel: event-view → event-save → export in Umami"
+      description: >
+        With analytics and personalization consent granted and Umami loaded:
+        1. Click "Friday Salsa Night" on the calendar grid (event-view).
+        2. Click the save heart on "Salsa Congress 2026" (event-save).
+        3. Open the FAB and export .ics (export).
+        Check Network tab for the three Umami /api/send requests. Then open
+        the Umami dashboard → Events tab.
+      expected: >
+        Three sequential POSTs to http://localhost:3100/api/send:
+        1. event name "event-view", props: {source: "calendar"}
+        2. event name "event-save", props: {action: "save"}
+        3. event name "export", props: {format: "ics", event_count: <n>}
+        All three appear in the Umami Events tab with timestamps in order.
+        The backend also received all three corresponding /api/track/* calls
+        (verify in the terminal running the scenario — API logs show 201s).
+        This confirms the full view → save → export analytics funnel works
+        end-to-end in both the self-hosted backend and Umami.
+      verification: "All 3 funnel events in Umami Events tab, all 3 backend 201s"

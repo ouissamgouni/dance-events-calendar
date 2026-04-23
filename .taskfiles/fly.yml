@@ -1,0 +1,144 @@
+version: "3"
+
+# Fly.io operational tasks — run after `fly auth login` (one-time)
+# All tasks use dir: "{{ROOT_DIR}}" from the include in Taskfile.yml
+
+tasks:
+  secrets:
+    desc: "Push secrets from secrets.prod.env to Fly.io (run once or after secrets change)"
+    cmds:
+      - |
+        if [ ! -f secrets.prod.env ]; then
+          echo "❌ secrets.prod.env not found — copy secrets.prod.env.example and fill in values"
+          exit 1
+        fi
+      - |
+        echo "Pushing secrets to Fly.io (excluding CLOUDFLARE_* vars)..."
+        grep -v '^#' secrets.prod.env \
+          | grep -v '^[[:space:]]*$' \
+          | grep -v '^CLOUDFLARE_' \
+          | grep -v '^VITE_' \
+          | fly secrets import
+        echo "✅ Core secrets imported"
+      - |
+        if [ -f backend/credentials/service-account.json ]; then
+          echo "Setting GOOGLE_SERVICE_ACCOUNT_JSON from credentials file..."
+          fly secrets set GOOGLE_SERVICE_ACCOUNT_JSON="$(cat backend/credentials/service-account.json)"
+          echo "✅ GOOGLE_SERVICE_ACCOUNT_JSON set"
+        else
+          echo ""
+          echo "⚠️  backend/credentials/service-account.json not found"
+          echo "   Set it manually when you have the file:"
+          echo '   fly secrets set GOOGLE_SERVICE_ACCOUNT_JSON="$(cat backend/credentials/service-account.json)"'
+        fi
+      - |
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "✅ Fly.io secrets pushed. Verify with: task fly:secrets:list"
+        echo "   Deploy with: task fly:deploy"
+        echo "═══════════════════════════════════════════════════════════════"
+
+  secrets:list:
+    desc: "List all secrets currently set on Fly.io (names only, no values)"
+    cmds:
+      - fly secrets list
+
+  deploy:
+    desc: "Deploy backend to Fly.io (runs remote Docker build — no local Docker needed)"
+    cmds:
+      - |
+        echo "Deploying to Fly.io..."
+        fly deploy --remote-only
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "✅ Backend deployed. Verify:"
+        echo "   task fly:logs    → stream logs"
+        echo "   task fly:status  → machine info"
+        echo "═══════════════════════════════════════════════════════════════"
+
+  logs:
+    desc: "Stream Fly.io backend logs"
+    cmds:
+      - fly logs
+
+  ssh:
+    desc: "Open SSH console on Fly.io machine"
+    cmds:
+      - fly ssh console
+
+  open:
+    desc: "Open the Fly.io app in your browser"
+    cmds:
+      - fly open
+
+  status:
+    desc: "Show Fly.io app status and machine info"
+    cmds:
+      - fly status
+
+  # ════════════════════════════════════════════════════════════════
+  # Staging (fly.staging.toml — salsa-events-calendar-staging)
+  # Machine sleeps when idle (auto_stop_machines = true)
+  # ════════════════════════════════════════════════════════════════
+
+  staging:secrets:
+    desc: "Push secrets from secrets.staging.env to the staging Fly.io app"
+    cmds:
+      - |
+        if [ ! -f secrets.staging.env ]; then
+          echo "❌ secrets.staging.env not found — copy secrets.staging.env.example and fill in values"
+          exit 1
+        fi
+      - |
+        echo "Pushing secrets to staging Fly.io app..."
+        grep -v '^#' secrets.staging.env \
+          | grep -v '^[[:space:]]*$' \
+          | grep -v '^VITE_' \
+          | fly secrets import -c fly.staging.toml
+        echo "✅ Core secrets imported"
+      - |
+        if [ -f backend/credentials/service-account.json ]; then
+          echo "Setting GOOGLE_SERVICE_ACCOUNT_JSON from credentials file..."
+          fly secrets set -c fly.staging.toml GOOGLE_SERVICE_ACCOUNT_JSON="$(cat backend/credentials/service-account.json)"
+          echo "✅ GOOGLE_SERVICE_ACCOUNT_JSON set"
+        else
+          echo "⚠️  backend/credentials/service-account.json not found — set GOOGLE_SERVICE_ACCOUNT_JSON manually"
+        fi
+      - |
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "✅ Staging secrets pushed. Deploy with: task deploy:staging:remote"
+        echo "═══════════════════════════════════════════════════════════════"
+
+  staging:secrets:list:
+    desc: "List secrets set on the staging Fly.io app (names only)"
+    cmds:
+      - fly secrets list -c fly.staging.toml
+
+  staging:deploy:
+    desc: "Deploy backend to staging Fly.io app (remote build)"
+    cmds:
+      - |
+        echo "Deploying to staging Fly.io app..."
+        fly deploy --remote-only -c fly.staging.toml
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "✅ Staging backend deployed"
+        echo "   task logs:staging:remote  → stream logs"
+        echo "   task fly:staging:status   → machine info"
+        echo "═══════════════════════════════════════════════════════════════"
+
+  staging:ssh:
+    desc: "Open SSH console on staging Fly.io machine"
+    cmds:
+      - fly ssh console -c fly.staging.toml
+
+  staging:open:
+    desc: "Open the staging Fly.io app in your browser"
+    cmds:
+      - fly open -c fly.staging.toml
+
+  staging:status:
+    desc: "Show staging Fly.io app status and machine info"
+    cmds:
+      - fly status -c fly.staging.toml

@@ -6,9 +6,10 @@ interface Props {
     event: CalendarEvent;
     onClose: () => void;
     onEdit?: (event: CalendarEvent) => void;
+    source?: string;
 }
 
-export default function EventModal({ event, onClose, onEdit }: Props) {
+export default function EventModal({ event, onClose, onEdit, source }: Props) {
     // Close on Escape
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
@@ -31,6 +32,7 @@ export default function EventModal({ event, onClose, onEdit }: Props) {
                     surface="card"
                     className="w-full max-w-lg max-h-[85vh]"
                     bodyClassName="max-h-[calc(85vh-80px)]"
+                    source={source}
                 />
             </div>
         </div>

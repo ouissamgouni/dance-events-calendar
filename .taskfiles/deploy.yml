@@ -1,15 +1,15 @@
 version: "3"
 
 tasks:
-  staging:
-    desc: "Build from develop and deploy to staging. DRY_RUN=1 to preview."
+  staging:local:
+    desc: "Build from develop and deploy to local staging (docker-compose). DRY_RUN=1 to preview."
     dotenv: [.env.staging]
     vars:
       DRY_RUN: '{{.DRY_RUN | default "0"}}'
     cmds:
       - |
         if [ "{{.DRY_RUN}}" = "1" ]; then
-          echo "🔍 DRY RUN — would deploy to STAGING (from develop)"
+          echo "🔍 DRY RUN — would deploy to local STAGING (from develop)"
           echo ""
           echo "Steps:"
           echo "  1. Build images from develop (task build:staging)"
@@ -27,18 +27,44 @@ tasks:
       - |
         echo ""
         echo "═══════════════════════════════════════════════════════════════"
-        echo "✅ Deployed to STAGING (from develop branch)"
+        echo "✅ Deployed to local STAGING (from develop branch)"
         echo ""
         echo "   Frontend: http://localhost:${FRONTEND_PORT:-3001}"
         echo "   Backend:  http://localhost:${BACKEND_PORT:-8002}"
         echo "   Database: localhost:${POSTGRES_PORT:-5436}"
         echo ""
         echo "Next steps:"
-        echo "   task logs:staging         → View logs"
+        echo "   task logs:staging:local   → View logs"
         echo "═══════════════════════════════════════════════════════════════"
 
-  staging:ref:
-    desc: "Build from any git ref and deploy to staging. DRY_RUN=1 to preview."
+  staging:remote:
+    desc: "Migrate Neon develop branch + deploy backend to staging Fly.io app (requires secrets.staging.env)"
+    dotenv: ["secrets.env", "secrets.staging.env", ".env.staging"]
+    cmds:
+      - |
+        if [ ! -f secrets.staging.env ]; then
+          echo "❌ secrets.staging.env not found — copy secrets.staging.env.example and fill in values"
+          exit 1
+        fi
+        if [ -z "$DATABASE_URL" ]; then
+          echo "❌ DATABASE_URL not set — fill in secrets.staging.env"
+          exit 1
+        fi
+      - |
+        echo "Running migrations on Neon staging (develop branch)..."
+        PYTHONPATH=. .venv/bin/alembic -c backend/alembic.ini upgrade head
+      - task: :fly:staging:deploy
+      - |
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "✅ Remote staging deployed"
+        echo "   Backend:  https://salsa-events-calendar-staging.fly.dev"
+        echo "   Frontend: auto-deployed by Cloudflare Pages (develop branch)"
+        echo "   Logs:     task logs:staging:remote"
+        echo "═══════════════════════════════════════════════════════════════"
+
+  staging:local:ref:
+    desc: "Build from any git ref and deploy to local staging (docker-compose). DRY_RUN=1 to preview."
     dotenv: [.env.staging]
     vars:
       REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
@@ -48,7 +74,7 @@ tasks:
         REF="{{.REF}}"
         if [ -z "$REF" ]; then
           echo "❌ Usage:"
-          echo "   task deploy:staging:ref -- feature/my-branch"
+          echo "   task deploy:staging:local:ref -- feature/my-branch"
           exit 1
         fi
       - |
@@ -56,7 +82,7 @@ tasks:
           REF="{{.REF}}"
           SHA=$(git rev-parse --short=7 "$REF" 2>/dev/null || echo "unknown")
           TAG="ref-$SHA"
-          echo "🔍 DRY RUN — would deploy to STAGING (from $REF)"
+          echo "🔍 DRY RUN — would deploy to local STAGING (from $REF)"
           echo ""
           echo "Steps:"
           echo "  1. Build images from $REF (task build:ref)"
@@ -77,7 +103,7 @@ tasks:
 
         echo ""
         echo "═══════════════════════════════════════════════════════════════"
-        echo "✅ Deployed to STAGING (from $REF)"
+        echo "✅ Deployed to local STAGING (from $REF)"
         echo ""
         echo "   Git ref:  $REF"
         echo "   SHA:      $SHA"
@@ -87,8 +113,8 @@ tasks:
         echo "   Backend:  http://localhost:${BACKEND_PORT:-8002}"
         echo "═══════════════════════════════════════════════════════════════"
 
-  staging:dirty:
-    desc: "Build from current working directory and deploy to staging. DRY_RUN=1 to preview."
+  staging:local:dirty:
+    desc: "Build from current working directory and deploy to local staging. DRY_RUN=1 to preview."
     dotenv: [.env.staging]
     vars:
       DRY_RUN: '{{.DRY_RUN | default "0"}}'
@@ -97,7 +123,7 @@ tasks:
         if [ "{{.DRY_RUN}}" = "1" ]; then
           TIMESTAMP=$(date +%Y%m%d-%H%M%S)
           TAG="dirty-$TIMESTAMP"
-          echo "🔍 DRY RUN — would deploy to STAGING (from working directory)"
+          echo "🔍 DRY RUN — would deploy to local STAGING (from working directory)"
           echo ""
           echo "Steps:"
           echo "  1. Build images from current directory (task build:dirty)"
@@ -116,13 +142,44 @@ tasks:
 
         echo ""
         echo "═══════════════════════════════════════════════════════════════"
-        echo "✅ Deployed to STAGING (from working directory)"
+        echo "✅ Deployed to local STAGING (from working directory)"
         echo ""
         echo "   ⚠️  Built from uncommitted changes"
         echo "   Tag: :$TAG"
         echo ""
         echo "   Frontend: http://localhost:${FRONTEND_PORT:-3001}"
         echo "   Backend:  http://localhost:${BACKEND_PORT:-8002}"
+        echo "═══════════════════════════════════════════════════════════════"
+
+  cloudflare:pages:
+    desc: "Build frontend and deploy to Cloudflare Pages (manual — CI auto-deploys on push to main)"
+    dotenv: ["secrets.env", "secrets.prod.env", ".env.prod"]
+    vars:
+      PROJECT_NAME: '{{.PROJECT_NAME | default "salsa-events-calendar"}}'
+    cmds:
+      - |
+        if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+          echo "❌ Set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in secrets.prod.env"
+          exit 1
+        fi
+        if [ -z "$VITE_API_URL" ]; then
+          echo "❌ Set VITE_API_URL in secrets.prod.env (e.g. https://api.yourdomain.com)"
+          exit 1
+        fi
+      - |
+        echo "Building frontend (VITE_API_URL=$VITE_API_URL)..."
+        cd frontend && VITE_API_URL=$VITE_API_URL npm run build
+      - |
+        echo "Deploying to Cloudflare Pages (project: {{.PROJECT_NAME}})..."
+        cd frontend && \
+          CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN \
+          CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID \
+          npx --yes wrangler pages deploy dist \
+            --project-name={{.PROJECT_NAME}} \
+            --branch=main
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "✅ Frontend deployed to Cloudflare Pages"
         echo "═══════════════════════════════════════════════════════════════"
 
   prod:

@@ -55,6 +55,7 @@ jobs:
             - name: Run backend unit tests
               env:
                   ENV_NAME: test
+                  MOCK_ADMIN_AUTH: "true"
                   POSTGRES_USER: calendar_user
                   POSTGRES_PASSWORD: calendar_password
                   POSTGRES_DB: calendar_db_test
@@ -62,7 +63,6 @@ jobs:
                   POSTGRES_PORT: 5435
                   CALENDAR_SERVICE: mock
                   GOOGLE_CLIENT_ID: test-client-id
-                  GOOGLE_CLIENT_SECRET: test-client-secret
                   ADMIN_EMAIL: admin@example.com
                   SESSION_SECRET: test-secret
                   PYTHONPATH: ${{ github.workspace }}

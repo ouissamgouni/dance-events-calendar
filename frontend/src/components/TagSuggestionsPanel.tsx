@@ -1,164 +1,196 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { TagSuggestionResponse, TagGroup } from '../types';
-import { fetchAdminTagSuggestions, approveTagSuggestion, rejectTagSuggestion, fetchTagGroups } from '../api';
+import { fetchAdminTagSuggestions, fetchTagGroups } from '../api';
+import TagSuggestionReviewModal from './TagSuggestionReviewModal';
+import AdminEventDetailPanel from './AdminEventDetailPanel';
 
-export default function TagSuggestionsPanel() {
+interface Props {
+    isOpen: boolean;
+    onClose: () => void;
+    onCountChange: (count: number) => void;
+}
+
+const TABS = ['all', 'pending', 'approved', 'rejected'] as const;
+type Tab = typeof TABS[number];
+
+export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: Props) {
     const [suggestions, setSuggestions] = useState<TagSuggestionResponse[]>([]);
     const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
-    const [filter, setFilter] = useState<string>('pending');
-    const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<Tab>('pending');
+    const [loading, setLoading] = useState(false);
+    const [reviewing, setReviewing] = useState<TagSuggestionResponse | null>(null);
+    const [adminDetailEventId, setAdminDetailEventId] = useState<string | null>(null);
 
-    const load = async () => {
+    const load = useCallback(async () => {
         setLoading(true);
         try {
             const [s, g] = await Promise.all([
-                fetchAdminTagSuggestions(filter || undefined),
+                fetchAdminTagSuggestions(),
                 fetchTagGroups(),
             ]);
             setSuggestions(s);
             setTagGroups(g);
+            onCountChange(s.filter((x) => x.status === 'pending').length);
         } catch {
             // silently fail
         } finally {
             setLoading(false);
         }
-    };
+    }, [onCountChange]);
 
     useEffect(() => {
-        load();
-    }, [filter]);
+        if (isOpen) load();
+    }, [isOpen, load]);
 
-    const handleApprove = async (id: number, tagId?: number) => {
-        await approveTagSuggestion(id, tagId);
-        load();
+    const counts: Record<Tab, number> = {
+        all: suggestions.length,
+        pending: suggestions.filter((s) => s.status === 'pending').length,
+        approved: suggestions.filter((s) => s.status === 'approved').length,
+        rejected: suggestions.filter((s) => s.status === 'rejected').length,
     };
 
-    const handleReject = async (id: number) => {
-        const notes = prompt('Admin notes (optional):');
-        await rejectTagSuggestion(id, notes || undefined);
-        load();
+    const filtered = activeTab === 'all'
+        ? suggestions
+        : suggestions.filter((s) => s.status === activeTab);
+
+    const statusBadge = (status: string) => {
+        const colors: Record<string, string> = {
+            pending: 'bg-amber-100 text-amber-700',
+            approved: 'bg-emerald-100 text-emerald-700',
+            rejected: 'bg-red-100 text-red-700',
+        };
+        return (
+            <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${colors[status] ?? 'bg-gray-100 text-gray-600'}`}>
+                {status}
+            </span>
+        );
     };
 
-    // Flat list of all tags for the assign dropdown
     const allTags = tagGroups.flatMap((g) =>
-        g.tags.map((t) => ({ ...t, groupLabel: g.label }))
+        g.tags.map((t) => ({ ...t, groupLabel: g.label, groupId: g.id }))
     );
 
     return (
-        <div className="space-y-4">
-            <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-gray-700">Tag Suggestions</h3>
-                <select
-                    value={filter}
-                    onChange={(e) => setFilter(e.target.value)}
-                    className="rounded border border-gray-300 px-2 py-1 text-xs"
-                >
-                    <option value="pending">Pending</option>
-                    <option value="approved">Approved</option>
-                    <option value="rejected">Rejected</option>
-                    <option value="">All</option>
-                </select>
-            </div>
+        <>
+            {isOpen && (
+                <div className="fixed inset-0 bg-black/20 z-40" onClick={onClose} />
+            )}
 
-            {loading ? (
-                <p className="text-sm text-gray-400">Loading…</p>
-            ) : suggestions.length === 0 ? (
-                <p className="text-sm text-gray-400">No suggestions found.</p>
-            ) : (
-                <div className="space-y-2">
-                    {suggestions.map((s) => (
-                        <div key={s.id} className="rounded border border-gray-200 p-3 text-sm">
-                            <div className="flex items-start justify-between">
-                                <div>
-                                    <p className="font-medium text-gray-800">
-                                        {s.event_title || s.event_id}
-                                    </p>
-                                    {s.tag ? (
-                                        <span
-                                            className="inline-block rounded-full px-2 py-0.5 text-xs mt-1"
-                                            style={{
-                                                backgroundColor: `${s.tag.group_color ?? s.tag.color ?? '#6b7280'}20`,
-                                                color: s.tag.group_color ?? s.tag.color ?? '#6b7280',
-                                            }}
-                                        >
-                                            {s.tag.group_label}: {s.tag.label}
-                                        </span>
-                                    ) : s.free_text ? (
-                                        <p className="text-gray-500 text-xs mt-1">
-                                            Free text: &ldquo;{s.free_text}&rdquo;
-                                        </p>
-                                    ) : null}
-                                    <p className="text-gray-400 text-[10px] mt-1">
-                                        {new Date(s.created_at).toLocaleDateString()} · {s.status}
-                                    </p>
-                                    {s.admin_notes && (
-                                        <p className="text-gray-500 text-xs mt-1 italic">
-                                            Note: {s.admin_notes}
-                                        </p>
-                                    )}
-                                </div>
-                                {s.status === 'pending' && (
-                                    <div className="flex gap-1 ml-2 shrink-0">
-                                        {s.free_text && !s.tag ? (
-                                            <FreeTextApprover
-                                                allTags={allTags}
-                                                onApprove={(tagId) => handleApprove(s.id, tagId)}
-                                            />
-                                        ) : (
-                                            <button
-                                                onClick={() => handleApprove(s.id, s.tag?.id)}
-                                                className="rounded bg-green-500 px-2 py-1 text-xs text-white hover:bg-green-600"
-                                            >
-                                                Approve
-                                            </button>
-                                        )}
-                                        <button
-                                            onClick={() => handleReject(s.id)}
-                                            className="rounded bg-red-500 px-2 py-1 text-xs text-white hover:bg-red-600"
-                                        >
-                                            Reject
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+            <div
+                className={`fixed top-0 right-0 h-full w-[420px] bg-white shadow-lg border-l border-gray-200 z-50 transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+            >
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 bg-gray-50">
+                    <div className="flex items-center gap-2">
+                        <h2 className="text-xs font-semibold text-gray-800 uppercase tracking-wide">Tag Suggestions</h2>
+                        {counts.pending > 0 && (
+                            <span className="inline-flex items-center justify-center bg-violet-500 text-white text-[10px] font-semibold px-1.5 py-0.5 min-w-[18px] rounded">
+                                {counts.pending}
+                            </span>
+                        )}
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="text-gray-400 hover:text-gray-600 text-sm leading-none p-1"
+                        aria-label="Close"
+                    >
+                        ✕
+                    </button>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex border-b border-gray-200">
+                    {TABS.map((tab) => (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab)}
+                            className={`flex-1 py-2 text-[11px] font-medium capitalize transition border-b-2 ${activeTab === tab
+                                ? 'border-violet-500 text-violet-600'
+                                : 'border-transparent text-gray-400 hover:text-gray-600'
+                                }`}
+                        >
+                            {tab} ({counts[tab]})
+                        </button>
                     ))}
                 </div>
+
+                {/* List */}
+                <div className="overflow-y-auto" style={{ height: 'calc(100% - 90px)' }}>
+                    {loading ? (
+                        <p className="text-center text-[11px] text-gray-400 mt-8">Loading…</p>
+                    ) : filtered.length === 0 ? (
+                        <p className="text-center text-[11px] text-gray-400 mt-8">No suggestions</p>
+                    ) : (
+                        <ul className="divide-y divide-gray-100">
+                            {filtered.map((s) => (
+                                <li
+                                    key={s.id}
+                                    className="px-4 py-3 hover:bg-gray-50 cursor-pointer transition"
+                                    onClick={() => setReviewing(s)}
+                                >
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-1.5">
+                                                <p className="text-[12px] font-medium text-gray-800 truncate">
+                                                    {s.event_title || s.event_id}
+                                                </p>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setAdminDetailEventId(s.event_id); }}
+                                                    className="text-[10px] font-mono text-rose-500 hover:text-rose-700 hover:underline shrink-0"
+                                                    title="View event details"
+                                                >
+                                                    #{s.event_id.slice(0, 8)}
+                                                </button>
+                                            </div>
+                                            {s.tag ? (
+                                                <span
+                                                    className="inline-block rounded-full px-2 py-0.5 text-[10px] mt-1"
+                                                    style={{
+                                                        backgroundColor: `${s.tag.group_color ?? s.tag.color ?? '#6b7280'}20`,
+                                                        color: s.tag.group_color ?? s.tag.color ?? '#6b7280',
+                                                    }}
+                                                >
+                                                    {s.tag.group_label}: {s.tag.label}
+                                                </span>
+                                            ) : s.free_text ? (
+                                                <p className="text-gray-400 text-[10px] mt-1 italic">&ldquo;{s.free_text}&rdquo;</p>
+                                            ) : null}
+                                            <p className="text-gray-400 text-[10px] mt-1">
+                                                {new Date(s.created_at).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                        {statusBadge(s.status)}
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            </div>
+
+            {reviewing && (
+                <TagSuggestionReviewModal
+                    suggestion={reviewing}
+                    allTags={allTags}
+                    tagGroups={tagGroups}
+                    onClose={() => setReviewing(null)}
+                    onUpdated={(updated) => {
+                        setSuggestions((prev) =>
+                            prev.map((s) => (s.id === updated.id ? updated : s)),
+                        );
+                        setReviewing(updated);
+                        onCountChange(
+                            suggestions
+                                .map((s) => (s.id === updated.id ? updated : s))
+                                .filter((s) => s.status === 'pending').length
+                        );
+                    }}
+                />
             )}
-        </div>
-    );
-}
-
-function FreeTextApprover({
-    allTags,
-    onApprove,
-}: {
-    allTags: { id: number; label: string; groupLabel: string }[];
-    onApprove: (tagId: number) => void;
-}) {
-    const [tagId, setTagId] = useState<number | ''>('');
-
-    return (
-        <div className="flex gap-1 items-center">
-            <select
-                value={tagId}
-                onChange={(e) => setTagId(Number(e.target.value) || '')}
-                className="rounded border border-gray-300 px-1 py-0.5 text-xs max-w-[140px]"
-            >
-                <option value="">Assign tag…</option>
-                {allTags.map((t) => (
-                    <option key={t.id} value={t.id}>
-                        {t.groupLabel}: {t.label}
-                    </option>
-                ))}
-            </select>
-            <button
-                onClick={() => tagId && onApprove(tagId as number)}
-                disabled={!tagId}
-                className="rounded bg-green-500 px-2 py-1 text-xs text-white hover:bg-green-600 disabled:opacity-50"
-            >
-                Approve
-            </button>
-        </div>
+            <AdminEventDetailPanel
+                eventId={adminDetailEventId}
+                onClose={() => setAdminDetailEventId(null)}
+            />
+        </>
     );
 }

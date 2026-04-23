@@ -24,6 +24,7 @@ export interface SiteSettings {
     sync_interval_minutes: number;
     show_prices: boolean;
     show_popularity: boolean;
+    popularity_threshold: number;
 }
 
 export async function fetchSettings(): Promise<SiteSettings> {
@@ -462,6 +463,22 @@ export async function fetchMostSavedEvents(limit = 20): Promise<MostSavedEvent[]
         credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to fetch most saved events');
+    return res.json();
+}
+
+// --- Admin: Most Viewed ---
+
+export interface MostViewedEvent {
+    event_id: string;
+    title: string;
+    view_count: number;
+}
+
+export async function fetchMostViewedEvents(limit = 20): Promise<MostViewedEvent[]> {
+    const res = await fetch(`${BASE}/admin/most-viewed-events?limit=${limit}`, {
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to fetch most viewed events');
     return res.json();
 }
 

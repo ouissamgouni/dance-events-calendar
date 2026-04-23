@@ -15,7 +15,7 @@ tasks:
       - echo "✅ All dev services stopped"
 
   dev:db:
-    desc: Stop dev database only
+    desc: Stop dev database and Umami analytics
     cmds:
       - |
         docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.dev.yml down
@@ -53,8 +53,9 @@ tasks:
       - |
         if [ "{{.DRY_RUN}}" = "1" ]; then
           echo "🔍 DRY RUN — would remove:"
-          echo "  • calendar_db_dev container"
-          echo "  • calendar_dev_data volume"
+          echo "  • calendar_db_dev container + calendar_dev_data volume"
+          echo "  • umami_dev container"
+          echo "  • umami_db_dev container + umami_dev_data volume"
         fi
       - task: _dev:volumes:exec
         vars: { DRY_RUN: "{{.DRY_RUN}}" }
@@ -72,25 +73,25 @@ tasks:
   # Staging
   # ════════════════════════════════════════════════════════════════
 
-  staging:
-    desc: Stop staging stack
+  staging:local:
+    desc: Stop local staging stack (docker-compose)
     cmds:
       - ENV_NAME=staging docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p movida-staging down
-      - echo "✅ Staging stopped"
+      - echo "✅ Local staging stopped"
 
-  staging:volumes:
-    desc: "Stop staging and remove volumes (⚠️ destroys data). DRY_RUN=1 to preview."
+  staging:local:volumes:
+    desc: "Stop local staging and remove volumes (⚠️ destroys data). DRY_RUN=1 to preview."
     vars:
       DRY_RUN: '{{.DRY_RUN | default "0"}}'
-    prompt: "This will destroy all staging data. Continue?"
+    prompt: "This will destroy all local staging data. Continue?"
     cmds:
       - |
         if [ "{{.DRY_RUN}}" = "1" ]; then
-          echo "🔍 DRY RUN — would remove staging containers + volumes"
+          echo "🔍 DRY RUN — would remove local staging containers + volumes"
           exit 0
         fi
       - ENV_NAME=staging docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p movida-staging down -v
-      - echo "✅ Staging containers and volumes removed"
+      - echo "✅ Local staging containers and volumes removed"
 
   # ════════════════════════════════════════════════════════════════
   # Prod
@@ -129,10 +130,19 @@ tasks:
       - |
         source {{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
 
+        # Use persisted ports if available (overrides may have been used at start time)
+        STATE_FILE="{{.ROOT_DIR}}/.taskfiles/.scenario-state/{{.SCENARIO}}.env"
+        if [ -f "$STATE_FILE" ]; then
+          source "$STATE_FILE"
+        fi
+
         echo "Stopping scenario: $SCENARIO_NAME..."
 
         # Stop Docker DB
         docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.scenario-db.yml -p $SC_PROJECT_NAME down -v 2>/dev/null || true
+
+        # Stop Umami (always started with scenario)
+        docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.scenario-umami.yml -p $SC_UMAMI_PROJECT down -v 2>/dev/null || true
 
         # Also try unified compose (for :ref mode)
         docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p $SC_PROJECT_NAME down -v 2>/dev/null || true
@@ -141,6 +151,7 @@ tasks:
         lsof -ti:$SC_API_PORT | xargs kill -9 2>/dev/null || true
         lsof -ti:$SC_WEB_PORT | xargs kill -9 2>/dev/null || true
 
+        rm -f "{{.ROOT_DIR}}/.taskfiles/.scenario-state/{{.SCENARIO}}.env"
         echo "✅ Scenario '$SCENARIO_NAME' stopped"
 
   scenario:all:
@@ -150,17 +161,39 @@ tasks:
       - |
         echo "Stopping all scenario instances..."
 
-        # Stop all calendar_db_scenario* containers
-        docker ps --filter "name=calendar_db_scenario" --format '{{`{{.Names}}`}}' 2>/dev/null | while read CONTAINER; do
-          PROJECT=$(docker inspect --format '{{`{{index .Config.Labels "com.docker.compose.project"}}`}}' "$CONTAINER" 2>/dev/null || echo "")
-          if [ -n "$PROJECT" ]; then
-            docker compose -p "$PROJECT" down -v 2>/dev/null || true
-            echo "  Stopped: $PROJECT"
-          else
-            docker stop "$CONTAINER" 2>/dev/null || true
-            docker rm "$CONTAINER" 2>/dev/null || true
-            echo "  Stopped: $CONTAINER"
+        _stop_scenario() {
+          local SCENARIO_NAME=$1
+          source {{.ROOT_DIR}}/.taskfiles/scenario_ports.sh "$SCENARIO_NAME"
+
+          # Use persisted ports if available (overrides may have been used at start time)
+          local STATE_FILE="{{.ROOT_DIR}}/.taskfiles/.scenario-state/${SCENARIO_NAME}.env"
+          if [ -f "$STATE_FILE" ]; then
+            source "$STATE_FILE"
           fi
-        done
+
+          # Stop Docker DB
+          docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.scenario-db.yml -p $SC_PROJECT_NAME down -v 2>/dev/null || true
+          docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p $SC_PROJECT_NAME down -v 2>/dev/null || true
+
+          # Kill API and web processes on the exact ports (persisted or computed)
+          lsof -ti:$SC_API_PORT 2>/dev/null | xargs kill -9 2>/dev/null || true
+          lsof -ti:$SC_WEB_PORT 2>/dev/null | xargs kill -9 2>/dev/null || true
+
+          rm -f "$STATE_FILE"
+          echo "  Stopped: $SCENARIO_NAME  (api:$SC_API_PORT web:$SC_WEB_PORT)"
+        }
+
+        # Default scenario
+        _stop_scenario "default"
+
+        # All named scenarios
+        SCENARIOS_DIR="{{.ROOT_DIR}}/scenarios"
+        if [ -d "$SCENARIOS_DIR" ]; then
+          for DIR in "$SCENARIOS_DIR"/*/; do
+            NAME=$(basename "$DIR")
+            [ "$NAME" = "default" ] && continue
+            _stop_scenario "$NAME"
+          done
+        fi
 
         echo "✅ All scenario instances stopped"

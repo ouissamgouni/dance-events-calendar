@@ -17,6 +17,7 @@ interface EventListPanelProps {
     onEventClick: (event: CalendarEvent) => void;
     showPrices: boolean;
     showPopularity: boolean;
+    popularityThreshold?: number;
     sortBy: 'date' | 'popularity';
     onSortChange: (sort: 'date' | 'popularity') => void;
     hoveredEventId?: string | null;
@@ -44,32 +45,40 @@ function PriceBadge({ event }: { event: CalendarEvent }) {
     return null;
 }
 
-function PopularityBadge({ viewCount, allViewCounts }: { viewCount: number; allViewCounts: number[] }) {
+function PopularityBadge({ viewCount, allViewCounts, threshold }: { viewCount: number; allViewCounts: number[]; threshold: number }) {
     if (viewCount === 0) return null;
 
     // Check if this is in top 3 of current visible events
     const sorted = [...allViewCounts].sort((a, b) => b - a);
     const isTop3 = viewCount > 0 && sorted.indexOf(viewCount) < 3 && sorted[0] > 0;
 
-    if (isTop3 && viewCount >= 10) {
-        return (
-            <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700">
-                🔥 Trending
-            </span>
-        );
-    }
-    if (viewCount >= 10) {
-        return (
-            <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700">
-                🔥 Popular
-            </span>
-        );
-    }
-    return (
+    const countBadge = (
         <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
             👁 {viewCount}
         </span>
     );
+
+    if (isTop3 && viewCount >= threshold) {
+        return (
+            <>
+                <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700">
+                    🔥 Trending
+                </span>
+                {countBadge}
+            </>
+        );
+    }
+    if (viewCount >= threshold) {
+        return (
+            <>
+                <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700">
+                    🔥 Popular
+                </span>
+                {countBadge}
+            </>
+        );
+    }
+    return countBadge;
 }
 
 function isInBounds(event: CalendarEvent, bounds: MapBounds): boolean {
@@ -94,13 +103,14 @@ export default function EventListPanel({
     onEventClick,
     showPrices,
     showPopularity,
+    popularityThreshold = 10,
     sortBy,
     onSortChange,
     hoveredEventId,
     onEventHover,
 }: EventListPanelProps) {
     const { isSaved } = useSavedEvents();
-    const cardRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+    const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const scrollRef = useRef<HTMLDivElement>(null);
     const [showBottomFade, setShowBottomFade] = useState(false);
 
@@ -183,11 +193,14 @@ export default function EventListPanel({
                             const onMap = isOnMap(event, mapBounds);
                             const isHighlighted = hoveredEventId === event.event_id;
                             return (
-                                <button
+                                <div
                                     key={event.event_id}
                                     ref={(el) => { if (el) cardRefs.current.set(event.event_id, el); else cardRefs.current.delete(event.event_id); }}
+                                    role="button"
+                                    tabIndex={0}
                                     className={`event-card${onMap ? '' : ' opacity-40'}${isHighlighted ? ' event-card-highlighted' : ''}`}
                                     onClick={() => onEventClick(event)}
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onEventClick(event); } }}
                                     onMouseEnter={() => onEventHover?.(event.event_id)}
                                     onMouseLeave={() => onEventHover?.(null)}
                                 >
@@ -205,7 +218,7 @@ export default function EventListPanel({
                                                 <div className="event-card-badges">
                                                     {showPrices && <PriceBadge event={event} />}
                                                     {showPopularity && (
-                                                        <PopularityBadge viewCount={event.view_count} allViewCounts={allViewCounts} />
+                                                        <PopularityBadge viewCount={event.view_count} allViewCounts={allViewCounts} threshold={popularityThreshold} />
                                                     )}
                                                 </div>
                                             )}
@@ -222,7 +235,7 @@ export default function EventListPanel({
                                             className={`absolute top-0 right-0 ${isSaved(event.event_id) ? 'text-slate-700' : ''}`}
                                         />
                                     </div>
-                                </button>
+                                </div>
                             );
                         })
                     )}

@@ -105,7 +105,7 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
             { label: weekendLabel, start: formatDate(weekendSat), end: formatDate(weekendSun) },
             { label: 'Next week', start: formatDate(today), end: formatDate(nextWeek) },
             { label: 'Next month', start: formatDate(today), end: formatDate(nextMonth) },
-            { label: 'Next 6 months', start: formatDate(today), end: formatDate(next6Months) },
+            { label: 'Next 6m', start: formatDate(today), end: formatDate(next6Months) },
             ...seasonPresets,
         ];
     }, []);

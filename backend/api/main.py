@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -10,6 +9,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from backend.api.routes.admin import router as admin_router
 from backend.api.routes.auth import router as auth_router
@@ -57,16 +57,46 @@ async def lifespan(app: FastAPI):
         pass
 
 
+_SECURITY_HEADERS = [
+    (b"x-frame-options", b"DENY"),
+    (b"x-content-type-options", b"nosniff"),
+    (b"referrer-policy", b"strict-origin-when-cross-origin"),
+    (b"strict-transport-security", b"max-age=31536000; includeSubDomains"),
+    (b"x-permitted-cross-domain-policies", b"none"),
+]
+
+
+class SecurityHeadersMiddleware:
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_headers(message) -> None:
+            if message["type"] == "http.response.start":
+                message = {
+                    **message,
+                    "headers": list(message.get("headers", [])) + _SECURITY_HEADERS,
+                }
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
+
+
 app = FastAPI(title="Movida", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_cors_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 
@@ -88,7 +118,4 @@ app.include_router(tags_router)
 
 @app.get("/health", response_model=HealthResponse)
 def health():
-    return HealthResponse(
-        status="ok",
-        env=os.getenv("ENV_NAME", "unknown"),
-    )
+    return HealthResponse(status="ok")

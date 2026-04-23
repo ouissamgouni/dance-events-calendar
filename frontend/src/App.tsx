@@ -1,9 +1,10 @@
-import { Routes, Route, Link } from 'react-router-dom';
+import { Routes, Route, Link, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ConsentProvider } from './context/ConsentContext';
 import { FeatureFlagsProvider } from './context/FeatureFlagsContext';
 import { SavedEventsProvider } from './context/SavedEventsContext';
-import { QaTestPlanProvider } from './components/QaTestPlanPanel';
+import { QaTestPlanProvider, useQaPinnedWidth } from './components/QaTestPlanPanel';
 import { StatusBar } from './components/StatusBar';
 import InstagramBadge from './components/InstagramBadge';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -13,6 +14,8 @@ import Login from './pages/Login';
 import EventDetailPage from './pages/EventDetailPage';
 import MyCalendar from './pages/MyCalendar';
 import Privacy from './pages/Privacy';
+import { useConsent } from './context/ConsentContext';
+import { umamiPageView } from './utils/umami';
 
 export default function App() {
   return (
@@ -32,10 +35,20 @@ export default function App() {
 
 function AppShell() {
   const { user } = useAuth();
+  const { analyticsConsent } = useConsent();
+  const location = useLocation();
+  const qaPinnedWidth = useQaPinnedWidth();
+
+  useEffect(() => {
+    if (analyticsConsent) umamiPageView();
+  }, [location.pathname, analyticsConsent]);
 
   return (
     <>
-      <div className="flex flex-col h-screen">
+      <div
+        className="flex flex-col h-screen"
+        style={qaPinnedWidth ? { marginRight: qaPinnedWidth, transition: 'margin-right 0.2s ease' } : { transition: 'margin-right 0.2s ease' }}
+      >
         <div className="flex items-center justify-between bg-slate-900 px-4 py-1.5">
           <div className="flex items-center gap-1.5">
             <Link to="/">

@@ -1,7 +1,8 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { CalendarEvent, CalendarSetting, TagGroup } from '../types';
 import { fetchEvents, fetchCalendars, fetchSettings, fetchTagGroups } from '../api';
+import { trackView } from '../utils/tracking';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import type FullCalendar from '@fullcalendar/react';
@@ -17,7 +18,6 @@ import TagFilterPills from '../components/TagFilterPills';
 import SavedEventsFab from '../components/SavedEventsFab';
 import SuggestEventModal from '../components/SuggestEventModal';
 import EventAnchoredDetailPanel from '../components/EventAnchoredDetailPanel';
-import EventDetailsPanel from '../components/EventDetailsPanel';
 
 type ViewMode = 'explorer' | 'calendar';
 
@@ -27,7 +27,7 @@ function formatDate(date: Date): string {
 
 export default function Home() {
     const { user } = useAuth();
-    const { showPrices, showPopularity } = useFeatureFlags();
+    const { showPrices, showPopularity, popularityThreshold } = useFeatureFlags();
     const [showSuggestModal, setShowSuggestModal] = useState(false);
     const location = useLocation();
     const viewMode: ViewMode = location.pathname === '/calendar' ? 'calendar' : 'explorer';
@@ -36,6 +36,7 @@ export default function Home() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+    const [selectedEventSource, setSelectedEventSource] = useState<string | null>(null);
     const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
     const [calendars, setCalendars] = useState<CalendarSetting[]>([]);
     const [activeCalendarIds, setActiveCalendarIds] = useState<Set<string> | null>(null);
@@ -49,9 +50,6 @@ export default function Home() {
 
     // Shared selection anchor for calendar desktop details
     const [selectedEventRect, setSelectedEventRect] = useState<DOMRect | null>(null);
-
-    // Explorer list scroll position preservation
-    const listScrollRef = useRef(0);
 
     // Responsive: detect desktop for explorer detail swap
     const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 1024);
@@ -71,6 +69,8 @@ export default function Home() {
 
     // Calendar mode map bounds (for off-map styling in the calendar grid)
     const [calMapBounds, setCalMapBounds] = useState<MapBounds | null>(null);
+
+    const navigate = useNavigate();
 
     // Cross-component hover highlight
     const [hoveredEventId, setHoveredEventId] = useState<string | null>(null);
@@ -180,34 +180,37 @@ export default function Home() {
 
     const handleEventClick = useCallback((evt: CalendarEvent, clickRect?: DOMRect) => {
         if (viewMode === 'explorer') {
-            // Desktop: swap left column to detail view
-            // Mobile: set selectedEvent for overlay modal
-            if (isDesktop) {
-                // Save scroll position of the list panel
-                const listEl = document.querySelector('[data-event-list-scroll]');
-                if (listEl) listScrollRef.current = listEl.scrollTop;
-            }
-            setSelectedEventRect(null);
-            setSelectedEvent(evt);
+            // Navigate to the event detail page
+            navigate(`/event/${evt.event_id}`);
         } else {
             setSelectedEventRect(clickRect ?? null);
+            setSelectedEventSource('calendar');
             setSelectedEvent(evt);
         }
-    }, [viewMode, isDesktop]);
+    }, [viewMode, navigate]);
+
+    // Calendar-mode map marker click — fires its own trackView (no double-fire with Calendar grid)
+    const handleCalMapEventClick = useCallback((evt: CalendarEvent) => {
+        trackView(evt.event_id, 'calendar-map');
+        setSelectedEventRect(null);
+        setSelectedEventSource('calendar-map');
+        setSelectedEvent(evt);
+    }, []);
+
+    // Explorer list panel click — carries source through URL query param
+    const handleExplorerListEventClick = useCallback((evt: CalendarEvent) => {
+        navigate(`/event/${evt.event_id}?src=explorer-list`);
+    }, [navigate]);
+
+    // Explorer map marker click — carries source through URL query param
+    const handleExplorerMapEventClick = useCallback((evt: CalendarEvent) => {
+        navigate(`/event/${evt.event_id}?src=explorer-map`);
+    }, [navigate]);
 
     const handleCloseModal = useCallback(() => {
         setSelectedEventRect(null);
-        if (viewMode === 'explorer' && isDesktop) {
-            // Restore list view + scroll position
-            setSelectedEvent(null);
-            requestAnimationFrame(() => {
-                const listEl = document.querySelector('[data-event-list-scroll]');
-                if (listEl) listEl.scrollTop = listScrollRef.current;
-            });
-        } else {
-            setSelectedEvent(null);
-        }
-    }, [viewMode, isDesktop]);
+        setSelectedEvent(null);
+    }, []);
 
     const handleEditEvent = useCallback((evt: CalendarEvent) => {
         setSelectedEventRect(null);
@@ -307,67 +310,46 @@ export default function Home() {
                 )}
                 {!loading && !error && viewMode === 'explorer' && (
                     <div className="flex flex-col lg:flex-row gap-6 lg:items-start">
-                        {/* Left column on desktop: swaps between list and detail */}
+                        {/* Left column: filters + list */}
                         <div className="order-1 lg:order-1 lg:w-[350px] lg:shrink-0 flex flex-col gap-4 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
-                            {selectedEvent && isDesktop ? (
-                                /* ── Event detail view (Google Maps pattern) ── */
-                                <>
-                                    <button
-                                        onClick={handleCloseModal}
-                                        className="flex items-center gap-1 text-sm text-rose-600 hover:text-rose-700 font-medium"
-                                    >
-                                        ← Back to list
-                                    </button>
-                                    <EventDetailsPanel
-                                        event={selectedEvent}
-                                        onEdit={user ? handleEditEvent : undefined}
-                                        surface="plain"
-                                        className="flex-1 min-h-0"
-                                        bodyClassName="flex-1 min-h-0"
-                                    />
-                                </>
-                            ) : (
-                                /* ── Filters + list view ── */
-                                <>
-                                    <DateRangePicker
-                                        startDate={startDate}
-                                        endDate={endDate}
-                                        onChange={handleDateRangeChange}
-                                    />
-                                    {tagGroups.length > 0 && (
-                                        <TagFilterPills
-                                            tagGroups={tagGroups}
-                                            activeTagIds={activeTagIds}
-                                            onToggle={handleToggleTag}
-                                            onClear={handleClearTags}
-                                        />
-                                    )}
-                                    {/* Event list: hidden on mobile until after map, fills remaining height on desktop */}
-                                    <div className="hidden lg:block lg:flex-1 lg:min-h-0 lg:overflow-hidden">
-                                        <EventListPanel
-                                            events={filteredEvents}
-                                            mapBounds={mapBounds}
-                                            onEventClick={handleEventClick}
-                                            showPrices={showPrices}
-                                            showPopularity={showPopularity}
-                                            sortBy={sortBy}
-                                            onSortChange={setSortBy}
-                                            hoveredEventId={hoveredEventId}
-                                            onEventHover={handleEventHover}
-                                        />
-                                    </div>
-                                </>
+                            <DateRangePicker
+                                startDate={startDate}
+                                endDate={endDate}
+                                onChange={handleDateRangeChange}
+                            />
+                            {tagGroups.length > 0 && (
+                                <TagFilterPills
+                                    tagGroups={tagGroups}
+                                    activeTagIds={activeTagIds}
+                                    onToggle={handleToggleTag}
+                                    onClear={handleClearTags}
+                                />
                             )}
+                            {/* Event list: hidden on mobile until after map, fills remaining height on desktop */}
+                            <div className="hidden lg:block lg:flex-1 lg:min-h-0 lg:overflow-hidden">
+                                <EventListPanel
+                                    events={filteredEvents}
+                                    mapBounds={mapBounds}
+                                    onEventClick={handleExplorerListEventClick}
+                                    showPrices={showPrices}
+                                    showPopularity={showPopularity}
+                                    popularityThreshold={popularityThreshold}
+                                    sortBy={sortBy}
+                                    onSortChange={setSortBy}
+                                    hoveredEventId={hoveredEventId}
+                                    onEventHover={handleEventHover}
+                                />
+                            </div>
                         </div>
                         {/* Map: order-2 on mobile, right column on desktop */}
                         <div className="order-2 lg:order-2 h-[250px] lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
                             <EventMap
                                 events={filteredEvents}
-                                focusedEvent={selectedEvent}
-                                onEventClick={handleEventClick}
+                                onEventClick={handleExplorerMapEventClick}
                                 onBoundsChange={handleBoundsChange}
                                 hoveredEventId={hoveredEventId}
                                 onEventHover={handleEventHover}
+                                detailLinkSource="explorer-map"
                             />
                         </div>
                         {/* Event list on mobile: order-3, hidden on desktop */}
@@ -375,9 +357,10 @@ export default function Home() {
                             <EventListPanel
                                 events={filteredEvents}
                                 mapBounds={mapBounds}
-                                onEventClick={handleEventClick}
+                                onEventClick={handleExplorerListEventClick}
                                 showPrices={showPrices}
                                 showPopularity={showPopularity}
+                                popularityThreshold={popularityThreshold}
                                 sortBy={sortBy}
                                 onSortChange={setSortBy}
                                 hoveredEventId={hoveredEventId}
@@ -446,10 +429,11 @@ export default function Home() {
                                         key={String(showCalendarGrid)}
                                         events={calendarVisibleEvents}
                                         focusedEvent={selectedEvent}
-                                        onEventClick={handleEventClick}
+                                        onEventClick={handleCalMapEventClick}
                                         onBoundsChange={handleCalBoundsChange}
                                         hoveredEventId={hoveredEventId}
                                         onEventHover={handleEventHover}
+                                        detailLinkSource="calendar-map"
                                     />
                                 </div>
                             )}
@@ -461,12 +445,13 @@ export default function Home() {
                 )}
             </main>
 
-            {/* Overlay modal — explorer mobile only */}
-            {selectedEvent && !(viewMode === 'explorer' && isDesktop) && !(viewMode === 'calendar' && isDesktop) && (
+            {/* Overlay modal — calendar mode mobile only */}
+            {selectedEvent && viewMode === 'calendar' && !isDesktop && (
                 <EventModal
                     event={selectedEvent}
                     onClose={handleCloseModal}
                     onEdit={user ? handleEditEvent : undefined}
+                    source={selectedEventSource ?? undefined}
                 />
             )}
 
@@ -476,6 +461,7 @@ export default function Home() {
                     anchorRect={selectedEventRect}
                     onClose={handleCloseModal}
                     onEdit={user ? handleEditEvent : undefined}
+                    source={selectedEventSource ?? undefined}
                 />
             )}
 

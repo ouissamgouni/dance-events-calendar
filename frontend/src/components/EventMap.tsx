@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { MutableRefObject } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { Link } from 'react-router-dom';
 import L from 'leaflet';
 import type { CalendarEvent } from '../types';
 import SaveEventButton from './SaveEventButton';
@@ -53,6 +54,8 @@ interface Props {
     onBoundsChange?: (bounds: MapBounds) => void;
     hoveredEventId?: string | null;
     onEventHover?: (eventId: string | null) => void;
+    /** Source value appended as ?src= on popup "Details" links */
+    detailLinkSource?: string;
 }
 
 function BoundsReporter({ onBoundsChange }: { onBoundsChange?: (bounds: MapBounds) => void }) {
@@ -147,7 +150,7 @@ function MapController({
     return null;
 }
 
-export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover }: Props) {
+export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource }: Props) {
     const markerRefs = useRef(new Map<string, L.Marker>());
     const geoEvents = useMemo(
         () => events.filter((e) => e.latitude != null && e.longitude != null),
@@ -235,12 +238,12 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                             )}
                             <div className="flex items-center justify-between pt-1 border-t border-slate-100">
                                 <SaveEventButton eventId={e.event_id} appearance="icon" size="sm" stopPropagation />
-                                <button
-                                    onClick={() => onEventClick?.(e)}
+                                <Link
+                                    to={`/event/${e.event_id}${detailLinkSource ? `?src=${detailLinkSource}` : ''}`}
                                     className="text-[10px] font-medium text-rose-500 hover:text-rose-700"
                                 >
                                     Details →
-                                </button>
+                                </Link>
                             </div>
                         </div>
                     </Popup>

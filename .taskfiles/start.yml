@@ -8,7 +8,7 @@ vars:
 
 tasks:
   dev:db:
-    desc: Start database only (RESET=1 to teardown first)
+    desc: Start dev database + Umami analytics (RESET=1 to teardown first)
     vars:
       RESET: '{{.RESET | default "0"}}'
     cmds:
@@ -18,6 +18,17 @@ tasks:
           docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.dev.yml down -v 2>/dev/null || true
         fi
         docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.dev.yml up -d
+      - |
+        echo ""
+        echo "✅ Dev stack started"
+        echo "   Database: localhost:${POSTGRES_PORT:-5434}"
+        echo "   Umami:    http://localhost:${UMAMI_PORT:-3100}"
+
+  open:umami:
+    desc: Open Umami analytics dashboard in browser
+    cmds:
+      - |
+        {{.ROOT_DIR}}/.taskfiles/open-browser.sh "http://localhost:${UMAMI_PORT:-3100}"
 
   dev:db:check:
     internal: true
@@ -45,7 +56,7 @@ tasks:
           --prefix-colors "blue,green,yellow" \
           --kill-others-on-fail \
           "cd {{.BACKEND_DIR}} && PYTHONPATH={{.ROOT_DIR}} LOG_LEVEL={{.LOG_LEVEL}} UVICORN_ACCESS_LOG_EXCLUDE_PATHS={{.UVICORN_ACCESS_LOG_EXCLUDE_PATHS}} {{.ROOT_DIR}}/.venv/bin/uvicorn backend.api.main:app {{.RELOAD_FLAG}} --host 0.0.0.0 --port $BACKEND_PORT" \
-          "cd {{.FRONTEND_DIR}} && npm run dev -- --port $FRONTEND_PORT" \
+          "cd {{.FRONTEND_DIR}} && npm run dev -- --port $FRONTEND_PORT --strictPort" \
           "until curl -sf http://localhost:$FRONTEND_PORT >/dev/null 2>&1; do sleep 1; done && {{.ROOT_DIR}}/.taskfiles/open-browser.sh http://localhost:$FRONTEND_PORT"
 
   dev:debug:
@@ -64,8 +75,8 @@ tasks:
           --names "API,WEB,OPEN" \
           --prefix-colors "blue,green,yellow" \
           --kill-others-on-fail \
-          "cd {{.BACKEND_DIR}} && PYTHONPATH={{.ROOT_DIR}} LOG_LEVEL={{.LOG_LEVEL}} UVICORN_ACCESS_LOG_EXCLUDE_PATHS={{.UVICORN_ACCESS_LOG_EXCLUDE_PATHS}} {{.ROOT_DIR}}/.venv/bin/python -m debugpy --listen 0.0.0.0:5678 -m uvicorn backend.api.main:app {{.RELOAD_FLAG}} --host 0.0.0.0 --port $BACKEND_PORT" \
-          "cd {{.FRONTEND_DIR}} && npm run dev -- --port $FRONTEND_PORT" \
+          "cd {{.BACKEND_DIR}} && PYTHONPATH={{.ROOT_DIR}} LOG_LEVEL={{.LOG_LEVEL}} UVICORN_ACCESS_LOG_EXCLUDE_PATHS={{.UVICORN_ACCESS_LOG_EXCLUDE_PATHS}} {{.ROOT_DIR}}/.venv/bin/python -m debugpy --listen 127.0.0.1:5678 -m uvicorn backend.api.main:app {{.RELOAD_FLAG}} --host 0.0.0.0 --port $BACKEND_PORT" \
+          "cd {{.FRONTEND_DIR}} && npm run dev -- --port $FRONTEND_PORT --strictPort" \
           "until curl -sf http://localhost:$FRONTEND_PORT >/dev/null 2>&1; do sleep 1; done && {{.ROOT_DIR}}/.taskfiles/open-browser.sh http://localhost:$FRONTEND_PORT"
 
   dev:backend:
@@ -92,7 +103,7 @@ tasks:
     deps: [dev:db]
     cmds:
       - task: dev:db:check
-      - cd {{.BACKEND_DIR}} && PYTHONPATH={{.ROOT_DIR}} LOG_LEVEL={{.LOG_LEVEL}} UVICORN_ACCESS_LOG_EXCLUDE_PATHS={{.UVICORN_ACCESS_LOG_EXCLUDE_PATHS}} {{.ROOT_DIR}}/.venv/bin/python -m debugpy --listen 0.0.0.0:5678 -m uvicorn backend.api.main:app {{.RELOAD_FLAG}} --host 0.0.0.0 --port $BACKEND_PORT
+      - cd {{.BACKEND_DIR}} && PYTHONPATH={{.ROOT_DIR}} LOG_LEVEL={{.LOG_LEVEL}} UVICORN_ACCESS_LOG_EXCLUDE_PATHS={{.UVICORN_ACCESS_LOG_EXCLUDE_PATHS}} {{.ROOT_DIR}}/.venv/bin/python -m debugpy --listen 127.0.0.1:5678 -m uvicorn backend.api.main:app {{.RELOAD_FLAG}} --host 0.0.0.0 --port $BACKEND_PORT
 
   dev:frontend:
     desc: Start frontend only (no backend)
@@ -105,7 +116,7 @@ tasks:
     cmds:
       - |
         (until curl -sf http://localhost:$FRONTEND_PORT >/dev/null 2>&1; do sleep 1; done && {{.ROOT_DIR}}/.taskfiles/open-browser.sh http://localhost:$FRONTEND_PORT) &
-        cd {{.FRONTEND_DIR}} && npm run dev -- --port $FRONTEND_PORT
+        cd {{.FRONTEND_DIR}} && npm run dev -- --port $FRONTEND_PORT --strictPort
 
   dev:mock:
     desc: "Start all with mock calendar service (no Google creds needed)"
@@ -118,21 +129,21 @@ tasks:
   # Staging & Prod (start from existing images)
   # ════════════════════════════════════════════════════════════════
 
-  staging:
-    desc: Start staging stack (RESET=1 to teardown first)
+  staging:local:
+    desc: Start local staging stack (docker-compose). RESET=1 to teardown first.
     dotenv: ["{{.ROOT_DIR}}/.env.staging"]
     vars:
       RESET: '{{.RESET | default "0"}}'
     cmds:
       - |
         if [ "{{.RESET}}" = "1" ]; then
-          echo "🔄 RESET: tearing down staging stack..."
+          echo "🔄 RESET: tearing down local staging stack..."
           ENV_NAME=staging docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p movida-staging down -v 2>/dev/null || true
         fi
         ENV_NAME=staging IMAGE_TAG=develop docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p movida-staging up -d
       - |
         echo ""
-        echo "✅ Staging started"
+        echo "✅ Local staging started"
         echo "   Frontend: http://localhost:${FRONTEND_PORT:-3001}"
         echo "   Backend:  http://localhost:${BACKEND_PORT:-8002}"
         {{.ROOT_DIR}}/.taskfiles/open-browser.sh "http://localhost:${FRONTEND_PORT:-3001}"
@@ -177,9 +188,13 @@ tasks:
       SCENARIO: '{{.SCENARIO | default "default"}}'
       SEED_DIR: '{{.SEED_DIR | default ""}}'
       RESET: '{{.RESET | default "0"}}'
+      WEB_PORT: '{{.WEB_PORT | default ""}}'
+      API_PORT: '{{.API_PORT | default ""}}'
     cmds:
       - |
         source {{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
+        [ -n "{{.WEB_PORT}}" ] && SC_WEB_PORT="{{.WEB_PORT}}"
+        [ -n "{{.API_PORT}}" ] && SC_API_PORT="{{.API_PORT}}"
 
         # ── RESET cleanup ──
         if [ "{{.RESET}}" = "1" ]; then
@@ -203,6 +218,13 @@ tasks:
           source "$SCENARIO_DIR/secrets.env"
           set +a
         fi
+
+        # Persist actual ports so stop tasks can find them even if overridden
+        STATE_DIR="{{.ROOT_DIR}}/.taskfiles/.scenario-state"
+        mkdir -p "$STATE_DIR"
+        printf 'SC_API_PORT=%s\nSC_WEB_PORT=%s\nSC_DB_PORT=%s\nSC_PROJECT_NAME=%s\n' \
+          "$SC_API_PORT" "$SC_WEB_PORT" "$SC_DB_PORT" "$SC_PROJECT_NAME" \
+          > "$STATE_DIR/{{.SCENARIO}}.env"
 
         echo "═══════════════════════════════════════════════════════════════"
         echo "  Starting scenario: $SCENARIO_NAME"
@@ -236,10 +258,53 @@ tasks:
         DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${SC_DB_PORT}/${SC_DB_NAME}" \
         PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.seed $SEED_ARG
 
+        # ── Start Umami analytics ──
+        echo ""
+        echo "Starting Umami analytics..."
+        SC_UMAMI_PORT=$SC_UMAMI_PORT \
+        SC_PROJECT_NAME=$SC_PROJECT_NAME \
+        docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.scenario-umami.yml -p $SC_UMAMI_PROJECT up -d
+
+        # Wait for Umami HTTP to be ready (up to 60s)
+        UMAMI_URL="http://localhost:${SC_UMAMI_PORT}"
+        echo "Waiting for Umami at $UMAMI_URL ..."
+        for i in $(seq 1 30); do
+          if curl -sf "${UMAMI_URL}/api/heartbeat" >/dev/null 2>&1; then
+            break
+          fi
+          sleep 2
+        done
+
+        # Bootstrap: create website and capture website ID
+        UMAMI_TOKEN=$(curl -sf -X POST "${UMAMI_URL}/api/auth/login" \
+          -H 'Content-Type: application/json' \
+          -d '{"username":"admin","password":"umami"}' | {{.ROOT_DIR}}/.venv/bin/python -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+        SC_UMAMI_WEBSITE_ID=$(curl -sf -X POST "${UMAMI_URL}/api/websites" \
+          -H 'Content-Type: application/json' \
+          -H "Authorization: Bearer ${UMAMI_TOKEN}" \
+          -d "{\"name\":\"${SCENARIO_NAME}\",\"domain\":\"localhost\"}" | {{.ROOT_DIR}}/.venv/bin/python -c "import sys,json; print(json.load(sys.stdin)['id'])")
+
+        echo "✅ Umami ready — website ID: $SC_UMAMI_WEBSITE_ID"
+        echo "   Dashboard: $UMAMI_URL"
+
+        # Persist Umami info into state file
+        STATE_DIR="{{.ROOT_DIR}}/.taskfiles/.scenario-state"
+        echo "SC_UMAMI_PORT=${SC_UMAMI_PORT}" >> "$STATE_DIR/{{.SCENARIO}}.env"
+        echo "SC_UMAMI_WEBSITE_ID=${SC_UMAMI_WEBSITE_ID}" >> "$STATE_DIR/{{.SCENARIO}}.env"
+
         echo ""
         echo "Starting backend + frontend..."
       - |
         source {{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
+        [ -n "{{.WEB_PORT}}" ] && SC_WEB_PORT="{{.WEB_PORT}}"
+        [ -n "{{.API_PORT}}" ] && SC_API_PORT="{{.API_PORT}}"
+
+        # Restore persisted state (picks up SC_UMAMI_PORT + SC_UMAMI_WEBSITE_ID)
+        STATE_FILE="{{.ROOT_DIR}}/.taskfiles/.scenario-state/{{.SCENARIO}}.env"
+        if [ -f "$STATE_FILE" ]; then
+          source "$STATE_FILE"
+        fi
 
         # Read calendar_service from scenario config.yaml (default: mock)
         SCENARIO_DIR="{{.ROOT_DIR}}/scenarios/{{.SCENARIO}}"
@@ -259,7 +324,7 @@ tasks:
           --names "API,WEB,OPEN" \
           --prefix-colors "blue,green,yellow" \
           "cd {{.BACKEND_DIR}} && PYTHONPATH={{.ROOT_DIR}} ENV_NAME=$ENV_NAME DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${SC_DB_PORT}/${SC_DB_NAME} CALENDAR_SERVICE=$CALENDAR_SVC SCENARIO_DIR=$SCENARIO_DIR GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-} GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-} ADMIN_EMAIL=${ADMIN_EMAIL:-} SESSION_SECRET=${SESSION_SECRET:-scenario-secret} GOOGLE_SERVICE_ACCOUNT_FILE=${GOOGLE_SERVICE_ACCOUNT_FILE:-} {{.ROOT_DIR}}/.venv/bin/uvicorn backend.api.main:app --reload --host 0.0.0.0 --port $SC_API_PORT" \
-          "cd {{.FRONTEND_DIR}} && VITE_API_URL=http://localhost:$SC_API_PORT npm run dev -- --port $SC_WEB_PORT" \
+          "cd {{.FRONTEND_DIR}} && VITE_API_URL=http://localhost:$SC_API_PORT VITE_UMAMI_URL=http://localhost:${SC_UMAMI_PORT} VITE_UMAMI_WEBSITE_ID=${SC_UMAMI_WEBSITE_ID} npm run dev -- --port $SC_WEB_PORT --strictPort" \
           "until curl -sf http://localhost:$SC_WEB_PORT >/dev/null 2>&1; do sleep 1; done && {{.ROOT_DIR}}/.taskfiles/open-browser.sh http://localhost:$SC_WEB_PORT"
 
   scenario:ref:

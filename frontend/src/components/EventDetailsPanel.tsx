@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import type { CalendarEvent } from '../types';
 import EventDetailContent from './EventDetailContent';
 import SaveEventButton from './SaveEventButton';
@@ -10,6 +11,8 @@ interface Props {
     surface?: 'plain' | 'card';
     className?: string;
     bodyClassName?: string;
+    /** Source passed as ?src= on the "See full details" link for tracking attribution */
+    source?: string;
 }
 
 export default function EventDetailsPanel({
@@ -20,6 +23,7 @@ export default function EventDetailsPanel({
     surface = 'card',
     className = '',
     bodyClassName = '',
+    source,
 }: Props) {
     const surfaceClassName = surface === 'card'
         ? 'rounded-2xl bg-white shadow-2xl border border-slate-200'
@@ -28,10 +32,18 @@ export default function EventDetailsPanel({
     return (
         <div className={`flex flex-col ${surfaceClassName} ${className}`.trim()}>
             <div className="flex items-start justify-between border-b border-slate-100 px-6 pt-5 pb-4">
-                <h2 className="text-lg font-bold text-slate-900 leading-snug">
-                    {event.title}
-                </h2>
-                <div className="ml-4 flex items-center gap-1 shrink-0">
+                <div className="min-w-0 flex-1 mr-3">
+                    <h2 className="text-lg font-bold text-slate-900 leading-snug">
+                        {event.title}
+                    </h2>
+                    <Link
+                        to={`/event/${event.event_id}${source ? `?src=${source}` : ''}`}
+                        className="text-xs text-rose-500 hover:text-rose-700 hover:underline mt-0.5 inline-block"
+                    >
+                        See full details →
+                    </Link>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
                     <SaveEventButton eventId={event.event_id} appearance="icon" />
                     {onClose && (
                         <button

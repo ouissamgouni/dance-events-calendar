@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import * as CookieConsent from 'vanilla-cookieconsent';
 import 'vanilla-cookieconsent/dist/cookieconsent.css';
 import { cookieConsentConfig } from '../utils/cookieconsent-config';
+import { loadUmami } from '../utils/umami';
 
 interface ConsentContextValue {
     analyticsConsent: boolean;
@@ -21,8 +22,11 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
     const [personalizationConsent, setPersonalizationConsent] = useState(false);
 
     const syncConsent = useCallback(() => {
-        setAnalyticsConsent(CookieConsent.acceptedCategory('analytics'));
-        setPersonalizationConsent(CookieConsent.acceptedCategory('personalization'));
+        const analytics = CookieConsent.acceptedCategory('analytics');
+        const personalization = CookieConsent.acceptedCategory('personalization');
+        setAnalyticsConsent(analytics);
+        setPersonalizationConsent(personalization);
+        if (analytics) loadUmami();
     }, []);
 
     useEffect(() => {

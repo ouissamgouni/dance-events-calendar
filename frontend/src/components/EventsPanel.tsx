@@ -15,7 +15,7 @@ import {
     bulkAssignTags,
 } from '../api';
 import LocationBadge from './LocationBadge';
-import EventEditModal from './EventEditModal';
+import AdminEventDetailPanel from './AdminEventDetailPanel';
 
 export type EventsPanelPreset = 'all' | 'pending' | 'ungeolocated';
 
@@ -52,7 +52,7 @@ export default function EventsPanel({ isOpen, onClose, preset }: Props) {
     const [selectedGeoStatus, setSelectedGeoStatus] = useState<string>('');
     const [selectedTagIds, setSelectedTagIds] = useState<string>('');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-    const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+    const [adminDetailEventId, setAdminDetailEventId] = useState<string | null>(null);
     const [busy, setBusy] = useState('');
     const [message, setMessage] = useState('');
     const searchTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -109,7 +109,7 @@ export default function EventsPanel({ isOpen, onClose, preset }: Props) {
             setSelectedTagIds('');
             setSelectedIds(new Set());
             setMessage('');
-            setEditingEvent(null);
+            setAdminDetailEventId(null);
         }
     }, [isOpen, preset]);
 
@@ -188,11 +188,6 @@ export default function EventsPanel({ isOpen, onClose, preset }: Props) {
         } catch {
             setMessage('Failed to review event.');
         }
-    };
-
-    const handleEventSaved = (updated: CalendarEvent) => {
-        setEvents((prev) => prev.map((e) => (e.event_id === updated.event_id ? updated : e)));
-        setEditingEvent(null);
     };
 
     const formatDate = (iso: string) => {
@@ -354,7 +349,7 @@ export default function EventsPanel({ isOpen, onClose, preset }: Props) {
                                     <tr
                                         key={event.event_id}
                                         className={`hover:bg-gray-50/50 transition cursor-pointer ${selectedIds.has(event.event_id) ? 'bg-blue-50/30' : ''}`}
-                                        onClick={() => setEditingEvent(event)}
+                                        onClick={() => setAdminDetailEventId(event.event_id)}
                                     >
                                         <td className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
                                             <input
@@ -492,14 +487,11 @@ export default function EventsPanel({ isOpen, onClose, preset }: Props) {
                 )}
             </div>
 
-            {/* Edit Modal */}
-            {editingEvent && (
-                <EventEditModal
-                    event={editingEvent}
-                    onClose={() => setEditingEvent(null)}
-                    onSaved={handleEventSaved}
-                />
-            )}
+            {/* Admin event detail side panel */}
+            <AdminEventDetailPanel
+                eventId={adminDetailEventId}
+                onClose={() => setAdminDetailEventId(null)}
+            />
         </>
     );
 }

@@ -37,6 +37,7 @@ export interface TagSuggestionResponse {
     event_title: string | null;
     tag: Tag | null;
     free_text: string | null;
+    group_slug: string | null;
     status: string;
     submitter_device_id: string | null;
     admin_notes: string | null;

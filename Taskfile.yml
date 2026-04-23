@@ -19,6 +19,9 @@ includes:
   deploy:
     taskfile: .taskfiles/deploy.yml
     dir: "{{.ROOT_DIR}}"
+  fly:
+    taskfile: .taskfiles/fly.yml
+    dir: "{{.ROOT_DIR}}"
   git:
     taskfile: .taskfiles/git.yml
     dir: "{{.ROOT_DIR}}"
@@ -100,19 +103,32 @@ tasks:
         echo "  Scenarios"
         echo "═══════════════════════════════════════════════════════════════"
         echo ""
-        printf "  %-34s  %6s  %-5s  %-5s  %-5s  %s\n" "Name" "Offset" "DB" "API" "WEB" "Status"
-        printf "  %-34s  %6s  %-5s  %-5s  %-5s  %s\n" "──────────────────────────────────" "──────" "─────" "─────" "─────" "──────────"
+        printf "  %-34s  %6s  %-10s  %-10s  %-10s  %-10s\n" "Name" "Offset" "DB" "API" "WEB" "UMAMI"
+        printf "  %-34s  %6s  %-10s  %-10s  %-10s  %-10s\n" "──────────────────────────────────" "──────" "──────────" "──────────" "──────────" "──────────"
 
-        RUNNING_DOCKER=$(docker ps --filter "name=calendar_db_qa" --format '{{`{{.Names}}`}}' 2>/dev/null || true)
+        _scenario_status() {
+          local NAME=$1 DB=$2 API=$3 WEB=$4 UMAMI=$5
+          local DB_CONTAINER UMAMI_CONTAINER UMAMI_PROJECT
+          if [ "$NAME" = "default" ]; then
+            DB_CONTAINER="calendar_db_scenario"
+            UMAMI_PROJECT="movida-scenario-umami"
+            UMAMI_CONTAINER="umami_movida-scenario"
+          else
+            DB_CONTAINER="calendar_db_scenario-${NAME}"
+            UMAMI_PROJECT="movida-scenario-${NAME}-umami"
+            UMAMI_CONTAINER="umami_movida-scenario-${NAME}"
+          fi
+          local DB_S="—" API_S="—" WEB_S="—" UMAMI_S="—"
+          docker ps --filter "name=^/${DB_CONTAINER}$" --filter "status=running" --format '{{`{{.Names}}`}}' 2>/dev/null | grep -q . && DB_S="🟢"
+          lsof -iTCP:$API -sTCP:LISTEN >/dev/null 2>&1 && API_S="🟢"
+          lsof -iTCP:$WEB -sTCP:LISTEN >/dev/null 2>&1 && WEB_S="🟢"
+          docker ps --filter "name=^/${UMAMI_CONTAINER}$" --filter "status=running" --format '{{`{{.Names}}`}}' 2>/dev/null | grep -q . && UMAMI_S="🟢"
+          printf "  %-34s  %6s  %-5s  %-5s  %-5s  %-5s\n" "$NAME" "$OFFSET" "$DB_S db:$DB" "$API_S api:$API" "$WEB_S web:$WEB" "$UMAMI_S :$UMAMI"
+        }
 
         # Default scenario
-        STATUS="—"
-        if echo "$RUNNING_DOCKER" | grep -qx "calendar_db_qa" 2>/dev/null; then
-          STATUS="🟢 docker"
-        elif lsof -iTCP:8003 -sTCP:LISTEN >/dev/null 2>&1; then
-          STATUS="🟢 local"
-        fi
-        printf "  %-34s  %6s  %-5s  %-5s  %-5s  %s\n" "default" "0" "5437" "8003" "3002" "$STATUS"
+        OFFSET=0
+        _scenario_status "default" 5437 8003 3002 3101
 
         # Named scenarios from seed directories
         if [ -d "$SCENARIOS_DIR" ]; then
@@ -123,14 +139,8 @@ tasks:
             DB=$((5437 + OFFSET))
             API=$((8003 + OFFSET))
             WEB=$((3002 + OFFSET))
-            STATUS="—"
-            CONTAINER="calendar_db_qa-${NAME}"
-            if echo "$RUNNING_DOCKER" | grep -qx "$CONTAINER" 2>/dev/null; then
-              STATUS="🟢 docker"
-            elif lsof -iTCP:$API -sTCP:LISTEN >/dev/null 2>&1; then
-              STATUS="🟢 local"
-            fi
-            printf "  %-34s  %6s  %-5s  %-5s  %-5s  %s\n" "$NAME" "$OFFSET" "$DB" "$API" "$WEB" "$STATUS"
+            UMAMI=$((3101 + OFFSET))
+            _scenario_status "$NAME" $DB $API $WEB $UMAMI
           done
         fi
         echo ""

@@ -39,17 +39,17 @@ export function SavedEventsProvider({ children }: { children: ReactNode }) {
     const toggleSave = useCallback((eventId: string) => {
         setSavedIds((prev) => {
             const next = new Set(prev);
-            const action = next.has(eventId) ? 'unsave' : 'save';
-            if (action === 'unsave') {
+            if (next.has(eventId)) {
                 next.delete(eventId);
             } else {
                 next.add(eventId);
             }
-            // Fire-and-forget consent-gated server tracking
-            trackSave(eventId, action as 'save' | 'unsave');
             return next;
         });
-    }, []);
+        // Side effect outside the updater — safe under StrictMode double-invoke
+        const action = savedIds.has(eventId) ? 'unsave' : 'save';
+        trackSave(eventId, action);
+    }, [savedIds]);
 
     const isSaved = useCallback((eventId: string) => savedIds.has(eventId), [savedIds]);
 

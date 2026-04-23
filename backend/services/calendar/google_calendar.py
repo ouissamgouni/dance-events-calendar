@@ -24,16 +24,25 @@ class GoogleCalendarService(BaseCalendarService):
         if self._service is not None:
             return self._service
 
+        import json
+
         from google.oauth2 import service_account
         from googleapiclient.discovery import build
 
-        creds_file = os.getenv(
-            "GOOGLE_SERVICE_ACCOUNT_FILE", "credentials/service-account.json"
-        )
-        credentials = service_account.Credentials.from_service_account_file(
-            creds_file,
-            scopes=["https://www.googleapis.com/auth/calendar"],
-        )
+        json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+        if json_str:
+            credentials = service_account.Credentials.from_service_account_info(
+                json.loads(json_str),
+                scopes=["https://www.googleapis.com/auth/calendar"],
+            )
+        else:
+            creds_file = os.getenv(
+                "GOOGLE_SERVICE_ACCOUNT_FILE", "credentials/service-account.json"
+            )
+            credentials = service_account.Credentials.from_service_account_file(
+                creds_file,
+                scopes=["https://www.googleapis.com/auth/calendar"],
+            )
         self._service = build("calendar", "v3", credentials=credentials)
         return self._service
 

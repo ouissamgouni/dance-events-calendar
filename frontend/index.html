@@ -8,6 +8,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#e11d48" />
 
+  <!-- Security -->
+  <!-- VITE_UMAMI_URL is substituted at build/dev time; empty string is safe (ignored by browsers) -->
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'self'; script-src 'self' https://accounts.google.com %VITE_UMAMI_URL%; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https: %VITE_UMAMI_URL%; font-src 'self' data:; frame-src 'none'; object-src 'none';" />
+
   <title>Movida — Salsa, Bachata &amp; Dance Events Near You</title>
   <meta name="description"
     content="Discover upcoming salsa classes, socials, workshops, and dance events near you. Browse by date, location, and style." />

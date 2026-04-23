@@ -21,7 +21,7 @@ async def geolocate_ip(ip: str) -> dict | None:
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
             resp = await client.get(
-                f"http://ip-api.com/json/{ip}?fields=status,city,country,lat,lon"
+                f"https://ip-api.com/json/{ip}?fields=status,city,country,lat,lon"
             )
             data = resp.json()
             if data.get("status") == "success":

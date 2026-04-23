@@ -5,7 +5,12 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from backend.api.deps import create_session_token, get_current_user
-from backend.config.loader import get_admin_email, get_env_name, get_google_client_id
+from backend.config.loader import (
+    get_admin_email,
+    get_env_name,
+    get_google_client_id,
+    get_mock_admin_auth,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +19,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 _COOKIE_NAME = "session_token"
 _MAX_AGE = 60 * 60 * 24 * 7  # 7 days
 
-_SAFE_ENV_NAMES = {"dev", "mock", "test", "qa"}
+_SECURE_ENV_NAMES = {"staging", "production"}
 
 
 class GoogleLoginRequest(BaseModel):
@@ -22,17 +27,14 @@ class GoogleLoginRequest(BaseModel):
 
 
 def _is_dev_auth() -> bool:
-    """True only when Google Client ID is not configured AND we're in a safe environment."""
+    """True when MOCK_ADMIN_AUTH=true — replaces Google OAuth with a one-click mock login."""
+    if not get_mock_admin_auth():
+        return False
     if get_google_client_id():
-        return False
-    env_name = get_env_name()
-    if env_name not in _SAFE_ENV_NAMES:
         logger.warning(
-            "GOOGLE_CLIENT_ID is not set in '%s' environment — login disabled. "
-            "Set GOOGLE_CLIENT_ID to enable authentication.",
-            env_name,
+            "MOCK_ADMIN_AUTH is enabled but GOOGLE_CLIENT_ID is also set — "
+            "mock login will be used and Google OAuth will be ignored."
         )
-        return False
     return True
 
 
@@ -44,7 +46,7 @@ def _set_session_cookie(response: JSONResponse, email: str, name: str) -> JSONRe
         max_age=_MAX_AGE,
         httponly=True,
         samesite="lax",
-        secure=False,  # Set True in production behind HTTPS
+        secure=get_env_name() in _SECURE_ENV_NAMES,
     )
     return response
 

@@ -72,74 +72,239 @@ tasks:
       - task: seed:dev
 
   # ════════════════════════════════════════════════════════════════
-  # Staging
+  # Staging — Local (docker-compose, port 5436)
   # ════════════════════════════════════════════════════════════════
 
-  migrate:staging:
-    desc: Run Alembic migrations (staging)
+  migrate:staging:local:
+    desc: "Run Alembic migrations against local staging DB (docker-compose, port 5436)"
     dir: backend
     dotenv: [".env.staging"]
     cmds:
       - |
-        DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5436}/${POSTGRES_DB}" \
+        export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5436}/${POSTGRES_DB}"
+        echo "Running migrations against local staging DB..."
         PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini upgrade head
 
-  seed:staging:
-    desc: Seed staging database
+  seed:staging:local:
+    desc: "Seed local staging database (docker-compose, port 5436)"
     dir: backend
     dotenv: [".env.staging"]
     cmds:
       - |
-        DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5436}/${POSTGRES_DB}" \
+        export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5436}/${POSTGRES_DB}"
         PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.seed {{.CLI_ARGS}}
 
-  reset:staging:
-    desc: "Reset staging database (DESTRUCTIVE). DRY_RUN=1 to preview."
+  status:staging:local:
+    desc: "Show migration status for local staging DB (docker-compose, port 5436)"
+    dir: backend
+    dotenv: [".env.staging"]
+    cmds:
+      - |
+        export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5436}/${POSTGRES_DB}"
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini current
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini history
+
+  check:staging:local:
+    desc: "Test connectivity + validate migration state for local staging DB (docker-compose, port 5436)"
+    dir: backend
+    dotenv: [".env.staging"]
+    cmds:
+      - |
+        export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5436}/${POSTGRES_DB}"
+        echo "Checking local staging DB..."
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini check 2>&1 && \
+          echo "✅ Connected. Migrations are up to date" || \
+          echo "⚠️  Connected but migrations need attention"
+        echo "Current revision:"
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini current
+
+  reset:staging:local:
+    desc: "Reset local staging database — DESTRUCTIVE. DRY_RUN=1 to preview."
     dir: backend
     dotenv: [".env.staging"]
     vars:
       DRY_RUN: '{{.DRY_RUN | default "0"}}'
-    prompt: "This will drop all tables and re-seed staging database. Continue?"
+    prompt: "This will drop all tables and re-seed the LOCAL staging database. Continue?"
     cmds:
       - |
         if [ "{{.DRY_RUN}}" = "1" ]; then
-          echo "🔍 DRY RUN — would reset staging database"
+          echo "🔍 DRY RUN — would reset local staging database"
           exit 0
         fi
-      - |
-        DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5436}/${POSTGRES_DB}" \
+        export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5436}/${POSTGRES_DB}"
         PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.reset
-      - task: migrate:staging
-      - task: seed:staging
+      - task: migrate:staging:local
+      - task: seed:staging:local
+
+  # ════════════════════════════════════════════════════════════════
+  # Staging — Remote (Neon develop branch)
+  # Requires secrets.staging.env with DATABASE_URL set
+  # ════════════════════════════════════════════════════════════════
+
+  migrate:staging:remote:
+    desc: "Run Alembic migrations against remote staging DB (Neon develop branch)"
+    dir: backend
+    dotenv: ["secrets.env", "secrets.staging.env", ".env.staging"]
+    cmds:
+      - |
+        if [ -z "$DATABASE_URL" ]; then
+          echo "❌ DATABASE_URL not set — fill in secrets.staging.env"
+          exit 1
+        fi
+        echo "Running migrations against remote staging (Neon): $(echo $DATABASE_URL | sed 's/:.*@/@/')"
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini upgrade head
+
+  seed:staging:remote:
+    desc: "Seed remote staging database (Neon develop branch)"
+    dir: backend
+    dotenv: ["secrets.env", "secrets.staging.env", ".env.staging"]
+    prompt: "This will seed the REMOTE staging database (Neon). Continue?"
+    cmds:
+      - |
+        if [ -z "$DATABASE_URL" ]; then
+          echo "❌ DATABASE_URL not set — fill in secrets.staging.env"
+          exit 1
+        fi
+        echo "Seeding remote staging (Neon): $(echo $DATABASE_URL | sed 's/:.*@/@/')"
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.seed {{.CLI_ARGS}}
+
+  status:staging:remote:
+    desc: "Show migration status for remote staging DB (Neon develop branch)"
+    dir: backend
+    dotenv: ["secrets.env", "secrets.staging.env", ".env.staging"]
+    cmds:
+      - |
+        if [ -z "$DATABASE_URL" ]; then
+          echo "❌ DATABASE_URL not set — fill in secrets.staging.env"
+          exit 1
+        fi
+        echo "Checking remote staging (Neon): $(echo $DATABASE_URL | sed 's/:.*@/@/')"
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini current
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini history
+
+  check:staging:remote:
+    desc: "Test connectivity + validate migration state for remote staging DB (Neon develop branch)"
+    dir: backend
+    dotenv: ["secrets.env", "secrets.staging.env", ".env.staging"]
+    cmds:
+      - |
+        if [ -z "$DATABASE_URL" ]; then
+          echo "❌ DATABASE_URL not set — fill in secrets.staging.env"
+          exit 1
+        fi
+        echo "Checking remote staging (Neon): $(echo $DATABASE_URL | sed 's/:.*@/@/')"
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini check 2>&1 && \
+          echo "✅ Connected. Migrations are up to date" || \
+          echo "⚠️  Connected but migrations need attention"
+        echo "Current revision:"
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini current
+
+  reset:staging:remote:
+    desc: "Reset REMOTE staging database (Neon develop branch) — DESTRUCTIVE. DRY_RUN=1 to preview."
+    dir: backend
+    dotenv: ["secrets.env", "secrets.staging.env", ".env.staging"]
+    vars:
+      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+    prompt: "⚠️  This will drop all tables and re-seed the REMOTE staging database (Neon develop branch). Continue?"
+    cmds:
+      - |
+        if [ -z "$DATABASE_URL" ]; then
+          echo "❌ DATABASE_URL not set — fill in secrets.staging.env"
+          exit 1
+        fi
+        if [ "{{.DRY_RUN}}" = "1" ]; then
+          echo "🔍 DRY RUN — would reset remote staging (Neon): $(echo $DATABASE_URL | sed 's/:.*@/@/')"
+          exit 0
+        fi
+        echo "Resetting remote staging (Neon): $(echo $DATABASE_URL | sed 's/:.*@/@/')"
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.reset
+      - task: migrate:staging:remote
+      - task: seed:staging:remote
+
+  # ════════════════════════════════════════════════════════════════
+  # Staging — Convenience aliases (default to local)
+  # ════════════════════════════════════════════════════════════════
+
+  migrate:staging:
+    desc: "Alias for migrate:staging:local"
+    cmds:
+      - task: migrate:staging:local
+
+  seed:staging:
+    desc: "Alias for seed:staging:local"
+    cmds:
+      - task: seed:staging:local
 
   # ════════════════════════════════════════════════════════════════
   # Prod
   # ════════════════════════════════════════════════════════════════
 
   migrate:prod:
-    desc: Run Alembic migrations (prod)
+    desc: "Run Alembic migrations (prod — Neon). Requires secrets.prod.env with DATABASE_URL."
     dir: backend
-    dotenv: [".env.prod"]
+    dotenv: ["secrets.env", "secrets.prod.env", ".env.prod"]
     cmds:
       - |
-        DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5438}/${POSTGRES_DB}" \
+        if [ -z "$DATABASE_URL" ]; then
+          echo "❌ DATABASE_URL not set — fill in secrets.prod.env"
+          exit 1
+        fi
+        echo "Running migrations against: $(echo $DATABASE_URL | sed 's/:.*@/@/')"
         PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini upgrade head
+
+  seed:prod:
+    desc: "Seed prod database (DESTRUCTIVE). Requires secrets.prod.env with DATABASE_URL."
+    dir: backend
+    dotenv: ["secrets.env", "secrets.prod.env", ".env.prod"]
+    prompt: "⚠️  This will seed the PRODUCTION database. Continue?"
+    cmds:
+      - |
+        if [ -z "$DATABASE_URL" ]; then
+          echo "❌ DATABASE_URL not set — fill in secrets.prod.env"
+          exit 1
+        fi
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.seed {{.CLI_ARGS}}
+
+  status:prod:
+    desc: "Show migration status for prod database (Neon)"
+    dir: backend
+    dotenv: ["secrets.env", "secrets.prod.env", ".env.prod"]
+    cmds:
+      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini current
+      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini history
+
+  check:prod:
+    desc: "Test connectivity + validate migration state for prod database (Neon)"
+    dir: backend
+    dotenv: ["secrets.env", "secrets.prod.env", ".env.prod"]
+    cmds:
+      - |
+        if [ -z "$DATABASE_URL" ]; then
+          echo "❌ DATABASE_URL not set — fill in secrets.prod.env"
+          exit 1
+        fi
+        echo "Checking prod database (Neon)..."
+        echo "Host: $(echo $DATABASE_URL | sed 's/:.*@/@/' | sed 's/@/\n/' | tail -1 | cut -d'/' -f1)"
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini check 2>&1 && \
+          echo "✅ Connected. Migrations are up to date" || \
+          echo "⚠️  Connected but migrations need attention"
+      - |
+        echo "Current revision:"
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini current
 
   reset:prod:
     desc: "Reset prod database (🚨 DESTRUCTIVE). DRY_RUN=1 to preview."
     dir: backend
-    dotenv: [".env.prod"]
+    dotenv: ["secrets.env", "secrets.prod.env", ".env.prod"]
     vars:
       DRY_RUN: '{{.DRY_RUN | default "0"}}'
     prompt: "🚨 This will DESTROY ALL PRODUCTION DATA. Are you absolutely sure?"
     cmds:
       - |
         if [ "{{.DRY_RUN}}" = "1" ]; then
-          echo "🔍 DRY RUN — would reset prod database"
+          echo "🔍 DRY RUN — would reset prod database (Neon)"
           exit 0
         fi
-      - |
-        DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5438}/${POSTGRES_DB}" \
         PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.reset
       - task: migrate:prod
 

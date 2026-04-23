@@ -7,7 +7,11 @@ def get_database_url() -> str:
         return explicit
 
     user = os.getenv("POSTGRES_USER", "calendar_user")
-    password = os.getenv("POSTGRES_PASSWORD", "calendar_password")
+    password = os.getenv("POSTGRES_PASSWORD")
+    if not password:
+        raise RuntimeError(
+            "POSTGRES_PASSWORD environment variable must be set when DATABASE_URL is not provided."
+        )
     host = os.getenv("POSTGRES_HOST", "localhost")
     port = os.getenv("POSTGRES_PORT", "5432")
     db = os.getenv("POSTGRES_DB", "calendar_db_dev")
@@ -32,11 +36,26 @@ def get_admin_email() -> str:
 
 
 def get_session_secret() -> str:
-    return os.getenv("SESSION_SECRET", "change-me")
+    secret = os.getenv("SESSION_SECRET")
+    if not secret:
+        raise RuntimeError(
+            "SESSION_SECRET environment variable is not set. "
+            "Generate a strong secret (e.g. `openssl rand -hex 32`) and set it before starting."
+        )
+    if secret == "change-me":
+        raise RuntimeError(
+            "SESSION_SECRET is still set to the insecure default 'change-me'. "
+            "Set a strong, unique secret before starting."
+        )
+    return secret
 
 
 def get_google_client_id() -> str:
     return os.getenv("GOOGLE_CLIENT_ID", "")
+
+
+def get_mock_admin_auth() -> bool:
+    return os.getenv("MOCK_ADMIN_AUTH", "").lower() in ("true", "1")
 
 
 def get_env_name() -> str:

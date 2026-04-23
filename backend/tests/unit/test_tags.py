@@ -90,7 +90,8 @@ class TestListTags:
         tag.group = group
         group.tags = [tag]
 
-        session.exec.return_value.all.return_value = [group]
+        # First exec().all() returns groups; second returns empty count rows
+        session.exec.return_value.all.side_effect = [[group], []]
         resp = c.get("/api/tags")
         assert resp.status_code == 200
         data = resp.json()

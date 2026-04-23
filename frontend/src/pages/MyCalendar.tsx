@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { fetchEventsByIds, exportIcs, exportXlsx } from '../api';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
-import { trackExportAction } from '../utils/tracking';
+import { trackExportAction, trackView } from '../utils/tracking';
 import EventListPanel from '../components/EventListPanel';
 import EventMap from '../components/EventMap';
 import type { MapBounds } from '../components/EventMap';
@@ -45,6 +45,7 @@ export default function MyCalendar() {
     }, [savedEventIds]);
 
     const handleEventClick = useCallback((evt: CalendarEvent) => {
+        trackView(evt.event_id, 'my-calendar');
         setSelectedEvent(evt);
     }, []);
 

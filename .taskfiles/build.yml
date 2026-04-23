@@ -35,6 +35,8 @@ tasks:
         echo "Building frontend from develop..."
         docker build -t movida-frontend:develop \
           --build-arg VITE_API_URL=http://localhost:${BACKEND_PORT:-8002} \
+          --build-arg VITE_UMAMI_URL=${VITE_UMAMI_URL:-} \
+          --build-arg VITE_UMAMI_WEBSITE_ID=${VITE_UMAMI_WEBSITE_ID:-} \
           {{.WORKTREE_DEVELOP}}/frontend
         echo "✅ Frontend image built: :develop"
 
@@ -87,6 +89,8 @@ tasks:
         echo "Building frontend from main as $VERSION..."
         docker build -t movida-frontend:$VERSION \
           --build-arg VITE_API_URL=http://localhost:${BACKEND_PORT:-8080} \
+          --build-arg VITE_UMAMI_URL=${VITE_UMAMI_URL:-} \
+          --build-arg VITE_UMAMI_WEBSITE_ID=${VITE_UMAMI_WEBSITE_ID:-} \
           {{.WORKTREE_MAIN}}/frontend
         docker tag movida-frontend:$VERSION movida-frontend:latest
         echo "✅ Frontend image built: :$VERSION and :latest"
@@ -132,6 +136,8 @@ tasks:
         echo "Building frontend..."
         docker build -t movida-frontend:$TAG \
           --build-arg VITE_API_URL=http://localhost:${BACKEND_PORT:-8002} \
+          --build-arg VITE_UMAMI_URL=${VITE_UMAMI_URL:-} \
+          --build-arg VITE_UMAMI_WEBSITE_ID=${VITE_UMAMI_WEBSITE_ID:-} \
           $WORKTREE_PATH/frontend
 
         echo ""
@@ -167,6 +173,8 @@ tasks:
         echo "Building frontend..."
         docker build -t movida-frontend:$TAG \
           --build-arg VITE_API_URL=http://localhost:${BACKEND_PORT:-8001} \
+          --build-arg VITE_UMAMI_URL=${VITE_UMAMI_URL:-} \
+          --build-arg VITE_UMAMI_WEBSITE_ID=${VITE_UMAMI_WEBSITE_ID:-} \
           ./frontend
 
         echo ""

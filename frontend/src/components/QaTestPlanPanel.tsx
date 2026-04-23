@@ -11,6 +11,7 @@ interface QaContextValue {
     setIsOpen: (open: boolean) => void;
     doneCount: number;
     totalSteps: number;
+    pinnedWidth: number;
 }
 
 const QaCtx = createContext<QaContextValue>({
@@ -19,15 +20,18 @@ const QaCtx = createContext<QaContextValue>({
     setIsOpen: () => { },
     doneCount: 0,
     totalSteps: 0,
+    pinnedWidth: 0,
 });
 
 export const useQaContext = () => useContext(QaCtx);
+export const useQaPinnedWidth = () => useContext(QaCtx).pinnedWidth;
 
 export function QaTestPlanProvider({ children }: { children: ReactNode }) {
     const [isOpen, setIsOpen] = useState(false);
     const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
     const [doneCount, setDoneCount] = useState(0);
     const [totalSteps, setTotalSteps] = useState(0);
+    const [pinnedWidth, setPinnedWidth] = useState(0);
 
     useEffect(() => {
         fetchAppInfo()
@@ -36,12 +40,13 @@ export function QaTestPlanProvider({ children }: { children: ReactNode }) {
     }, []);
 
     return (
-        <QaCtx.Provider value={{ appInfo, isOpen, setIsOpen, doneCount, totalSteps }}>
+        <QaCtx.Provider value={{ appInfo, isOpen, setIsOpen, doneCount, totalSteps, pinnedWidth }}>
             {children}
             <QaTestPlanPanelInner
                 appInfo={appInfo}
                 isOpen={isOpen}
                 setIsOpen={setIsOpen}
+                onPinnedWidthChange={setPinnedWidth}
                 onProgressChange={(done, total) => {
                     setDoneCount(done);
                     setTotalSteps(total);
@@ -55,19 +60,27 @@ function QaTestPlanPanelInner({
     appInfo,
     isOpen,
     setIsOpen,
+    onPinnedWidthChange,
     onProgressChange,
 }: {
     appInfo: AppInfo | null;
     isOpen: boolean;
     setIsOpen: (v: boolean) => void;
+    onPinnedWidthChange: (w: number) => void;
     onProgressChange: (done: number, total: number) => void;
 }) {
+    const [pinned, setPinned] = useState(false);
     const [activeScenario, setActiveScenario] = useState<string | null>(null);
     const [testPlan, setTestPlan] = useState<TestPlan | null>(null);
     const [loading, setLoading] = useState(false);
     const [checkedSteps, setCheckedSteps] = useState<Record<string, Set<number>>>({});
 
     const scenarios = appInfo?.qa_scenarios ?? [];
+
+    // Notify parent of pinned width changes
+    useEffect(() => {
+        onPinnedWidthChange(pinned && isOpen ? QA_PANEL_WIDTH : 0);
+    }, [pinned, isOpen, onPinnedWidthChange]);
 
     // Auto-select if only one scenario
     useEffect(() => {
@@ -112,7 +125,11 @@ function QaTestPlanPanelInner({
         });
     };
 
-    const handleClose = () => setIsOpen(false);
+    const handleClose = () => {
+        setIsOpen(false);
+        if (pinned) setPinned(false);
+    };
+    const togglePin = () => setPinned((p) => !p);
 
     const panelContent = (
         <>
@@ -126,14 +143,27 @@ function QaTestPlanPanelInner({
                         {activeScenario ? `QA: ${activeScenario}` : 'QA Test Plans'}
                     </span>
                 </div>
-                <button
-                    onClick={handleClose}
-                    className="p-1 rounded hover:bg-gray-200 transition-colors text-gray-500"
-                >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
+                <div className="flex items-center gap-0.5">
+                    <button
+                        onClick={togglePin}
+                        className={`p-1 rounded transition-colors ${pinned ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100' : 'text-gray-400 hover:bg-gray-200 hover:text-gray-600'}`}
+                        title={pinned ? 'Unpin panel (overlay mode)' : 'Pin panel (side-by-side)'}
+                    >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill={pinned ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="12" y1="17" x2="12" y2="22" />
+                            <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
+                            {!pinned && <line x1="2" y1="2" x2="22" y2="22" />}
+                        </svg>
+                    </button>
+                    <button
+                        onClick={handleClose}
+                        className="p-1 rounded hover:bg-gray-200 transition-colors text-gray-500"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
             </div>
 
             {/* Body */}
@@ -249,6 +279,17 @@ function QaTestPlanPanelInner({
     );
 
     if (!isOpen) return null;
+
+    if (pinned) {
+        return (
+            <div
+                className="fixed right-0 top-0 bottom-[22px] bg-white z-10 flex flex-col border-l border-gray-200"
+                style={{ width: QA_PANEL_WIDTH, boxShadow: '-2px 0 8px rgba(0,0,0,0.08)' }}
+            >
+                {panelContent}
+            </div>
+        );
+    }
 
     return (
         <>

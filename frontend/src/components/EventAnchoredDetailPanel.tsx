@@ -8,6 +8,7 @@ interface Props {
     anchorRect: DOMRect | null;
     onClose: () => void;
     onEdit?: (event: CalendarEvent) => void;
+    source?: string;
 }
 
 const VIEWPORT_PADDING = 16;
@@ -46,7 +47,7 @@ function getPanelStyle(anchorRect: DOMRect | null): CSSProperties {
     };
 }
 
-export default function EventAnchoredDetailPanel({ event, anchorRect, onClose, onEdit }: Props) {
+export default function EventAnchoredDetailPanel({ event, anchorRect, onClose, onEdit, source }: Props) {
     useEffect(() => {
         const handler = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
@@ -70,6 +71,7 @@ export default function EventAnchoredDetailPanel({ event, anchorRect, onClose, o
                     surface="card"
                     className="max-h-[calc(100vh-32px)]"
                     bodyClassName="max-h-[calc(100vh-120px)]"
+                    source={source}
                 />
             </div>
         </>

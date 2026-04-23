@@ -1,47 +1,82 @@
-import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { MapContainer, TileLayer, Marker } from 'react-leaflet';
-import L from 'leaflet';
-import { fetchEvent } from '../api';
+import { fetchEvent, updateEvent } from '../api';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import { useAuth } from '../context/AuthContext';
-import { trackView } from '../utils/tracking';
+import { trackView, trackLink } from '../utils/tracking';
 import EventDetailContent from '../components/EventDetailContent';
-import EventEditModal from '../components/EventEditModal';
+import EventMap from '../components/EventMap';
 import type { CalendarEvent } from '../types';
-
-function makePin(color: string): L.DivIcon {
-    return L.divIcon({
-        className: '',
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
-        html: `<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="14" cy="14" r="11" fill="${color}" stroke="white" stroke-width="2.5" />
-            <circle cx="14" cy="14" r="4" fill="white" opacity="0.9" />
-        </svg>`,
-    });
-}
 
 export default function EventDetailPage() {
     const { eventId } = useParams<{ eventId: string }>();
+    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [event, setEvent] = useState<CalendarEvent | null>(null);
-    const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
     const [error, setError] = useState(false);
     const [loading, setLoading] = useState(true);
     const { isSaved, toggleSave } = useSavedEvents();
     const { user } = useAuth();
 
+    // Edit mode — admin must explicitly activate inline editing
+    const [editMode, setEditMode] = useState(false);
+
+    // Title inline editing
+    const [editingTitle, setEditingTitle] = useState(false);
+    const [titleValue, setTitleValue] = useState('');
+    const [savingTitle, setSavingTitle] = useState(false);
+    const titleCancelledRef = useRef(false);
+
     useEffect(() => {
         if (!eventId) return;
+        let cancelled = false;
         fetchEvent(eventId)
             .then((e) => {
+                if (cancelled) return;
                 setEvent(e);
-                trackView(eventId, 'direct');
+                setTitleValue(e.title);
+                trackView(eventId, searchParams.get('src') ?? 'direct');
             })
-            .catch(() => setError(true))
-            .finally(() => setLoading(false));
+            .catch(() => { if (!cancelled) setError(true); })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
     }, [eventId]);
+
+    const handleBack = () => {
+        if (window.history.length > 1) navigate(-1);
+        else navigate('/');
+    };
+
+    const handleFieldSave = async (changes: Partial<CalendarEvent>) => {
+        if (!event) return;
+        const updated = await updateEvent(event.event_id, changes);
+        setEvent(updated);
+        setTitleValue(updated.title);
+    };
+
+    const handleTagsUpdated = () => {
+        if (!eventId) return;
+        fetchEvent(eventId).then((e) => { setEvent(e); setTitleValue(e.title); }).catch(() => { });
+    };
+
+    const handleTitleBlur = async () => {
+        if (titleCancelledRef.current) { titleCancelledRef.current = false; return; }
+        if (!event || titleValue === event.title) { setEditingTitle(false); return; }
+        setSavingTitle(true);
+        try {
+            const updated = await updateEvent(event.event_id, { title: titleValue });
+            setEvent(updated);
+        } finally {
+            setSavingTitle(false);
+            setEditingTitle(false);
+        }
+    };
+
+    const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') { e.preventDefault(); handleTitleBlur(); }
+        if (e.key === 'Escape') { titleCancelledRef.current = true; setTitleValue(event?.title ?? ''); setEditingTitle(false); }
+    };
 
     if (loading) {
         return (
@@ -55,7 +90,7 @@ export default function EventDetailPage() {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 gap-4">
                 <p className="text-slate-600 text-lg">Event not found</p>
-                <Link to="/" className="text-rose-600 hover:underline text-sm">← Back to calendar</Link>
+                <button onClick={handleBack} className="text-rose-600 hover:underline text-sm">← Back</button>
             </div>
         );
     }
@@ -75,7 +110,6 @@ export default function EventDetailPage() {
         event.description?.slice(0, 120),
     ].filter(Boolean).join(' · ');
 
-    // Schema.org JSON-LD for DanceEvent
     const jsonLd = {
         '@context': 'https://schema.org',
         '@type': 'DanceEvent',
@@ -88,11 +122,7 @@ export default function EventDetailPage() {
                 '@type': 'Place',
                 name: event.location,
                 ...(event.latitude != null && event.longitude != null && {
-                    geo: {
-                        '@type': 'GeoCoordinates',
-                        latitude: event.latitude,
-                        longitude: event.longitude,
-                    },
+                    geo: { '@type': 'GeoCoordinates', latitude: event.latitude, longitude: event.longitude },
                 }),
             },
         }),
@@ -102,9 +132,7 @@ export default function EventDetailPage() {
                 offers: {
                     '@type': 'Offer',
                     price: event.price_min,
-                    ...(event.price_max != null && event.price_max !== event.price_min && {
-                        highPrice: event.price_max,
-                    }),
+                    ...(event.price_max != null && event.price_max !== event.price_min && { highPrice: event.price_max }),
                     priceCurrency: event.price_currency,
                     availability: 'https://schema.org/InStock',
                 },
@@ -113,11 +141,6 @@ export default function EventDetailPage() {
     };
 
     const shareUrl = window.location.href;
-
-    const handleEventSaved = (updated: CalendarEvent) => {
-        setEvent(updated);
-        setEditingEvent(null);
-    };
 
     return (
         <>
@@ -131,86 +154,124 @@ export default function EventDetailPage() {
                 <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
             </Helmet>
 
-            <div className="min-h-screen bg-slate-50">
-                <div className="mx-auto max-w-2xl px-4 py-8">
-                    <Link to="/" className="text-sm text-rose-600 hover:underline mb-6 inline-block">
-                        ← Back to calendar
-                    </Link>
+            <div className="min-h-screen bg-slate-50 overflow-x-hidden">
+                <div className="mx-auto max-w-5xl px-4 py-8">
+                    {/* Back link */}
+                    <button
+                        onClick={handleBack}
+                        className="text-sm text-rose-600 hover:underline mb-4 inline-flex items-center gap-1"
+                    >
+                        ← Back
+                    </button>
 
-                    <article className="bg-white rounded-2xl shadow-lg overflow-hidden">
-                        {/* Header */}
-                        <div className="px-6 pt-6 pb-4 border-b border-slate-100">
-                            <h1 className="text-2xl font-bold text-slate-900 leading-tight">
-                                {event.title}
-                            </h1>
-                        </div>
-
-                        {/* Body — shared content */}
-                        <div className="px-6 py-5">
-                            <EventDetailContent
-                                event={event}
-                                onEdit={user ? (evt) => setEditingEvent(evt) : undefined}
+                    {/* Title — editable inline for admins in edit mode */}
+                    {editingTitle ? (
+                        <div className="mb-6">
+                            <input
+                                autoFocus
+                                type="text"
+                                value={titleValue}
+                                onChange={(e) => setTitleValue(e.target.value)}
+                                onBlur={handleTitleBlur}
+                                onKeyDown={handleTitleKeyDown}
+                                disabled={savingTitle}
+                                className="w-full text-2xl font-bold text-slate-900 leading-tight border-b-2 border-rose-300 bg-transparent focus:outline-none py-1"
                             />
                         </div>
+                    ) : (
+                        <h1
+                            className={`text-2xl font-bold text-slate-900 leading-tight mb-6 ${editMode ? 'cursor-text hover:bg-slate-100 -mx-2 px-2 py-1 rounded transition' : ''}`}
+                            onClick={editMode ? () => setEditingTitle(true) : undefined}
+                            title={editMode ? 'Click to edit title' : undefined}
+                        >
+                            {event.title}
+                        </h1>
+                    )}
 
-                        {/* Mini map */}
-                        {event.latitude != null && event.longitude != null && (
-                            <div className="h-48 border-t border-slate-100">
-                                <MapContainer
-                                    center={[event.latitude, event.longitude]}
-                                    zoom={14}
-                                    className="h-full w-full"
-                                    scrollWheelZoom={false}
-                                    dragging={false}
-                                    zoomControl={false}
-                                    attributionControl={false}
-                                >
-                                    <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
-                                    <Marker
-                                        position={[event.latitude, event.longitude]}
-                                        icon={makePin(event.color ?? '#e11d48')}
+                    {/* 2-column layout: details left, map right */}
+                    <div className="flex flex-col lg:flex-row gap-6">
+                        {/* Left: event details card */}
+                        <div className="lg:w-1/3 min-w-0">
+                            <article className="bg-white rounded-2xl shadow-lg overflow-hidden">
+                                <div className="px-6 py-5">
+                                    <EventDetailContent
+                                        event={event}
+                                        editable={editMode}
+                                        onFieldSave={handleFieldSave}
+                                        onTagsUpdated={handleTagsUpdated}
+                                        maxTags={event.tags?.length ?? undefined}
+                                        showActions={false}
                                     />
-                                </MapContainer>
+                                </div>
+
+                                {/* Actions bar */}
+                                <div className="border-t border-slate-100 px-4 py-2 flex items-center gap-1.5">
+                                    <button
+                                        onClick={() => toggleSave(event.event_id)}
+                                        className={`text-xs rounded px-2.5 py-1 transition flex items-center gap-1 shrink-0 ${isSaved(event.event_id) ? 'text-slate-800 bg-slate-200 hover:bg-slate-300' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'}`}
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                                            <path d="M5 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14l-5-2.5L5 18V4Z" />
+                                        </svg>
+                                        {isSaved(event.event_id) ? 'Saved' : 'Save'}
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(shareUrl).catch(() => { });
+                                            trackLink(event.event_id, shareUrl);
+                                        }}
+                                        className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded px-2.5 py-1 transition shrink-0"
+                                    >
+                                        📋 Copy
+                                    </button>
+                                    <a
+                                        href={`https://wa.me/?text=${encodeURIComponent(event.title + ' — ' + shareUrl)}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={() => trackLink(event.event_id, `https://wa.me/?text=${encodeURIComponent(event.title + ' — ' + shareUrl)}`)}
+                                        className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded px-2.5 py-1 transition shrink-0"
+                                    >
+                                        💬 WhatsApp
+                                    </a>
+                                    {user && (
+                                        <button
+                                            onClick={() => setEditMode((m) => !m)}
+                                            className={`ml-auto inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition shrink-0 ${editMode
+                                                ? 'bg-slate-800 text-white hover:bg-slate-700'
+                                                : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 hover:border-slate-400'
+                                                }`}
+                                        >
+                                            {editMode ? (
+                                                <>
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3">
+                                                        <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+                                                    </svg>
+                                                    Done
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3">
+                                                        <path d="m5.433 13.917.664-2.657a2 2 0 0 1 .503-.896l6.657-6.657a2.121 2.121 0 1 1 3 3l-6.657 6.657a2 2 0 0 1-.896.503l-2.657.664a.75.75 0 0 1-.914-.914Z" />
+                                                    </svg>
+                                                    Edit
+                                                </>
+                                            )}
+                                        </button>
+                                    )}
+                                </div>
+                            </article>
+                        </div>
+
+                        {/* Right: interactive map */}
+                        {event.latitude != null && event.longitude != null && (
+                            <div className="h-[300px] lg:w-2/3 lg:h-auto lg:aspect-[4/3] rounded-xl overflow-hidden shadow-sm">
+                                <EventMap events={[event]} />
                             </div>
                         )}
-
-                        {/* Share bar */}
-                        <div className="border-t border-slate-100 px-6 py-3 flex items-center gap-3">
-                            <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Share</span>
-                            <button
-                                onClick={() => toggleSave(event.event_id)}
-                                className={`text-xs rounded-full px-3 py-1 transition flex items-center gap-1 ${isSaved(event.event_id) ? 'text-slate-800 bg-slate-200 hover:bg-slate-300' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'}`}
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-                                    <path d="M5 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14l-5-2.5L5 18V4Z" />
-                                </svg>
-                                {isSaved(event.event_id) ? 'Saved' : 'Save'}
-                            </button>
-                            <button
-                                onClick={() => navigator.clipboard.writeText(shareUrl).catch(() => { })}
-                                className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-full px-3 py-1 transition"
-                            >
-                                📋 Copy link
-                            </button>
-                            <a
-                                href={`https://wa.me/?text=${encodeURIComponent(event.title + ' — ' + shareUrl)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-full px-3 py-1 transition"
-                            >
-                                💬 WhatsApp
-                            </a>
-                        </div>
-                    </article>
+                    </div>
                 </div>
             </div>
-            {editingEvent && (
-                <EventEditModal
-                    event={editingEvent}
-                    onClose={() => setEditingEvent(null)}
-                    onSaved={handleEventSaved}
-                />
-            )}
+
         </>
     );
 }
