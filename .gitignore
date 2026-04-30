@@ -68,3 +68,8 @@ backend/db/alembic/versions/__pycache__/
 # ── Misc ──────────────────────────────────────────────
 *.log
 tmp/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
