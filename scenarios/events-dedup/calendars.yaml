@@ -1,0 +1,16 @@
+calendars:
+  # Primary source calendar — the canonical source for salsa events
+  - id: "salsa-primary"
+    name: "Salsa Paris"
+    color: "#e11d48"
+    default_tags:
+      - "dance-style:salsa"
+      - "source:primary"
+
+  # Aggregator calendar — re-publishes some events from salsa-primary plus
+  # some unique ones. Events that appear in both should be deduplicated.
+  - id: "local-events"
+    name: "Local Events"
+    color: "#0ea5e9"
+    default_tags:
+      - "source:aggregator"

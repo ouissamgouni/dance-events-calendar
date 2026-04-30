@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { AdminTagGroup } from '../api';
+import type { AdminTag, AdminTagGroup } from '../api';
 import { fetchAdminTagGroups, createTagGroup, updateTagGroup, createTag, updateTag } from '../api';
 
 const CARD_BG_COLORS = [
@@ -7,6 +7,14 @@ const CARD_BG_COLORS = [
     'bg-violet-50', 'bg-orange-50', 'bg-teal-50', 'bg-pink-50',
     'bg-indigo-50', 'bg-lime-50', 'bg-cyan-50', 'bg-fuchsia-50',
 ];
+
+function moveGroup(groups: AdminTagGroup[], fromIndex: number, toIndex: number): AdminTagGroup[] {
+    if (fromIndex === toIndex) return groups;
+    const next = [...groups];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    return next;
+}
 
 export default function AdminTagCategories() {
     const [groups, setGroups] = useState<AdminTagGroup[]>([]);
@@ -16,6 +24,9 @@ export default function AdminTagCategories() {
     const [newTagInputs, setNewTagInputs] = useState<Record<number, string>>({});
     const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
     const [editingGroupLabel, setEditingGroupLabel] = useState('');
+    const [draggingGroupId, setDraggingGroupId] = useState<number | null>(null);
+    const [dragOverGroupId, setDragOverGroupId] = useState<number | null>(null);
+    const [reorderError, setReorderError] = useState<string | null>(null);
 
     const load = () => {
         fetchAdminTagGroups()
@@ -59,6 +70,30 @@ export default function AdminTagCategories() {
         await updateTag(tagId, { enabled });
     };
 
+    const handleToggleHero = async (tag: AdminTag) => {
+        const nextHero = !tag.is_hero_filter;
+        // Compute next hero_ordinal: end of current hero list, or null when removing
+        let nextHeroOrdinal: number | null = null;
+        if (nextHero) {
+            const allTags = groups.flatMap((g) => g.tags);
+            const maxOrdinal = allTags
+                .filter((t) => t.is_hero_filter && t.id !== tag.id)
+                .reduce((max, t) => Math.max(max, t.hero_ordinal ?? 0), -1);
+            nextHeroOrdinal = maxOrdinal + 1;
+        }
+        setGroups((prev) =>
+            prev.map((g) => ({
+                ...g,
+                tags: g.tags.map((t) =>
+                    t.id === tag.id
+                        ? { ...t, is_hero_filter: nextHero, hero_ordinal: nextHeroOrdinal }
+                        : t,
+                ),
+            })),
+        );
+        await updateTag(tag.id, { is_hero_filter: nextHero, hero_ordinal: nextHeroOrdinal });
+    };
+
     const handleGroupLabelEdit = (group: AdminTagGroup) => {
         setEditingGroupId(group.id);
         setEditingGroupLabel(group.label);
@@ -78,6 +113,45 @@ export default function AdminTagCategories() {
         setNewTagInputs((prev) => ({ ...prev, [groupId]: '' }));
         await createTag({ group_id: groupId, label });
         load();
+    };
+
+    const persistGroupOrder = async (next: AdminTagGroup[], previous: AdminTagGroup[]) => {
+        const previousOrdinals = new Map(previous.map((g) => [g.id, g.ordinal]));
+        const changed = next.filter((g) => previousOrdinals.get(g.id) !== g.ordinal);
+        if (!changed.length) return;
+
+        try {
+            await Promise.all(changed.map((g) => updateTagGroup(g.id, { ordinal: g.ordinal })));
+            setReorderError(null);
+        } catch {
+            setReorderError('Failed to save category order. Reloaded latest order from server.');
+            load();
+        }
+    };
+
+    const handleGroupDrop = (targetGroupId: number) => {
+        if (draggingGroupId == null || draggingGroupId === targetGroupId) {
+            setDragOverGroupId(null);
+            setDraggingGroupId(null);
+            return;
+        }
+
+        setGroups((previous) => {
+            const fromIndex = previous.findIndex((g) => g.id === draggingGroupId);
+            const toIndex = previous.findIndex((g) => g.id === targetGroupId);
+            if (fromIndex < 0 || toIndex < 0) return previous;
+
+            const moved = moveGroup(previous, fromIndex, toIndex);
+            const reOrdinaled = moved.map((group, index) => ({
+                ...group,
+                ordinal: index,
+            }));
+            void persistGroupOrder(reOrdinaled, previous);
+            return reOrdinaled;
+        });
+
+        setDragOverGroupId(null);
+        setDraggingGroupId(null);
     };
 
     return (
@@ -126,6 +200,9 @@ export default function AdminTagCategories() {
             </div>
 
             <div className="p-4">
+                {reorderError && (
+                    <p className="mb-2 text-[11px] text-rose-600">{reorderError}</p>
+                )}
                 {loading ? (
                     <p className="text-[11px] text-gray-400">Loading…</p>
                 ) : groups.length === 0 ? (
@@ -138,10 +215,34 @@ export default function AdminTagCategories() {
                             return (
                                 <div
                                     key={group.id}
-                                    className={`border border-gray-200 rounded ${bgClass} ${!group.enabled ? 'opacity-50' : ''}`}
+                                    className={`border border-gray-200 rounded ${bgClass} ${!group.enabled ? 'opacity-50' : ''} ${dragOverGroupId === group.id ? 'ring-2 ring-blue-300 ring-offset-1' : ''}`}
+                                    draggable
+                                    onDragStart={() => {
+                                        setDraggingGroupId(group.id);
+                                        setReorderError(null);
+                                    }}
+                                    onDragOver={(e) => {
+                                        e.preventDefault();
+                                        if (dragOverGroupId !== group.id) setDragOverGroupId(group.id);
+                                    }}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        handleGroupDrop(group.id);
+                                    }}
+                                    onDragEnd={() => {
+                                        setDraggingGroupId(null);
+                                        setDragOverGroupId(null);
+                                    }}
                                 >
                                     {/* Category header */}
                                     <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100/60">
+                                        <span
+                                            className="text-gray-400 cursor-grab active:cursor-grabbing select-none"
+                                            title="Drag to reorder category"
+                                            aria-label="Drag to reorder category"
+                                        >
+                                            ⋮⋮
+                                        </span>
                                         <button
                                             onClick={() => handleToggleGroup(group.id, !group.enabled)}
                                             className={`relative inline-flex h-4 w-7 items-center rounded-full transition shrink-0 ${group.enabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
@@ -194,6 +295,14 @@ export default function AdminTagCategories() {
                                                     >
                                                         {tag.event_count}
                                                     </span>
+                                                    <button
+                                                        onClick={() => handleToggleHero(tag)}
+                                                        className={`ml-0.5 hover:opacity-80 transition text-[10px] leading-none ${tag.is_hero_filter ? 'opacity-100' : 'opacity-40'}`}
+                                                        title={tag.is_hero_filter ? 'Remove from hero filters' : 'Mark as hero filter'}
+                                                        aria-label={tag.is_hero_filter ? 'Remove from hero filters' : 'Mark as hero filter'}
+                                                    >
+                                                        ★
+                                                    </button>
                                                     <button
                                                         onClick={() => handleToggleTag(tag.id, !tag.enabled)}
                                                         className="ml-0.5 hover:opacity-80 transition text-[9px]"

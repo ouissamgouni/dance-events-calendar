@@ -17,6 +17,7 @@ from backend.api.routes.config import router as config_router
 from backend.api.routes.events import router as events_router
 from backend.api.routes.export import router as export_router
 from backend.api.routes.settings import router as settings_router
+from backend.api.routes.sharing import router as sharing_router
 from backend.api.routes.suggestions import router as suggestions_router
 from backend.api.routes.tags import router as tags_router
 from backend.api.routes.tracking import router as tracking_router
@@ -109,6 +110,7 @@ app.include_router(auth_router)
 app.include_router(events_router)
 app.include_router(export_router)
 app.include_router(tracking_router)
+app.include_router(sharing_router)
 app.include_router(admin_router)
 app.include_router(settings_router)
 app.include_router(config_router)

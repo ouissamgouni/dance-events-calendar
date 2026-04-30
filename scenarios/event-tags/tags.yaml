@@ -1,12 +1,14 @@
 tag_groups:
   - slug: format
     label: Format
-    ordinal: 0
+    ordinal: 10
     allow_multiple: true
     color: "#f472b6"
     tags:
       - slug: social
         label: Social
+        is_hero_filter: true
+        hero_ordinal: 0
       - slug: class
         label: Class
       - slug: workshop
@@ -22,7 +24,7 @@ tag_groups:
 
   - slug: scale
     label: Scale
-    ordinal: 1
+    ordinal: 20
     allow_multiple: false
     color: "#38bdf8"
     tags:
@@ -35,7 +37,7 @@ tag_groups:
 
   - slug: scope
     label: Scope
-    ordinal: 2
+    ordinal: 30
     allow_multiple: true
     color: "#a78bfa"
     tags:
@@ -48,7 +50,7 @@ tag_groups:
 
   - slug: venue
     label: Venue
-    ordinal: 3
+    ordinal: 40
     allow_multiple: true
     color: "#34d399"
     tags:
@@ -61,14 +63,18 @@ tag_groups:
 
   - slug: dance-style
     label: Dance Style
-    ordinal: 4
+    ordinal: 50
     allow_multiple: true
     color: "#fb923c"
     tags:
       - slug: salsa
         label: Salsa
+        is_hero_filter: true
+        hero_ordinal: 1
       - slug: bachata
         label: Bachata
+        is_hero_filter: true
+        hero_ordinal: 2
       - slug: kizomba
         label: Kizomba
       - slug: semba
@@ -84,12 +90,14 @@ tag_groups:
 
   - slug: level
     label: Level
-    ordinal: 5
+    ordinal: 60
     allow_multiple: true
     color: "#60a5fa"
     tags:
       - slug: beginner-friendly
         label: Beginner-Friendly
+        is_hero_filter: true
+        hero_ordinal: 3
       - slug: intermediate
         label: Intermediate
       - slug: advanced
@@ -99,7 +107,7 @@ tag_groups:
 
   - slug: vibe
     label: Vibe
-    ordinal: 6
+    ordinal: 70
     allow_multiple: true
     color: "#e879f9"
     tags:

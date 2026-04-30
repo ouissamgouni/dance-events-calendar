@@ -10,8 +10,12 @@ from sqlmodel import Session, select
 
 from backend.db.models import (
     CachedEvent,
+    CalendarDefaultTag,
     CalendarSetting,
+    EventExport,
+    EventLinkClick,
     EventTag,
+    EventView,
     SiteSetting,
     Tag,
     TagGroup,
@@ -57,11 +61,28 @@ class DatabaseSeeder:
     def seed(self, scenario_dir: Path):
         logger.info("Seeding from %s", scenario_dir)
 
+        # Check if this scenario uses a mock calendar service.
+        # If so, skip seeding events — they must come through sync so that
+        # the dedup logic fires correctly on first encounter.
+        config_path = scenario_dir / "config.yaml"
+        uses_mock_calendar = False
+        if config_path.exists():
+            with open(config_path) as f:
+                config = yaml.safe_load(f) or {}
+            uses_mock_calendar = config.get("calendar_service") == "mock"
+
         self._seed_tags(scenario_dir / "tags.yaml")
         self._seed_calendars(scenario_dir / "calendars.yaml")
-        self._seed_events(scenario_dir / "events.yaml")
-        self._seed_event_tags(scenario_dir / "events.yaml")
-        self._seed_tag_suggestions(scenario_dir / "events.yaml")
+        self._seed_calendar_default_tags(scenario_dir / "calendars.yaml")
+        if uses_mock_calendar:
+            logger.info(
+                "Skipping event pre-seed (calendar_service=mock) — run sync to populate events"
+            )
+        else:
+            self._seed_events(scenario_dir / "events.yaml")
+            self._seed_event_tags(scenario_dir / "events.yaml")
+            self._seed_tag_suggestions(scenario_dir / "events.yaml")
+        self._seed_tracking(scenario_dir / "tracking.yaml")
         self._ingest_test_plans(scenario_dir)
         self.session.commit()
         logger.info("Seeding complete")
@@ -148,12 +169,16 @@ class DatabaseSeeder:
                 tag_ordinal = tag_data.get("ordinal", tag_idx)
                 tag_color = tag_data.get("color")
                 tag_enabled = tag_data.get("enabled", True)
+                tag_is_hero = tag_data.get("is_hero_filter", False)
+                tag_hero_ordinal = tag_data.get("hero_ordinal", None)
 
                 if tag:
                     tag.label = tag_label
                     tag.ordinal = tag_ordinal
                     tag.color = tag_color
                     tag.enabled = tag_enabled
+                    tag.is_hero_filter = tag_is_hero
+                    tag.hero_ordinal = tag_hero_ordinal
                     self.session.add(tag)
                 else:
                     self.session.add(
@@ -164,6 +189,8 @@ class DatabaseSeeder:
                             ordinal=tag_ordinal,
                             color=tag_color,
                             enabled=tag_enabled,
+                            is_hero_filter=tag_is_hero,
+                            hero_ordinal=tag_hero_ordinal,
                         )
                     )
 
@@ -193,6 +220,59 @@ class DatabaseSeeder:
                     )
                 )
                 logger.info("Created calendar: %s", cal_data["name"])
+
+    def _seed_calendar_default_tags(self, path: Path):
+        """Seed CalendarDefaultTag rows from 'default_tags' lists in calendars.yaml.
+
+        Each tag is referenced as 'group_slug:tag_slug', e.g. 'dance-style:salsa'.
+        Existing rows for a calendar are replaced when the calendar has a 'default_tags' key.
+        Calendars without a 'default_tags' key are left untouched.
+        """
+        if not path.exists():
+            return
+
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+
+        calendars_data = data.get("calendars", [])
+        has_defaults = any("default_tags" in c for c in calendars_data)
+        if not has_defaults:
+            return
+
+        tag_lookup = self._build_tag_lookup()
+        if not tag_lookup:
+            logger.warning("No tags in DB – skipping calendar default tag seeding")
+            return
+
+        # Flush so CalendarSetting rows are visible
+        self.session.flush()
+
+        for cal_data in calendars_data:
+            cal_id = cal_data["id"]
+            tag_slugs = cal_data.get("default_tags")
+            if tag_slugs is None:
+                continue
+
+            # Delete existing default tags for this calendar
+            existing = self.session.exec(
+                select(CalendarDefaultTag).where(
+                    CalendarDefaultTag.calendar_id == cal_id
+                )
+            ).all()
+            for row in existing:
+                self.session.delete(row)
+
+            for slug in tag_slugs:
+                tag_id = tag_lookup.get(slug)
+                if not tag_id:
+                    logger.warning(
+                        "Unknown tag slug '%s' for calendar %s default tags",
+                        slug,
+                        cal_id,
+                    )
+                    continue
+                self.session.add(CalendarDefaultTag(calendar_id=cal_id, tag_id=tag_id))
+                logger.info("Set default tag '%s' for calendar %s", slug, cal_id)
 
     def _seed_events(self, path: Path):
         if not path.exists():
@@ -379,3 +459,69 @@ class DatabaseSeeder:
                 tag_slug,
                 free_text,
             )
+
+    def _seed_tracking(self, path: Path) -> None:
+        """Seed EventView, EventLinkClick, and EventExport rows from tracking.yaml.
+
+        Expected structure:
+          views:
+            - event_id: evt-001
+              device_id: seed-device-fr
+              source: explorer-list
+              country: France
+              city: Paris
+          link_clicks:
+            - event_id: evt-001
+              device_id: seed-device-fr
+              url: https://example.com/tickets
+              country: France
+          exports:
+            - device_id: seed-device-fr
+              format: ics
+              event_count: 5
+        """
+        if not path.exists():
+            return
+
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+
+        for row in data.get("views", []):
+            self.session.add(
+                EventView(
+                    event_id=row["event_id"],
+                    device_id=row.get("device_id"),
+                    source=row.get("source"),
+                    country=row.get("country"),
+                    city=row.get("city"),
+                )
+            )
+        views_count = len(data.get("views", []))
+        if views_count:
+            logger.info("Seeded %d EventView rows", views_count)
+
+        for row in data.get("link_clicks", []):
+            self.session.add(
+                EventLinkClick(
+                    event_id=row["event_id"],
+                    device_id=row.get("device_id"),
+                    url=row["url"],
+                    country=row.get("country"),
+                    city=row.get("city"),
+                )
+            )
+        clicks_count = len(data.get("link_clicks", []))
+        if clicks_count:
+            logger.info("Seeded %d EventLinkClick rows", clicks_count)
+
+        for row in data.get("exports", []):
+            self.session.add(
+                EventExport(
+                    device_id=row.get("device_id"),
+                    format=row["format"],
+                    event_count=row.get("event_count", 0),
+                )
+            )
+        exports_count = len(data.get("exports", []))
+        if exports_count:
+            logger.info("Seeded %d EventExport rows", exports_count)

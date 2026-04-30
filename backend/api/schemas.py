@@ -21,6 +21,8 @@ class TagResponse(BaseModel):
     group_color: Optional[str] = None
     event_count: Optional[int] = None
     enabled: bool = True
+    is_hero_filter: bool = False
+    hero_ordinal: Optional[int] = None
 
 
 class EventResponse(BaseModel):
@@ -77,6 +79,12 @@ class EventSaveRequest(BaseModel):
     action: str = Field(..., pattern="^(save|unsave)$")
 
 
+class EventAttendanceRequest(BaseModel):
+    event_id: str
+    device_id: str = Field(..., min_length=1, max_length=64)
+    action: str = Field(..., pattern="^(going|not_going)$")
+
+
 class EventLinkClickRequest(BaseModel):
     event_id: str
     url: str = Field(..., min_length=1, max_length=2048)
@@ -101,9 +109,52 @@ class HealthResponse(BaseModel):
     status: str
 
 
+class CreateShareTokenRequest(BaseModel):
+    device_id: str = Field(..., min_length=1, max_length=64)
+
+
+class ShareTokenResponse(BaseModel):
+    token: str
+
+
+class SharedCalendarResponse(BaseModel):
+    events: list[EventResponse]
+
+
+class MostViewedEvent(BaseModel):
+    event_id: str
+    title: str
+    view_count: int
+    unique_viewers: int
+
+
+class SourceBreakdown(BaseModel):
+    source: str
+    view_count: int
+
+
+class CountryBreakdown(BaseModel):
+    country: str
+    view_count: int
+
+
+class TopLink(BaseModel):
+    event_id: str
+    event_title: str
+    url: str
+    click_count: int
+
+
+class ExportStat(BaseModel):
+    format: str
+    export_count: int
+    total_events_exported: int
+
+
 class SiteSettingsResponse(BaseModel):
     since_date: str
     sync_interval_minutes: int
+    auto_sync_enabled: bool = False
     show_prices: bool = False
     show_popularity: bool = False
     popularity_threshold: int = 10
@@ -112,6 +163,7 @@ class SiteSettingsResponse(BaseModel):
 class SiteSettingsUpdateRequest(BaseModel):
     since_date: Optional[str] = None
     sync_interval_minutes: Optional[int] = Field(default=None, ge=1, le=1440)
+    auto_sync_enabled: Optional[bool] = None
     show_prices: Optional[bool] = None
     show_popularity: Optional[bool] = None
     popularity_threshold: Optional[int] = Field(default=None, ge=1, le=10000)
@@ -129,6 +181,7 @@ class SyncLogResponse(BaseModel):
     error_message: Optional[str] = None
     enrichment_status: str = "pending"
     enrichment_progress: Optional[dict] = None
+    dedup_log: Optional[list] = None
 
 
 class EventUpdateRequest(BaseModel):
@@ -281,6 +334,8 @@ class TagUpdate(BaseModel):
     color: Optional[str] = None
     ordinal: Optional[int] = None
     enabled: Optional[bool] = None
+    is_hero_filter: Optional[bool] = None
+    hero_ordinal: Optional[int] = None
 
 
 class EventTagAssignment(BaseModel):
@@ -349,3 +404,16 @@ class BulkEventIdsRequest(BaseModel):
 class BulkTagAssignRequest(BaseModel):
     event_ids: list[str] = Field(..., min_length=1, max_length=200)
     tag_ids: list[int] = Field(..., min_length=1, max_length=50)
+
+
+class CalendarDefaultTagsResponse(BaseModel):
+    calendar_id: str
+    tag_ids: list[int]
+
+
+class CalendarDefaultTagsUpdate(BaseModel):
+    tag_ids: list[int] = Field(..., max_length=50)
+
+
+class EventIdsResponse(BaseModel):
+    ids: list[str]

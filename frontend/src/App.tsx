@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ConsentProvider } from './context/ConsentContext';
 import { FeatureFlagsProvider } from './context/FeatureFlagsContext';
 import { SavedEventsProvider } from './context/SavedEventsContext';
+import { AttendingEventsProvider } from './context/AttendingEventsContext';
 import { QaTestPlanProvider, useQaPinnedWidth } from './components/QaTestPlanPanel';
 import { StatusBar } from './components/StatusBar';
 import InstagramBadge from './components/InstagramBadge';
@@ -13,6 +14,7 @@ import Admin from './pages/Admin';
 import Login from './pages/Login';
 import EventDetailPage from './pages/EventDetailPage';
 import MyCalendar from './pages/MyCalendar';
+import SharedCalendarPage from './pages/SharedCalendarPage';
 import Privacy from './pages/Privacy';
 import { useConsent } from './context/ConsentContext';
 import { umamiPageView } from './utils/umami';
@@ -23,9 +25,11 @@ export default function App() {
       <ConsentProvider>
         <FeatureFlagsProvider>
           <SavedEventsProvider>
-            <QaTestPlanProvider>
-              <AppShell />
-            </QaTestPlanProvider>
+            <AttendingEventsProvider>
+              <QaTestPlanProvider>
+                <AppShell />
+              </QaTestPlanProvider>
+            </AttendingEventsProvider>
           </SavedEventsProvider>
         </FeatureFlagsProvider>
       </ConsentProvider>
@@ -37,6 +41,7 @@ function AppShell() {
   const { user } = useAuth();
   const { analyticsConsent } = useConsent();
   const location = useLocation();
+  const isAdminPage = location.pathname.startsWith('/admin');
   const qaPinnedWidth = useQaPinnedWidth();
 
   useEffect(() => {
@@ -59,10 +64,10 @@ function AppShell() {
           <div className="flex items-center gap-3">
             {user && (
               <Link
-                to="/admin"
+                to={isAdminPage ? '/' : '/admin'}
                 className="bg-gray-700 px-2.5 py-1 text-xs font-medium text-white rounded hover:bg-gray-600 transition"
               >
-                Admin
+                {isAdminPage ? 'Explorer' : 'Admin'}
               </Link>
             )}
             <InstagramBadge />
@@ -74,6 +79,7 @@ function AppShell() {
             <Route path="/calendar" element={<Home />} />
             <Route path="/event/:eventId" element={<EventDetailPage />} />
             <Route path="/my-calendar" element={<MyCalendar />} />
+            <Route path="/shared/:token" element={<SharedCalendarPage />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/login" element={<Login />} />
             <Route

@@ -1,0 +1,70 @@
+base_week: 0
+
+events:
+  # ── Unique to salsa-primary ──────────────────────────────────
+  - id: "dedup-evt-001"
+    calendar_id: "salsa-primary"
+    title: "Friday Salsa Social"
+    description: "Weekly salsa social. All levels welcome!"
+    location: "Studio Mambo, 12 Rue de Lappe, Paris, France"
+    latitude: 48.8533
+    longitude: 2.3692
+    start: "w0 Fri 21:00"
+    end: "w0 Sat 01:00"
+    price_is_free: true
+
+  - id: "dedup-evt-002"
+    calendar_id: "salsa-primary"
+    title: "Salsa On2 Workshop"
+    description: "Intermediate On2 technique with Carlos & Maria."
+    location: "Studio Salsa, 45 Rue Oberkampf, Paris, France"
+    latitude: 48.8647
+    longitude: 2.3788
+    start: "w0 Sat 15:00"
+    end: "w0 Sat 18:00"
+    price_is_free: false
+    price_min: 20
+    price_currency: "EUR"
+
+  # ── Duplicate events — same title + start + location as above,
+  #    but with a different Google Calendar event ID because they
+  #    come from the "local-events" aggregator calendar.
+  #    The sync service should detect these as duplicates via
+  #    content_hash and NOT create new CachedEvent rows.
+  - id: "dedup-evt-001-dup"
+    calendar_id: "local-events"
+    title: "Friday Salsa Social"
+    description: "Salsa social night — all levels!"
+    location: "Studio Mambo, 12 Rue de Lappe, Paris, France"
+    latitude: 48.8533
+    longitude: 2.3692
+    start: "w0 Fri 21:00"
+    end: "w0 Sat 01:00"
+    price_is_free: true
+
+  - id: "dedup-evt-002-dup"
+    calendar_id: "local-events"
+    title: "Salsa On2 Workshop"
+    description: "On2 workshop with Carlos & Maria — register now."
+    location: "Studio Salsa, 45 Rue Oberkampf, Paris, France"
+    latitude: 48.8647
+    longitude: 2.3788
+    start: "w0 Sat 15:00"
+    end: "w0 Sat 18:00"
+    price_is_free: false
+    price_min: 20
+    price_currency: "EUR"
+
+  # ── Unique to local-events (not a duplicate) ────────────────
+  - id: "dedup-evt-003"
+    calendar_id: "local-events"
+    title: "Sunday Kizomba Social"
+    description: "Kizomba social hosted by Dance Afro Paris."
+    location: "Espace Kilaï, 20 Rue des Taillandiers, Paris, France"
+    latitude: 48.8522
+    longitude: 2.3718
+    start: "w0 Sun 19:00"
+    end: "w0 Sun 23:00"
+    price_is_free: false
+    price_min: 10
+    price_currency: "EUR"

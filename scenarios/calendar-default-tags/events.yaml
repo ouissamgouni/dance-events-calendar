@@ -1,0 +1,263 @@
+base_week: 0
+
+# Events across 3 calendars, each with different default-tag configurations.
+#
+# Design:
+#   - salsa-cal-dt-001 "Salsa Events"    → default: dance-style:salsa
+#   - bachata-cal-dt-002 "Bachata Events" → default: dance-style:bachata
+#   - afro-cal-dt-003 "Kizomba & Afro"  → default: dance-style:kizomba + dance-style:semba
+#
+# Groups of events intentionally show two states:
+#   A) Already tagged with the calendar's default tag (simulates events synced
+#      after the default was configured).
+#   B) Missing the calendar's default tag (simulates older events synced before
+#      the feature was set up — used to test the bulk-assign flow).
+#
+# See test_plan.yaml for full walkthrough.
+
+events:
+  # ── Salsa calendar — default: dance-style:salsa ──────────────────────────
+  # A) Already tagged with salsa (synced after default was configured)
+
+  - id: "evt-cdt-001"
+    calendar_id: "salsa-cal-dt-001"
+    title: "Friday Salsa Social"
+    description: "Weekly social dance night with DJ Mambo. All levels welcome!"
+    location: "Dance Studio, 10 Rue de Rivoli, Paris, France"
+    latitude: 48.8566
+    longitude: 2.3522
+    start: "w0 Fri 21:00"
+    end: "w0 Sat 01:00"
+    price_is_free: true
+    tags:
+      - "dance-style:salsa"
+      - "format:social"
+      - "level:all-levels"
+      - "venue:indoor"
+      - "scale:medium"
+
+  - id: "evt-cdt-002"
+    calendar_id: "salsa-cal-dt-001"
+    title: "Salsa On2 Workshop"
+    description: "Intensive salsa on2 technique with Carlos & Maria."
+    location: "Salsero Studio, Calle Gran Vía, Madrid, Spain"
+    latitude: 40.4200
+    longitude: -3.7038
+    start: "w0 Sat 14:00"
+    end: "w0 Sat 17:00"
+    price_is_free: false
+    price_min: 25
+    price_max: 35
+    price_currency: "EUR"
+    tags:
+      - "dance-style:salsa"
+      - "format:workshop"
+      - "level:intermediate"
+      - "venue:indoor"
+      - "scale:small"
+
+  - id: "evt-cdt-003"
+    calendar_id: "salsa-cal-dt-001"
+    title: "Salsa on the Rooftop"
+    description: "Open-air salsa party with live band Orquesta del Sol."
+    location: "Skybar, Av. de la Liberté, Brussels, Belgium"
+    latitude: 50.8503
+    longitude: 4.3517
+    start: "w1 Sat 20:00"
+    end: "w1 Sun 00:00"
+    price_is_free: false
+    price_min: 10
+    price_currency: "EUR"
+    tags:
+      - "dance-style:salsa"
+      - "format:social"
+      - "level:all-levels"
+      - "venue:rooftop"
+      - "vibe:live-band"
+      - "scale:medium"
+
+  - id: "evt-cdt-004"
+    calendar_id: "salsa-cal-dt-001"
+    title: "Rueda de Casino Practice"
+    description: "Group rueda practice open to all. No partner needed."
+    location: "Community Hall, Rue Neuve 50, Brussels, Belgium"
+    latitude: 50.8512
+    longitude: 4.3550
+    start: "w0 Sun 11:00"
+    end: "w0 Sun 13:00"
+    price_is_free: true
+    tags:
+      - "dance-style:salsa"
+      - "dance-style:rueda"
+      - "format:practice"
+      - "level:beginner-friendly"
+      - "venue:indoor"
+      - "scale:small"
+
+  # B) Missing dance-style:salsa — synced before default tags were configured
+  - id: "evt-cdt-005"
+    calendar_id: "salsa-cal-dt-001"
+    title: "Advanced Salsa Shines"
+    description: "Solo footwork masterclass for advanced dancers."
+    location: "Latin Motion, Via Roma 42, Milan, Italy"
+    latitude: 45.4642
+    longitude: 9.1900
+    start: "w1 Sun 16:00"
+    end: "w1 Sun 18:00"
+    price_is_free: false
+    price_min: 30
+    price_currency: "EUR"
+    tags:
+      - "format:workshop"
+      - "level:advanced"
+      - "venue:indoor"
+      - "scale:small"
+      - "vibe:high-level-dancers"
+    # NOTE: dance-style:salsa is intentionally missing — used in step 8 (bulk-assign)
+
+  - id: "evt-cdt-006"
+    calendar_id: "salsa-cal-dt-001"
+    title: "Salsa Congress Warm-up Party"
+    description: "Pre-congress social before the big weekend."
+    location: "Palais des Congrès, Paris, France"
+    latitude: 48.8784
+    longitude: 2.2830
+    start: "w1 Thu 20:00"
+    end: "w1 Fri 01:00"
+    price_is_free: false
+    price_min: 15
+    price_currency: "EUR"
+    tags:
+      - "format:social"
+      - "level:all-levels"
+      - "venue:indoor"
+      - "scale:large"
+    # NOTE: dance-style:salsa is intentionally missing — used in step 8 (bulk-assign)
+
+  # ── Bachata calendar — default: dance-style:bachata ──────────────────────
+  # A) Already tagged with bachata
+
+  - id: "evt-cdt-007"
+    calendar_id: "bachata-cal-dt-002"
+    title: "Bachata Night"
+    description: "Sensual bachata social with classes beforehand."
+    location: "Tanzhaus, Friedrichstr. 100, Berlin, Germany"
+    latitude: 52.5200
+    longitude: 13.4050
+    start: "w0 Sat 21:00"
+    end: "w0 Sun 02:00"
+    price_is_free: false
+    price_min: 10
+    price_currency: "EUR"
+    tags:
+      - "dance-style:bachata"
+      - "format:social"
+      - "level:all-levels"
+      - "venue:indoor"
+      - "vibe:good-music"
+      - "scale:medium"
+
+  - id: "evt-cdt-008"
+    calendar_id: "bachata-cal-dt-002"
+    title: "Bachata Beach Festival"
+    description: "Open-air bachata festival on the beach. Workshops + parties."
+    location: "Playa de la Barceloneta, Barcelona, Spain"
+    latitude: 41.3784
+    longitude: 2.1925
+    start: "w1 Sat 12:00"
+    end: "w1 Sun 22:00"
+    price_is_free: false
+    price_min: 60
+    price_max: 100
+    price_currency: "EUR"
+    tags:
+      - "dance-style:bachata"
+      - "format:festival"
+      - "level:all-levels"
+      - "scale:large"
+      - "scope:international"
+      - "venue:outdoor"
+
+  # B) Missing dance-style:bachata — synced before default tags were configured
+  - id: "evt-cdt-009"
+    calendar_id: "bachata-cal-dt-002"
+    title: "Bachata Bootcamp Weekend"
+    description: "Intensive 2-day training. Covers modern and sensual bachata."
+    location: "Dance Academy, Königstraße, Stuttgart, Germany"
+    latitude: 48.7758
+    longitude: 9.1829
+    start: "w2 Sat 10:00"
+    end: "w2 Sun 18:00"
+    price_is_free: false
+    price_min: 70
+    price_max: 90
+    price_currency: "EUR"
+    tags:
+      - "format:bootcamp"
+      - "level:intermediate"
+      - "scale:small"
+      - "scope:regional"
+      - "venue:indoor"
+    # NOTE: dance-style:bachata is intentionally missing — used in step 9 (bulk-assign)
+
+  # ── Kizomba & Afro calendar — default: dance-style:kizomba + dance-style:semba ──
+  # A) Already tagged with both kizomba + semba
+
+  - id: "evt-cdt-010"
+    calendar_id: "afro-cal-dt-003"
+    title: "Kizomba & Semba Night"
+    description: "Kizomba and semba social with guest DJ from Lisbon."
+    location: "Casa Latina, Lisbon, Portugal"
+    latitude: 38.7223
+    longitude: -9.1393
+    start: "w0 Fri 22:00"
+    end: "w0 Sat 03:00"
+    price_is_free: false
+    price_min: 8
+    price_currency: "EUR"
+    tags:
+      - "dance-style:kizomba"
+      - "dance-style:semba"
+      - "format:social"
+      - "level:all-levels"
+      - "venue:indoor"
+      - "vibe:good-music"
+
+  - id: "evt-cdt-011"
+    calendar_id: "afro-cal-dt-003"
+    title: "Kizomba Fundamentals Class"
+    description: "Drop-in kizomba class. All levels. Beginner-friendly."
+    location: "Move Studio, Damrak 1, Amsterdam, Netherlands"
+    latitude: 52.3738
+    longitude: 4.8910
+    start: "w0 Sun 15:00"
+    end: "w0 Sun 17:00"
+    price_is_free: false
+    price_min: 15
+    price_currency: "EUR"
+    tags:
+      - "dance-style:kizomba"
+      - "dance-style:semba"
+      - "format:class"
+      - "level:beginner-friendly"
+      - "venue:indoor"
+      - "scale:small"
+
+  # B) Missing both kizomba + semba — synced before default tags were configured
+  - id: "evt-cdt-012"
+    calendar_id: "afro-cal-dt-003"
+    title: "Spring Kizomba Garden Party"
+    description: "Open-air kizomba in Vondelpark. Bring dancing shoes."
+    location: "Vondelpark, Amsterdam, Netherlands"
+    latitude: 52.3579
+    longitude: 4.8686
+    start: "w3 Sat 16:00"
+    end: "w3 Sat 21:00"
+    price_is_free: true
+    tags:
+      - "format:social"
+      - "level:all-levels"
+      - "venue:outdoor"
+      - "scale:medium"
+      - "vibe:social-atmosphere"
+    # NOTE: dance-style:kizomba + dance-style:semba are intentionally missing

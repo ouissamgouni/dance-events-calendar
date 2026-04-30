@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import L from 'leaflet';
 import type { CalendarEvent } from '../types';
 import SaveEventButton from './SaveEventButton';
+import GoingButton from './GoingButton';
 import TagBadges from './TagBadges';
 
 export interface MapBounds {
@@ -237,7 +238,10 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                                 <TagBadges tags={e.tags} maxVisible={3} />
                             )}
                             <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-                                <SaveEventButton eventId={e.event_id} appearance="icon" size="sm" stopPropagation />
+                                <div className="flex items-center gap-1">
+                                    <SaveEventButton eventId={e.event_id} appearance="icon" size="sm" stopPropagation />
+                                    <GoingButton eventId={e.event_id} appearance="icon" size="sm" stopPropagation />
+                                </div>
                                 <Link
                                     to={`/event/${e.event_id}${detailLinkSource ? `?src=${detailLinkSource}` : ''}`}
                                     className="text-[10px] font-medium text-rose-500 hover:text-rose-700"

@@ -79,3 +79,12 @@ events:
     start: "w2 Wed 19:30"
     end: "w2 Wed 21:00"
     price_is_free: true
+
+  - id: "evt-gdpr-006"
+    calendar_id: "bachata-cal-002"
+    title: "Street Salsa Flash Mob"
+    description: "Surprise outdoor dance. Location announced on the day."
+    start: "w2 Sat 15:00"
+    end: "w2 Sat 16:30"
+    price_is_free: true
+    # No location/lat/lon — tests null geo handling in analytics

@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import type { CalendarEvent, CalendarSetting, TagGroup } from '../types';
-import { fetchEvents, fetchCalendars, fetchSettings, fetchTagGroups } from '../api';
+import type { CalendarEvent, TagGroup } from '../types';
+import { fetchEvents, fetchSettings, fetchTagGroups } from '../api';
 import { trackView } from '../utils/tracking';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
@@ -11,7 +11,6 @@ import EventMap from '../components/EventMap';
 import type { MapBounds } from '../components/EventMap';
 import EventModal from '../components/EventModal';
 import EventEditModal from '../components/EventEditModal';
-import CalendarFilterPills from '../components/CalendarFilterPills';
 import DateRangePicker from '../components/DateRangePicker';
 import EventListPanel from '../components/EventListPanel';
 import TagFilterPills from '../components/TagFilterPills';
@@ -38,8 +37,6 @@ export default function Home() {
     const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
     const [selectedEventSource, setSelectedEventSource] = useState<string | null>(null);
     const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
-    const [calendars, setCalendars] = useState<CalendarSetting[]>([]);
-    const [activeCalendarIds, setActiveCalendarIds] = useState<Set<string> | null>(null);
     const [sortBy, setSortBy] = useState<'date' | 'popularity'>('date');
     const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
     const [activeTagIds, setActiveTagIds] = useState<Set<number>>(new Set());
@@ -99,16 +96,11 @@ export default function Home() {
             // Calendar mode initial load: use same default as explorer
             params = { startDate, endDate };
         }
-        Promise.all([fetchEvents(params), fetchSettings(), fetchCalendars(), fetchTagGroups()])
-            .then(([evts, settings, cals, groups]) => {
+        Promise.all([fetchEvents(params), fetchSettings(), fetchTagGroups()])
+            .then(([evts, settings, groups]) => {
                 setEvents(evts);
                 setSinceDate(settings.since_date);
-                setCalendars(cals);
                 setTagGroups(groups);
-                setActiveCalendarIds((prev) => {
-                    if (prev !== null) return prev;
-                    return new Set(cals.map((c) => c.calendar_id));
-                });
             })
             .catch((e) => setError(e.message))
             .finally(() => {
@@ -120,18 +112,6 @@ export default function Home() {
     const handleDateRangeChange = useCallback((start: string, end: string) => {
         setStartDate(start);
         setEndDate(end);
-    }, []);
-
-    const handleToggleCalendar = useCallback((calendarId: string) => {
-        setActiveCalendarIds((prev) => {
-            const next = new Set(prev);
-            if (next.has(calendarId)) {
-                next.delete(calendarId);
-            } else {
-                next.add(calendarId);
-            }
-            return next;
-        });
     }, []);
 
     const handleToggleTag = useCallback((tagId: number) => {
@@ -149,16 +129,13 @@ export default function Home() {
 
     const filteredEvents = useMemo(() => {
         let result = events;
-        if (activeCalendarIds && activeCalendarIds.size !== calendars.length) {
-            result = result.filter((e) => activeCalendarIds.has(e.calendar_id));
-        }
         if (activeTagIds.size > 0) {
             result = result.filter((e) =>
                 [...activeTagIds].every((tagId) => e.tags?.some((t) => t.id === tagId))
             );
         }
         return result;
-    }, [events, activeCalendarIds, calendars.length, activeTagIds]);
+    }, [events, activeTagIds]);
 
     const handleDatesChange = useCallback((start: Date, end: Date) => {
         setVisibleRange((prev) => {
@@ -293,13 +270,6 @@ export default function Home() {
                                 </button>
                             </div>
                         </div>
-                        {calendars.length > 1 && activeCalendarIds && (
-                            <CalendarFilterPills
-                                calendars={calendars}
-                                activeIds={activeCalendarIds}
-                                onToggle={handleToggleCalendar}
-                            />
-                        )}
                     </div>
                 )}
                 {loading && (

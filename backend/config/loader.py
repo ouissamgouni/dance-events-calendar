@@ -1,4 +1,7 @@
 import os
+from pathlib import Path
+
+import yaml
 
 
 def get_database_url() -> str:
@@ -29,6 +32,54 @@ def get_cors_origins() -> list[str]:
 
 def get_sync_interval_minutes() -> int:
     return int(os.getenv("SYNC_INTERVAL_MINUTES", "15"))
+
+
+def _parse_bool(value: str | bool | None) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return None
+    normalized = str(value).strip().lower()
+    if normalized in ("1", "true", "yes", "on"):
+        return True
+    if normalized in ("0", "false", "no", "off"):
+        return False
+    return None
+
+
+def _get_scenario_config_bool(key: str) -> bool | None:
+    scenario_dir = os.getenv("SCENARIO_DIR", "").strip()
+    if not scenario_dir:
+        return None
+
+    config_path = Path(scenario_dir) / "config.yaml"
+    if not config_path.exists():
+        return None
+
+    try:
+        with open(config_path) as f:
+            config = yaml.safe_load(f) or {}
+    except Exception:
+        return None
+
+    return _parse_bool(config.get(key))
+
+
+def get_auto_sync_enabled() -> bool:
+    """Return whether automatic background sync is enabled.
+
+    Priority order: env var AUTO_SYNC_ENABLED -> SCENARIO_DIR/config.yaml
+    key auto_sync_enabled -> default False.
+    """
+    from_env = _parse_bool(os.getenv("AUTO_SYNC_ENABLED"))
+    if from_env is not None:
+        return from_env
+
+    from_scenario = _get_scenario_config_bool("auto_sync_enabled")
+    if from_scenario is not None:
+        return from_scenario
+
+    return False
 
 
 def get_admin_email() -> str:

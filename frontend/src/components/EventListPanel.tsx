@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import type { CalendarEvent } from '../types';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import SaveEventButton from './SaveEventButton';
+import GoingButton from './GoingButton';
 import TagBadges from './TagBadges';
 
 interface MapBounds {
@@ -198,7 +199,7 @@ export default function EventListPanel({
                                     ref={(el) => { if (el) cardRefs.current.set(event.event_id, el); else cardRefs.current.delete(event.event_id); }}
                                     role="button"
                                     tabIndex={0}
-                                    className={`event-card${onMap ? '' : ' opacity-40'}${isHighlighted ? ' event-card-highlighted' : ''}`}
+                                    className={`event-card${onMap ? '' : ' event-card-offmap'}${isHighlighted ? ' event-card-highlighted' : ''}`}
                                     onClick={() => onEventClick(event)}
                                     onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onEventClick(event); } }}
                                     onMouseEnter={() => onEventHover?.(event.event_id)}
@@ -212,6 +213,9 @@ export default function EventListPanel({
                                         </p>
                                         {event.location && (
                                             <p className="event-card-location">📍 {event.location}</p>
+                                        )}
+                                        {!onMap && (
+                                            <span className="event-card-offmap-badge">Off map</span>
                                         )}
                                         {((showPrices && (event.price_is_free || (event.price_min != null && event.price_currency))) ||
                                             (showPopularity && event.view_count > 0)) && (
@@ -227,13 +231,21 @@ export default function EventListPanel({
                                                 <TagBadges tags={event.tags} maxVisible={3} />
                                             </div>
                                         )}
-                                        <SaveEventButton
-                                            eventId={event.event_id}
-                                            appearance="icon"
-                                            size="sm"
-                                            stopPropagation
-                                            className={`absolute top-0 right-0 ${isSaved(event.event_id) ? 'text-slate-700' : ''}`}
-                                        />
+                                        <div className="absolute top-0 right-0 flex items-center gap-0.5">
+                                            <SaveEventButton
+                                                eventId={event.event_id}
+                                                appearance="icon"
+                                                size="sm"
+                                                stopPropagation
+                                                className={isSaved(event.event_id) ? 'text-slate-700' : ''}
+                                            />
+                                            <GoingButton
+                                                eventId={event.event_id}
+                                                appearance="icon"
+                                                size="sm"
+                                                stopPropagation
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             );

@@ -1,0 +1,99 @@
+test_plan:
+  name: "Events Deduplication — Cross-Calendar Duplicate Detection & Log"
+  description: >
+    Verify that when the same real-world event appears in multiple Google
+    calendars (same title + start datetime + location), the sync service
+    keeps only one canonical CachedEvent row, records both source calendars
+    in event_calendar_sources, accumulates tags from all source calendars,
+    and persists the resolution details in SyncLog.dedup_log.
+    Uses 2 calendars: "salsa-primary" (canonical source) and "local-events"
+    (aggregator that re-publishes 2 of the same events). The 2 duplicates
+    should be merged; 1 unique event from local-events should be inserted
+    normally.
+  steps:
+    # ── Sync behaviour ──────────────────────────────────────────
+    - id: 1
+      title: "Only 3 unique events exist after sync (not 5)"
+      description: >
+        Trigger a manual sync from the admin panel or via
+        POST /api/admin/sync. Then query GET /api/events.
+      expected: >
+        3 events are returned:
+        - "Friday Salsa Social" (dedup-evt-001)
+        - "Salsa On2 Workshop" (dedup-evt-002)
+        - "Sunday Kizomba Social" (dedup-evt-003)
+        The duplicate IDs dedup-evt-001-dup and dedup-evt-002-dup do NOT
+        appear as separate events.
+
+    - id: 2
+      title: "event_calendar_sources has 2 rows for each merged event"
+      description: >
+        Inspect the event_calendar_sources table directly (via psql or
+        a DB admin tool).
+      expected: >
+        - event_id=dedup-evt-001 has sources: salsa-primary, local-events
+        - event_id=dedup-evt-002 has sources: salsa-primary, local-events
+        - event_id=dedup-evt-003 has sources: local-events only
+        Total: 5 rows in event_calendar_sources.
+
+    - id: 3
+      title: "Duplicate events do not appear in the public event list"
+      description: >
+        Open the home page (Explorer view). Count the event cards.
+      expected: >
+        Exactly 3 event cards are shown — no duplicates.
+
+    # ── Dedup log ───────────────────────────────────────────────
+    - id: 4
+      title: "Sync log shows 2 duplicates merged"
+      description: >
+        Open the admin page. Click "Sync History". Find the most recent
+        sync log entry.
+      expected: >
+        The entry shows "2 duplicates merged" in amber text below the
+        enrichment section.
+
+    - id: 5
+      title: "Dedup log expands to show details"
+      description: >
+        Click the "2 duplicates merged ▼" toggle in the sync log entry.
+      expected: >
+        Two rows appear, each showing:
+        - Event title (e.g. "Friday Salsa Social")
+        - Incoming Google event ID (truncated: first 8 chars + …)
+        - Arrow → canonical event ID (truncated)
+        - Source calendar ID (e.g. "local-events")
+
+    - id: 6
+      title: "GET /api/admin/sync-logs returns dedup_log array"
+      description: >
+        Call GET /api/admin/sync-logs (with admin auth). Inspect the
+        most recent entry's dedup_log field.
+      expected: >
+        dedup_log is a JSON array with 2 objects, each containing:
+        { "title": "...", "incoming_id": "...", "canonical_id": "...",
+          "calendar_id": "..." }
+
+    # ── Console logs ────────────────────────────────────────────
+    - id: 7
+      title: "Uvicorn logs show per-duplicate INFO messages"
+      description: >
+        Check the backend console output during or after the sync.
+      expected: >
+        Two INFO lines like:
+        "Duplicate detected: 'Friday Salsa Social' (incoming_id=dedup-evt-001-dup)
+         matches canonical dedup-evt-001 — merging tags from calendar local-events"
+        And a summary:
+        "Synced calendar local-events: 1 upserted, 0 deleted, 2 duplicates merged"
+
+    # ── Tag accumulation ────────────────────────────────────────
+    - id: 8
+      title: "Tags from both calendars' defaults accumulate on canonical event"
+      description: >
+        salsa-primary has defaults "dance-style:salsa" and "source:primary".
+        local-events has default "source:aggregator". After dedup merge,
+        canonical duplicate events should contain all three tags.
+      expected: >
+        The canonical event contains tags: salsa, primary, aggregator.
+        No duplicate EventTag rows exist
+        (unique constraint uq_event_tag is respected).

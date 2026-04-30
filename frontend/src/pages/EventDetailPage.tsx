@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { fetchEvent, updateEvent } from '../api';
+import { fetchEvent, updateEvent, fetchTagGroups } from '../api';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import { useAuth } from '../context/AuthContext';
 import { trackView, trackLink } from '../utils/tracking';
 import EventDetailContent from '../components/EventDetailContent';
 import EventMap from '../components/EventMap';
-import type { CalendarEvent } from '../types';
+import SuggestTagsButton from '../components/SuggestTagsButton';
+import GoingButton from '../components/GoingButton';
+import type { CalendarEvent, TagGroup } from '../types';
 
 export default function EventDetailPage() {
     const { eventId } = useParams<{ eventId: string }>();
@@ -21,6 +23,10 @@ export default function EventDetailPage() {
 
     // Edit mode — admin must explicitly activate inline editing
     const [editMode, setEditMode] = useState(false);
+
+    // Suggest tags
+    const [showSuggestTags, setShowSuggestTags] = useState(false);
+    const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
 
     // Title inline editing
     const [editingTitle, setEditingTitle] = useState(false);
@@ -204,8 +210,21 @@ export default function EventDetailPage() {
                                     />
                                 </div>
 
+                                {/* Suggest tags panel */}
+                                {showSuggestTags && (
+                                    <div className="border-t border-slate-100 px-4 pt-3 pb-2">
+                                        <SuggestTagsButton
+                                            eventId={event.event_id}
+                                            tagGroups={tagGroups}
+                                            existingTagIds={new Set(event.tags?.map((t) => t.id) ?? [])}
+                                            deviceId={localStorage.getItem('device_id') || 'anonymous'}
+                                            onClose={() => setShowSuggestTags(false)}
+                                        />
+                                    </div>
+                                )}
+
                                 {/* Actions bar */}
-                                <div className="border-t border-slate-100 px-4 py-2 flex items-center gap-1.5">
+                                <div className="border-t border-slate-100 px-4 py-2 flex items-center gap-1.5 flex-wrap">
                                     <button
                                         onClick={() => toggleSave(event.event_id)}
                                         className={`text-xs rounded px-2.5 py-1 transition flex items-center gap-1 shrink-0 ${isSaved(event.event_id) ? 'text-slate-800 bg-slate-200 hover:bg-slate-300' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'}`}
@@ -215,6 +234,7 @@ export default function EventDetailPage() {
                                         </svg>
                                         {isSaved(event.event_id) ? 'Saved' : 'Save'}
                                     </button>
+                                    <GoingButton eventId={event.event_id} appearance="pill" />
                                     <button
                                         onClick={() => {
                                             navigator.clipboard.writeText(shareUrl).catch(() => { });
@@ -233,6 +253,20 @@ export default function EventDetailPage() {
                                     >
                                         💬 WhatsApp
                                     </a>
+                                    {!editMode && (
+                                        <button
+                                            onClick={() => {
+                                                if (!tagGroups.length) fetchTagGroups().then(setTagGroups).catch(() => { });
+                                                setShowSuggestTags((v) => !v);
+                                            }}
+                                            className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded px-2.5 py-1 transition shrink-0"
+                                        >
+                                            Suggest{' '}
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="inline h-3.5 w-3.5 align-[-1px]">
+                                                <path fillRule="evenodd" d="M2 4.75A2.75 2.75 0 0 1 4.75 2h4.379a2.75 2.75 0 0 1 1.944.805l5.122 5.122a2.75 2.75 0 0 1 0 3.889l-4.38 4.379a2.75 2.75 0 0 1-3.888 0L2.805 11.073A2.75 2.75 0 0 1 2 9.129V4.75Zm4.5 1.75a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
+                                            </svg>
+                                        </button>
+                                    )}
                                     {user && (
                                         <button
                                             onClick={() => setEditMode((m) => !m)}

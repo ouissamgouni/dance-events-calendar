@@ -253,7 +253,7 @@ body {
 .preset-btn {
   font-size: 0.7rem;
   padding: 0.15rem 0.5rem;
-  border-radius: 9999px;
+  border-radius: 0;
   border: 1px solid #e2e8f0;
   background: white;
   color: #64748b;
@@ -397,6 +397,22 @@ body {
 
 .event-card-highlighted {
   background: #eef2ff !important;
+}
+
+.event-card-offmap {
+  filter: grayscale(0.85);
+}
+
+.event-card-offmap-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  background: #f1f5f9;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: #94a3b8;
+  margin-top: 0.25rem;
 }
 
 .event-card-color {

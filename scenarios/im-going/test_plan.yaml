@@ -1,0 +1,175 @@
+test_plan:
+  name: "I'm Going — Attendance Feature"
+  description: >
+    Verify the "I'm going" attendance feature: marking/unmarking attendance from
+    event list, modal, and detail page; state persistence across page reloads;
+    My Calendar integration with filter tabs; and admin "Most Going Events" metrics.
+    Uses mock calendar service with 5 events across 2 calendars.
+  steps:
+    # ── Marking Attendance ──────────────────────────────────────
+    - id: 1
+      title: "Going button visible next to Save in event list"
+      description: >
+        Open the home page in Explorer view. Find "Friday Salsa Social" in the
+        event list. Confirm there are two icon buttons on the card: the save
+        (bookmark) icon and the going (raised hand) icon.
+      expected: >
+        Both the save (bookmark) icon and the going (raised hand) icon are
+        visible on the event card. The going icon is gray/outline by default.
+
+    - id: 2
+      title: "Mark going from event list — icon fills and event auto-saves"
+      description: >
+        Click the raised-hand icon on "Friday Salsa Social" in the event list.
+      expected: >
+        The raised-hand icon turns green (solid). The bookmark icon also fills in
+        (event is auto-saved). No page navigation occurs (stopPropagation applied).
+
+    - id: 3
+      title: "Mark going from event modal — auto-saves too"
+      description: >
+        Click on "Bachata Sensual Workshop" to open the event modal.
+        Click the raised-hand icon in the modal header (next to the save icon).
+      expected: >
+        The raised hand turns green. The bookmark fills in (auto-saved).
+        The modal stays open.
+
+    - id: 4
+      title: "Mark going from event detail page (pill variant)"
+      description: >
+        Navigate to /event/evt-going-003 (Salsa on the Rooftop).
+        In the action bar at the bottom of the event detail, click the "I'm going" pill button.
+      expected: >
+        The pill button changes to "Going ✓" with a green background.
+        The Save button also becomes active (auto-saved).
+
+    - id: 5
+      title: "Desktop tooltip on going button"
+      description: >
+        On a desktop browser, hover the mouse over the raised-hand icon on any event card
+        without clicking.
+      expected: >
+        A small dark tooltip appears above the button reading "I'm going" (or "Not going"
+        if already going). The tooltip disappears when the mouse moves away.
+
+    - id: 6
+      title: "Fade-out toast on click"
+      description: >
+        Click the raised-hand icon on "Rueda de Casino Night" (not yet going).
+      expected: >
+        The icon turns green. A small "I'm going!" label fades in below the button
+        then fades out after about 1 second.
+
+    # ── Toggle / Undo ───────────────────────────────────────────
+    - id: 7
+      title: "Unmark going toggles back — save is retained"
+      description: >
+        Click the green raised-hand icon on "Friday Salsa Social" in the event list again.
+      expected: >
+        The raised-hand icon returns to gray (not going). However, the bookmark icon
+        remains filled — un-going does NOT auto-un-save. The event remains in My Calendar.
+
+    - id: 8
+      title: "Re-mark going"
+      description: >
+        Click the gray raised-hand icon on "Friday Salsa Social" once more.
+      expected: >
+        The icon turns green again. State is back to going.
+
+    # ── Persistence ─────────────────────────────────────────────
+    - id: 9
+      title: "Attendance persists across page reload"
+      description: >
+        With "Friday Salsa Social" and "Bachata Sensual Workshop" marked as going,
+        reload the page (F5 or Cmd+R).
+      expected: >
+        After reload, both events still show the green raised-hand icon. State was
+        persisted in localStorage under key "movida_attending_events".
+
+    # ── My Calendar integration ──────────────────────────────────
+    - id: 10
+      title: "Going events appear in My Calendar"
+      description: >
+        Mark "Bachata Weekender" as going (do not manually save it).
+        Navigate to /my-calendar.
+      expected: >
+        "Bachata Weekender" appears in the event list and on the map.
+        The header shows a count like "(2 saved · 1 going)" or similar breakdown.
+
+    - id: 11
+      title: "Filter tabs appear when both saved and going events exist"
+      description: >
+        While on My Calendar with at least one saved-only and one going event,
+        look at the filter area below the header.
+      expected: >
+        Three pill buttons are visible: "All (N)", "Saved (N)", "Going (N)".
+        "All" is active by default.
+
+    - id: 12
+      title: "Filter by Going shows only going events"
+      description: >
+        Click the "Going" filter tab on My Calendar.
+      expected: >
+        Only events marked as going are shown in the list and on the map.
+        Events that are saved but not going disappear from the view.
+
+    - id: 13
+      title: "Filter by Saved shows only saved events"
+      description: >
+        Click the "Saved" filter tab on My Calendar.
+      expected: >
+        Only saved events are shown. Going-only events (not manually saved) are hidden.
+
+    - id: 14
+      title: "Export includes all events (going + saved)"
+      description: >
+        While on My Calendar with the "Going" filter active, click "Export .ics".
+      expected: >
+        The exported .ics file contains ALL events (both saved and going), not just
+        the ones currently shown in the filtered view.
+
+    # ── Map popup ────────────────────────────────────────────────
+    - id: 15
+      title: "Going button visible in map popup"
+      description: >
+        On the home page, click a map marker for any event to open the Leaflet popup.
+      expected: >
+        The popup footer shows both a raised-hand icon (going) and a bookmark icon (save)
+        side by side, plus a "Details →" link.
+
+    # ── Admin Metrics ────────────────────────────────────────────
+    - id: 16
+      title: "Admin metrics: Most Going Events section appears"
+      description: >
+        Log in as admin and navigate to /admin. Scroll to the metrics section.
+        Ensure at least 2 events are marked as going (from steps above).
+      expected: >
+        A "🎟 Most Going Events" section is visible below "📌 Most Saved Events".
+        The section lists the events with their going count and a green progress bar.
+
+    - id: 17
+      title: "Admin going count reflects actual count"
+      description: >
+        Compare the going count shown in admin for "Friday Salsa Social" with the
+        number of unique devices that clicked going (in this test: 1).
+      expected: >
+        Admin shows "1 going" for "Friday Salsa Social".
+
+    - id: 18
+      title: "Admin section absent when no one is going"
+      description: >
+        In a fresh browser session (clear localStorage or use incognito),
+        navigate to /admin without marking any event as going.
+      expected: >
+        The "🎟 Most Going Events" section is NOT rendered (section only appears
+        when going_count > 0 for at least one event).
+
+    # ── GDPR ─────────────────────────────────────────────────────
+    - id: 19
+      title: "GDPR deletion removes attendance data"
+      description: >
+        Via the privacy settings, trigger data deletion for the current device.
+        Call DELETE /api/user-data/{device_id} and inspect the response.
+      expected: >
+        Response JSON includes "event_attendances" and "user_event_attendances"
+        keys with the count of deleted rows (>= 0). Attendance data is wiped.

@@ -1,4 +1,4 @@
-import { trackEventView, trackEventSave, trackLinkClick, trackExport } from '../api';
+import { trackEventView, trackEventSave, trackEventAttendance, trackLinkClick, trackExport } from '../api';
 import { getDeviceId } from './deviceId';
 import { umamiTrack } from './umami';
 
@@ -56,4 +56,13 @@ export function trackExportAction(format: 'ics' | 'xlsx', eventCount: number): v
     if (!readConsent().analytics) return;
     trackExport(format, eventCount, getConsentedDeviceId()).catch(() => { });
     umamiTrack('export', { format, event_count: eventCount });
+}
+
+/** Track an event attendance toggle — requires analytics consent + device identification. */
+export function trackAttendance(eventId: string, action: 'going' | 'not_going'): void {
+    if (!readConsent().analytics) return;
+    const deviceId = getConsentedDeviceId();
+    if (!deviceId) return;
+    trackEventAttendance(eventId, deviceId, action).catch(() => { });
+    umamiTrack('event-attendance', { action });
 }

@@ -1,0 +1,78 @@
+base_week: 0
+
+events:
+  - id: "evt-going-001"
+    calendar_id: "salsa-cal-001"
+    title: "Friday Salsa Social"
+    description: "Weekly social dance with DJ Mambo. Beginners welcome!"
+    location: "Dance Studio, 10 Rue de Rivoli, Paris, France"
+    latitude: 48.8566
+    longitude: 2.3522
+    start: "w0 Fri 21:00"
+    end: "w0 Sat 01:00"
+    price_is_free: true
+
+  - id: "evt-going-002"
+    calendar_id: "bachata-cal-002"
+    title: "Bachata Sensual Workshop"
+    description: "Intensive workshop with Carlos & Maria. Level: Intermediate."
+    location: "Tanzhaus, Friedrichstr. 100, Berlin, Germany"
+    latitude: 52.5200
+    longitude: 13.4050
+    start: "w0 Sat 14:00"
+    end: "w0 Sat 17:00"
+    price_is_free: false
+    price_min: 25
+    price_max: 35
+    price_currency: "EUR"
+
+  - id: "evt-going-003"
+    calendar_id: "salsa-cal-001"
+    title: "Salsa on the Rooftop"
+    description: "Open-air salsa party with live band Orquesta del Sol."
+    location: "Skybar, Av. de la Liberté, Brussels, Belgium"
+    latitude: 50.8503
+    longitude: 4.3517
+    start: "w1 Sat 20:00"
+    end: "w1 Sun 00:00"
+    price_is_free: false
+    price_min: 10
+    price_currency: "EUR"
+
+  - id: "evt-going-004"
+    calendar_id: "bachata-cal-002"
+    title: "Bachata Weekender"
+    description: "Full weekend of bachata workshops and parties. 3 rooms, 20 artists."
+    location: "Congress Center, Dam Square, Amsterdam, Netherlands"
+    latitude: 52.3676
+    longitude: 4.9041
+    start: "w1 Fri 18:00"
+    end: "w1 Sun 23:00"
+    price_is_free: false
+    price_min: 80
+    price_max: 120
+    price_currency: "EUR"
+
+  - id: "evt-going-005"
+    calendar_id: "salsa-cal-001"
+    title: "Rueda de Casino Night"
+    description: "Group rueda dancing. All levels. No partner needed."
+    location: "Salsa Club, Calle Mayor 55, Madrid, Spain"
+    latitude: 40.4168
+    longitude: -3.7038
+    start: "w1 Sun 18:00"
+    end: "w1 Sun 22:00"
+    price_is_free: true
+
+  - id: "evt-going-006"
+    calendar_id: "bachata-cal-002"
+    title: "Kizomba Night Out"
+    description: "Relaxed kizomba social. No partner required. DJ Semba on decks."
+    location: "Club Fusion, Rua Augusta 12, Lisbon, Portugal"
+    latitude: 38.7169
+    longitude: -9.1399
+    start: "w2 Fri 22:00"
+    end: "w2 Sat 03:00"
+    price_is_free: false
+    price_min: 8
+    price_currency: "EUR"

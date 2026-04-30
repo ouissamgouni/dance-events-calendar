@@ -9,6 +9,8 @@ export interface Tag {
     group_color: string | null;
     event_count?: number;
     enabled: boolean;
+    is_hero_filter: boolean;
+    hero_ordinal: number | null;
 }
 
 export interface TagGroup {

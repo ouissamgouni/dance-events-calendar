@@ -1,0 +1,278 @@
+test_plan:
+  name: "Calendar Default Tags — Auto-tag on Sync, Bulk Assign, Admin UI"
+  description: >
+    Verify the calendar default tags feature: configuring default tags per calendar
+    in the admin UI, viewing and using the per-calendar "Show Events" link in the
+    Events panel, bulk-assigning tags to all events from a calendar (including
+    "select all matching" across pages), and verifying that new events synced from
+    a calendar automatically receive the configured default tags while pre-existing
+    events are left untouched.
+    Uses mock calendar service with 12 events across 3 calendars (Salsa, Bachata,
+    Kizomba & Afro). Each calendar has default tags pre-seeded; some events are
+    intentionally missing those tags to exercise the bulk-assign workflow.
+  steps:
+    # ── 1. Admin — Calendar Sources card: Tags button ────────────────────────
+    - id: 1
+      title: "Tags button visible per calendar"
+      description: >
+        Go to /admin. Find the Calendar Sources card (left column). Look at each
+        calendar row: "Salsa Events", "Bachata Events", "Kizomba & Afro".
+      expected: >
+        Each calendar row shows a "Tags" button on the right side (next to the
+        On/Off toggle). The button has a violet count badge showing the number of
+        currently configured default tags.
+
+    - id: 2
+      title: "Salsa calendar shows 1 default tag"
+      description: >
+        Check the count badge on the "Tags" button for "Salsa Events".
+      expected: >
+        The badge shows "1", reflecting the pre-seeded default tag: dance-style:salsa.
+
+    - id: 3
+      title: "Kizomba & Afro calendar shows 2 default tags"
+      description: >
+        Check the count badge on the "Tags" button for "Kizomba & Afro".
+      expected: >
+        The badge shows "2", reflecting dance-style:kizomba and dance-style:semba.
+
+    # ── 2. Admin — Opening the per-calendar default tags picker ─────────────
+    - id: 4
+      title: "Open default tags picker for Salsa calendar"
+      description: >
+        Click the "Tags" button on the "Salsa Events" row.
+      expected: >
+        An inline tag picker expands below the "Salsa Events" row showing all
+        enabled tags as chips. The chip for "Salsa" (under Dance Style) is
+        highlighted/active.
+
+    - id: 5
+      title: "Active default tag is visually highlighted"
+      description: >
+        In the expanded picker for "Salsa Events", look at the tag chips.
+      expected: >
+        The "Salsa" chip has a colored background matching the Dance Style group
+        color (#fb923c). All other chips appear inactive (outline/muted style).
+
+    - id: 6
+      title: "Add a second default tag to Salsa calendar"
+      description: >
+        In the same picker, click the "Social" chip (under Format).
+      expected: >
+        The "Social" chip becomes highlighted immediately (optimistic update).
+        The badge count on the Tags button updates to "2".
+        Refreshing the page and re-opening the picker shows "Salsa" + "Social"
+        still active (change was persisted).
+
+    - id: 7
+      title: "Remove a default tag from Salsa calendar"
+      description: >
+        Click the active "Social" chip again to deselect it.
+      expected: >
+        The "Social" chip returns to inactive state. The badge count drops back to
+        "1". Refresh confirms the change persisted.
+
+    - id: 8
+      title: "Close the picker by clicking Tags again"
+      description: >
+        Click the "Tags" button a second time on the "Salsa Events" row.
+      expected: >
+        The inline picker collapses. The row returns to its normal appearance.
+
+    # ── 3. Admin — Events link: per-calendar pre-filtered EventsPanel ────────
+    - id: 9
+      title: "Show Events link visible per calendar"
+      description: >
+        In the Calendar Sources card, look at each calendar row in the right-side
+        button group.
+      expected: >
+        A "Events" text link appears to the left of the Tags button for each
+        calendar. Clicking it is how the admin opens the Events panel pre-filtered.
+
+    - id: 10
+      title: "Events link opens EventsPanel filtered to that calendar"
+      description: >
+        Click the "Events" link on the "Salsa Events" row.
+      expected: >
+        The Events side panel opens. The calendar filter is pre-set to
+        "Salsa Events". Only salsa calendar events appear (evt-cdt-001 through
+        evt-cdt-006). The filter dropdown shows "Salsa Events" selected.
+
+    - id: 11
+      title: "Events link for Bachata shows only bachata events"
+      description: >
+        Close the events panel. Click the "Events" link on "Bachata Events".
+      expected: >
+        The panel reopens filtered to "Bachata Events" only, showing evt-cdt-007,
+        evt-cdt-008, evt-cdt-009.
+
+    # ── 4. Identify events missing the calendar's default tag ─────────────────
+    - id: 12
+      title: "Some events are missing the calendar's default tag"
+      description: >
+        With the Events panel open for "Salsa Events", scroll through the list.
+        Look at the tag badges on each event card.
+      expected: >
+        "Advanced Salsa Shines" (evt-cdt-005) and "Salsa Congress Warm-up Party"
+        (evt-cdt-006) show no "Salsa" tag badge. The other 4 salsa events do show
+        the Salsa badge. This simulates events synced before the default was set.
+
+    # ── 5. Bulk-assign the default tag to all matching events ─────────────────
+    - id: 13
+      title: "Select all events on page with checkbox"
+      description: >
+        With the panel filtered to "Salsa Events", click the "Select all on page"
+        checkbox at the top of the events list.
+      expected: >
+        All 6 salsa events become selected (checkboxes ticked). The bulk action
+        bar appears at the bottom showing "6 selected".
+
+    - id: 14
+      title: "Assign Tags button opens tag picker in bulk action bar"
+      description: >
+        In the bulk action bar, click the "Assign Tags" button.
+      expected: >
+        An inline tag picker appears above the bulk action bar, showing all tag
+        groups and their chips.
+
+    - id: 15
+      title: "Select dance-style:salsa in bulk picker and confirm"
+      description: >
+        In the bulk tag picker, find the Dance Style group and click the "Salsa"
+        chip. Then click "Apply" (or confirm the selection).
+      expected: >
+        All 6 salsa calendar events now have the "Salsa" tag. The previously
+        untagged events (evt-cdt-005, evt-cdt-006) now show the Salsa badge.
+        The bulk picker closes and the selection is cleared.
+
+    - id: 16
+      title: "Already-tagged events keep existing tags after bulk assign"
+      description: >
+        Click on "Friday Salsa Social" (evt-cdt-001) to inspect its tags.
+      expected: >
+        Tags remain: Salsa, Social, All Levels, Indoor, Medium. No duplicate
+        Salsa tag was added (bulk assign is idempotent).
+
+    # ── 6. Bulk-assign for Bachata calendar ───────────────────────────────────
+    - id: 17
+      title: "Open Events panel for Bachata calendar, assign default tag"
+      description: >
+        Close the panel. Click the "Events" link on the "Bachata Events" row.
+        Select all 3 events. Click "Assign Tags", select "Bachata" chip, apply.
+      expected: >
+        All 3 bachata events (evt-cdt-007, evt-cdt-008, evt-cdt-009) now have the
+        "Bachata" tag. evt-cdt-009 "Bachata Bootcamp Weekend" previously had no
+        dance-style tag and now shows the Bachata badge.
+
+    # ── 7. Bulk-assign for Kizomba & Afro calendar ───────────────────────────
+    - id: 18
+      title: "Open Events panel for Kizomba & Afro, assign both default tags"
+      description: >
+        Close the panel. Click the "Events" link on "Kizomba & Afro". Select all
+        3 events. In the bulk tag picker, select both "Kizomba" and "Semba" chips,
+        then apply.
+      expected: >
+        All 3 kizomba events now have both "Kizomba" and "Semba" tags.
+        "Spring Kizomba Garden Party" (evt-cdt-012) previously had no dance-style
+        tags and now shows both badges. Already-tagged events are unaffected.
+
+    # ── 8. Sync — new events receive default tags automatically ───────────────
+    - id: 19
+      title: "Configure mock calendar with a new event to sync"
+      description: >
+        Check the scenario events.yaml for the "salsa-cal-dt-001" calendar. Note
+        there is no new mock event to sync in a fresh seed. To test auto-tagging,
+        manually trigger a sync from the admin's Sync card.
+      expected: >
+        After clicking "Sync Now" in the Admin Sync card for "Salsa Events",
+        the sync completes with no errors. If the mock service returns no new
+        events (all are already in DB), the operation finishes silently.
+      note: >
+        This step validates the sync mechanism runs cleanly. The auto-tag logic
+        is exercised in steps 20–21 which require a truly new event not in the DB.
+
+    - id: 20
+      title: "New event synced from Salsa calendar gets default tags"
+      description: >
+        Temporarily add a new event ID (e.g., evt-cdt-NEW) to the mock service
+        for "salsa-cal-dt-001". Trigger sync from admin.
+        In the Events panel filtered to Salsa, find the newly synced event.
+      expected: >
+        The new event automatically has the "Salsa" tag applied (from the
+        calendar's configured default: dance-style:salsa). No manual tagging was
+        needed.
+
+    - id: 21
+      title: "Pre-existing events are NOT retroactively tagged on re-sync"
+      description: >
+        After the sync in step 20, look at the events that were already in the DB
+        before the sync (evt-cdt-001 through evt-cdt-006).
+      expected: >
+        These events' tags are unchanged by the sync. The sync only applies default
+        tags to brand new events (first-time insert); it never modifies existing
+        events' tags. Manual tag edits are preserved.
+
+    - id: 22
+      title: "Removing a default tag does not affect future syncs retroactively"
+      description: >
+        In the Tags picker for "Salsa Events", remove "dance-style:salsa" by
+        clicking it to deselect. Trigger sync again.
+      expected: >
+        No new events get the salsa tag automatically during this sync.
+        However, events that previously received the tag (from earlier syncs)
+        still keep it — removing a calendar default does not strip existing tags.
+
+    # ── 9. Public view — verify tags display correctly ───────────────────────
+    - id: 23
+      title: "Tagged events display correctly on public event list"
+      description: >
+        Navigate to the public home page (/). Browse events.
+      expected: >
+        Events from the Salsa, Bachata, and Kizomba calendars show their
+        respective dance-style tag badges (Salsa, Bachata, Kizomba/Semba).
+
+    - id: 24
+      title: "Filter by dance-style:bachata on public page"
+      description: >
+        On the home page, click the "Bachata" chip under Dance Style filters.
+      expected: >
+        Only bachata events appear in the list. This confirms the bulk-assigned
+        tags are stored and queryable.
+
+    - id: 25
+      title: "Filter by dance-style:kizomba AND dance-style:semba"
+      description: >
+        Deselect Bachata. Click both "Kizomba" and "Semba" chips.
+      expected: >
+        Only events tagged with BOTH kizomba AND semba appear:
+        "Kizomba & Semba Night" (evt-cdt-010) and "Kizomba Fundamentals Class"
+        (evt-cdt-011). "Spring Kizomba Garden Party" (evt-cdt-012) should appear
+        only after the bulk-assign in step 18 was applied.
+
+    # ── 10. Edge cases ────────────────────────────────────────────────────────
+    - id: 26
+      title: "Calendar with no default tags shows badge 0"
+      description: >
+        If a calendar has no default tags configured, check its Tags button badge.
+      expected: >
+        No badge is shown (or badge is hidden when count is 0). Clicking the Tags
+        button opens an empty picker where all chips are inactive.
+
+    - id: 27
+      title: "Bulk-assign is additive — does not remove existing tags"
+      description: >
+        Use the Events panel, select "Salsa on the Rooftop" (evt-cdt-003) which
+        has tags: Salsa, Social, All Levels, Rooftop, Live Band, Medium.
+        Bulk-assign only "Salsa" tag.
+      expected: >
+        After applying, evt-cdt-003 still has ALL its original tags. The Salsa
+        tag is present (was already there). No other tags were removed.
+
+    - id: 28
+      title: "Changing calendar filter in EventsPanel while panel is open"
+      description: >
+        Open the Events panel via the "Events" action bar button (not the per-cal
+        link). Then change the calendar dropdown to "Salsa Events".
+      expected: >
+        Panel re-fetches and shows only salsa events. The initialCalendarId
+        filter from the calendar link is overridable by the user within the panel.

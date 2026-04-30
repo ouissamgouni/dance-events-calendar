@@ -22,6 +22,7 @@ export async function fetchEvent(eventId: string): Promise<CalendarEvent> {
 export interface SiteSettings {
     since_date: string;
     sync_interval_minutes: number;
+    auto_sync_enabled: boolean;
     show_prices: boolean;
     show_popularity: boolean;
     popularity_threshold: number;
@@ -166,6 +167,7 @@ export interface SyncLogEntry {
     error_message: string | null;
     enrichment_status: string;
     enrichment_progress: Record<string, { processed: number; skipped: number; failed: number }> | null;
+    dedup_log: Array<{ title: string; incoming_id: string; canonical_id: string; calendar_id: string }> | null;
 }
 
 export async function fetchSyncLogs(limit = 20, offset = 0): Promise<SyncLogEntry[]> {
@@ -400,6 +402,20 @@ export async function syncSuggestionToGoogle(id: string): Promise<EventSuggestio
     return res.json();
 }
 
+// --- Event Attendance Tracking ---
+
+export async function trackEventAttendance(
+    eventId: string,
+    deviceId: string,
+    action: 'going' | 'not_going',
+): Promise<void> {
+    await fetch(`${BASE}/track/event-attendance`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_id: eventId, device_id: deviceId, action }),
+    });
+}
+
 // --- Event Save Tracking ---
 
 export async function trackEventSave(
@@ -449,6 +465,43 @@ export async function exportXlsx(eventIds: string[]): Promise<Blob> {
     return res.blob();
 }
 
+// --- Sharing ---
+
+export async function createShareToken(deviceId: string): Promise<{ token: string }> {
+    const res = await fetch(`${BASE}/share/calendar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device_id: deviceId }),
+    });
+    if (!res.ok) throw new Error('Failed to create share token');
+    return res.json();
+}
+
+export async function fetchSharedCalendar(token: string): Promise<CalendarEvent[]> {
+    const res = await fetch(`${BASE}/share/calendar/${encodeURIComponent(token)}`);
+    if (res.status === 404) throw new Error('not_found');
+    if (!res.ok) throw new Error('Failed to fetch shared calendar');
+    const data = await res.json();
+    return data.events;
+}
+
+// --- Admin: Most Attended ---
+
+export interface MostAttendedEvent {
+    event_id: string;
+    title: string;
+    start: string | null;
+    going_count: number;
+}
+
+export async function fetchMostAttendedEvents(limit = 20): Promise<MostAttendedEvent[]> {
+    const res = await fetch(`${BASE}/admin/most-attended-events?limit=${limit}`, {
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to fetch most attended events');
+    return res.json();
+}
+
 // --- Admin: Most Saved ---
 
 export interface MostSavedEvent {
@@ -472,6 +525,7 @@ export interface MostViewedEvent {
     event_id: string;
     title: string;
     view_count: number;
+    unique_viewers: number;
 }
 
 export async function fetchMostViewedEvents(limit = 20): Promise<MostViewedEvent[]> {
@@ -479,6 +533,55 @@ export async function fetchMostViewedEvents(limit = 20): Promise<MostViewedEvent
         credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to fetch most viewed events');
+    return res.json();
+}
+
+// --- Admin: Analytics ---
+
+export interface SourceBreakdown {
+    source: string;
+    view_count: number;
+}
+
+export async function fetchSourceBreakdown(): Promise<SourceBreakdown[]> {
+    const res = await fetch(`${BASE}/admin/analytics/source-breakdown`, { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to fetch source breakdown');
+    return res.json();
+}
+
+export interface CountryBreakdown {
+    country: string;
+    view_count: number;
+}
+
+export async function fetchTopCountries(limit = 10): Promise<CountryBreakdown[]> {
+    const res = await fetch(`${BASE}/admin/analytics/top-countries?limit=${limit}`, { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to fetch top countries');
+    return res.json();
+}
+
+export interface TopLink {
+    event_id: string;
+    event_title: string;
+    url: string;
+    click_count: number;
+}
+
+export async function fetchTopLinks(limit = 20): Promise<TopLink[]> {
+    const res = await fetch(`${BASE}/admin/analytics/top-links?limit=${limit}`, { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to fetch top links');
+    return res.json();
+}
+
+export interface ExportStat {
+    format: string;
+    export_count: number;
+    total_events_exported: number;
+}
+
+export async function fetchExportStats(): Promise<ExportStat[]> {
+    const res = await fetch(`${BASE}/admin/analytics/exports`, { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to fetch export stats');
     return res.json();
 }
 
@@ -631,7 +734,7 @@ export async function createTag(data: { group_id: number; label: string; color?:
     return res.json();
 }
 
-export async function updateTag(tagId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean }): Promise<Tag> {
+export async function updateTag(tagId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean; is_hero_filter?: boolean; hero_ordinal?: number | null }): Promise<Tag> {
     const res = await fetch(`${BASE}/admin/tags/${tagId}`, {
         method: 'PATCH',
         headers: adminHeaders(),
@@ -649,5 +752,41 @@ export async function retryGeocodingSingle(eventId: string): Promise<{ geocoded:
         credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to retry geocoding');
+    return res.json();
+}
+
+// --- Admin: Event IDs (for cross-page select-all) ---
+
+export async function fetchAdminEventIds(params: EventFilterParams = {}): Promise<{ ids: string[] }> {
+    const qs = new URLSearchParams();
+    if (params.search) qs.set('search', params.search);
+    if (params.review_status) qs.set('review_status', params.review_status);
+    if (params.calendar_id) qs.set('calendar_id', params.calendar_id);
+    if (params.tag_ids) qs.set('tag_ids', params.tag_ids);
+    if (params.ungeolocated) qs.set('ungeolocated', 'true');
+    if (params.future_only) qs.set('future_only', 'true');
+    const res = await fetch(`${BASE}/admin/events/ids?${qs}`, { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to fetch event IDs');
+    return res.json();
+}
+
+// --- Calendar Default Tags ---
+
+export async function fetchCalendarDefaultTags(calendarId: string): Promise<{ calendar_id: string; tag_ids: number[] }> {
+    const res = await fetch(`${BASE}/admin/calendars/${encodeURIComponent(calendarId)}/default-tags`, {
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to fetch calendar default tags');
+    return res.json();
+}
+
+export async function updateCalendarDefaultTags(calendarId: string, tagIds: number[]): Promise<{ calendar_id: string; tag_ids: number[] }> {
+    const res = await fetch(`${BASE}/admin/calendars/${encodeURIComponent(calendarId)}/default-tags`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag_ids: tagIds }),
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to update calendar default tags');
     return res.json();
 }

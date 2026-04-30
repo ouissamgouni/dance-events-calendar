@@ -1,0 +1,222 @@
+test_plan:
+  name: "Share My Calendar"
+  description: >
+    Verify the share-my-calendar feature end-to-end: generating a share link
+    from /my-calendar, opening it on a second device (simulated by a private
+    window), live updates when the sharer adds or removes events, recipient
+    saving individual events to their own calendar, and GDPR data deletion
+    cleaning up share tokens. Uses mock calendar with 5 events across 2
+    calendars.
+
+  steps:
+    # ── Setup: Build a saved-events state ───────────────────────
+    - id: 1
+      title: "Save 3 events as the sharer"
+      description: >
+        Open the home page in a normal browser window (this is the sharer).
+        Save "Friday Salsa Social", "Bachata Sensual Workshop", and
+        "Salsa on the Rooftop" using the heart icons.
+      expected: >
+        FAB shows count "3". All three hearts are red.
+
+    - id: 2
+      title: "Navigate to My Calendar"
+      description: >
+        Click the FAB and choose "View My Calendar", or navigate directly
+        to /my-calendar.
+      expected: >
+        Page shows "My Calendar (3 events)" header with export buttons,
+        "🔗 Share" button, and "Clear all" button. List shows the 3 saved events.
+
+    # ── Share Button ─────────────────────────────────────────────
+    - id: 3
+      title: "Share button appears only when events are saved"
+      description: >
+        Verify the "🔗 Share" button is visible in the header action bar
+        on the My Calendar page.
+      expected: >
+        "🔗 Share" button is visible alongside the export and clear-all buttons.
+        It is NOT visible on the empty-state My Calendar page (no events saved).
+
+    - id: 4
+      title: "Click Share — generates link and copies to clipboard"
+      description: >
+        Click the "🔗 Share" button.
+      expected: >
+        Button briefly shows "Generating…" then changes to "✓ Link copied!".
+        The clipboard contains a URL of the form:
+        http://localhost:5173/shared/<uuid-token>
+        (Token is a UUID v4, same token on repeated clicks.)
+
+    - id: 5
+      title: "Share button is idempotent — same token on repeated clicks"
+      description: >
+        Click "🔗 Share" a second time.
+      expected: >
+        The copied URL contains the exact same token UUID as the first click.
+        No new token is created.
+
+    # ── Shared Page — Happy Path ─────────────────────────────────
+    - id: 6
+      title: "Open shared link in a private window (recipient device)"
+      description: >
+        Open a new private/incognito browser window.
+        Paste the copied URL and navigate to it.
+      expected: >
+        Page loads at /shared/<token>. Header shows "Shared Calendar (3 events)".
+        A banner reads:
+        "This is a shared calendar. Save individual events to add them to your
+        own calendar."
+        The event list shows the same 3 events ("Friday Salsa Social",
+        "Bachata Sensual Workshop", "Salsa on the Rooftop").
+        The map shows markers for Paris, Berlin, and Brussels.
+
+    - id: 7
+      title: "Shared page event list is interactive"
+      description: >
+        In the private window, click "Bachata Sensual Workshop" in the list.
+      expected: >
+        Event modal opens with full details. The modal shows a save (heart) icon.
+
+    - id: 8
+      title: "Recipient saves an event to their own calendar"
+      description: >
+        In the modal on the shared page, click the heart icon to save
+        "Bachata Sensual Workshop".
+      expected: >
+        Heart turns red. FAB appears in the private window with count "1".
+        The sharer's original window is NOT affected (their FAB still shows "3").
+
+    - id: 9
+      title: "Recipient's saved event appears in their own /my-calendar"
+      description: >
+        In the private window, navigate to /my-calendar.
+      expected: >
+        Page shows "My Calendar (1 event)" — only "Bachata Sensual Workshop".
+        The sharer's events ("Friday Salsa Social", "Salsa on the Rooftop")
+        are NOT shown, as they belong to a different device_id.
+
+    - id: 10
+      title: "Shared page has CTA link to recipient's own calendar"
+      description: >
+        Go back to /shared/<token> in the private window.
+        Check the header area.
+      expected: >
+        A "My Calendar →" link is visible in the header (only when events > 0).
+        Clicking it navigates to /my-calendar showing the recipient's own saved events.
+
+    # ── Live Updates ─────────────────────────────────────────────
+    - id: 11
+      title: "Sharer adds event — recipient sees it on next load"
+      description: >
+        Switch to the normal (sharer) window. Save "Bachata Weekender"
+        (4th event). Then switch back to the private window and reload
+        the shared page (F5).
+      expected: >
+        Shared page now shows "4 events". "Bachata Weekender" appears in
+        the list and a new map marker appears in Amsterdam.
+
+    - id: 12
+      title: "Sharer removes event — recipient sees it on next load"
+      description: >
+        Switch to the sharer's window. Unsave "Friday Salsa Social"
+        (click the red heart to remove it). Switch to the private window
+        and reload the shared page.
+      expected: >
+        Shared page now shows "3 events". "Friday Salsa Social" is no longer
+        listed. The Paris map marker is gone.
+
+    # ── Error States ─────────────────────────────────────────────
+    - id: 13
+      title: "Invalid token shows 404 state"
+      description: >
+        Navigate to /shared/00000000-0000-0000-0000-000000000000
+        (a well-formed but non-existent token).
+      expected: >
+        Page shows "Share link not found" message with secondary text:
+        "This link may be invalid or the calendar may have been removed."
+        A "← Browse events" link is visible.
+
+    - id: 14
+      title: "Sharer clears all events — shared page shows empty state"
+      description: >
+        Switch to the sharer's window. Navigate to /my-calendar and click
+        "Clear all". Switch to the private window and reload the shared page.
+      expected: >
+        Shared page shows empty state: "No events saved yet" with secondary text:
+        "The owner of this calendar hasn't saved any events yet."
+        No list, no map markers are shown.
+
+    # ── Token Stability After Clear ──────────────────────────────
+    - id: 15
+      title: "Token persists even after sharer clears all events"
+      description: >
+        With the sharer's calendar cleared, have the sharer save a new event
+        ("Rueda de Casino Night") and reload the shared page in the private window.
+      expected: >
+        The same /shared/<token> URL (same UUID as before) now shows 1 event:
+        "Rueda de Casino Night". No new token was created — the link is reusable.
+
+    # ── GDPR ─────────────────────────────────────────────────────
+    - id: 16
+      title: "GDPR deletion removes share token and saved state"
+      description: >
+        In the sharer's window, open browser DevTools. Find the value of
+        localStorage key "movida_device_id". Call:
+          DELETE /api/user-data/<device_id>
+        (via curl or the network tab).
+      expected: >
+        Response contains:
+          "deleted": {
+            "event_views": <n>,
+            "event_saves": <n>,
+            "user_saved_events": <n>,
+            "share_tokens": 1,
+            ...
+          }
+        The share token is invalidated. Reloading /shared/<token> in the
+        private window now shows the 404 "Share link not found" state.
+
+    # ── Backend API ──────────────────────────────────────────────
+    - id: 17
+      title: "POST /api/share/calendar — creates token"
+      description: >
+        Send: POST /api/share/calendar
+              { "device_id": "test-device-abc" }
+      expected: >
+        201 response: { "token": "<uuid-v4>" }
+
+    - id: 18
+      title: "POST /api/share/calendar — idempotent"
+      description: >
+        Send the same request again with the same device_id.
+      expected: >
+        201 response with the exact same token UUID as step 17.
+
+    - id: 19
+      title: "GET /api/share/calendar/{token} — returns saved events"
+      description: >
+        Using the token from step 17, first POST a save:
+          POST /api/track/event-save
+          { "event_id": "evt-share-001", "device_id": "test-device-abc", "action": "save" }
+        Then call:
+          GET /api/share/calendar/<token>
+      expected: >
+        200 response: { "events": [ { "event_id": "evt-share-001", ... } ] }
+        Full EventResponse object with title, location, tags, etc.
+
+    - id: 20
+      title: "GET /api/share/calendar/{token} — reflects unsave"
+      description: >
+        POST /api/track/event-save with action "unsave" for evt-share-001.
+        Then GET /api/share/calendar/<token> again.
+      expected: >
+        200 response: { "events": [] }
+        The event is removed from the shared list.
+
+    - id: 21
+      title: "GET /api/share/calendar/{bad-token} — 404"
+      description: >
+        GET /api/share/calendar/not-a-real-token
+      expected: >
+        404 response: { "detail": "Share link not found" }

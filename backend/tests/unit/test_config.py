@@ -4,6 +4,7 @@ import os
 import pytest
 
 from backend.config.loader import (
+    get_auto_sync_enabled,
     get_database_url,
     get_calendar_service_type,
     get_cors_origins,
@@ -49,3 +50,22 @@ class TestConfigLoader:
     def test_get_sync_interval_custom(self, monkeypatch):
         monkeypatch.setenv("SYNC_INTERVAL_MINUTES", "30")
         assert get_sync_interval_minutes() == 30
+
+    def test_get_auto_sync_enabled_default_false(self, monkeypatch):
+        monkeypatch.delenv("AUTO_SYNC_ENABLED", raising=False)
+        monkeypatch.delenv("SCENARIO_DIR", raising=False)
+        assert get_auto_sync_enabled() is False
+
+    def test_get_auto_sync_enabled_from_env(self, monkeypatch):
+        monkeypatch.setenv("AUTO_SYNC_ENABLED", "true")
+        assert get_auto_sync_enabled() is True
+
+    def test_get_auto_sync_enabled_from_scenario_config(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("AUTO_SYNC_ENABLED", raising=False)
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir()
+        (scenario_dir / "config.yaml").write_text(
+            "calendar_service: mock\nauto_sync_enabled: true\n"
+        )
+        monkeypatch.setenv("SCENARIO_DIR", str(scenario_dir))
+        assert get_auto_sync_enabled() is True

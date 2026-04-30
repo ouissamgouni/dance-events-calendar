@@ -1,0 +1,22 @@
+calendars:
+  # Each calendar has default_tags: these are applied automatically to new events
+  # synced from that calendar (set via the admin "Tags" button per calendar).
+
+  - id: "salsa-cal-dt-001"
+    name: "Salsa Events"
+    color: "#e11d48"
+    default_tags:
+      - "dance-style:salsa"
+
+  - id: "bachata-cal-dt-002"
+    name: "Bachata Events"
+    color: "#7c3aed"
+    default_tags:
+      - "dance-style:bachata"
+
+  - id: "afro-cal-dt-003"
+    name: "Kizomba & Afro"
+    color: "#059669"
+    default_tags:
+      - "dance-style:kizomba"
+      - "dance-style:semba"

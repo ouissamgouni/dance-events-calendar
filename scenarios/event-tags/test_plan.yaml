@@ -260,6 +260,33 @@ test_plan:
         "Reach" as the group name.
 
     - id: 31
+      title: "Reorder categories with drag-and-drop"
+      description: >
+        In Admin > Tag Categories, drag the "Vibe" category card and drop it
+        above "Format".
+      expected: >
+        Category cards reorder immediately. After page refresh, the order is
+        preserved with "Vibe" shown before "Format".
+
+    - id: 32
+      title: "Filter pills follow admin category order"
+      description: >
+        After reordering categories (Vibe above Format), return to the public
+        events page and inspect tag filter groups.
+      expected: >
+        Filter groups follow the admin-defined order. "Vibe" appears before
+        "Format".
+
+    - id: 33
+      title: "Event tag chips follow admin category order"
+      description: >
+        Open an event that has tags from multiple groups (e.g. Friday Salsa
+        Social) in list or modal view after category reorder.
+      expected: >
+        Tag chips are rendered in group order defined by admin configuration
+        (group ordinal), not by popularity or arbitrary order.
+
+    - id: 34
       title: "Add new tag to existing category"
       description: >
         On the "Venue" category card, click the "+" button. Type "Beach"
@@ -268,7 +295,7 @@ test_plan:
         A new "Beach" tag pill appears in the Venue category with event
         count 0. The tag is now available in filter pills and tag editors.
 
-    - id: 32
+    - id: 35
       title: "Add new tag category"
       description: >
         Click the "+" button in the Tag Categories header. Type "Pricing"
@@ -277,7 +304,7 @@ test_plan:
         A new "Pricing" category card appears with no tags and no color.
         The "+" button inside the card allows adding tags.
 
-    - id: 33
+    - id: 36
       title: "Add tags to new category"
       description: >
         In the new "Pricing" category, click "+", add "Budget-Friendly",
@@ -287,7 +314,7 @@ test_plan:
         Set a color (#16a34a green) via the color picker. Both pills
         turn green.
 
-    - id: 34
+    - id: 37
       title: "New category appears in filters and editors"
       description: >
         Navigate back to the event list. Check filter pills and open the
@@ -295,3 +322,63 @@ test_plan:
       expected: >
         "Pricing" group appears in the filter pills area and in the tag
         editor modal, with "Budget-Friendly" and "Premium" as options.
+
+    - id: 38
+      title: "Mark a tag as hero filter in admin"
+      description: >
+        In Admin → Tag Categories, find the "Dance Style" group. Click the star (★)
+        button on the "Kizomba" tag to mark it as a hero filter. Refresh the page.
+      expected: >
+        The star button on "Kizomba" appears fully opaque (not faded), indicating
+        hero status. After refresh, the admin page still shows the star as active,
+        confirming hero_filter state was persisted.
+
+    - id: 39
+      title: "Hero tags appear in the first highlighted row of public filters"
+      description: >
+        Open the public event list page. Observe the filter pills area at the top.
+      expected: >
+        A first row contains exactly the four hero tags seeded in the scenario:
+        "Social", "Salsa", "Bachata", "Beginner-Friendly" — in that order
+        (hero_ordinal 0–3). A second row shows the remaining non-hero tags.
+        The two rows are visually distinct (one above the other).
+
+    - id: 40
+      title: "Non-hero filters remain behind '+' expander"
+      description: >
+        On the public event list page, observe the second row (remainder tags).
+        Count the visible tags. Then click the '+' expander button.
+      expected: >
+        Initially only up to 8 non-hero tags are visible in the second row plus
+        any that are already active. Clicking '+' reveals all remaining non-hero
+        tags. Hero tags are NOT duplicated in the remainder list.
+
+    - id: 41
+      title: "Hero row respects hero_ordinal"
+      description: >
+        In Admin → Tag Categories, remove hero status from "Social" (Format group,
+        hero_ordinal 0). Then mark "All Levels" (Level group) as hero. Refresh the
+        public event list.
+      expected: >
+        The hero row now shows "Salsa", "Bachata", "Beginner-Friendly" (ordinals 1–3)
+        followed by "All Levels" at the end. "Social" moves back to the remainder row.
+        Undo: re-mark "Social" as hero (ordinal 0) and remove "All Levels".
+
+    - id: 42
+      title: "Active non-hero tag stays visible when remainder is collapsed"
+      description: >
+        Click a non-hero tag beyond position 8 in the remainder row to activate it
+        (first expand with '+' if needed). Then collapse the remainder by clicking '+'
+        again.
+      expected: >
+        The activated non-hero tag remains visible in the remainder row even though
+        the full list is collapsed, consistent with the existing active-tag visibility rule.
+
+    - id: 43
+      title: "Event chips in list, modal, and map are unaffected by hero status"
+      description: >
+        Open an event that has both hero and non-hero tags. Check the tag chips
+        visible in the event list card, the event detail modal, and the map popup.
+      expected: >
+        Tag chips are ordered by group ordinal then tag ordinal (canonical order),
+        NOT by hero_ordinal. Hero status has no effect on chip ordering.

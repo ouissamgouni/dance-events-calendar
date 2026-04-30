@@ -49,6 +49,8 @@ def _tag_to_response(tag: Tag) -> TagResponse:
         group_label=tag.group.label if tag.group else "",
         group_color=tag.group.color if tag.group else None,
         enabled=tag.enabled,
+        is_hero_filter=tag.is_hero_filter,
+        hero_ordinal=tag.hero_ordinal,
     )
 
 
@@ -93,6 +95,8 @@ def get_event_tags(
             group_label=group.label,
             group_color=group.color,
             enabled=tag.enabled,
+            is_hero_filter=tag.is_hero_filter,
+            hero_ordinal=tag.hero_ordinal,
         )
         result.setdefault(et.event_id, []).append(tag_resp)
     return result

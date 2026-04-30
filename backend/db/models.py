@@ -37,8 +37,23 @@ class CachedEvent(SQLModel, table=True):
     price_is_free: bool = Field(default=False)
     review_status: str = Field(default="pending")
     links: Optional[list] = Field(default=None, sa_column=Column(JSON))
+    content_hash: Optional[str] = Field(default=None, index=True)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     deleted_at: Optional[datetime] = Field(default=None, index=True)
+
+
+class EventCalendarSource(SQLModel, table=True):
+    """Tracks every source calendar that contributed to a canonical CachedEvent."""
+
+    __tablename__ = "event_calendar_sources"
+    __table_args__ = (
+        UniqueConstraint("event_id", "calendar_id", name="uq_event_calendar_source"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    event_id: str = Field(foreign_key="cached_events.event_id", index=True)
+    calendar_id: str = Field(foreign_key="calendar_settings.calendar_id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class EventView(SQLModel, table=True):
@@ -48,6 +63,8 @@ class EventView(SQLModel, table=True):
     event_id: str = Field(index=True)
     device_id: Optional[str] = Field(default=None, index=True)
     source: Optional[str] = Field(default=None)  # calendar | list | map | direct
+    country: Optional[str] = Field(default=None)
+    city: Optional[str] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -58,6 +75,25 @@ class EventSave(SQLModel, table=True):
     event_id: str = Field(index=True)
     device_id: str = Field(index=True)
     action: str = Field(default="save")  # save | unsave
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class UserSavedEvent(SQLModel, table=True):
+    __tablename__ = "user_saved_events"
+    __table_args__ = (UniqueConstraint("device_id", "event_id"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    device_id: str = Field(index=True, max_length=64)
+    event_id: str = Field(index=True)
+    saved_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ShareToken(SQLModel, table=True):
+    __tablename__ = "share_tokens"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    token: str = Field(unique=True, index=True)
+    device_id: str = Field(unique=True, index=True, max_length=64)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -82,6 +118,7 @@ class SyncLog(SQLModel, table=True):
     error_message: Optional[str] = Field(default=None, sa_column=Column(Text))
     enrichment_status: str = Field(default="pending")  # pending | running | completed
     enrichment_progress: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    dedup_log: Optional[list] = Field(default=None, sa_column=Column(JSON))
 
 
 class EventSuggestion(SQLModel, table=True):
@@ -136,6 +173,8 @@ class EventLinkClick(SQLModel, table=True):
     event_id: str = Field(index=True)
     device_id: Optional[str] = Field(default=None, index=True)
     url: str
+    country: Optional[str] = Field(default=None)
+    city: Optional[str] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -178,6 +217,8 @@ class Tag(SQLModel, table=True):
     color: Optional[str] = Field(default=None)
     ordinal: int = Field(default=0)
     enabled: bool = Field(default=True)
+    is_hero_filter: bool = Field(default=False)
+    hero_ordinal: Optional[int] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     group: Optional[TagGroup] = Relationship(back_populates="tags")
@@ -205,4 +246,42 @@ class TagSuggestion(SQLModel, table=True):
     submitter_ip: Optional[str] = Field(default=None)
     admin_notes: Optional[str] = Field(default=None, sa_column=Column(Text))
     reviewed_at: Optional[datetime] = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class EventAttendance(SQLModel, table=True):
+    """Append-only audit log of going/not_going actions (mirrors EventSave)."""
+
+    __tablename__ = "event_attendances"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    event_id: str = Field(index=True)
+    device_id: str = Field(index=True)
+    action: str = Field(default="going")  # going | not_going
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class UserEventAttendance(SQLModel, table=True):
+    """Materialized current attendance state — one row means the device is currently going."""
+
+    __tablename__ = "user_event_attendances"
+    __table_args__ = (UniqueConstraint("device_id", "event_id"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    device_id: str = Field(index=True, max_length=64)
+    event_id: str = Field(index=True)
+    attending_since: datetime = Field(default_factory=datetime.utcnow)
+
+
+class CalendarDefaultTag(SQLModel, table=True):
+    """Tags automatically applied to new events synced from a calendar."""
+
+    __tablename__ = "calendar_default_tags"
+    __table_args__ = (
+        UniqueConstraint("calendar_id", "tag_id", name="uq_calendar_default_tag"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    calendar_id: str = Field(foreign_key="calendar_settings.calendar_id", index=True)
+    tag_id: int = Field(foreign_key="tags.id", index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)

@@ -9,6 +9,9 @@
 #   Source attribution — explorer-list, explorer-map, calendar-map, my-calendar
 # Phase 2 additions (new Group 8, steps 33–40):
 #   Umami analytics — consent-gated script load, page views, custom events
+# Phase 3 additions (new Group 9, steps 48–52):
+#   Analytics KPIs — unique viewers, source breakdown, top countries, top links,
+#   export stats, null geo handling (6th event without location)
 
 test_plan:
   name: "GDPR Tracking — Consent & Analytics"
@@ -17,8 +20,9 @@ test_plan:
     banner, consent-gated event views/link clicks/exports with source
     attribution, Umami page-level analytics, personalization (device_id),
     admin analytics views, GDPR data deletion endpoint, and edge cases
-    around consent changes. Uses mock calendar service with 5 events
-    (4 with structured links, 1 with fallback link in description).
+    around consent changes. Uses mock calendar service with 6 events
+    (5 with locations, 1 with no location to test null geo handling,
+    4 with structured links, 1 with fallback link in description).
 
   steps:
     # ── Group 1: Consent Banner UX ─────────────────────────────
@@ -422,9 +426,10 @@ test_plan:
       verification: "429 on 31st request, no user-visible error"
 
     # ── Group 8: Umami Page & Event Analytics ──────────────────
-    # Prerequisites: Umami running (docker compose up umami_dev),
-    # VITE_UMAMI_WEBSITE_ID set in secrets.dev.env, dev server restarted.
-    # Umami dashboard at http://localhost:3100 (admin/umami).
+    # Note: In scenario mode, Umami starts automatically with the scenario
+    # (docker-compose.scenario-umami.yml) and the website is auto-bootstrapped.
+    # No manual setup required. Umami URL and WEBSITE_ID are passed to the
+    # dev server automatically. Dashboard at http://localhost:<SC_UMAMI_PORT>.
     - id: 38
       title: "Umami script not loaded before consent"
       description: >
@@ -496,8 +501,10 @@ test_plan:
       title: "Umami no-ops gracefully with no WEBSITE_ID"
       description: >
         This tests the fallback mode (VITE_UMAMI_WEBSITE_ID not set or empty).
-        Set VITE_UMAMI_WEBSITE_ID= (empty) in secrets.dev.env and restart
-        the dev server. Accept all cookies.
+        In dev mode (non-scenario), set VITE_UMAMI_WEBSITE_ID= (empty) in
+        secrets.dev.env and restart the dev server. In scenario mode, the
+        WEBSITE_ID is auto-set and this step only applies to the dev environment.
+        Accept all cookies.
       expected: >
         No request to localhost:3100/script.js is made. In DevTools console,
         a debug message "[umami] VITE_UMAMI_WEBSITE_ID or VITE_UMAMI_URL not
@@ -556,3 +563,92 @@ test_plan:
         This confirms the full view → save → export analytics funnel works
         end-to-end in both the self-hosted backend and Umami.
       verification: "All 3 funnel events in Umami Events tab, all 3 backend 201s"
+
+    # ── Group 9: Analytics KPI Panels ──────────────────────────
+    # Prerequisites: complete steps 1–22 (generate view, link click,
+    # save, and export tracking data across multiple events and sources).
+    # Then log in as admin and check the Analytics sections of the admin panel.
+
+    - id: 48
+      title: "Admin sees unique_viewers on most-viewed events"
+      description: >
+        The scenario seeds EventView rows with multiple device_ids across
+        events (tracking.yaml). Log in as admin and scroll to the
+        "👁 Most Viewed Events" section.
+      expected: >
+        Each event row shows two numbers: "N views" (total view count) and
+        "N unique" (distinct device_ids). evt-gdpr-001 should have the
+        highest view count (seeded from multiple countries/devices). A
+        relative bar scales to the most-viewed event.
+      verification: "Both view_count and unique_viewers shown per event"
+
+    - id: 49
+      title: "Source breakdown panel shows view origins"
+      description: >
+        The scenario seeds EventView rows across all source channels
+        (tracking.yaml uses calendar, explorer-list, explorer-map,
+        calendar-map, and direct). Log in as admin and look for the
+        "📊 Views by Source" panel.
+      expected: >
+        Panel lists all 5 source channels with view counts and proportional
+        CSS bars. The dominant source (explorer-list from seeded data) has
+        a near-full bar. Additional views you generate at runtime will add
+        to the relevant source bucket.
+      verification: "Source breakdown panel shows all channels, bars proportional"
+
+    - id: 50
+      title: "Top countries panel shows seeded geo data"
+      description: >
+        The scenario seeds EventView rows with country data in tracking.yaml
+        (France 8 views, Germany 5, Spain 4, Netherlands 3, Belgium 2,
+        United Kingdom 2). Log in as admin immediately after scenario start
+        and look for the "🌍 Top Countries" panel.
+        Note: views you generate at runtime from localhost will NOT add to
+        country counts (127.0.0.1 is a private IP — geo resolution is skipped
+        by design). The seeded rows provide the visible data.
+      expected: >
+        Panel shows at least 6 countries sorted by view count:
+        France (8), Germany (5), Spain (4), Netherlands (3), Belgium (2),
+        United Kingdom (2). Each has a proportional CSS bar. France bar
+        is 100% width; others scale relative to it.
+      verification: "Top Countries panel lists 6 countries with correct counts and bars"
+
+    - id: 51
+      title: "Top clicked links panel shows seeded link data"
+      description: >
+        The scenario seeds 10 EventLinkClick rows (tracking.yaml). Log in
+        as admin and look for the "🔗 Top Clicked Links" panel.
+      expected: >
+        Panel shows at least:
+        - evt-gdpr-001 / https://example.com/salsa-night-tickets (4 clicks)
+        - evt-gdpr-004 / https://example.com/congress-tickets (2 clicks)
+        - evt-gdpr-002 / https://example.com/bachata-register (2 clicks)
+        Links are sorted by click count. Each row shows event title, the
+        URL as a clickable link, and the click count.
+      verification: "Top links panel lists clicked URLs with event titles and counts"
+
+    - id: 52
+      title: "Export stats panel shows seeded export data"
+      description: >
+        The scenario seeds 5 EventExport rows — 3 ICS exports (10 total
+        events) and 2 XLSX exports (10 total events) — in tracking.yaml.
+        Log in as admin and look for the "📥 Exports" panel.
+      expected: >
+        Panel shows two cards:
+        - ICS: export_count=3, total_events_exported=10
+        - XLSX: export_count=2, total_events_exported=10
+        (Additional exports you generate at runtime will increment these.)
+      verification: "Export stats panel shows ics and xlsx with seeded counts"
+
+    - id: 53
+      title: "6th event (no location) does not break analytics"
+      description: >
+        The scenario includes evt-gdpr-006 (Street Salsa Flash Mob) with no
+        location, latitude, or longitude. Click it to generate a view event.
+        Then log in as admin.
+      expected: >
+        Admin panels load without error. The event appears in most-viewed
+        events (no title shown if not in cached_events, or correct title if
+        synced). The top-countries panel handles null geo gracefully —
+        null country rows are excluded from the aggregate. No 500 errors.
+      verification: "No errors, null geo excluded from country breakdown"

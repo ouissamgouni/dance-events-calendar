@@ -9,11 +9,14 @@ import type {
 import {
     fetchAdminEvents,
     fetchEventFilterOptions,
+    fetchAdminEventIds,
+    fetchAdminTagGroups,
     reviewEvent,
     bulkReviewEvents,
     bulkRetryGeocoding,
     bulkAssignTags,
 } from '../api';
+import type { AdminTagGroup } from '../api';
 import LocationBadge from './LocationBadge';
 import AdminEventDetailPanel from './AdminEventDetailPanel';
 
@@ -23,6 +26,7 @@ interface Props {
     isOpen: boolean;
     onClose: () => void;
     preset: EventsPanelPreset;
+    initialCalendarId?: string;
 }
 
 const PAGE_SIZE = 25;
@@ -39,7 +43,7 @@ const PRESET_TITLES: Record<EventsPanelPreset, string> = {
     ungeolocated: 'Ungeolocated Events',
 };
 
-export default function EventsPanel({ isOpen, onClose, preset }: Props) {
+export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId }: Props) {
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(0);
@@ -52,9 +56,13 @@ export default function EventsPanel({ isOpen, onClose, preset }: Props) {
     const [selectedGeoStatus, setSelectedGeoStatus] = useState<string>('');
     const [selectedTagIds, setSelectedTagIds] = useState<string>('');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [allMatchingSelected, setAllMatchingSelected] = useState(false);
     const [adminDetailEventId, setAdminDetailEventId] = useState<string | null>(null);
     const [busy, setBusy] = useState('');
     const [message, setMessage] = useState('');
+    const [tagGroups, setTagGroups] = useState<AdminTagGroup[]>([]);
+    const [bulkTagPickerOpen, setBulkTagPickerOpen] = useState(false);
+    const [bulkTagIds, setBulkTagIds] = useState<number[]>([]);
     const searchTimer = useRef<ReturnType<typeof setTimeout>>();
 
     // Build filter params from current state
@@ -81,9 +89,12 @@ export default function EventsPanel({ isOpen, onClose, preset }: Props) {
             setLoading(true);
             try {
                 const params = buildParams(pageOverride);
+                // Fetch filter options without calendar_id so the calendar dropdown
+                // always shows all calendars regardless of the current selection.
+                const { calendar_id: _calId, ...optionParams } = params;
                 const [eventsRes, optionsRes] = await Promise.all([
                     fetchAdminEvents(params),
-                    fetchEventFilterOptions(params),
+                    fetchEventFilterOptions(optionParams),
                 ]);
                 setEvents(eventsRes.items);
                 setTotal(eventsRes.total);
@@ -103,15 +114,25 @@ export default function EventsPanel({ isOpen, onClose, preset }: Props) {
             setPage(0);
             setSearch('');
             setDebouncedSearch('');
-            setSelectedCalendar('');
+            setSelectedCalendar(initialCalendarId ?? '');
             setSelectedReviewStatus('');
             setSelectedGeoStatus('');
             setSelectedTagIds('');
             setSelectedIds(new Set());
+            setAllMatchingSelected(false);
             setMessage('');
             setAdminDetailEventId(null);
+            setBulkTagPickerOpen(false);
+            setBulkTagIds([]);
         }
-    }, [isOpen, preset]);
+    }, [isOpen, preset, initialCalendarId]);
+
+    // Load tag groups once for the bulk tag picker
+    useEffect(() => {
+        if (isOpen && tagGroups.length === 0) {
+            fetchAdminTagGroups().then(setTagGroups).catch(() => { });
+        }
+    }, [isOpen]);  // eslint-disable-line react-hooks/exhaustive-deps
 
     // Fetch when filters/page change
     useEffect(() => {
@@ -137,12 +158,55 @@ export default function EventsPanel({ isOpen, onClose, preset }: Props) {
     const handleSelectAll = () => {
         if (selectedIds.size === events.length) {
             setSelectedIds(new Set());
+            setAllMatchingSelected(false);
         } else {
             setSelectedIds(new Set(events.map((e) => e.event_id)));
+            setAllMatchingSelected(false);
+        }
+    };
+
+    const handleSelectAllMatching = async () => {
+        setBusy('select-all');
+        try {
+            const params = buildParams(0);
+            // Remove pagination for the IDs fetch
+            const { limit: _l, offset: _o, ...filterParams } = params;
+            const result = await fetchAdminEventIds(filterParams);
+            setSelectedIds(new Set(result.ids));
+            setAllMatchingSelected(true);
+        } catch {
+            setMessage('Failed to select all matching events.');
+        } finally {
+            setBusy('');
+        }
+    };
+
+    const handleToggleBulkTag = (tagId: number) => {
+        setBulkTagIds((prev) =>
+            prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
+        );
+    };
+
+    const handleBulkAssignTags = async () => {
+        if (selectedIds.size === 0 || bulkTagIds.length === 0) return;
+        setBusy('bulk-tags');
+        try {
+            const result = await bulkAssignTags([...selectedIds], bulkTagIds);
+            setMessage(`Assigned ${result.assigned} tag assignment(s) across ${selectedIds.size} event(s).`);
+            setSelectedIds(new Set());
+            setAllMatchingSelected(false);
+            setBulkTagPickerOpen(false);
+            setBulkTagIds([]);
+            loadEvents();
+        } catch {
+            setMessage('Failed to assign tags.');
+        } finally {
+            setBusy('');
         }
     };
 
     const handleToggleSelect = (id: string) => {
+        setAllMatchingSelected(false);
         setSelectedIds((prev) => {
             const next = new Set(prev);
             if (next.has(id)) next.delete(id);
@@ -238,7 +302,7 @@ export default function EventsPanel({ isOpen, onClose, preset }: Props) {
                     {filterOptions && (
                         <div className="flex flex-wrap gap-1.5">
                             {/* Calendar filter */}
-                            {filterOptions.calendars.length > 1 && (
+                            {filterOptions.calendars.length > 0 && (
                                 <select
                                     value={selectedCalendar}
                                     onChange={(e) => { setSelectedCalendar(e.target.value); setPage(0); }}
@@ -456,6 +520,70 @@ export default function EventsPanel({ isOpen, onClose, preset }: Props) {
                     </div>
                 )}
 
+                {/* Select-all-matching banner */}
+                {selectedIds.size === events.length && events.length === PAGE_SIZE && total > PAGE_SIZE && !allMatchingSelected && (
+                    <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-50 border-t border-amber-200 text-[10px] text-amber-800 shrink-0">
+                        <span>All {events.length} on this page selected.</span>
+                        <button
+                            onClick={handleSelectAllMatching}
+                            disabled={busy === 'select-all'}
+                            className="font-semibold underline hover:no-underline disabled:opacity-50"
+                        >
+                            {busy === 'select-all' ? 'Selecting…' : `Select all ${total} matching events`}
+                        </button>
+                    </div>
+                )}
+                {allMatchingSelected && (
+                    <div className="flex items-center gap-2 px-4 py-1.5 bg-amber-50 border-t border-amber-200 text-[10px] text-amber-800 shrink-0">
+                        <span>All {selectedIds.size} matching events selected.</span>
+                        <button
+                            onClick={() => { setSelectedIds(new Set(events.map((e) => e.event_id))); setAllMatchingSelected(false); }}
+                            className="font-semibold underline hover:no-underline"
+                        >
+                            Revert to page selection
+                        </button>
+                    </div>
+                )}
+
+                {/* Bulk Tag Picker */}
+                {bulkTagPickerOpen && (
+                    <div className="px-4 py-2.5 border-t border-blue-200 bg-white shrink-0">
+                        <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-2">Assign tags to {selectedIds.size} event(s)</p>
+                        <div className="flex flex-wrap gap-1 mb-2">
+                            {tagGroups.filter((g) => g.enabled).map((group) =>
+                                group.tags.filter((t) => t.enabled).map((tag) => (
+                                    <button
+                                        key={tag.id}
+                                        onClick={() => handleToggleBulkTag(tag.id)}
+                                        className={`text-[10px] px-2 py-0.5 border transition ${bulkTagIds.includes(tag.id)
+                                            ? 'bg-blue-600 border-blue-600 text-white'
+                                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                                            }`}
+                                        style={bulkTagIds.includes(tag.id) && tag.color ? { backgroundColor: tag.color, borderColor: tag.color } : {}}
+                                    >
+                                        {tag.label}
+                                    </button>
+                                ))
+                            )}
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleBulkAssignTags}
+                                disabled={bulkTagIds.length === 0 || !!busy}
+                                className="text-[10px] font-medium px-2.5 py-1 bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 transition"
+                            >
+                                {busy === 'bulk-tags' ? 'Applying…' : `Apply ${bulkTagIds.length > 0 ? `(${bulkTagIds.length})` : ''}`}
+                            </button>
+                            <button
+                                onClick={() => { setBulkTagPickerOpen(false); setBulkTagIds([]); }}
+                                className="text-[10px] text-gray-500 hover:text-gray-700"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Bulk Action Bar */}
                 {selectedIds.size > 0 && (
                     <div className="flex items-center gap-2 px-4 py-2 border-t border-blue-200 bg-blue-50 shrink-0">
@@ -463,6 +591,13 @@ export default function EventsPanel({ isOpen, onClose, preset }: Props) {
                             {selectedIds.size} selected
                         </span>
                         <div className="flex-1" />
+                        <button
+                            onClick={() => { setBulkTagPickerOpen((o) => !o); setBulkTagIds([]); }}
+                            disabled={!!busy}
+                            className="text-[10px] font-medium px-2 py-1 bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition"
+                        >
+                            Assign Tags
+                        </button>
                         <button
                             onClick={handleBulkReview}
                             disabled={!!busy}
@@ -478,7 +613,7 @@ export default function EventsPanel({ isOpen, onClose, preset }: Props) {
                             {busy === 'bulk-geo' ? 'Retrying…' : 'Retry Geocoding'}
                         </button>
                         <button
-                            onClick={() => setSelectedIds(new Set())}
+                            onClick={() => { setSelectedIds(new Set()); setAllMatchingSelected(false); setBulkTagPickerOpen(false); }}
                             className="text-[10px] text-gray-500 hover:text-gray-700 px-1"
                         >
                             Clear

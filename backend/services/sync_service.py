@@ -1,9 +1,29 @@
+import hashlib
 import logging
 from datetime import datetime
 
 from sqlmodel import Session, select
 
-from backend.db.models import CachedEvent, CalendarSetting, SyncLog
+from backend.db.models import (
+    CachedEvent,
+    CalendarDefaultTag,
+    CalendarSetting,
+    EventCalendarSource,
+    EventTag,
+    SyncLog,
+)
+
+
+def compute_content_hash(title: str, start: datetime, location: str | None) -> str:
+    """SHA-256 of normalized title|start_iso|location — used for cross-calendar dedup."""
+    normalized = (
+        f"{(title or '').strip().lower()}"
+        f"|{start.isoformat()}"
+        f"|{(location or '').strip().lower()}"
+    )
+    return hashlib.sha256(normalized.encode()).hexdigest()
+
+
 from backend.services.calendar.base import BaseCalendarService
 from backend.services.pipeline.base import EnrichmentPipeline
 from backend.services.pipeline.stages.geocoding import GeocodingStage
@@ -55,6 +75,7 @@ class SyncService:
 
         stats = {"calendars_synced": 0, "events_upserted": 0, "events_deleted": 0}
         all_needs_enrichment: list[str] = []
+        all_dedup_entries: list[dict] = []
 
         enabled = session.exec(
             select(CalendarSetting).where(CalendarSetting.enabled == True)
@@ -68,6 +89,7 @@ class SyncService:
                     stats["events_upserted"] += cal_stats["upserted"]
                     stats["events_deleted"] += cal_stats["deleted"]
                     all_needs_enrichment.extend(cal_stats.get("needs_enrichment", []))
+                    all_dedup_entries.extend(cal_stats.get("dedup_entries", []))
                 except Exception:
                     logger.exception("Failed to sync calendar %s", cal.calendar_id)
 
@@ -81,6 +103,12 @@ class SyncService:
             log.calendars_synced = stats["calendars_synced"]
             log.events_upserted = stats["events_upserted"]
             log.events_deleted = stats["events_deleted"]
+            if all_dedup_entries:
+                log.dedup_log = all_dedup_entries
+                logger.info(
+                    "Sync complete: %d duplicates merged across all calendars",
+                    len(all_dedup_entries),
+                )
             session.add(log)
             session.commit()
 
@@ -117,15 +145,31 @@ class SyncService:
                 sync_token=None,
             )
 
+        # Load default tag IDs for this calendar once
+        default_tag_ids = [
+            row.tag_id
+            for row in session.exec(
+                select(CalendarDefaultTag).where(
+                    CalendarDefaultTag.calendar_id == cal.calendar_id
+                )
+            ).all()
+        ]
+
         # Phase 1: Upsert events immediately (no enrichment) so they are
         # visible to GET /events right away.
         upserted = 0
+        duplicates_merged = 0
         needs_enrichment: list[str] = []
+        dedup_entries: list[dict] = []
 
         for event in result.events:
+            content_hash = compute_content_hash(
+                event.title, event.start, event.location
+            )
+
             existing = session.get(CachedEvent, event.event_id)
             if existing:
-                # Check if user-visible fields changed BEFORE overwriting
+                # --- Known Google event ID: normal upsert ---
                 fields_changed = (
                     existing.title != event.title
                     or existing.description != event.description
@@ -140,11 +184,11 @@ class SyncService:
                 existing.start = event.start
                 existing.end = event.end
                 existing.all_day = event.all_day
+                existing.content_hash = content_hash
                 existing.updated_at = datetime.utcnow()
                 existing.deleted_at = None  # un-delete if re-appeared
                 if fields_changed:
                     existing.review_status = "pending"
-                # Mark for enrichment if any field is missing
                 if (
                     (event.location and existing.latitude is None)
                     or (event.description and existing.price_min is None)
@@ -152,21 +196,62 @@ class SyncService:
                 ):
                     needs_enrichment.append(event.event_id)
                 session.add(existing)
+                # Track this calendar as a source (ignore if already recorded)
+                _upsert_calendar_source(session, event.event_id, cal.calendar_id)
+                upserted += 1
             else:
-                new_event = CachedEvent(
-                    event_id=event.event_id,
-                    calendar_id=event.calendar_id,
-                    title=event.title,
-                    description=event.description,
-                    location=event.location,
-                    start=event.start,
-                    end=event.end,
-                    all_day=event.all_day,
-                )
-                session.add(new_event)
-                if event.location or event.description:
-                    needs_enrichment.append(event.event_id)
-            upserted += 1
+                # --- Unknown Google event ID: check for content-hash duplicate ---
+                canonical = session.exec(
+                    select(CachedEvent).where(
+                        CachedEvent.content_hash == content_hash,
+                        CachedEvent.deleted_at == None,  # noqa: E711
+                    )
+                ).first()
+
+                if canonical:
+                    # Duplicate found — merge tags and record source, skip new row
+                    logger.info(
+                        "Duplicate detected: '%s' (incoming_id=%s) matches canonical %s"
+                        " — merging tags from calendar %s",
+                        event.title,
+                        event.event_id,
+                        canonical.event_id,
+                        cal.calendar_id,
+                    )
+                    for tag_id in default_tag_ids:
+                        _upsert_event_tag(session, canonical.event_id, tag_id)
+                    _upsert_calendar_source(
+                        session, canonical.event_id, cal.calendar_id
+                    )
+                    dedup_entries.append(
+                        {
+                            "title": event.title,
+                            "incoming_id": event.event_id,
+                            "canonical_id": canonical.event_id,
+                            "calendar_id": cal.calendar_id,
+                        }
+                    )
+                    duplicates_merged += 1
+                else:
+                    # Genuinely new event
+                    new_event = CachedEvent(
+                        event_id=event.event_id,
+                        calendar_id=event.calendar_id,
+                        title=event.title,
+                        description=event.description,
+                        location=event.location,
+                        start=event.start,
+                        end=event.end,
+                        all_day=event.all_day,
+                        content_hash=content_hash,
+                    )
+                    session.add(new_event)
+                    for tag_id in default_tag_ids:
+                        session.add(EventTag(event_id=event.event_id, tag_id=tag_id))
+                    _upsert_calendar_source(session, event.event_id, cal.calendar_id)
+                    if event.location or event.description:
+                        needs_enrichment.append(event.event_id)
+                    upserted += 1
 
         deleted = 0
         for event_id in result.deleted_event_ids:
@@ -184,14 +269,45 @@ class SyncService:
         # Commit events immediately — visible to API consumers now
         session.commit()
         logger.info(
-            "Synced calendar %s: %d upserted, %d deleted",
+            "Synced calendar %s: %d upserted, %d deleted, %d duplicates merged",
             cal.calendar_id,
             upserted,
             deleted,
+            duplicates_merged,
         )
 
         return {
             "upserted": upserted,
             "deleted": deleted,
             "needs_enrichment": needs_enrichment,
+            "dedup_entries": dedup_entries,
         }
+
+
+# ---------------------------------------------------------------------------
+# Private helpers
+# ---------------------------------------------------------------------------
+
+
+def _upsert_calendar_source(session: Session, event_id: str, calendar_id: str) -> None:
+    """Insert an EventCalendarSource row if it doesn't already exist."""
+    existing = session.exec(
+        select(EventCalendarSource).where(
+            EventCalendarSource.event_id == event_id,
+            EventCalendarSource.calendar_id == calendar_id,
+        )
+    ).first()
+    if not existing:
+        session.add(EventCalendarSource(event_id=event_id, calendar_id=calendar_id))
+
+
+def _upsert_event_tag(session: Session, event_id: str, tag_id: int) -> None:
+    """Insert an EventTag row if it doesn't already exist."""
+    existing = session.exec(
+        select(EventTag).where(
+            EventTag.event_id == event_id,
+            EventTag.tag_id == tag_id,
+        )
+    ).first()
+    if not existing:
+        session.add(EventTag(event_id=event_id, tag_id=tag_id))

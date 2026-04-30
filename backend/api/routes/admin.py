@@ -11,9 +11,12 @@ from backend.api.schemas import (
     BulkEventIdsRequest,
     BulkTagAssignRequest,
     CalendarAddRequest,
+    CalendarDefaultTagsResponse,
+    CalendarDefaultTagsUpdate,
     CalendarSettingResponse,
     CalendarToggleRequest,
     EventFilterOptionsResponse,
+    EventIdsResponse,
     EventResponse,
     EventUpdateRequest,
     FilterOption,
@@ -24,13 +27,18 @@ from backend.api.schemas import (
 from backend.api.routes.tags import get_event_tags
 from backend.db.database import get_session
 from backend.db.models import (
+    CalendarDefaultTag,
     CachedEvent,
     CalendarSetting,
+    EventAttendance,
+    EventLinkClick,
+    EventExport,
     EventSave,
     EventTag,
     EventView,
     SyncLog,
     Tag,
+    UserEventAttendance,
 )
 from backend.services.geocoding import geocode_location
 from backend.services.sync_service import SyncService
@@ -193,7 +201,11 @@ def most_viewed_events(
     _admin: dict = Depends(require_admin),
 ):
     results = session.exec(
-        select(EventView.event_id, func.count(EventView.id).label("view_count"))
+        select(
+            EventView.event_id,
+            func.count(EventView.id).label("view_count"),
+            func.count(func.distinct(EventView.device_id)).label("unique_viewers"),
+        )
         .group_by(EventView.event_id)
         .order_by(func.count(EventView.id).desc())
         .limit(limit)
@@ -213,6 +225,106 @@ def most_viewed_events(
             "event_id": r[0],
             "title": events_map[r[0]].title if r[0] in events_map else "Unknown",
             "view_count": r[1],
+            "unique_viewers": r[2],
+        }
+        for r in results
+    ]
+
+
+@router.get("/analytics/source-breakdown")
+def analytics_source_breakdown(
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Aggregate EventView by source channel."""
+    results = session.exec(
+        select(
+            func.coalesce(EventView.source, "direct").label("source"),
+            func.count(EventView.id).label("view_count"),
+        )
+        .group_by(func.coalesce(EventView.source, "direct"))
+        .order_by(func.count(EventView.id).desc())
+    ).all()
+    return [{"source": r[0], "view_count": r[1]} for r in results]
+
+
+@router.get("/analytics/top-countries")
+def analytics_top_countries(
+    limit: int = 10,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Aggregate EventView by visitor country."""
+    results = session.exec(
+        select(
+            EventView.country,
+            func.count(EventView.id).label("view_count"),
+        )
+        .where(EventView.country.is_not(None))
+        .group_by(EventView.country)
+        .order_by(func.count(EventView.id).desc())
+        .limit(limit)
+    ).all()
+    return [{"country": r[0], "view_count": r[1]} for r in results]
+
+
+@router.get("/analytics/top-links")
+def analytics_top_links(
+    limit: int = 20,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Aggregate EventLinkClick by URL with event title."""
+    results = session.exec(
+        select(
+            EventLinkClick.event_id,
+            EventLinkClick.url,
+            func.count(EventLinkClick.id).label("click_count"),
+        )
+        .group_by(EventLinkClick.event_id, EventLinkClick.url)
+        .order_by(func.count(EventLinkClick.id).desc())
+        .limit(limit)
+    ).all()
+
+    event_ids = list({r[0] for r in results})
+    events_map: dict[str, CachedEvent] = {}
+    if event_ids:
+        evts = session.exec(
+            select(CachedEvent).where(CachedEvent.event_id.in_(event_ids))
+        ).all()
+        events_map = {e.event_id: e for e in evts}
+
+    return [
+        {
+            "event_id": r[0],
+            "event_title": events_map[r[0]].title if r[0] in events_map else "Unknown",
+            "url": r[1],
+            "click_count": r[2],
+        }
+        for r in results
+    ]
+
+
+@router.get("/analytics/exports")
+def analytics_exports(
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Aggregate EventExport by format."""
+    results = session.exec(
+        select(
+            EventExport.format,
+            func.count(EventExport.id).label("export_count"),
+            func.sum(EventExport.event_count).label("total_events_exported"),
+        )
+        .group_by(EventExport.format)
+        .order_by(func.count(EventExport.id).desc())
+    ).all()
+    return [
+        {
+            "format": r[0],
+            "export_count": r[1],
+            "total_events_exported": r[2] or 0,
         }
         for r in results
     ]
@@ -280,6 +392,68 @@ def most_saved_events(
             "save_count": r[1],
         }
         for r in save_counts
+    ]
+
+
+@router.get("/most-attended-events")
+def most_attended_events(
+    limit: int = 20,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Top events by net going count (going minus not_going per device)."""
+    from sqlalchemy import case
+
+    going_counts = session.exec(
+        select(
+            EventAttendance.event_id,
+            func.sum(
+                case(
+                    (EventAttendance.action == "going", 1),
+                    (EventAttendance.action == "not_going", -1),
+                    else_=0,
+                )
+            ).label("going_count"),
+        )
+        .group_by(EventAttendance.event_id)
+        .having(
+            func.sum(
+                case(
+                    (EventAttendance.action == "going", 1),
+                    (EventAttendance.action == "not_going", -1),
+                    else_=0,
+                )
+            )
+            > 0
+        )
+        .order_by(
+            func.sum(
+                case(
+                    (EventAttendance.action == "going", 1),
+                    (EventAttendance.action == "not_going", -1),
+                    else_=0,
+                )
+            ).desc()
+        )
+        .limit(limit)
+    ).all()
+
+    event_ids = [r[0] for r in going_counts]
+    events_map: dict[str, CachedEvent] = {}
+    if event_ids:
+        evts = session.exec(
+            select(CachedEvent).where(CachedEvent.event_id.in_(event_ids))
+        ).all()
+        events_map = {e.event_id: e for e in evts}
+
+    return [
+        {
+            "event_id": r[0],
+            "title": events_map[r[0]].title if r[0] in events_map else "Unknown",
+            "start": events_map[r[0]].start.isoformat() if r[0] in events_map else None,
+            "going_count": r[1],
+        }
+        for r in going_counts
     ]
 
 
@@ -760,6 +934,112 @@ def retry_geocoding_single(
         "geocoded": geo.processed if geo else 0,
         "failed": geo.failed if geo else 0,
     }
+
+
+@router.get("/events/ids", response_model=EventIdsResponse)
+def list_admin_event_ids(
+    search: Optional[str] = Query(default=None, max_length=200),
+    review_status: Optional[str] = Query(default=None, pattern="^(pending|reviewed)$"),
+    calendar_id: Optional[str] = Query(default=None),
+    tag_ids: Optional[str] = Query(default=None),
+    ungeolocated: Optional[bool] = Query(default=None),
+    future_only: Optional[bool] = Query(default=None),
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Return all matching event IDs (no pagination). Used for cross-page select-all."""
+    from datetime import datetime as dt
+    from sqlalchemy import cast, String
+
+    base = select(CachedEvent.event_id).where(CachedEvent.deleted_at == None)
+
+    if review_status:
+        base = base.where(CachedEvent.review_status == review_status)
+    if calendar_id:
+        base = base.where(CachedEvent.calendar_id == calendar_id)
+    if ungeolocated:
+        base = base.where(
+            CachedEvent.location != None,
+            CachedEvent.latitude == None,
+        )
+    if future_only:
+        base = base.where(CachedEvent.start > dt.utcnow())
+    if search:
+        pattern = f"%{search}%"
+        base = base.where(
+            (CachedEvent.title.ilike(pattern))
+            | (CachedEvent.description.ilike(pattern))
+            | (CachedEvent.location.ilike(pattern))
+            | (cast(CachedEvent.links, String).ilike(pattern))
+        )
+    if tag_ids:
+        tid_list = [int(t) for t in tag_ids.split(",") if t.strip().isdigit()]
+        if tid_list:
+            matching_event_ids = session.exec(
+                select(EventTag.event_id)
+                .where(EventTag.tag_id.in_(tid_list))
+                .distinct()
+            ).all()
+            base = base.where(CachedEvent.event_id.in_(matching_event_ids))
+
+    ids = session.exec(base).all()
+    return EventIdsResponse(ids=list(ids))
+
+
+@router.get(
+    "/calendars/{calendar_id}/default-tags", response_model=CalendarDefaultTagsResponse
+)
+def get_calendar_default_tags(
+    calendar_id: str,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Get the default tag IDs configured for a calendar."""
+    cal = session.get(CalendarSetting, calendar_id)
+    if not cal:
+        raise HTTPException(status_code=404, detail="Calendar not found")
+    rows = session.exec(
+        select(CalendarDefaultTag).where(CalendarDefaultTag.calendar_id == calendar_id)
+    ).all()
+    return CalendarDefaultTagsResponse(
+        calendar_id=calendar_id, tag_ids=[r.tag_id for r in rows]
+    )
+
+
+@router.put(
+    "/calendars/{calendar_id}/default-tags", response_model=CalendarDefaultTagsResponse
+)
+def set_calendar_default_tags(
+    calendar_id: str,
+    body: CalendarDefaultTagsUpdate,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Replace the set of default tags for a calendar."""
+    cal = session.get(CalendarSetting, calendar_id)
+    if not cal:
+        raise HTTPException(status_code=404, detail="Calendar not found")
+
+    # Validate tag IDs exist
+    valid_tags = session.exec(select(Tag).where(Tag.id.in_(body.tag_ids))).all()
+    valid_tag_ids = {t.id for t in valid_tags}
+
+    # Delete existing
+    existing = session.exec(
+        select(CalendarDefaultTag).where(CalendarDefaultTag.calendar_id == calendar_id)
+    ).all()
+    for row in existing:
+        session.delete(row)
+    session.flush()  # push DELETEs to DB before INSERTs to avoid unique constraint violation
+
+    # Insert new
+    for tid in valid_tag_ids:
+        session.add(CalendarDefaultTag(calendar_id=calendar_id, tag_id=tid))
+
+    session.commit()
+    return CalendarDefaultTagsResponse(
+        calendar_id=calendar_id, tag_ids=list(valid_tag_ids)
+    )
 
 
 @router.get("/sync-logs/{log_id}/progress")

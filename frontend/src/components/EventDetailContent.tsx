@@ -10,6 +10,7 @@ import AddressAutocomplete from './AddressAutocomplete';
 import EventTagEditor from './EventTagEditor';
 import LocationBadge from './LocationBadge';
 import SaveEventButton from './SaveEventButton';
+import GoingButton from './GoingButton';
 import TagBadges from './TagBadges';
 import SuggestTagsButton from './SuggestTagsButton';
 
@@ -568,6 +569,7 @@ export default function EventDetailContent({
             {showActions && (
                 <div className="border-t border-slate-100 pt-3 flex items-center gap-2 flex-wrap">
                     <SaveEventButton eventId={event.event_id} appearance="pill" />
+                    <GoingButton eventId={event.event_id} appearance="pill" />
                     <button
                         onClick={() => {
                             const url = `${window.location.origin}/event/${event.event_id}`;

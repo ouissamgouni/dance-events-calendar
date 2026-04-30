@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { CalendarEvent } from '../types';
 import EventDetailContent from './EventDetailContent';
+import GoingButton from './GoingButton';
 import SaveEventButton from './SaveEventButton';
 
 interface Props {
@@ -45,6 +46,7 @@ export default function EventDetailsPanel({
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                     <SaveEventButton eventId={event.event_id} appearance="icon" />
+                    <GoingButton eventId={event.event_id} appearance="icon" />
                     {onClose && (
                         <button
                             onClick={onClose}

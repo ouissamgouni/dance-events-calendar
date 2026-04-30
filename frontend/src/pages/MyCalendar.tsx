@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchEventsByIds, exportIcs, exportXlsx } from '../api';
+import { fetchEventsByIds, exportIcs, exportXlsx, createShareToken } from '../api';
+import { getDeviceId } from '../utils/deviceId';
 import { useSavedEvents } from '../context/SavedEventsContext';
+import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { trackExportAction, trackView } from '../utils/tracking';
 import EventListPanel from '../components/EventListPanel';
@@ -9,6 +11,8 @@ import EventMap from '../components/EventMap';
 import type { MapBounds } from '../components/EventMap';
 import EventModal from '../components/EventModal';
 import type { CalendarEvent } from '../types';
+
+type Filter = 'all' | 'saved' | 'going';
 
 function downloadBlob(blob: Blob, filename: string) {
     const url = URL.createObjectURL(blob);
@@ -22,7 +26,8 @@ function downloadBlob(blob: Blob, filename: string) {
 }
 
 export default function MyCalendar() {
-    const { savedEventIds, savedCount, clearAll } = useSavedEvents();
+    const { savedEventIds, savedCount, isSaved, clearAll } = useSavedEvents();
+    const { attendingEventIds, attendingCount, isAttending } = useAttendingEvents();
     const { showPrices, showPopularity } = useFeatureFlags();
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [loading, setLoading] = useState(true);
@@ -30,19 +35,29 @@ export default function MyCalendar() {
     const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
     const [sortBy, setSortBy] = useState<'date' | 'popularity'>('date');
     const [exporting, setExporting] = useState('');
+    const [shareStatus, setShareStatus] = useState<'idle' | 'loading' | 'copied'>('idle');
+    const [activeFilter, setActiveFilter] = useState<Filter>('all');
+
+    // Union of saved + going — deduplicated
+    const allEventIds = useMemo(
+        () => [...new Set([...savedEventIds, ...attendingEventIds])],
+        [savedEventIds, attendingEventIds],
+    );
+
+    const showFilterTabs = savedCount > 0 && attendingCount > 0;
 
     useEffect(() => {
-        if (savedEventIds.length === 0) {
+        if (allEventIds.length === 0) {
             setEvents([]);
             setLoading(false);
             return;
         }
         setLoading(true);
-        fetchEventsByIds(savedEventIds)
+        fetchEventsByIds(allEventIds)
             .then(setEvents)
             .catch(() => setEvents([]))
             .finally(() => setLoading(false));
-    }, [savedEventIds]);
+    }, [allEventIds]);
 
     const handleEventClick = useCallback((evt: CalendarEvent) => {
         trackView(evt.event_id, 'my-calendar');
@@ -54,30 +69,61 @@ export default function MyCalendar() {
     }, []);
 
     const handleExportIcs = useCallback(async () => {
-        if (savedEventIds.length === 0) return;
+        if (allEventIds.length === 0) return;
         setExporting('ics');
         try {
-            const blob = await exportIcs(savedEventIds);
+            const blob = await exportIcs(allEventIds);
             downloadBlob(blob, 'my-movida-events.ics');
-            trackExportAction('ics', savedEventIds.length);
+            trackExportAction('ics', allEventIds.length);
         } catch { /* ignore */ }
         finally { setExporting(''); }
-    }, [savedEventIds]);
+    }, [allEventIds]);
 
     const handleExportXlsx = useCallback(async () => {
-        if (savedEventIds.length === 0) return;
+        if (allEventIds.length === 0) return;
         setExporting('xlsx');
         try {
-            const blob = await exportXlsx(savedEventIds);
+            const blob = await exportXlsx(allEventIds);
             downloadBlob(blob, 'my-movida-events.xlsx');
-            trackExportAction('xlsx', savedEventIds.length);
+            trackExportAction('xlsx', allEventIds.length);
         } catch { /* ignore */ }
         finally { setExporting(''); }
-    }, [savedEventIds]);
+    }, [allEventIds]);
+
+    const handleShare = useCallback(async () => {
+        const deviceId = getDeviceId();
+        setShareStatus('loading');
+        try {
+            const { token } = await createShareToken(deviceId);
+            await navigator.clipboard.writeText(`${window.location.origin}/shared/${token}`);
+            setShareStatus('copied');
+            setTimeout(() => setShareStatus('idle'), 2500);
+        } catch {
+            setShareStatus('idle');
+        }
+    }, []);
 
     // Memoize empty array for the no-events case to keep EventMap stable
     const stableEmptyEvents = useMemo(() => [] as CalendarEvent[], []);
-    const mapEvents = events.length > 0 ? events : stableEmptyEvents;
+
+    // Events filtered by active tab
+    const displayedEvents = useMemo(() => {
+        if (activeFilter === 'saved') return events.filter((e) => isSaved(e.event_id));
+        if (activeFilter === 'going') return events.filter((e) => isAttending(e.event_id));
+        return events;
+    }, [activeFilter, events, isSaved, isAttending]);
+
+    const mapEvents = displayedEvents.length > 0 ? displayedEvents : stableEmptyEvents;
+
+    // Header count label
+    const countLabel = useMemo(() => {
+        if (savedCount > 0 && attendingCount > 0) {
+            return `${savedCount} saved · ${attendingCount} going`;
+        }
+        if (savedCount > 0) return `${savedCount} saved`;
+        if (attendingCount > 0) return `${attendingCount} going`;
+        return null;
+    }, [savedCount, attendingCount]);
 
     return (
         <div className="min-h-screen bg-[#f8fafc]">
@@ -92,13 +138,13 @@ export default function MyCalendar() {
                             <path d="M5 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14l-5-2.5L5 18V4Z" />
                         </svg>
                         My Calendar
-                        {savedCount > 0 && (
+                        {countLabel && (
                             <span className="ml-2 text-sm font-normal text-slate-500">
-                                ({savedCount} event{savedCount !== 1 ? 's' : ''})
+                                ({countLabel})
                             </span>
                         )}
                     </h1>
-                    {savedCount > 0 && (
+                    {allEventIds.length > 0 && (
                         <div className="ml-auto flex items-center gap-2">
                             <button
                                 onClick={handleExportIcs}
@@ -115,6 +161,13 @@ export default function MyCalendar() {
                                 {exporting === 'xlsx' ? 'Exporting…' : '📊 Export .xlsx'}
                             </button>
                             <button
+                                onClick={handleShare}
+                                disabled={shareStatus === 'loading'}
+                                className="rounded-full bg-rose-50 px-3 py-1 text-xs text-rose-600 hover:bg-rose-100 transition disabled:opacity-50"
+                            >
+                                {shareStatus === 'copied' ? '✓ Link copied!' : shareStatus === 'loading' ? 'Generating…' : '🔗 Share'}
+                            </button>
+                            <button
                                 onClick={clearAll}
                                 className="rounded-full bg-red-50 px-3 py-1 text-xs text-red-600 hover:bg-red-100 transition"
                             >
@@ -124,18 +177,43 @@ export default function MyCalendar() {
                     )}
                 </div>
 
-                {loading && (
-                    <p className="text-center text-slate-400 py-12">Loading saved events…</p>
+                {/* Filter tabs — only when both saved and going events exist */}
+                {showFilterTabs && (
+                    <div className="mb-4 flex items-center gap-1">
+                        {(['all', 'saved', 'going'] as Filter[]).map((f) => {
+                            const label = f === 'all'
+                                ? `All (${allEventIds.length})`
+                                : f === 'saved'
+                                    ? `Saved (${savedCount})`
+                                    : `Going (${attendingCount})`;
+                            return (
+                                <button
+                                    key={f}
+                                    onClick={() => setActiveFilter(f)}
+                                    className={`rounded-full px-3 py-1 text-xs font-medium transition ${activeFilter === f
+                                        ? 'bg-slate-800 text-white'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                        }`}
+                                >
+                                    {label}
+                                </button>
+                            );
+                        })}
+                    </div>
                 )}
 
-                {!loading && savedCount === 0 && (
+                {loading && (
+                    <p className="text-center text-slate-400 py-12">Loading your events…</p>
+                )}
+
+                {!loading && allEventIds.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-20 text-center">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-10 h-10 text-slate-300 mb-4">
                             <path d="M5 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14l-5-2.5L5 18V4Z" />
                         </svg>
-                        <p className="text-slate-600 text-lg font-medium">No events saved yet</p>
+                        <p className="text-slate-600 text-lg font-medium">No events yet</p>
                         <p className="text-slate-400 text-sm mt-1">
-                            Browse events and tap the save icon to build your personal calendar.
+                            Save events or mark "I'm going" to build your personal calendar.
                         </p>
                         <Link to="/" className="mt-6 text-sm text-slate-600 hover:underline">
                             ← Browse events
@@ -143,13 +221,13 @@ export default function MyCalendar() {
                     </div>
                 )}
 
-                {!loading && savedCount > 0 && (
+                {!loading && allEventIds.length > 0 && (
                     <div className="flex flex-col lg:flex-row gap-6">
                         {/* Left: Event list */}
                         <div className="order-1 lg:order-1 lg:w-[350px] lg:shrink-0 flex flex-col gap-4">
                             <div className="hidden lg:block lg:h-[calc(100vh-220px)] lg:overflow-hidden">
                                 <EventListPanel
-                                    events={events}
+                                    events={displayedEvents}
                                     mapBounds={mapBounds}
                                     onEventClick={handleEventClick}
                                     showPrices={showPrices}
@@ -171,7 +249,7 @@ export default function MyCalendar() {
                         {/* Mobile list */}
                         <div className="order-3 lg:hidden">
                             <EventListPanel
-                                events={events}
+                                events={displayedEvents}
                                 mapBounds={mapBounds}
                                 onEventClick={handleEventClick}
                                 showPrices={showPrices}

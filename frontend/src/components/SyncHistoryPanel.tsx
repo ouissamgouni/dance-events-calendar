@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { SyncLogEntry } from '../api';
 
 interface SyncHistoryPanelProps {
@@ -7,6 +8,7 @@ interface SyncHistoryPanelProps {
 }
 
 export default function SyncHistoryPanel({ isOpen, onClose, syncLogs }: SyncHistoryPanelProps) {
+    const [expandedDedupId, setExpandedDedupId] = useState<number | null>(null);
     return (
         <>
             {isOpen && (
@@ -65,6 +67,36 @@ export default function SyncHistoryPanel({ isOpen, onClose, syncLogs }: SyncHist
                                             ))}
                                             {log.enrichment_status === 'running' && (
                                                 <span className="text-[10px] text-blue-500 animate-pulse">enriching…</span>
+                                            )}
+                                        </div>
+                                    )}
+                                    {log.dedup_log && log.dedup_log.length > 0 && (
+                                        <div className="ml-3.5 mt-1">
+                                            <button
+                                                className="text-[10px] text-amber-600 hover:text-amber-700 cursor-pointer"
+                                                onClick={() =>
+                                                    setExpandedDedupId(
+                                                        expandedDedupId === log.id ? null : log.id
+                                                    )
+                                                }
+                                            >
+                                                {log.dedup_log.length} duplicate{log.dedup_log.length !== 1 ? 's' : ''} merged{' '}
+                                                {expandedDedupId === log.id ? '▲' : '▼'}
+                                            </button>
+                                            {expandedDedupId === log.id && (
+                                                <div className="mt-0.5 flex flex-col gap-y-0.5">
+                                                    {log.dedup_log.map((entry, i) => (
+                                                        <span key={i} className="text-[10px] text-gray-400 break-all">
+                                                            <span className="text-gray-500">{entry.title}</span>
+                                                            {' · '}
+                                                            <span className="font-mono">{entry.incoming_id.slice(0, 8)}…</span>
+                                                            {' → '}
+                                                            <span className="font-mono">{entry.canonical_id.slice(0, 8)}…</span>
+                                                            {' · '}
+                                                            {entry.calendar_id}
+                                                        </span>
+                                                    ))}
+                                                </div>
                                             )}
                                         </div>
                                     )}

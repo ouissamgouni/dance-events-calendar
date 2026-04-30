@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import type { CalendarSetting, EventSuggestion } from '../types';
-import type { SyncLogEntry } from '../api';
+import type { SyncLogEntry, AdminTagGroup } from '../api';
 import {
     fetchAdminCalendars, updateCalendar, discoverCalendars, triggerSync, addCalendar,
     fetchSettings, updateSettings, fetchSyncLogs,
     fetchSuggestions, fetchMostSavedEvents, fetchMostViewedEvents, fetchAdminTagSuggestions,
-    fetchEventFilterOptions,
+    fetchEventFilterOptions, fetchAdminTagGroups,
+    fetchCalendarDefaultTags, updateCalendarDefaultTags,
+    fetchSourceBreakdown, fetchTopCountries, fetchTopLinks, fetchExportStats,
+    fetchMostAttendedEvents,
 } from '../api';
-import type { MostSavedEvent, MostViewedEvent } from '../api';
+import type { MostSavedEvent, MostViewedEvent, MostAttendedEvent, SourceBreakdown, CountryBreakdown, TopLink, ExportStat } from '../api';
 import { useAuth } from '../context/AuthContext';
 import SyncHistoryPanel from '../components/SyncHistoryPanel';
 import EventsPanel from '../components/EventsPanel';
@@ -17,6 +20,7 @@ import SuggestionsPanel from '../components/SuggestionsPanel';
 import UnsyncedSuggestionsPanel from '../components/UnsyncedSuggestionsPanel';
 import TagSuggestionsPanel from '../components/TagSuggestionsPanel';
 import AdminTagCategories from '../components/AdminTagCategories';
+import AdminAnalytics from '../components/AdminAnalytics';
 
 export default function Admin() {
     const [calendars, setCalendars] = useState<CalendarSetting[]>([]);
@@ -26,6 +30,7 @@ export default function Admin() {
     const [newCalId, setNewCalId] = useState('');
     const [sinceDate, setSinceDate] = useState('');
     const [syncInterval, setSyncInterval] = useState(15);
+    const [autoSyncEnabled, setAutoSyncEnabled] = useState(false);
     const [showPrices, setShowPrices] = useState(false);
     const [showPopularity, setShowPopularity] = useState(false);
     const [popularityThreshold, setPopularityThreshold] = useState(10);
@@ -35,6 +40,7 @@ export default function Admin() {
     const [syncPanelOpen, setSyncPanelOpen] = useState(false);
     const [eventsPanelOpen, setEventsPanelOpen] = useState(false);
     const [eventsPanelPreset, setEventsPanelPreset] = useState<EventsPanelPreset>('all');
+    const [eventsPanelCalendarId, setEventsPanelCalendarId] = useState<string>('');
     const [suggestionsPanelOpen, setSuggestionsPanelOpen] = useState(false);
     const [unsyncedPanelOpen, setUnsyncedPanelOpen] = useState(false);
     const [tagSuggestionsPanelOpen, setTagSuggestionsPanelOpen] = useState(false);
@@ -44,12 +50,36 @@ export default function Admin() {
     const [suggestions, setSuggestions] = useState<EventSuggestion[]>([]);
     const [mostSaved, setMostSaved] = useState<MostSavedEvent[]>([]);
     const [mostViewed, setMostViewed] = useState<MostViewedEvent[]>([]);
+    const [mostAttended, setMostAttended] = useState<MostAttendedEvent[]>([]);
+    const [sourceBreakdown, setSourceBreakdown] = useState<SourceBreakdown[]>([]);
+    const [topCountries, setTopCountries] = useState<CountryBreakdown[]>([]);
+    const [topLinks, setTopLinks] = useState<TopLink[]>([]);
+    const [exportStats, setExportStats] = useState<ExportStat[]>([]);
+    // Calendar default tags: which calendar row is expanded, the tag groups data, and each calendar's tag IDs
+    const [expandedDefaultTagsCalId, setExpandedDefaultTagsCalId] = useState<string | null>(null);
+    const [tagGroups, setTagGroups] = useState<AdminTagGroup[]>([]);
+    const [calendarDefaultTagIds, setCalendarDefaultTagIds] = useState<Record<string, number[]>>({});
+    const [activeTab, setActiveTab] = useState<'config' | 'analytics'>('config');
     const { user, logout } = useAuth();
     const navigate = useNavigate();
 
     const loadCalendars = () => {
         fetchAdminCalendars()
-            .then(setCalendars)
+            .then((cals) => {
+                setCalendars(cals);
+                // Eagerly load default tag counts for all calendars so badges are visible
+                Promise.all(
+                    cals.map((cal) =>
+                        fetchCalendarDefaultTags(cal.calendar_id)
+                            .then((res) => ({ calId: cal.calendar_id, tagIds: res.tag_ids }))
+                            .catch(() => ({ calId: cal.calendar_id, tagIds: [] })),
+                    ),
+                ).then((results) => {
+                    const map: Record<string, number[]> = {};
+                    for (const { calId, tagIds } of results) map[calId] = tagIds;
+                    setCalendarDefaultTagIds(map);
+                });
+            })
             .catch(() => { })
             .finally(() => setLoading(false));
     };
@@ -59,6 +89,7 @@ export default function Admin() {
         fetchSettings().then((s) => {
             setSinceDate(s.since_date);
             setSyncInterval(s.sync_interval_minutes);
+            setAutoSyncEnabled(s.auto_sync_enabled);
             setShowPrices(s.show_prices);
             setShowPopularity(s.show_popularity);
             setPopularityThreshold(s.popularity_threshold ?? 10);
@@ -67,6 +98,11 @@ export default function Admin() {
         fetchSuggestions().then(setSuggestions).catch(() => { });
         fetchMostSavedEvents().then(setMostSaved).catch(() => { });
         fetchMostViewedEvents().then(setMostViewed).catch(() => { });
+        fetchMostAttendedEvents().then(setMostAttended).catch(() => { });
+        fetchSourceBreakdown().then(setSourceBreakdown).catch(() => { });
+        fetchTopCountries().then(setTopCountries).catch(() => { });
+        fetchTopLinks().then(setTopLinks).catch(() => { });
+        fetchExportStats().then(setExportStats).catch(() => { });
         fetchAdminTagSuggestions('pending').then((s) => setTagSuggestionCount(s.length)).catch(() => { });
         fetchEventFilterOptions({ future_only: true }).then((opts) => {
             setPendingReviewCount(opts.review_statuses.find((s) => s.value === 'pending')?.count ?? 0);
@@ -101,6 +137,43 @@ export default function Admin() {
         setCalendars((prev) =>
             prev.map((c) => (c.calendar_id === updated.calendar_id ? updated : c)),
         );
+    };
+
+    const handleShowCalendarEvents = (calId: string) => {
+        setEventsPanelCalendarId(calId);
+        setEventsPanelPreset('all');
+        setEventsPanelOpen(true);
+    };
+
+    const handleToggleDefaultTags = async (calId: string) => {
+        if (expandedDefaultTagsCalId === calId) {
+            setExpandedDefaultTagsCalId(null);
+            return;
+        }
+        setExpandedDefaultTagsCalId(calId);
+        // Fetch tag groups if not yet loaded
+        if (tagGroups.length === 0) {
+            const groups = await fetchAdminTagGroups().catch(() => []);
+            setTagGroups(groups);
+        }
+        // Fetch this calendar's current default tags if not yet loaded
+        if (!(calId in calendarDefaultTagIds)) {
+            const result = await fetchCalendarDefaultTags(calId).catch(() => ({ tag_ids: [] }));
+            setCalendarDefaultTagIds((prev) => ({ ...prev, [calId]: result.tag_ids }));
+        }
+    };
+
+    const handleToggleDefaultTag = async (calId: string, tagId: number) => {
+        const current = calendarDefaultTagIds[calId] ?? [];
+        const next = current.includes(tagId)
+            ? current.filter((id) => id !== tagId)
+            : [...current, tagId];
+        // Optimistic update
+        setCalendarDefaultTagIds((prev) => ({ ...prev, [calId]: next }));
+        await updateCalendarDefaultTags(calId, next).catch(() => {
+            // Rollback on error
+            setCalendarDefaultTagIds((prev) => ({ ...prev, [calId]: current }));
+        });
     };
 
     const handleDiscover = async () => {
@@ -187,6 +260,18 @@ export default function Admin() {
         }
     };
 
+    const handleToggleAutoSync = async () => {
+        const newVal = !autoSyncEnabled;
+        setAutoSyncEnabled(newVal);
+        try {
+            await updateSettings({ auto_sync_enabled: newVal });
+            setMessage(`Automatic sync ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setAutoSyncEnabled(!newVal);
+            setMessage('Failed to update auto sync setting.');
+        }
+    };
+
     const handleTogglePrices = async () => {
         const newVal = !showPrices;
         setShowPrices(newVal);
@@ -226,33 +311,47 @@ export default function Admin() {
     return (
         <div className="mx-auto max-w-7xl px-5 py-6">
             {/* ── Header ── */}
-            <div className="mb-5 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <h1 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                        Admin
-                    </h1>
-                    <Link
-                        to="/"
-                        className="bg-gray-100 text-gray-600 text-[11px] font-medium px-2.5 py-1 hover:bg-gray-200 transition border border-gray-200 rounded"
-                    >
-                        Explorer
-                    </Link>
-                </div>
-                <div className="flex items-center gap-2">
-                    {user && (
-                        <span className="text-[11px] text-gray-400">{user.email}</span>
-                    )}
-                    <button
-                        onClick={handleLogout}
-                        className="bg-gray-100 text-gray-600 text-[11px] font-medium px-2.5 py-1 hover:bg-gray-200 transition border border-gray-200"
-                    >
-                        Logout
-                    </button>
+            <div className="mb-5 space-y-2">
+                <h1 className="-mt-2 text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                    Admin
+                </h1>
+                <div className="flex flex-wrap items-start gap-2 sm:items-start sm:justify-between">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                        <button
+                            onClick={() => setActiveTab('config')}
+                            className={`text-[11px] font-medium px-2 py-1 sm:px-2.5 transition border ${activeTab === 'config'
+                                ? 'bg-gray-800 text-white border-gray-800 hover:bg-gray-700'
+                                : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
+                                }`}
+                        >
+                            Configuration
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('analytics')}
+                            className={`text-[11px] font-medium px-2 py-1 sm:px-2.5 transition border ${activeTab === 'analytics'
+                                ? 'bg-gray-800 text-white border-gray-800 hover:bg-gray-700'
+                                : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
+                                }`}
+                        >
+                            Analytics
+                        </button>
+                    </div>
+                    <div className="ml-auto flex min-w-0 flex-col items-end gap-1">
+                        <button
+                            onClick={handleLogout}
+                            className="whitespace-nowrap bg-gray-100 text-gray-600 text-[11px] font-medium px-2.5 py-1 hover:bg-gray-200 transition border border-gray-200"
+                        >
+                            Logout
+                        </button>
+                        {user && (
+                            <span className="max-w-[82vw] break-all text-right text-[11px] text-gray-400 sm:max-w-none">{user.email}</span>
+                        )}
+                    </div>
                 </div>
             </div>
 
-            {/* ── Action Bar ── */}
-            <div className="mb-4 flex items-center gap-2 flex-wrap">
+            {/* ── Action Bar (config only) ── */}
+            {activeTab === 'config' && <div className="mb-4 flex items-center gap-2 flex-wrap">
                 <button
                     onClick={handleDiscover}
                     disabled={!!busy}
@@ -282,7 +381,7 @@ export default function Admin() {
                     )}
                 </button>
                 <button
-                    onClick={() => { setEventsPanelPreset('all'); setEventsPanelOpen(true); }}
+                    onClick={() => { setEventsPanelPreset('all'); setEventsPanelCalendarId(''); setEventsPanelOpen(true); }}
                     className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
                 >
                     Events
@@ -342,14 +441,14 @@ export default function Admin() {
                         </span>
                     )}
                 </button>
-            </div>
+            </div>}
 
-            {message && (
+            {activeTab === 'config' && message && (
                 <p className="mb-4 bg-blue-50 border border-blue-100 px-3 py-1.5 text-[11px] text-blue-700">{message}</p>
             )}
 
-            {/* ── 3-Column Grid ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* ── 3-Column Grid (Config) ── */}
+            {activeTab === 'config' && <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
                 {/* Card 1: Calendar Sources */}
                 <div className="border border-gray-200 bg-white">
@@ -386,49 +485,106 @@ export default function Admin() {
                         ) : (
                             <ul className="divide-y divide-gray-100">
                                 {calendars.map((cal) => (
-                                    <li key={cal.calendar_id} className="flex items-center justify-between py-2 first:pt-0 last:pb-0">
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <input
-                                                type="color"
-                                                value={cal.color || '#3b82f6'}
-                                                onChange={(e) => handleColorChange(cal, e.target.value)}
-                                                className="h-4 w-4 cursor-pointer border-0 p-0 shrink-0"
-                                                title="Change color"
-                                            />
-                                            <div className="min-w-0">
-                                                {editingCalId === cal.calendar_id ? (
-                                                    <input
-                                                        type="text"
-                                                        value={editingName}
-                                                        onChange={(e) => setEditingName(e.target.value)}
-                                                        onBlur={() => handleNameSave(cal)}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') handleNameSave(cal);
-                                                            if (e.key === 'Escape') setEditingCalId(null);
-                                                        }}
-                                                        autoFocus
-                                                        className="text-[11px] font-medium text-gray-700 border border-blue-400 px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 w-full"
-                                                    />
-                                                ) : (
-                                                    <span
-                                                        className="text-[11px] font-medium text-gray-700 cursor-pointer hover:text-blue-600 transition block truncate"
-                                                        onClick={() => handleNameEdit(cal)}
-                                                        title={cal.calendar_id}
-                                                    >
-                                                        {cal.name}
-                                                    </span>
-                                                )}
+                                    <li key={cal.calendar_id} className="py-2 first:pt-0 last:pb-0">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <input
+                                                    type="color"
+                                                    value={cal.color || '#3b82f6'}
+                                                    onChange={(e) => handleColorChange(cal, e.target.value)}
+                                                    className="h-4 w-4 cursor-pointer border-0 p-0 shrink-0"
+                                                    title="Change color"
+                                                />
+                                                <div className="min-w-0">
+                                                    {editingCalId === cal.calendar_id ? (
+                                                        <input
+                                                            type="text"
+                                                            value={editingName}
+                                                            onChange={(e) => setEditingName(e.target.value)}
+                                                            onBlur={() => handleNameSave(cal)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') handleNameSave(cal);
+                                                                if (e.key === 'Escape') setEditingCalId(null);
+                                                            }}
+                                                            autoFocus
+                                                            className="text-[11px] font-medium text-gray-700 border border-blue-400 px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 w-full"
+                                                        />
+                                                    ) : (
+                                                        <span
+                                                            className="text-[11px] font-medium text-gray-700 cursor-pointer hover:text-blue-600 transition block truncate"
+                                                            onClick={() => handleNameEdit(cal)}
+                                                            title={cal.calendar_id}
+                                                        >
+                                                            {cal.name}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                <button
+                                                    onClick={() => handleShowCalendarEvents(cal.calendar_id)}
+                                                    className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition"
+                                                    title="Show all events from this calendar"
+                                                >
+                                                    Events
+                                                </button>
+                                                <button
+                                                    onClick={() => handleToggleDefaultTags(cal.calendar_id)}
+                                                    className={`text-[10px] font-medium px-1.5 py-0.5 border transition ${expandedDefaultTagsCalId === cal.calendar_id
+                                                        ? 'bg-violet-50 border-violet-300 text-violet-700'
+                                                        : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                                                        }`}
+                                                    title="Configure default tags for new events from this calendar"
+                                                >
+                                                    Tags
+                                                    {(calendarDefaultTagIds[cal.calendar_id]?.length ?? 0) > 0 && (
+                                                        <span className="ml-1 inline-flex items-center justify-center bg-violet-500 text-white text-[9px] font-semibold px-1 min-w-[14px]">
+                                                            {calendarDefaultTagIds[cal.calendar_id].length}
+                                                        </span>
+                                                    )}
+                                                </button>
+                                                <button
+                                                    onClick={() => handleToggle(cal)}
+                                                    className={`text-[10px] font-medium px-2 py-0.5 transition ${cal.enabled
+                                                        ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                                        }`}
+                                                >
+                                                    {cal.enabled ? 'On' : 'Off'}
+                                                </button>
                                             </div>
                                         </div>
-                                        <button
-                                            onClick={() => handleToggle(cal)}
-                                            className={`text-[10px] font-medium px-2 py-0.5 shrink-0 transition ${cal.enabled
-                                                ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                                                }`}
-                                        >
-                                            {cal.enabled ? 'On' : 'Off'}
-                                        </button>
+                                        {/* Inline default tags picker */}
+                                        {expandedDefaultTagsCalId === cal.calendar_id && (
+                                            <div className="mt-2 pl-6">
+                                                <p className="text-[10px] text-gray-400 mb-1.5">
+                                                    Default tags — applied to new events synced from this calendar:
+                                                </p>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {tagGroups.filter((g) => g.enabled).map((group) =>
+                                                        group.tags.filter((t) => t.enabled).map((tag) => {
+                                                            const active = (calendarDefaultTagIds[cal.calendar_id] ?? []).includes(tag.id);
+                                                            return (
+                                                                <button
+                                                                    key={tag.id}
+                                                                    onClick={() => handleToggleDefaultTag(cal.calendar_id, tag.id)}
+                                                                    className={`text-[10px] px-2 py-0.5 border transition ${active
+                                                                        ? 'text-white border-transparent'
+                                                                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                                                                        }`}
+                                                                    style={active ? { backgroundColor: tag.color || '#7c3aed', borderColor: tag.color || '#7c3aed' } : {}}
+                                                                >
+                                                                    {tag.label}
+                                                                </button>
+                                                            );
+                                                        })
+                                                    )}
+                                                    {tagGroups.length === 0 && (
+                                                        <span className="text-[10px] text-gray-400">No tags configured yet.</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
                                     </li>
                                 ))}
                             </ul>
@@ -463,24 +619,33 @@ export default function Admin() {
                             </div>
                         </div>
 
-                        <div>
-                            <label className="text-[11px] font-medium text-gray-500 block mb-1">
-                                Sync interval
-                            </label>
+                        <div className="border border-gray-100 bg-gray-50 px-2.5 py-2 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-medium text-gray-700">Auto sync</span>
+                                <button
+                                    onClick={handleToggleAutoSync}
+                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${autoSyncEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                >
+                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${autoSyncEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                </button>
+                            </div>
+
                             <div className="flex items-center gap-1.5">
+                                <span className="text-[11px] font-medium text-gray-500">Sync interval</span>
                                 <input
                                     type="number"
                                     min={1}
                                     max={1440}
                                     value={syncInterval}
                                     onChange={(e) => setSyncInterval(Number(e.target.value))}
-                                    className="w-16 border border-gray-200 px-2.5 py-1.5 text-[11px] text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    disabled={!autoSyncEnabled}
+                                    className="w-16 border border-gray-200 px-2.5 py-1.5 text-[11px] text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
                                 />
                                 <span className="text-[11px] text-gray-400">min</span>
                                 <button
                                     onClick={handleSyncIntervalSave}
-                                    disabled={!!busy || syncInterval < 1 || syncInterval > 1440}
-                                    className="bg-gray-800 text-white text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-700 disabled:opacity-50 transition"
+                                    disabled={!autoSyncEnabled || !!busy || syncInterval < 1 || syncInterval > 1440}
+                                    className="bg-gray-800 text-white text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                                 >
                                     {busy === 'interval' ? '…' : 'Save'}
                                 </button>
@@ -544,42 +709,19 @@ export default function Admin() {
                 <div className="border border-gray-200 bg-white lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto">
                     <AdminTagCategories />
                 </div>
-            </div>
+            </div>}
 
-            {/* Most Viewed Events */}
-            {mostViewed.length > 0 && (
-                <div className="mt-6 bg-white border border-gray-200 p-4">
-                    <h2 className="text-sm font-bold text-gray-800 mb-3">👁 Most Viewed Events</h2>
-                    <div className="space-y-2">
-                        {mostViewed.map((item, i) => (
-                            <div key={item.event_id} className="flex items-center justify-between text-xs">
-                                <span className="text-gray-700 truncate flex-1">
-                                    <span className="text-gray-400 mr-2">#{i + 1}</span>
-                                    {item.title || item.event_id}
-                                </span>
-                                <span className="text-blue-600 font-medium ml-2">{item.view_count} view{item.view_count !== 1 ? 's' : ''}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Most Saved Events */}
-            {mostSaved.length > 0 && (
-                <div className="mt-6 bg-white border border-gray-200 p-4">
-                    <h2 className="text-sm font-bold text-gray-800 mb-3">📌 Most Saved Events</h2>
-                    <div className="space-y-2">
-                        {mostSaved.map((item, i) => (
-                            <div key={item.event_id} className="flex items-center justify-between text-xs">
-                                <span className="text-gray-700 truncate flex-1">
-                                    <span className="text-gray-400 mr-2">#{i + 1}</span>
-                                    {item.title || item.event_id}
-                                </span>
-                                <span className="text-rose-600 font-medium ml-2">{item.save_count} save{item.save_count !== 1 ? 's' : ''}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
+            {/* ── Analytics tab ── */}
+            {activeTab === 'analytics' && (
+                <AdminAnalytics
+                    mostViewed={mostViewed}
+                    mostSaved={mostSaved}
+                    mostAttended={mostAttended}
+                    sourceBreakdown={sourceBreakdown}
+                    topCountries={topCountries}
+                    topLinks={topLinks}
+                    exportStats={exportStats}
+                />
             )}
 
             {/* Slide-Out Panels */}
@@ -592,6 +734,7 @@ export default function Admin() {
                 isOpen={eventsPanelOpen}
                 onClose={() => setEventsPanelOpen(false)}
                 preset={eventsPanelPreset}
+                initialCalendarId={eventsPanelCalendarId}
             />
             <SuggestionsPanel
                 isOpen={suggestionsPanelOpen}

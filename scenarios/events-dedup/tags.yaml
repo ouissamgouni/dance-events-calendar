@@ -1,0 +1,20 @@
+tag_groups:
+  - slug: dance-style
+    label: Dance Style
+    ordinal: 10
+    allow_multiple: true
+    color: "#fb923c"
+    tags:
+      - slug: salsa
+        label: Salsa
+
+  - slug: source
+    label: Source
+    ordinal: 20
+    allow_multiple: true
+    color: "#38bdf8"
+    tags:
+      - slug: primary
+        label: Primary Calendar
+      - slug: aggregator
+        label: Aggregator Calendar

@@ -5,7 +5,7 @@ from sqlmodel import Session
 
 from backend.api.deps import require_admin
 from backend.api.schemas import SiteSettingsResponse, SiteSettingsUpdateRequest
-from backend.config.loader import get_sync_interval_minutes
+from backend.config.loader import get_auto_sync_enabled, get_sync_interval_minutes
 from backend.db.database import get_session
 from backend.db.models import SiteSetting
 
@@ -40,6 +40,17 @@ def _get_sync_interval(session: Session) -> int:
     except Exception:
         pass
     return get_sync_interval_minutes()
+
+
+def _get_auto_sync_enabled(session: Session) -> bool:
+    """Get auto_sync_enabled from DB, fallback to env/scenario/default."""
+    try:
+        row = session.get(SiteSetting, "auto_sync_enabled")
+        if row:
+            return row.value.lower() == "true"
+    except Exception:
+        pass
+    return get_auto_sync_enabled()
 
 
 def _get_bool_setting(session: Session, key: str, default: bool = False) -> bool:
@@ -80,6 +91,7 @@ def get_settings(session: Session = Depends(get_session)):
     return SiteSettingsResponse(
         since_date=_get_since_date(session),
         sync_interval_minutes=_get_sync_interval(session),
+        auto_sync_enabled=_get_auto_sync_enabled(session),
         show_prices=_get_bool_setting(session, "show_prices"),
         show_popularity=_get_bool_setting(session, "show_popularity"),
         popularity_threshold=_get_int_setting(session, "popularity_threshold", 10),
@@ -113,6 +125,9 @@ def update_settings(
             )
         session.add(row)
 
+    if body.auto_sync_enabled is not None:
+        _set_bool_setting(session, "auto_sync_enabled", body.auto_sync_enabled)
+
     if body.show_prices is not None:
         _set_bool_setting(session, "show_prices", body.show_prices)
 
@@ -134,6 +149,7 @@ def update_settings(
     return SiteSettingsResponse(
         since_date=_get_since_date(session),
         sync_interval_minutes=_get_sync_interval(session),
+        auto_sync_enabled=_get_auto_sync_enabled(session),
         show_prices=_get_bool_setting(session, "show_prices"),
         show_popularity=_get_bool_setting(session, "show_popularity"),
         popularity_threshold=_get_int_setting(session, "popularity_threshold", 10),

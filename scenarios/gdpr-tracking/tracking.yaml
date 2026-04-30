@@ -1,0 +1,69 @@
+# Pre-seeded tracking data for the gdpr-tracking scenario.
+#
+# Purpose: populate EventView.country/city so the "Top Countries" admin panel
+# renders out-of-the-box without requiring a real (non-private) IP.  When the
+# scenario runs on localhost, geolocate_ip() returns None for 127.0.0.1, so
+# country is never written to the DB via the BackgroundTask.  These rows
+# simulate traffic from multiple countries so every analytics KPI panel has
+# visible data from the first page load.
+#
+# device_id format: seed-<country-code>-<N>  (2 per country → unique_viewers = 2)
+# source values: calendar | explorer-list | explorer-map | calendar-map | direct
+
+views:
+  # ── France (8 views, 3 unique devices) ──────────────────────────────────
+  - { event_id: "evt-gdpr-001", device_id: "seed-fr-1", source: "calendar",       country: "France",      city: "Paris" }
+  - { event_id: "evt-gdpr-001", device_id: "seed-fr-1", source: "calendar",       country: "France",      city: "Paris" }
+  - { event_id: "evt-gdpr-002", device_id: "seed-fr-2", source: "explorer-list",  country: "France",      city: "Lyon" }
+  - { event_id: "evt-gdpr-003", device_id: "seed-fr-2", source: "explorer-list",  country: "France",      city: "Lyon" }
+  - { event_id: "evt-gdpr-004", device_id: "seed-fr-3", source: "explorer-map",   country: "France",      city: "Bordeaux" }
+  - { event_id: "evt-gdpr-001", device_id: "seed-fr-3", source: "direct",         country: "France",      city: "Bordeaux" }
+  - { event_id: "evt-gdpr-005", device_id: "seed-fr-1", source: "calendar-map",   country: "France",      city: "Paris" }
+  - { event_id: "evt-gdpr-002", device_id: "seed-fr-3", source: "calendar",       country: "France",      city: "Bordeaux" }
+
+  # ── Germany (5 views, 2 unique devices) ─────────────────────────────────
+  - { event_id: "evt-gdpr-001", device_id: "seed-de-1", source: "explorer-list",  country: "Germany",     city: "Berlin" }
+  - { event_id: "evt-gdpr-002", device_id: "seed-de-1", source: "explorer-list",  country: "Germany",     city: "Berlin" }
+  - { event_id: "evt-gdpr-003", device_id: "seed-de-2", source: "calendar",       country: "Germany",     city: "Hamburg" }
+  - { event_id: "evt-gdpr-004", device_id: "seed-de-2", source: "calendar",       country: "Germany",     city: "Hamburg" }
+  - { event_id: "evt-gdpr-001", device_id: "seed-de-2", source: "direct",         country: "Germany",     city: "Hamburg" }
+
+  # ── Spain (4 views, 2 unique devices) ───────────────────────────────────
+  - { event_id: "evt-gdpr-001", device_id: "seed-es-1", source: "explorer-map",   country: "Spain",       city: "Barcelona" }
+  - { event_id: "evt-gdpr-002", device_id: "seed-es-1", source: "explorer-map",   country: "Spain",       city: "Barcelona" }
+  - { event_id: "evt-gdpr-003", device_id: "seed-es-2", source: "calendar-map",   country: "Spain",       city: "Madrid" }
+  - { event_id: "evt-gdpr-001", device_id: "seed-es-2", source: "explorer-list",  country: "Spain",       city: "Madrid" }
+
+  # ── Netherlands (3 views, 2 unique devices) ──────────────────────────────
+  - { event_id: "evt-gdpr-004", device_id: "seed-nl-1", source: "calendar",       country: "Netherlands", city: "Amsterdam" }
+  - { event_id: "evt-gdpr-001", device_id: "seed-nl-1", source: "direct",         country: "Netherlands", city: "Amsterdam" }
+  - { event_id: "evt-gdpr-004", device_id: "seed-nl-2", source: "explorer-list",  country: "Netherlands", city: "Rotterdam" }
+
+  # ── Belgium (2 views, 2 unique devices) ─────────────────────────────────
+  - { event_id: "evt-gdpr-003", device_id: "seed-be-1", source: "calendar",       country: "Belgium",     city: "Brussels" }
+  - { event_id: "evt-gdpr-004", device_id: "seed-be-2", source: "calendar",       country: "Belgium",     city: "Antwerp" }
+
+  # ── United Kingdom (2 views, 1 unique device) ────────────────────────────
+  - { event_id: "evt-gdpr-005", device_id: "seed-gb-1", source: "explorer-list",  country: "United Kingdom", city: "London" }
+  - { event_id: "evt-gdpr-001", device_id: "seed-gb-1", source: "direct",         country: "United Kingdom", city: "London" }
+
+link_clicks:
+  # Clicks on ticket/registration links — populates Top Clicked Links panel
+  - { event_id: "evt-gdpr-001", device_id: "seed-fr-1", url: "https://example.com/salsa-night-tickets",   country: "France",  city: "Paris" }
+  - { event_id: "evt-gdpr-001", device_id: "seed-fr-2", url: "https://example.com/salsa-night-tickets",   country: "France",  city: "Lyon" }
+  - { event_id: "evt-gdpr-001", device_id: "seed-de-1", url: "https://example.com/salsa-night-tickets",   country: "Germany", city: "Berlin" }
+  - { event_id: "evt-gdpr-001", device_id: "seed-es-1", url: "https://example.com/salsa-night-tickets",   country: "Spain",   city: "Barcelona" }
+  - { event_id: "evt-gdpr-001", device_id: "seed-fr-1", url: "https://facebook.com/events/salsa-night",   country: "France",  city: "Paris" }
+  - { event_id: "evt-gdpr-002", device_id: "seed-de-1", url: "https://example.com/bachata-register",      country: "Germany", city: "Berlin" }
+  - { event_id: "evt-gdpr-002", device_id: "seed-fr-2", url: "https://example.com/bachata-register",      country: "France",  city: "Lyon" }
+  - { event_id: "evt-gdpr-004", device_id: "seed-nl-1", url: "https://example.com/congress-tickets",      country: "Netherlands", city: "Amsterdam" }
+  - { event_id: "evt-gdpr-004", device_id: "seed-nl-2", url: "https://example.com/congress-tickets",      country: "Netherlands", city: "Rotterdam" }
+  - { event_id: "evt-gdpr-004", device_id: "seed-de-2", url: "https://example.com/congress-lineup",       country: "Germany", city: "Hamburg" }
+
+exports:
+  # Pre-seeded export actions — populates Exports panel
+  - { device_id: "seed-fr-1",  format: "ics",  event_count: 5 }
+  - { device_id: "seed-de-1",  format: "ics",  event_count: 3 }
+  - { device_id: "seed-es-1",  format: "ics",  event_count: 2 }
+  - { device_id: "seed-nl-1",  format: "xlsx", event_count: 4 }
+  - { device_id: "seed-fr-2",  format: "xlsx", event_count: 6 }
