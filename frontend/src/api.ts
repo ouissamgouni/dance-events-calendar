@@ -1,6 +1,49 @@
 import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse } from './types';
 
-const BASE = '/api';
+const resolveApiBase = (): string => {
+    // In Vite dev server, keep relative /api so proxy rules apply.
+    if (import.meta.env.DEV) return '/api';
+
+    const rawApiUrl = (import.meta.env.VITE_API_URL || '').trim();
+    if (!rawApiUrl) return '/api';
+    const normalized = rawApiUrl.replace(/\/+$/, '');
+    return normalized.endsWith('/api') ? normalized : `${normalized}/api`;
+};
+
+const BASE = resolveApiBase();
+
+const parseJsonResponse = async <T>(res: Response, fallbackMessage: string): Promise<T> => {
+    const contentType = res.headers.get('content-type') || '';
+    const bodyText = await res.text();
+
+    if (!res.ok) {
+        if (contentType.includes('application/json') && bodyText) {
+            try {
+                const errorBody = JSON.parse(bodyText) as { detail?: string; message?: string };
+                throw new Error(errorBody.detail || errorBody.message || fallbackMessage);
+            } catch {
+                throw new Error(`${fallbackMessage} (HTTP ${res.status})`);
+            }
+        }
+        throw new Error(`${fallbackMessage} (HTTP ${res.status})`);
+    }
+
+    if (!bodyText) return {} as T;
+
+    if (!contentType.includes('application/json')) {
+        const htmlReply = /^\s*</.test(bodyText);
+        const hint = htmlReply
+            ? 'Received HTML instead of JSON. Check VITE_API_URL and API routing.'
+            : 'Response was not JSON.';
+        throw new Error(`${fallbackMessage}: ${hint}`);
+    }
+
+    try {
+        return JSON.parse(bodyText) as T;
+    } catch {
+        throw new Error(`${fallbackMessage}: Invalid JSON response`);
+    }
+};
 
 export async function fetchEvents(params?: { startDate?: string; endDate?: string; tagIds?: number[] }): Promise<CalendarEvent[]> {
     const searchParams = new URLSearchParams();
@@ -9,8 +52,7 @@ export async function fetchEvents(params?: { startDate?: string; endDate?: strin
     if (params?.tagIds?.length) searchParams.set('tag_ids', params.tagIds.join(','));
     const qs = searchParams.toString();
     const res = await fetch(`${BASE}/events${qs ? `?${qs}` : ''}`, { cache: 'no-cache' });
-    if (!res.ok) throw new Error('Failed to fetch events');
-    return res.json();
+    return parseJsonResponse<CalendarEvent[]>(res, 'Failed to fetch events');
 }
 
 export async function fetchEvent(eventId: string): Promise<CalendarEvent> {
@@ -30,8 +72,7 @@ export interface SiteSettings {
 
 export async function fetchSettings(): Promise<SiteSettings> {
     const res = await fetch(`${BASE}/settings`);
-    if (!res.ok) throw new Error('Failed to fetch settings');
-    return res.json();
+    return parseJsonResponse<SiteSettings>(res, 'Failed to fetch settings');
 }
 
 export async function updateSettings(settings: Partial<SiteSettings>): Promise<SiteSettings> {
@@ -623,8 +664,7 @@ export async function deleteUserData(deviceId: string): Promise<{ deleted: Recor
 
 export async function fetchTagGroups(): Promise<TagGroup[]> {
     const res = await fetch(`${BASE}/tags`, { cache: 'no-cache' });
-    if (!res.ok) throw new Error('Failed to fetch tags');
-    return res.json();
+    return parseJsonResponse<TagGroup[]>(res, 'Failed to fetch tags');
 }
 
 export async function submitTagSuggestion(body: TagSuggestionCreate): Promise<void> {
