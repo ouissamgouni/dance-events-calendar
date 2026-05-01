@@ -40,13 +40,14 @@ def _is_dev_auth() -> bool:
 
 def _set_session_cookie(response: JSONResponse, email: str, name: str) -> JSONResponse:
     token = create_session_token(email, name)
+    secure = get_env_name() in _SECURE_ENV_NAMES
     response.set_cookie(
         key=_COOKIE_NAME,
         value=token,
         max_age=_MAX_AGE,
         httponly=True,
-        samesite="lax",
-        secure=get_env_name() in _SECURE_ENV_NAMES,
+        samesite="none" if secure else "lax",
+        secure=secure,
     )
     return response
 

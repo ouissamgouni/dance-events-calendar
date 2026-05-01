@@ -679,7 +679,7 @@ export async function submitTagSuggestion(body: TagSuggestionCreate): Promise<vo
 export async function fetchAdminTagSuggestions(status?: string): Promise<TagSuggestionResponse[]> {
     const qs = status ? `?status=${status}` : '';
     const res = await fetch(`${BASE}/admin/tags/suggestions${qs}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('admin_token') || ''}` },
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to fetch tag suggestions');
     return res.json();
@@ -688,11 +688,9 @@ export async function fetchAdminTagSuggestions(status?: string): Promise<TagSugg
 export async function approveTagSuggestion(id: number, tagId?: number): Promise<void> {
     const res = await fetch(`${BASE}/admin/tags/suggestions/${id}/approve`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('admin_token') || ''}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(tagId ? { tag_id: tagId } : {}),
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to approve tag suggestion');
 }
@@ -700,11 +698,9 @@ export async function approveTagSuggestion(id: number, tagId?: number): Promise<
 export async function rejectTagSuggestion(id: number, adminNotes?: string): Promise<void> {
     const res = await fetch(`${BASE}/admin/tags/suggestions/${id}/reject`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('admin_token') || ''}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(adminNotes ? { admin_notes: adminNotes } : {}),
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to reject tag suggestion');
 }
@@ -712,11 +708,9 @@ export async function rejectTagSuggestion(id: number, adminNotes?: string): Prom
 export async function updateEventTags(eventId: string, tagIds: number[]): Promise<void> {
     const res = await fetch(`${BASE}/admin/events/${encodeURIComponent(eventId)}/tags`, {
         method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('admin_token') || ''}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tag_ids: tagIds }),
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to update event tags');
 }
@@ -731,14 +725,11 @@ export interface AdminTagGroup extends Omit<TagGroup, 'tags'> {
     tags: AdminTag[];
 }
 
-const adminHeaders = () => ({
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${localStorage.getItem('admin_token') || ''}`,
-});
+const adminJsonHeaders = { 'Content-Type': 'application/json' };
 
 export async function fetchAdminTagGroups(): Promise<AdminTagGroup[]> {
     const res = await fetch(`${BASE}/admin/tags/groups`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('admin_token') || ''}` },
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to fetch admin tag groups');
     return res.json();
@@ -747,8 +738,9 @@ export async function fetchAdminTagGroups(): Promise<AdminTagGroup[]> {
 export async function createTagGroup(data: { label: string; color?: string }): Promise<TagGroup> {
     const res = await fetch(`${BASE}/admin/tags/groups`, {
         method: 'POST',
-        headers: adminHeaders(),
+        headers: adminJsonHeaders,
         body: JSON.stringify(data),
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to create tag group');
     return res.json();
@@ -757,8 +749,9 @@ export async function createTagGroup(data: { label: string; color?: string }): P
 export async function updateTagGroup(groupId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean }): Promise<TagGroup> {
     const res = await fetch(`${BASE}/admin/tags/groups/${groupId}`, {
         method: 'PATCH',
-        headers: adminHeaders(),
+        headers: adminJsonHeaders,
         body: JSON.stringify(data),
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to update tag group');
     return res.json();
@@ -767,8 +760,9 @@ export async function updateTagGroup(groupId: number, data: { label?: string; co
 export async function createTag(data: { group_id: number; label: string; color?: string }): Promise<Tag> {
     const res = await fetch(`${BASE}/admin/tags`, {
         method: 'POST',
-        headers: adminHeaders(),
+        headers: adminJsonHeaders,
         body: JSON.stringify(data),
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to create tag');
     return res.json();
@@ -777,8 +771,9 @@ export async function createTag(data: { group_id: number; label: string; color?:
 export async function updateTag(tagId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean; is_hero_filter?: boolean; hero_ordinal?: number | null }): Promise<Tag> {
     const res = await fetch(`${BASE}/admin/tags/${tagId}`, {
         method: 'PATCH',
-        headers: adminHeaders(),
+        headers: adminJsonHeaders,
         body: JSON.stringify(data),
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to update tag');
     return res.json();
