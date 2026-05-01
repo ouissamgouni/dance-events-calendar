@@ -216,8 +216,11 @@ export default function Admin() {
         setMessage('');
         try {
             const stats = await triggerSync();
+            const enrichmentNote = stats.enrichment_queued > 0
+                ? ` Enriching ${stats.enrichment_queued} event(s) in background.`
+                : '';
             setMessage(
-                `Synced ${stats.calendars_synced} calendar(s): ${stats.events_upserted} upserted, ${stats.events_deleted} deleted.`,
+                `Synced ${stats.calendars_synced} calendar(s): ${stats.events_upserted} upserted, ${stats.events_deleted} deleted.${enrichmentNote}`,
             );
             fetchSyncLogs().then(setSyncLogs).catch(() => { });
         } catch {

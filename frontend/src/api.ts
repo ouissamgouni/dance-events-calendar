@@ -156,7 +156,14 @@ export async function addCalendar(calendarId: string): Promise<CalendarSetting> 
     return res.json();
 }
 
-export async function triggerSync(): Promise<Record<string, number>> {
+export interface SyncStats {
+    calendars_synced: number;
+    events_upserted: number;
+    events_deleted: number;
+    enrichment_queued: number;
+}
+
+export async function triggerSync(): Promise<SyncStats> {
     const res = await fetch(`${BASE}/admin/sync`, {
         method: 'POST',
         credentials: 'include',

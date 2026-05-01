@@ -275,7 +275,12 @@ tasks:
   staging:local:
     desc: "Build from develop + deploy to local staging (docker-compose). DRY_RUN=1
       to preview."
-    dotenv: [ "config/base.env", "config/staging.local.env", "config/secrets.staging.local.env" ]
+    dotenv:
+      [
+        "config/base.env",
+        "config/staging.local.env",
+        "config/secrets.staging.local.env",
+      ]
     vars:
       DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
     cmds:
@@ -313,7 +318,12 @@ tasks:
 
   staging:local:ref:
     desc: "Build from any git ref + deploy to local staging. DRY_RUN=1 to preview."
-    dotenv: [ "config/base.env", "config/staging.local.env", "config/secrets.staging.local.env" ]
+    dotenv:
+      [
+        "config/base.env",
+        "config/staging.local.env",
+        "config/secrets.staging.local.env",
+      ]
     vars:
       REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
       DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
@@ -350,7 +360,12 @@ tasks:
   staging:local:dirty:
     desc: "Build from working directory + deploy to local staging. DRY_RUN=1 to
       preview."
-    dotenv: [ "config/base.env", "config/staging.local.env", "config/secrets.staging.local.env" ]
+    dotenv:
+      [
+        "config/base.env",
+        "config/staging.local.env",
+        "config/secrets.staging.local.env",
+      ]
     vars:
       DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
     cmds:
@@ -376,43 +391,6 @@ tasks:
   # ──────────────────────────────────────────────────────────────────────────
   # PROD LOCAL — docker-compose
   # ──────────────────────────────────────────────────────────────────────────
-
-  prod:
-    desc: "Deploy to local prod (docker-compose). DRY_RUN=1 to preview. Usage: task
-      deploy:prod -- v1.2.0"
-    prompt: "This will deploy to PRODUCTION. Continue?"
-    dotenv: [ "config/base.env", "config/prod.local.env", "config/secrets.prod.local.env" ]
-    vars:
-      REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
-      DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
-    cmds:
-      - |
-        REF="{{.REF}}"
-        if [ -z "$REF" ]; then REF="latest"; fi
-
-        if [ "{{.DRY_RUN}}" = "1" ]; then
-          echo "🔍 DRY RUN — would deploy to local PROD: $REF"
-          exit 0
-        fi
-
-        if docker image inspect movida-backend:$REF > /dev/null 2>&1; then
-          VERSION="$REF"
-        else
-          echo "No image found for :$REF — attempting to build from git ref..."
-          task build:ref -- "$REF" || { echo "❌ Failed to build from $REF"; exit 1; }
-          SHA=$(git rev-parse --short=7 "$REF")
-          VERSION="ref-$SHA"
-        fi
-
-        ENV_NAME=prod IMAGE_TAG=$VERSION docker compose -f infra/docker/docker-compose.unified.yml -p movida-prod down
-        ENV_NAME=prod IMAGE_TAG=$VERSION docker compose -f infra/docker/docker-compose.unified.yml -p movida-prod up -d
-        sleep 5
-        echo ""
-        echo "═══════════════════════════════════════════════════════════════"
-        echo "✅ Deployed to local PROD: $VERSION"
-        echo "   Frontend: http://localhost:${FRONTEND_PORT:-3000}"
-        echo "   Backend:  http://localhost:${BACKEND_PORT:-8080}"
-        echo "═══════════════════════════════════════════════════════════════"
 
   # ──────────────────────────────────────────────────────────────────────────
   # Backward-compat aliases (kept so existing scripts don't break)

@@ -144,7 +144,12 @@ tasks:
 
   staging:local:
     desc: Start local staging stack (docker-compose). RESET=1 to teardown first.
-    dotenv: [ "{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/staging.local.env", "{{.ROOT_DIR}}/config/secrets.staging.local.env" ]
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/config/base.env",
+        "{{.ROOT_DIR}}/config/staging.local.env",
+        "{{.ROOT_DIR}}/config/secrets.staging.local.env",
+      ]
     vars:
       RESET: "{{.RESET | default \"0\"}}"
     cmds:
@@ -160,30 +165,6 @@ tasks:
         echo "   Frontend: http://localhost:${FRONTEND_PORT:-3001}"
         echo "   Backend:  http://localhost:${BACKEND_PORT:-8002}"
         {{.ROOT_DIR}}/.taskfiles/open-browser.sh "http://localhost:${FRONTEND_PORT:-3001}"
-
-  prod:
-    desc: Start prod stack (RESET=1 FORCE=1 to teardown first)
-    dotenv: [ "{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/prod.local.env", "{{.ROOT_DIR}}/config/secrets.prod.local.env" ]
-    vars:
-      RESET: "{{.RESET | default \"0\"}}"
-      FORCE: "{{.FORCE | default \"0\"}}"
-    cmds:
-      - |
-        if [ "{{.RESET}}" = "1" ]; then
-          if [ "{{.FORCE}}" != "1" ]; then
-            echo "🚨 RESET on prod requires FORCE=1. Usage: task start:prod RESET=1 FORCE=1"
-            exit 1
-          fi
-          echo "🚨 RESET: tearing down PRODUCTION stack..."
-          ENV_NAME=prod docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p movida-prod down -v 2>/dev/null || true
-        fi
-        ENV_NAME=prod IMAGE_TAG=latest docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p movida-prod up -d
-      - |
-        echo ""
-        echo "✅ Prod started"
-        echo "   Frontend: http://localhost:${FRONTEND_PORT:-3000}"
-        echo "   Backend:  http://localhost:${BACKEND_PORT:-8080}"
-        {{.ROOT_DIR}}/.taskfiles/open-browser.sh "http://localhost:${FRONTEND_PORT:-3000}"
 
   # ════════════════════════════════════════════════════════════════
   # Scenario (isolated manual testing)
