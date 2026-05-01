@@ -1,0 +1,21 @@
+# Real Google Calendar IDs for staging — DO NOT COMMIT
+# Copy this file to calendars.yaml and fill in real IDs.
+# Get calendar IDs from Google Calendar settings → "Calendar ID" field.
+#
+# default_tags use "group_slug:tag_slug" format.
+# Available tags are defined in scenarios/staging/tags.yaml.
+
+calendars:
+  - id: "your-google-calendar-id-1@group.calendar.google.com"
+    name: "Salsa Events"
+    color: "#e11d48"
+    default_tags:
+      - "dance-style:salsa"
+      - "format:social"
+
+  - id: "your-google-calendar-id-2@group.calendar.google.com"
+    name: "Bachata Events"
+    color: "#7c3aed"
+    default_tags:
+      - "dance-style:bachata"
+      - "format:social"

@@ -3,7 +3,8 @@ services:
     image: postgres:16-alpine
     container_name: calendar_db_dev
     env_file:
-      - ../../.env.dev
+      - ../../config/base.env
+      - ../../config/dev.env
     ports:
       - "${POSTGRES_PORT:-5434}:5432"
     volumes:

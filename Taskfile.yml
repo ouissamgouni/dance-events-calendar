@@ -1,6 +1,6 @@
 version: "3"
 
-dotenv: [".env"]
+dotenv: [ "config/base.env" ]
 
 vars:
   ROOT_DIR:

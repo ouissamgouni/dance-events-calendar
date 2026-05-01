@@ -123,7 +123,7 @@ export async function updateCalendar(
     calendarId: string,
     update: { enabled?: boolean; color?: string; name?: string },
 ): Promise<CalendarSetting> {
-    const res = await fetch(`${BASE}/admin/calendars/${calendarId}/toggle`, {
+    const res = await fetch(`${BASE}/admin/calendars/${encodeURIComponent(calendarId)}/toggle`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(update),

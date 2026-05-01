@@ -5,16 +5,16 @@ version: "3"
 
 tasks:
   secrets:
-    desc: "Push secrets from secrets.prod.env to Fly.io (run once or after secrets change)"
+    desc: "Push secrets from config/secrets.env + config/secrets.prod.env to Fly.io"
     cmds:
       - |
-        if [ ! -f secrets.prod.env ]; then
-          echo "❌ secrets.prod.env not found — copy secrets.prod.env.example and fill in values"
+        if [ ! -f config/secrets.prod.env ]; then
+          echo "❌ config/secrets.prod.env not found — copy config/secrets.prod.env.example and fill in values"
           exit 1
         fi
       - |
         echo "Pushing secrets to Fly.io (excluding CLOUDFLARE_* vars)..."
-        grep -v '^#' secrets.prod.env \
+        cat config/secrets.env config/secrets.prod.env \
           | grep -v '^[[:space:]]*$' \
           | grep -v '^CLOUDFLARE_' \
           | grep -v '^VITE_' \
@@ -82,16 +82,16 @@ tasks:
   # ════════════════════════════════════════════════════════════════
 
   staging:secrets:
-    desc: "Push secrets from secrets.staging.remote.env to the staging Fly.io app"
+    desc: "Push secrets from config/secrets.env + config/secrets.staging.env to the staging Fly.io app"
     cmds:
       - |
-        if [ ! -f secrets.staging.remote.env ]; then
-          echo "❌ secrets.staging.remote.env not found — copy secrets.staging.remote.env.example and fill in values"
+        if [ ! -f config/secrets.staging.env ]; then
+          echo "❌ config/secrets.staging.env not found — copy config/secrets.staging.env.example and fill in values"
           exit 1
         fi
       - |
         echo "Pushing secrets to staging Fly.io app..."
-        grep -v '^#' secrets.staging.remote.env \
+        cat config/secrets.env config/secrets.staging.env \
           | grep -v '^[[:space:]]*$' \
           | grep -v '^VITE_' \
           | fly secrets import -c fly.staging.toml

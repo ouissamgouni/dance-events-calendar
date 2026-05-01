@@ -61,3 +61,28 @@ events:
     start: "w2 Wed 19:30"
     end: "w2 Wed 21:00"
     price_is_free: true
+
+  # Past events (ended before now) — used for the past-events toggle tests
+  - id: "evt-save-past-001"
+    calendar_id: "salsa-cal-001"
+    title: "Last Week's Salsa Social"
+    description: "Weekly social that already happened."
+    location: "Dance Studio, 10 Rue de Rivoli, Paris, France"
+    latitude: 48.8566
+    longitude: 2.3522
+    start: "w-1 Fri 21:00"
+    end: "w-1 Sat 01:00"
+    price_is_free: true
+
+  - id: "evt-save-past-002"
+    calendar_id: "bachata-cal-002"
+    title: "Old Bachata Workshop"
+    description: "Workshop that took place two weeks ago."
+    location: "Tanzhaus, Friedrichstr. 100, Berlin, Germany"
+    latitude: 52.5200
+    longitude: 13.4050
+    start: "w-2 Sat 14:00"
+    end: "w-2 Sat 17:00"
+    price_is_free: false
+    price_min: 25
+    price_currency: "EUR"

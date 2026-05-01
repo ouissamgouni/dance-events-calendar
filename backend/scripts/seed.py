@@ -16,12 +16,21 @@ def main():
     parser = argparse.ArgumentParser(description="Seed the database")
     parser.add_argument(
         "--scenario",
-        required=True,
-        help="Scenario name (folder under scenarios/)",
+        default="default",
+        help=(
+            "Scenario name (folder under scenarios/) or an explicit path. "
+            "Defaults to 'default'."
+        ),
     )
     args = parser.parse_args()
 
-    scenario_dir = SCENARIOS_DIR / args.scenario
+    # Accept either a bare name (resolved under scenarios/) or an explicit path.
+    candidate = Path(args.scenario)
+    if candidate.is_absolute() or "/" in args.scenario:
+        scenario_dir = candidate
+    else:
+        scenario_dir = SCENARIOS_DIR / args.scenario
+
     if not scenario_dir.exists():
         raise FileNotFoundError(f"Scenario directory not found: {scenario_dir}")
 

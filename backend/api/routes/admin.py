@@ -90,10 +90,19 @@ def add_calendar(
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
-    """Add a calendar by ID. Verifies the service account can access it."""
+    """Add a calendar by ID. Verifies the service account can access it.
+
+    Manually added calendars are enabled by default so they are immediately
+    eligible for sync.
+    """
     # Check if already exists
     existing = session.get(CalendarSetting, body.calendar_id)
     if existing:
+        if not existing.enabled:
+            existing.enabled = True
+            session.add(existing)
+            session.commit()
+            session.refresh(existing)
         return existing
 
     calendar_service = request.app.state.calendar_service
@@ -114,7 +123,7 @@ def add_calendar(
     cal = CalendarSetting(
         calendar_id=info.calendar_id,
         name=info.name,
-        enabled=False,
+        enabled=True,
         color=_next_color(session),
     )
     session.add(cal)
