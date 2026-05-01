@@ -1,11 +1,21 @@
 import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse } from './types';
 
+declare const __VITE_API_URL__: string;
+
 const resolveApiBase = (): string => {
     // In Vite dev server, keep relative /api so proxy rules apply.
     if (import.meta.env.DEV) return '/api';
 
-    const rawApiUrl = (import.meta.env.VITE_API_URL || '').trim();
-    if (!rawApiUrl) return '/api';
+    const rawApiUrl = (__VITE_API_URL__ || import.meta.env.VITE_API_URL || '').trim();
+    if (!rawApiUrl) {
+        // Fallback for Pages deployments if build env injection is missing.
+        if (typeof window !== 'undefined') {
+            const host = window.location.hostname;
+            if (host === 'movida.pages.dev') return 'https://movida.fly.dev/api';
+            if (host.endsWith('.movida.pages.dev')) return 'https://movida-staging.fly.dev/api';
+        }
+        return '/api';
+    }
     const normalized = rawApiUrl.replace(/\/+$/, '');
     return normalized.endsWith('/api') ? normalized : `${normalized}/api`;
 };
