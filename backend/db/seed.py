@@ -76,13 +76,18 @@ class DatabaseSeeder:
         self._seed_calendar_default_tags(scenario_dir / "calendars.yaml")
         if uses_mock_calendar:
             logger.info(
-                "Skipping event pre-seed (calendar_service=mock) — run sync to populate events"
+                "Skipping mock-sync-events pre-seed (calendar_service=mock) — events enter DB via sync"
             )
         else:
-            self._seed_events(scenario_dir / "events.yaml")
-            self._seed_event_tags(scenario_dir / "events.yaml")
-            self._seed_tag_suggestions(scenario_dir / "events.yaml")
-        self._seed_tracking(scenario_dir / "tracking.yaml")
+            self._seed_events(scenario_dir / "mock-sync-events.yaml")
+            self._seed_event_tags(scenario_dir / "mock-sync-events.yaml")
+            self._seed_tag_suggestions(scenario_dir / "mock-sync-events.yaml")
+        # db-events.yaml is always seeded directly into the DB (bypasses sync).
+        # Only create this file in scenarios that need events available before sync fires.
+        self._seed_events(scenario_dir / "db-events.yaml")
+        self._seed_event_tags(scenario_dir / "db-events.yaml")
+        self._seed_tag_suggestions(scenario_dir / "db-events.yaml")
+        self._seed_tracking(scenario_dir / "db-tracking.yaml")
         self._ingest_test_plans(scenario_dir)
         self.session.commit()
         logger.info("Seeding complete")
@@ -276,7 +281,6 @@ class DatabaseSeeder:
 
     def _seed_events(self, path: Path):
         if not path.exists():
-            logger.warning("No events.yaml found at %s", path)
             return
 
         with open(path) as f:
@@ -382,7 +386,7 @@ class DatabaseSeeder:
         return {f"{group_map[t.group_id]}:{t.slug}": t.id for t in tags}
 
     def _seed_event_tags(self, path: Path):
-        """Assign tags to events based on 'tags' list in events.yaml.
+        """Assign tags to events based on 'tags' list in mock-sync-events.yaml or db-events.yaml.
 
         Each tag is referenced as 'group_slug:tag_slug', e.g. 'format:social'.
         """
@@ -422,7 +426,7 @@ class DatabaseSeeder:
                     logger.info("Tagged event %s with %s", evt_id, slug)
 
     def _seed_tag_suggestions(self, path: Path):
-        """Create tag suggestions from 'tag_suggestions' list in events.yaml."""
+        """Create tag suggestions from 'tag_suggestions' list in mock-sync-events.yaml or db-events.yaml."""
         if not path.exists():
             return
 
@@ -461,7 +465,7 @@ class DatabaseSeeder:
             )
 
     def _seed_tracking(self, path: Path) -> None:
-        """Seed EventView, EventLinkClick, and EventExport rows from tracking.yaml.
+        """Seed EventView, EventLinkClick, and EventExport rows from db-tracking.yaml.
 
         Expected structure:
           views:

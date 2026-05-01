@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { CalendarEvent, LinkItem } from '../types';
+import type { CalendarEvent } from '../types';
 import type { GeocodeSuggestion } from '../api';
 import { updateEvent } from '../api';
 import AddressAutocomplete from './AddressAutocomplete';

@@ -13,7 +13,7 @@ export default function AddressAutocomplete({ value, onChange, onSelect, searchF
     const [suggestions, setSuggestions] = useState<GeocodeSuggestion[]>([]);
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
-    const timerRef = useRef<ReturnType<typeof setTimeout>>();
+    const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
     const containerRef = useRef<HTMLDivElement>(null);
     const doFetch = searchFn ?? searchAddress;
 

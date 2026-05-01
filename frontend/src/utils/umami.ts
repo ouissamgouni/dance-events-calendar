@@ -2,7 +2,7 @@ declare global {
     interface Window {
         umami?: {
             track: (
-                event: string | { url: string },
+                event: string | { website?: string; url: string; referrer?: string },
                 props?: Record<string, string | number>,
             ) => void;
         };
@@ -54,7 +54,12 @@ export function umamiTrack(event: string, props?: Record<string, string | number
 /** Send a page view for the current URL to Umami. No-ops if not loaded. */
 export function umamiPageView(): void {
     if (window.umami) {
-        window.umami.track({ url: window.location.pathname });
+        const websiteId = import.meta.env.VITE_UMAMI_WEBSITE_ID as string | undefined;
+        window.umami.track({
+            website: websiteId,
+            url: window.location.pathname,
+            referrer: document.referrer,
+        });
     } else if (import.meta.env.DEV) {
         console.debug('[umami] pageview', window.location.pathname);
     }

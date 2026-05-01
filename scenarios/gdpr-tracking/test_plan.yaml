@@ -573,7 +573,7 @@ test_plan:
       title: "Admin sees unique_viewers on most-viewed events"
       description: >
         The scenario seeds EventView rows with multiple device_ids across
-        events (tracking.yaml). Log in as admin and scroll to the
+        events (db-tracking.yaml). Log in as admin and scroll to the
         "👁 Most Viewed Events" section.
       expected: >
         Each event row shows two numbers: "N views" (total view count) and
@@ -586,7 +586,7 @@ test_plan:
       title: "Source breakdown panel shows view origins"
       description: >
         The scenario seeds EventView rows across all source channels
-        (tracking.yaml uses calendar, explorer-list, explorer-map,
+        (db-tracking.yaml uses calendar, explorer-list, explorer-map,
         calendar-map, and direct). Log in as admin and look for the
         "📊 Views by Source" panel.
       expected: >
@@ -599,7 +599,7 @@ test_plan:
     - id: 50
       title: "Top countries panel shows seeded geo data"
       description: >
-        The scenario seeds EventView rows with country data in tracking.yaml
+        The scenario seeds EventView rows with country data in db-tracking.yaml
         (France 8 views, Germany 5, Spain 4, Netherlands 3, Belgium 2,
         United Kingdom 2). Log in as admin immediately after scenario start
         and look for the "🌍 Top Countries" panel.
@@ -616,7 +616,7 @@ test_plan:
     - id: 51
       title: "Top clicked links panel shows seeded link data"
       description: >
-        The scenario seeds 10 EventLinkClick rows (tracking.yaml). Log in
+        The scenario seeds 10 EventLinkClick rows (db-tracking.yaml). Log in
         as admin and look for the "🔗 Top Clicked Links" panel.
       expected: >
         Panel shows at least:
@@ -631,7 +631,7 @@ test_plan:
       title: "Export stats panel shows seeded export data"
       description: >
         The scenario seeds 5 EventExport rows — 3 ICS exports (10 total
-        events) and 2 XLSX exports (10 total events) — in tracking.yaml.
+        events) and 2 XLSX exports (10 total events) — in db-tracking.yaml.
         Log in as admin and look for the "📥 Exports" panel.
       expected: >
         Panel shows two cards:

@@ -161,7 +161,7 @@ export default function Home() {
             navigate(`/event/${evt.event_id}`);
         } else {
             setSelectedEventRect(clickRect ?? null);
-            setSelectedEventSource('calendar');
+            setSelectedEventSource('calendar-modal');
             setSelectedEvent(evt);
         }
     }, [viewMode, navigate]);
@@ -170,7 +170,7 @@ export default function Home() {
     const handleCalMapEventClick = useCallback((evt: CalendarEvent) => {
         trackView(evt.event_id, 'calendar-map');
         setSelectedEventRect(null);
-        setSelectedEventSource('calendar-map');
+        setSelectedEventSource('calendar-map-modal');
         setSelectedEvent(evt);
     }, []);
 

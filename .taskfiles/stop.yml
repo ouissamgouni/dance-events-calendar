@@ -173,6 +173,10 @@ tasks:
 
           # Stop Docker DB
           docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.scenario-db.yml -p $SC_PROJECT_NAME down -v 2>/dev/null || true
+
+          # Stop Umami
+          docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.scenario-umami.yml -p $SC_UMAMI_PROJECT down -v 2>/dev/null || true
+
           docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p $SC_PROJECT_NAME down -v 2>/dev/null || true
 
           # Kill API and web processes on the exact ports (persisted or computed)

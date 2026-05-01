@@ -7,7 +7,7 @@
 #   - min_machines_running = 0   (free tier: zero idle cost)
 #   - ENV_NAME = "staging"
 
-app = "salsa-events-calendar-staging"
+app = "movida-staging"
 primary_region = "cdg"
 
 [build]

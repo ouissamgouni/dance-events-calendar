@@ -16,21 +16,24 @@ tasks:
   migrate:dev:
     desc: Run Alembic migrations (dev)
     dir: backend
-    dotenv: [".env.dev"]
+    dotenv: [ "{{.ROOT_DIR}}/.env.dev" ]
     cmds:
-      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini upgrade head
+      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c
+        {{.BACKEND_DIR}}/alembic.ini upgrade head
 
   seed:
-    desc: "Seed dev database (alias for seed:dev). Usage: task db:seed -- --scenario default"
+    desc: "Seed dev database (alias for seed:dev). Usage: task db:seed -- --scenario
+      default"
     cmds:
       - task: seed:dev
 
   seed:dev:
     desc: "Seed dev database. Usage: task db:seed:dev -- --scenario default"
     dir: backend
-    dotenv: [".env.dev"]
+    dotenv: [ "{{.ROOT_DIR}}/.env.dev" ]
     cmds:
-      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.seed {{.CLI_ARGS}}
+      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m
+        backend.scripts.seed {{.CLI_ARGS}}
 
   reset:
     desc: "Drop all tables, re-migrate, re-seed dev (alias for reset:dev)"
@@ -40,9 +43,9 @@ tasks:
   reset:dev:
     desc: "Drop all tables, re-migrate, re-seed (DESTRUCTIVE). DRY_RUN=1 to preview."
     dir: backend
-    dotenv: [".env.dev"]
+    dotenv: [ ".env.dev" ]
     vars:
-      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+      DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
     cmds:
       - |
         if [ "{{.DRY_RUN}}" = "1" ]; then
@@ -57,7 +60,7 @@ tasks:
   _reset:dev:confirm:
     internal: true
     status:
-      - '[ "{{.DRY_RUN}}" = "1" ]'
+      - "[ \"{{.DRY_RUN}}\" = \"1\" ]"
     prompt: "This will drop all tables and re-seed dev database. Continue?"
     cmds:
       - task: _reset:dev:exec
@@ -65,9 +68,10 @@ tasks:
   _reset:dev:exec:
     internal: true
     dir: backend
-    dotenv: [".env.dev"]
+    dotenv: [ "{{.ROOT_DIR}}/.env.dev" ]
     cmds:
-      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.reset
+      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m
+        backend.scripts.reset
       - task: migrate:dev
       - task: seed:dev
 
@@ -76,42 +80,40 @@ tasks:
   # ════════════════════════════════════════════════════════════════
 
   migrate:staging:local:
-    desc: "Run Alembic migrations against local staging DB (docker-compose, port 5436)"
+    desc: "Run Alembic migrations against local staging DB (docker-compose, port
+      5436)"
     dir: backend
-    dotenv: [".env.staging"]
+    dotenv: [ "{{.ROOT_DIR}}/.env.staging.local" ]
     cmds:
       - |
-        export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5436}/${POSTGRES_DB}"
-        echo "Running migrations against local staging DB..."
+        echo "Running migrations against local staging DB ($DATABASE_URL)..."
         PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini upgrade head
 
   seed:staging:local:
     desc: "Seed local staging database (docker-compose, port 5436)"
     dir: backend
-    dotenv: [".env.staging"]
+    dotenv: [ "{{.ROOT_DIR}}/.env.staging.local" ]
     cmds:
       - |
-        export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5436}/${POSTGRES_DB}"
         PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.seed {{.CLI_ARGS}}
 
   status:staging:local:
     desc: "Show migration status for local staging DB (docker-compose, port 5436)"
     dir: backend
-    dotenv: [".env.staging"]
+    dotenv: [ "{{.ROOT_DIR}}/.env.staging.local" ]
     cmds:
       - |
-        export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5436}/${POSTGRES_DB}"
         PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini current
         PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini history
 
   check:staging:local:
-    desc: "Test connectivity + validate migration state for local staging DB (docker-compose, port 5436)"
+    desc: "Test connectivity + validate migration state for local staging DB
+      (docker-compose, port 5436)"
     dir: backend
-    dotenv: [".env.staging"]
+    dotenv: [ "{{.ROOT_DIR}}/.env.staging.local" ]
     cmds:
       - |
-        export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5436}/${POSTGRES_DB}"
-        echo "Checking local staging DB..."
+        echo "Checking local staging DB ($DATABASE_URL)..."
         PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini check 2>&1 && \
           echo "✅ Connected. Migrations are up to date" || \
           echo "⚠️  Connected but migrations need attention"
@@ -121,34 +123,34 @@ tasks:
   reset:staging:local:
     desc: "Reset local staging database — DESTRUCTIVE. DRY_RUN=1 to preview."
     dir: backend
-    dotenv: [".env.staging"]
+    dotenv: [ "{{.ROOT_DIR}}/.env.staging.local" ]
     vars:
-      DRY_RUN: '{{.DRY_RUN | default "0"}}'
-    prompt: "This will drop all tables and re-seed the LOCAL staging database. Continue?"
+      DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
+    prompt: "This will drop all tables and re-seed the LOCAL staging database.
+      Continue?"
     cmds:
       - |
         if [ "{{.DRY_RUN}}" = "1" ]; then
           echo "🔍 DRY RUN — would reset local staging database"
           exit 0
         fi
-        export DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5436}/${POSTGRES_DB}"
         PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.reset
       - task: migrate:staging:local
       - task: seed:staging:local
 
   # ════════════════════════════════════════════════════════════════
   # Staging — Remote (Neon develop branch)
-  # Requires secrets.staging.env with DATABASE_URL set
+  # Requires secrets.staging.remote.env with DATABASE_URL set
   # ════════════════════════════════════════════════════════════════
 
   migrate:staging:remote:
     desc: "Run Alembic migrations against remote staging DB (Neon develop branch)"
     dir: backend
-    dotenv: ["secrets.env", "secrets.staging.env", ".env.staging"]
+    dotenv: [ "{{.ROOT_DIR}}/secrets.env", "{{.ROOT_DIR}}/secrets.staging.remote.env" ]
     cmds:
       - |
         if [ -z "$DATABASE_URL" ]; then
-          echo "❌ DATABASE_URL not set — fill in secrets.staging.env"
+          echo "❌ DATABASE_URL not set — fill in secrets.staging.remote.env"
           exit 1
         fi
         echo "Running migrations against remote staging (Neon): $(echo $DATABASE_URL | sed 's/:.*@/@/')"
@@ -157,12 +159,12 @@ tasks:
   seed:staging:remote:
     desc: "Seed remote staging database (Neon develop branch)"
     dir: backend
-    dotenv: ["secrets.env", "secrets.staging.env", ".env.staging"]
+    dotenv: [ "{{.ROOT_DIR}}/secrets.env", "{{.ROOT_DIR}}/secrets.staging.remote.env" ]
     prompt: "This will seed the REMOTE staging database (Neon). Continue?"
     cmds:
       - |
         if [ -z "$DATABASE_URL" ]; then
-          echo "❌ DATABASE_URL not set — fill in secrets.staging.env"
+          echo "❌ DATABASE_URL not set — fill in secrets.staging.remote.env"
           exit 1
         fi
         echo "Seeding remote staging (Neon): $(echo $DATABASE_URL | sed 's/:.*@/@/')"
@@ -171,11 +173,11 @@ tasks:
   status:staging:remote:
     desc: "Show migration status for remote staging DB (Neon develop branch)"
     dir: backend
-    dotenv: ["secrets.env", "secrets.staging.env", ".env.staging"]
+    dotenv: [ "{{.ROOT_DIR}}/secrets.env", "{{.ROOT_DIR}}/secrets.staging.remote.env" ]
     cmds:
       - |
         if [ -z "$DATABASE_URL" ]; then
-          echo "❌ DATABASE_URL not set — fill in secrets.staging.env"
+          echo "❌ DATABASE_URL not set — fill in secrets.staging.remote.env"
           exit 1
         fi
         echo "Checking remote staging (Neon): $(echo $DATABASE_URL | sed 's/:.*@/@/')"
@@ -183,13 +185,14 @@ tasks:
         PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini history
 
   check:staging:remote:
-    desc: "Test connectivity + validate migration state for remote staging DB (Neon develop branch)"
+    desc: "Test connectivity + validate migration state for remote staging DB (Neon
+      develop branch)"
     dir: backend
-    dotenv: ["secrets.env", "secrets.staging.env", ".env.staging"]
+    dotenv: [ "{{.ROOT_DIR}}/secrets.env", "{{.ROOT_DIR}}/secrets.staging.remote.env" ]
     cmds:
       - |
         if [ -z "$DATABASE_URL" ]; then
-          echo "❌ DATABASE_URL not set — fill in secrets.staging.env"
+          echo "❌ DATABASE_URL not set — fill in secrets.staging.remote.env"
           exit 1
         fi
         echo "Checking remote staging (Neon): $(echo $DATABASE_URL | sed 's/:.*@/@/')"
@@ -200,16 +203,18 @@ tasks:
         PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini current
 
   reset:staging:remote:
-    desc: "Reset REMOTE staging database (Neon develop branch) — DESTRUCTIVE. DRY_RUN=1 to preview."
+    desc: "Reset REMOTE staging database (Neon develop branch) — DESTRUCTIVE.
+      DRY_RUN=1 to preview."
     dir: backend
-    dotenv: ["secrets.env", "secrets.staging.env", ".env.staging"]
+    dotenv: [ "{{.ROOT_DIR}}/secrets.env", "{{.ROOT_DIR}}/secrets.staging.remote.env" ]
     vars:
-      DRY_RUN: '{{.DRY_RUN | default "0"}}'
-    prompt: "⚠️  This will drop all tables and re-seed the REMOTE staging database (Neon develop branch). Continue?"
+      DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
+    prompt: "⚠️  This will drop all tables and re-seed the REMOTE staging database
+      (Neon develop branch). Continue?"
     cmds:
       - |
         if [ -z "$DATABASE_URL" ]; then
-          echo "❌ DATABASE_URL not set — fill in secrets.staging.env"
+          echo "❌ DATABASE_URL not set — fill in secrets.staging.remote.env"
           exit 1
         fi
         if [ "{{.DRY_RUN}}" = "1" ]; then
@@ -240,9 +245,15 @@ tasks:
   # ════════════════════════════════════════════════════════════════
 
   migrate:prod:
-    desc: "Run Alembic migrations (prod — Neon). Requires secrets.prod.env with DATABASE_URL."
+    desc: "Run Alembic migrations (prod — Neon). Requires secrets.prod.env with
+      DATABASE_URL."
     dir: backend
-    dotenv: ["secrets.env", "secrets.prod.env", ".env.prod"]
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/secrets.env",
+        "{{.ROOT_DIR}}/secrets.prod.env",
+        "{{.ROOT_DIR}}/.env.prod",
+      ]
     cmds:
       - |
         if [ -z "$DATABASE_URL" ]; then
@@ -253,9 +264,15 @@ tasks:
         PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini upgrade head
 
   seed:prod:
-    desc: "Seed prod database (DESTRUCTIVE). Requires secrets.prod.env with DATABASE_URL."
+    desc: "Seed prod database (DESTRUCTIVE). Requires secrets.prod.env with
+      DATABASE_URL."
     dir: backend
-    dotenv: ["secrets.env", "secrets.prod.env", ".env.prod"]
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/secrets.env",
+        "{{.ROOT_DIR}}/secrets.prod.env",
+        "{{.ROOT_DIR}}/.env.prod",
+      ]
     prompt: "⚠️  This will seed the PRODUCTION database. Continue?"
     cmds:
       - |
@@ -268,15 +285,27 @@ tasks:
   status:prod:
     desc: "Show migration status for prod database (Neon)"
     dir: backend
-    dotenv: ["secrets.env", "secrets.prod.env", ".env.prod"]
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/secrets.env",
+        "{{.ROOT_DIR}}/secrets.prod.env",
+        "{{.ROOT_DIR}}/.env.prod",
+      ]
     cmds:
-      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini current
-      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini history
+      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c
+        {{.BACKEND_DIR}}/alembic.ini current
+      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c
+        {{.BACKEND_DIR}}/alembic.ini history
 
   check:prod:
     desc: "Test connectivity + validate migration state for prod database (Neon)"
     dir: backend
-    dotenv: ["secrets.env", "secrets.prod.env", ".env.prod"]
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/secrets.env",
+        "{{.ROOT_DIR}}/secrets.prod.env",
+        "{{.ROOT_DIR}}/.env.prod",
+      ]
     cmds:
       - |
         if [ -z "$DATABASE_URL" ]; then
@@ -295,9 +324,14 @@ tasks:
   reset:prod:
     desc: "Reset prod database (🚨 DESTRUCTIVE). DRY_RUN=1 to preview."
     dir: backend
-    dotenv: ["secrets.env", "secrets.prod.env", ".env.prod"]
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/secrets.env",
+        "{{.ROOT_DIR}}/secrets.prod.env",
+        "{{.ROOT_DIR}}/.env.prod",
+      ]
     vars:
-      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+      DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
     prompt: "🚨 This will DESTROY ALL PRODUCTION DATA. Are you absolutely sure?"
     cmds:
       - |
@@ -315,9 +349,9 @@ tasks:
   seed:scenario:
     desc: "Seed scenario database (SCENARIO=name)"
     dir: backend
-    dotenv: [".env.scenario"]
+    dotenv: [ ".env.scenario" ]
     vars:
-      SCENARIO: '{{.SCENARIO | default "default"}}'
+      SCENARIO: "{{.SCENARIO | default \"default\"}}"
     cmds:
       - |
         source {{.ROOT_DIR}}/{{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
@@ -331,10 +365,10 @@ tasks:
   reset:scenario:
     desc: "Reset scenario database (SCENARIO=name). DRY_RUN=1 to preview."
     dir: backend
-    dotenv: [".env.scenario"]
+    dotenv: [ ".env.scenario" ]
     vars:
-      SCENARIO: '{{.SCENARIO | default "default"}}'
-      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+      SCENARIO: "{{.SCENARIO | default \"default\"}}"
+      DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
     prompt: "This will drop all tables and re-seed scenario '{{.SCENARIO}}'. Continue?"
     cmds:
       - |
@@ -353,9 +387,9 @@ tasks:
   migrate:scenario:
     desc: "Run migrations on scenario database (SCENARIO=name)"
     dir: backend
-    dotenv: [".env.scenario"]
+    dotenv: [ ".env.scenario" ]
     vars:
-      SCENARIO: '{{.SCENARIO | default "default"}}'
+      SCENARIO: "{{.SCENARIO | default \"default\"}}"
     cmds:
       - |
         source {{.ROOT_DIR}}/{{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
@@ -369,15 +403,18 @@ tasks:
   setup:integ:
     desc: Create isolated test database, migrate, and seed
     dir: backend
-    dotenv: [".env.test"]
+    dotenv: [ ".env.test" ]
     cmds:
       - |
         docker exec calendar_db_dev psql -U $POSTGRES_USER -d postgres -c \
           "SELECT 1 FROM pg_database WHERE datname = 'calendar_db_test'" | grep -q 1 || \
         docker exec calendar_db_dev psql -U $POSTGRES_USER -d postgres -c \
           "CREATE DATABASE calendar_db_test OWNER $POSTGRES_USER"
-      - PYTHONPATH={{.ROOT_DIR}} DATABASE_URL=$TEST_DATABASE_URL {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini upgrade head
-      - PYTHONPATH={{.ROOT_DIR}} DATABASE_URL=$TEST_DATABASE_URL {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.seed
+      - PYTHONPATH={{.ROOT_DIR}} DATABASE_URL=$TEST_DATABASE_URL
+        {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini upgrade
+        head
+      - PYTHONPATH={{.ROOT_DIR}} DATABASE_URL=$TEST_DATABASE_URL
+        {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.seed
 
   # ════════════════════════════════════════════════════════════════
   # Status / Health
@@ -386,10 +423,12 @@ tasks:
   status:dev:
     desc: Show migration status for dev database
     dir: backend
-    dotenv: [".env.dev"]
+    dotenv: [ ".env.dev" ]
     cmds:
-      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini current
-      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini history
+      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c
+        {{.BACKEND_DIR}}/alembic.ini current
+      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c
+        {{.BACKEND_DIR}}/alembic.ini history
       - |
         HEAD_COUNT=$(PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini heads 2>/dev/null | grep -c "(head)" || echo "0")
         if [ "$HEAD_COUNT" -gt 1 ]; then
@@ -402,7 +441,7 @@ tasks:
   status:staging:
     desc: Show migration status for staging database
     dir: backend
-    dotenv: [".env.staging"]
+    dotenv: [ ".env.staging.local" ]
     cmds:
       - |
         DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5436}/${POSTGRES_DB}" \
@@ -414,7 +453,7 @@ tasks:
   check:dev:
     desc: Validate migration health for dev database
     dir: backend
-    dotenv: [".env.dev"]
+    dotenv: [ ".env.dev" ]
     cmds:
       - |
         echo "Checking migration status..."
@@ -429,7 +468,7 @@ tasks:
   merge:dev:
     desc: Merge multiple Alembic migration heads
     dir: backend
-    dotenv: [".env.dev"]
+    dotenv: [ ".env.dev" ]
     cmds:
       - |
         HEAD_COUNT=$(PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini heads 2>/dev/null | grep -c "(head)" || echo "0")
@@ -446,7 +485,7 @@ tasks:
   stamp:dev:
     desc: "⚠️ Stamp database to a revision (recovery tool)"
     dir: backend
-    dotenv: [".env.dev"]
+    dotenv: [ ".env.dev" ]
     prompt: "This will update alembic_version without running migrations. Continue?"
     cmds:
       - |
@@ -461,7 +500,7 @@ tasks:
   downgrade:dev:
     desc: "⚠️ Rollback migrations (use with caution)"
     dir: backend
-    dotenv: [".env.dev"]
+    dotenv: [ ".env.dev" ]
     prompt: "This will rollback migrations. Continue?"
     cmds:
       - |
@@ -479,14 +518,14 @@ tasks:
 
   copy:dev-to-staging:
     desc: "🔄 Copy dev database → staging. DRY_RUN=1 to preview."
-    dotenv: [".env.dev"]
+    dotenv: [ ".env.dev" ]
     prompt: "This will REPLACE the staging database with dev data. Continue?"
     vars:
-      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+      DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
     cmds:
       - |
         # Load staging env
-        set -a; source {{.ROOT_DIR}}/.env.staging; set +a
+        set -a; source {{.ROOT_DIR}}/.env.staging.local; set +a
         DST_PORT=${POSTGRES_PORT}
         DST_DB=${POSTGRES_DB}
         # Reload dev env
@@ -512,10 +551,10 @@ tasks:
 
   copy:staging-to-dev:
     desc: "🔄 Copy staging database → dev. DRY_RUN=1 to preview."
-    dotenv: [".env.staging"]
+    dotenv: [ ".env.staging.local" ]
     prompt: "This will REPLACE the dev database with staging data. Continue?"
     vars:
-      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+      DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
     cmds:
       - |
         # Load dev env
@@ -523,7 +562,7 @@ tasks:
         DST_PORT=${POSTGRES_PORT}
         DST_DB=${POSTGRES_DB}
         # Reload staging env
-        set -a; source {{.ROOT_DIR}}/.env.staging; set +a
+        set -a; source {{.ROOT_DIR}}/.env.staging.local; set +a
         SRC_PORT=${POSTGRES_PORT}
         SRC_DB=${POSTGRES_DB}
 
@@ -549,11 +588,12 @@ tasks:
         echo "✅ Staging → Dev copy complete (with schema migration)"
 
   copy:staging-to-prod:
-    desc: "🚨 Copy staging database → prod (promotes to production). DRY_RUN=1 to preview."
-    dotenv: [".env.staging"]
+    desc: "🚨 Copy staging database → prod (promotes to production). DRY_RUN=1 to
+      preview."
+    dotenv: [ ".env.staging.local" ]
     prompt: "🚨 This will REPLACE the PRODUCTION database with staging data. Continue?"
     vars:
-      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+      DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
     cmds:
       - |
         # Load prod env
@@ -561,7 +601,7 @@ tasks:
         DST_PORT=${POSTGRES_PORT}
         DST_DB=${POSTGRES_DB}
         # Reload staging env
-        set -a; source {{.ROOT_DIR}}/.env.staging; set +a
+        set -a; source {{.ROOT_DIR}}/.env.staging.local; set +a
         SRC_PORT=${POSTGRES_PORT}
         SRC_DB=${POSTGRES_DB}
 

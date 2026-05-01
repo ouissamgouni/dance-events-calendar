@@ -37,6 +37,7 @@ export default function MyCalendar() {
     const [exporting, setExporting] = useState('');
     const [shareStatus, setShareStatus] = useState<'idle' | 'loading' | 'copied'>('idle');
     const [activeFilter, setActiveFilter] = useState<Filter>('all');
+    const [showPastEvents, setShowPastEvents] = useState(false);
 
     // Union of saved + going — deduplicated
     const allEventIds = useMemo(
@@ -113,7 +114,23 @@ export default function MyCalendar() {
         return events;
     }, [activeFilter, events, isSaved, isAttending]);
 
-    const mapEvents = displayedEvents.length > 0 ? displayedEvents : stableEmptyEvents;
+    // Split into upcoming / past
+    const { upcomingDisplayed, pastEventIds } = useMemo(() => {
+        const now = Date.now();
+        const pastIds = new Set<string>();
+        const upcoming: CalendarEvent[] = [];
+        for (const event of displayedEvents) {
+            if (new Date(event.end).getTime() < now) {
+                pastIds.add(event.event_id);
+            } else {
+                upcoming.push(event);
+            }
+        }
+        return { upcomingDisplayed: upcoming, pastEventIds: pastIds };
+    }, [displayedEvents]);
+
+    const eventsForList = showPastEvents ? displayedEvents : upcomingDisplayed;
+    const mapEvents = eventsForList.length > 0 ? eventsForList : stableEmptyEvents;
 
     // Header count label
     const countLabel = useMemo(() => {
@@ -202,6 +219,20 @@ export default function MyCalendar() {
                     </div>
                 )}
 
+                {/* Past events toggle */}
+                {!loading && pastEventIds.size > 0 && (
+                    <div className="mb-3">
+                        <button
+                            onClick={() => setShowPastEvents((v) => !v)}
+                            className="text-xs text-slate-500 hover:text-slate-700 underline underline-offset-2 transition"
+                        >
+                            {showPastEvents
+                                ? 'Hide past events'
+                                : `Show ${pastEventIds.size} past event${pastEventIds.size !== 1 ? 's' : ''}`}
+                        </button>
+                    </div>
+                )}
+
                 {loading && (
                     <p className="text-center text-slate-400 py-12">Loading your events…</p>
                 )}
@@ -227,7 +258,8 @@ export default function MyCalendar() {
                         <div className="order-1 lg:order-1 lg:w-[350px] lg:shrink-0 flex flex-col gap-4">
                             <div className="hidden lg:block lg:h-[calc(100vh-220px)] lg:overflow-hidden">
                                 <EventListPanel
-                                    events={displayedEvents}
+                                    events={eventsForList}
+                                    pastEventIds={showPastEvents ? pastEventIds : undefined}
                                     mapBounds={mapBounds}
                                     onEventClick={handleEventClick}
                                     showPrices={showPrices}
@@ -249,7 +281,8 @@ export default function MyCalendar() {
                         {/* Mobile list */}
                         <div className="order-3 lg:hidden">
                             <EventListPanel
-                                events={displayedEvents}
+                                events={eventsForList}
+                                pastEventIds={showPastEvents ? pastEventIds : undefined}
                                 mapBounds={mapBounds}
                                 onEventClick={handleEventClick}
                                 showPrices={showPrices}

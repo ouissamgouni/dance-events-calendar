@@ -12,6 +12,7 @@ venv/
 .env
 .env.*
 !.env.example
+!.env.staging.local
 secrets.env
 secrets.*.env
 scenarios/*/secrets.env

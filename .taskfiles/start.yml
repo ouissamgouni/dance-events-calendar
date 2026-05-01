@@ -131,7 +131,7 @@ tasks:
 
   staging:local:
     desc: Start local staging stack (docker-compose). RESET=1 to teardown first.
-    dotenv: ["{{.ROOT_DIR}}/.env.staging"]
+    dotenv: ["{{.ROOT_DIR}}/.env.staging.local"]
     vars:
       RESET: '{{.RESET | default "0"}}'
     cmds:
@@ -275,18 +275,41 @@ tasks:
           sleep 2
         done
 
-        # Bootstrap: create website and capture website ID
-        UMAMI_TOKEN=$(curl -sf -X POST "${UMAMI_URL}/api/auth/login" \
-          -H 'Content-Type: application/json' \
-          -d '{"username":"admin","password":"umami"}' | {{.ROOT_DIR}}/.venv/bin/python -c "import sys,json; print(json.load(sys.stdin)['token'])")
+        # Bootstrap: login with retry (Umami runs DB migrations after heartbeat is ready,
+        # so login can fail for 5-15s even after /api/heartbeat returns OK)
+        UMAMI_TOKEN=""
+        for attempt in $(seq 1 20); do
+          UMAMI_TOKEN=$(curl -sf -X POST "${UMAMI_URL}/api/auth/login" \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"admin","password":"umami"}' 2>/dev/null \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])" 2>/dev/null \
+            || true)
+          if [ -n "$UMAMI_TOKEN" ]; then
+            break
+          fi
+          echo "  Umami login attempt $attempt/20 not ready yet, retrying in 2s..."
+          sleep 2
+        done
 
-        SC_UMAMI_WEBSITE_ID=$(curl -sf -X POST "${UMAMI_URL}/api/websites" \
-          -H 'Content-Type: application/json' \
-          -H "Authorization: Bearer ${UMAMI_TOKEN}" \
-          -d "{\"name\":\"${SCENARIO_NAME}\",\"domain\":\"localhost\"}" | {{.ROOT_DIR}}/.venv/bin/python -c "import sys,json; print(json.load(sys.stdin)['id'])")
-
-        echo "✅ Umami ready — website ID: $SC_UMAMI_WEBSITE_ID"
-        echo "   Dashboard: $UMAMI_URL"
+        SC_UMAMI_WEBSITE_ID=""
+        if [ -z "$UMAMI_TOKEN" ]; then
+          echo "⚠️  Umami bootstrap failed: could not log in after 20 attempts"
+          echo "   Umami tracking will be disabled for this session"
+        else
+          SC_UMAMI_WEBSITE_ID=$(curl -sf -X POST "${UMAMI_URL}/api/websites" \
+            -H 'Content-Type: application/json' \
+            -H "Authorization: Bearer ${UMAMI_TOKEN}" \
+            -d "{\"name\":\"${SCENARIO_NAME}\",\"domain\":\"localhost\"}" 2>/dev/null \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])" 2>/dev/null \
+            || true)
+          if [ -z "$SC_UMAMI_WEBSITE_ID" ]; then
+            echo "⚠️  Umami bootstrap failed: could not create website (got empty ID)"
+            echo "   Umami tracking will be disabled for this session"
+          else
+            echo "✅ Umami ready — website ID: $SC_UMAMI_WEBSITE_ID"
+            echo "   Dashboard: $UMAMI_URL"
+          fi
+        fi
 
         # Persist Umami info into state file
         STATE_DIR="{{.ROOT_DIR}}/.taskfiles/.scenario-state"

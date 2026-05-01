@@ -53,7 +53,7 @@ class MockCalendarService(BaseCalendarService):
         sync_token: Optional[str] = None,
         time_min: Optional[datetime] = None,
     ) -> SyncResult:
-        events_file = self.scenario_dir / "events.yaml"
+        events_file = self.scenario_dir / "mock-sync-events.yaml"
         if not events_file.exists():
             return SyncResult(events=[], deleted_event_ids=[], next_sync_token=None)
 

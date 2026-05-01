@@ -180,7 +180,7 @@ test_plan:
     - id: 19
       title: "Configure mock calendar with a new event to sync"
       description: >
-        Check the scenario events.yaml for the "salsa-cal-dt-001" calendar. Note
+        Check the scenario mock-sync-events.yaml for the "salsa-cal-dt-001" calendar. Note
         there is no new mock event to sync in a fresh seed. To test auto-tagging,
         manually trigger a sync from the admin's Sync card.
       expected: >

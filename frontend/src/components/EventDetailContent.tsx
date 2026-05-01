@@ -139,11 +139,6 @@ export default function EventDetailContent({
         saveField({ [field]: value || null } as Partial<CalendarEvent>);
     };
 
-    const handleTextKeyDown = (e: React.KeyboardEvent, onEnterSave: () => void) => {
-        if (e.key === 'Enter') { e.preventDefault(); onEnterSave(); }
-        if (e.key === 'Escape') { cancelledRef.current = true; cancelEdit(); }
-    };
-
     // Small pencil hint shown on hover when editable
     const EditHint = () => (
         <span className="opacity-0 group-hover:opacity-40 absolute top-0.5 right-0 text-slate-400 text-[10px] pointer-events-none select-none">

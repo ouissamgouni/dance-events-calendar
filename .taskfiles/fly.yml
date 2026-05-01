@@ -82,16 +82,16 @@ tasks:
   # ════════════════════════════════════════════════════════════════
 
   staging:secrets:
-    desc: "Push secrets from secrets.staging.env to the staging Fly.io app"
+    desc: "Push secrets from secrets.staging.remote.env to the staging Fly.io app"
     cmds:
       - |
-        if [ ! -f secrets.staging.env ]; then
-          echo "❌ secrets.staging.env not found — copy secrets.staging.env.example and fill in values"
+        if [ ! -f secrets.staging.remote.env ]; then
+          echo "❌ secrets.staging.remote.env not found — copy secrets.staging.remote.env.example and fill in values"
           exit 1
         fi
       - |
         echo "Pushing secrets to staging Fly.io app..."
-        grep -v '^#' secrets.staging.env \
+        grep -v '^#' secrets.staging.remote.env \
           | grep -v '^[[:space:]]*$' \
           | grep -v '^VITE_' \
           | fly secrets import -c fly.staging.toml

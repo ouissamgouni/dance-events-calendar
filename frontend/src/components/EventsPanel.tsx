@@ -3,8 +3,6 @@ import type { CalendarEvent } from '../types';
 import type {
     EventFilterParams,
     EventFilterOptionsResponse,
-    FilterOption,
-    PaginatedEventsResponse,
 } from '../api';
 import {
     fetchAdminEvents,
@@ -63,7 +61,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
     const [tagGroups, setTagGroups] = useState<AdminTagGroup[]>([]);
     const [bulkTagPickerOpen, setBulkTagPickerOpen] = useState(false);
     const [bulkTagIds, setBulkTagIds] = useState<number[]>([]);
-    const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+    const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
     // Build filter params from current state
     const buildParams = useCallback(

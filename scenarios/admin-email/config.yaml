@@ -1,4 +1,4 @@
 # Calendar service to use for this scenario.
-# - "mock"   → uses seed data from calendars.yaml + events.yaml (no real API calls)
+# - "mock"   → uses seed data from calendars.yaml + mock-sync-events.yaml (no real API calls)
 # - "google" → uses real Google Calendar API (needs valid credentials)
 calendar_service: mock

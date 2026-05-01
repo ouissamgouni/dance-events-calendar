@@ -1,7 +1,7 @@
 # Fly.io app configuration
 # https://fly.io/docs/reference/configuration/
 
-app = "salsa-events-calendar"
+app = "movida"
 primary_region = "cdg"
 
 [build]

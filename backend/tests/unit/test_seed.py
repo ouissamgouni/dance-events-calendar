@@ -97,7 +97,7 @@ class TestDatabaseSeeder:
         scenario = SCENARIOS_DIR / "calendar-service-mock"
         assert scenario.exists(), f"Scenario dir does not exist: {scenario}"
         assert (scenario / "calendars.yaml").exists()
-        assert (scenario / "events.yaml").exists()
+        assert (scenario / "mock-sync-events.yaml").exists()
 
     def test_seed_calendars_yaml_has_expected_structure(self):
         import yaml
@@ -115,7 +115,9 @@ class TestDatabaseSeeder:
         import yaml
         from backend.db.seed import SCENARIOS_DIR
 
-        with open(SCENARIOS_DIR / "calendar-service-mock" / "events.yaml") as f:
+        with open(
+            SCENARIOS_DIR / "calendar-service-mock" / "mock-sync-events.yaml"
+        ) as f:
             data = yaml.safe_load(f)
 
         assert "events" in data

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { Fragment, useEffect, useRef, useState, useCallback } from 'react';
 import type { CalendarEvent } from '../types';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import SaveEventButton from './SaveEventButton';
@@ -23,6 +23,7 @@ interface EventListPanelProps {
     onSortChange: (sort: 'date' | 'popularity') => void;
     hoveredEventId?: string | null;
     onEventHover?: (eventId: string | null) => void;
+    pastEventIds?: Set<string>;
 }
 
 function PriceBadge({ event }: { event: CalendarEvent }) {
@@ -109,6 +110,7 @@ export default function EventListPanel({
     onSortChange,
     hoveredEventId,
     onEventHover,
+    pastEventIds,
 }: EventListPanelProps) {
     const { isSaved } = useSavedEvents();
     const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -136,14 +138,31 @@ export default function EventListPanel({
         }
     }, [hoveredEventId]);
 
-    // Show all events — on-map first, off-map / ungeolocated pushed to the bottom
+    // Show all events — on-map first, off-map / ungeolocated pushed to the bottom.
+    // When pastEventIds is provided, keep upcoming events before past events.
     const sortedEvents = [...events].sort((a, b) => {
+        if (pastEventIds) {
+            const aPast = pastEventIds.has(a.event_id);
+            const bPast = pastEventIds.has(b.event_id);
+            if (aPast !== bPast) return aPast ? 1 : -1;
+            // Within the past group, sort descending by date (most recent first)
+            if (aPast && sortBy === 'date') {
+                const aOnMap = isOnMap(a, mapBounds);
+                const bOnMap = isOnMap(b, mapBounds);
+                if (aOnMap !== bOnMap) return aOnMap ? -1 : 1;
+                return new Date(b.start).getTime() - new Date(a.start).getTime();
+            }
+        }
         const aOnMap = isOnMap(a, mapBounds);
         const bOnMap = isOnMap(b, mapBounds);
         if (aOnMap !== bOnMap) return aOnMap ? -1 : 1;
         if (sortBy === 'popularity') return b.view_count - a.view_count;
         return new Date(a.start).getTime() - new Date(b.start).getTime();
     });
+
+    const firstPastIndex = pastEventIds
+        ? sortedEvents.findIndex((e) => pastEventIds.has(e.event_id))
+        : -1;
 
     const onMapCount = mapBounds ? events.filter((e) => isOnMap(e, mapBounds)).length : events.length;
 
@@ -189,65 +208,71 @@ export default function EventListPanel({
                             <p className="text-xs text-slate-400 mt-1">Try zooming out or adjusting the date range.</p>
                         </div>
                     ) : (
-                        sortedEvents.map((event) => {
+                        sortedEvents.map((event, idx) => {
                             const start = new Date(event.start);
                             const onMap = isOnMap(event, mapBounds);
                             const isHighlighted = hoveredEventId === event.event_id;
                             return (
-                                <div
-                                    key={event.event_id}
-                                    ref={(el) => { if (el) cardRefs.current.set(event.event_id, el); else cardRefs.current.delete(event.event_id); }}
-                                    role="button"
-                                    tabIndex={0}
-                                    className={`event-card${onMap ? '' : ' event-card-offmap'}${isHighlighted ? ' event-card-highlighted' : ''}`}
-                                    onClick={() => onEventClick(event)}
-                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onEventClick(event); } }}
-                                    onMouseEnter={() => onEventHover?.(event.event_id)}
-                                    onMouseLeave={() => onEventHover?.(null)}
-                                >
-                                    <div className="event-card-color" style={{ backgroundColor: onMap ? (event.color || '#6b7280') : '#d1d5db' }} />
-                                    <div className="event-card-content relative">
-                                        <h4 className="event-card-title">{event.title}</h4>
-                                        <p className="event-card-date">
-                                            {event.all_day ? formatDate(start) : `${formatDate(start)} · ${formatTime(start)}`}
-                                        </p>
-                                        {event.location && (
-                                            <p className="event-card-location">📍 {event.location}</p>
-                                        )}
-                                        {!onMap && (
-                                            <span className="event-card-offmap-badge">Off map</span>
-                                        )}
-                                        {((showPrices && (event.price_is_free || (event.price_min != null && event.price_currency))) ||
-                                            (showPopularity && event.view_count > 0)) && (
-                                                <div className="event-card-badges">
-                                                    {showPrices && <PriceBadge event={event} />}
-                                                    {showPopularity && (
-                                                        <PopularityBadge viewCount={event.view_count} allViewCounts={allViewCounts} threshold={popularityThreshold} />
-                                                    )}
+                                <Fragment key={event.event_id}>
+                                    {idx === firstPastIndex && (
+                                        <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wide border-t border-slate-200 mt-2">
+                                            Past events
+                                        </div>
+                                    )}
+                                    <div
+                                        ref={(el) => { if (el) cardRefs.current.set(event.event_id, el); else cardRefs.current.delete(event.event_id); }}
+                                        role="button"
+                                        tabIndex={0}
+                                        className={`event-card${onMap ? '' : ' event-card-offmap'}${isHighlighted ? ' event-card-highlighted' : ''}`}
+                                        onClick={() => onEventClick(event)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onEventClick(event); } }}
+                                        onMouseEnter={() => onEventHover?.(event.event_id)}
+                                        onMouseLeave={() => onEventHover?.(null)}
+                                    >
+                                        <div className="event-card-color" style={{ backgroundColor: onMap ? (event.color || '#6b7280') : '#d1d5db' }} />
+                                        <div className="event-card-content relative">
+                                            <h4 className="event-card-title">{event.title}</h4>
+                                            <p className="event-card-date">
+                                                {event.all_day ? formatDate(start) : `${formatDate(start)} · ${formatTime(start)}`}
+                                            </p>
+                                            {event.location && (
+                                                <p className="event-card-location">📍 {event.location}</p>
+                                            )}
+                                            {!onMap && (
+                                                <span className="event-card-offmap-badge">Off map</span>
+                                            )}
+                                            {((showPrices && (event.price_is_free || (event.price_min != null && event.price_currency))) ||
+                                                (showPopularity && event.view_count > 0)) && (
+                                                    <div className="event-card-badges">
+                                                        {showPrices && <PriceBadge event={event} />}
+                                                        {showPopularity && (
+                                                            <PopularityBadge viewCount={event.view_count} allViewCounts={allViewCounts} threshold={popularityThreshold} />
+                                                        )}
+                                                    </div>
+                                                )}
+                                            {event.tags?.length > 0 && (
+                                                <div className="mt-1">
+                                                    <TagBadges tags={event.tags} maxVisible={3} />
                                                 </div>
                                             )}
-                                        {event.tags?.length > 0 && (
-                                            <div className="mt-1">
-                                                <TagBadges tags={event.tags} maxVisible={3} />
+                                            <div className="absolute top-0 right-0 flex items-center gap-0.5">
+                                                <SaveEventButton
+                                                    eventId={event.event_id}
+                                                    appearance="icon"
+                                                    size="sm"
+                                                    stopPropagation
+                                                    className={isSaved(event.event_id) ? 'text-slate-700' : ''}
+                                                />
+                                                <GoingButton
+                                                    eventId={event.event_id}
+                                                    appearance="icon"
+                                                    size="sm"
+                                                    stopPropagation
+                                                />
                                             </div>
-                                        )}
-                                        <div className="absolute top-0 right-0 flex items-center gap-0.5">
-                                            <SaveEventButton
-                                                eventId={event.event_id}
-                                                appearance="icon"
-                                                size="sm"
-                                                stopPropagation
-                                                className={isSaved(event.event_id) ? 'text-slate-700' : ''}
-                                            />
-                                            <GoingButton
-                                                eventId={event.event_id}
-                                                appearance="icon"
-                                                size="sm"
-                                                stopPropagation
-                                            />
                                         </div>
                                     </div>
-                                </div>
+                                </Fragment>
                             );
                         })
                     )}

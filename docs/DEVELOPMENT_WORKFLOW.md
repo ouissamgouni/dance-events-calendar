@@ -269,7 +269,8 @@ The scenario environment lets you spin up an isolated full stack, seed it with s
 scenarios/<name>/
 ├── config.yaml           # Required: calendar_service (google|mock)
 ├── calendars.yaml        # Optional: calendar settings
-├── events.yaml           # Optional: event data
+├── mock-sync-events.yaml # Optional: events served by MockCalendarService during sync
+├── db-events.yaml        # Optional: events pre-seeded directly into DB (before sync fires)
 └── secrets.env           # Optional: per-scenario secret overrides (gitignored)
 ```
 
