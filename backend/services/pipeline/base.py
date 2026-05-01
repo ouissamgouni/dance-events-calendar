@@ -61,51 +61,58 @@ class EnrichmentPipeline:
         self.stages.append(stage)
         return self
 
+    _CHUNK_SIZE = 50  # events loaded per DB query to cap peak memory
+
     def run(
         self,
         session: Session,
         event_ids: list[str],
         since_date: datetime | None = None,
     ) -> PipelineProgress:
-        """Run all stages on the given events. Future events first, skip past events."""
+        """Run all stages on the given events. Future events first, skip past events.
+
+        Events are loaded in chunks of _CHUNK_SIZE to avoid materialising the full
+        list in memory when syncing large calendars.
+        """
         progress = PipelineProgress()
         for stage in self.stages:
             progress.stages[stage.name] = StageResult()
 
-        # Load events, ordered future-first
-        events = session.exec(
-            select(CachedEvent)
-            .where(
-                CachedEvent.event_id.in_(event_ids),  # type: ignore[attr-defined]
-                CachedEvent.deleted_at == None,
-            )
-            .order_by(col(CachedEvent.start).desc())
-        ).all()
+        for chunk_start in range(0, len(event_ids), self._CHUNK_SIZE):
+            chunk_ids = event_ids[chunk_start : chunk_start + self._CHUNK_SIZE]
 
-        # Skip events before since_date
-        if since_date:
-            events = [e for e in events if e.start >= since_date]
+            events = session.exec(
+                select(CachedEvent)
+                .where(
+                    CachedEvent.event_id.in_(chunk_ids),  # type: ignore[attr-defined]
+                    CachedEvent.deleted_at == None,
+                )
+                .order_by(col(CachedEvent.start).desc())
+            ).all()
 
-        for event in events:
-            for stage in self.stages:
-                result = progress.stages[stage.name]
-                if not stage.should_process(event):
-                    result.skipped += 1
-                    continue
-                try:
-                    ok = stage.process(event)
-                    if ok:
-                        result.processed += 1
-                    else:
+            if since_date:
+                events = [e for e in events if e.start >= since_date]
+
+            for event in events:
+                for stage in self.stages:
+                    result = progress.stages[stage.name]
+                    if not stage.should_process(event):
+                        result.skipped += 1
+                        continue
+                    try:
+                        ok = stage.process(event)
+                        if ok:
+                            result.processed += 1
+                        else:
+                            result.failed += 1
+                    except Exception:
+                        logger.exception(
+                            "Stage %s failed for event %s", stage.name, event.event_id
+                        )
                         result.failed += 1
-                except Exception:
-                    logger.exception(
-                        "Stage %s failed for event %s", stage.name, event.event_id
-                    )
-                    result.failed += 1
 
-                # Commit per-event per-stage so progress is visible immediately
-                session.add(event)
-                session.commit()
+                    # Commit per-event per-stage so progress is visible immediately
+                    session.add(event)
+                    session.commit()
 
         return progress

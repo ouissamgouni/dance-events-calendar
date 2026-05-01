@@ -67,7 +67,51 @@ class SyncService:
         return discovered
 
     def sync_all(self, session: Session, trigger: str = "auto") -> dict:
-        """Sync events for all enabled calendars. Returns summary stats."""
+        """Sync events and run enrichment inline. Used by the background scheduler."""
+        stats, needs_enrichment, log = self._sync_phase(session, trigger)
+        self._enrich_phase(session, needs_enrichment, log)
+        return stats
+
+    def sync_all_fast(
+        self, session: Session, trigger: str = "manual"
+    ) -> tuple[dict, list[str], int]:
+        """Sync events only (no enrichment). Returns (stats, event_ids_needing_enrichment, log_id).
+
+        Designed for the manual-trigger endpoint: the caller is responsible for
+        running enrichment asynchronously so the HTTP response is not blocked.
+        """
+        stats, needs_enrichment, log = self._sync_phase(session, trigger)
+        return stats, needs_enrichment, log.id
+
+    def run_enrichment(self, log_id: int, event_ids: list[str]) -> None:
+        """Run the enrichment pipeline for a previously completed sync log.
+
+        Intended to be called in a background task after sync_all_fast().
+        Opens its own DB session so it can run independently of the request session.
+        """
+        from backend.db.database import get_engine
+        from sqlmodel import Session as DBSession
+
+        engine = get_engine()
+        with DBSession(engine) as session:
+            log = session.get(SyncLog, log_id)
+            if log:
+                log.enrichment_status = "running"
+                session.add(log)
+                session.commit()
+
+            progress = self.pipeline.run(session, event_ids)
+
+            if log:
+                log.enrichment_status = "completed"
+                log.enrichment_progress = progress.to_dict()
+                session.add(log)
+                session.commit()
+
+    def _sync_phase(
+        self, session: Session, trigger: str
+    ) -> tuple[dict, list[str], SyncLog]:
+        """Phase 1: sync calendars, upsert events, return enrichment candidates."""
         log = SyncLog(trigger=trigger)
         session.add(log)
         session.commit()
@@ -112,20 +156,24 @@ class SyncService:
             session.add(log)
             session.commit()
 
-        # Phase 2: Run enrichment pipeline on all events that need it
-        if all_needs_enrichment:
-            log.enrichment_status = "running"
-            session.add(log)
-            session.commit()
+        return stats, all_needs_enrichment, log
 
-            progress = self.pipeline.run(session, all_needs_enrichment)
+    def _enrich_phase(
+        self, session: Session, event_ids: list[str], log: SyncLog
+    ) -> None:
+        """Phase 2: run enrichment pipeline inline (used by scheduler)."""
+        if not event_ids:
+            return
+        log.enrichment_status = "running"
+        session.add(log)
+        session.commit()
 
-            log.enrichment_status = "completed"
-            log.enrichment_progress = progress.to_dict()
-            session.add(log)
-            session.commit()
+        progress = self.pipeline.run(session, event_ids)
 
-        return stats
+        log.enrichment_status = "completed"
+        log.enrichment_progress = progress.to_dict()
+        session.add(log)
+        session.commit()
 
     def sync_calendar(self, session: Session, cal: CalendarSetting) -> dict:
         """Sync a single calendar. Uses sync token for incremental sync."""

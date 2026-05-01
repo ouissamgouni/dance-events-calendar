@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from sqlmodel import Session, col, func, select
 
 logger = logging.getLogger(__name__)
@@ -160,14 +160,22 @@ def discover_calendars(
 @router.post("/sync")
 def trigger_sync(
     request: Request,
+    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
-    """Manually trigger a sync for all enabled calendars."""
+    """Manually trigger a sync for all enabled calendars.
+
+    Returns immediately after syncing events. Enrichment (geocoding, price
+    extraction, link extraction) runs in the background so the request does
+    not block until the Fly proxy timeout.
+    """
     calendar_service = request.app.state.calendar_service
     sync_service = SyncService(calendar_service)
     try:
-        stats = sync_service.sync_all(session, trigger="manual")
+        stats, needs_enrichment, log_id = sync_service.sync_all_fast(
+            session, trigger="manual"
+        )
     except FileNotFoundError as exc:
         logger.exception("Service account file not found")
         raise HTTPException(
@@ -178,7 +186,11 @@ def trigger_sync(
         raise HTTPException(
             status_code=502, detail=f"Calendar service error: {exc}"
         ) from exc
-    return stats
+
+    if needs_enrichment:
+        background_tasks.add_task(sync_service.run_enrichment, log_id, needs_enrichment)
+
+    return {**stats, "enrichment_queued": len(needs_enrichment)}
 
 
 @router.post("/calendars/{calendar_id}/toggle", response_model=CalendarSettingResponse)
