@@ -38,6 +38,8 @@ tasks:
   staging:remote:backend:
     desc: "Stage Fly secrets + deploy backend to movida-staging.fly.dev"
     dotenv: [ "config/secrets.env", "config/secrets.staging.env" ]
+    vars:
+      LOG_LEVEL: "{{.LOG_LEVEL | default \"\"}}"
     cmds:
       - |
         if [ ! -f config/secrets.staging.env ]; then
@@ -56,6 +58,10 @@ tasks:
           echo "✅ GOOGLE_SERVICE_ACCOUNT_JSON staged"
         else
           echo "⚠️  backend/credentials/service-account.json not found — GOOGLE_SERVICE_ACCOUNT_JSON not staged"
+        fi
+        if [ -n "{{.LOG_LEVEL}}" ]; then
+          fly secrets set -c fly.staging.toml --stage LOG_LEVEL="{{.LOG_LEVEL}}"
+          echo "✅ LOG_LEVEL staged: {{.LOG_LEVEL}}"
         fi
       - |
         echo "Deploying backend to movida-staging.fly.dev..."
