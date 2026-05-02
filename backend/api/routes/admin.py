@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
@@ -170,8 +171,10 @@ def trigger_sync(
     extraction, link extraction) runs in the background so the request does
     not block until the Fly proxy timeout.
     """
+    started = time.perf_counter()
     calendar_service = request.app.state.calendar_service
     sync_service = SyncService(calendar_service)
+    logger.info("Manual sync requested")
     try:
         stats, needs_enrichment, log_id = sync_service.sync_all_fast(
             session, trigger="manual"
@@ -189,6 +192,22 @@ def trigger_sync(
 
     if needs_enrichment:
         background_tasks.add_task(sync_service.run_enrichment, log_id, needs_enrichment)
+        logger.info(
+            "Queued enrichment background task (log_id=%s, events=%d)",
+            log_id,
+            len(needs_enrichment),
+        )
+
+    elapsed = time.perf_counter() - started
+    logger.info(
+        "Manual sync request finished in %.2fs (log_id=%s, calendars=%d, upserted=%d, deleted=%d, queued_enrichment=%d)",
+        elapsed,
+        log_id,
+        stats["calendars_synced"],
+        stats["events_upserted"],
+        stats["events_deleted"],
+        len(needs_enrichment),
+    )
 
     return {**stats, "enrichment_queued": len(needs_enrichment)}
 

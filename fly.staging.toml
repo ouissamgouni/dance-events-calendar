@@ -16,6 +16,7 @@ primary_region = "cdg"
 [env]
   PYTHONPATH = "/app"
   PYTHONUNBUFFERED = "1"
+  LOG_LEVEL = "debug"
   ENV_NAME = "staging"
   CALENDAR_SERVICE = "google"
 

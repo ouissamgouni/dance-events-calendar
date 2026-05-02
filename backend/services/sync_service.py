@@ -1,5 +1,6 @@
 import hashlib
 import logging
+import time
 from datetime import datetime
 
 from sqlmodel import Session, select
@@ -68,8 +69,19 @@ class SyncService:
 
     def sync_all(self, session: Session, trigger: str = "auto") -> dict:
         """Sync events and run enrichment inline. Used by the background scheduler."""
+        started = time.perf_counter()
+        logger.info("Starting full sync run (trigger=%s)", trigger)
         stats, needs_enrichment, log = self._sync_phase(session, trigger)
         self._enrich_phase(session, needs_enrichment, log)
+        elapsed = time.perf_counter() - started
+        logger.info(
+            "Full sync run finished in %.2fs (trigger=%s, calendars=%d, upserted=%d, deleted=%d)",
+            elapsed,
+            trigger,
+            stats["calendars_synced"],
+            stats["events_upserted"],
+            stats["events_deleted"],
+        )
         return stats
 
     def sync_all_fast(
@@ -92,6 +104,7 @@ class SyncService:
         from backend.db.database import get_engine
         from sqlmodel import Session as DBSession
 
+        started = time.perf_counter()
         engine = get_engine()
         with DBSession(engine) as session:
             log = session.get(SyncLog, log_id)
@@ -100,7 +113,26 @@ class SyncService:
                 session.add(log)
                 session.commit()
 
-            progress = self.pipeline.run(session, event_ids)
+            logger.info(
+                "Starting background enrichment (log_id=%s, events=%d)",
+                log_id,
+                len(event_ids),
+            )
+
+            try:
+                progress = self.pipeline.run(session, event_ids)
+            except Exception as exc:
+                logger.exception(
+                    "Background enrichment failed (log_id=%s, events=%d)",
+                    log_id,
+                    len(event_ids),
+                )
+                if log:
+                    log.enrichment_status = "error"
+                    log.error_message = str(exc)
+                    session.add(log)
+                    session.commit()
+                return
 
             if log:
                 log.enrichment_status = "completed"
@@ -108,10 +140,19 @@ class SyncService:
                 session.add(log)
                 session.commit()
 
+            elapsed = time.perf_counter() - started
+            logger.info(
+                "Background enrichment completed in %.2fs (log_id=%s, events=%d)",
+                elapsed,
+                log_id,
+                len(event_ids),
+            )
+
     def _sync_phase(
         self, session: Session, trigger: str
     ) -> tuple[dict, list[str], SyncLog]:
         """Phase 1: sync calendars, upsert events, return enrichment candidates."""
+        started = time.perf_counter()
         log = SyncLog(trigger=trigger)
         session.add(log)
         session.commit()
@@ -124,9 +165,16 @@ class SyncService:
         enabled = session.exec(
             select(CalendarSetting).where(CalendarSetting.enabled == True)
         ).all()
+        logger.info(
+            "Starting sync phase (log_id=%s, trigger=%s, enabled_calendars=%d)",
+            log.id,
+            trigger,
+            len(enabled),
+        )
 
         try:
             for cal in enabled:
+                cal_started = time.perf_counter()
                 try:
                     cal_stats = self.sync_calendar(session, cal)
                     stats["calendars_synced"] += 1
@@ -134,6 +182,16 @@ class SyncService:
                     stats["events_deleted"] += cal_stats["deleted"]
                     all_needs_enrichment.extend(cal_stats.get("needs_enrichment", []))
                     all_dedup_entries.extend(cal_stats.get("dedup_entries", []))
+                    cal_elapsed = time.perf_counter() - cal_started
+                    logger.info(
+                        "Calendar sync done (log_id=%s, calendar_id=%s, upserted=%d, deleted=%d, enrich_candidates=%d, elapsed=%.2fs)",
+                        log.id,
+                        cal.calendar_id,
+                        cal_stats["upserted"],
+                        cal_stats["deleted"],
+                        len(cal_stats.get("needs_enrichment", [])),
+                        cal_elapsed,
+                    )
                 except Exception:
                     logger.exception("Failed to sync calendar %s", cal.calendar_id)
 
@@ -156,6 +214,18 @@ class SyncService:
             session.add(log)
             session.commit()
 
+        elapsed = time.perf_counter() - started
+        logger.info(
+            "Sync phase finished in %.2fs (log_id=%s, trigger=%s, calendars=%d, upserted=%d, deleted=%d, enrich_candidates=%d)",
+            elapsed,
+            log.id,
+            trigger,
+            stats["calendars_synced"],
+            stats["events_upserted"],
+            stats["events_deleted"],
+            len(all_needs_enrichment),
+        )
+
         return stats, all_needs_enrichment, log
 
     def _enrich_phase(
@@ -163,17 +233,43 @@ class SyncService:
     ) -> None:
         """Phase 2: run enrichment pipeline inline (used by scheduler)."""
         if not event_ids:
+            logger.info("Skipping enrichment phase: no candidate events")
             return
+        started = time.perf_counter()
+        logger.info(
+            "Starting enrichment phase (log_id=%s, events=%d)",
+            log.id,
+            len(event_ids),
+        )
         log.enrichment_status = "running"
         session.add(log)
         session.commit()
 
-        progress = self.pipeline.run(session, event_ids)
+        try:
+            progress = self.pipeline.run(session, event_ids)
+        except Exception as exc:
+            log.enrichment_status = "error"
+            log.error_message = str(exc)
+            session.add(log)
+            session.commit()
+            logger.exception(
+                "Enrichment phase failed (log_id=%s, events=%d)",
+                log.id,
+                len(event_ids),
+            )
+            return
 
         log.enrichment_status = "completed"
         log.enrichment_progress = progress.to_dict()
         session.add(log)
         session.commit()
+        elapsed = time.perf_counter() - started
+        logger.info(
+            "Enrichment phase finished in %.2fs (log_id=%s, events=%d)",
+            elapsed,
+            log.id,
+            len(event_ids),
+        )
 
     def sync_calendar(self, session: Session, cal: CalendarSetting) -> dict:
         """Sync a single calendar. Uses sync token for incremental sync."""
