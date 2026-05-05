@@ -5,7 +5,6 @@ calendars:
     enabled: true
     default_tags:
       - "dance-style:salsa"
-      - "format:social"
   - id: "evrpds0rvercm3ugjpgjia2kds@group.calendar.google.com"
     name: "Salsa - Going !"
     color: "#7c3aed"
@@ -13,3 +12,10 @@ calendars:
     default_tags:
       - "dance-style:salsa"
       - "misc:ogouni-going"
+  - id: "1e2764bc22c8fb43e0dcda5a3a3fd9d7d064112013e7525cade7dadbcd9220c4@group.cal\
+      endar.google.com"
+    name: "Salsa - Local"
+    color: "#ab2737"
+    enabled: true
+    default_tags:
+      - "scope:local"

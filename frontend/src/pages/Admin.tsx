@@ -611,7 +611,7 @@ export default function Admin() {
                                                             Default tags — applied to new events synced from this calendar:
                                                         </p>
                                                         <div className="flex flex-wrap gap-1">
-                                                            {tagGroups.filter((g) => g.enabled).map((group) =>
+                                                            {tagGroups.filter((g) => g.enabled && (g.scope ?? 'event') === 'event').map((group) =>
                                                                 group.tags.filter((t) => t.enabled).map((tag) => {
                                                                     const active = (calendarDefaultTagIds[cal.calendar_id] ?? []).includes(tag.id);
                                                                     return (
