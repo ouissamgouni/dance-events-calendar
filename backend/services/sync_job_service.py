@@ -379,7 +379,7 @@ class SyncJobService:
                 if row is None:
                     row = SyncJobRun(job_id=record.job_id)
                 row.status = payload["status"]
-                row.mode = payload["mode"]
+                row.mode = payload["mode"] or "incremental"
                 row.since_date = payload["since_date"]
                 row.started_at = record.started_at
                 row.finished_at = record.finished_at
@@ -394,7 +394,7 @@ class SyncJobService:
                 session.add(row)
                 session.commit()
         except Exception:
-            logger.debug(
+            logger.warning(
                 "SyncJobService: persist failed for job %s",
                 record.job_id,
                 exc_info=True,

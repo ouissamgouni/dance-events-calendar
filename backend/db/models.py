@@ -123,6 +123,32 @@ class SyncLog(SQLModel, table=True):
     dedup_log: Optional[list] = Field(default=None, sa_column=Column(JSON))
 
 
+class SyncJobRun(SQLModel, table=True):
+    """Persisted snapshot of a SyncJobService job run.
+
+    The in-memory SyncJobService is the source of truth while a job is
+    running; rows here are written periodically (throttled) and on
+    finalization so Sync History survives backend restarts.
+    """
+
+    __tablename__ = "sync_job_runs"
+
+    job_id: str = Field(primary_key=True)
+    status: str = Field(index=True)
+    mode: Optional[str] = Field(default=None)
+    since_date: Optional[str] = Field(default=None)
+    started_at: datetime = Field(index=True)
+    finished_at: Optional[datetime] = Field(default=None)
+    heartbeat_at: Optional[datetime] = Field(default=None)
+    abort_requested: bool = Field(default=False)
+    warning_message: Optional[str] = Field(default=None, sa_column=Column(Text))
+    error_message: Optional[str] = Field(default=None, sa_column=Column(Text))
+    totals_json: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    stage_totals_json: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    calendar_statuses_json: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    metadata_json: Optional[dict] = Field(default=None, sa_column=Column("metadata_json", JSON))
+
+
 class EventSuggestion(SQLModel, table=True):
     __tablename__ = "event_suggestions"
 

@@ -151,7 +151,41 @@ def _run_sync_job_worker(
         job_service.update_calendar_statuses(
             job_id, {cid: p.to_dict() for cid, p in progress_map.items()}
         )
+        # Roll up live totals so the cross-calendar metrics also update
+        # while the pipeline is still draining.
+        job_service.update_totals(
+            job_id,
+            calendars_synced=sum(
+                1 for p in progress_map.values()
+                if p.status in ("completed", "warning", "failed", "processing")
+            ),
+            events_fetched=sum(p.fetched for p in progress_map.values()),
+            events_upserted=sum(p.upserted for p in progress_map.values()),
+            events_deduped=sum(p.deduped for p in progress_map.values()),
+            events_enriched=sum(p.enriched_ok for p in progress_map.values()),
+            events_failed=sum(p.enriched_failed for p in progress_map.values()),
+        )
         job_service.heartbeat(job_id)
+
+    # Periodic publisher: pushes live progress + totals to the job service
+    # every second so the UI sees per-stage counters and logs accumulate
+    # while enrichment is still running (rather than only after each fetch
+    # future completes).
+    publisher_stop = threading.Event()
+
+    def _publisher_loop() -> None:
+        while not publisher_stop.wait(1.0):
+            try:
+                _publish_progress()
+            except Exception:
+                logger.exception("Progress publisher tick failed")
+
+    publisher_thread = threading.Thread(
+        target=_publisher_loop,
+        name=f"sync-publisher-{job_id[:8]}",
+        daemon=True,
+    )
+    publisher_thread.start()
 
     # --- Create pipeline (one instance, shared across workers — stages are stateless) ---
     pipeline = EnrichmentPipeline(
@@ -219,6 +253,11 @@ def _run_sync_job_worker(
 
     # --- Drain enrichment queue ---
     processor.stop()
+
+    # Stop the periodic publisher before the final aggregation so it can't
+    # race with update_totals() below.
+    publisher_stop.set()
+    publisher_thread.join(timeout=2.0)
 
     # Transition any calendars that finished fetching successfully from
     # the intermediate "processing" state to "completed" now that the
