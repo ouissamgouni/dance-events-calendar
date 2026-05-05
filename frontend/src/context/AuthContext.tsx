@@ -7,6 +7,13 @@ import {
     type AuthUser,
 } from '../api';
 import { rotateDeviceId } from '../utils/deviceId';
+import { clearUmamiBaseContext, setUmamiBaseContext, umamiIdentify } from '../utils/umami';
+import {
+    trackLoginCompleted,
+    trackLogout,
+    trackSignupCompleted,
+    type AuthMethod,
+} from '../utils/tracking';
 
 export type User = AuthUser;
 
@@ -36,7 +43,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const gen = ++generation.current;
         fetchMe()
             .then((u) => {
-                if (generation.current === gen) setUser(u);
+                if (generation.current === gen) {
+                    setUser(u);
+                    // Restore Umami session identity on page reload (no event fired —
+                    // this is not a new login, just session restoration).
+                    if (u.user_id) umamiIdentify(u.user_id);
+                    setUmamiBaseContext({ is_authenticated: true });
+                }
             })
             .catch(() => {
                 if (generation.current === gen) setUser(null);
@@ -58,15 +71,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const u = await apiLogin(credential, deviceId, mockEmail, mockName);
         setUser(u);
         setLoading(false);
+        // Analytics: distinguish first-time signup from returning login, then
+        // identify the Umami session by internal user id (no PII).
+        const method: AuthMethod = mockEmail ? 'dev' : 'google';
+        if (u.is_new_user) {
+            trackSignupCompleted(method);
+        } else {
+            trackLoginCompleted(method);
+        }
+        if (u.user_id) umamiIdentify(u.user_id);
+        setUmamiBaseContext({ is_authenticated: true, auth_method: method });
     }, []);
 
     const logout = useCallback(async () => {
         generation.current++;
+        trackLogout();
         await apiLogout();
         // Rotate the anonymous device identity so the next sign-in on this
         // browser (potentially a different user) cannot inherit anonymous
         // activity that happened during this user's session.
         rotateDeviceId();
+        clearUmamiBaseContext();
         setUser(null);
     }, []);
 
@@ -74,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         generation.current++;
         await apiDeleteMe();
         rotateDeviceId();
+        clearUmamiBaseContext();
         setUser(null);
     }, []);
 

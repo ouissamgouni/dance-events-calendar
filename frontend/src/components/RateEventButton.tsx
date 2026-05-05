@@ -5,6 +5,7 @@ import { useRatingAggregate, useInvalidateRatingAggregate } from '../context/Rat
 import { useMyRating, useUpsertMyRating } from '../context/MyRatingsContext';
 import RateEventModal from './RateEventModal';
 import type { EventRating } from '../types';
+import { trackRatingModalOpened, type RatingEntryPoint } from '../utils/tracking';
 
 interface Props {
     eventId: string;
@@ -16,6 +17,8 @@ interface Props {
     /** When true, the icon shows as filled even if the current user hasn't rated yet. */
     eventHasReviews?: boolean;
     onRatingChanged?: (rating: EventRating | null) => void;
+    /** Where in the UI this button lives — used as the Umami `entry_point` property. */
+    entryPoint?: RatingEntryPoint;
 }
 
 export default function RateEventButton({
@@ -27,6 +30,7 @@ export default function RateEventButton({
     initialRating = null,
     eventHasReviews = false,
     onRatingChanged,
+    entryPoint,
 }: Props) {
     const { user } = useAuth();
     const location = useLocation();
@@ -77,6 +81,7 @@ export default function RateEventButton({
             setShowSignIn((s) => !s);
             return;
         }
+        trackRatingModalOpened(entryPoint ?? appearance, !!myRating);
         setOpen(true);
     };
 

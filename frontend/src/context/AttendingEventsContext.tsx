@@ -130,19 +130,20 @@ export function AttendingEventsProvider({ children }: { children: ReactNode }) {
             eventId,
             wasAttending ? 'not_going' : 'going',
             wasAttending ? undefined : sharePublicly,
+            !!user,
         ).then(() => invalidate(eventId));
         // Optimistic invalidate too, so any in-flight read is superseded.
         invalidate(eventId);
-    }, [attendingIds]);
+    }, [attendingIds, user]);
 
     const setSharePublicly = useCallback((eventId: string, sharePublicly: boolean) => {
         if (!attendingIds.has(eventId)) return;
         setShareMap((prev) => ({ ...prev, [eventId]: sharePublicly }));
         // Re-emit "going" with the new flag to update the server-side row
         // without changing attendance state.
-        trackAttendance(eventId, 'going', sharePublicly).then(() => invalidate(eventId));
+        trackAttendance(eventId, 'going', sharePublicly, !!user).then(() => invalidate(eventId));
         invalidate(eventId);
-    }, [attendingIds]);
+    }, [attendingIds, user]);
 
     const isAttending = useCallback((eventId: string) => attendingIds.has(eventId), [attendingIds]);
     const isSharingPublicly = useCallback(

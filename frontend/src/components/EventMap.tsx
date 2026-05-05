@@ -154,7 +154,7 @@ function MapController({
 }
 
 export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource }: Props) {
-    const { showRatings } = useFeatureFlags();
+    const { showRatings, eventColorBarColor } = useFeatureFlags();
     const markerRefs = useRef(new Map<string, L.Marker>());
     const geoEvents = useMemo(
         () => events.filter((e) => e.latitude != null && e.longitude != null),
@@ -219,7 +219,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                     key={e.event_id}
                     ref={(marker) => registerMarker(e.event_id, marker)}
                     position={[e.latitude!, e.longitude!]}
-                    icon={hoveredEventId === e.event_id ? makeHighlightedIcon(e.color) : makeColoredIcon(e.color)}
+                    icon={hoveredEventId === e.event_id ? makeHighlightedIcon(eventColorBarColor) : makeColoredIcon(eventColorBarColor)}
                     eventHandlers={{
                         mouseover: () => onEventHover?.(e.event_id),
                         mouseout: () => onEventHover?.(null),

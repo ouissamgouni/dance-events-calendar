@@ -5,6 +5,7 @@ import { deleteMyRating, fetchTagGroups, submitFeedback } from '../api';
 import { getDeviceId } from '../utils/deviceId';
 import RatingStars from './RatingStars';
 import SuggestTagsButton, { type InlineTagSuggestion } from './SuggestTagsButton';
+import { trackRatingDeleted, trackRatingSubmitFailed, trackRatingSubmitted } from '../utils/tracking';
 
 interface Props {
     eventId: string;
@@ -80,10 +81,19 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                 tag_suggestions: tagSuggestions,
                 website: website || undefined,
             });
+            trackRatingSubmitted({
+                stars,
+                commentLength: trimmedComment.length,
+                tagCount: reviewTagIds.size,
+                isAnonymous: identity === 'anonymous',
+                isEdit: !!initialRating,
+            });
             onSubmitted(res.rating);
             setThanks(true);
         } catch (e) {
-            setError(e instanceof Error ? e.message : 'Failed to submit. Please try again.');
+            const msg = e instanceof Error ? e.message : 'Failed to submit. Please try again.';
+            trackRatingSubmitFailed(msg.slice(0, 60));
+            setError(msg);
         } finally {
             setSubmitting(false);
         }
@@ -95,6 +105,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
         setSubmitting(true);
         try {
             await deleteMyRating(eventId);
+            trackRatingDeleted();
             onDeleted?.();
             onClose();
         } catch (e) {

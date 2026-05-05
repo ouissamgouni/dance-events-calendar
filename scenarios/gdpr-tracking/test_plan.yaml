@@ -12,6 +12,12 @@
 # Phase 3 additions (new Group 9, steps 48–52):
 #   Analytics KPIs — unique viewers, source breakdown, top countries, top links,
 #   export stats, null geo handling (6th event without location)
+# Phase 4 additions (new Groups 10–12, steps 54–66):
+#   Auth funnel — signup_started, signup_completed, login_completed,
+#     login_failed, logout, umami.identify, base context propagation
+#   Rating funnel — rating_modal_opened, rating_submitted, rating_deleted,
+#     rating_submit_failed, attendance_marked enrichment
+#   Debug mode — ?debug_analytics=1 console mirroring
 
 test_plan:
   name: "GDPR Tracking — Consent & Analytics"
@@ -459,27 +465,27 @@ test_plan:
       verification: "4 pageview POSTs to Umami, all pages visible in dashboard"
 
     - id: 41
-      title: "Umami receives custom event-view event"
+      title: "Umami receives custom event_viewed event"
       description: >
         With analytics consent and Umami loaded: click an event on the calendar
         grid. Check Network tab for POST to /api/send.
       expected: >
         Two tracking requests fire simultaneously: 1. POST /api/track/event-view
         → backend (201) 2. POST http://localhost:3100/api/send → Umami with
-        event name
-           "event-view" and property source="calendar"
-        Umami dashboard → Events shows the "event-view" entry.
-      verification: "Both backend and Umami receive event-view, source prop visible"
+        event name "event_viewed" and property source="calendar". The Umami
+        payload also includes base context props (is_authenticated=false until a
+        user signs in). Umami dashboard → Events shows the "event_viewed" entry.
+      verification: "Both backend and Umami receive event_viewed, source prop visible"
 
     - id: 42
-      title: "Umami receives export and save events"
+      title: "Umami receives event_saved and export_completed events"
       description: >
         Save an event (save heart). Export .ics from the FAB. Check Network.
       expected: >
-        POST to Umami /api/send with event name "event-save", action="save".
-        POST to Umami /api/send with event name "export", format="ics". Both
-        visible in Umami dashboard → Events tab.
-      verification: "event-save and export events in Umami dashboard"
+        POST to Umami /api/send with event name "event_saved", action="save".
+        POST to Umami /api/send with event name "export_completed",
+        format="ics". Both visible in Umami dashboard → Events tab.
+      verification: "event_saved and export_completed events in Umami dashboard"
 
     - id: 43
       title: "No Umami requests when analytics consent denied"
@@ -503,7 +509,7 @@ test_plan:
         No request to localhost:3100/script.js is made. In DevTools console, a
         debug message "[umami] VITE_UMAMI_WEBSITE_ID or VITE_UMAMI_URL not set —
         tracking calls will be logged only" appears. When clicking an event,
-        "[umami] track event-view {...}" appears in console. No errors.
+        "[umami] track event_viewed {...}" appears in console. No errors.
       verification: "Console debug logs only, no network requests, no JS errors"
 
     - id: 45
@@ -517,8 +523,8 @@ test_plan:
         non-zero value for today. - "Pages" table listing at least: /,
         /calendar, /my-calendar,
           and /event/evt-gdpr-001 (or whichever event pages were visited).
-        - "Events" tab listing: event-view, event-save, export custom events
-          with counts matching the actions performed in steps 41–42.
+        - "Events" tab listing: event_viewed, event_saved, export_completed
+          custom events with counts matching the actions performed in steps 41–42.
         - "Referrers" section visible (may be empty if navigated directly). -
         "Devices" and "Browsers" sections populated with at least one entry.
       verification: "Dashboard shows pageviews, pages, events, devices — all non-empty"
@@ -537,22 +543,23 @@ test_plan:
       verification: "Umami Sources/Referrers shows 'instagram' from utm_source"
 
     - id: 47
-      title: "Funnel: event-view → event-save → export in Umami"
+      title: "Funnel: event_viewed → event_saved → export_completed in Umami"
       description: >
         With analytics and personalization consent granted and Umami loaded: 1.
-        Click "Friday Salsa Night" on the calendar grid (event-view). 2. Click
-        the save heart on "Salsa Congress 2026" (event-save). 3. Open the FAB
-        and export .ics (export). Check Network tab for the three Umami
-        /api/send requests. Then open the Umami dashboard → Events tab.
+        Click "Friday Salsa Night" on the calendar grid (event_viewed). 2. Click
+        the save heart on "Salsa Congress 2026" (event_saved). 3. Open the FAB
+        and export .ics (export_completed). Check Network tab for the three
+        Umami /api/send requests. Then open the Umami dashboard → Events tab.
       expected: >
         Three sequential POSTs to http://localhost:3100/api/send: 1. event name
-        "event-view", props: {source: "calendar"} 2. event name "event-save",
-        props: {action: "save"} 3. event name "export", props: {format: "ics",
-        event_count: <n>} All three appear in the Umami Events tab with
-        timestamps in order. The backend also received all three corresponding
-        /api/track/* calls (verify in the terminal running the scenario — API
-        logs show 201s). This confirms the full view → save → export analytics
-        funnel works end-to-end in both the self-hosted backend and Umami.
+        "event_viewed", props: {source: "calendar"} 2. event name "event_saved",
+        props: {action: "save"} 3. event name "export_completed", props:
+        {format: "ics", event_count: <n>} All three appear in the Umami Events
+        tab with timestamps in order. The backend also received all three
+        corresponding /api/track/* calls (verify in the terminal running the
+        scenario — API logs show 201s). This confirms the full view → save →
+        export analytics funnel works end-to-end in both the self-hosted backend
+        and Umami.
       verification: "All 3 funnel events in Umami Events tab, all 3 backend 201s"
 
     # ── Group 9: Analytics KPI Panels ──────────────────────────
@@ -642,3 +649,194 @@ test_plan:
         The top-countries panel handles null geo gracefully — null country rows
         are excluded from the aggregate. No 500 errors.
       verification: "No errors, null geo excluded from country breakdown"
+
+    # ── Group 10: Auth Funnel (Umami only) ─────────────────────
+    # Validates the signup vs returning-login distinction, identify call,
+    # base-context propagation, and logout. DEV_AUTH=true so /login renders
+    # the mock-users.yaml entries as one-click sign-in buttons.
+
+    - id: 54
+      title: "signup_started fires on dev sign-in click"
+      description: >
+        Clear cookies, accept all. Navigate to /login. Open DevTools console and
+        Network tab (filter "umami" / "api/send"). Click "Sign in as Dev User".
+      expected: >
+        A POST to Umami /api/send fires immediately on click with event name
+        "signup_started" and props {method: "dev"}. Then a separate POST fires
+        with event name "signup_completed" (Dev User has no prior row → first
+        login → backend returns is_new_user=true) with props {method: "dev",
+        is_authenticated: true} (base context merged in from setUmamiBaseContext
+        after login).
+      verification: "signup_started then signup_completed in Network and Umami Events tab"
+
+    - id: 55
+      title: "umami.identify called with internal user_id only"
+      description: >
+        Continuing from step 54, in DevTools console run:
+          window.umami && console.log(typeof window.umami.identify)
+        Then check the Network tab for a POST to /api/send with type=identify
+        (Umami v2 identify call).
+      expected: >
+        The identify request body contains a `data` field with {userId:
+        "<uuid>"}. NO email, name, or Google sub appears in the payload. The
+        user_id matches the value returned by GET /api/auth/me.
+      verification: "identify payload has only userId UUID, no PII"
+
+    - id: 56
+      title: "login_completed fires for returning user"
+      description: >
+        From step 54, click Logout (Account menu). Clear analytics consent and
+        re-accept (or just click "Refuser" then "Accepter" in the cookie modal —
+        the cc_cookie state is what matters). Then sign in again as "Returning
+        User" (this email has signed in once already during scenario seeding so
+        backend returns is_new_user=false). Note: if Returning User has never
+        signed in in your scenario session, sign in once first to seed the row,
+        then sign out and back in to observe login_completed.
+      expected: >
+        First sign-in (seed): signup_completed fires with method=dev. Second
+        sign-in: ONLY login_completed fires (no signup_completed) with props
+        {method: "dev", is_authenticated: true}. Visible both in the Network tab
+        and the Umami Events tab.
+      verification: "login_completed (not signup_completed) on second sign-in"
+
+    - id: 57
+      title: "logout event fires before session ends"
+      description: >
+        While signed in, open DevTools Network tab. Click the Logout link in the
+        Account menu.
+      expected: >
+        Two requests in order: 1. POST to Umami /api/send with event name
+        "logout" 2. POST to /api/auth/logout (clears the session cookie). After
+        logout, window.umami still exists but subsequent events lose the
+        is_authenticated=true base context (clearUmamiBaseContext was called).
+      verification: "logout event in Network, then session cookie cleared"
+
+    - id: 58
+      title: "login_failed fires on Google verification error"
+      description: >
+        This requires temporarily disabling DEV_AUTH (set DEV_AUTH=false in
+        config.env and restart the scenario, OR test in a non-dev environment).
+        Without a real Google client, click the Google sign-in button and let it
+        fail (or use an expired token via DevTools to mutate the response). In
+        dev mode, this step is informational only — verify the code path exists
+        in Login.tsx (handleGoogleCallback catch branch).
+      expected: >
+        Umami /api/send POST with event name "login_failed" and props {method:
+        "google", reason: "token_invalid"}.
+      verification: "login_failed event with method+reason in Umami"
+
+    - id: 59
+      title: "Page-reload preserves identity but does NOT re-fire login"
+      description: >
+        While signed in (from step 54 or 56), reload the page (Cmd+R). Watch the
+        Network tab.
+      expected: >
+        NO signup_started / signup_completed / login_completed event fires on
+        reload. AuthContext restores the session via /api/auth/me and silently
+        re-calls umami.identify(user_id) to re-attach the Umami session to the
+        same user. Subsequent events (e.g. clicking an event_viewed) carry
+        is_authenticated=true in their props.
+      verification: "No login_* events on reload, identify re-fired silently"
+
+    # ── Group 11: Rating & Attendance Funnels ──────────────────
+    # Validates rating_modal_opened (with entry_point), rating_submitted
+    # (with stars + comment_length bucket + tag_count + is_anonymous +
+    # is_edit), rating_deleted, rating_submit_failed, and the enriched
+    # attendance_marked event (now with share_publicly + is_authenticated).
+
+    - id: 60
+      title: "rating_modal_opened fires with entry_point=detail"
+      description: >
+        Sign in as Dev User (consent accepted). Navigate to /event/evt-gdpr-001.
+        Click the "Rate" star button on the detail page. Watch Network tab for
+        /api/send.
+      expected: >
+        POST to Umami /api/send with event name "rating_modal_opened" and props
+        {entry_point: "pill", is_edit: false, is_authenticated: true}. The
+        entry_point reflects the button's `appearance` prop ("pill" on the
+        detail page); other call sites pass "icon" (map) or explicit entryPoint
+        values.
+      verification: "rating_modal_opened with entry_point and is_edit in Umami"
+
+    - id: 61
+      title: "rating_submitted fires with bucketed properties"
+      description: >
+        From step 60: select 4 stars, type a 50-character comment, select 1
+        review tag, leave anonymous OFF, submit.
+      expected: >
+        POST to Umami /api/send with event name "rating_submitted" and props:
+          - stars: 4
+          - comment_length: "31-100"  (length 50 → bucket "31-100")
+          - tag_count: 1
+          - is_anonymous: false
+          - is_edit: false
+          - is_authenticated: true
+        NO comment text, NO event_id appears in the props (low cardinality
+        rule). The "Thanks for your feedback" view appears.
+      verification: "rating_submitted with all 5 props bucketed correctly"
+
+    - id: 62
+      title: "rating_submitted with is_edit=true on re-submission"
+      description: >
+        From step 61: close the modal, then click the rating button again (now
+        shows your own pending rating). Change stars to 5, click submit.
+      expected: >
+        rating_modal_opened fires first with is_edit: true. Then
+        rating_submitted fires with is_edit: true and the new stars value.
+        comment_length and tag_count reflect the current modal state.
+      verification: "Both rating events show is_edit=true"
+
+    - id: 63
+      title: "rating_deleted fires on delete"
+      description: >
+        From step 62: open the rating modal again, click the Delete button,
+        confirm the prompt.
+      expected: >
+        POST to Umami /api/send with event name "rating_deleted" (no extra
+        props; is_authenticated comes from base context). The user's row in
+        event_ratings is removed.
+      verification: "rating_deleted in Umami, modal closes"
+
+    - id: 64
+      title: "rating_submit_failed fires on backend rejection"
+      description: >
+        Reproduce a submit failure. Easiest: open DevTools → Network →
+        right-click `/api/ratings/...` and "Block request URL". Open the rating
+        modal again, fill it in, submit.
+      expected: >
+        POST to Umami /api/send with event name "rating_submit_failed" and props
+        {reason: "<truncated to 60 chars>"}. The reason contains the error
+        message (e.g. "Failed to fetch") with no PII.
+      verification: "rating_submit_failed with truncated reason in Umami"
+
+    - id: 65
+      title: "attendance_marked carries share_publicly + is_authenticated"
+      description: >
+        Sign in as Dev User. On any event detail page, click the "I'm going"
+        button. The share-confirmation popover appears — pick "Public". Watch
+        Network for /api/send.
+      expected: >
+        POST to Umami /api/send with event name "attendance_marked" and props
+        {action: "going", share_publicly: "true", is_authenticated: true}. Then
+        sign out, click "I'm going" on a different event as an anonymous user.
+        The next attendance_marked event shows {action: "going", share_publicly:
+        "unset", is_authenticated: false}.
+      verification: "attendance_marked has share_publicly+is_authenticated in both states"
+
+    # ── Group 12: Debug Mode ───────────────────────────────────
+
+    - id: 66
+      title: "?debug_analytics=1 mirrors events to console"
+      description: >
+        Open any page with the URL parameter ?debug_analytics=1 (e.g.
+        http://localhost:<SC_WEB_PORT>/?debug_analytics=1). Accept all cookies.
+        Open DevTools console. Click any event.
+      expected: >
+        Two outputs for each tracked action:
+          1. The normal POST to Umami /api/send (Network tab)
+          2. A console.debug line "[umami] track event_viewed {source: ...}"
+        in the console. Subsequent navigations log "[umami] pageview /path". On
+        sign-in, "[umami] identify <uuid>" appears in console. Useful for
+        staging/prod QA where the Umami dashboard may not be immediately
+        accessible.
+      verification: "Both Network POSTs AND console.debug lines for every event"

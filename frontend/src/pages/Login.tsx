@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { fetchAuthMode, fetchDevUsers, type AuthMode, type DevUser } from '../api';
 import { getDeviceId } from '../utils/deviceId';
+import { trackLoginFailed, trackSignupStarted } from '../utils/tracking';
 
 declare global {
     interface Window {
@@ -59,11 +60,13 @@ export default function Login() {
         window.google.accounts.id.initialize({
             client_id: clientId,
             callback: async (response: { credential: string }) => {
+                trackSignupStarted('google');
                 try {
                     await login(response.credential, getDeviceId());
                     // Destination is computed by the redirect effect once `user` updates.
                 } catch {
                     // Token verification failed — button stays visible to retry
+                    trackLoginFailed('google', 'token_invalid');
                 }
             },
         });
@@ -79,9 +82,11 @@ export default function Login() {
 
     const handleDevLoginAs = async (email: string, name?: string) => {
         setLoginError(null);
+        trackSignupStarted('dev');
         try {
             await login('dev-credential', getDeviceId(), email, name);
         } catch {
+            trackLoginFailed('dev', 'request_failed');
             setLoginError(`Sign-in as ${email} failed`);
         }
     };

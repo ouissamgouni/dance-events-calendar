@@ -105,8 +105,12 @@ def _upsert_user_from_claims(
     name: str,
     picture: Optional[str],
     provider_subject: Optional[str],
-) -> User:
-    """Find an existing user by Google subject (preferred) or email; else create."""
+) -> tuple[User, bool]:
+    """Find an existing user by Google subject (preferred) or email; else create.
+
+    Returns (user, is_new_user) so the caller can distinguish first-time signup
+    from a repeat login (used for analytics — `signup_completed` vs `login_completed`).
+    """
     user: Optional[User] = None
     if provider_subject:
         user = session.exec(
@@ -116,6 +120,7 @@ def _upsert_user_from_claims(
         user = session.exec(select(User).where(User.email == email)).first()
 
     now = datetime.utcnow()
+    is_new_user = user is None
     if user is None:
         user = User(
             email=email,
@@ -140,7 +145,7 @@ def _upsert_user_from_claims(
 
     session.commit()
     session.refresh(user)
-    return user
+    return user, is_new_user
 
 
 def _merge_device_data(session: Session, user: User, device_id: Optional[str]) -> None:
@@ -268,7 +273,7 @@ def login_with_google(
         picture = idinfo.get("picture")
         provider_subject = idinfo.get("sub")
 
-    user = _upsert_user_from_claims(
+    user, is_new_user = _upsert_user_from_claims(
         session,
         email=email,
         name=name,
@@ -285,6 +290,7 @@ def login_with_google(
             "name": user.display_name or user.email,
             "avatar_url": user.avatar_url,
             "is_admin": is_admin,
+            "is_new_user": is_new_user,
         }
     )
     return _set_session_cookie(response, user, is_admin)

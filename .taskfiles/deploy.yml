@@ -99,7 +99,7 @@ tasks:
           exit 1
         fi
         echo "Building staging frontend (VITE_API_URL=$VITE_API_URL)..."
-        cd frontend && VITE_API_URL=$VITE_API_URL VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" npm run build
+        cd frontend && VITE_API_URL=$VITE_API_URL VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" VITE_UMAMI_WEBSITE_ID="${VITE_UMAMI_WEBSITE_ID:-}" npm run build
         echo "Deploying to Cloudflare Pages (branch: develop)..."
         CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN \
         CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID \
@@ -224,7 +224,7 @@ tasks:
           exit 1
         fi
         echo "Building prod frontend (VITE_API_URL=$VITE_API_URL)..."
-        cd frontend && VITE_API_URL=$VITE_API_URL VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" npm run build
+        cd frontend && VITE_API_URL=$VITE_API_URL VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" VITE_UMAMI_WEBSITE_ID="${VITE_UMAMI_WEBSITE_ID:-}" npm run build
         echo "Deploying to Cloudflare Pages (branch: main)..."
         CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN \
         CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID \

@@ -187,6 +187,9 @@ export interface AuthUser {
     avatar_url?: string | null;
     is_admin?: boolean;
     share_attendance_default?: boolean;
+    /** Only present on the /auth/google response — lets the client emit
+     * `signup_completed` vs `login_completed`. Absent on /auth/me. */
+    is_new_user?: boolean;
 }
 
 export async function loginWithGoogle(

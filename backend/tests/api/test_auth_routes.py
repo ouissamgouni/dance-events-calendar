@@ -93,6 +93,7 @@ def test_auth_google_creates_user_on_first_login(client, session, monkeypatch):
     assert data["email"] == "alice@example.com"
     assert data["is_admin"] is True  # ADMIN_EMAIL was patched to match
     assert data["user_id"]
+    assert data["is_new_user"] is True
 
     users = session.exec(select(User)).all()
     assert len(users) == 1
@@ -106,8 +107,10 @@ def test_auth_google_reuses_user_on_repeat_login(client, session, monkeypatch):
 
     r1 = _login(client, email="alice@example.com")
     assert r1.status_code == 200
+    assert r1.json()["is_new_user"] is True
     r2 = _login(client, email="alice@example.com")
     assert r2.status_code == 200
+    assert r2.json()["is_new_user"] is False
 
     users = session.exec(select(User)).all()
     assert len(users) == 1
