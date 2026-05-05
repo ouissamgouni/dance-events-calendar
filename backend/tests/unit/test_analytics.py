@@ -297,7 +297,7 @@ class TestGeoCapture:
 
         with patch(
             "backend.api.routes.tracking._update_view_geo",
-            new_callable=lambda: lambda: AsyncMock(),
+            new=AsyncMock(),
         ) as mock_geo:
             client = TestClient(app)
             resp = client.post(
@@ -430,7 +430,7 @@ class TestGeoCapture:
 
         with patch(
             "backend.api.routes.tracking._update_view_geo",
-            new_callable=lambda: lambda: AsyncMock(),
+            new=AsyncMock(),
         ) as mock_geo:
             client = TestClient(app)
             resp = client.post(
@@ -456,7 +456,7 @@ class TestGeoCapture:
 
         with patch(
             "backend.api.routes.tracking._update_click_geo",
-            new_callable=lambda: lambda: AsyncMock(),
+            new=AsyncMock(),
         ) as mock_geo:
             client = TestClient(app)
             resp = client.post(

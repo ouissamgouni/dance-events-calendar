@@ -1,8 +1,7 @@
 import logging
-import time
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlmodel import Session, col, func, select
 
 logger = logging.getLogger(__name__)
@@ -23,10 +22,12 @@ from backend.api.schemas import (
     FilterOption,
     GeocodeSuggestion,
     PaginatedEventsResponse,
+    SyncJobListResponse,
+    SyncJobStartRequest,
     SyncLogResponse,
 )
 from backend.api.routes.tags import get_event_tags
-from backend.db.database import get_session
+from backend.db.database import get_engine, get_session
 from backend.db.models import (
     CalendarDefaultTag,
     CachedEvent,
@@ -41,7 +42,8 @@ from backend.db.models import (
     Tag,
     UserEventAttendance,
 )
-from backend.services.geocoding import geocode_location
+from backend.services.geocoding import geocode_location, search_locations
+from backend.services.sync_job_service import SyncJobStatus, get_sync_job_service
 from backend.services.sync_service import SyncService
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -59,6 +61,208 @@ CALENDAR_COLORS = [
     "#ca8a04",  # yellow-600
     "#0d9488",  # teal-600
 ]
+
+
+def _run_sync_job_worker(
+    job_id: str,
+    job_service,
+    calendar_service,
+    mode: str,
+    since_date: str | None,
+):
+    """Streaming fetch+enrich sync job worker.
+
+    Each enabled calendar runs in its own fetch thread.  Events are submitted
+    one-by-one into a bounded queue as they arrive.  A pool of enrichment
+    workers pulls from the queue, upserts each event and runs the pipeline
+    concurrently — so the first event can be geocoded before the last calendar
+    page has even been fetched.
+    """
+    import threading
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from datetime import datetime as _dt
+
+    from backend.services.calendar_sync_worker import CalendarSyncWorker
+    from backend.services.event_pipeline_processor import (
+        CalendarProgress,
+        EventPipelineProcessor,
+    )
+    from backend.services.pipeline.base import EnrichmentPipeline
+    from backend.services.pipeline.stages.geocoding import GeocodingStage
+    from backend.services.pipeline.stages.link_extraction import LinkExtractionStage
+    from backend.services.pipeline.stages.price_extraction import PriceExtractionStage
+
+    engine = get_engine()
+    job_service.heartbeat(job_id)
+
+    # --- Parse since_date ---
+    time_min: _dt | None = None
+    if since_date:
+        try:
+            time_min = _dt.fromisoformat(since_date)
+        except ValueError:
+            logger.warning(
+                "Invalid since_date '%s' in sync job %s — ignoring",
+                since_date,
+                job_id,
+            )
+
+    # --- Reseed: clear all sync tokens ---
+    if mode == "reseed":
+        with Session(engine) as session:
+            calendars = session.exec(
+                select(CalendarSetting).where(CalendarSetting.enabled == True)
+            ).all()
+            for cal in calendars:
+                cal.sync_token = None
+                session.add(cal)
+            session.commit()
+        job_service.set_metadata(job_id, reseed_applied=True, since_date=since_date)
+
+    # --- Load enabled calendars ---
+    with Session(engine) as session:
+        enabled = session.exec(
+            select(CalendarSetting).where(CalendarSetting.enabled == True)
+        ).all()
+        # Snapshot the fields we need (avoid detached-instance issues across threads)
+        calendar_snapshots = [
+            {
+                "calendar_id": cal.calendar_id,
+                "name": cal.name,
+                "sync_token": cal.sync_token,
+            }
+            for cal in enabled
+        ]
+
+    if not calendar_snapshots:
+        return {"status": SyncJobStatus.COMPLETED}
+
+    # --- Build per-calendar progress map ---
+    abort_event = threading.Event()
+    progress_map: dict[str, CalendarProgress] = {
+        snap["calendar_id"]: CalendarProgress(
+            calendar_id=snap["calendar_id"],
+            calendar_name=snap["name"] or snap["calendar_id"],
+        )
+        for snap in calendar_snapshots
+    }
+
+    def _publish_progress() -> None:
+        job_service.update_calendar_statuses(
+            job_id, {cid: p.to_dict() for cid, p in progress_map.items()}
+        )
+        job_service.heartbeat(job_id)
+
+    # --- Create pipeline (one instance, shared across workers — stages are stateless) ---
+    pipeline = EnrichmentPipeline(
+        [
+            LinkExtractionStage(),
+            PriceExtractionStage(),
+            GeocodingStage(),
+        ]
+    )
+
+    # --- Start enrichment worker pool ---
+    processor = EventPipelineProcessor(
+        pipeline=pipeline,
+        progress_map=progress_map,
+        abort_event=abort_event,
+        num_workers=4,
+        max_queue_size=500,
+    )
+    processor.start()
+
+    # --- Launch calendar fetch threads ---
+    with ThreadPoolExecutor(
+        max_workers=len(calendar_snapshots),
+        thread_name_prefix="calendar-fetch",
+    ) as fetch_pool:
+
+        def _make_worker(snap: dict) -> CalendarSyncWorker:
+            # We need a CalendarSetting-like object for the worker
+            class _CalSnap:
+                calendar_id = snap["calendar_id"]
+                sync_token = snap["sync_token"]
+
+            return CalendarSyncWorker(
+                cal=_CalSnap(),
+                calendar_name=snap["name"] or snap["calendar_id"],
+                calendar_service=calendar_service,
+                processor=processor,
+                progress=progress_map[snap["calendar_id"]],
+                time_min=time_min,
+                abort_event=abort_event,
+                engine=engine,
+            )
+
+        fetch_futures = {
+            fetch_pool.submit(_make_worker(snap).run): snap["calendar_id"]
+            for snap in calendar_snapshots
+        }
+
+        # Stream progress updates while calendars are fetching
+        for future in as_completed(fetch_futures):
+            cal_id = fetch_futures[future]
+            try:
+                future.result()
+            except Exception as exc:
+                logger.exception("Calendar fetch thread failed for %s", cal_id)
+                p = progress_map.get(cal_id)
+                if p:
+                    p.status = "failed"
+                    p.error = str(exc)
+            _publish_progress()
+
+        # Check abort after all fetches
+        if job_service.should_abort(job_id):
+            abort_event.set()
+
+    # --- Drain enrichment queue ---
+    processor.stop()
+
+    # Transition any calendars that finished fetching successfully from
+    # the intermediate "processing" state to "completed" now that the
+    # pipeline has drained.
+    for p in progress_map.values():
+        if p.status == "processing":
+            p.status = "completed"
+    _publish_progress()
+
+    # --- Aggregate totals ---
+    total_fetched = sum(p.fetched for p in progress_map.values())
+    total_upserted = sum(p.upserted for p in progress_map.values())
+    total_deduped = sum(p.deduped for p in progress_map.values())
+    total_enriched_ok = sum(p.enriched_ok for p in progress_map.values())
+    total_enriched_failed = sum(p.enriched_failed for p in progress_map.values())
+    total_errors = sum(p.error_count for p in progress_map.values())
+    calendars_failed = sum(1 for p in progress_map.values() if p.status == "failed")
+
+    job_service.update_totals(
+        job_id,
+        calendars_synced=len(calendar_snapshots) - calendars_failed,
+        events_fetched=total_fetched,
+        events_upserted=total_upserted,
+        events_deduped=total_deduped,
+        events_enriched=total_enriched_ok,
+        events_failed=total_enriched_failed,
+    )
+
+    if abort_event.is_set():
+        return {"status": SyncJobStatus.ABORTED}
+
+    if calendars_failed > 0 or total_errors > 0:
+        return {
+            "status": SyncJobStatus.WARNING,
+            "warning_message": (
+                f"{calendars_failed} calendar(s) failed, {total_errors} event error(s)"
+            ),
+            "calendar_statuses": {cid: p.to_dict() for cid, p in progress_map.items()},
+        }
+
+    return {
+        "status": SyncJobStatus.COMPLETED,
+        "calendar_statuses": {cid: p.to_dict() for cid, p in progress_map.items()},
+    }
 
 
 def _next_color(session: Session) -> str:
@@ -158,58 +362,71 @@ def discover_calendars(
     return {"discovered": discovered, "total": len(all_calendars)}
 
 
-@router.post("/sync")
-def trigger_sync(
+@router.post("/sync-jobs")
+def start_sync_job(
+    body: SyncJobStartRequest,
     request: Request,
-    background_tasks: BackgroundTasks,
-    session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
-    """Manually trigger a sync for all enabled calendars.
+    if body.calendar_ids:
+        raise HTTPException(
+            status_code=400,
+            detail="calendar_ids filtering is not implemented yet",
+        )
 
-    Returns immediately after syncing events. Enrichment (geocoding, price
-    extraction, link extraction) runs in the background so the request does
-    not block until the Fly proxy timeout.
-    """
-    started = time.perf_counter()
+    job_service = get_sync_job_service()
     calendar_service = request.app.state.calendar_service
-    sync_service = SyncService(calendar_service)
-    logger.info("Manual sync requested")
+
     try:
-        stats, needs_enrichment, log_id = sync_service.sync_all_fast(
-            session, trigger="manual"
+        job = job_service.start_job(
+            worker=lambda job_id, service: _run_sync_job_worker(
+                job_id,
+                service,
+                calendar_service,
+                body.mode,
+                body.since_date,
+            ),
+            mode=body.mode,
+            since_date=body.since_date,
+            calendar_ids=body.calendar_ids,
         )
-    except FileNotFoundError as exc:
-        logger.exception("Service account file not found")
-        raise HTTPException(
-            status_code=502, detail=f"Service account file not found: {exc}"
-        ) from exc
-    except Exception as exc:
-        logger.exception("Failed to sync calendars")
-        raise HTTPException(
-            status_code=502, detail=f"Calendar service error: {exc}"
-        ) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
-    if needs_enrichment:
-        background_tasks.add_task(sync_service.run_enrichment, log_id, needs_enrichment)
-        logger.info(
-            "Queued enrichment background task (log_id=%s, events=%d)",
-            log_id,
-            len(needs_enrichment),
-        )
+    return job
 
-    elapsed = time.perf_counter() - started
-    logger.info(
-        "Manual sync request finished in %.2fs (log_id=%s, calendars=%d, upserted=%d, deleted=%d, queued_enrichment=%d)",
-        elapsed,
-        log_id,
-        stats["calendars_synced"],
-        stats["events_upserted"],
-        stats["events_deleted"],
-        len(needs_enrichment),
-    )
 
-    return {**stats, "enrichment_queued": len(needs_enrichment)}
+@router.get("/sync-jobs/current")
+def get_current_sync_job(_admin: dict = Depends(require_admin)):
+    job = get_sync_job_service().get_current_job()
+    if job is None:
+        return {"status": SyncJobStatus.IDLE}
+    return job
+
+
+@router.get("/sync-jobs/{job_id}")
+def get_sync_job(job_id: str, _admin: dict = Depends(require_admin)):
+    try:
+        return get_sync_job_service().get_job(job_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Sync job not found") from exc
+
+
+@router.get("/sync-jobs", response_model=SyncJobListResponse)
+def list_sync_jobs(
+    limit: int = Query(default=20, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    _admin: dict = Depends(require_admin),
+):
+    return get_sync_job_service().list_jobs(limit=limit, offset=offset)
+
+
+@router.post("/sync-jobs/{job_id}/abort")
+def abort_sync_job(job_id: str, _admin: dict = Depends(require_admin)):
+    try:
+        return get_sync_job_service().abort_job(job_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Sync job not found") from exc
 
 
 @router.post("/calendars/{calendar_id}/toggle", response_model=CalendarSettingResponse)
@@ -685,28 +902,13 @@ def geocode_search(
     q: str = Query(..., min_length=3, max_length=200),
     _admin: dict = Depends(require_admin),
 ):
-    """Search for address suggestions using Nominatim. Returns up to 5 results."""
-    from geopy.geocoders import Nominatim
-    from geopy.exc import GeocoderTimedOut, GeocoderServiceError
-
-    geocoder = Nominatim(user_agent="movida", timeout=5)
-    try:
-        results = geocoder.geocode(q, exactly_one=False, limit=5)
-    except (GeocoderTimedOut, GeocoderServiceError) as e:
-        logger.warning("Geocode search failed: %s", e)
-        return []
-    except Exception:
-        logger.exception("Unexpected geocode search error")
-        return []
-
-    if not results:
-        return []
-
+    """Search for address suggestions. Uses Google Geocoding API if configured, else Nominatim."""
+    results = search_locations(q, limit=5)
     return [
         GeocodeSuggestion(
-            display_name=r.address,
-            latitude=r.latitude,
-            longitude=r.longitude,
+            display_name=r["display_name"],
+            latitude=r["latitude"],
+            longitude=r["longitude"],
         )
         for r in results
     ]

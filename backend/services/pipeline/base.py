@@ -61,6 +61,39 @@ class EnrichmentPipeline:
         self.stages.append(stage)
         return self
 
+    def process_event(
+        self, session: Session, event: CachedEvent
+    ) -> dict[str, StageResult]:
+        """Run all stages on a single pre-loaded event.
+
+        Designed for parallel enrichment where each worker owns its own session.
+        The caller is responsible for loading the event and committing the session.
+        """
+        results: dict[str, StageResult] = {
+            stage.name: StageResult() for stage in self.stages
+        }
+        if event.deleted_at is not None:
+            return results
+        for stage in self.stages:
+            result = results[stage.name]
+            if not stage.should_process(event):
+                result.skipped += 1
+                continue
+            try:
+                ok = stage.process(event)
+                if ok:
+                    result.processed += 1
+                else:
+                    result.failed += 1
+            except Exception:
+                logger.exception(
+                    "Stage %s failed for event %s", stage.name, event.event_id
+                )
+                result.failed += 1
+            session.add(event)
+            session.commit()
+        return results
+
     _CHUNK_SIZE = 50  # events loaded per DB query to cap peak memory
 
     def run(

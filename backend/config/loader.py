@@ -47,11 +47,24 @@ def _parse_bool(value: str | bool | None) -> bool | None:
 def get_auto_sync_enabled() -> bool:
     """Return whether automatic background sync is enabled.
 
-    Priority order: env var AUTO_SYNC_ENABLED -> default False.
+    Priority order: env var AUTO_SYNC_ENABLED -> SCENARIO_DIR/config.yaml -> default False.
     """
     from_env = _parse_bool(os.getenv("AUTO_SYNC_ENABLED"))
     if from_env is not None:
         return from_env
+
+    scenario_dir = os.getenv("SCENARIO_DIR")
+    if scenario_dir:
+        config_path = os.path.join(scenario_dir, "config.yaml")
+        if os.path.exists(config_path):
+            import yaml
+
+            with open(config_path) as f:
+                data = yaml.safe_load(f)
+            if data and "auto_sync_enabled" in data:
+                val = _parse_bool(data["auto_sync_enabled"])
+                if val is not None:
+                    return val
 
     return False
 

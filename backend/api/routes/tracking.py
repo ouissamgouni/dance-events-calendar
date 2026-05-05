@@ -30,13 +30,13 @@ limiter = Limiter(key_func=get_remote_address)
 
 async def _update_view_geo(view_id: int, ip: str) -> None:
     """Resolve IP geo and update the EventView row. Fire-and-forget — failures are silent."""
-    from backend.db.database import engine
-    from sqlmodel import Session as _Session
-
     geo = await geolocate_ip(ip)
     if not geo:
         return
-    with _Session(engine) as session:
+    from backend.db.database import get_engine
+    from sqlmodel import Session as _Session
+
+    with _Session(get_engine()) as session:
         view = session.get(EventView, view_id)
         if view:
             view.country = geo.get("country")
@@ -47,13 +47,13 @@ async def _update_view_geo(view_id: int, ip: str) -> None:
 
 async def _update_click_geo(click_id: int, ip: str) -> None:
     """Resolve IP geo and update the EventLinkClick row. Fire-and-forget — failures are silent."""
-    from backend.db.database import engine
-    from sqlmodel import Session as _Session
-
     geo = await geolocate_ip(ip)
     if not geo:
         return
-    with _Session(engine) as session:
+    from backend.db.database import get_engine
+    from sqlmodel import Session as _Session
+
+    with _Session(get_engine()) as session:
         click = session.get(EventLinkClick, click_id)
         if click:
             click.country = geo.get("country")

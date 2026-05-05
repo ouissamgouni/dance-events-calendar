@@ -5,7 +5,7 @@ import { parseLinks } from '../utils/parseLinks';
 import { deriveLinkLabel } from '../utils/deriveLinkLabel';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { trackLink } from '../utils/tracking';
-import { fetchTagGroups } from '../api';
+import { fetchTagGroups, retryGeocodingSingle } from '../api';
 import AddressAutocomplete from './AddressAutocomplete';
 import EventTagEditor from './EventTagEditor';
 import LocationBadge from './LocationBadge';
@@ -73,6 +73,10 @@ export default function EventDetailContent({
     const [editLocationLat, setEditLocationLat] = useState<number | null>(null);
     const [editLocationLng, setEditLocationLng] = useState<number | null>(null);
     const [editLocationDirty, setEditLocationDirty] = useState(false);
+
+    // Retry geocoding state
+    const [retryingGeo, setRetryingGeo] = useState(false);
+    const [retryGeoMsg, setRetryGeoMsg] = useState<string | null>(null);
 
     // Close any open field editor when editable is toggled off
     React.useEffect(() => {
@@ -372,7 +376,38 @@ export default function EventDetailContent({
                             📍
                             <LocationBadge size="sm" location={event.location} latitude={event.latitude} longitude={event.longitude} />
                         </span>
-                        <span>{event.location}</span>
+                        <span className="flex-1">{event.location}</span>
+                        {editable && (
+                            <button
+                                onClick={async (e) => {
+                                    e.stopPropagation();
+                                    if (retryingGeo) return;
+                                    setRetryingGeo(true);
+                                    setRetryGeoMsg(null);
+                                    try {
+                                        const r = await retryGeocodingSingle(event.event_id);
+                                        setRetryGeoMsg(
+                                            r.geocoded > 0
+                                                ? '✓ geocoded'
+                                                : r.failed > 0
+                                                    ? '✗ still no match'
+                                                    : 'no change',
+                                        );
+                                        if (r.geocoded > 0) onTagsUpdated?.();
+                                    } catch {
+                                        setRetryGeoMsg('error');
+                                    } finally {
+                                        setRetryingGeo(false);
+                                        setTimeout(() => setRetryGeoMsg(null), 4000);
+                                    }
+                                }}
+                                disabled={retryingGeo}
+                                title="Retry geocoding"
+                                className="shrink-0 self-start text-[10px] font-medium px-1.5 py-0.5 border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 transition"
+                            >
+                                {retryingGeo ? '…' : retryGeoMsg ?? '↻ Retry'}
+                            </button>
+                        )}
                     </p>
                     {editable && <EditHint />}
                 </div>

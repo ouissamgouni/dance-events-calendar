@@ -22,8 +22,13 @@ def _mock_session():
     def mock_delete(obj):
         session._deleted.append(obj)
 
+    def mock_refresh(obj):
+        if getattr(obj, "id", None) is None:
+            obj.id = 1
+
     session.add.side_effect = mock_add
     session.delete.side_effect = mock_delete
+    session.refresh.side_effect = mock_refresh
     return session
 
 
@@ -124,7 +129,7 @@ class TestSubmitTagSuggestion:
                 "website": "http://spam.com",
             },
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         assert len(session._added) == 0
 
     def test_submit_suggestion_requires_tag_or_free_text(self, client):

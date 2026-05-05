@@ -92,20 +92,28 @@ class TestEventSaveTracking:
             app.dependency_overrides.clear()
 
     def test_track_save_invalid_action(self):
-        client = TestClient(app)
-        resp = client.post(
-            "/api/track/event-save",
-            json={"event_id": "evt-1", "device_id": "dev-abc", "action": "invalid"},
-        )
-        assert resp.status_code == 422
+        app.dependency_overrides[get_session] = lambda: MagicMock(spec=Session)
+        try:
+            client = TestClient(app)
+            resp = client.post(
+                "/api/track/event-save",
+                json={"event_id": "evt-1", "device_id": "dev-abc", "action": "invalid"},
+            )
+            assert resp.status_code == 422
+        finally:
+            app.dependency_overrides.pop(get_session, None)
 
     def test_track_save_missing_device_id(self):
-        client = TestClient(app)
-        resp = client.post(
-            "/api/track/event-save",
-            json={"event_id": "evt-1", "action": "save"},
-        )
-        assert resp.status_code == 422
+        app.dependency_overrides[get_session] = lambda: MagicMock(spec=Session)
+        try:
+            client = TestClient(app)
+            resp = client.post(
+                "/api/track/event-save",
+                json={"event_id": "evt-1", "action": "save"},
+            )
+            assert resp.status_code == 422
+        finally:
+            app.dependency_overrides.pop(get_session, None)
 
 
 @pytest.mark.unit
@@ -131,12 +139,16 @@ class TestBatchFetchEvents:
 
     def test_fetch_by_ids_empty_list_rejected(self):
         """Empty list is rejected by schema (min_length=1)."""
-        client = TestClient(app)
-        resp = client.post(
-            "/api/events/by-ids",
-            json={"event_ids": []},
-        )
-        assert resp.status_code == 422
+        app.dependency_overrides[get_session] = lambda: MagicMock(spec=Session)
+        try:
+            client = TestClient(app)
+            resp = client.post(
+                "/api/events/by-ids",
+                json={"event_ids": []},
+            )
+            assert resp.status_code == 422
+        finally:
+            app.dependency_overrides.pop(get_session, None)
 
 
 @pytest.mark.unit
@@ -163,12 +175,16 @@ class TestExportIcs:
 
     def test_export_ics_empty_ids_rejected(self):
         """Empty list is rejected by schema (min_length=1)."""
-        client = TestClient(app)
-        resp = client.post(
-            "/api/events/export/ics",
-            json={"event_ids": []},
-        )
-        assert resp.status_code == 422
+        app.dependency_overrides[get_session] = lambda: MagicMock(spec=Session)
+        try:
+            client = TestClient(app)
+            resp = client.post(
+                "/api/events/export/ics",
+                json={"event_ids": []},
+            )
+            assert resp.status_code == 422
+        finally:
+            app.dependency_overrides.pop(get_session, None)
 
 
 @pytest.mark.unit

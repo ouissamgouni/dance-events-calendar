@@ -15,7 +15,14 @@ from backend.services.calendar.base import (
 
 
 class MockCalendarService(BaseCalendarService):
-    """Reads calendars and events from YAML seed files. Deterministic, no Google creds needed."""
+    """Reads calendars and events from YAML seed files. Deterministic, no Google creds needed.
+
+    Honors ``sync_token`` in a simple way to support testing of the incremental
+    sync path: the first call (or one with no/invalid token) returns the full
+    event list along with a fresh token; subsequent calls with that exact token
+    return an empty event list (i.e. "no changes since last fetch") with the
+    same token. To force a refresh, callers can pass ``sync_token=None``.
+    """
 
     def __init__(self, scenario_dir: Optional[str] = None):
         if scenario_dir is None:
@@ -26,6 +33,10 @@ class MockCalendarService(BaseCalendarService):
                 "SCENARIO_DIR environment variable"
             )
         self.scenario_dir = Path(scenario_dir)
+        # Per-calendar token state. Each entry maps calendar_id -> current
+        # opaque sync token. When a caller presents the matching token, we
+        # report "no changes" instead of the full list.
+        self._calendar_tokens: dict[str, str] = {}
 
     def list_calendars(self) -> list[CalendarInfo]:
         calendars_file = self.scenario_dir / "calendars.yaml"
@@ -53,6 +64,16 @@ class MockCalendarService(BaseCalendarService):
         sync_token: Optional[str] = None,
         time_min: Optional[datetime] = None,
     ) -> SyncResult:
+        # Incremental short-circuit: caller presented the token we last issued
+        # for this calendar. Report no changes, keep token stable.
+        current_token = self._calendar_tokens.get(calendar_id)
+        if sync_token is not None and sync_token == current_token:
+            return SyncResult(
+                events=[],
+                deleted_event_ids=[],
+                next_sync_token=current_token,
+            )
+
         events_file = self.scenario_dir / "mock-sync-events.yaml"
         if not events_file.exists():
             return SyncResult(events=[], deleted_event_ids=[], next_sync_token=None)
@@ -91,10 +112,15 @@ class MockCalendarService(BaseCalendarService):
                 )
             )
 
+        # Issue (or rotate) a token unique to this calendar so the next call
+        # with the same token will short-circuit.
+        next_token = f"mock-sync-token-{calendar_id}"
+        self._calendar_tokens[calendar_id] = next_token
+
         return SyncResult(
             events=events,
             deleted_event_ids=[],
-            next_sync_token="mock-sync-token",
+            next_sync_token=next_token,
         )
 
     def create_event(

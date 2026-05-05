@@ -31,8 +31,8 @@ const PAGE_SIZE = 25;
 
 const PRESET_FILTERS: Record<EventsPanelPreset, Partial<EventFilterParams>> = {
     all: {},
-    pending: { review_status: 'pending', future_only: true },
-    ungeolocated: { ungeolocated: true, future_only: true },
+    pending: { review_status: 'pending' },
+    ungeolocated: { ungeolocated: true },
 };
 
 const PRESET_TITLES: Record<EventsPanelPreset, string> = {
@@ -61,6 +61,8 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
     const [tagGroups, setTagGroups] = useState<AdminTagGroup[]>([]);
     const [bulkTagPickerOpen, setBulkTagPickerOpen] = useState(false);
     const [bulkTagIds, setBulkTagIds] = useState<number[]>([]);
+    // Hide past events by default; toggle to include them.
+    const [hidePast, setHidePast] = useState(true);
     const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
     // Build filter params from current state
@@ -75,10 +77,10 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 calendar_id: selectedCalendar || undefined,
                 tag_ids: selectedTagIds || undefined,
                 ungeolocated: selectedGeoStatus === 'ungeolocated' || presetFilters.ungeolocated || undefined,
-                future_only: presetFilters.future_only || undefined,
+                future_only: hidePast || undefined,
             };
         },
-        [preset, page, debouncedSearch, selectedReviewStatus, selectedCalendar, selectedTagIds, selectedGeoStatus],
+        [preset, page, debouncedSearch, selectedReviewStatus, selectedCalendar, selectedTagIds, selectedGeoStatus, hidePast],
     );
 
     // Load events
@@ -122,6 +124,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             setAdminDetailEventId(null);
             setBulkTagPickerOpen(false);
             setBulkTagIds([]);
+            setHidePast(true);
         }
     }, [isOpen, preset, initialCalendarId]);
 
@@ -364,6 +367,18 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                     ))}
                                 </select>
                             )}
+
+                            {/* Hide past events toggle */}
+                            <button
+                                onClick={() => { setHidePast((v) => !v); setPage(0); }}
+                                className={`text-[10px] font-medium px-2 py-0.5 border transition ${hidePast
+                                    ? 'bg-blue-50 border-blue-300 text-blue-700'
+                                    : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                                    }`}
+                                title={hidePast ? 'Currently hiding past events. Click to include them.' : 'Currently including past events. Click to hide.'}
+                            >
+                                {hidePast ? 'Hide past' : 'Include past'}
+                            </button>
                         </div>
                     )}
                 </div>

@@ -106,15 +106,35 @@ class TestAuthRoutes:
 class TestAdminProtection:
     def test_toggle_requires_auth(self):
         """Admin toggle endpoint should return 401 without auth."""
-        client = TestClient(app)
-        resp = client.post(
-            "/api/admin/calendars/cal-1/toggle",
-            json={"enabled": True},
-        )
-        assert resp.status_code == 401
+        from unittest.mock import MagicMock
+        from sqlmodel import Session
+        from backend.api.deps import require_admin
+        from backend.db.database import get_session
+
+        app.dependency_overrides.pop(require_admin, None)
+        app.dependency_overrides[get_session] = lambda: MagicMock(spec=Session)
+        try:
+            client = TestClient(app)
+            resp = client.post(
+                "/api/admin/calendars/cal-1/toggle",
+                json={"enabled": True},
+            )
+            assert resp.status_code == 401
+        finally:
+            app.dependency_overrides.pop(get_session, None)
 
     def test_most_viewed_requires_auth(self):
         """Admin most-viewed endpoint should return 401 without auth."""
-        client = TestClient(app)
-        resp = client.get("/api/admin/most-viewed-events")
-        assert resp.status_code == 401
+        from unittest.mock import MagicMock
+        from sqlmodel import Session
+        from backend.api.deps import require_admin
+        from backend.db.database import get_session
+
+        app.dependency_overrides.pop(require_admin, None)
+        app.dependency_overrides[get_session] = lambda: MagicMock(spec=Session)
+        try:
+            client = TestClient(app)
+            resp = client.get("/api/admin/most-viewed-events")
+            assert resp.status_code == 401
+        finally:
+            app.dependency_overrides.pop(get_session, None)

@@ -96,7 +96,8 @@ export default function Home() {
             // Calendar mode initial load: use same default as explorer
             params = { startDate, endDate };
         }
-        Promise.all([fetchEvents(params), fetchSettings(), fetchTagGroups()])
+        const tagParams = params?.startDate || params?.endDate ? params : undefined;
+        Promise.all([fetchEvents(params), fetchSettings(), fetchTagGroups(tagParams)])
             .then(([evts, settings, groups]) => {
                 setEvents(evts);
                 setSinceDate(settings.since_date);

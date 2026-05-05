@@ -6,15 +6,33 @@ from backend.services.price_extractor import extract_price
 
 
 class TestExtractPriceFree:
-    def test_free_keyword(self):
+    def test_bare_free_is_not_matched(self):
+        # Bare "free" is too ambiguous ("free salsa night", "free parking",
+        # "feel free to bring a partner"). We require explicit admission/entry
+        # context.
         result = extract_price("Join us for a free salsa night!")
-        assert result is not None
-        assert result["is_free"] is True
-        assert result["min"] == 0
-        assert result["max"] == 0
+        assert result is None
+
+    def test_free_parking_not_matched(self):
+        result = extract_price("Free parking available next door.")
+        assert result is None
+
+    def test_free_wifi_not_matched(self):
+        result = extract_price("Free wifi all night.")
+        assert result is None
 
     def test_free_entry(self):
         result = extract_price("Free entry for all dancers.")
+        assert result is not None
+        assert result["is_free"] is True
+
+    def test_free_admission(self):
+        result = extract_price("Free admission all night.")
+        assert result is not None
+        assert result["is_free"] is True
+
+    def test_no_cover(self):
+        result = extract_price("No cover, just bring your dancing shoes.")
         assert result is not None
         assert result["is_free"] is True
 

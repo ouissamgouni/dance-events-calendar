@@ -3,7 +3,13 @@ calendars:
     name: "Salsa"
     color: "#e11d48"
     enabled: true
+    default_tags:
+      - "dance-style:salsa"
+      - "format:social"
   - id: "evrpds0rvercm3ugjpgjia2kds@group.calendar.google.com"
     name: "Salsa - Going !"
     color: "#7c3aed"
     enabled: true
+    default_tags:
+      - "dance-style:salsa"
+      - "misc:ogouni-going"

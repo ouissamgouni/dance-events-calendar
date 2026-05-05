@@ -73,8 +73,10 @@ export async function fetchEvent(eventId: string): Promise<CalendarEvent> {
 
 export interface SiteSettings {
     since_date: string;
+    sync_since_date: string;
     sync_interval_minutes: number;
     auto_sync_enabled: boolean;
+    auto_sync_mode: 'incremental' | 'reseed';
     show_prices: boolean;
     show_popularity: boolean;
     popularity_threshold: number;
@@ -163,15 +165,6 @@ export interface SyncStats {
     enrichment_queued: number;
 }
 
-export async function triggerSync(): Promise<SyncStats> {
-    const res = await fetch(`${BASE}/admin/sync`, {
-        method: 'POST',
-        credentials: 'include',
-    });
-    if (!res.ok) throw new Error('Failed to trigger sync');
-    return res.json();
-}
-
 // --- Auth ---
 
 export interface AuthMode {
@@ -233,6 +226,135 @@ export async function fetchSyncLogs(limit = 20, offset = 0): Promise<SyncLogEntr
         credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to fetch sync logs');
+    return res.json();
+}
+
+// --- Sync Jobs ---
+
+export interface SyncJobTotals {
+    calendars_synced: number;
+    events_fetched: number;
+    events_upserted: number;
+    events_deduped: number;
+    events_deleted: number;
+    events_enriched: number;
+    events_failed: number;
+}
+
+export interface LogEntry {
+    timestamp: string;
+    level: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';
+    message: string;
+}
+
+export interface ProcessedEventSummary {
+    event_id: string;
+    title: string;
+    start_dt: string;
+    location: string | null;
+    action: 'new' | 'updated' | 'deduped' | 'failed';
+    geocode_provider: string | null;
+    price: string | null;
+    error: string | null;
+}
+
+export interface CalendarStatus {
+    calendar_id: string;
+    calendar_name: string;
+    status: 'queued' | 'running' | 'processing' | 'completed' | 'warning' | 'failed';
+    fetched: number;
+    upserted: number;
+    deduped: number;
+    enriched_ok: number;
+    enriched_failed: number;
+    error_count: number;
+    started_at: string | null;
+    finished_at: string | null;
+    error: string | null;
+    logs: LogEntry[];
+    processed_events: ProcessedEventSummary[];
+}
+
+export interface SyncJobRecord {
+    job_id: string;
+    status: 'idle' | 'running' | 'abort_requested' | 'aborted' | 'completed' | 'warning' | 'failed';
+    started_at: string;
+    finished_at: string | null;
+    heartbeat_at: string;
+    mode: 'incremental' | 'reseed';
+    since_date: string | null;
+    abort_requested: boolean;
+    warning_message: string | null;
+    error_message: string | null;
+    totals: SyncJobTotals;
+    stage_totals: Record<string, { processed: number; skipped: number; failed: number }>;
+    metadata: Record<string, unknown>;
+    calendar_statuses: Record<string, CalendarStatus>;
+    is_stale?: boolean;
+}
+
+export async function startSyncJob(
+    mode: 'incremental' | 'reseed',
+    since_date?: string | null,
+): Promise<SyncJobRecord> {
+    const res = await fetch(`${BASE}/admin/sync-jobs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, since_date: since_date ?? null, calendar_ids: [] }),
+        credentials: 'include',
+    });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { detail?: string }).detail || 'Failed to start sync job');
+    }
+    return res.json();
+}
+
+export async function getSyncJob(jobId: string): Promise<SyncJobRecord> {
+    const res = await fetch(`${BASE}/admin/sync-jobs/${jobId}`, { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to get sync job');
+    return res.json();
+}
+
+export async function retryCalendarInJob(
+    _jobId: string,
+    calendarId: string,
+): Promise<SyncJobRecord> {
+    const res = await fetch(`${BASE}/admin/sync-jobs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'incremental', since_date: null, calendar_ids: [calendarId] }),
+        credentials: 'include',
+    });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { detail?: string }).detail || 'Failed to retry calendar sync');
+    }
+    return res.json();
+}
+
+export async function getCurrentSyncJob(): Promise<SyncJobRecord> {
+    const res = await fetch(`${BASE}/admin/sync-jobs/current`, { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to get current sync job');
+    return res.json();
+}
+
+export async function abortSyncJob(jobId: string): Promise<SyncJobRecord> {
+    const res = await fetch(`${BASE}/admin/sync-jobs/${jobId}/abort`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to abort sync job');
+    return res.json();
+}
+
+export async function fetchSyncJobs(
+    limit = 20,
+): Promise<{ items: SyncJobRecord[]; total: number }> {
+    const res = await fetch(`${BASE}/admin/sync-jobs?limit=${limit}`, {
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to fetch sync jobs');
     return res.json();
 }
 
@@ -679,8 +801,12 @@ export async function deleteUserData(deviceId: string): Promise<{ deleted: Recor
 
 // --- Tags ---
 
-export async function fetchTagGroups(): Promise<TagGroup[]> {
-    const res = await fetch(`${BASE}/tags`, { cache: 'no-cache' });
+export async function fetchTagGroups(params?: { startDate?: string; endDate?: string }): Promise<TagGroup[]> {
+    const qs = new URLSearchParams();
+    if (params?.startDate) qs.set('start_date', params.startDate);
+    if (params?.endDate) qs.set('end_date', params.endDate);
+    const url = qs.toString() ? `${BASE}/tags?${qs}` : `${BASE}/tags`;
+    const res = await fetch(url, { cache: 'no-cache' });
     return parseJsonResponse<TagGroup[]>(res, 'Failed to fetch tags');
 }
 

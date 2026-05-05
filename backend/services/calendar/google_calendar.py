@@ -85,14 +85,18 @@ class GoogleCalendarService(BaseCalendarService):
         kwargs = {
             "calendarId": calendar_id,
             "singleEvents": True,
-            "orderBy": "startTime",
             "maxResults": 250,
         }
 
         if sync_token:
+            # Google API: syncToken is incompatible with orderBy, q, timeMin,
+            # timeMax, timeZone, updatedMin. Only set syncToken here.
             kwargs["syncToken"] = sync_token
-        elif time_min:
-            kwargs["timeMin"] = time_min.isoformat() + "Z"
+        else:
+            # Full fetch: order by start time and optionally filter by time_min.
+            kwargs["orderBy"] = "startTime"
+            if time_min:
+                kwargs["timeMin"] = time_min.isoformat() + "Z"
 
         retries = 0
         while True:

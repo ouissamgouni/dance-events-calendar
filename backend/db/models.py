@@ -31,6 +31,8 @@ class CachedEvent(SQLModel, table=True):
     all_day: bool = Field(default=False)
     latitude: Optional[float] = Field(default=None)
     longitude: Optional[float] = Field(default=None)
+    geocode_query: Optional[str] = Field(default=None)
+    geocode_provider: Optional[str] = Field(default=None)
     price_min: Optional[float] = Field(default=None)
     price_max: Optional[float] = Field(default=None)
     price_currency: Optional[str] = Field(default=None)

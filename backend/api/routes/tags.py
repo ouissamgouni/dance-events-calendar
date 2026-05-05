@@ -110,8 +110,16 @@ def get_event_tags(
 def list_tag_groups(
     request: Request,
     session: Session = Depends(get_session),
+    start_date: str | None = Query(
+        default=None, description="ISO date string to scope event counts (YYYY-MM-DD)"
+    ),
+    end_date: str | None = Query(
+        default=None, description="ISO date string to scope event counts (YYYY-MM-DD)"
+    ),
 ):
     """List all tag groups with nested tags (for filter UI & tag picker)."""
+    from datetime import datetime, timezone
+
     from sqlalchemy import func
     from fastapi.responses import JSONResponse
 
@@ -119,15 +127,25 @@ def list_tag_groups(
         select(TagGroup).where(TagGroup.enabled == True).order_by(TagGroup.ordinal)  # noqa: E712
     ).all()
 
-    # Count events per tag (only non-deleted events)
-    from backend.db.models import CachedEvent
-
-    count_rows = session.exec(
+    # Count events per tag (only non-deleted events), optionally scoped to a date range
+    count_q = (
         select(EventTag.tag_id, func.count(func.distinct(EventTag.event_id)))
         .join(CachedEvent, CachedEvent.event_id == EventTag.event_id)
         .where(CachedEvent.deleted_at == None)  # noqa: E711
-        .group_by(EventTag.tag_id)
-    ).all()
+    )
+    if start_date:
+        try:
+            dt_start = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
+            count_q = count_q.where(CachedEvent.end >= dt_start)
+        except ValueError:
+            pass
+    if end_date:
+        try:
+            dt_end = datetime.fromisoformat(end_date).replace(tzinfo=timezone.utc)
+            count_q = count_q.where(CachedEvent.start <= dt_end)
+        except ValueError:
+            pass
+    count_rows = session.exec(count_q.group_by(EventTag.tag_id)).all()
     count_map = {tid: cnt for tid, cnt in count_rows}
 
     data = [_group_to_response(g) for g in groups]
@@ -168,7 +186,7 @@ def submit_tag_suggestion(
     # Validate: at least one of tag_id or free_text
     if not body.tag_id and not body.free_text:
         raise HTTPException(
-            status_code=422,
+            status_code=400,
             detail="Either tag_id or free_text is required",
         )
 

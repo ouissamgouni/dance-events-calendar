@@ -153,8 +153,10 @@ class ExportStat(BaseModel):
 
 class SiteSettingsResponse(BaseModel):
     since_date: str
+    sync_since_date: str
     sync_interval_minutes: int
     auto_sync_enabled: bool = False
+    auto_sync_mode: str = "incremental"  # "incremental" | "reseed"
     show_prices: bool = False
     show_popularity: bool = False
     popularity_threshold: int = 10
@@ -162,26 +164,15 @@ class SiteSettingsResponse(BaseModel):
 
 class SiteSettingsUpdateRequest(BaseModel):
     since_date: Optional[str] = None
+    sync_since_date: Optional[str] = None
     sync_interval_minutes: Optional[int] = Field(default=None, ge=1, le=1440)
     auto_sync_enabled: Optional[bool] = None
+    auto_sync_mode: Optional[str] = Field(
+        default=None, pattern="^(incremental|reseed)$"
+    )
     show_prices: Optional[bool] = None
     show_popularity: Optional[bool] = None
     popularity_threshold: Optional[int] = Field(default=None, ge=1, le=10000)
-
-
-class SyncLogResponse(BaseModel):
-    id: int
-    started_at: datetime
-    finished_at: Optional[datetime] = None
-    status: str
-    trigger: str
-    calendars_synced: int
-    events_upserted: int
-    events_deleted: int
-    error_message: Optional[str] = None
-    enrichment_status: str = "pending"
-    enrichment_progress: Optional[dict] = None
-    dedup_log: Optional[list] = None
 
 
 class EventUpdateRequest(BaseModel):
@@ -417,3 +408,32 @@ class CalendarDefaultTagsUpdate(BaseModel):
 
 class EventIdsResponse(BaseModel):
     ids: list[str]
+
+
+class SyncJobStartRequest(BaseModel):
+    mode: str = Field(default="incremental", pattern="^(incremental|reseed)$")
+    since_date: Optional[str] = None
+    calendar_ids: list[str] = Field(default_factory=list, max_length=200)
+
+
+class SyncJobListResponse(BaseModel):
+    items: list[dict]
+    total: int
+
+
+class SyncLogResponse(BaseModel):
+    id: int
+    started_at: datetime
+    finished_at: Optional[datetime] = None
+    status: str
+    trigger: str
+    calendars_synced: int
+    events_upserted: int
+    events_deleted: int
+    error_message: Optional[str] = None
+    enrichment_status: str
+    enrichment_progress: Optional[dict] = None
+    dedup_log: Optional[list] = None
+
+    class Config:
+        from_attributes = True

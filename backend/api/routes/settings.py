@@ -11,7 +11,7 @@ from backend.db.models import SiteSetting
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
-DEFAULT_SINCE_YEARS = 2
+DEFAULT_SINCE_YEARS = 1
 
 
 def _default_since_date() -> str:
@@ -21,9 +21,24 @@ def _default_since_date() -> str:
 
 
 def _get_since_date(session: Session) -> str:
-    """Get the since_date setting from the DB, or default to 2 years ago."""
+    """Get the since_date setting from the DB, or default to 1 year ago."""
     try:
         row = session.get(SiteSetting, "since_date")
+        if row and isinstance(row.value, str):
+            return row.value
+    except Exception:
+        pass
+    return _default_since_date()
+
+
+def _get_sync_since_date(session: Session) -> str:
+    """Get the sync_since_date setting from the DB, or default to 1 year ago.
+
+    Independent from ``since_date`` (which controls UI display filtering).
+    Used as the lower bound when fetching events from upstream calendars.
+    """
+    try:
+        row = session.get(SiteSetting, "sync_since_date")
         if row and isinstance(row.value, str):
             return row.value
     except Exception:
@@ -51,6 +66,17 @@ def _get_auto_sync_enabled(session: Session) -> bool:
     except Exception:
         pass
     return get_auto_sync_enabled()
+
+
+def _get_auto_sync_mode(session: Session) -> str:
+    """Get auto_sync_mode from DB ('incremental' | 'reseed'), default 'incremental'."""
+    try:
+        row = session.get(SiteSetting, "auto_sync_mode")
+        if row and row.value in {"incremental", "reseed"}:
+            return row.value
+    except Exception:
+        pass
+    return "incremental"
 
 
 def _get_bool_setting(session: Session, key: str, default: bool = False) -> bool:
@@ -90,8 +116,10 @@ def get_settings(session: Session = Depends(get_session)):
     """Public endpoint — returns site settings needed by the frontend."""
     return SiteSettingsResponse(
         since_date=_get_since_date(session),
+        sync_since_date=_get_sync_since_date(session),
         sync_interval_minutes=_get_sync_interval(session),
         auto_sync_enabled=_get_auto_sync_enabled(session),
+        auto_sync_mode=_get_auto_sync_mode(session),
         show_prices=_get_bool_setting(session, "show_prices"),
         show_popularity=_get_bool_setting(session, "show_popularity"),
         popularity_threshold=_get_int_setting(session, "popularity_threshold", 10),
@@ -115,6 +143,15 @@ def update_settings(
             row = SiteSetting(key="since_date", value=body.since_date)
         session.add(row)
 
+    if body.sync_since_date is not None:
+        datetime.strptime(body.sync_since_date, "%Y-%m-%d")
+        row = session.get(SiteSetting, "sync_since_date")
+        if row:
+            row.value = body.sync_since_date
+        else:
+            row = SiteSetting(key="sync_since_date", value=body.sync_since_date)
+        session.add(row)
+
     if body.sync_interval_minutes is not None:
         row = session.get(SiteSetting, "sync_interval_minutes")
         if row:
@@ -127,6 +164,14 @@ def update_settings(
 
     if body.auto_sync_enabled is not None:
         _set_bool_setting(session, "auto_sync_enabled", body.auto_sync_enabled)
+
+    if body.auto_sync_mode is not None:
+        row = session.get(SiteSetting, "auto_sync_mode")
+        if row:
+            row.value = body.auto_sync_mode
+        else:
+            row = SiteSetting(key="auto_sync_mode", value=body.auto_sync_mode)
+        session.add(row)
 
     if body.show_prices is not None:
         _set_bool_setting(session, "show_prices", body.show_prices)
@@ -148,8 +193,10 @@ def update_settings(
 
     return SiteSettingsResponse(
         since_date=_get_since_date(session),
+        sync_since_date=_get_sync_since_date(session),
         sync_interval_minutes=_get_sync_interval(session),
         auto_sync_enabled=_get_auto_sync_enabled(session),
+        auto_sync_mode=_get_auto_sync_mode(session),
         show_prices=_get_bool_setting(session, "show_prices"),
         show_popularity=_get_bool_setting(session, "show_popularity"),
         popularity_threshold=_get_int_setting(session, "popularity_threshold", 10),
