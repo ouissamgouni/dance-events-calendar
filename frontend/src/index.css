@@ -360,6 +360,33 @@ body {
   height: 100%;
 }
 
+/* On mobile, let the page scroll naturally instead of trapping touch
+   scrolling inside the inner list container. */
+@media (max-width: 1023px) {
+  .event-list-panel {
+    height: auto;
+    overflow: visible;
+  }
+
+  .event-list-scroll-wrapper {
+    overflow: visible;
+    flex: none;
+    min-height: 0;
+  }
+
+  .event-list-scroll-wrapper>.event-list-scroll,
+  .event-list-scroll {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    overscroll-behavior: auto;
+  }
+
+  .event-list-fade {
+    display: none;
+  }
+}
+
 .event-list-fade {
   position: absolute;
   bottom: 0;
