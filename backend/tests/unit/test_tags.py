@@ -148,10 +148,12 @@ class TestSubmitTagSuggestion:
         c, session = client
         event = _make_event()
         tag = _make_tag()
+        group = _make_tag_group()  # scope='event' by default
         session.get.side_effect = lambda model, id: {
-            ("evt-001",): event,
-            (1,): tag,
-        }.get((id,))
+            (CachedEvent, "evt-001"): event,
+            (Tag, 1): tag,
+            (TagGroup, 1): group,
+        }.get((model, id))
         # Mock the rate limit check
         session.exec.return_value.one.return_value = 0
 

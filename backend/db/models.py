@@ -257,6 +257,12 @@ class TagGroup(SQLModel, table=True):
     ordinal: int = Field(default=0)
     allow_multiple: bool = Field(default=True)
     enabled: bool = Field(default=True)
+    # Scope separates first-class event taxonomy from review-only aspect tags.
+    # 'event' = appears in explorer filter, event tag pills, suggestion form.
+    # 'review' = appears in rate-event modal and review-list filter chips only.
+    # Mirrors the two-namespace pattern used by Google/Yelp/Airbnb (place
+    # attributes vs review aspects). Enforced in routes + suggestion validation.
+    scope: str = Field(default="event", index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     tags: List["Tag"] = Relationship(back_populates="group")

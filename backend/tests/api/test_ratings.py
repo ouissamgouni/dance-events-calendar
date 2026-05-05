@@ -43,6 +43,8 @@ from backend.db.models import (  # noqa: E402
     TagSuggestion,
     User,
 )
+# EventTag is imported only to assert that approving a rating does *not* mutate
+# the event's first-class tags (review tags stay attached to the review row).
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────
@@ -110,6 +112,7 @@ def review_tag_group(session):
         ordinal=100,
         allow_multiple=True,
         color="#f59e0b",
+        scope="review",
     )
     session.add(grp)
     session.commit()
@@ -487,11 +490,17 @@ def test_admin_approve_rating_independent_of_suggestions(
 
 
 @pytest.mark.unit
-def test_admin_approve_propagates_review_tags_to_event_tags(
+def test_admin_approve_does_not_propagate_review_tags_to_event_tags(
     client, session, event, review_tag_group
 ):
-    """Approving a rating should attach its review tags to the event so they become
-    filterable like normal tags."""
+    """Approving a rating must NOT attach its review tags to the event.
+
+    Review tags describe subjective experience ("loud", "friendly crowd") and
+    are surfaced as filter chips inside the reviews list only, mirroring how
+    Google/Yelp/TripAdvisor handle aspect tags. They must not become
+    first-class taxonomy tags or one anonymous reviewer could pollute the
+    explorer filters for everyone.
+    """
     _, t1, t2 = review_tag_group
     assert _login(client, email="user@example.com").status_code == 200
     resp = client.post(
@@ -506,46 +515,144 @@ def test_admin_approve_propagates_review_tags_to_event_tags(
     assert resp.status_code == 201
     rating_id = resp.json()["rating"]["id"]
 
-    # Pre-condition: no event tags yet.
-    assert session.exec(select(EventTag).where(EventTag.event_id == event.event_id)).all() == []
-
     assert _login(client, email="admin@example.com").status_code == 200
     approve = client.post(f"/api/admin/ratings/{rating_id}/approve", json={})
     assert approve.status_code == 200
 
-    tag_ids = sorted(
-        [
-            et.tag_id
-            for et in session.exec(
-                select(EventTag).where(EventTag.event_id == event.event_id)
-            ).all()
-        ]
+    # Event tags must remain untouched by review-tag approval.
+    assert (
+        session.exec(select(EventTag).where(EventTag.event_id == event.event_id)).all()
+        == []
     )
-    assert tag_ids == sorted([t1.id, t2.id])
 
-    # Idempotent: approving again would no-op (here we re-run the propagation
-    # path by calling approve on a second rating with the same tags via
-    # another user, ensuring no UniqueConstraint violation).
-    assert _login(client, email="second@example.com").status_code == 200
-    resp2 = client.post(
-        f"/api/events/{event.event_id}/feedback",
+    # The review row itself still carries the tags for review-list filtering.
+    rating = session.exec(
+        select(EventRating).where(EventRating.event_id == event.event_id)
+    ).one()
+    assert sorted(rating.review_tag_ids or []) == sorted([t1.id, t2.id])
+
+
+# ── Tag-group scope separation ────────────────────────────────────────
+#
+# Review tags live in their own namespace (TagGroup.scope='review') so
+# they cannot leak into the event-classification surfaces:
+#   - the public `/api/tags` listing (explorer filter)
+#   - the public `/api/tags/suggestions` form
+#   - the admin event-tag PUT
+# Mirrors the Google/Yelp/Airbnb separation between place attributes and
+# review aspects.
+
+
+@pytest.fixture
+def event_tag_group(session):
+    """Create an event-scope group so the public tag list has something to return."""
+    grp = TagGroup(
+        slug="format",
+        label="Format",
+        ordinal=10,
+        allow_multiple=True,
+        color="#f472b6",
+        scope="event",
+    )
+    session.add(grp)
+    session.commit()
+    session.refresh(grp)
+    t = Tag(group_id=grp.id, slug="social", label="Social", ordinal=0)
+    session.add(t)
+    session.commit()
+    session.refresh(t)
+    return grp, t
+
+
+@pytest.mark.unit
+def test_public_tag_list_excludes_review_scope_groups(
+    client, event_tag_group, review_tag_group
+):
+    resp = client.get("/api/tags")
+    assert resp.status_code == 200
+    slugs = {g["slug"] for g in resp.json()}
+    assert "format" in slugs
+    assert "review-tags" not in slugs
+
+
+@pytest.mark.unit
+def test_public_tag_list_scope_review_returns_review_groups(
+    client, event_tag_group, review_tag_group
+):
+    resp = client.get("/api/tags?scope=review")
+    assert resp.status_code == 200
+    payload = resp.json()
+    slugs = {g["slug"] for g in payload}
+    assert slugs == {"review-tags"}
+    # Scope is echoed so the client can sanity-check.
+    assert payload[0]["scope"] == "review"
+
+
+@pytest.mark.unit
+def test_public_tag_list_scope_invalid_rejected(client):
+    resp = client.get("/api/tags?scope=bogus")
+    assert resp.status_code == 422
+
+
+@pytest.mark.unit
+def test_tag_suggestion_rejects_review_scope_tag(client, event, review_tag_group):
+    """A reviewer-vocabulary tag must not be suggestable as an event tag."""
+    _, t1, _ = review_tag_group
+    resp = client.post(
+        "/api/tags/suggestions",
         json={
-            "stars": 4,
-            "review_tag_ids": [t1.id],
-            "is_anonymous": False,
-            "tag_suggestions": [],
+            "event_id": event.event_id,
+            "tag_id": t1.id,
+            "device_id": "dev-1",
         },
     )
-    assert resp2.status_code == 201
-    rid2 = resp2.json()["rating"]["id"]
+    assert resp.status_code == 400
+    assert "review" in resp.json()["detail"].lower()
+
+
+@pytest.mark.unit
+def test_tag_suggestion_rejects_review_scope_group_slug(
+    client, event, review_tag_group
+):
+    """Free-text suggestions targeting the review-tags group are rejected too."""
+    resp = client.post(
+        "/api/tags/suggestions",
+        json={
+            "event_id": event.event_id,
+            "free_text": "loud-bar",
+            "group_slug": "review-tags",
+            "device_id": "dev-1",
+        },
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.unit
+def test_admin_event_tag_assignment_rejects_review_scope_tag(
+    client, session, event, event_tag_group, review_tag_group
+):
+    """Defence-in-depth: even an admin cannot attach a review-scope tag to an event."""
+    _, social = event_tag_group
+    _, rt1, _ = review_tag_group
+
     assert _login(client, email="admin@example.com").status_code == 200
-    assert client.post(f"/api/admin/ratings/{rid2}/approve", json={}).status_code == 200
-    # Still only 2 distinct event-tag rows.
+
+    # Mixing one valid event-scope id and one review-scope id must reject the whole call.
+    resp = client.put(
+        f"/api/admin/events/{event.event_id}/tags",
+        json={"tag_ids": [social.id, rt1.id]},
+    )
+    assert resp.status_code == 400
+    assert "review" in resp.json()["detail"].lower()
+
+    # Single-tag POST endpoint is also guarded.
+    resp2 = client.post(
+        f"/api/admin/events/{event.event_id}/tags/{rt1.id}",
+    )
+    assert resp2.status_code == 400
+
+    # Sanity: the event still has no tags after the rejected calls.
     assert (
-        len(
-            session.exec(
-                select(EventTag).where(EventTag.event_id == event.event_id)
-            ).all()
-        )
-        == 2
+        session.exec(select(EventTag).where(EventTag.event_id == event.event_id)).all()
+        == []
     )

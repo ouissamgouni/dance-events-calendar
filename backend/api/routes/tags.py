@@ -63,8 +63,31 @@ def _group_to_response(group: TagGroup) -> TagGroupResponse:
         ordinal=group.ordinal,
         allow_multiple=group.allow_multiple,
         enabled=group.enabled,
+        scope=group.scope,
         tags=[_tag_to_response(t) for t in sorted(group.tags, key=lambda t: t.ordinal)],
     )
+
+
+def _assert_event_scope_tag(session: Session, tag_id: int) -> Tag:
+    """Reject attempts to attach a review-scoped tag to an event.
+
+    Defence-in-depth: even if a future call site forgets to filter by scope,
+    the routes that mutate the event-tag namespace will refuse review-scope
+    ids. Returns the tag for convenience.
+    """
+    tag = session.get(Tag, tag_id)
+    if not tag:
+        raise HTTPException(status_code=404, detail=f"Tag {tag_id} not found")
+    group = session.get(TagGroup, tag.group_id)
+    if group and group.scope != "event":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Tag {tag_id} belongs to a '{group.scope}'-scope group "
+                f"and cannot be attached to events."
+            ),
+        )
+    return tag
 
 
 # ── helpers shared with other routes ──────────────────────────────────
@@ -116,15 +139,33 @@ def list_tag_groups(
     end_date: str | None = Query(
         default=None, description="ISO date string to scope event counts (YYYY-MM-DD)"
     ),
+    scope: str = Query(
+        default="event",
+        pattern="^(event|review)$",
+        description=(
+            "Tag namespace. 'event' (default) returns groups used for "
+            "explorer filtering and event classification. 'review' returns "
+            "review-only aspect tags used inside the rate-event modal and "
+            "review-list filter chips."
+        ),
+    ),
 ):
-    """List all tag groups with nested tags (for filter UI & tag picker)."""
+    """List tag groups within a given scope (default: event).
+
+    Review-scope groups are kept on a separate namespace so reviewer
+    vocabulary cannot pollute the event filter taxonomy (mirrors how
+    Google/Yelp/Airbnb separate place attributes from review aspects).
+    """
     from datetime import datetime, timezone
 
     from sqlalchemy import func
     from fastapi.responses import JSONResponse
 
     groups = session.exec(
-        select(TagGroup).where(TagGroup.enabled == True).order_by(TagGroup.ordinal)  # noqa: E712
+        select(TagGroup)
+        .where(TagGroup.enabled == True)  # noqa: E712
+        .where(TagGroup.scope == scope)
+        .order_by(TagGroup.ordinal)
     ).all()
 
     # Count events per tag (only non-deleted events), optionally scoped to a date range
@@ -200,6 +241,29 @@ def submit_tag_suggestion(
         tag = session.get(Tag, body.tag_id)
         if not tag:
             raise HTTPException(status_code=404, detail="Tag not found")
+        group = session.get(TagGroup, tag.group_id)
+        if group and group.scope != "event":
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Review-scope tags cannot be suggested as event tags. "
+                    "Attach them through the rate-event flow instead."
+                ),
+            )
+
+    # Free-text suggestions targeting a review-scope group are also rejected.
+    if body.group_slug:
+        target_group = session.exec(
+            select(TagGroup).where(TagGroup.slug == body.group_slug)
+        ).first()
+        if target_group and target_group.scope != "event":
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Group '{body.group_slug}' is review-scope and does not "
+                    "accept event-tag suggestions."
+                ),
+            )
 
     client_ip = get_client_ip(request)
 
@@ -288,6 +352,7 @@ def create_tag_group(
         label=body.label,
         color=body.color,
         ordinal=(max_ordinal or 0) + 1,
+        scope=body.scope or "event",
     )
     session.add(group)
     session.commit()
@@ -452,9 +517,7 @@ def set_event_tags(
 
     # Add new
     for tag_id in body.tag_ids:
-        tag = session.get(Tag, tag_id)
-        if not tag:
-            raise HTTPException(status_code=404, detail=f"Tag {tag_id} not found")
+        _assert_event_scope_tag(session, tag_id)
         session.add(EventTag(event_id=event_id, tag_id=tag_id))
 
     session.commit()
@@ -475,9 +538,7 @@ def add_event_tag(
     event = session.get(CachedEvent, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    tag = session.get(Tag, tag_id)
-    if not tag:
-        raise HTTPException(status_code=404, detail="Tag not found")
+    _assert_event_scope_tag(session, tag_id)
 
     existing = session.exec(
         select(EventTag).where(EventTag.event_id == event_id, EventTag.tag_id == tag_id)
@@ -598,9 +659,7 @@ def approve_tag_suggestion(
         # Admin can override the suggested tag
         tag_id = body.tag_id
 
-    tag = session.get(Tag, tag_id)
-    if not tag:
-        raise HTTPException(status_code=404, detail="Tag not found")
+    tag = _assert_event_scope_tag(session, tag_id)
 
     # Create EventTag (idempotent)
     existing_et = session.exec(

@@ -70,6 +70,8 @@ tag_groups:
         label: Outdoor
       - slug: rooftop
         label: Rooftop
+      - slug: live-band
+        label: Live band
 
   - slug: dance-style
     label: Dance Style
@@ -115,21 +117,93 @@ tag_groups:
       - slug: all-levels
         label: All Levels
 
-  - slug: vibe
-    label: Vibe
-    ordinal: 70
+  # NOTE: the previous "Vibe" group (good-music / crowded / spacious /
+  # high-level-dancers / social-atmosphere / live-band) was a mix of
+  # subjective experience tags and one factual property. Following the
+  # event-vs-review scope split:
+  #   - the subjective ones moved to the review-tags group below
+  #     (great-music, crowded, spacious, high-level-dancers, great-vibe);
+  #   - live-band (a factual property organisers can declare) moved to
+  #     the venue group above.
+  # Keeping subjective qualities out of the event taxonomy prevents
+  # organisers from self-claiming them (Google/Yelp/Airbnb pattern).
+
+  # Review-only aspect tags. scope: review keeps them out of the explorer
+  # filter and the public tag-suggestion form; they are surfaced only inside
+  # the rate-event modal and the per-event review-list filter chips.
+  # Curated to mirror Google/Yelp/TripAdvisor review-aspect vocabularies
+  # while staying relevant to the salsa/bachata/kizomba scene.
+  - slug: review-tags
+    label: Review tags
+    ordinal: 100
     allow_multiple: true
-    color: "#e879f9"
+    color: "#f59e0b"
+    scope: review
     tags:
-      - slug: good-music
-        label: Good Music
-      - slug: crowded
-        label: Crowded
+      # ── Music ──
+      - slug: great-music
+        label: Great music
+      - slug: great-dj
+        label: Great DJ
+      - slug: too-loud
+        label: Too loud
+      - slug: bad-sound
+        label: Bad sound
+      # ── Crowd & vibe ──
+      - slug: friendly-crowd
+        label: Friendly crowd
+      - slug: welcoming-to-newcomers
+        label: Welcoming to newcomers
+      - slug: great-vibe
+        label: Great vibe
+      - slug: cliquey
+        label: Cliquey
+      - slug: unsafe
+        label: Felt unsafe
+      # ── Dance level ──
+      - slug: beginner-friendly
+        label: Beginner-friendly
+      - slug: high-level-dancers
+        label: High-level dancers
+      - slug: balanced-leads-follows
+        label: Balanced leads/follows
+      - slug: not-enough-partners
+        label: Not enough partners
+      # ── Floor & venue ──
+      - slug: great-dance-floor
+        label: Great dance floor
+      - slug: slippery-floor
+        label: Slippery floor
+      - slug: sticky-floor
+        label: Sticky floor
       - slug: spacious
         label: Spacious
-      - slug: high-level-dancers
-        label: High-Level Dancers
-      - slug: social-atmosphere
-        label: Social Atmosphere
-      - slug: live-band
-        label: Live Band
+      - slug: crowded
+        label: Crowded
+      - slug: good-ventilation
+        label: Good ventilation
+      - slug: too-hot
+        label: Too hot
+      # ── Service & logistics ──
+      - slug: easy-parking
+        label: Easy parking
+      - slug: good-drinks
+        label: Good drinks
+      - slug: friendly-staff
+        label: Friendly staff
+      - slug: long-wait
+        label: Long wait
+      - slug: poor-organization
+        label: Poor organization
+      # ── Value ──
+      - slug: good-value
+        label: Good value
+      - slug: overpriced
+        label: Overpriced
+      # ── Class / workshop specific ──
+      - slug: good-workshops
+        label: Good workshops
+      - slug: poor-workshops
+        label: Poor workshops
+      - slug: authentic
+        label: Authentic

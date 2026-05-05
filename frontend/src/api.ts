@@ -957,10 +957,11 @@ export async function deleteUserData(deviceId: string): Promise<{ deleted: Recor
 
 // --- Tags ---
 
-export async function fetchTagGroups(params?: { startDate?: string; endDate?: string }): Promise<TagGroup[]> {
+export async function fetchTagGroups(params?: { startDate?: string; endDate?: string; scope?: 'event' | 'review' }): Promise<TagGroup[]> {
     const qs = new URLSearchParams();
     if (params?.startDate) qs.set('start_date', params.startDate);
     if (params?.endDate) qs.set('end_date', params.endDate);
+    if (params?.scope) qs.set('scope', params.scope);
     const url = qs.toString() ? `${BASE}/tags?${qs}` : `${BASE}/tags`;
     const res = await fetch(url, { cache: 'no-cache' });
     return parseJsonResponse<TagGroup[]>(res, 'Failed to fetch tags');
@@ -1191,7 +1192,7 @@ export async function fetchMyRatings(): Promise<MyRating[]> {
 }
 
 export async function fetchReviewTagGroup(): Promise<TagGroup | null> {
-    const groups = await fetchTagGroups();
+    const groups = await fetchTagGroups({ scope: 'review' });
     return groups.find((g) => g.slug === 'review-tags') ?? null;
 }
 

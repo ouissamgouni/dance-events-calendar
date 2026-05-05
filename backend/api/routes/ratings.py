@@ -52,7 +52,6 @@ from backend.db.database import get_session
 from backend.db.models import (
     CachedEvent,
     EventRating,
-    EventTag,
     Tag,
     TagGroup,
     TagSuggestion,
@@ -654,27 +653,6 @@ def approve_rating(
     session.add(rating)
     session.commit()
     session.refresh(rating)
-
-    # Propagate review tags to event tags so they become filterable like normal tags.
-    review_tag_ids = list(rating.review_tag_ids or [])
-    if review_tag_ids:
-        existing = session.exec(
-            select(EventTag.tag_id).where(
-                EventTag.event_id == rating.event_id,
-                col(EventTag.tag_id).in_(review_tag_ids),
-            )
-        ).all()
-        existing_set = set(existing)
-        added = False
-        for tid in review_tag_ids:
-            if tid in existing_set:
-                continue
-            if not session.get(Tag, tid):
-                continue
-            session.add(EventTag(event_id=rating.event_id, tag_id=tid))
-            added = True
-        if added:
-            session.commit()
 
     event = session.get(CachedEvent, rating.event_id)
     user = session.get(User, rating.user_id) if rating.user_id else None

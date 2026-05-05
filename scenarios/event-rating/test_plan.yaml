@@ -120,17 +120,18 @@ test_plan:
         the count went from 3 → 4.
 
     - id: 11
-      title: "Approved review tags become event tags (filterable)"
+      title: "Review tags stay scoped to the reviews list (no leakage to event tags)"
       description: |
-        On evt-rating-001 the seeded reviews include several approved
+        On evt-rating-001 the seeded approved reviews carry several
         review-tags (e.g. "Great music", "Friendly crowd", "Crowded",
-        "Authentic"). These were attached to the event when each rating
-        was approved by the seed. Open the event detail page and look at
-        the tag pills row.
+        "Authentic"). Open the event detail page and look at the event's
+        tag pills row, then look at the Reviews section filter chips.
       expected: |
-        The event has the corresponding tags shown next to its other
-        format/dance-style pills. They behave like normal tags: clicking
-        one in the home filter narrows results to events with that tag.
+        The event's first-class tag pills (format / dance-style) are
+        unchanged — review-tags do NOT appear there. The review-tags ARE
+        visible inside the Reviews section as filter chips that narrow
+        the review list. Going back to the home filter, the explorer
+        shows no review-tag pill in the available filters.
 
     - id: 12
       title: "Card click does NOT bleed into rating click"

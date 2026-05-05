@@ -344,6 +344,7 @@ class TagGroupResponse(BaseModel):
     ordinal: int = 0
     allow_multiple: bool = True
     enabled: bool = True
+    scope: str = "event"
     tags: list[TagResponse] = []
 
 
@@ -351,6 +352,11 @@ class TagGroupCreate(BaseModel):
     label: str = Field(..., min_length=1, max_length=100)
     slug: Optional[str] = Field(default=None, max_length=100)
     color: Optional[str] = None
+    scope: Optional[str] = Field(
+        default="event",
+        pattern="^(event|review)$",
+        description="'event' for taxonomy/filter tags, 'review' for review-only aspect tags",
+    )
 
 
 class TagGroupUpdate(BaseModel):
@@ -359,6 +365,7 @@ class TagGroupUpdate(BaseModel):
     allow_multiple: Optional[bool] = None
     color: Optional[str] = None
     enabled: Optional[bool] = None
+    scope: Optional[str] = Field(default=None, pattern="^(event|review)$")
 
 
 class TagCreate(BaseModel):

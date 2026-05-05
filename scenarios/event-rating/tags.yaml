@@ -30,6 +30,7 @@ tag_groups:
     ordinal: 100
     allow_multiple: true
     color: "#f59e0b"
+    scope: review
     tags:
       - slug: great-music
         label: Great music

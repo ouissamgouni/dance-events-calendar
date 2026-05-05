@@ -145,6 +145,14 @@ class DatabaseSeeder:
             allow_multiple = group_data.get("allow_multiple", True)
             color = group_data.get("color")
             enabled = group_data.get("enabled", True)
+            scope = group_data.get("scope", "event")
+            if scope not in ("event", "review"):
+                logger.warning(
+                    "Tag group %s has invalid scope %r; defaulting to 'event'",
+                    slug,
+                    scope,
+                )
+                scope = "event"
 
             if group:
                 group.label = label
@@ -152,6 +160,7 @@ class DatabaseSeeder:
                 group.allow_multiple = allow_multiple
                 group.color = color
                 group.enabled = enabled
+                group.scope = scope
                 self.session.add(group)
                 logger.info("Updated tag group: %s", slug)
             else:
@@ -162,6 +171,7 @@ class DatabaseSeeder:
                     allow_multiple=allow_multiple,
                     color=color,
                     enabled=enabled,
+                    scope=scope,
                 )
                 self.session.add(group)
                 self.session.flush()
@@ -380,7 +390,9 @@ class DatabaseSeeder:
 
         items = data.get("settings", {}) or {}
         if not isinstance(items, dict):
-            logger.warning("Invalid settings.yaml at %s: 'settings' must be a mapping", path)
+            logger.warning(
+                "Invalid settings.yaml at %s: 'settings' must be a mapping", path
+            )
             return
 
         for key, value in items.items():
@@ -781,23 +793,6 @@ class DatabaseSeeder:
                 created_at=now,
             )
             self.session.add(rating)
-
-            # If approved, propagate review tag ids to event tags (mirrors the
-            # admin approve handler so the seeded data is filterable).
-            if status == "approved" and review_tag_ids:
-                existing_tags = self.session.exec(
-                    select(EventTag.tag_id).where(
-                        EventTag.event_id == event_id,
-                        EventTag.tag_id.in_(review_tag_ids),
-                    )
-                ).all()
-                existing_tag_set = set(existing_tags)
-                for tid in review_tag_ids:
-                    if tid in existing_tag_set:
-                        continue
-                    if not self.session.get(Tag, tid):
-                        continue
-                    self.session.add(EventTag(event_id=event_id, tag_id=tid))
 
             seeded += 1
         if seeded:
