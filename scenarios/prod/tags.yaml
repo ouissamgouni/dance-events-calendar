@@ -6,7 +6,7 @@ tag_groups:
     color: "#f422b8"
     tags:
       - slug: ogouni-going
-        label: Ogouni - Going !
+        label: OGoing !
         is_hero_filter: true
         hero_ordinal: 0
   - slug: format

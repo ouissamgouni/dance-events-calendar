@@ -407,7 +407,7 @@ export default function Home() {
                                     <button className="px-2.5 py-1 text-sm border-y border-slate-300 bg-white hover:bg-slate-50" onClick={handleCalToday}>today</button>
                                     <button className="px-2 py-1 text-sm border border-slate-300 bg-white hover:bg-slate-50" onClick={handleCalNext}>›</button>
                                 </div>
-                                <h2 className="text-lg font-semibold text-slate-800">{calendarTitle}</h2>
+                                <h2 className="text-sm sm:text-lg font-semibold text-slate-800 whitespace-nowrap">{calendarTitle}</h2>
                             </div>
                             {isMobileViewport && (
                                 <div className="flex gap-1 bg-slate-200 p-1 shrink-0 sm:hidden">

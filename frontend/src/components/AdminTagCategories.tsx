@@ -27,6 +27,8 @@ export default function AdminTagCategories() {
     const [draggingGroupId, setDraggingGroupId] = useState<number | null>(null);
     const [dragOverGroupId, setDragOverGroupId] = useState<number | null>(null);
     const [reorderError, setReorderError] = useState<string | null>(null);
+    const [editingTagId, setEditingTagId] = useState<number | null>(null);
+    const [editingTagLabel, setEditingTagLabel] = useState('');
 
     const load = () => {
         fetchAdminTagGroups()
@@ -104,6 +106,19 @@ export default function AdminTagCategories() {
         setEditingGroupId(null);
         if (!label) return;
         await updateTagGroup(groupId, { label });
+        load();
+    };
+
+    const handleTagLabelEdit = (tag: AdminTag) => {
+        setEditingTagId(tag.id);
+        setEditingTagLabel(tag.label);
+    };
+
+    const handleTagLabelSave = async (tagId: number) => {
+        const label = editingTagLabel.trim();
+        setEditingTagId(null);
+        if (!label) return;
+        await updateTag(tagId, { label });
         load();
     };
 
@@ -289,7 +304,29 @@ export default function AdminTagCategories() {
                                                     className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-white ${!tag.enabled ? 'opacity-40 line-through' : ''}`}
                                                     style={{ backgroundColor: groupColor }}
                                                 >
-                                                    {tag.label}
+                                                    {editingTagId === tag.id ? (
+                                                        <input
+                                                            type="text"
+                                                            value={editingTagLabel}
+                                                            onChange={(e) => setEditingTagLabel(e.target.value)}
+                                                            onBlur={() => handleTagLabelSave(tag.id)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') handleTagLabelSave(tag.id);
+                                                                if (e.key === 'Escape') setEditingTagId(null);
+                                                            }}
+                                                            autoFocus
+                                                            className="bg-white/20 text-white text-[10px] font-medium border-b border-white/60 focus:outline-none w-20 placeholder-white/60"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        />
+                                                    ) : (
+                                                        <span
+                                                            className="cursor-pointer hover:underline"
+                                                            title="Click to rename tag"
+                                                            onClick={() => handleTagLabelEdit(tag)}
+                                                        >
+                                                            {tag.label}
+                                                        </span>
+                                                    )}
                                                     <span
                                                         className="inline-flex items-center justify-center rounded-full bg-white/30 text-[9px] font-semibold min-w-[14px] h-[14px] px-0.5"
                                                     >
