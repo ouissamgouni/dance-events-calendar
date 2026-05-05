@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import type FullCalendar from '@fullcalendar/react';
 import Calendar from '../components/Calendar';
+import type { CalendarViewMode } from '../components/Calendar';
 import EventMap from '../components/EventMap';
 import type { MapBounds } from '../components/EventMap';
 import EventModal from '../components/EventModal';
@@ -44,6 +45,25 @@ export default function Home() {
     // Calendar view section visibility
     const [showCalendarGrid, setShowCalendarGrid] = useState(true);
     const [showCalendarMap, setShowCalendarMap] = useState(true);
+
+    // Mobile calendar view: 3-week (default on mobile) vs full month. Persisted.
+    const [isMobileViewport, setIsMobileViewport] = useState(() => window.innerWidth < 640);
+    useEffect(() => {
+        const mq = window.matchMedia('(max-width: 639px)');
+        const handler = (e: MediaQueryListEvent) => setIsMobileViewport(e.matches);
+        mq.addEventListener('change', handler);
+        return () => mq.removeEventListener('change', handler);
+    }, []);
+    const [mobileCalendarView, setMobileCalendarView] = useState<CalendarViewMode>(() => {
+        const stored = typeof window !== 'undefined' ? window.localStorage.getItem('mobileCalendarView') : null;
+        return stored === 'month' ? 'month' : '3week';
+    });
+    useEffect(() => {
+        try {
+            window.localStorage.setItem('mobileCalendarView', mobileCalendarView);
+        } catch { /* ignore */ }
+    }, [mobileCalendarView]);
+    const calendarViewMode: CalendarViewMode = isMobileViewport ? mobileCalendarView : 'month';
 
     // Shared selection anchor for calendar desktop details
     const [selectedEventRect, setSelectedEventRect] = useState<DOMRect | null>(null);
@@ -242,6 +262,23 @@ export default function Home() {
 
     const calendarTitle = useMemo(() => {
         if (!visibleRange) return '';
+        const spanDays = (visibleRange.end.getTime() - visibleRange.start.getTime()) / (1000 * 60 * 60 * 24);
+        // Month view spans ~5-6 weeks (35-42 days). 3-week view spans 21 days.
+        if (spanDays <= 28) {
+            const start = visibleRange.start;
+            // FullCalendar's range end is exclusive; subtract one day for display.
+            const endInclusive = new Date(visibleRange.end.getTime() - 24 * 60 * 60 * 1000);
+            const sameYear = start.getFullYear() === endInclusive.getFullYear();
+            const sameMonth = sameYear && start.getMonth() === endInclusive.getMonth();
+            const startStr = start.toLocaleDateString('en-US', sameMonth
+                ? { month: 'short', day: 'numeric' }
+                : { month: 'short', day: 'numeric' });
+            const endStr = endInclusive.toLocaleDateString('en-US', sameYear
+                ? { month: sameMonth ? undefined : 'short', day: 'numeric' }
+                : { month: 'short', day: 'numeric', year: 'numeric' });
+            const yearSuffix = sameYear ? `, ${endInclusive.getFullYear()}` : '';
+            return `${startStr} – ${endStr}${yearSuffix}`;
+        }
         const mid = new Date((visibleRange.start.getTime() + visibleRange.end.getTime()) / 2);
         return mid.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     }, [visibleRange]);
@@ -372,6 +409,24 @@ export default function Home() {
                                 </div>
                                 <h2 className="text-lg font-semibold text-slate-800">{calendarTitle}</h2>
                             </div>
+                            {isMobileViewport && (
+                                <div className="flex gap-1 bg-slate-200 p-1 shrink-0 sm:hidden">
+                                    <button
+                                        className={`px-2 py-1 text-xs font-medium transition ${mobileCalendarView === '3week' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        onClick={() => setMobileCalendarView('3week')}
+                                        aria-pressed={mobileCalendarView === '3week'}
+                                    >
+                                        3 wk
+                                    </button>
+                                    <button
+                                        className={`px-2 py-1 text-xs font-medium transition ${mobileCalendarView === 'month' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        onClick={() => setMobileCalendarView('month')}
+                                        aria-pressed={mobileCalendarView === 'month'}
+                                    >
+                                        Month
+                                    </button>
+                                </div>
+                            )}
                         </div>
                         {tagGroups.length > 0 && (
                             <div className="mb-4">
@@ -395,6 +450,7 @@ export default function Home() {
                                     hoveredEventId={hoveredEventId}
                                     onEventHover={handleEventHover}
                                     offMapEventIds={offMapEventIds}
+                                    viewMode={calendarViewMode}
                                 />
                             </div>
                             {showCalendarMap && (
