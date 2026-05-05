@@ -1,23 +1,31 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { fetchSettings } from '../api';
 
+export const DEFAULT_EVENT_COLOR_BAR_COLOR = '#64748b';
+
 interface FeatureFlags {
     showPrices: boolean;
     showPopularity: boolean;
+    showRatings: boolean;
     popularityThreshold: number;
+    eventColorBarColor: string;
 }
 
 const FeatureFlagsContext = createContext<FeatureFlags>({
     showPrices: false,
     showPopularity: false,
+    showRatings: false,
     popularityThreshold: 10,
+    eventColorBarColor: DEFAULT_EVENT_COLOR_BAR_COLOR,
 });
 
 export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
     const [flags, setFlags] = useState<FeatureFlags>({
         showPrices: false,
         showPopularity: false,
+        showRatings: false,
         popularityThreshold: 10,
+        eventColorBarColor: DEFAULT_EVENT_COLOR_BAR_COLOR,
     });
 
     useEffect(() => {
@@ -26,7 +34,9 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                 setFlags({
                     showPrices: s.show_prices,
                     showPopularity: s.show_popularity,
+                    showRatings: s.show_ratings,
                     popularityThreshold: s.popularity_threshold,
+                    eventColorBarColor: s.event_color_bar_color || DEFAULT_EVENT_COLOR_BAR_COLOR,
                 });
             })
             .catch(() => {

@@ -12,10 +12,12 @@ from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from backend.api.routes.admin import router as admin_router
+from backend.api.routes.attendance import router as attendance_router
 from backend.api.routes.auth import router as auth_router
 from backend.api.routes.config import router as config_router
 from backend.api.routes.events import router as events_router
 from backend.api.routes.export import router as export_router
+from backend.api.routes.ratings import router as ratings_router
 from backend.api.routes.settings import router as settings_router
 from backend.api.routes.sharing import router as sharing_router
 from backend.api.routes.suggestions import router as suggestions_router
@@ -110,12 +112,14 @@ app.include_router(auth_router)
 app.include_router(events_router)
 app.include_router(export_router)
 app.include_router(tracking_router)
+app.include_router(attendance_router)
 app.include_router(sharing_router)
 app.include_router(admin_router)
 app.include_router(settings_router)
 app.include_router(config_router)
 app.include_router(suggestions_router)
 app.include_router(tags_router)
+app.include_router(ratings_router)
 
 
 @app.get("/health", response_model=HealthResponse)

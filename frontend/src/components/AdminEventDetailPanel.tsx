@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchEvent, updateEvent } from '../api';
-import EventDetailContent from './EventDetailContent';
+import AdminEventDetailContent from './AdminEventDetailContent';
 import type { CalendarEvent } from '../types';
 
 interface Props {
@@ -134,14 +134,10 @@ export default function AdminEventDetailPanel({ eventId, onClose }: Props) {
                         <p className="text-xs text-red-500 text-center mt-8">Failed to load event.</p>
                     )}
                     {event && (
-                        <EventDetailContent
+                        <AdminEventDetailContent
                             event={event}
-                            editable
-                            disableTracking
                             onFieldSave={handleFieldSave}
                             onTagsUpdated={handleTagsUpdated}
-                            maxTags={event.tags?.length ?? undefined}
-                            showActions={false}
                         />
                     )}
                 </div>

@@ -4,11 +4,17 @@ import { Helmet } from 'react-helmet-async';
 import { fetchEvent, updateEvent, fetchTagGroups } from '../api';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import { useAuth } from '../context/AuthContext';
-import { trackView, trackLink } from '../utils/tracking';
+import { trackView } from '../utils/tracking';
 import EventDetailContent from '../components/EventDetailContent';
+import AdminEventDetailContent from '../components/AdminEventDetailContent';
 import EventMap from '../components/EventMap';
 import SuggestTagsButton from '../components/SuggestTagsButton';
 import GoingButton from '../components/GoingButton';
+import RateEventButton from '../components/RateEventButton';
+import EventReviewsSection from '../components/EventReviewsSection';
+import AttendeeList from '../components/AttendeeList';
+import ShareButton from '../components/ShareButton';
+import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import type { CalendarEvent, TagGroup } from '../types';
 
 export default function EventDetailPage() {
@@ -20,6 +26,7 @@ export default function EventDetailPage() {
     const [loading, setLoading] = useState(true);
     const { isSaved, toggleSave } = useSavedEvents();
     const { user } = useAuth();
+    const { showRatings } = useFeatureFlags();
 
     // Edit mode — admin must explicitly activate inline editing
     const [editMode, setEditMode] = useState(false);
@@ -32,6 +39,7 @@ export default function EventDetailPage() {
     const [editingTitle, setEditingTitle] = useState(false);
     const [titleValue, setTitleValue] = useState('');
     const [savingTitle, setSavingTitle] = useState(false);
+    const [reviewCount, setReviewCount] = useState(0);
     const titleCancelledRef = useRef(false);
 
     useEffect(() => {
@@ -186,9 +194,9 @@ export default function EventDetailPage() {
                         </div>
                     ) : (
                         <h1
-                            className={`text-2xl font-bold text-slate-900 leading-tight mb-6 ${editMode ? 'cursor-text hover:bg-slate-100 -mx-2 px-2 py-1 rounded transition' : ''}`}
-                            onClick={editMode ? () => setEditingTitle(true) : undefined}
-                            title={editMode ? 'Click to edit title' : undefined}
+                            className={`text-2xl font-bold text-slate-900 leading-tight mb-6 ${editMode && user?.is_admin ? 'cursor-text hover:bg-slate-100 -mx-2 px-2 py-1 rounded transition' : ''}`}
+                            onClick={editMode && user?.is_admin ? () => setEditingTitle(true) : undefined}
+                            title={editMode && user?.is_admin ? 'Click to edit title' : undefined}
                         >
                             {event.title}
                         </h1>
@@ -200,14 +208,20 @@ export default function EventDetailPage() {
                         <div className="lg:w-1/3 min-w-0">
                             <article className="bg-white rounded-2xl shadow-lg overflow-hidden">
                                 <div className="px-6 py-5">
-                                    <EventDetailContent
-                                        event={event}
-                                        editable={editMode}
-                                        onFieldSave={handleFieldSave}
-                                        onTagsUpdated={handleTagsUpdated}
-                                        maxTags={event.tags?.length ?? undefined}
-                                        showActions={false}
-                                    />
+                                    {editMode && user?.is_admin ? (
+                                        <AdminEventDetailContent
+                                            event={event}
+                                            onFieldSave={handleFieldSave}
+                                            onTagsUpdated={handleTagsUpdated}
+                                        />
+                                    ) : (
+                                        <EventDetailContent
+                                            event={event}
+                                            onTagsUpdated={handleTagsUpdated}
+                                            maxTags={event.tags?.length ?? undefined}
+                                            showActions={false}
+                                        />
+                                    )}
                                 </div>
 
                                 {/* Suggest tags panel */}
@@ -223,6 +237,14 @@ export default function EventDetailPage() {
                                     </div>
                                 )}
 
+                                {/* Who's going */}
+                                <div className="border-t border-slate-100 px-4 py-3">
+                                    <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                                        Who's going
+                                    </h3>
+                                    <AttendeeList eventId={event.event_id} expanded />
+                                </div>
+
                                 {/* Actions bar */}
                                 <div className="border-t border-slate-100 px-4 py-2 flex items-center gap-1.5 flex-wrap">
                                     <button
@@ -235,24 +257,12 @@ export default function EventDetailPage() {
                                         {isSaved(event.event_id) ? 'Saved' : 'Save'}
                                     </button>
                                     <GoingButton eventId={event.event_id} appearance="pill" />
-                                    <button
-                                        onClick={() => {
-                                            navigator.clipboard.writeText(shareUrl).catch(() => { });
-                                            trackLink(event.event_id, shareUrl);
-                                        }}
-                                        className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded px-2.5 py-1 transition shrink-0"
-                                    >
-                                        📋 Copy
-                                    </button>
-                                    <a
-                                        href={`https://wa.me/?text=${encodeURIComponent(event.title + ' — ' + shareUrl)}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        onClick={() => trackLink(event.event_id, `https://wa.me/?text=${encodeURIComponent(event.title + ' — ' + shareUrl)}`)}
-                                        className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded px-2.5 py-1 transition shrink-0"
-                                    >
-                                        💬 WhatsApp
-                                    </a>
+                                    {showRatings && <RateEventButton eventId={event.event_id} appearance="pill" eventHasReviews={reviewCount > 0} />}
+                                    <ShareButton
+                                        eventId={event.event_id}
+                                        title={event.title}
+                                        url={shareUrl}
+                                    />
                                     {!editMode && (
                                         <button
                                             onClick={() => {
@@ -267,7 +277,7 @@ export default function EventDetailPage() {
                                             </svg>
                                         </button>
                                     )}
-                                    {user && (
+                                    {user?.is_admin && (
                                         <button
                                             onClick={() => setEditMode((m) => !m)}
                                             className={`ml-auto inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition shrink-0 ${editMode
@@ -293,6 +303,11 @@ export default function EventDetailPage() {
                                         </button>
                                     )}
                                 </div>
+                                {showRatings && (
+                                    <div className="px-6 pb-5">
+                                        <EventReviewsSection eventId={event.event_id} onAggregateLoaded={(a) => setReviewCount(a?.count ?? 0)} />
+                                    </div>
+                                )}
                             </article>
                         </div>
 

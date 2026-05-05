@@ -10,7 +10,7 @@ import Calendar from '../components/Calendar';
 import EventMap from '../components/EventMap';
 import type { MapBounds } from '../components/EventMap';
 import EventModal from '../components/EventModal';
-import EventEditModal from '../components/EventEditModal';
+import AdminEventDetailPanel from '../components/AdminEventDetailPanel';
 import DateRangePicker from '../components/DateRangePicker';
 import EventListPanel from '../components/EventListPanel';
 import TagFilterPills from '../components/TagFilterPills';
@@ -36,7 +36,7 @@ export default function Home() {
     const [error, setError] = useState<string | null>(null);
     const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
     const [selectedEventSource, setSelectedEventSource] = useState<string | null>(null);
-    const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+    const [editingEventId, setEditingEventId] = useState<string | null>(null);
     const [sortBy, setSortBy] = useState<'date' | 'popularity'>('date');
     const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
     const [activeTagIds, setActiveTagIds] = useState<Set<number>>(new Set());
@@ -193,13 +193,19 @@ export default function Home() {
     const handleEditEvent = useCallback((evt: CalendarEvent) => {
         setSelectedEventRect(null);
         setSelectedEvent(null);
-        setEditingEvent(evt);
+        setEditingEventId(evt.event_id);
     }, []);
 
-    const handleEventSaved = useCallback((updated: CalendarEvent) => {
-        setEvents((prev) => prev.map((e) => (e.event_id === updated.event_id ? updated : e)));
-        setEditingEvent(null);
-    }, []);
+    const handleCloseEdit = useCallback(() => {
+        setEditingEventId(null);
+        // Refresh events list so any admin edits propagate to other surfaces.
+        const params = viewMode === 'explorer'
+            ? { startDate, endDate }
+            : visibleRange
+                ? { startDate: formatDate(visibleRange.start), endDate: formatDate(visibleRange.end) }
+                : { startDate, endDate };
+        fetchEvents(params).then(setEvents).catch(() => { });
+    }, [viewMode, startDate, endDate, visibleRange]);
 
     const handleBoundsChange = useCallback((bounds: MapBounds) => {
         setMapBounds(bounds);
@@ -421,7 +427,7 @@ export default function Home() {
                 <EventModal
                     event={selectedEvent}
                     onClose={handleCloseModal}
-                    onEdit={user ? handleEditEvent : undefined}
+                    onEdit={user?.is_admin ? handleEditEvent : undefined}
                     source={selectedEventSource ?? undefined}
                 />
             )}
@@ -431,18 +437,15 @@ export default function Home() {
                     event={selectedEvent}
                     anchorRect={selectedEventRect}
                     onClose={handleCloseModal}
-                    onEdit={user ? handleEditEvent : undefined}
+                    onEdit={user?.is_admin ? handleEditEvent : undefined}
                     source={selectedEventSource ?? undefined}
                 />
             )}
 
-            {editingEvent && (
-                <EventEditModal
-                    event={editingEvent}
-                    onClose={() => setEditingEvent(null)}
-                    onSaved={handleEventSaved}
-                />
-            )}
+            <AdminEventDetailPanel
+                eventId={editingEventId}
+                onClose={handleCloseEdit}
+            />
             {showSuggestModal && (
                 <SuggestEventModal onClose={() => setShowSuggestModal(false)} />
             )}

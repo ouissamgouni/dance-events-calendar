@@ -1,4 +1,4 @@
-import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse } from './types';
+import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry } from './types';
 
 declare const __VITE_API_URL__: string;
 
@@ -79,7 +79,9 @@ export interface SiteSettings {
     auto_sync_mode: 'incremental' | 'reseed';
     show_prices: boolean;
     show_popularity: boolean;
+    show_ratings: boolean;
     popularity_threshold: number;
+    event_color_bar_color: string;
 }
 
 export async function fetchSettings(): Promise<SiteSettings> {
@@ -178,20 +180,47 @@ export async function fetchAuthMode(): Promise<AuthMode> {
     return res.json();
 }
 
+export interface AuthUser {
+    user_id?: string;
+    email: string;
+    name: string;
+    avatar_url?: string | null;
+    is_admin?: boolean;
+    share_attendance_default?: boolean;
+}
+
 export async function loginWithGoogle(
     credential: string,
-): Promise<{ email: string; name: string }> {
+    deviceId?: string,
+    mockEmail?: string,
+    mockName?: string,
+): Promise<AuthUser> {
+    const body: Record<string, unknown> = { credential, device_id: deviceId };
+    if (mockEmail) body.mock_email = mockEmail;
+    if (mockName) body.mock_name = mockName;
     const res = await fetch(`${BASE}/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credential }),
+        body: JSON.stringify(body),
         credentials: 'include',
     });
     if (!res.ok) throw new Error('Login failed');
     return res.json();
 }
 
-export async function fetchMe(): Promise<{ email: string; name: string }> {
+export interface DevUser {
+    email: string;
+    name: string;
+}
+
+export async function fetchDevUsers(): Promise<DevUser[]> {
+    const res = await fetch(`${BASE}/auth/dev-users`);
+    if (!res.ok) return [];
+    const data = await res.json() as { users?: DevUser[] };
+    return data.users ?? [];
+}
+
+export async function fetchMe(): Promise<AuthUser> {
     const res = await fetch(`${BASE}/auth/me`, { credentials: 'include' });
     if (!res.ok) throw new Error('Not authenticated');
     return res.json();
@@ -202,6 +231,77 @@ export async function logout(): Promise<void> {
         method: 'POST',
         credentials: 'include',
     });
+}
+
+export async function deleteMyAccount(): Promise<void> {
+    const res = await fetch(`${BASE}/auth/me`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Account deletion failed');
+}
+
+export async function fetchMySavedEventIds(): Promise<string[]> {
+    const res = await fetch(`${BASE}/auth/saved-events`, { credentials: 'include' });
+    if (!res.ok) return [];
+    const data = await res.json() as { event_ids: string[] };
+    return data.event_ids ?? [];
+}
+
+export async function fetchMyAttendingEventIds(): Promise<string[]> {
+    const res = await fetch(`${BASE}/auth/attending-events`, { credentials: 'include' });
+    if (!res.ok) return [];
+    const data = await res.json() as { event_ids: string[] };
+    return data.event_ids ?? [];
+}
+
+export async function fetchMyAttendingEvents(): Promise<AttendingEventEntry[]> {
+    const res = await fetch(`${BASE}/auth/attending-events`, { credentials: 'include' });
+    if (!res.ok) return [];
+    const data = await res.json() as { events?: AttendingEventEntry[] };
+    return data.events ?? [];
+}
+
+export async function updateUserPreferences(prefs: { share_attendance_default?: boolean }): Promise<{ share_attendance_default: boolean }> {
+    const res = await fetch(`${BASE}/auth/preferences`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(prefs),
+    });
+    if (!res.ok) throw new Error('Failed to update preferences');
+    return res.json();
+}
+
+// --- Who's Going (attendee visibility) ---
+
+export async function fetchAttendanceSummary(eventId: string): Promise<AttendanceSummary> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/attendance-summary`, {
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to fetch attendance summary');
+    return res.json();
+}
+
+export async function fetchAttendanceSummaryBatch(eventIds: string[]): Promise<AttendanceSummary[]> {
+    if (eventIds.length === 0) return [];
+    const res = await fetch(`${BASE}/events/attendance-summary`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ event_ids: eventIds }),
+    });
+    if (!res.ok) return [];
+    return res.json();
+}
+
+export async function fetchEventAttendees(eventId: string): Promise<Attendee[] | { unauthorized: true }> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/attendees`, {
+        credentials: 'include',
+    });
+    if (res.status === 401) return { unauthorized: true };
+    if (!res.ok) throw new Error('Failed to fetch attendees');
+    return res.json();
 }
 
 // --- Sync Logs ---
@@ -247,14 +347,41 @@ export interface LogEntry {
     message: string;
 }
 
+// Alias used by job-level views; structurally identical to LogEntry today.
+export type JobLogEntry = LogEntry;
+
+export type FailureType =
+    | 'ungeolocated'
+    | 'price_not_found'
+    | 'links_not_found'
+    | 'enrichment_exception'
+    | 'persistence_failed';
+
+export interface FailureEntry {
+    timestamp: string;
+    event_id: string;
+    title: string;
+    stage: string;
+    type: FailureType;
+    message: string;
+}
+
+export interface StageStats {
+    processed: number;
+    skipped: number;
+    failed: number;
+}
+
 export interface ProcessedEventSummary {
     event_id: string;
     title: string;
     start_dt: string;
     location: string | null;
-    action: 'new' | 'updated' | 'deduped' | 'failed';
+    action: 'new' | 'updated' | 'unchanged' | 'deduped' | 'failed' | 'processing';
+    pipeline_stage: string | null;
     geocode_provider: string | null;
     price: string | null;
+    links_count: number | null;
     error: string | null;
 }
 
@@ -271,8 +398,12 @@ export interface CalendarStatus {
     started_at: string | null;
     finished_at: string | null;
     error: string | null;
+    current_operation: string | null;
+    pipeline_stage: string | null;
+    stage_stats: Record<string, StageStats>;
     logs: LogEntry[];
     processed_events: ProcessedEventSummary[];
+    failures: FailureEntry[];
 }
 
 export interface SyncJobRecord {
@@ -350,10 +481,12 @@ export async function abortSyncJob(jobId: string): Promise<SyncJobRecord> {
 
 export async function fetchSyncJobs(
     limit = 20,
+    offset = 0,
 ): Promise<{ items: SyncJobRecord[]; total: number }> {
-    const res = await fetch(`${BASE}/admin/sync-jobs?limit=${limit}`, {
-        credentials: 'include',
-    });
+    const res = await fetch(
+        `${BASE}/admin/sync-jobs?limit=${limit}&offset=${offset}`,
+        { credentials: 'include' },
+    );
     if (!res.ok) throw new Error('Failed to fetch sync jobs');
     return res.json();
 }
@@ -453,7 +586,10 @@ export async function bulkAssignTags(eventIds: string[], tagIds: number[]): Prom
 
 export async function updateEvent(
     eventId: string,
-    update: Partial<Omit<CalendarEvent, 'event_id' | 'calendar_id' | 'color'>>,
+    update: Partial<Omit<CalendarEvent, 'event_id' | 'color'>> & {
+        review_status?: string;
+        tag_ids?: number[];
+    },
 ): Promise<CalendarEvent> {
     const res = await fetch(`${BASE}/admin/events/${eventId}`, {
         method: 'PATCH',
@@ -588,11 +724,21 @@ export async function trackEventAttendance(
     eventId: string,
     deviceId: string,
     action: 'going' | 'not_going',
+    recordAnalytics: boolean = true,
+    sharePublicly?: boolean,
 ): Promise<void> {
+    const body: Record<string, unknown> = {
+        event_id: eventId,
+        device_id: deviceId,
+        action,
+        record_analytics: recordAnalytics,
+    };
+    if (sharePublicly !== undefined) body.share_publicly = sharePublicly;
     await fetch(`${BASE}/track/event-attendance`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event_id: eventId, device_id: deviceId, action }),
+        credentials: 'include',
+        body: JSON.stringify(body),
     });
 }
 
@@ -602,11 +748,13 @@ export async function trackEventSave(
     eventId: string,
     deviceId: string,
     action: 'save' | 'unsave',
+    recordAnalytics: boolean = true,
 ): Promise<void> {
     await fetch(`${BASE}/track/event-save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event_id: eventId, device_id: deviceId, action }),
+        credentials: 'include',
+        body: JSON.stringify({ event_id: eventId, device_id: deviceId, action, record_analytics: recordAnalytics }),
     });
 }
 
@@ -657,12 +805,20 @@ export async function createShareToken(deviceId: string): Promise<{ token: strin
     return res.json();
 }
 
-export async function fetchSharedCalendar(token: string): Promise<CalendarEvent[]> {
+export interface SharedCalendarPayload {
+    events: CalendarEvent[];
+    owner_display_name: string | null;
+}
+
+export async function fetchSharedCalendar(token: string): Promise<SharedCalendarPayload> {
     const res = await fetch(`${BASE}/share/calendar/${encodeURIComponent(token)}`);
     if (res.status === 404) throw new Error('not_found');
     if (!res.ok) throw new Error('Failed to fetch shared calendar');
     const data = await res.json();
-    return data.events;
+    return {
+        events: data.events ?? [],
+        owner_display_name: data.owner_display_name ?? null,
+    };
 }
 
 // --- Admin: Most Attended ---
@@ -967,4 +1123,104 @@ export async function updateCalendarDefaultTags(calendarId: string, tagIds: numb
     });
     if (!res.ok) throw new Error('Failed to update calendar default tags');
     return res.json();
+}
+
+// ── Ratings / Feedback ────────────────────────────────────────────────
+
+export async function submitFeedback(eventId: string, body: FeedbackSubmissionCreate): Promise<FeedbackSubmissionResponse> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        credentials: 'include',
+    });
+    return parseJsonResponse<FeedbackSubmissionResponse>(res, 'Failed to submit feedback');
+}
+
+export async function fetchMyRating(eventId: string): Promise<EventRating | null> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/rating/me`, {
+        credentials: 'include',
+    });
+    if (res.status === 401) return null;
+    if (!res.ok) throw new Error('Failed to fetch rating');
+    const text = await res.text();
+    if (!text || text === 'null') return null;
+    return JSON.parse(text) as EventRating;
+}
+
+export async function deleteMyRating(eventId: string): Promise<void> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/rating`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    if (!res.ok && res.status !== 204) throw new Error('Failed to delete rating');
+}
+
+export async function fetchRatingAggregate(eventId: string): Promise<EventRatingAggregate> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/rating`);
+    return parseJsonResponse<EventRatingAggregate>(res, 'Failed to fetch rating aggregate');
+}
+
+export async function fetchRatingAggregates(eventIds: string[]): Promise<EventRatingAggregate[]> {
+    if (!eventIds.length) return [];
+    const res = await fetch(`${BASE}/events/ratings/aggregate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_ids: eventIds }),
+    });
+    return parseJsonResponse<EventRatingAggregate[]>(res, 'Failed to fetch rating aggregates');
+}
+
+export async function fetchEventReviews(
+    eventId: string,
+    opts?: { limit?: number; offset?: number; sort?: 'recent' | 'highest' | 'lowest'; minStars?: number },
+): Promise<EventReviewsList> {
+    const sp = new URLSearchParams();
+    if (opts?.limit != null) sp.set('limit', String(opts.limit));
+    if (opts?.offset != null) sp.set('offset', String(opts.offset));
+    if (opts?.sort) sp.set('sort', opts.sort);
+    if (opts?.minStars != null) sp.set('min_stars', String(opts.minStars));
+    const qs = sp.toString();
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/reviews${qs ? `?${qs}` : ''}`);
+    return parseJsonResponse<EventReviewsList>(res, 'Failed to fetch reviews');
+}
+
+export async function fetchMyRatings(): Promise<MyRating[]> {
+    const res = await fetch(`${BASE}/users/me/ratings`, { credentials: 'include' });
+    return parseJsonResponse<MyRating[]>(res, 'Failed to fetch my ratings');
+}
+
+export async function fetchReviewTagGroup(): Promise<TagGroup | null> {
+    const groups = await fetchTagGroups();
+    return groups.find((g) => g.slug === 'review-tags') ?? null;
+}
+
+// Admin
+export async function fetchAdminRatings(opts?: { status?: 'pending' | 'approved' | 'rejected'; page?: number; pageSize?: number }): Promise<AdminRatingList> {
+    const sp = new URLSearchParams();
+    if (opts?.status) sp.set('status', opts.status);
+    sp.set('page', String(opts?.page ?? 1));
+    sp.set('page_size', String(opts?.pageSize ?? 25));
+    const res = await fetch(`${BASE}/admin/feedback?${sp.toString()}`, { credentials: 'include' });
+    return parseJsonResponse<AdminRatingList>(res, 'Failed to fetch admin ratings');
+}
+
+export async function approveRating(ratingId: string, adminNotes?: string): Promise<AdminRating> {
+    const res = await fetch(`${BASE}/admin/ratings/${encodeURIComponent(ratingId)}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admin_notes: adminNotes ?? null }),
+        credentials: 'include',
+    });
+    return parseJsonResponse<AdminRating>(res, 'Failed to approve rating');
+}
+
+export async function rejectRating(ratingId: string, adminNotes?: string): Promise<AdminRating> {
+    const res = await fetch(`${BASE}/admin/ratings/${encodeURIComponent(ratingId)}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admin_notes: adminNotes ?? null }),
+        credentials: 'include',
+    });
+    return parseJsonResponse<AdminRating>(res, 'Failed to reject rating');
 }

@@ -10,6 +10,7 @@ import {
     fetchCalendarDefaultTags, updateCalendarDefaultTags,
     fetchSourceBreakdown, fetchTopCountries, fetchTopLinks, fetchExportStats,
     fetchMostAttendedEvents, getCurrentSyncJob,
+    fetchAdminRatings,
 } from '../api';
 import type { MostSavedEvent, MostViewedEvent, MostAttendedEvent, SourceBreakdown, CountryBreakdown, TopLink, ExportStat } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -20,6 +21,7 @@ import type { EventsPanelPreset } from '../components/EventsPanel';
 import SuggestionsPanel from '../components/SuggestionsPanel';
 import UnsyncedSuggestionsPanel from '../components/UnsyncedSuggestionsPanel';
 import TagSuggestionsPanel from '../components/TagSuggestionsPanel';
+import FeedbackPanel from '../components/FeedbackPanel';
 import AdminTagCategories from '../components/AdminTagCategories';
 import AdminAnalytics from '../components/AdminAnalytics';
 
@@ -39,7 +41,9 @@ export default function Admin() {
     const [autoSyncMode, setAutoSyncMode] = useState<SyncMode>('incremental');
     const [showPrices, setShowPrices] = useState(false);
     const [showPopularity, setShowPopularity] = useState(false);
+    const [showRatings, setShowRatings] = useState(false);
     const [popularityThreshold, setPopularityThreshold] = useState(10);
+    const [eventColorBarColor, setEventColorBarColor] = useState('#64748b');
     const [editingCalId, setEditingCalId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
     const [showSyncProgress, setShowSyncProgress] = useState(false);
@@ -49,6 +53,8 @@ export default function Admin() {
     const [suggestionsPanelOpen, setSuggestionsPanelOpen] = useState(false);
     const [unsyncedPanelOpen, setUnsyncedPanelOpen] = useState(false);
     const [tagSuggestionsPanelOpen, setTagSuggestionsPanelOpen] = useState(false);
+    const [feedbackPanelOpen, setFeedbackPanelOpen] = useState(false);
+    const [feedbackPendingCount, setFeedbackPendingCount] = useState(0);
     const [tagSuggestionCount, setTagSuggestionCount] = useState(0);
     const [pendingReviewCount, setPendingReviewCount] = useState(0);
     const [ungeolocatedCount, setUngeolocatedCount] = useState(0);
@@ -97,7 +103,9 @@ export default function Admin() {
             setAutoSyncMode(s.auto_sync_mode ?? 'incremental');
             setShowPrices(s.show_prices);
             setShowPopularity(s.show_popularity);
+            setShowRatings(s.show_ratings);
             setPopularityThreshold(s.popularity_threshold ?? 10);
+            setEventColorBarColor(s.event_color_bar_color || '#64748b');
         }).catch(() => { });
         fetchSuggestions().then(setSuggestions).catch(() => { });
         fetchMostSavedEvents().then(setMostSaved).catch(() => { });
@@ -108,6 +116,7 @@ export default function Admin() {
         fetchTopLinks().then(setTopLinks).catch(() => { });
         fetchExportStats().then(setExportStats).catch(() => { });
         fetchAdminTagSuggestions('pending').then((s) => setTagSuggestionCount(s.length)).catch(() => { });
+        fetchAdminRatings({ status: 'pending', page: 1, pageSize: 1 }).then((res) => setFeedbackPendingCount(res.total)).catch(() => { });
         fetchEventFilterOptions({ future_only: true }).then((opts) => {
             setPendingReviewCount(opts.review_statuses.find((s) => s.value === 'pending')?.count ?? 0);
             setUngeolocatedCount(opts.geo_statuses.find((s) => s.value === 'ungeolocated')?.count ?? 0);
@@ -329,6 +338,18 @@ export default function Admin() {
         }
     };
 
+    const handleToggleRatings = async () => {
+        const newVal = !showRatings;
+        setShowRatings(newVal);
+        try {
+            await updateSettings({ show_ratings: newVal });
+            setMessage(`Ratings ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setShowRatings(!newVal);
+            setMessage('Failed to update feature flag.');
+        }
+    };
+
     const handlePopularityThresholdChange = async (value: number) => {
         if (isNaN(value) || value < 1) return;
         setPopularityThreshold(value);
@@ -336,6 +357,23 @@ export default function Admin() {
             await updateSettings({ popularity_threshold: value });
         } catch {
             setMessage('Failed to update popularity threshold.');
+        }
+    };
+
+    const handleEventColorBarColorChange = async (value: string) => {
+        const v = value.trim();
+        if (!/^#[0-9a-fA-F]{6}$/.test(v)) {
+            setMessage('Color must be a 6-digit hex like #64748b.');
+            return;
+        }
+        const prev = eventColorBarColor;
+        setEventColorBarColor(v);
+        try {
+            await updateSettings({ event_color_bar_color: v });
+            setMessage('Event bar color updated.');
+        } catch {
+            setEventColorBarColor(prev);
+            setMessage('Failed to update event bar color.');
         }
     };
 
@@ -422,6 +460,17 @@ export default function Admin() {
                         {tagSuggestionCount > 0 && (
                             <span className="inline-flex items-center justify-center bg-violet-500 text-white text-[10px] font-semibold px-1.5 py-0 min-w-[16px]">
                                 {tagSuggestionCount}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        onClick={() => setFeedbackPanelOpen(true)}
+                        className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
+                    >
+                        Feedback
+                        {feedbackPendingCount > 0 && (
+                            <span className="inline-flex items-center justify-center bg-amber-500 text-white text-[10px] font-semibold px-1.5 py-0 min-w-[16px]">
+                                {feedbackPendingCount}
                             </span>
                         )}
                     </button>
@@ -754,6 +803,18 @@ export default function Admin() {
                                     <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${showPopularity ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                 </button>
                             </div>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <span className="text-[11px] font-medium text-gray-700">Show ratings</span>
+                                    <p className="text-[10px] text-gray-400">Star ratings and reviews</p>
+                                </div>
+                                <button
+                                    onClick={handleToggleRatings}
+                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${showRatings ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                >
+                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${showRatings ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                </button>
+                            </div>
                             {showPopularity && (
                                 <div className="flex items-center justify-between mt-2 pl-1">
                                     <div>
@@ -772,6 +833,31 @@ export default function Admin() {
                                     />
                                 </div>
                             )}
+                            <div className="flex items-center justify-between mt-2">
+                                <div>
+                                    <span className="text-[11px] font-medium text-gray-700">Event bar color</span>
+                                    <p className="text-[10px] text-gray-400">Background of event bars in the calendar</p>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <input
+                                        type="color"
+                                        value={eventColorBarColor}
+                                        onChange={(e) => setEventColorBarColor(e.target.value)}
+                                        onBlur={(e) => handleEventColorBarColorChange(e.target.value)}
+                                        className="h-6 w-8 cursor-pointer border border-gray-200 rounded p-0"
+                                        aria-label="Event bar color picker"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={eventColorBarColor}
+                                        onChange={(e) => setEventColorBarColor(e.target.value)}
+                                        onBlur={(e) => handleEventColorBarColorChange(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleEventColorBarColorChange(eventColorBarColor)}
+                                        placeholder="#64748b"
+                                        className="w-20 text-[11px] font-mono border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                    />
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -824,6 +910,11 @@ export default function Admin() {
                 isOpen={tagSuggestionsPanelOpen}
                 onClose={() => setTagSuggestionsPanelOpen(false)}
                 onCountChange={setTagSuggestionCount}
+            />
+            <FeedbackPanel
+                isOpen={feedbackPanelOpen}
+                onClose={() => setFeedbackPanelOpen(false)}
+                onCountChange={setFeedbackPendingCount}
             />
         </div>
     );

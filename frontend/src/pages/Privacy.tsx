@@ -66,6 +66,25 @@ export default function Privacy() {
                         Cet identifiant permet de synchroniser vos favoris côté serveur.
                         Il ne contient aucune information personnelle.
                     </p>
+
+                    <h3 className="font-medium mt-4 mb-2">Données de compte (uniquement si vous vous connectez)</h3>
+                    <p className="mb-2">
+                        Si vous créez un compte via « Se connecter avec Google » pour synchroniser vos
+                        données entre appareils, nous stockons sur notre serveur :
+                    </p>
+                    <ul className="list-disc ml-6 mb-4 space-y-1">
+                        <li>Votre adresse e-mail Google et votre nom d’affichage</li>
+                        <li>Votre photo de profil Google (URL uniquement)</li>
+                        <li>L’identifiant unique de votre compte Google (claim <code>sub</code>)</li>
+                        <li>Vos événements favoris et « J’y vais » associés à votre compte</li>
+                        <li>Votre lien de partage de calendrier personnel</li>
+                    </ul>
+                    <p className="mb-2">
+                        <strong>Base légale</strong> : votre consentement, donné lors de la création du compte.
+                        <strong> Durée de conservation</strong> : jusqu’à la suppression de votre compte.
+                        Vous pouvez supprimer votre compte et toutes les données associées à tout moment
+                        depuis la page <Link to="/account" className="underline">Mon compte</Link>.
+                    </p>
                 </section>
 
                 <section className="mb-8">
@@ -166,6 +185,25 @@ export default function Privacy() {
                         (<code>movida_device_id</code>) is generated and stored in your browser.
                         This identifier allows server-side bookmark syncing.
                         It contains no personal information.
+                    </p>
+
+                    <h3 className="font-medium mt-4 mb-2">Account data (only if you sign in)</h3>
+                    <p className="mb-2">
+                        If you create an account via “Sign in with Google” to sync your data across
+                        devices, we store on our server:
+                    </p>
+                    <ul className="list-disc ml-6 mb-4 space-y-1">
+                        <li>Your Google email address and display name</li>
+                        <li>Your Google profile picture (URL only)</li>
+                        <li>Your Google account’s unique identifier (the <code>sub</code> claim)</li>
+                        <li>Your bookmarked and “I’m going” events linked to your account</li>
+                        <li>Your personal share-my-calendar link</li>
+                    </ul>
+                    <p className="mb-2">
+                        <strong>Legal basis</strong>: your consent, given at sign-up.
+                        <strong> Retention</strong>: until you delete your account.
+                        You can delete your account and all associated data at any time from the
+                        <Link to="/account" className="underline"> Account</Link> page.
                     </p>
                 </section>
 

@@ -1,0 +1,13 @@
+# Mock users pre-seeded for this scenario.
+#
+# At scenario boot the seeder upserts these into the User table.
+# At runtime /api/auth/dev-users exposes them so the /login page can render
+# one "Sign in as <Name>" button per entry.
+#
+# `is_admin` is derived at login time by comparing the email to ADMIN_EMAIL,
+# so to get an admin login just include the ADMIN_EMAIL value here.
+users:
+  - email: dev-user@example.com
+    name: Dev User
+  - email: admin@example.com # matches ADMIN_EMAIL → admin badge on /account
+    name: Dev Admin

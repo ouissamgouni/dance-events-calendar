@@ -1,0 +1,40 @@
+# Mock users pre-seeded for the share-im-going scenario.
+#
+# Three regular users let us exercise the privacy mix on a single event:
+# one shares publicly, one is private, one toggles their default preference.
+# The admin lets us verify the admin "Most Going" metric is unchanged.
+users:
+  - email: alice@example.com
+    name: Alice
+  - email: bob@example.com
+    name: Bob
+  - email: carol@example.com
+    name: Carol
+  - email: admin@example.com # matches ADMIN_EMAIL → admin badge
+    name: Dev Admin
+  # Extra users used to pre-seed a large attendee list on evt-share-003 so
+  # the "Show all" / collapse UI can be exercised without 12 manual clicks.
+  - email: dancer01@example.com
+    name: Diana Reyes
+  - email: dancer02@example.com
+    name: Eduardo Vega
+  - email: dancer03@example.com
+    name: Fatou Diop
+  - email: dancer04@example.com
+    name: Gabi Müller
+  - email: dancer05@example.com
+    name: Hiroshi Tanaka
+  - email: dancer06@example.com
+    name: Ines Costa
+  - email: dancer07@example.com
+    name: Jamal Hassan
+  - email: dancer08@example.com
+    name: Kira Volkov
+  - email: dancer09@example.com
+    name: Lucas Pereira
+  - email: dancer10@example.com
+    name: Mei Lin
+  - email: dancer11@example.com
+    name: Noor Ahmed
+  - email: dancer12@example.com
+    name: Olivia Park

@@ -5,6 +5,7 @@ import { getDeviceId } from '../utils/deviceId';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
+import { useAuth } from '../context/AuthContext';
 import { trackExportAction, trackView } from '../utils/tracking';
 import EventListPanel from '../components/EventListPanel';
 import EventMap from '../components/EventMap';
@@ -29,6 +30,7 @@ export default function MyCalendar() {
     const { savedEventIds, savedCount, isSaved, clearAll } = useSavedEvents();
     const { attendingEventIds, attendingCount, isAttending } = useAttendingEvents();
     const { showPrices, showPopularity } = useFeatureFlags();
+    const { user } = useAuth();
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
@@ -147,7 +149,7 @@ export default function MyCalendar() {
             <main className="mx-auto max-w-7xl px-4 py-4">
                 {/* Header */}
                 <div className="mb-4 flex flex-wrap items-center gap-3">
-                    <Link to="/" className="text-sm text-rose-600 hover:underline shrink-0">
+                    <Link to="/" className="text-sm text-slate-600 hover:underline shrink-0">
                         ← Back
                     </Link>
                     <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
@@ -166,33 +168,50 @@ export default function MyCalendar() {
                             <button
                                 onClick={handleExportIcs}
                                 disabled={!!exporting}
-                                className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600 hover:bg-slate-200 transition disabled:opacity-50"
+                                className="border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
                             >
                                 {exporting === 'ics' ? 'Exporting…' : '📅 Export .ics'}
                             </button>
                             <button
                                 onClick={handleExportXlsx}
                                 disabled={!!exporting}
-                                className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600 hover:bg-slate-200 transition disabled:opacity-50"
+                                className="border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
                             >
                                 {exporting === 'xlsx' ? 'Exporting…' : '📊 Export .xlsx'}
                             </button>
                             <button
                                 onClick={handleShare}
                                 disabled={shareStatus === 'loading'}
-                                className="rounded-full bg-rose-50 px-3 py-1 text-xs text-rose-600 hover:bg-rose-100 transition disabled:opacity-50"
+                                className="bg-blue-500 px-3 py-1 text-xs text-white hover:bg-blue-600 transition disabled:opacity-50"
                             >
                                 {shareStatus === 'copied' ? '✓ Link copied!' : shareStatus === 'loading' ? 'Generating…' : '🔗 Share'}
                             </button>
                             <button
                                 onClick={clearAll}
-                                className="rounded-full bg-red-50 px-3 py-1 text-xs text-red-600 hover:bg-red-100 transition"
+                                className="border border-slate-200 bg-white px-3 py-1 text-xs text-slate-600 hover:bg-slate-50 transition"
                             >
                                 Clear all
                             </button>
                         </div>
                     )}
                 </div>
+
+                {/* Anonymous users: invite to sign in to keep calendar across devices. */}
+                {!user && allEventIds.length > 0 && (
+                    <div className="mb-4 flex flex-wrap items-center gap-3 border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                        <span className="text-lg" aria-hidden>✨</span>
+                        <p className="flex-1 min-w-[14rem]">
+                            <span className="font-medium text-slate-800">Keep your calendar across devices.</span>{' '}
+                            Sign in to sync your saved events, “I’m going” list, and share link wherever you go.
+                        </p>
+                        <Link
+                            to={`/login?next=${encodeURIComponent('/my-calendar')}`}
+                            className="shrink-0 bg-blue-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-blue-600 transition"
+                        >
+                            Sign in
+                        </Link>
+                    </div>
+                )}
 
                 {/* Filter tabs — only when both saved and going events exist */}
                 {showFilterTabs && (
@@ -207,9 +226,9 @@ export default function MyCalendar() {
                                 <button
                                     key={f}
                                     onClick={() => setActiveFilter(f)}
-                                    className={`rounded-full px-3 py-1 text-xs font-medium transition ${activeFilter === f
-                                        ? 'bg-slate-800 text-white'
-                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    className={`px-3 py-1 text-xs font-medium border transition ${activeFilter === f
+                                        ? 'bg-blue-500 border-blue-500 text-white'
+                                        : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500'
                                         }`}
                                 >
                                     {label}

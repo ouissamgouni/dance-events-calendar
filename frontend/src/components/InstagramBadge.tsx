@@ -4,6 +4,8 @@ export default function InstagramBadge() {
             href="https://www.instagram.com/ogouni.dance/"
             target="_blank"
             rel="noopener noreferrer"
+            aria-label="Follow @ogouni.dance on Instagram"
+            title="Follow @ogouni.dance on Instagram"
             className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
         >
             <svg
@@ -20,7 +22,7 @@ export default function InstagramBadge() {
                 <circle cx="12" cy="12" r="5" />
                 <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
             </svg>
-            <span>@ogouni.dance</span>
+            <span>Follow @ogouni.dance</span>
         </a>
     );
 }

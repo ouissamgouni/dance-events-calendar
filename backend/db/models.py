@@ -6,6 +6,28 @@ from sqlalchemy import Column, JSON, Text, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 
+class User(SQLModel, table=True):
+    """End-user account (distinct from the admin role gated by ADMIN_EMAIL)."""
+
+    __tablename__ = "users"
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    email: str = Field(unique=True, index=True, max_length=255)
+    display_name: Optional[str] = Field(default=None, max_length=120)
+    avatar_url: Optional[str] = Field(default=None, max_length=512)
+    provider: str = Field(default="google", max_length=32)
+    provider_subject: Optional[str] = Field(
+        default=None, unique=True, index=True, max_length=255
+    )
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_login_at: Optional[datetime] = Field(default=None)
+    deleted_at: Optional[datetime] = Field(default=None, index=True)
+    # Pre-fills the "Share my name" toggle in the GoingButton confirmation
+    # popover. Privacy-first default; users opt in once via account settings
+    # (or per-event in the popover) to be visible on attendee lists.
+    share_attendance_default: bool = Field(default=False, nullable=False)
+
+
 class CalendarSetting(SQLModel, table=True):
     __tablename__ = "calendar_settings"
 
@@ -87,6 +109,7 @@ class UserSavedEvent(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     device_id: str = Field(index=True, max_length=64)
     event_id: str = Field(index=True)
+    user_id: Optional[UUID] = Field(default=None, foreign_key="users.id", index=True)
     saved_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -96,6 +119,9 @@ class ShareToken(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     token: str = Field(unique=True, index=True)
     device_id: str = Field(unique=True, index=True, max_length=64)
+    user_id: Optional[UUID] = Field(
+        default=None, foreign_key="users.id", unique=True, index=True
+    )
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -146,7 +172,9 @@ class SyncJobRun(SQLModel, table=True):
     totals_json: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     stage_totals_json: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     calendar_statuses_json: Optional[dict] = Field(default=None, sa_column=Column(JSON))
-    metadata_json: Optional[dict] = Field(default=None, sa_column=Column("metadata_json", JSON))
+    metadata_json: Optional[dict] = Field(
+        default=None, sa_column=Column("metadata_json", JSON)
+    )
 
 
 class EventSuggestion(SQLModel, table=True):
@@ -275,6 +303,49 @@ class TagSuggestion(SQLModel, table=True):
     admin_notes: Optional[str] = Field(default=None, sa_column=Column(Text))
     reviewed_at: Optional[datetime] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    # Links a TagSuggestion to the parent feedback envelope (rating + tag suggestions
+    # submitted together). NULL for legacy/standalone suggestions.
+    feedback_submission_id: Optional[UUID] = Field(default=None, index=True)
+
+
+class EventRating(SQLModel, table=True):
+    """User rating + review for an event. Pre-moderated by admin."""
+
+    __tablename__ = "event_ratings"
+    __table_args__ = (
+        # Partial unique constraint (one rating per user per event) is created
+        # in the Alembic migration as ``CREATE UNIQUE INDEX ... WHERE user_id IS NOT NULL``
+        # because SQLAlchemy/SQLModel cannot express partial uniques portably.
+    )
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    event_id: str = Field(foreign_key="cached_events.event_id", index=True)
+    # Nullable so account deletion can soft-anonymise (ON DELETE SET NULL on FK).
+    user_id: Optional[UUID] = Field(default=None, foreign_key="users.id", index=True)
+
+    stars: int = Field(ge=1, le=5)
+    comment: Optional[str] = Field(default=None, sa_column=Column(Text))
+    review_tag_ids: Optional[list] = Field(default=None, sa_column=Column(JSON))
+    is_anonymous: bool = Field(default=False)
+
+    # Groups together the rating and any tag-suggestions submitted in the same
+    # feedback envelope so the admin UI can show them together while still
+    # moderating each independently.
+    feedback_submission_id: Optional[UUID] = Field(default=None, index=True)
+
+    # Workflow
+    status: str = Field(default="pending", index=True)  # pending | approved | rejected
+    admin_notes: Optional[str] = Field(default=None, sa_column=Column(Text))
+    reviewed_at: Optional[datetime] = Field(default=None)
+    reviewed_by: Optional[str] = Field(default=None)
+
+    # Audit
+    submitter_ip: Optional[str] = Field(default=None)
+    submitter_user_agent: Optional[str] = Field(default=None)
+    submitter_country: Optional[str] = Field(default=None)
+
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class EventAttendance(SQLModel, table=True):
@@ -298,7 +369,13 @@ class UserEventAttendance(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     device_id: str = Field(index=True, max_length=64)
     event_id: str = Field(index=True)
+    user_id: Optional[UUID] = Field(default=None, foreign_key="users.id", index=True)
     attending_since: datetime = Field(default_factory=datetime.utcnow)
+    # When True AND user_id IS NOT NULL the row is eligible to appear in the
+    # public attendee list for the event. When False, the attendance is
+    # counted but the user is not named ("private going"). Anonymous device
+    # rows (user_id IS NULL) are always private regardless of this flag.
+    share_publicly: bool = Field(default=False, nullable=False)
 
 
 class CalendarDefaultTag(SQLModel, table=True):

@@ -2,7 +2,7 @@ version: "3"
 
 vars:
   RELOAD_FLAG: "{{if eq (env \"DONT_RELOAD\") \"true\"}}{{else}}--reload{{end}}"
-  LOG_LEVEL: "{{.LOG_LEVEL | default \"INFO\"}}"
+  LOG_LEVEL: "{{.LOG_LEVEL | default \"info\"}}"
   UVICORN_ACCESS_LOG_EXCLUDE_PATHS: "{{.UVICORN_ACCESS_LOG_EXCLUDE_PATHS | default \"\"}}"
   SCENARIO_PORTS_SH: .taskfiles/scenario_ports.sh
 

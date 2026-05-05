@@ -77,12 +77,48 @@ class EventSaveRequest(BaseModel):
     event_id: str
     device_id: str = Field(..., min_length=1, max_length=64)
     action: str = Field(..., pattern="^(save|unsave)$")
+    # When False, the route updates only the functional UserSavedEvent state
+    # and skips writing the analytics EventSave log row.
+    record_analytics: bool = True
 
 
 class EventAttendanceRequest(BaseModel):
     event_id: str
     device_id: str = Field(..., min_length=1, max_length=64)
     action: str = Field(..., pattern="^(going|not_going)$")
+    record_analytics: bool = True
+    # When None on a "going" action: keep the existing value if the row already
+    # exists, otherwise fall back to ``user.share_attendance_default``. Logged-out
+    # callers always store user_id=NULL so the field is ignored for them.
+    share_publicly: Optional[bool] = None
+
+
+class AttendeeResponse(BaseModel):
+    user_id: UUID
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+
+class AttendanceSummaryResponse(BaseModel):
+    """Counts for one event. The ``public_*`` and ``anonymous_*`` breakdown is
+    only populated for authenticated callers — logged-out viewers see only the
+    total and a flag telling them to sign in for the rest."""
+
+    event_id: str
+    total_going: int = 0
+    public_going: int = 0
+    anonymous_going: int = 0
+    can_view_attendees: bool = False
+    viewer_is_sharing: bool = False
+    preview_attendees: list[AttendeeResponse] = []
+
+
+class AttendanceSummaryBatchRequest(BaseModel):
+    event_ids: list[str] = Field(..., min_length=1, max_length=200)
+
+
+class UpdatePreferencesRequest(BaseModel):
+    share_attendance_default: Optional[bool] = None
 
 
 class EventLinkClickRequest(BaseModel):
@@ -119,6 +155,10 @@ class ShareTokenResponse(BaseModel):
 
 class SharedCalendarResponse(BaseModel):
     events: list[EventResponse]
+    # First name (or email-local-part fallback) of the share-token owner when
+    # the token is user-scoped. None for anonymous (device-only) tokens. Used
+    # by the public /shared/:token page to render "{name}'s calendar".
+    owner_display_name: Optional[str] = None
 
 
 class MostViewedEvent(BaseModel):
@@ -159,7 +199,9 @@ class SiteSettingsResponse(BaseModel):
     auto_sync_mode: str = "incremental"  # "incremental" | "reseed"
     show_prices: bool = False
     show_popularity: bool = False
+    show_ratings: bool = False
     popularity_threshold: int = 10
+    event_color_bar_color: str = "#64748b"
 
 
 class SiteSettingsUpdateRequest(BaseModel):
@@ -172,7 +214,11 @@ class SiteSettingsUpdateRequest(BaseModel):
     )
     show_prices: Optional[bool] = None
     show_popularity: Optional[bool] = None
+    show_ratings: Optional[bool] = None
     popularity_threshold: Optional[int] = Field(default=None, ge=1, le=10000)
+    event_color_bar_color: Optional[str] = Field(
+        default=None, pattern="^#[0-9a-fA-F]{6}$"
+    )
 
 
 class EventUpdateRequest(BaseModel):
@@ -190,6 +236,8 @@ class EventUpdateRequest(BaseModel):
     price_is_free: Optional[bool] = None
     links: Optional[list[LinkItem]] = None
     tag_ids: Optional[list[int]] = None
+    calendar_id: Optional[str] = None
+    review_status: Optional[str] = Field(default=None, pattern="^(pending|reviewed)$")
 
 
 class GeocodeSuggestion(BaseModel):
@@ -437,3 +485,125 @@ class SyncLogResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# --- Ratings / Feedback ---
+
+
+class TagSuggestionInline(BaseModel):
+    """A tag suggestion submitted as part of a feedback envelope."""
+
+    tag_id: Optional[int] = None
+    free_text: Optional[str] = Field(default=None, max_length=100)
+    group_slug: Optional[str] = Field(default=None, max_length=64)
+
+
+class FeedbackSubmissionCreate(BaseModel):
+    """Unified envelope: rating + optional related tag suggestions."""
+
+    stars: int = Field(..., ge=1, le=5)
+    comment: Optional[str] = Field(default=None, max_length=2000)
+    review_tag_ids: list[int] = Field(default_factory=list, max_length=10)
+    is_anonymous: bool = False
+    tag_suggestions: list[TagSuggestionInline] = Field(
+        default_factory=list, max_length=10
+    )
+    website: str = ""  # honeypot
+
+
+class EventRatingResponse(BaseModel):
+    id: UUID
+    event_id: str
+    stars: int
+    comment: Optional[str] = None
+    review_tag_ids: list[int] = []
+    is_anonymous: bool = False
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class FeedbackSubmissionResponse(BaseModel):
+    feedback_submission_id: UUID
+    rating: EventRatingResponse
+    tag_suggestion_ids: list[int] = []
+    message: str = "Thanks for your feedback! Your review is being checked by our team."
+
+
+class EventRatingAggregate(BaseModel):
+    event_id: str
+    average: float = 0.0
+    count: int = 0
+    distribution: dict[int, int] = Field(default_factory=dict)
+
+
+class EventReviewPublic(BaseModel):
+    """Approved review shown publicly on the event detail page."""
+
+    id: UUID
+    stars: int
+    comment: Optional[str] = None
+    review_tags: list[TagResponse] = []
+    reviewer_label: str  # display name, "Anonymous", or initials
+    created_at: datetime
+
+
+class EventReviewsListResponse(BaseModel):
+    items: list[EventReviewPublic]
+    total: int
+
+
+class BatchAggregateRequest(BaseModel):
+    event_ids: list[str] = Field(..., min_length=1, max_length=200)
+
+
+class AdminRatingResponse(BaseModel):
+    id: UUID
+    event_id: str
+    event_title: Optional[str] = None
+    user_email: Optional[str] = None
+    user_display_name: Optional[str] = None
+    is_anonymous: bool = False
+    stars: int
+    comment: Optional[str] = None
+    review_tags: list[TagResponse] = []
+    feedback_submission_id: Optional[UUID] = None
+    linked_tag_suggestion_ids: list[int] = []
+    status: str
+    admin_notes: Optional[str] = None
+    submitter_ip: Optional[str] = None
+    submitter_user_agent: Optional[str] = None
+    submitter_country: Optional[str] = None
+    auto_flagged: bool = False
+    reviewed_at: Optional[datetime] = None
+    reviewed_by: Optional[str] = None
+    created_at: datetime
+
+
+class AdminRatingListResponse(BaseModel):
+    items: list[AdminRatingResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class RatingApproveRequest(BaseModel):
+    admin_notes: Optional[str] = Field(default=None, max_length=500)
+
+
+class RatingRejectRequest(BaseModel):
+    admin_notes: Optional[str] = Field(default=None, max_length=500)
+
+
+class MyRatingResponse(BaseModel):
+    id: UUID
+    event_id: str
+    event_title: Optional[str] = None
+    event_start: Optional[datetime] = None
+    stars: int
+    comment: Optional[str] = None
+    review_tag_ids: list[int] = []
+    is_anonymous: bool = False
+    status: str
+    created_at: datetime
+    updated_at: datetime

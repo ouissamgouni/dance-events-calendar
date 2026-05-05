@@ -173,8 +173,9 @@ test_plan:
     - id: 21
       title: "Admin shows most-saved events"
       description: >
-        Log in as admin (dev login). Check admin page for "❤️ Most Saved Events"
-        section.
+        Log in as admin via /login ("Sign in as Admin" if seeded, otherwise type
+        ADMIN_EMAIL into the dev email input). Check admin page for "❤️ Most
+        Saved Events" section.
       expected: >
         Section appears showing events ranked by net saves. Events that were
         saved appear with their save count.

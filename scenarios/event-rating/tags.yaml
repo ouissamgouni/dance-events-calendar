@@ -1,0 +1,49 @@
+tag_groups:
+  - slug: format
+    label: Format
+    ordinal: 10
+    allow_multiple: true
+    color: "#f472b6"
+    tags:
+      - slug: social
+        label: Social
+      - slug: class
+        label: Class
+      - slug: workshop
+        label: Workshop
+
+  - slug: dance-style
+    label: Dance style
+    ordinal: 20
+    allow_multiple: true
+    color: "#e11d48"
+    tags:
+      - slug: salsa
+        label: Salsa
+      - slug: bachata
+        label: Bachata
+      - slug: kizomba
+        label: Kizomba
+
+  - slug: review-tags
+    label: Review tags
+    ordinal: 100
+    allow_multiple: true
+    color: "#f59e0b"
+    tags:
+      - slug: great-music
+        label: Great music
+      - slug: friendly-crowd
+        label: Friendly crowd
+      - slug: crowded
+        label: Crowded
+      - slug: overpriced
+        label: Overpriced
+      - slug: beginner-friendly
+        label: Beginner-friendly
+      - slug: authentic
+        label: Authentic
+      - slug: loud
+        label: Loud
+      - slug: good-venue
+        label: Good venue

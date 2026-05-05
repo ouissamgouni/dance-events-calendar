@@ -18,19 +18,19 @@ test_plan:
   description: >
     End-to-end test of the GDPR-compliant tracking feature: cookie consent
     banner, consent-gated event views/link clicks/exports with source
-    attribution, Umami page-level analytics, personalization (device_id),
-    admin analytics views, GDPR data deletion endpoint, and edge cases
-    around consent changes. Uses mock calendar service with 6 events
-    (5 with locations, 1 with no location to test null geo handling,
-    4 with structured links, 1 with fallback link in description).
+    attribution, Umami page-level analytics, personalization (device_id), admin
+    analytics views, GDPR data deletion endpoint, and edge cases around consent
+    changes. Uses mock calendar service with 6 events (5 with locations, 1 with
+    no location to test null geo handling, 4 with structured links, 1 with
+    fallback link in description).
 
   steps:
     # ── Group 1: Consent Banner UX ─────────────────────────────
     - id: 1
       title: "First visit shows consent banner"
       description: >
-        Open the home page in a fresh browser or incognito window.
-        The cookie consent banner should appear at the bottom of the page.
+        Open the home page in a fresh browser or incognito window. The cookie
+        consent banner should appear at the bottom of the page.
       expected: >
         Banner visible with title "Nous utilisons des cookies" (or English
         equivalent), three buttons: "Tout accepter", "Refuser tout",
@@ -52,43 +52,40 @@ test_plan:
       description: >
         Click "Personnaliser" (or "Customize") on the consent banner.
       expected: >
-        A preferences modal opens showing 3 categories:
-        1. "Cookies strictement nécessaires" — toggle locked ON, read-only.
-        2. "Cookies d'analyse" — toggle OFF by default.
-        3. "Cookies de personnalisation" — toggle OFF by default.
-        Buttons: "Tout accepter", "Refuser tout", "Enregistrer".
+        A preferences modal opens showing 3 categories: 1. "Cookies strictement
+        nécessaires" — toggle locked ON, read-only. 2. "Cookies d'analyse" —
+        toggle OFF by default. 3. "Cookies de personnalisation" — toggle OFF by
+        default. Buttons: "Tout accepter", "Refuser tout", "Enregistrer".
       verification: "Modal shows 3 categories, necessary is locked on"
 
     - id: 4
       title: "Accept all sets all categories"
       description: >
-        Click "Tout accepter" (Accept all) in the consent banner.
-        Open browser DevTools → Application → Cookies.
+        Click "Tout accepter" (Accept all) in the consent banner. Open browser
+        DevTools → Application → Cookies.
       expected: >
-        Banner disappears. A cookie named "cc_cookie" exists. Its value
-        (JSON) contains categories including "necessary", "analytics",
-        and "personalization".
+        Banner disappears. A cookie named "cc_cookie" exists. Its value (JSON)
+        contains categories including "necessary", "analytics", and
+        "personalization".
       verification: "cc_cookie present with all 3 categories"
 
     - id: 5
       title: "Reject all sets only necessary"
       description: >
-        Clear all cookies (DevTools → Application → Clear site data).
-        Reload the page. When the banner appears, click "Refuser tout"
-        (Reject all).
+        Clear all cookies (DevTools → Application → Clear site data). Reload the
+        page. When the banner appears, click "Refuser tout" (Reject all).
       expected: >
-        Banner disappears. The "cc_cookie" contains only "necessary".
-        No "analytics" or "personalization" in the accepted categories.
+        Banner disappears. The "cc_cookie" contains only "necessary". No
+        "analytics" or "personalization" in the accepted categories.
       verification: "cc_cookie has only necessary category"
 
     - id: 6
       title: "Cookie Settings button in status bar"
       description: >
-        Look at the bottom status bar. Find the "🔒 Cookies" button.
-        Click it.
+        Look at the bottom status bar. Find the "🔒 Cookies" button. Click it.
       expected: >
-        The cookie preferences modal reopens, showing the current consent
-        state (matching what was previously chosen).
+        The cookie preferences modal reopens, showing the current consent state
+        (matching what was previously chosen).
       verification: "Preferences modal opens from status bar button"
 
     - id: 7
@@ -107,26 +104,25 @@ test_plan:
     - id: 8
       title: "Accept all, click event on calendar grid"
       description: >
-        Clear cookies, reload page. Accept all cookies. Switch to calendar
-        view. Click "Friday Salsa Night" on the FullCalendar grid (not the
-        map). Open browser DevTools → Network tab and filter for "track".
+        Clear cookies, reload page. Accept all cookies. Switch to calendar view.
+        Click "Friday Salsa Night" on the FullCalendar grid (not the map). Open
+        browser DevTools → Network tab and filter for "track".
       expected: >
-        A POST request to /api/track/event-view is sent with body:
-        {"event_id": "evt-gdpr-001", "device_id": "<uuid>", "source": "calendar"}.
-        Response: 201.
-        Note: source="calendar" is set by Calendar.tsx before passing the
+        A POST request to /api/track/event-view is sent with body: {"event_id":
+        "evt-gdpr-001", "device_id": "<uuid>", "source": "calendar"}. Response:
+        201. Note: source="calendar" is set by Calendar.tsx before passing the
         click to Home.tsx — not by Home.tsx itself.
       verification: "Network shows event-view POST with source=calendar"
 
     - id: 9
       title: "Open event detail page directly"
       description: >
-        Navigate to /event/evt-gdpr-002 by typing in the address bar.
-        Check Network tab.
+        Navigate to /event/evt-gdpr-002 by typing in the address bar. Check
+        Network tab.
       expected: >
-        A POST to /api/track/event-view with event_id "evt-gdpr-002"
-        and source "direct". device_id is present (personalization accepted).
-        The URL has no ?src= param — EventDetailPage falls back to "direct".
+        A POST to /api/track/event-view with event_id "evt-gdpr-002" and source
+        "direct". device_id is present (personalization accepted). The URL has
+        no ?src= param — EventDetailPage falls back to "direct".
       verification: "event-view tracked with source=direct"
 
     - id: 10
@@ -135,19 +131,19 @@ test_plan:
         Open "Friday Salsa Night" modal. Click the "Tickets" link
         (https://example.com/salsa-night-tickets). Check Network tab.
       expected: >
-        Link opens in a new tab. A POST to /api/track/link-click is sent
-        with body containing event_id "evt-gdpr-001" and the clicked URL.
-        Response: 201.
+        Link opens in a new tab. A POST to /api/track/link-click is sent with
+        body containing event_id "evt-gdpr-001" and the clicked URL. Response:
+        201.
       verification: "link-click POST with correct event_id and url"
 
     - id: 11
       title: "Click fallback link in detail page"
       description: >
-        Navigate to /event/evt-gdpr-005 (Rueda de Casino Night). The
-        description contains a URL. Click it.
+        Navigate to /event/evt-gdpr-005 (Rueda de Casino Night). The description
+        contains a URL. Click it.
       expected: >
-        Link opens in new tab. POST to /api/track/link-click with
-        event_id "evt-gdpr-005" and the fallback URL.
+        Link opens in new tab. POST to /api/track/link-click with event_id
+        "evt-gdpr-005" and the fallback URL.
       verification: "Fallback link click tracked"
 
     - id: 12
@@ -156,8 +152,8 @@ test_plan:
         Save 2 events (e.g. evt-gdpr-001 and evt-gdpr-003). Open the FAB
         dropdown and click "Export .ics". Check Network tab.
       expected: >
-        File "my-movida-events.ics" downloads. A POST to /api/track/export
-        is sent with {"format": "ics", "event_count": 2, "device_id": "<uuid>"}.
+        File "my-movida-events.ics" downloads. A POST to /api/track/export is
+        sent with {"format": "ics", "event_count": 2, "device_id": "<uuid>"}.
       verification: "export POST with format=ics and event_count=2"
 
     - id: 13
@@ -165,8 +161,8 @@ test_plan:
       description: >
         On the My Calendar page, click "📊 Export .xlsx". Check Network tab.
       expected: >
-        File downloads. POST to /api/track/export with format "xlsx"
-        and event_count matching saved count.
+        File downloads. POST to /api/track/export with format "xlsx" and
+        event_count matching saved count.
       verification: "export POST with format=xlsx"
 
     - id: 14
@@ -174,52 +170,52 @@ test_plan:
       description: >
         Click the save heart on "Salsa Congress 2026". Check Network tab.
       expected: >
-        POST to /api/track/event-save with event_id "evt-gdpr-004",
-        device_id (present because personalization accepted), action "save".
+        POST to /api/track/event-save with event_id "evt-gdpr-004", device_id
+        (present because personalization accepted), action "save".
       verification: "event-save POST with action=save and device_id"
 
     # ── Group 2b: Source Attribution ───────────────────────────
     - id: 33
       title: "Explorer list click — source=explorer-list"
       description: >
-        Ensure analytics consent is granted. Go to the home page (/ or
-        explorer mode). In the event list panel on the left (desktop) or
-        below the map (mobile), click "Kizomba Social".
+        Ensure analytics consent is granted. Go to the home page (/ or explorer
+        mode). In the event list panel on the left (desktop) or below the map
+        (mobile), click "Kizomba Social".
       expected: >
-        Browser navigates to /event/evt-gdpr-003?src=explorer-list.
-        A POST to /api/track/event-view is sent with source "explorer-list".
-        The ?src= query param is consumed by EventDetailPage — it does NOT
-        appear in the page title or UI.
+        Browser navigates to /event/evt-gdpr-003?src=explorer-list. A POST to
+        /api/track/event-view is sent with source "explorer-list". The ?src=
+        query param is consumed by EventDetailPage — it does NOT appear in the
+        page title or UI.
       verification: "event-view POST with source=explorer-list"
 
     - id: 34
       title: "Explorer map marker click — source=explorer-map"
       description: >
-        Stay in explorer mode. On the map, click the marker for
-        "Salsa Congress 2026" (Amsterdam). Check Network tab.
+        Stay in explorer mode. On the map, click the marker for "Salsa Congress
+        2026" (Amsterdam). Check Network tab.
       expected: >
-        Browser navigates to /event/evt-gdpr-004?src=explorer-map.
-        POST /api/track/event-view with source "explorer-map". Response 201.
+        Browser navigates to /event/evt-gdpr-004?src=explorer-map. POST
+        /api/track/event-view with source "explorer-map". Response 201.
       verification: "event-view POST with source=explorer-map"
 
     - id: 35
       title: "Calendar map marker click — source=calendar-map"
       description: >
-        Switch to calendar view. Enable the 📍 Map toggle if it is off.
-        Click a map marker (e.g. Friday Salsa Night in Paris).
-        Note: the calendar map opens a modal — it does NOT navigate.
+        Switch to calendar view. Enable the 📍 Map toggle if it is off. Click a
+        map marker (e.g. Friday Salsa Night in Paris). Note: the calendar map
+        opens a modal — it does NOT navigate.
       expected: >
-        An event modal opens in-page.
-        POST /api/track/event-view with source "calendar-map". Response 201.
-        (This is fired by handleCalMapEventClick in Home.tsx, not Calendar.tsx,
-        so no double-fire with the source="calendar" path.)
+        An event modal opens in-page. POST /api/track/event-view with source
+        "calendar-map". Response 201. (This is fired by handleCalMapEventClick
+        in Home.tsx, not Calendar.tsx, so no double-fire with the
+        source="calendar" path.)
       verification: "event-view POST with source=calendar-map, modal shown"
 
     - id: 36
       title: "My Calendar modal open — source=my-calendar"
       description: >
-        Save at least one event. Navigate to /my-calendar. Click a saved
-        event in the list or on the map.
+        Save at least one event. Navigate to /my-calendar. Click a saved event
+        in the list or on the map.
       expected: >
         Event modal opens. POST /api/track/event-view with source "my-calendar".
         Response 201.
@@ -228,23 +224,23 @@ test_plan:
     - id: 37
       title: "All four sources are distinct in backend"
       description: >
-        Perform all four actions above (steps 33–36) in one session.
-        Check the Network tab requests side by side.
+        Perform all four actions above (steps 33–36) in one session. Check the
+        Network tab requests side by side.
       expected: >
-        Four separate /api/track/event-view POSTs, each with a different
-        source value: "explorer-list", "explorer-map", "calendar-map",
-        "my-calendar". All return 201.
+        Four separate /api/track/event-view POSTs, each with a different source
+        value: "explorer-list", "explorer-map", "calendar-map", "my-calendar".
+        All return 201.
       verification: "Four distinct source values in tracking requests"
 
     # ── Group 3: Analytics Tracking — Consent Denied ───────────
     - id: 15
       title: "Reject all, click event — no tracking"
       description: >
-        Clear cookies, reload. Click "Refuser tout". Click "Friday Salsa
-        Night" on the calendar. Check Network tab for /api/track requests.
+        Clear cookies, reload. Click "Refuser tout". Click "Friday Salsa Night"
+        on the calendar. Check Network tab for /api/track requests.
       expected: >
-        NO /api/track/event-view request is sent. The event modal still
-        opens normally. All UI functionality works.
+        NO /api/track/event-view request is sent. The event modal still opens
+        normally. All UI functionality works.
       verification: "No tracking requests in Network tab"
 
     - id: 16
@@ -260,8 +256,8 @@ test_plan:
       description: >
         Save 2 events, open FAB, export .ics.
       expected: >
-        File downloads successfully (export is functional, not blocked).
-        NO /api/track/export request is sent.
+        File downloads successfully (export is functional, not blocked). NO
+        /api/track/export request is sent.
       verification: "ICS downloads, no export tracking in Network"
 
     - id: 18
@@ -269,31 +265,31 @@ test_plan:
       description: >
         Click save heart on "Bachata Sensual Workshop".
       expected: >
-        Heart turns red. Event saved in localStorage (check Application →
-        Local Storage → movida_saved_events). NO /api/track/event-save
-        request sent (server-side save tracking requires analytics consent).
+        Heart turns red. Event saved in localStorage (check Application → Local
+        Storage → movida_saved_events). NO /api/track/event-save request sent
+        (server-side save tracking requires analytics consent).
       verification: "localStorage updated, no server tracking"
 
     # ── Group 4: Personalization Tracking ──────────────────────
     - id: 19
       title: "Analytics only — no device_id sent"
       description: >
-        Clear cookies, reload. Click "Personnaliser". Enable ONLY
-        "Cookies d'analyse" (analytics). Keep personalization OFF.
-        Click "Enregistrer". Click an event on the calendar.
+        Clear cookies, reload. Click "Personnaliser". Enable ONLY "Cookies
+        d'analyse" (analytics). Keep personalization OFF. Click "Enregistrer".
+        Click an event on the calendar.
       expected: >
-        POST /api/track/event-view is sent. Body has event_id and
-        source, but device_id is absent or null.
+        POST /api/track/event-view is sent. Body has event_id and source, but
+        device_id is absent or null.
       verification: "event-view POST has no device_id field"
 
     - id: 20
       title: "Analytics + personalization — device_id present"
       description: >
-        Open cookie preferences (status bar button). Enable both analytics
-        AND personalization. Save. Click another event.
+        Open cookie preferences (status bar button). Enable both analytics AND
+        personalization. Save. Click another event.
       expected: >
-        POST /api/track/event-view includes a device_id (UUID format).
-        Check localStorage: "movida_device_id" key exists with the same UUID.
+        POST /api/track/event-view includes a device_id (UUID format). Check
+        localStorage: "movida_device_id" key exists with the same UUID.
       verification: "device_id in POST matches movida_device_id in localStorage"
 
     - id: 21
@@ -308,21 +304,22 @@ test_plan:
     - id: 22
       title: "Revoke personalization — device_id stops being sent"
       description: >
-        Open cookie preferences. Turn OFF personalization (keep analytics
-        ON). Save. Click another event.
+        Open cookie preferences. Turn OFF personalization (keep analytics ON).
+        Save. Click another event.
       expected: >
-        POST /api/track/event-view is still sent (analytics ON) but
-        device_id is absent. The movida_device_id key may still exist
-        in localStorage but is not included in the request.
+        POST /api/track/event-view is still sent (analytics ON) but device_id is
+        absent. The movida_device_id key may still exist in localStorage but is
+        not included in the request.
       verification: "event-view POST has no device_id after revocation"
 
     # ── Group 5: Admin Analytics Views ─────────────────────────
     - id: 23
       title: "Admin sees most-saved events"
       description: >
-        Prerequisites: with full consent, save evt-gdpr-001, evt-gdpr-002,
-        and evt-gdpr-003. Then log in as admin (dev login). Check the admin
-        panel for the "❤️ Most Saved Events" section.
+        Prerequisites: with full consent, save evt-gdpr-001, evt-gdpr-002, and
+        evt-gdpr-003. Then log in as admin via /login ("Sign in as Admin" if
+        seeded, otherwise type ADMIN_EMAIL into the dev email input). Check the
+        admin panel for the "❤️ Most Saved Events" section.
       expected: >
         Section shows 3 events with their titles and save counts (1 each).
       verification: "Most Saved section lists the 3 saved events"
@@ -330,12 +327,12 @@ test_plan:
     - id: 24
       title: "Enable show popularity — view counts visible"
       description: >
-        In admin, toggle the "Show popularity" feature flag ON. Go back
-        to the public home page. Open the modal for an event you previously
-        clicked multiple times.
+        In admin, toggle the "Show popularity" feature flag ON. Go back to the
+        public home page. Open the modal for an event you previously clicked
+        multiple times.
       expected: >
-        Event modal shows a "👁 N views" or "🔥 N views" badge with the
-        correct count. Events with no views show no badge.
+        Event modal shows a "👁 N views" or "🔥 N views" badge with the correct
+        count. Events with no views show no badge.
       verification: "View count badges visible on clicked events"
 
     - id: 25
@@ -352,25 +349,23 @@ test_plan:
     - id: 26
       title: "Delete user data via API"
       description: >
-        With personalization accepted, perform several actions to generate
-        data. Note the device_id from localStorage (movida_device_id).
-        Then call: DELETE /api/user-data/{device_id} (use curl or browser
-        console fetch).
+        With personalization accepted, perform several actions to generate data.
+        Note the device_id from localStorage (movida_device_id). Then call:
+        DELETE /api/user-data/{device_id} (use curl or browser console fetch).
       expected: >
-        Response 200 with body like:
-        {"deleted": {"event_views": 3, "event_saves": 2,
-        "event_link_clicks": 1, "event_exports": 1}}.
-        Counts reflect the actual tracked data for that device.
+        Response 200 with body like: {"deleted": {"event_views": 3,
+        "event_saves": 2, "event_link_clicks": 1, "event_exports": 1}}. Counts
+        reflect the actual tracked data for that device.
       verification: "200 response with accurate deletion counts"
 
     - id: 27
       title: "Verify deletion completeness"
       description: >
-        After deletion, login as admin. Check most-saved events and
-        enable show_popularity.
+        After deletion, login as admin. Check most-saved events and enable
+        show_popularity.
       expected: >
-        Admin data reflects reduced counts. The deleted device's
-        contributions are gone. Other devices' data (if any) remains.
+        Admin data reflects reduced counts. The deleted device's contributions
+        are gone. Other devices' data (if any) remains.
       verification: "Admin counts reduced by deleted device's data"
 
     - id: 28
@@ -379,15 +374,14 @@ test_plan:
         Call DELETE /api/user-data/nonexistent-device-id-12345
       expected: >
         Response 200 with {"deleted": {"event_views": 0, "event_saves": 0,
-        "event_link_clicks": 0, "event_exports": 0}}.
-        No 404 or 500 error.
+        "event_link_clicks": 0, "event_exports": 0}}. No 404 or 500 error.
       verification: "200 with all zeros, graceful handling"
 
     - id: 29
       title: "Privacy page preferences button works"
       description: >
-        Navigate to /privacy. Click "Modifier mes préférences de cookies"
-        (or English equivalent).
+        Navigate to /privacy. Click "Modifier mes préférences de cookies" (or
+        English equivalent).
       expected: >
         Cookie preferences modal opens. User can change consent settings.
       verification: "Preferences modal opens from privacy page"
@@ -396,12 +390,12 @@ test_plan:
     - id: 30
       title: "Change consent mid-session"
       description: >
-        Accept all cookies. Click 3 different events (tracked). Then open
-        cookie preferences and revoke analytics. Click 2 more events.
+        Accept all cookies. Click 3 different events (tracked). Then open cookie
+        preferences and revoke analytics. Click 2 more events.
       expected: >
-        First 3 events generate /api/track/event-view requests. After
-        revoking analytics, the next 2 clicks produce NO tracking requests.
-        Total views for this session: 3.
+        First 3 events generate /api/track/event-view requests. After revoking
+        analytics, the next 2 clicks produce NO tracking requests. Total views
+        for this session: 3.
       verification: "3 tracking requests before revocation, 0 after"
 
     - id: 31
@@ -409,20 +403,20 @@ test_plan:
       description: >
         Accept all cookies. Reload the page (F5 or Cmd+R).
       expected: >
-        Consent banner does NOT reappear. Clicking an event triggers
-        tracking (analytics consent still active). cc_cookie persists.
+        Consent banner does NOT reappear. Clicking an event triggers tracking
+        (analytics consent still active). cc_cookie persists.
       verification: "No banner on reload, tracking still works"
 
     - id: 32
       title: "Rate limiting on tracking endpoints"
       description: >
-        Accept all cookies. Rapidly click 31+ different events within
-        1 minute (or use browser console to fire 31 fetch calls to
-        /api/track/event-view in quick succession).
+        Accept all cookies. Rapidly click 31+ different events within 1 minute
+        (or use browser console to fire 31 fetch calls to /api/track/event-view
+        in quick succession).
       expected: >
-        First 30 requests return 201. The 31st request returns 429
-        (Too Many Requests). App handles the 429 gracefully (no error
-        shown to user, fire-and-forget pattern swallows the error).
+        First 30 requests return 201. The 31st request returns 429 (Too Many
+        Requests). App handles the 429 gracefully (no error shown to user,
+        fire-and-forget pattern swallows the error).
       verification: "429 on 31st request, no user-visible error"
 
     # ── Group 8: Umami Page & Event Analytics ──────────────────
@@ -433,12 +427,12 @@ test_plan:
     - id: 38
       title: "Umami script not loaded before consent"
       description: >
-        Clear cookies, reload. Before accepting any cookies, open
-        DevTools → Network tab. Filter for "script.js" or "umami".
+        Clear cookies, reload. Before accepting any cookies, open DevTools →
+        Network tab. Filter for "script.js" or "umami".
       expected: >
-        No request to http://localhost:3100/script.js. Umami is NOT loaded
-        until analytics consent is granted. The window.umami object does
-        not exist (check: typeof window.umami === "undefined" in console).
+        No request to http://localhost:3100/script.js. Umami is NOT loaded until
+        analytics consent is granted. The window.umami object does not exist
+        (check: typeof window.umami === "undefined" in console).
       verification: "No Umami script loaded, window.umami undefined"
 
     - id: 39
@@ -447,17 +441,17 @@ test_plan:
         With no prior consent, accept all cookies (or analytics only via
         Customize). Check DevTools → Network tab.
       expected: >
-        A GET request to http://localhost:3100/script.js fires immediately
-        after consent. window.umami is defined in browser console shortly
-        after. The Umami dashboard shows a new active session.
+        A GET request to http://localhost:3100/script.js fires immediately after
+        consent. window.umami is defined in browser console shortly after. The
+        Umami dashboard shows a new active session.
       verification: "script.js loaded, window.umami defined, session in dashboard"
 
     - id: 40
       title: "Page views tracked in Umami on navigation"
       description: >
         With analytics consent and Umami loaded: navigate between /, /calendar,
-        /my-calendar, and /event/evt-gdpr-001. Check DevTools Network tab
-        for POST requests to http://localhost:3100/api/send.
+        /my-calendar, and /event/evt-gdpr-001. Check DevTools Network tab for
+        POST requests to http://localhost:3100/api/send.
       expected: >
         Each route change fires a POST to /api/send with a page view payload.
         After navigating 4 pages, the Umami dashboard → Pages section shows
@@ -467,12 +461,12 @@ test_plan:
     - id: 41
       title: "Umami receives custom event-view event"
       description: >
-        With analytics consent and Umami loaded: click an event on the
-        calendar grid. Check Network tab for POST to /api/send.
+        With analytics consent and Umami loaded: click an event on the calendar
+        grid. Check Network tab for POST to /api/send.
       expected: >
-        Two tracking requests fire simultaneously:
-        1. POST /api/track/event-view → backend (201)
-        2. POST http://localhost:3100/api/send → Umami with event name
+        Two tracking requests fire simultaneously: 1. POST /api/track/event-view
+        → backend (201) 2. POST http://localhost:3100/api/send → Umami with
+        event name
            "event-view" and property source="calendar"
         Umami dashboard → Events shows the "event-view" entry.
       verification: "Both backend and Umami receive event-view, source prop visible"
@@ -483,8 +477,8 @@ test_plan:
         Save an event (save heart). Export .ics from the FAB. Check Network.
       expected: >
         POST to Umami /api/send with event name "event-save", action="save".
-        POST to Umami /api/send with event name "export", format="ics".
-        Both visible in Umami dashboard → Events tab.
+        POST to Umami /api/send with event name "export", format="ics". Both
+        visible in Umami dashboard → Events tab.
       verification: "event-save and export events in Umami dashboard"
 
     - id: 43
@@ -493,8 +487,8 @@ test_plan:
         Clear cookies, reload. Click "Refuser tout". Navigate between pages.
         Click an event. Check Network for any request to localhost:3100.
       expected: >
-        Zero requests to http://localhost:3100. Umami script was never
-        loaded. window.umami is still undefined.
+        Zero requests to http://localhost:3100. Umami script was never loaded.
+        window.umami is still undefined.
       verification: "Zero Umami network requests with analytics denied"
 
     - id: 44
@@ -503,65 +497,62 @@ test_plan:
         This tests the fallback mode (VITE_UMAMI_WEBSITE_ID not set or empty).
         In dev mode (non-scenario), set VITE_UMAMI_WEBSITE_ID= (empty) in
         secrets.dev.env and restart the dev server. In scenario mode, the
-        WEBSITE_ID is auto-set and this step only applies to the dev environment.
-        Accept all cookies.
+        WEBSITE_ID is auto-set and this step only applies to the dev
+        environment. Accept all cookies.
       expected: >
-        No request to localhost:3100/script.js is made. In DevTools console,
-        a debug message "[umami] VITE_UMAMI_WEBSITE_ID or VITE_UMAMI_URL not
-        set — tracking calls will be logged only" appears. When clicking an
-        event, "[umami] track event-view {...}" appears in console. No errors.
+        No request to localhost:3100/script.js is made. In DevTools console, a
+        debug message "[umami] VITE_UMAMI_WEBSITE_ID or VITE_UMAMI_URL not set —
+        tracking calls will be logged only" appears. When clicking an event,
+        "[umami] track event-view {...}" appears in console. No errors.
       verification: "Console debug logs only, no network requests, no JS errors"
 
     - id: 45
       title: "Umami dashboard shows populated data"
       description: >
         Prerequisites: complete steps 38–42 (Umami loaded, several page views
-        and custom events sent). Open http://localhost:3100 in a new tab.
-        Log in (admin / umami). Navigate to the website created during setup.
+        and custom events sent). Open http://localhost:3100 in a new tab. Log in
+        (admin / umami). Navigate to the website created during setup.
       expected: >
-        The Umami dashboard shows:
-        - "Pageviews" time-series chart with a non-zero value for today.
-        - "Pages" table listing at least: /, /calendar, /my-calendar,
+        The Umami dashboard shows: - "Pageviews" time-series chart with a
+        non-zero value for today. - "Pages" table listing at least: /,
+        /calendar, /my-calendar,
           and /event/evt-gdpr-001 (or whichever event pages were visited).
         - "Events" tab listing: event-view, event-save, export custom events
           with counts matching the actions performed in steps 41–42.
-        - "Referrers" section visible (may be empty if navigated directly).
-        - "Devices" and "Browsers" sections populated with at least one entry.
+        - "Referrers" section visible (may be empty if navigated directly). -
+        "Devices" and "Browsers" sections populated with at least one entry.
       verification: "Dashboard shows pageviews, pages, events, devices — all non-empty"
 
     - id: 46
       title: "UTM / referrer captured by Umami"
       description: >
         Clear cookies. Open a new tab and navigate to:
-        http://localhost:10209/?utm_source=instagram&utm_campaign=test
-        Accept all cookies. Navigate to at least one other page (/calendar).
+        http://localhost:10209/?utm_source=instagram&utm_campaign=test Accept
+        all cookies. Navigate to at least one other page (/calendar).
       expected: >
         In Umami dashboard → Referrers (or Sources): an entry for "instagram"
-        appears (Umami reads utm_source automatically). The pageview count
-        for the session is recorded.
-        Note: this requires no code changes — Umami auto-captures UTM params
-        from the URL on each page view POST.
+        appears (Umami reads utm_source automatically). The pageview count for
+        the session is recorded. Note: this requires no code changes — Umami
+        auto-captures UTM params from the URL on each page view POST.
       verification: "Umami Sources/Referrers shows 'instagram' from utm_source"
 
     - id: 47
       title: "Funnel: event-view → event-save → export in Umami"
       description: >
-        With analytics and personalization consent granted and Umami loaded:
-        1. Click "Friday Salsa Night" on the calendar grid (event-view).
-        2. Click the save heart on "Salsa Congress 2026" (event-save).
-        3. Open the FAB and export .ics (export).
-        Check Network tab for the three Umami /api/send requests. Then open
-        the Umami dashboard → Events tab.
+        With analytics and personalization consent granted and Umami loaded: 1.
+        Click "Friday Salsa Night" on the calendar grid (event-view). 2. Click
+        the save heart on "Salsa Congress 2026" (event-save). 3. Open the FAB
+        and export .ics (export). Check Network tab for the three Umami
+        /api/send requests. Then open the Umami dashboard → Events tab.
       expected: >
-        Three sequential POSTs to http://localhost:3100/api/send:
-        1. event name "event-view", props: {source: "calendar"}
-        2. event name "event-save", props: {action: "save"}
-        3. event name "export", props: {format: "ics", event_count: <n>}
-        All three appear in the Umami Events tab with timestamps in order.
-        The backend also received all three corresponding /api/track/* calls
-        (verify in the terminal running the scenario — API logs show 201s).
-        This confirms the full view → save → export analytics funnel works
-        end-to-end in both the self-hosted backend and Umami.
+        Three sequential POSTs to http://localhost:3100/api/send: 1. event name
+        "event-view", props: {source: "calendar"} 2. event name "event-save",
+        props: {action: "save"} 3. event name "export", props: {format: "ics",
+        event_count: <n>} All three appear in the Umami Events tab with
+        timestamps in order. The backend also received all three corresponding
+        /api/track/* calls (verify in the terminal running the scenario — API
+        logs show 201s). This confirms the full view → save → export analytics
+        funnel works end-to-end in both the self-hosted backend and Umami.
       verification: "All 3 funnel events in Umami Events tab, all 3 backend 201s"
 
     # ── Group 9: Analytics KPI Panels ──────────────────────────
@@ -572,14 +563,14 @@ test_plan:
     - id: 48
       title: "Admin sees unique_viewers on most-viewed events"
       description: >
-        The scenario seeds EventView rows with multiple device_ids across
-        events (db-tracking.yaml). Log in as admin and scroll to the
-        "👁 Most Viewed Events" section.
+        The scenario seeds EventView rows with multiple device_ids across events
+        (db-tracking.yaml). Log in as admin and scroll to the "👁 Most Viewed
+        Events" section.
       expected: >
-        Each event row shows two numbers: "N views" (total view count) and
-        "N unique" (distinct device_ids). evt-gdpr-001 should have the
-        highest view count (seeded from multiple countries/devices). A
-        relative bar scales to the most-viewed event.
+        Each event row shows two numbers: "N views" (total view count) and "N
+        unique" (distinct device_ids). evt-gdpr-001 should have the highest view
+        count (seeded from multiple countries/devices). A relative bar scales to
+        the most-viewed event.
       verification: "Both view_count and unique_viewers shown per event"
 
     - id: 49
@@ -587,57 +578,56 @@ test_plan:
       description: >
         The scenario seeds EventView rows across all source channels
         (db-tracking.yaml uses calendar, explorer-list, explorer-map,
-        calendar-map, and direct). Log in as admin and look for the
-        "📊 Views by Source" panel.
+        calendar-map, and direct). Log in as admin and look for the "📊 Views by
+        Source" panel.
       expected: >
-        Panel lists all 5 source channels with view counts and proportional
-        CSS bars. The dominant source (explorer-list from seeded data) has
-        a near-full bar. Additional views you generate at runtime will add
-        to the relevant source bucket.
+        Panel lists all 5 source channels with view counts and proportional CSS
+        bars. The dominant source (explorer-list from seeded data) has a
+        near-full bar. Additional views you generate at runtime will add to the
+        relevant source bucket.
       verification: "Source breakdown panel shows all channels, bars proportional"
 
     - id: 50
       title: "Top countries panel shows seeded geo data"
       description: >
         The scenario seeds EventView rows with country data in db-tracking.yaml
-        (France 8 views, Germany 5, Spain 4, Netherlands 3, Belgium 2,
-        United Kingdom 2). Log in as admin immediately after scenario start
-        and look for the "🌍 Top Countries" panel.
-        Note: views you generate at runtime from localhost will NOT add to
-        country counts (127.0.0.1 is a private IP — geo resolution is skipped
-        by design). The seeded rows provide the visible data.
+        (France 8 views, Germany 5, Spain 4, Netherlands 3, Belgium 2, United
+        Kingdom 2). Log in as admin immediately after scenario start and look
+        for the "🌍 Top Countries" panel. Note: views you generate at runtime
+        from localhost will NOT add to country counts (127.0.0.1 is a private IP
+        — geo resolution is skipped by design). The seeded rows provide the
+        visible data.
       expected: >
-        Panel shows at least 6 countries sorted by view count:
-        France (8), Germany (5), Spain (4), Netherlands (3), Belgium (2),
-        United Kingdom (2). Each has a proportional CSS bar. France bar
-        is 100% width; others scale relative to it.
+        Panel shows at least 6 countries sorted by view count: France (8),
+        Germany (5), Spain (4), Netherlands (3), Belgium (2), United Kingdom
+        (2). Each has a proportional CSS bar. France bar is 100% width; others
+        scale relative to it.
       verification: "Top Countries panel lists 6 countries with correct counts and bars"
 
     - id: 51
       title: "Top clicked links panel shows seeded link data"
       description: >
-        The scenario seeds 10 EventLinkClick rows (db-tracking.yaml). Log in
-        as admin and look for the "🔗 Top Clicked Links" panel.
+        The scenario seeds 10 EventLinkClick rows (db-tracking.yaml). Log in as
+        admin and look for the "🔗 Top Clicked Links" panel.
       expected: >
-        Panel shows at least:
-        - evt-gdpr-001 / https://example.com/salsa-night-tickets (4 clicks)
-        - evt-gdpr-004 / https://example.com/congress-tickets (2 clicks)
-        - evt-gdpr-002 / https://example.com/bachata-register (2 clicks)
-        Links are sorted by click count. Each row shows event title, the
-        URL as a clickable link, and the click count.
+        Panel shows at least: - evt-gdpr-001 /
+        https://example.com/salsa-night-tickets (4 clicks) - evt-gdpr-004 /
+        https://example.com/congress-tickets (2 clicks) - evt-gdpr-002 /
+        https://example.com/bachata-register (2 clicks) Links are sorted by
+        click count. Each row shows event title, the URL as a clickable link,
+        and the click count.
       verification: "Top links panel lists clicked URLs with event titles and counts"
 
     - id: 52
       title: "Export stats panel shows seeded export data"
       description: >
-        The scenario seeds 5 EventExport rows — 3 ICS exports (10 total
-        events) and 2 XLSX exports (10 total events) — in db-tracking.yaml.
-        Log in as admin and look for the "📥 Exports" panel.
+        The scenario seeds 5 EventExport rows — 3 ICS exports (10 total events)
+        and 2 XLSX exports (10 total events) — in db-tracking.yaml. Log in as
+        admin and look for the "📥 Exports" panel.
       expected: >
-        Panel shows two cards:
-        - ICS: export_count=3, total_events_exported=10
-        - XLSX: export_count=2, total_events_exported=10
-        (Additional exports you generate at runtime will increment these.)
+        Panel shows two cards: - ICS: export_count=3, total_events_exported=10 -
+        XLSX: export_count=2, total_events_exported=10 (Additional exports you
+        generate at runtime will increment these.)
       verification: "Export stats panel shows ics and xlsx with seeded counts"
 
     - id: 53
@@ -647,8 +637,8 @@ test_plan:
         location, latitude, or longitude. Click it to generate a view event.
         Then log in as admin.
       expected: >
-        Admin panels load without error. The event appears in most-viewed
-        events (no title shown if not in cached_events, or correct title if
-        synced). The top-countries panel handles null geo gracefully —
-        null country rows are excluded from the aggregate. No 500 errors.
+        Admin panels load without error. The event appears in most-viewed events
+        (no title shown if not in cached_events, or correct title if synced).
+        The top-countries panel handles null geo gracefully — null country rows
+        are excluded from the aggregate. No 500 errors.
       verification: "No errors, null geo excluded from country breakdown"

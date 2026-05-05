@@ -8,3 +8,14 @@ export function getDeviceId(): string {
     }
     return id;
 }
+
+/**
+ * Replace the current device id with a fresh UUID. Called on logout so
+ * the next anonymous activity on this device cannot be claimed by whoever
+ * signs in next (e.g. a different user on the same browser).
+ */
+export function rotateDeviceId(): string {
+    const id = crypto.randomUUID();
+    localStorage.setItem(STORAGE_KEY, id);
+    return id;
+}

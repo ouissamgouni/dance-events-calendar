@@ -1,5 +1,6 @@
 import logging
 import os
+import socket
 import time
 from datetime import datetime
 from typing import Optional
@@ -12,6 +13,9 @@ from backend.services.calendar.base import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Default per-request socket timeout (seconds). Overridable via env.
+_HTTP_TIMEOUT = float(os.getenv("GOOGLE_CALENDAR_HTTP_TIMEOUT", "60"))
 
 
 class GoogleCalendarService(BaseCalendarService):
@@ -26,7 +30,9 @@ class GoogleCalendarService(BaseCalendarService):
 
         import json
 
+        import httplib2
         from google.oauth2 import service_account
+        from google_auth_httplib2 import AuthorizedHttp
         from googleapiclient.discovery import build
 
         json_str = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
@@ -43,7 +49,13 @@ class GoogleCalendarService(BaseCalendarService):
                 creds_file,
                 scopes=["https://www.googleapis.com/auth/calendar"],
             )
-        self._service = build("calendar", "v3", credentials=credentials)
+        # Use an httplib2 client with an explicit socket timeout so that a
+        # stalled Google API request fails fast and is retried instead of
+        # blocking the worker thread for the OS-default (often unbounded).
+        authed_http = AuthorizedHttp(
+            credentials, http=httplib2.Http(timeout=_HTTP_TIMEOUT)
+        )
+        self._service = build("calendar", "v3", http=authed_http, cache_discovery=False)
         return self._service
 
     def list_calendars(self) -> list[CalendarInfo]:
@@ -93,10 +105,15 @@ class GoogleCalendarService(BaseCalendarService):
             # timeMax, timeZone, updatedMin. Only set syncToken here.
             kwargs["syncToken"] = sync_token
         else:
-            # Full fetch: order by start time and optionally filter by time_min.
-            kwargs["orderBy"] = "startTime"
-            if time_min:
-                kwargs["timeMin"] = time_min.isoformat() + "Z"
+            # Full fetch.
+            # NOTE: We deliberately do NOT pass `timeMin` *or* `orderBy` here.
+            # Per the Google Calendar API docs, `nextSyncToken` is ONLY
+            # returned when the result set is unfiltered — i.e. NOT pruned by
+            # `timeMin`, `timeMax`, `q`, `updatedMin`, *or* sorted by
+            # `orderBy`. Specifying any of these silently disables incremental
+            # sync (no token returned), so every subsequent run becomes
+            # another full fetch. We sort/filter client-side below instead.
+            pass
 
         retries = 0
         while True:
@@ -105,6 +122,24 @@ class GoogleCalendarService(BaseCalendarService):
 
             try:
                 result = service.events().list(**kwargs).execute()
+            except socket.timeout:
+                # Read timeout — retry with exponential backoff before giving up
+                if retries < 3:
+                    wait = 2**retries
+                    logger.warning(
+                        "Google Calendar request timed out for %s, retrying in %ds",
+                        calendar_id,
+                        wait,
+                    )
+                    time.sleep(wait)
+                    retries += 1
+                    continue
+                logger.error(
+                    "Google Calendar request timed out for %s after %d retries",
+                    calendar_id,
+                    retries,
+                )
+                raise
             except Exception as e:
                 error_str = str(e)
                 # 410 Gone — sync token expired, need full re-sync
@@ -120,6 +155,20 @@ class GoogleCalendarService(BaseCalendarService):
                 if "429" in error_str and retries < 5:
                     wait = 2**retries
                     logger.warning("Rate limited, backing off %ds", wait)
+                    time.sleep(wait)
+                    retries += 1
+                    continue
+                # Generic transient I/O errors — retry a couple of times
+                if (
+                    "timed out" in error_str.lower()
+                    or "connection reset" in error_str.lower()
+                ) and retries < 3:
+                    wait = 2**retries
+                    logger.warning(
+                        "Transient error from Google Calendar (%s), retrying in %ds",
+                        error_str,
+                        wait,
+                    )
                     time.sleep(wait)
                     retries += 1
                     continue
@@ -145,6 +194,22 @@ class GoogleCalendarService(BaseCalendarService):
                         end_data["dateTime"].replace("Z", "+00:00")
                     )
 
+                # Client-side time_min filter on full fetches (we cannot push
+                # this to the server without losing nextSyncToken — see note
+                # above). On incremental fetches Google returns only changes,
+                # so this filter would incorrectly hide updates to older
+                # events; only apply it when there is no sync token.
+                if time_min is not None and sync_token is None:
+                    # Compare in UTC; treat naive datetimes as UTC.
+                    cutoff = time_min if time_min.tzinfo else time_min
+                    end_cmp = end if (all_day or end.tzinfo is None) else end
+                    if cutoff.tzinfo is None and end_cmp.tzinfo is not None:
+                        end_cmp = end_cmp.replace(tzinfo=None)
+                    elif cutoff.tzinfo is not None and end_cmp.tzinfo is None:
+                        cutoff = cutoff.replace(tzinfo=None)
+                    if end_cmp < cutoff:
+                        continue
+
                 events.append(
                     CalendarEvent(
                         event_id=item["id"],
@@ -162,6 +227,15 @@ class GoogleCalendarService(BaseCalendarService):
             next_sync_token = result.get("nextSyncToken")
             if not page_token:
                 break
+
+        logger.info(
+            "Google fetch %s: events=%d deleted=%d next_sync_token=%s (incremental=%s)",
+            calendar_id,
+            len(events),
+            len(deleted_ids),
+            (next_sync_token[:8] + "…") if next_sync_token else "None",
+            bool(sync_token),
+        )
 
         return SyncResult(
             events=events,

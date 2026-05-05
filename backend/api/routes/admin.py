@@ -156,7 +156,8 @@ def _run_sync_job_worker(
         job_service.update_totals(
             job_id,
             calendars_synced=sum(
-                1 for p in progress_map.values()
+                1
+                for p in progress_map.values()
                 if p.status in ("completed", "warning", "failed", "processing")
             ),
             events_fetched=sum(p.fetched for p in progress_map.values()),
@@ -273,7 +274,14 @@ def _run_sync_job_worker(
     total_deduped = sum(p.deduped for p in progress_map.values())
     total_enriched_ok = sum(p.enriched_ok for p in progress_map.values())
     total_enriched_failed = sum(p.enriched_failed for p in progress_map.values())
+    # Real errors: enrichment exceptions + persistence failures (counted in
+    # error_count via inc_enriched_failed).
     total_errors = sum(p.error_count for p in progress_map.values())
+    # Warnings: e.g. geocoding misses — non-fatal, event still saved.
+    total_warnings = sum(
+        sum(1 for f in p.failures if f.type == "ungeolocated")
+        for p in progress_map.values()
+    )
     calendars_failed = sum(1 for p in progress_map.values() if p.status == "failed")
 
     job_service.update_totals(
@@ -289,12 +297,17 @@ def _run_sync_job_worker(
     if abort_event.is_set():
         return {"status": SyncJobStatus.ABORTED}
 
-    if calendars_failed > 0 or total_errors > 0:
+    if calendars_failed > 0 or total_errors > 0 or total_warnings > 0:
+        parts: list[str] = []
+        if calendars_failed > 0:
+            parts.append(f"{calendars_failed} calendar(s) failed")
+        if total_errors > 0:
+            parts.append(f"{total_errors} error(s)")
+        if total_warnings > 0:
+            parts.append(f"{total_warnings} warning(s)")
         return {
             "status": SyncJobStatus.WARNING,
-            "warning_message": (
-                f"{calendars_failed} calendar(s) failed, {total_errors} event error(s)"
-            ),
+            "warning_message": ", ".join(parts),
             "calendar_statuses": {cid: p.to_dict() for cid, p in progress_map.items()},
         }
 
@@ -877,6 +890,12 @@ def update_event(
 
     # Handle tag_ids separately
     tag_ids = update_data.pop("tag_ids", None)
+
+    # Validate calendar_id (if changing) refers to an existing calendar
+    if "calendar_id" in update_data and update_data["calendar_id"] != event.calendar_id:
+        target_cal = session.get(CalendarSetting, update_data["calendar_id"])
+        if not target_cal:
+            raise HTTPException(status_code=400, detail="Unknown calendar_id")
 
     location_changed = (
         "location" in update_data and update_data["location"] != event.location

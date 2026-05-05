@@ -19,4 +19,4 @@ ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --log-level ${LOG_LEVEL:-info}"]
+CMD ["sh", "-c", "uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --log-level $(echo ${LOG_LEVEL:-info} | tr '[:upper:]' '[:lower:]')"]

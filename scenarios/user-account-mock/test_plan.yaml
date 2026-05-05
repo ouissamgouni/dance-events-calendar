@@ -1,0 +1,192 @@
+test_plan:
+  name: "User Account (mock auth) — Sign in with Google, mocked"
+  description: >
+    End-to-end verification of the user-account feature using DEV_AUTH so no
+    real Google credentials are required. Covers: anonymous → signed-in
+    auto-merge of saved/attending events, cross-device sync, share-link follows
+    user, account deletion (GDPR), and per-IP rate-limit on /api/auth/google.
+    For real Google OAuth, run the `user-account-google` scenario instead.
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=user-account-mock"
+    - >
+      In every browser session you use, accept the cookie banner with the
+      "Personalization" category enabled. Without personalization consent the
+      frontend skips POST /api/track/event-save and /event-attendance, so the
+      anonymous→user merge has nothing to merge.
+    - "Use a fresh browser profile or incognito window per device-side test."
+
+  steps:
+    # ── Anonymous baseline ───────────────────────────────────────
+    - id: 1
+      title: "Anonymous: save 2 events and mark 1 as going"
+      description: >
+        Open the home page in a fresh profile (Browser A). Accept cookies with
+        Personalization enabled. From the event list, click the bookmark on
+        evt-acct-001 and evt-acct-002, and click the raised-hand on
+        evt-acct-003.
+      expected: >
+        Bookmark icons fill on evt-acct-001 / evt-acct-002 and the raised hand
+        turns green on evt-acct-003 (which also auto-saves it). Network panel
+        shows POST /api/track/event-save and /api/track/event-attendance
+        succeeded.
+
+    - id: 2
+      title: "Account/Sign-in entry visible in nav for anonymous user"
+      description: >
+        Look at the top-right nav.
+      expected: >
+        A "Sign in" link is visible. Clicking it goes to /login. In dev mode
+        (DEV_AUTH=true) the page shows one button per pre-seeded user from
+        mock-users.yaml ("Sign in as Dev User", "Sign in as Dev Admin") plus a
+        free-form email input. In real mode it shows the Google Sign-In button.
+
+    # ── Sign in with mock auth ───────────────────────
+    - id: 3
+      title: "Sign in as a regular (non-admin) user"
+      description: >
+        On /login click "Sign in as Dev User" (or type any non-admin email into
+        the form input). After sign-in you should land on /account.
+      expected: >
+        The Account page shows the email "dev-user@example.com", the display
+        name "Dev User", and an avatar placeholder. The "Administrator" badge is
+        NOT shown. The nav now shows "Dev" (first name) instead of "Sign in".
+        You did NOT get redirected to /admin (regression check for the old bug
+        where every mock login was admin).
+
+    - id: 4
+      title: "Anonymous data was merged into the new account"
+      description: >
+        Navigate to /my-calendar.
+      expected: >
+        evt-acct-001, evt-acct-002 and evt-acct-003 are still listed as saved /
+        going (this is also the regression check for the old bug where local
+        saved-events were wiped on first /login mount). The header counter still
+        shows the same totals as before sign-in.
+
+    # ── Cross-device sync ────────────────────────────────────────
+    - id: 5
+      title: "Cross-device: open in a second browser and sign in"
+      description: >
+        Open Browser B (incognito or different profile). Visit /login and click
+        "Sign in as Dev User".
+      expected: >
+        After sign-in, /my-calendar in Browser B shows the same 3 events as
+        Browser A (the device-A bookmarks/attendance now follow the user).
+
+    - id: 6
+      title: "New saves on Browser B propagate when Browser A reloads"
+      description: >
+        On Browser B, save evt-acct-004. Then go back to Browser A and reload
+        /my-calendar.
+      expected: >
+        evt-acct-004 is now visible in Browser A's saved list (the SavedEvents
+        merge effect refetched server IDs on focus / reload).
+
+    # ── Sign-out ─────────────────────────────────────────────────
+    - id: 7
+      title: "Sign out keeps local saved/attending visible (industry standard)"
+      description: >
+        On Browser A, open /account and click "Sign out".
+      expected: >
+        The nav reverts to "Sign in". /my-calendar still shows the same events
+        (bookmarks are not sensitive — they persist locally so the user doesn't
+        lose them). Internally the device_id in localStorage was rotated to a
+        fresh UUID so anonymous activity from now on cannot be claimed by the
+        next user who signs in. Browser B is unaffected.
+
+    - id: 7b
+      title: "Anonymous saves between sessions stay anonymous on the server"
+      description: >
+        Still signed out on Browser A, save a new event evt-acct-005 from the
+        home page. In the database (or via the network tab) the new
+        UserSavedEvent row is created with the NEW device_id and user_id=NULL.
+      expected: >
+        evt-acct-005 appears in the local saved list. The server row has
+        user_id=NULL and a device_id different from the one used while signed
+        in. This is what prevents the "roommate inherits my bookmarks" leak.
+
+    - id: 8
+      title: "Sign back in: anonymous saves merge into the same account"
+      description: >
+        On Browser A, click "Sign in as Dev User" again.
+      expected: >
+        /my-calendar shows all events: the original 4 (already attributed to the
+        user server-side) plus evt-acct-005 (which had user_id=NULL on the new
+        device_id and was merged in by /api/auth/google). All 5 are now owned by
+        your account and will show on Browser B after a reload.
+
+    # ── Share link follows the user ──────────────────────────────
+    - id: 9
+      title: "Share link is account-scoped and shows the owner's first name"
+      description: >
+        On Browser A, on /my-calendar, click "Share my calendar" to generate a
+        share token. Copy the URL. Sign out. On Browser B (still signed in as
+        Alice), click "Share my calendar".
+      expected: >
+        Browser B returns the same share token URL as Browser A (one share token
+        per user). Opening the URL in a logged-out tab shows Alice's saved
+        events under the header "Alice's Calendar" (first name only — never the
+        full name or email). The /api/share/calendar/{token} response includes
+        `owner_display_name: "Alice"`.
+
+    - id: 9b
+      title: "Anonymous share tokens do not leak any name"
+      description: >
+        In a fresh incognito window (no sign-in), save evt-acct-001 from the
+        home page, go to /my-calendar, click "Share my calendar", open the link
+        in another tab.
+      expected: >
+        The header reads "Shared Calendar" (no owner name). The
+        /api/share/calendar/{token} response has `owner_display_name: null`
+        because the share token is device-only (user_id IS NULL).
+
+    # ── Account deletion (GDPR) ──────────────────────────────────
+    - id: 10
+      title: "Delete account removes all personal rows and signs the user out"
+      description: >
+        On Browser B, open /account, click "Delete my account", confirm with
+        "Yes, permanently delete".
+      expected: >
+        Browser B is redirected to "/" and the nav shows "Sign in". In the
+        database (or via /api/auth/me on Browser A), the user is gone: Browser
+        A's /api/auth/me returns 401 on next call, and there are no
+        UserSavedEvent / UserEventAttendance / ShareToken rows linked to that
+        user_id.
+
+    - id: 11
+      title: "Re-signing in as Dev User creates a fresh user"
+      description: >
+        On Browser A, click "Sign in as Dev User" again.
+      expected: >
+        Sign-in succeeds. /my-calendar is empty. A new User row exists with a
+        new UUID; no data from the previous account survives.
+
+    - id: 11b
+      title: "Sign in as the admin uses the admin button (separate identity)"
+      description: >
+        Click "Sign in as Dev Admin" on /login.
+      expected: >
+        You land on /admin (admin redirect). The Account page shows the
+        "Administrator" badge. The Dev User account from step 11 is unaffected.
+
+    # ── Rate limiting ────────────────────────────────────────────
+    - id: 12
+      title: "Rate limit: 11th /api/auth/google call within a minute returns 429"
+      description: >
+        From a single IP (e.g. localhost), POST to /api/auth/google 11 times
+        within one minute (curl in a loop is fine).
+      expected: >
+        The first 10 calls return 200 (or 401 for bad credentials, but never
+        429). The 11th call returns HTTP 429 Too Many Requests.
+
+    # ── Privacy copy ─────────────────────────────────────────────
+    - id: 13
+      title: "Privacy page documents account data"
+      description: >
+        Visit /privacy.
+      expected: >
+        Both the French and English versions contain a section ("Données de
+        compte" / "Account data") listing: Google email, display name, avatar
+        URL, Google sub, saved/attending event ids, share token; plus the legal
+        basis (consent), retention (until deletion), and a link to the Account
+        page for self-service deletion.

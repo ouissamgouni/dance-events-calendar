@@ -1,6 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { trackSave } from '../utils/tracking';
+import { useAuth } from './AuthContext';
+import { fetchMySavedEventIds } from '../api';
 
 const STORAGE_KEY = 'movida_saved_events';
 
@@ -31,10 +33,35 @@ function writeToStorage(ids: Set<string>) {
 
 export function SavedEventsProvider({ children }: { children: ReactNode }) {
     const [savedIds, setSavedIds] = useState<Set<string>>(() => readFromStorage());
+    const { user } = useAuth();
+    const lastSyncedUserId = useRef<string | null | undefined>(undefined);
 
     useEffect(() => {
         writeToStorage(savedIds);
     }, [savedIds]);
+
+    // On sign-in: union server-side saved events into local state. We never
+    // wipe local saves on sign-out: bookmarks are not sensitive data and the
+    // signed-out device just becomes anonymous again. The device_id rotates
+    // on logout (see AuthContext) so a different user signing in next can't
+    // inherit this device's anonymous bookmarks.
+    useEffect(() => {
+        const currentUserKey = user?.user_id ?? user?.email ?? null;
+        const previous = lastSyncedUserId.current;
+        if (previous === currentUserKey) return;
+        lastSyncedUserId.current = currentUserKey;
+        if (!user) return;
+        fetchMySavedEventIds()
+            .then((serverIds) => {
+                if (!serverIds.length) return;
+                setSavedIds((prev) => {
+                    const next = new Set(prev);
+                    for (const id of serverIds) next.add(id);
+                    return next;
+                });
+            })
+            .catch(() => { /* offline / no consent — ignore */ });
+    }, [user]);
 
     const toggleSave = useCallback((eventId: string) => {
         setSavedIds((prev) => {

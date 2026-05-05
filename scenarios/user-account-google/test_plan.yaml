@@ -1,0 +1,127 @@
+test_plan:
+  name: "User Account (real Google OAuth) — Sign in with Google, end-to-end"
+  description: >
+    Smoke test that the user-account feature works against the *real* Google
+    Sign-In flow — i.e. id_token.verify_oauth2_token succeeds against Google's
+    JWKs, the `sub` claim is stable across logins, the avatar URL renders, and
+    the account survives sign-out / re-sign-in.
+
+    Use this in addition to `user-account-mock` (which covers the broader
+    application logic without needing real Google credentials).
+
+  preconditions:
+    - >
+      In secrets.env replace GOOGLE_CLIENT_ID and ADMIN_EMAIL with real values.
+      The OAuth Web client must allow http://localhost:5173 as an authorized
+      JavaScript origin.
+    - "Run with: task start:scenario SCENARIO=user-account-google"
+    - >
+      You will need TWO Google accounts: one matching ADMIN_EMAIL (admin) and
+      one regular Google account (non-admin user). Browser profiles or incognito
+      windows make this easier.
+    - >
+      Cookie consent is not required for save / RSVP / share-link persistence.
+      You may accept analytics if you want to see Umami events fire, but the
+      anonymous→user merge no longer depends on it.
+
+  steps:
+    - id: 1
+      title: "Sign in succeeds with a real Google account"
+      description: >
+        Open http://localhost:5173/login in a fresh browser profile (Profile A)
+        signed into your *non-admin* Google account. Click the Google Sign-In
+        button.
+      expected: >
+        The Google consent prompt appears, you complete it, and you land on
+        /account. The page shows your real Google email, display name, and
+        avatar (loaded from googleusercontent.com). The "Administrator" badge is
+        NOT shown. The nav switches from "Sign in" to your first name.
+
+    - id: 2
+      title: "Repeat sign-in reuses the same user (stable Google sub)"
+      description: >
+        Sign out from /account. Sign back in with the same Google account.
+        Compare /api/auth/me responses (DevTools → Network) before and after.
+      expected: >
+        `user_id` is identical across both logins. No duplicate user row in the
+        database (verify with `task db:psql:scenario
+        SCENARIO=user-account-google` then `SELECT count(*) FROM users WHERE
+        provider_subject = '<sub>';` returns 1).
+
+    - id: 3
+      title: "Sign in as the admin Google account"
+      description: >
+        Open a second browser profile (Profile B) signed in as the Google
+        account that matches ADMIN_EMAIL in secrets.env. Visit /login and sign
+        in with Google.
+      expected: >
+        Sign-in succeeds. /account shows the admin email and an "Administrator"
+        badge. The nav now shows BOTH "Admin" and the first name link.
+
+    - id: 4
+      title: "Avatar URLs render without referrer issues"
+      description: >
+        On both profiles' /account page, inspect the <img src=...> for the
+        avatar.
+      expected: >
+        The image loads (no broken-image icon). The <img> uses
+        referrerPolicy="no-referrer" (so Google's CDN serves the asset). No "403
+        Forbidden" or CORB warnings appear in the DevTools console.
+
+    - id: 5
+      title: "Anonymous → real-Google merge still works"
+      description: >
+        Sign out from Profile A. While anonymous, save evt-acct-g-001 and mark
+        evt-acct-g-002 as going. Confirm POST /api/track/event-save and
+        /event-attendance both return 201. Then sign back in with Google.
+      expected: >
+        After sign-in, /my-calendar shows both events as saved/going. They are
+        now linked to your user_id in the DB (UserSavedEvent.user_id IS NOT NULL
+        for evt-acct-g-001).
+
+    - id: 6
+      title: "Cross-device sync with two real browsers"
+      description: >
+        Open Profile C (a third profile, e.g. another machine or a phone) signed
+        in to the SAME Google account as Profile A. Sign in via /login.
+      expected: >
+        /my-calendar in Profile C shows the same events that Profile A has, even
+        though Profile C never saved them locally.
+
+    - id: 7
+      title: "Delete account removes everything and signs the user out"
+      description: >
+        On Profile A, /account → "Delete my account" → confirm.
+      expected: >
+        Profile A is redirected to / and the nav reverts to "Sign in". Profile
+        C's next request to /api/auth/me returns 401 (cookie still present but
+        user is gone). In the DB the user row is anonymized (email starts with
+        "deleted-", deleted_at is set) and there are no UserSavedEvent /
+        UserEventAttendance / ShareToken rows linked to that user_id.
+
+    - id: 8
+      title: "Re-signing in with the same Google account creates a fresh user"
+      description: >
+        On Profile A, sign in again with the same Google account.
+      expected: >
+        Sign-in succeeds. /my-calendar is empty. A new User row exists with a
+        new UUID (different from the deleted one). The deleted_at column on the
+        old row is still set; nothing was un-deleted.
+
+    - id: 9
+      title: "Invalid Google credential is rejected"
+      description: >
+        From a terminal: `curl -i -X POST http://localhost:8001/api/auth/google
+        -H 'Content-Type: application/json' -d
+        '{"credential":"not-a-real-id-token"}'`
+      expected: >
+        HTTP 401 with body `{"detail":"Invalid Google token"}`. No user row is
+        created.
+
+    - id: 10
+      title: "Rate-limit smoke (real-OAuth path counts the same)"
+      description: >
+        From the same IP, repeat the curl above 11 times in under a minute.
+      expected: >
+        The first 10 calls return 401 (invalid token). The 11th returns 429. The
+        limiter applies regardless of whether the credential was valid.

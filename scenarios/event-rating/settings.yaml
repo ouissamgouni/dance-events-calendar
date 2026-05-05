@@ -1,0 +1,5 @@
+# Site settings pre-seeded into the SiteSetting table.
+# Required so the rating icon appears on event cards from first boot
+# (otherwise an admin would have to flip the toggle in /admin manually).
+settings:
+  show_ratings: true

@@ -103,18 +103,17 @@ class FailureType(str, Enum):
     """Categorised failure surfaced to the UI's Errors tab + filter chips."""
 
     UNGEOLOCATED = "ungeolocated"
-    PRICE_NOT_FOUND = "price_not_found"
-    LINKS_NOT_FOUND = "links_not_found"
     ENRICHMENT_EXCEPTION = "enrichment_exception"
     PERSISTENCE_FAILED = "persistence_failed"
 
 
 # Maps the enrichment stage that produced a `failed` StageResult to its
-# user-facing failure type.
+# user-facing failure type. Only stages whose `failed` count represents an
+# actual problem belong here. Link/price extraction stages no longer report
+# `failed` for "nothing to extract" — those are normal outcomes — so they
+# are intentionally absent.
 _STAGE_FAILURE_TYPE: dict[str, FailureType] = {
     PipelineStage.GEOCODING.value: FailureType.UNGEOLOCATED,
-    PipelineStage.PRICE_EXTRACTION.value: FailureType.PRICE_NOT_FOUND,
-    PipelineStage.LINK_EXTRACTION.value: FailureType.LINKS_NOT_FOUND,
 }
 
 
@@ -701,14 +700,12 @@ class EventPipelineProcessor:
                 return
 
             progress.inc_upserted()
-            had_failed_stage = any(
-                stage_results.get(name) and stage_results[name].failed > 0
-                for name in _ENRICHMENT_STAGE_NAMES
-            )
-            if had_failed_stage:
-                progress.inc_enriched_failed()
-            else:
-                progress.inc_enriched_ok()
+            # Geocoding may have failed for this event (no provider hit), but
+            # the event is still persisted with whatever data we have. We
+            # surface those as `failures` of type UNGEOLOCATED (warnings) but
+            # NOT as `enriched_failed` — that counter is reserved for genuine
+            # errors (exceptions, persistence failures).
+            progress.inc_enriched_ok()
 
             progress.add_log(
                 "INFO",

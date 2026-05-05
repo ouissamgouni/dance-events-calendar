@@ -224,6 +224,118 @@ class TestEventUpdateEndpoint:
         resp = client.patch("/api/admin/events/evt-1", json={"title": "X"})
         assert resp.status_code in (401, 403)
 
+    def test_patch_event_change_calendar(self):
+        event = CachedEvent(
+            event_id="evt-1",
+            calendar_id="cal-1",
+            title="t",
+            start=datetime(2026, 5, 1, 20, 0),
+            end=datetime(2026, 5, 1, 23, 0),
+        )
+        cal_old = CalendarSetting(
+            calendar_id="cal-1", name="Old", enabled=True, color="#ff0000"
+        )
+        cal_new = CalendarSetting(
+            calendar_id="cal-2", name="New", enabled=True, color="#00ff00"
+        )
+
+        def _get(model, key):
+            if model == CachedEvent:
+                return event
+            if key == "cal-1":
+                return cal_old
+            if key == "cal-2":
+                return cal_new
+            return None
+
+        mock_session = MagicMock(spec=Session)
+        mock_session.get.side_effect = _get
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[require_admin] = _fake_admin
+        try:
+            client = TestClient(app)
+            resp = client.patch(
+                "/api/admin/events/evt-1", json={"calendar_id": "cal-2"}
+            )
+            assert resp.status_code == 200
+            assert resp.json()["calendar_id"] == "cal-2"
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_patch_event_unknown_calendar_rejected(self):
+        event = CachedEvent(
+            event_id="evt-1",
+            calendar_id="cal-1",
+            title="t",
+            start=datetime(2026, 5, 1, 20, 0),
+            end=datetime(2026, 5, 1, 23, 0),
+        )
+
+        def _get(model, key):
+            if model == CachedEvent:
+                return event
+            return None
+
+        mock_session = MagicMock(spec=Session)
+        mock_session.get.side_effect = _get
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[require_admin] = _fake_admin
+        try:
+            client = TestClient(app)
+            resp = client.patch("/api/admin/events/evt-1", json={"calendar_id": "nope"})
+            assert resp.status_code == 400
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_patch_event_review_status(self):
+        event = CachedEvent(
+            event_id="evt-1",
+            calendar_id="cal-1",
+            title="t",
+            start=datetime(2026, 5, 1, 20, 0),
+            end=datetime(2026, 5, 1, 23, 0),
+            review_status="pending",
+        )
+        cal = CalendarSetting(
+            calendar_id="cal-1", name="C", enabled=True, color="#ff0000"
+        )
+        mock_session = MagicMock(spec=Session)
+        mock_session.get.side_effect = lambda model, key: (
+            event if model == CachedEvent else cal
+        )
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[require_admin] = _fake_admin
+        try:
+            client = TestClient(app)
+            resp = client.patch(
+                "/api/admin/events/evt-1", json={"review_status": "reviewed"}
+            )
+            assert resp.status_code == 200
+            assert resp.json()["review_status"] == "reviewed"
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_patch_event_invalid_review_status(self):
+        event = CachedEvent(
+            event_id="evt-1",
+            calendar_id="cal-1",
+            title="t",
+            start=datetime(2026, 5, 1, 20, 0),
+            end=datetime(2026, 5, 1, 23, 0),
+        )
+        mock_session = MagicMock(spec=Session)
+        mock_session.get.return_value = event
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[require_admin] = _fake_admin
+        try:
+            client = TestClient(app)
+            resp = client.patch(
+                "/api/admin/events/evt-1", json={"review_status": "garbage"}
+            )
+            assert resp.status_code == 422
+        finally:
+            app.dependency_overrides.clear()
+
 
 @pytest.mark.unit
 class TestGeocodeEndpoint:

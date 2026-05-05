@@ -1,0 +1,162 @@
+test_plan:
+  name: "Rate Event — critical path"
+  description: |
+    Verify the Rate Event feature end-to-end. The scenario pre-seeds three
+    events and 13 ratings (8 approved + 1 pending + 1 rejected on
+    evt-rating-001; 3 approved + 1 pending on evt-rating-002; none on
+    evt-rating-003) so most steps just require checking what's already there.
+
+    Sign-in tip: at /login, dev mode shows one button per mock user. Use
+    "Dev Admin" for admin steps and any other user (e.g. "Sam Rater") for
+    user-facing steps.
+
+  steps:
+    - id: 1
+      title: "Star icon — signed-out sign-in popover"
+      description: |
+        Sign out (top-right). On the home page, find the event card
+        "Salsa Social — Rate Me!" and click the small star icon on the card.
+      expected: |
+        A small popover opens beside the star with "Sign in to rate" and a
+        "Sign in" button. The map / event card is NOT highlighted and the
+        event detail page does NOT open.
+
+    - id: 2
+      title: "Star icon — sober styling"
+      description: |
+        Inspect the rating star icon on cards (Salsa Social — Rate Me!) and
+        on the detail page (open evt-rating-001). It should be small and
+        sober: light sky-blue / slate, square corners, no bright amber/red.
+      expected: |
+        Star icons are visually small (≈12px on cards) and use slate / sky
+        colours. No rounded pills or bright orange/red anywhere in the
+        rating UI.
+
+    - id: 3
+      title: "Submit a rating as a signed-in user"
+      description: |
+        Sign in as "Sam Rater". Open evt-rating-003 (Kizomba Class — No
+        Reviews Yet). Click "Rate" → choose 4 stars, write a 30+ char
+        comment, pick one review tag, submit.
+      expected: |
+        A "Thanks for your feedback!" confirmation appears. After closing,
+        the Rate pill changes to "Pending review" with a small amber dot,
+        and tooltip reads "Edit your rating (pending)".
+
+    - id: 4
+      title: "Edit your pending rating"
+      description: |
+        Still signed in as Sam Rater on evt-rating-003, click the
+        "Pending review" pill again.
+      expected: |
+        The same Rate modal reopens pre-filled with your stars, comment,
+        review tag and identity. Title says "Edit your rating". You can
+        update or Delete it.
+
+    - id: 5
+      title: "Aggregate display + distribution + filter"
+      description: |
+        Open evt-rating-001 (Salsa Social — Rate Me!). Look at the Reviews
+        section.
+      expected: |
+        Average shown ≈ 4.4 with 7 reviews (the rejected and pending rows
+        are excluded). Distribution histogram visible with 5★ majority.
+        Clicking a star bar filters the list to ratings ≥ that threshold;
+        clicking the "★ N+ ✕" pill clears the filter.
+
+    - id: 6
+      title: "Sort + pagination of reviews"
+      description: |
+        On evt-rating-001 still, change "Sort:" to "Highest rated" then to
+        "Lowest rated". Scroll the reviews list.
+      expected: |
+        Order changes accordingly. The reviews list is scrollable inside its
+        own container (max-height) and shows a "Load more reviews" button if
+        more than 5 are present. Fonts are small (≈11px) and no horizontal
+        overflow.
+
+    - id: 7
+      title: "Empty state"
+      description: |
+        Open evt-rating-003 (Kizomba Class) BEFORE step 3 (or in a fresh
+        scenario reset). If you already submitted a rating in step 3, look
+        instead at any unsigned event with no approved reviews.
+      expected: |
+        Reviews section shows "No reviews yet. Be the first to rate this
+        event!" with no histogram.
+
+    - id: 8
+      title: "Anonymous reviewer label"
+      description: |
+        On evt-rating-001 reviews list, find the review by "Sam Rater"
+        (5★, "Best salsa social in town!") which was submitted with the
+        Anonymous toggle on.
+      expected: |
+        Reviewer label shows "Anonymous" — never the email or name.
+
+    - id: 9
+      title: "Admin Feedback panel — pending row visible"
+      description: |
+        Sign in as Dev Admin. Click the bell / "Feedback & Reviews" button
+        (top right of admin toolbar). The Feedback drawer opens on the
+        Pending tab.
+      expected: |
+        At least 2 pending rows are visible (admin@example.com 2★ on Salsa
+        Social, and dimitri@example.com 3★ on Bachata Workshop, plus any
+        you submitted in step 3). Each row shows the event title, a small
+        "View event" link below it, the stars, the reviewer label, comment
+        snippet and a small slate "PENDING" badge. No bright amber/green/red.
+
+    - id: 10
+      title: "Admin Feedback panel — open + approve"
+      description: |
+        Click the dimitri@example.com 3★ pending row on Bachata Workshop.
+        The review modal opens. Approve it.
+      expected: |
+        Modal is small (max-md), white with thin slate border, square
+        corners. Approve button is sky-600 (sober). After clicking
+        Approve, status badge flips to APPROVED. Re-open evt-rating-002 in
+        a normal user tab → the new review now appears in the public list,
+        the count went from 3 → 4.
+
+    - id: 11
+      title: "Approved review tags become event tags (filterable)"
+      description: |
+        On evt-rating-001 the seeded reviews include several approved
+        review-tags (e.g. "Great music", "Friendly crowd", "Crowded",
+        "Authentic"). These were attached to the event when each rating
+        was approved by the seed. Open the event detail page and look at
+        the tag pills row.
+      expected: |
+        The event has the corresponding tags shown next to its other
+        format/dance-style pills. They behave like normal tags: clicking
+        one in the home filter narrows results to events with that tag.
+
+    - id: 12
+      title: "Card click does NOT bleed into rating click"
+      description: |
+        On the home page, click directly on a card's star icon (Salsa
+        Social — Rate Me!).
+      expected: |
+        Only the rate-popover (or modal if signed in) opens. The card
+        itself does not navigate to the event detail page and the map
+        marker does not flash highlight.
+
+    - id: 13
+      title: "show_ratings flag OFF hides the surfaces"
+      description: |
+        As Dev Admin, open Settings, toggle "Show ratings" OFF. Reload the
+        home page and an event detail page (any).
+      expected: |
+        Star icons disappear from event cards / detail page, and the
+        Reviews section is no longer rendered. Toggle back ON to restore.
+
+    - id: 14
+      title: "Account deletion soft-anonymises ratings"
+      description: |
+        As any non-admin user with a rating, go to /account → Delete
+        account. Confirm.
+      expected: |
+        You are logged out. As an admin, find the rating you just
+        submitted in the Feedback panel: reviewer label is "Anonymous"
+        (user_id removed). The aggregate count for the event is unchanged.

@@ -313,4 +313,8 @@ class TestLinkExtractionStage:
         stage = LinkExtractionStage()
         event = _make_event(description="No links here at all")
 
-        assert stage.process(event) is False
+        # No URLs in the description is a normal outcome (not a failure):
+        # the stage runs cleanly, returns True, and stores an empty list so
+        # we don't re-scan on every sync.
+        assert stage.process(event) is True
+        assert event.links == []

@@ -11,8 +11,12 @@ import EventTagEditor from './EventTagEditor';
 import LocationBadge from './LocationBadge';
 import SaveEventButton from './SaveEventButton';
 import GoingButton from './GoingButton';
+import AttendeeList from './AttendeeList';
+import RateEventButton from './RateEventButton';
 import TagBadges from './TagBadges';
 import SuggestTagsButton from './SuggestTagsButton';
+import ExpandableDescription from './ExpandableDescription';
+import ShareButton from './ShareButton';
 
 interface Props {
     event: CalendarEvent;
@@ -44,7 +48,7 @@ export default function EventDetailContent({
     maxTags,
     onTagsUpdated,
 }: Props) {
-    const { showPrices, showPopularity } = useFeatureFlags();
+    const { showPrices, showPopularity, showRatings } = useFeatureFlags();
     const [showSuggestTags, setShowSuggestTags] = useState(false);
     const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
 
@@ -474,9 +478,7 @@ export default function EventDetailContent({
                     className={editable ? 'group relative cursor-text hover:bg-slate-50 -mx-2 px-2 py-1 rounded transition' : ''}
                     onClick={editable ? () => startEdit('description', event.description ?? '') : undefined}
                 >
-                    <div className={`whitespace-pre-line leading-relaxed text-slate-600 ${compact ? 'text-xs' : 'text-sm'}`}>
-                        {event.description}
-                    </div>
+                    <ExpandableDescription text={event.description} compact={compact} />
                     {editable && <EditHint />}
                 </div>
             ) : editable ? (
@@ -595,21 +597,28 @@ export default function EventDetailContent({
                 </div>
             )}
 
+            {/* Who's going */}
+            {showActions && (
+                <div className="border-t border-slate-100 pt-3">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                        Who's going
+                    </h3>
+                    <AttendeeList eventId={event.event_id} expanded />
+                </div>
+            )}
+
             {/* Action bar */}
             {showActions && (
                 <div className="border-t border-slate-100 pt-3 flex items-center gap-2 flex-wrap">
                     <SaveEventButton eventId={event.event_id} appearance="pill" />
                     <GoingButton eventId={event.event_id} appearance="pill" />
-                    <button
-                        onClick={() => {
-                            const url = `${window.location.origin}/event/${event.event_id}`;
-                            navigator.clipboard.writeText(url).catch(() => { });
-                            trackLink(event.event_id, url);
-                        }}
+                    {showRatings && <RateEventButton eventId={event.event_id} appearance="pill" />}
+                    <ShareButton
+                        eventId={event.event_id}
+                        title={event.title}
+                        url={`${window.location.origin}/event/${event.event_id}`}
                         className="text-xs text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-full px-3 py-1 transition"
-                    >
-                        🔗 Copy link
-                    </button>
+                    />
                     {!editable && (
                         <button
                             onClick={() => {

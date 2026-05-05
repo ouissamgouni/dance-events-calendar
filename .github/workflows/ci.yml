@@ -2,9 +2,9 @@ name: CI
 
 on:
     pull_request:
-        branches: [develop, main]
+        branches: [ develop, main ]
     push:
-        branches: [develop, main]
+        branches: [ develop, main ]
 
 jobs:
     test:
@@ -21,10 +21,8 @@ jobs:
                 ports:
                     - 5435:5432
                 options: >-
-                    --health-cmd "pg_isready -U calendar_user"
-                    --health-interval 5s
-                    --health-timeout 5s
-                    --health-retries 5
+                    --health-cmd "pg_isready -U calendar_user" --health-interval
+                    5s --health-timeout 5s --health-retries 5
 
         steps:
             - uses: actions/checkout@v4
@@ -55,7 +53,7 @@ jobs:
             - name: Run backend unit tests
               env:
                   ENV_NAME: test
-                  MOCK_ADMIN_AUTH: "true"
+                  DEV_AUTH: "true"
                   POSTGRES_USER: calendar_user
                   POSTGRES_PASSWORD: calendar_password
                   POSTGRES_DB: calendar_db_test

@@ -4,6 +4,7 @@ import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional
+from uuid import uuid4
 
 import yaml
 from sqlmodel import Session, select
@@ -14,12 +15,15 @@ from backend.db.models import (
     CalendarSetting,
     EventExport,
     EventLinkClick,
+    EventRating,
     EventTag,
     EventView,
     SiteSetting,
     Tag,
     TagGroup,
     TagSuggestion,
+    User,
+    UserEventAttendance,
 )
 
 WEEKDAYS = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
@@ -62,14 +66,13 @@ class DatabaseSeeder:
         logger.info("Seeding from %s", scenario_dir)
 
         # Check if this scenario uses a mock calendar service.
-        # If so, skip seeding events — they must come through sync so that
-        # the dedup logic fires correctly on first encounter.
-        config_path = scenario_dir / "config.yaml"
-        uses_mock_calendar = False
-        if config_path.exists():
-            with open(config_path) as f:
-                config = yaml.safe_load(f) or {}
-            uses_mock_calendar = config.get("calendar_service") == "mock"
+        # If so, skip pre-seeding mock-sync-events.yaml — those events must
+        # enter the DB via the sync pipeline so dedup/enrichment fire on
+        # first encounter. Scenarios that need events to exist regardless
+        # of sync should use db-events.yaml (always pre-seeded below).
+        from backend.config.loader import get_calendar_service_type
+
+        uses_mock_calendar = get_calendar_service_type() == "mock"
 
         self._seed_tags(scenario_dir / "tags.yaml")
         self._seed_calendars(scenario_dir / "calendars.yaml")
@@ -88,6 +91,11 @@ class DatabaseSeeder:
         self._seed_event_tags(scenario_dir / "db-events.yaml")
         self._seed_tag_suggestions(scenario_dir / "db-events.yaml")
         self._seed_tracking(scenario_dir / "db-tracking.yaml")
+        self._seed_users(scenario_dir / "mock-users.yaml")
+        # Attendances must come AFTER users (FK on user_id) and after events.
+        self._seed_attendances(scenario_dir / "db-events.yaml")
+        self._seed_ratings(scenario_dir / "db-events.yaml")
+        self._seed_site_settings(scenario_dir / "settings.yaml")
         self._ingest_test_plans(scenario_dir)
         self.session.commit()
         logger.info("Seeding complete")
@@ -352,6 +360,44 @@ class DatabaseSeeder:
                 )
                 logger.info("Created event: %s", evt_data["title"])
 
+    def _seed_site_settings(self, path: Path) -> None:
+        """Pre-seed SiteSetting key/value rows from scenario settings.yaml.
+
+        Booleans are stored as 'true'/'false' strings to match the convention
+        used by api/routes/settings.py. Other values are stored verbatim
+        (already-string) or JSON-encoded.
+
+        Expected structure:
+          settings:
+            show_ratings: true
+            some_other_flag: false
+        """
+        if not path.exists():
+            return
+
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+
+        items = data.get("settings", {}) or {}
+        if not isinstance(items, dict):
+            logger.warning("Invalid settings.yaml at %s: 'settings' must be a mapping", path)
+            return
+
+        for key, value in items.items():
+            if isinstance(value, bool):
+                stored = "true" if value else "false"
+            elif isinstance(value, (int, float, str)):
+                stored = str(value)
+            else:
+                stored = json.dumps(value)
+            row = self.session.get(SiteSetting, key)
+            if row:
+                row.value = stored
+                self.session.add(row)
+            else:
+                self.session.add(SiteSetting(key=key, value=stored))
+            logger.info("Seeded site setting %s=%s", key, stored)
+
     def _ingest_test_plans(self, scenario_dir: Path) -> None:
         """Read test_plan.yaml from the scenario directory and persist to SiteSetting."""
         plans: list[dict[str, Any]] = []
@@ -464,6 +510,48 @@ class DatabaseSeeder:
                 free_text,
             )
 
+    def _seed_users(self, path: Path) -> None:
+        """Pre-create mock User rows from scenarios/<name>/mock-users.yaml.
+
+        Lets a scenario expose named "Sign in as <Name>" buttons on /login
+        and lets multi-user features (sharing, dedup, GDPR) be exercised
+        before any user has actually logged in. Idempotent.
+
+        Expected structure:
+          users:
+            - email: alice@example.com
+              name: Alice
+            - email: admin@example.com
+              name: Admin
+        """
+        if not path.exists():
+            return
+
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+
+        for entry in data.get("users", []) or []:
+            if not isinstance(entry, dict):
+                continue
+            email = (entry.get("email") or "").strip().lower()
+            if not email:
+                continue
+            provider_subject = f"mock|{email}"
+            existing = self.session.exec(
+                select(User).where(User.provider_subject == provider_subject)
+            ).first()
+            if existing:
+                continue
+            self.session.add(
+                User(
+                    email=email,
+                    display_name=entry.get("name") or email.split("@", 1)[0],
+                    provider="google",
+                    provider_subject=provider_subject,
+                )
+            )
+            logger.info("Created mock user: %s", email)
+
     def _seed_tracking(self, path: Path) -> None:
         """Seed EventView, EventLinkClick, and EventExport rows from db-tracking.yaml.
 
@@ -529,3 +617,188 @@ class DatabaseSeeder:
         exports_count = len(data.get("exports", []))
         if exports_count:
             logger.info("Seeded %d EventExport rows", exports_count)
+
+    def _seed_attendances(self, path: Path) -> None:
+        """Pre-seed UserEventAttendance rows from db-events.yaml.
+
+        Lets scenarios test "Who's going" UI states (e.g. large attendee
+        lists, mixed public/private breakdowns) without driving the UI.
+        Idempotent: existing (event_id, user_id, device_id) rows are skipped.
+
+        Expected structure (under db-events.yaml):
+          attendances:
+            - event_id: evt-share-003
+              email: alice@example.com   # required if no device_id
+              share_publicly: true       # default false
+            - event_id: evt-share-003
+              device_id: seed-anon-1     # anonymous device-only attendance
+        """
+        if not path.exists():
+            return
+
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+
+        rows = data.get("attendances") or []
+        if not rows:
+            return
+
+        seeded = 0
+        for entry in rows:
+            if not isinstance(entry, dict):
+                continue
+            event_id = entry.get("event_id")
+            if not event_id:
+                continue
+            email = (entry.get("email") or "").strip().lower() or None
+            device_id = entry.get("device_id")
+            share_publicly = bool(entry.get("share_publicly", False))
+
+            user_id = None
+            if email:
+                user = self.session.exec(
+                    select(User).where(User.email == email)
+                ).first()
+                if not user:
+                    logger.warning(
+                        "Skipping attendance: user %s not found (seed users first)",
+                        email,
+                    )
+                    continue
+                user_id = user.id
+
+            if user_id is None and not device_id:
+                logger.warning(
+                    "Skipping attendance for %s: needs email or device_id",
+                    event_id,
+                )
+                continue
+
+            # Idempotency check.
+            existing_q = select(UserEventAttendance).where(
+                UserEventAttendance.event_id == event_id
+            )
+            if user_id is not None:
+                existing_q = existing_q.where(UserEventAttendance.user_id == user_id)
+            else:
+                existing_q = existing_q.where(
+                    UserEventAttendance.device_id == device_id,
+                    UserEventAttendance.user_id.is_(None),
+                )
+            if self.session.exec(existing_q).first():
+                continue
+
+            self.session.add(
+                UserEventAttendance(
+                    event_id=event_id,
+                    user_id=user_id,
+                    device_id=device_id or f"seed-attend-{event_id}-{email or 'anon'}",
+                    share_publicly=share_publicly,
+                )
+            )
+            seeded += 1
+        if seeded:
+            logger.info("Seeded %d UserEventAttendance rows", seeded)
+
+    def _seed_ratings(self, path: Path) -> None:
+        """Pre-seed EventRating rows from db-events.yaml `ratings:` list.
+
+        Each entry can specify:
+          - event_id (required)
+          - email (optional, looked up to a user_id)
+          - stars (1..5, required)
+          - comment (optional)
+          - review_tag_slugs (list of "review-tags:slug")
+          - status: pending | approved | rejected (default approved)
+          - is_anonymous: bool
+          - admin_notes: str (optional)
+        Idempotent: skips if a row already exists for the same (event_id, user_id|email|comment-hash).
+        """
+        if not path.exists():
+            return
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+        rows = data.get("ratings") or []
+        if not rows:
+            return
+
+        tag_lookup = self._build_tag_lookup()
+        seeded = 0
+        for entry in rows:
+            if not isinstance(entry, dict):
+                continue
+            event_id = entry.get("event_id")
+            stars = entry.get("stars")
+            if not event_id or not stars:
+                continue
+            email = (entry.get("email") or "").strip().lower() or None
+            user_id = None
+            if email:
+                user = self.session.exec(
+                    select(User).where(User.email == email)
+                ).first()
+                if not user:
+                    logger.warning(
+                        "Skipping rating: user %s not found (seed users first)",
+                        email,
+                    )
+                    continue
+                user_id = user.id
+
+            # Idempotency: same (event_id, user_id) → skip.
+            if user_id is not None:
+                existing = self.session.exec(
+                    select(EventRating).where(
+                        EventRating.event_id == event_id,
+                        EventRating.user_id == user_id,
+                    )
+                ).first()
+                if existing:
+                    continue
+
+            review_tag_ids: list[int] = []
+            for slug in entry.get("review_tag_slugs") or []:
+                tid = tag_lookup.get(slug)
+                if tid:
+                    review_tag_ids.append(tid)
+                else:
+                    logger.warning("Unknown review tag slug '%s'", slug)
+
+            status = entry.get("status") or "approved"
+            now = datetime.utcnow()
+            rating = EventRating(
+                id=uuid4(),
+                event_id=event_id,
+                user_id=user_id,
+                stars=int(stars),
+                comment=entry.get("comment"),
+                review_tag_ids=review_tag_ids,
+                is_anonymous=bool(entry.get("is_anonymous", False)),
+                status=status,
+                admin_notes=entry.get("admin_notes"),
+                reviewed_at=now if status != "pending" else None,
+                reviewed_by=("seed" if status != "pending" else None),
+                created_at=now,
+            )
+            self.session.add(rating)
+
+            # If approved, propagate review tag ids to event tags (mirrors the
+            # admin approve handler so the seeded data is filterable).
+            if status == "approved" and review_tag_ids:
+                existing_tags = self.session.exec(
+                    select(EventTag.tag_id).where(
+                        EventTag.event_id == event_id,
+                        EventTag.tag_id.in_(review_tag_ids),
+                    )
+                ).all()
+                existing_tag_set = set(existing_tags)
+                for tid in review_tag_ids:
+                    if tid in existing_tag_set:
+                        continue
+                    if not self.session.get(Tag, tid):
+                        continue
+                    self.session.add(EventTag(event_id=event_id, tag_id=tid))
+
+            seeded += 1
+        if seeded:
+            logger.info("Seeded %d EventRating rows", seeded)

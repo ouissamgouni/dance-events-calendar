@@ -81,6 +81,27 @@ export interface CalendarSetting {
     color: string | null;
 }
 
+export interface Attendee {
+    user_id: string;
+    display_name: string | null;
+    avatar_url: string | null;
+}
+
+export interface AttendanceSummary {
+    event_id: string;
+    total_going: number;
+    public_going: number;
+    anonymous_going: number;
+    can_view_attendees: boolean;
+    viewer_is_sharing: boolean;
+    preview_attendees: Attendee[];
+}
+
+export interface AttendingEventEntry {
+    event_id: string;
+    share_publicly: boolean;
+}
+
 export interface AppInfo {
     environment: string;
     backend_version: string;
@@ -154,4 +175,105 @@ export interface EventSuggestion {
     created_at: string;
     reviewed_at: string | null;
     reviewed_by: string | null;
+}
+
+// --- Ratings / Feedback ---
+
+export interface RatingTagSuggestionInline {
+    tag_id?: number;
+    free_text?: string;
+    group_slug?: string;
+}
+
+export interface FeedbackSubmissionCreate {
+    stars: number;
+    comment?: string;
+    review_tag_ids: number[];
+    is_anonymous: boolean;
+    tag_suggestions: RatingTagSuggestionInline[];
+    website?: string; // honeypot
+}
+
+export interface EventRating {
+    id: string;
+    event_id: string;
+    stars: number;
+    comment: string | null;
+    review_tag_ids: number[];
+    is_anonymous: boolean;
+    status: 'pending' | 'approved' | 'rejected';
+    created_at: string;
+    updated_at: string;
+}
+
+export interface FeedbackSubmissionResponse {
+    feedback_submission_id: string;
+    rating: EventRating;
+    tag_suggestion_ids: number[];
+    message: string;
+}
+
+export interface EventRatingAggregate {
+    event_id: string;
+    average: number;
+    count: number;
+    distribution: Record<number, number>;
+}
+
+export interface EventReviewPublic {
+    id: string;
+    stars: number;
+    comment: string | null;
+    review_tags: Tag[];
+    reviewer_label: string;
+    created_at: string;
+}
+
+export interface EventReviewsList {
+    items: EventReviewPublic[];
+    total: number;
+}
+
+export interface AdminRating {
+    id: string;
+    event_id: string;
+    event_title: string | null;
+    user_email: string | null;
+    user_display_name: string | null;
+    is_anonymous: boolean;
+    stars: number;
+    comment: string | null;
+    review_tags: Tag[];
+    feedback_submission_id: string | null;
+    linked_tag_suggestion_ids: number[];
+    status: 'pending' | 'approved' | 'rejected';
+    admin_notes: string | null;
+    submitter_ip: string | null;
+    submitter_user_agent: string | null;
+    submitter_country: string | null;
+    auto_flagged: boolean;
+    reviewed_at: string | null;
+    reviewed_by: string | null;
+    created_at: string;
+}
+
+export interface AdminRatingList {
+    items: AdminRating[];
+    total: number;
+    page: number;
+    page_size: number;
+}
+
+export interface MyRating {
+    id: string;
+    event_id: string;
+    event_title: string | null;
+    event_start: string | null;
+    stars: number;
+    comment: string | null;
+    review_tag_ids: number[];
+    is_anonymous: boolean;
+    status: 'pending' | 'approved' | 'rejected';
+    created_at: string;
+    updated_at: string;
 }

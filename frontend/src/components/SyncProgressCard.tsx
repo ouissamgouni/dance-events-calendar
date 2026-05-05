@@ -248,8 +248,8 @@ function CalendarRow({
                 </div>
             </div>
 
-            {/* Per-stage chips + current operation */}
-            {(visibleStages.length > 0 || cal.current_operation) && (
+            {/* Per-stage chips */}
+            {visibleStages.length > 0 && (
                 <div className="flex items-center justify-between gap-2 pl-3.5">
                     <div className="flex items-center gap-1.5 flex-wrap">
                         {visibleStages.map((s) => {
@@ -286,11 +286,6 @@ function CalendarRow({
                             );
                         })}
                     </div>
-                    {cal.current_operation && (
-                        <span className="text-[10px] text-blue-600 italic truncate max-w-[200px]">
-                            {cal.current_operation}
-                        </span>
-                    )}
                 </div>
             )}
         </div>

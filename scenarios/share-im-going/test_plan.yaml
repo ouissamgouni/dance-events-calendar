@@ -1,0 +1,217 @@
+test_plan:
+  name: "Share I'm Going — Attendee Visibility & Privacy"
+  description: >
+    Verify the privacy-respecting "Who's Going" feature. Logged-out users see
+    only the total going count. Any signed-in user can see the attendee list,
+    but only attendees who explicitly opt in to share appear by name. Anonymous
+    device attendances (logged-out clicks) are counted but never named. Verifies
+    the per-event share toggle, the account-level default, and that GDPR
+    deletion wipes attendance data.
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=share-im-going"
+    - >
+      In every browser session you use, accept the cookie banner with the
+      "Personalization" category enabled — otherwise the frontend skips POST
+      /api/track/event-attendance and the scenario has nothing to verify.
+    - "Use a fresh browser profile or incognito window per device-side test."
+    - >
+      The scenario pre-seeds three users (Alice, Bob, Carol) plus Dev Admin via
+      mock-users.yaml. No attendance is pre-seeded — each step below creates the
+      state through the UI it tests.
+
+  steps:
+    # ── Anonymous baseline ───────────────────────────────────────
+    - id: 1
+      title: "Anonymous: only total count is shown, never names"
+      description: >
+        Open the home page in a fresh profile (Browser A, no sign-in). Open the
+        "Salsa Social Friday" event detail. Look at the "Who's going" section
+        above the action bar.
+      expected: >
+        The section reads "0 going" (no one has marked yet) or, if previous
+        steps have already run, "<N> people are going. Sign in to see who." No
+        avatars and no names are shown. There is no breakdown of
+        public-vs-private (the breakdown is hidden for anonymous viewers).
+
+    - id: 2
+      title: "Anonymous: mark going stays anonymous, count goes up"
+      description: >
+        On the same anonymous browser, click the "I'm going" pill in the action
+        bar. The button should toggle to "Going ✓" without opening any popover
+        (the share-confirmation popover is logged-in only). Reload the page.
+      expected: >
+        The pill remains "Going ✓" after reload. The "Who's going" section now
+        reads "1 person is going. Sign in to see who." The viewer is never
+        offered a share toggle and is never named anywhere — they are a
+        device-only attendee (user_id IS NULL).
+
+    # ── Carol private path ──────────────────────────────────────
+    - id: 3
+      title: "Carol signs in and views the attendee list (no breakdown yet)"
+      description: >
+        Open Browser B (fresh profile). Sign in as Carol via /login → "Sign in
+        as Carol". Open "Salsa Social Friday" event detail.
+      expected: >
+        The Who's going section now shows "1 going" (the private/anonymous count
+        includes the anonymous device from step 2). The attendee list shows the
+        empty-state hint "No one has shared their name yet — be the first by
+        marking yourself going publicly." Carol does NOT yet appear because she
+        hasn't marked herself going.
+
+    - id: 4
+      title: "Carol marks going PRIVATELY — counted but not named"
+      description: >
+        Carol clicks the "I'm going" pill. The share-confirmation popover opens
+        with the checkbox UNCHECKED (Carol's account default is off). Carol
+        leaves it unchecked and clicks "I'm going".
+      expected: >
+        Pill becomes "Going ✓" with a small eye-slash icon next to it. The Who's
+        going section updates to "2 going". The attendee list still shows the
+        empty-state — Carol is counted but not named. Reloading the page
+        preserves all of the above.
+
+    - id: 5
+      title: "Carol switches to PUBLIC via the per-event link"
+      description: >
+        Carol clicks the small eye-slash icon next to the "Going ✓" pill. The
+        "Edit visibility" popover opens with the checkbox unchecked. She checks
+        it and clicks "Save".
+      expected: >
+        The icon next to the pill changes to an eye icon. The Who's going
+        section becomes "2 going". Carol now appears in the attendee list with
+        her avatar/initial + display name "Carol".
+
+    # ── Bob public-by-default path ──────────────────────────────
+    - id: 6
+      title: "Bob enables share-by-default in account settings"
+      description: >
+        Open Browser C (fresh profile). Sign in as Bob via /login. Navigate to
+        /account → Privacy section. Tick "Share my name by default when I mark
+        myself going to an event."
+      expected: >
+        Checkbox stays checked after the network call (no error toast).
+        Reloading /account shows the box still ticked — the preference is
+        persisted server-side via PATCH /api/auth/preferences.
+
+    - id: 7
+      title: "Bob marks going — auto-public, no popover"
+      description: >
+        Bob navigates to "Salsa Social Friday" and clicks "I'm going".
+      expected: >
+        Because Bob's account default is share=true, NO confirmation popover
+        opens. The pill immediately becomes "Going ✓" with an eye icon (public).
+        The Who's going section becomes "3 going" and the attendee list shows
+        both "Carol" and "Bob" as horizontal chips (ordered by attending_since —
+        Carol first since she joined earlier).
+
+    # ── Cross-viewer verification ────────────────────────────────
+    - id: 8
+      title: "Carol (Browser B) sees the same breakdown and Bob's name"
+      description: >
+        Switch back to Browser B (still signed in as Carol). Reload the Salsa
+        Social Friday detail page.
+      expected: >
+        Carol sees "3 going" and an attendee list with "Carol" and "Bob". She
+        does NOT see anything that identifies the anonymous device from step 2.
+
+    - id: 9
+      title: "Anonymous viewer (Browser A) still sees only the count"
+      description: >
+        Reload "Salsa Social Friday" in Browser A (still signed out, but already
+        marked going as a device).
+      expected: >
+        The Who's going section reads "3 people are going. Sign in to see who."
+        No names, no avatars, no public/private breakdown. The pill on the page
+        is still "Going ✓" (own anonymous attendance preserved).
+
+    # ── Browse without attending ────────────────────────────────
+    - id: 10
+      title: "Admin can view the attendee list without being going"
+      description: >
+        Open Browser D (fresh profile). Sign in as Dev Admin → /login → "Sign in
+        as Dev Admin". Navigate to "Salsa Social Friday" event detail. Do NOT
+        click "I'm going".
+      expected: >
+        Admin sees the full attendee list with Carol and Bob, plus the "3 going"
+        breakdown — viewing requires only authentication, not reciprocal
+        sharing. The admin's own pill is "I'm going" (not toggled).
+
+    # ── Edit visibility from public back to private ─────────────
+    - id: 11
+      title: "Bob switches BACK to private from the action bar link"
+      description: >
+        On Browser C, on "Salsa Social Friday", click the eye icon next to Bob's
+        "Going ✓" pill. The Edit visibility popover opens with the box checked.
+        Uncheck it and click "Save".
+      expected: >
+        The icon toggles to an eye-slash icon. The Who's going section becomes
+        "3 going". Bob's name disappears from the attendee list (visible to
+        other authed viewers — verify by reloading Browser B, where only "Carol"
+        remains in the list).
+
+    # ── Default preference change does NOT affect existing rows ─
+    - id: 12
+      title: "Toggling account default does not change existing attendances"
+      description: >
+        On Browser C, go back to /account → Privacy and uncheck the
+        share-by-default box. Then navigate back to "Salsa Social Friday".
+      expected: >
+        Bob's pill is still "Going ✓" with "private" link — his existing
+        per-event choice is unchanged. The default preference only affects the
+        prefilled value of the popover for FUTURE events. Verify by opening
+        "Bachata Workshop" and clicking "I'm going" — the popover opens with the
+        checkbox UNCHECKED now (reflects the new default).
+
+    # ── Persistence across reload + sign-out/in ─────────────────
+    - id: 13
+      title: "Visibility state survives sign-out and sign-in"
+      description: >
+        On Browser B (Carol), go to /account → "Sign out". Then sign back in as
+        Carol. Navigate to "Salsa Social Friday".
+      expected: >
+        Carol's pill is "Going ✓" with eye icon (her per-event
+        share_publicly=true was reloaded from the server via
+        /api/auth/attending-events). She still appears in the attendee list
+        shown to all signed-in viewers.
+
+    # ── GDPR deletion wipes attendance ──────────────────────────
+    - id: 14
+      title: "Carol deletes her account — name + private rows are wiped"
+      description: >
+        On Browser B, /account → "Delete my account" → confirm. Then on Browser
+        D (admin), reload "Salsa Social Friday".
+      expected: >
+        Browser B is redirected to "/" with the nav showing "Sign in". On
+        Browser D, the attendee list no longer contains "Carol" and the Who's
+        going section drops by 1 ("2 going" — Bob is private, the anonymous
+        device remains). No UserEventAttendance rows linked to Carol's user_id
+        remain in the database.
+
+    # ── Anonymous device GDPR ───────────────────────────────────
+    - id: 15
+      title: "Anonymous device deletion wipes the anonymous attendance"
+      description: >
+        On Browser A, open the cookie banner / privacy controls and trigger
+        device-data deletion: DELETE /api/user-data/{device_id}.
+      expected: >
+        Response JSON includes "user_event_attendances" with a count >= 1.
+        Reloading "Salsa Social Friday" on Browser D shows "1 going" total (only
+        Bob remains). Browser A's pill is back to "I'm going" (state cleared).
+
+    # ── Large attendee list (pre-seeded) ────────────────────────
+    - id: 16
+      title: "Show all / collapse on a long attendee list"
+      description: >
+        On any signed-in browser (e.g. Browser D as Dev Admin), navigate to the
+        "Cuban Night" event detail page (evt-share-003). The scenario pre-seeds
+        12 public attendees on this event via db-events.yaml → attendances.
+        Inspect the Who's going section.
+      expected: >
+        The Who's going section shows "12 going". The attendee list renders the
+        first 10 names with avatars, followed by a "Show all 12" link in rose
+        text. Click "Show all 12" → all 12 attendees are now listed and the link
+        toggles to "Show less". Click "Show less" → list collapses back to the
+        first 10. On the event-card avatar stack on the home page, the same
+        event shows 3 avatars + "+9" overflow; clicking the stack navigates to
+        the detail page anchored at #attendees and the section is scrolled into
+        view.

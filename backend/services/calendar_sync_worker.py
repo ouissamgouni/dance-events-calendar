@@ -130,6 +130,15 @@ class CalendarSyncWorker:
             # Checkpoint sync token
             if result.next_sync_token:
                 self._save_sync_token(result.next_sync_token)
+                progress.add_log(
+                    "INFO",
+                    f"Saved sync_token={result.next_sync_token[:8]}…",
+                )
+            else:
+                progress.add_log(
+                    "WARNING",
+                    "Upstream returned no nextSyncToken — next sync will be a full fetch",
+                )
 
             progress.status = "processing"
             progress.add_log("INFO", f"Fetch complete for {self._calendar_name}")

@@ -1,6 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { TagGroup } from '../types';
 import { submitTagSuggestion } from '../api';
+
+export interface InlineTagSuggestion {
+    tag_id?: number;
+    free_text?: string;
+    group_slug?: string;
+}
 
 interface Props {
     eventId: string;
@@ -8,9 +14,15 @@ interface Props {
     existingTagIds: Set<number>;
     deviceId: string;
     onClose: () => void;
+    /**
+     * 'standalone' (default): self-contained — submits via /api/tags/suggestions.
+     * 'embedded': lifts selection state via onChange; hides Submit/Cancel/success UI.
+     */
+    mode?: 'standalone' | 'embedded';
+    onChange?: (suggestions: InlineTagSuggestion[]) => void;
 }
 
-export default function SuggestTagsButton({ eventId, tagGroups, existingTagIds, deviceId, onClose }: Props) {
+export default function SuggestTagsButton({ eventId, tagGroups, existingTagIds, deviceId, onClose, mode = 'standalone', onChange }: Props) {
     const [selectedGroupSlug, setSelectedGroupSlug] = useState<string | null>(tagGroups[0]?.slug ?? null);
     const [selectedTagIds, setSelectedTagIds] = useState<Set<number>>(new Set());
     const [freeTexts, setFreeTexts] = useState<Record<string, string>>({});
@@ -26,6 +38,19 @@ export default function SuggestTagsButton({ eventId, tagGroups, existingTagIds, 
     const totalCount =
         selectedTagIds.size +
         Object.values(freeTexts).filter((v) => v.trim()).length;
+
+    // Embedded mode: emit collected suggestions whenever selection changes so
+    // the parent (RateEventModal) can submit them in the unified envelope.
+    useEffect(() => {
+        if (mode !== 'embedded' || !onChange) return;
+        const out: InlineTagSuggestion[] = [];
+        for (const tagId of selectedTagIds) out.push({ tag_id: tagId });
+        for (const [groupSlug, text] of Object.entries(freeTexts)) {
+            const trimmed = text.trim();
+            if (trimmed) out.push({ free_text: trimmed, group_slug: groupSlug });
+        }
+        onChange(out);
+    }, [selectedTagIds, freeTexts, mode, onChange]);
 
     const toggleTag = (tagId: number) => {
         setSelectedTagIds((prev) => {
@@ -92,9 +117,11 @@ export default function SuggestTagsButton({ eventId, tagGroups, existingTagIds, 
         );
     }
 
+    const isEmbedded = mode === 'embedded';
+
     return (
-        <div className="p-4 space-y-3">
-            <h3 className="text-sm font-semibold text-gray-700">Suggest Tags</h3>
+        <div className={isEmbedded ? 'space-y-3' : 'p-4 space-y-3'}>
+            {!isEmbedded && <h3 className="text-sm font-semibold text-gray-700">Suggest Tags</h3>}
 
             {/* Category pills */}
             <div className="flex flex-wrap gap-1.5">
@@ -187,21 +214,23 @@ export default function SuggestTagsButton({ eventId, tagGroups, existingTagIds, 
 
             {error && <p className="text-xs text-red-500">{error}</p>}
 
-            <div className="flex gap-2">
-                <button
-                    onClick={handleSubmit}
-                    disabled={submitting || totalCount === 0}
-                    className="flex-1 rounded bg-rose-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-600 disabled:opacity-50"
-                >
-                    {submitting ? 'Submitting…' : totalCount > 0 ? `Submit ${totalCount} suggestion${totalCount !== 1 ? 's' : ''}` : 'Submit'}
-                </button>
-                <button
-                    onClick={onClose}
-                    className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
-                >
-                    Cancel
-                </button>
-            </div>
+            {!isEmbedded && (
+                <div className="flex gap-2">
+                    <button
+                        onClick={handleSubmit}
+                        disabled={submitting || totalCount === 0}
+                        className="flex-1 rounded bg-rose-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-600 disabled:opacity-50"
+                    >
+                        {submitting ? 'Submitting…' : totalCount > 0 ? `Submit ${totalCount} suggestion${totalCount !== 1 ? 's' : ''}` : 'Submit'}
+                    </button>
+                    <button
+                        onClick={onClose}
+                        className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

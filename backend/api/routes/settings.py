@@ -11,17 +11,15 @@ from backend.db.models import SiteSetting
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
-DEFAULT_SINCE_YEARS = 1
+DEFAULT_SINCE_DAYS = 183  # ~6 months
 
 
 def _default_since_date() -> str:
-    return (datetime.utcnow() - timedelta(days=DEFAULT_SINCE_YEARS * 365)).strftime(
-        "%Y-%m-%d"
-    )
+    return (datetime.utcnow() - timedelta(days=DEFAULT_SINCE_DAYS)).strftime("%Y-%m-%d")
 
 
 def _get_since_date(session: Session) -> str:
-    """Get the since_date setting from the DB, or default to 1 year ago."""
+    """Get the since_date setting from the DB, or default to 6 months ago."""
     try:
         row = session.get(SiteSetting, "since_date")
         if row and isinstance(row.value, str):
@@ -32,7 +30,7 @@ def _get_since_date(session: Session) -> str:
 
 
 def _get_sync_since_date(session: Session) -> str:
-    """Get the sync_since_date setting from the DB, or default to 1 year ago.
+    """Get the sync_since_date setting from the DB, or default to 6 months ago.
 
     Independent from ``since_date`` (which controls UI display filtering).
     Used as the lower bound when fetching events from upstream calendars.
@@ -101,6 +99,17 @@ def _get_int_setting(session: Session, key: str, default: int) -> int:
     return default
 
 
+def _get_str_setting(session: Session, key: str, default: str) -> str:
+    """Get a string setting from the DB."""
+    try:
+        row = session.get(SiteSetting, key)
+        if row and isinstance(row.value, str) and row.value:
+            return row.value
+    except Exception:
+        pass
+    return default
+
+
 def _set_bool_setting(session: Session, key: str, value: bool) -> None:
     """Set a boolean setting in the DB."""
     row = session.get(SiteSetting, key)
@@ -122,7 +131,11 @@ def get_settings(session: Session = Depends(get_session)):
         auto_sync_mode=_get_auto_sync_mode(session),
         show_prices=_get_bool_setting(session, "show_prices"),
         show_popularity=_get_bool_setting(session, "show_popularity"),
+        show_ratings=_get_bool_setting(session, "show_ratings"),
         popularity_threshold=_get_int_setting(session, "popularity_threshold", 10),
+        event_color_bar_color=_get_str_setting(
+            session, "event_color_bar_color", "#64748b"
+        ),
     )
 
 
@@ -179,6 +192,9 @@ def update_settings(
     if body.show_popularity is not None:
         _set_bool_setting(session, "show_popularity", body.show_popularity)
 
+    if body.show_ratings is not None:
+        _set_bool_setting(session, "show_ratings", body.show_ratings)
+
     if body.popularity_threshold is not None:
         row = session.get(SiteSetting, "popularity_threshold")
         if row:
@@ -186,6 +202,16 @@ def update_settings(
         else:
             row = SiteSetting(
                 key="popularity_threshold", value=str(body.popularity_threshold)
+            )
+        session.add(row)
+
+    if body.event_color_bar_color is not None:
+        row = session.get(SiteSetting, "event_color_bar_color")
+        if row:
+            row.value = body.event_color_bar_color
+        else:
+            row = SiteSetting(
+                key="event_color_bar_color", value=body.event_color_bar_color
             )
         session.add(row)
 
@@ -199,5 +225,9 @@ def update_settings(
         auto_sync_mode=_get_auto_sync_mode(session),
         show_prices=_get_bool_setting(session, "show_prices"),
         show_popularity=_get_bool_setting(session, "show_popularity"),
+        show_ratings=_get_bool_setting(session, "show_ratings"),
         popularity_threshold=_get_int_setting(session, "popularity_threshold", 10),
+        event_color_bar_color=_get_str_setting(
+            session, "event_color_bar_color", "#64748b"
+        ),
     )

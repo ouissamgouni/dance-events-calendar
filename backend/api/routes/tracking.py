@@ -3,6 +3,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlmodel import Session, select
 
+from backend.api.deps import get_current_user_optional
 from backend.api.schemas import (
     EventAttendanceRequest,
     EventSaveRequest,
@@ -17,6 +18,7 @@ from backend.db.models import (
     EventView,
     EventLinkClick,
     EventExport,
+    User,
     UserEventAttendance,
     UserSavedEvent,
     ShareToken,
@@ -89,15 +91,20 @@ def track_event_save(
     request: Request,
     payload: EventSaveRequest,
     session: Session = Depends(get_session),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
-    save = EventSave(
-        event_id=payload.event_id,
-        device_id=payload.device_id,
-        action=payload.action,
-    )
-    session.add(save)
+    if payload.record_analytics:
+        session.add(
+            EventSave(
+                event_id=payload.event_id,
+                device_id=payload.device_id,
+                action=payload.action,
+            )
+        )
 
-    # Maintain materialized state table (source of truth for sharing)
+    user_id = current_user.id if current_user else None
+
+    # Maintain materialized state table (source of truth for sharing).
     if payload.action == "save":
         existing = session.exec(
             select(UserSavedEvent).where(
@@ -105,11 +112,30 @@ def track_event_save(
                 UserSavedEvent.event_id == payload.event_id,
             )
         ).first()
-        if not existing:
+        if existing:
+            if user_id and existing.user_id is None:
+                existing.user_id = user_id
+                session.add(existing)
+        else:
             session.add(
-                UserSavedEvent(device_id=payload.device_id, event_id=payload.event_id)
+                UserSavedEvent(
+                    device_id=payload.device_id,
+                    event_id=payload.event_id,
+                    user_id=user_id,
+                )
             )
     else:
+        # Unsave: when authed, remove every row for this event owned by the user
+        # across all their devices so the cross-device view is consistent.
+        if user_id:
+            user_rows = session.exec(
+                select(UserSavedEvent).where(
+                    UserSavedEvent.user_id == user_id,
+                    UserSavedEvent.event_id == payload.event_id,
+                )
+            ).all()
+            for row in user_rows:
+                session.delete(row)
         row = session.exec(
             select(UserSavedEvent).where(
                 UserSavedEvent.device_id == payload.device_id,
@@ -129,15 +155,20 @@ def track_event_attendance(
     request: Request,
     payload: EventAttendanceRequest,
     session: Session = Depends(get_session),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
-    attendance = EventAttendance(
-        event_id=payload.event_id,
-        device_id=payload.device_id,
-        action=payload.action,
-    )
-    session.add(attendance)
+    if payload.record_analytics:
+        session.add(
+            EventAttendance(
+                event_id=payload.event_id,
+                device_id=payload.device_id,
+                action=payload.action,
+            )
+        )
 
-    # Maintain materialized state table
+    user_id = current_user.id if current_user else None
+
+    # Maintain materialized state table.
     if payload.action == "going":
         existing = session.exec(
             select(UserEventAttendance).where(
@@ -145,13 +176,42 @@ def track_event_attendance(
                 UserEventAttendance.event_id == payload.event_id,
             )
         ).first()
-        if not existing:
+        if existing:
+            if user_id and existing.user_id is None:
+                existing.user_id = user_id
+            # Only authenticated callers can change the visibility flag.
+            # Anonymous callers' field is ignored (rows with user_id=NULL
+            # are always treated as private/anonymous in the read path).
+            if current_user is not None and payload.share_publicly is not None:
+                existing.share_publicly = payload.share_publicly
+            session.add(existing)
+        else:
+            if current_user is not None:
+                share_publicly = (
+                    payload.share_publicly
+                    if payload.share_publicly is not None
+                    else current_user.share_attendance_default
+                )
+            else:
+                share_publicly = False
             session.add(
                 UserEventAttendance(
-                    device_id=payload.device_id, event_id=payload.event_id
+                    device_id=payload.device_id,
+                    event_id=payload.event_id,
+                    user_id=user_id,
+                    share_publicly=share_publicly,
                 )
             )
     else:
+        if user_id:
+            user_rows = session.exec(
+                select(UserEventAttendance).where(
+                    UserEventAttendance.user_id == user_id,
+                    UserEventAttendance.event_id == payload.event_id,
+                )
+            ).all()
+            for row in user_rows:
+                session.delete(row)
         row = session.exec(
             select(UserEventAttendance).where(
                 UserEventAttendance.device_id == payload.device_id,
