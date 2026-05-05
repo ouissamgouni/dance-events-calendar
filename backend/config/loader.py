@@ -93,22 +93,8 @@ def get_google_client_id() -> str:
 
 
 def get_dev_auth_enabled() -> bool:
-    """True when the dev sign-in bypass is enabled.
-
-    Reads DEV_AUTH first; falls back to the legacy MOCK_ADMIN_AUTH for
-    backward compatibility (with a one-time deprecation warning) so existing
-    .env / secrets files keep working until they're migrated.
-    """
+    """True when the dev sign-in bypass is enabled."""
     val = os.getenv("DEV_AUTH")
-    if val is None:
-        legacy = os.getenv("MOCK_ADMIN_AUTH")
-        if legacy is not None:
-            import logging
-
-            logging.getLogger(__name__).warning(
-                "MOCK_ADMIN_AUTH is deprecated; rename it to DEV_AUTH."
-            )
-            val = legacy
     return (val or "").lower() in ("true", "1")
 
 
