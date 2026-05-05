@@ -597,7 +597,7 @@ export default function Admin() {
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                     <label
                                         className="inline-flex items-center gap-1 text-[11px] text-gray-600"
-                                        title="Lower bound for fetching events from upstream calendars. Applies to Sync Now, Reseed, and Auto sync."
+                                        title="Lower bound for fetching events from upstream calendars. Used on Reseed and on the first-ever sync of each calendar (or after a sync token expires). Incremental syncs always return only changes since the last successful fetch."
                                     >
                                         <span className="text-gray-500">From</span>
                                         <input

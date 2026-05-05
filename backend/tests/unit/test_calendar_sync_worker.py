@@ -101,7 +101,10 @@ class TestCalendarSyncWorker:
 
         assert proc.submit.call_count == 3
         assert progress.fetched == 3
-        assert progress.status == "completed"
+        # After fetch completes the worker hands off to the shared pipeline
+        # processor; the calendar status stays "processing" until the admin
+        # job runner promotes it to "completed" after the pipeline drains.
+        assert progress.status == "processing"
 
     def test_410_fallback_clears_token_and_resyncs(self):
         """When sync token is present but result has no next_sync_token, worker retries without token."""

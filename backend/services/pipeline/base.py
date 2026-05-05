@@ -61,6 +61,44 @@ class EnrichmentPipeline:
         self.stages.append(stage)
         return self
 
+    def enrich(
+        self,
+        event: CachedEvent,
+        on_stage_start: "callable | None" = None,
+    ) -> dict[str, StageResult]:
+        """Run all stages on a transient event buffer (no DB writes).
+
+        Used by the parallel pipeline processor where persistence is performed
+        separately after enrichment completes. Each stage mutates ``event`` in
+        place. ``on_stage_start`` is called with the stage name before each
+        stage runs so callers can update progress UI.
+        """
+        results: dict[str, StageResult] = {
+            stage.name: StageResult() for stage in self.stages
+        }
+        for stage in self.stages:
+            result = results[stage.name]
+            if on_stage_start is not None:
+                try:
+                    on_stage_start(stage.name)
+                except Exception:
+                    logger.exception("on_stage_start callback failed")
+            if not stage.should_process(event):
+                result.skipped += 1
+                continue
+            try:
+                ok = stage.process(event)
+                if ok:
+                    result.processed += 1
+                else:
+                    result.failed += 1
+            except Exception:
+                logger.exception(
+                    "Stage %s failed for event %s", stage.name, event.event_id
+                )
+                result.failed += 1
+        return results
+
     def process_event(
         self, session: Session, event: CachedEvent
     ) -> dict[str, StageResult]:
