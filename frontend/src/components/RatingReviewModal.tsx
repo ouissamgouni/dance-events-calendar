@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { AdminRating, TagSuggestionResponse } from '../types';
 import {
     approveRating,
@@ -105,9 +106,9 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
         );
     };
 
-    return (
+    return createPortal(
         <div
-            className="fixed inset-0 z-[100] bg-slate-900/50 flex items-center justify-center p-4"
+            className="fixed inset-0 z-[1100] bg-slate-900/50 flex items-center justify-center p-4"
             onClick={onClose}
         >
             <div
@@ -291,6 +292,7 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
                     )}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body,
     );
 }

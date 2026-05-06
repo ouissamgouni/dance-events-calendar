@@ -45,7 +45,16 @@ export default function AttendeeAvatarStack({ eventId, max = 3 }: Props) {
     const { user } = useAuth();
     const summary = useAttendanceSummary(eventId);
     if (!summary) return null;
-    if (summary.total_going === 0) return null;
+    const totalSaved = summary.total_saved ?? 0;
+    if (summary.total_going === 0 && totalSaved === 0) return null;
+
+    const savedNode = totalSaved > 0 ? (
+        <span className="text-slate-500" title={`${totalSaved} saved`}>
+            <span className="text-slate-300 mx-1">·</span>
+            <span className="font-medium text-slate-600">Saved</span>
+            <span className="ml-1">{totalSaved}</span>
+        </span>
+    ) : null;
 
     // Logged-out viewers: count only, still tappable so they reach the
     // sign-in CTA in the detail page.
@@ -54,10 +63,22 @@ export default function AttendeeAvatarStack({ eventId, max = 3 }: Props) {
             <Link
                 to={`/event/${eventId}#attendees`}
                 onClick={(e) => e.stopPropagation()}
-                className="text-[11px] text-slate-500 hover:text-slate-700"
+                className="inline-flex items-center text-[11px] text-slate-500 hover:text-slate-700"
                 title="Sign in to see who"
             >
-                Going · {summary.total_going}
+                {summary.total_going > 0 && (
+                    <>
+                        <span className="font-medium text-slate-600">Going</span>
+                        <span className="ml-1">{summary.total_going}</span>
+                    </>
+                )}
+                {summary.total_going > 0 && savedNode}
+                {summary.total_going === 0 && totalSaved > 0 && (
+                    <>
+                        <span className="font-medium text-slate-600">Saved</span>
+                        <span className="ml-1">{totalSaved}</span>
+                    </>
+                )}
             </Link>
         );
     }
@@ -75,21 +96,32 @@ export default function AttendeeAvatarStack({ eventId, max = 3 }: Props) {
             className="inline-flex items-center gap-1.5 text-[11px] text-slate-500 hover:text-slate-700"
             title={namesTitle}
         >
-            <span className="font-medium text-slate-600">Going</span>
-            {shown.length > 0 && (
-                <span className="flex -space-x-1.5">
-                    {shown.map((a, i) => (
-                        <MiniAvatar key={a.user_id} attendee={a} z={shown.length - i} />
-                    ))}
-                </span>
+            {summary.total_going > 0 && (
+                <>
+                    <span className="font-medium text-slate-600">Going</span>
+                    {shown.length > 0 && (
+                        <span className="flex -space-x-1.5">
+                            {shown.map((a, i) => (
+                                <MiniAvatar key={a.user_id} attendee={a} z={shown.length - i} />
+                            ))}
+                        </span>
+                    )}
+                    <span>
+                        {shown.length === 0
+                            ? `· ${summary.total_going}`
+                            : overflow > 0
+                                ? `+${overflow}`
+                                : `· ${summary.total_going}`}
+                    </span>
+                </>
             )}
-            <span>
-                {shown.length === 0
-                    ? `· ${summary.total_going}`
-                    : overflow > 0
-                        ? `+${overflow}`
-                        : `· ${summary.total_going}`}
-            </span>
+            {summary.total_going === 0 && totalSaved > 0 && (
+                <>
+                    <span className="font-medium text-slate-600">Saved</span>
+                    <span>{totalSaved}</span>
+                </>
+            )}
+            {summary.total_going > 0 && savedNode}
         </Link>
     );
 }

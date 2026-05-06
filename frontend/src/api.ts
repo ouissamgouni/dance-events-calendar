@@ -1,4 +1,4 @@
-import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry } from './types';
+import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry } from './types';
 
 declare const __VITE_API_URL__: string;
 
@@ -11,6 +11,8 @@ const resolveApiBase = (): string => {
         // Fallback for Pages deployments if build env injection is missing.
         if (typeof window !== 'undefined') {
             const host = window.location.hostname;
+            if (host === 'joinmovida.com') return 'https://movida.fly.dev/api';
+            if (host === 'develop.joinmovida.com') return 'https://movida-staging.fly.dev/api';
             if (host === 'movida.pages.dev') return 'https://movida.fly.dev/api';
             if (host.endsWith('.movida.pages.dev')) return 'https://movida-staging.fly.dev/api';
         }
@@ -65,8 +67,13 @@ export async function fetchEvents(params?: { startDate?: string; endDate?: strin
     return parseJsonResponse<CalendarEvent[]>(res, 'Failed to fetch events');
 }
 
-export async function fetchEvent(eventId: string): Promise<CalendarEvent> {
-    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}`);
+export async function fetchEvent(eventId: string, opts?: { fresh?: boolean }): Promise<CalendarEvent> {
+    // `fresh: true` bypasses the browser HTTP cache. The public endpoint sets
+    // `Cache-Control: public, max-age=60`; admin flows that re-fetch after a
+    // mutation (approve a tag suggestion, edit a field, retry geocoding…) need
+    // the fresh server state immediately.
+    const init: RequestInit = opts?.fresh ? { cache: 'no-store' } : {};
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}`, init);
     if (!res.ok) throw new Error('Failed to fetch event');
     return res.json();
 }
@@ -979,8 +986,19 @@ export async function submitTagSuggestion(body: TagSuggestionCreate): Promise<vo
     if (!res.ok) throw new Error('Failed to submit tag suggestion');
 }
 
-export async function fetchAdminTagSuggestions(status?: string): Promise<TagSuggestionResponse[]> {
-    const qs = status ? `?status=${status}` : '';
+export async function fetchAdminTagSuggestions(
+    opts?: { status?: string; source?: 'user' | 'heuristic'; eventId?: string } | string,
+): Promise<TagSuggestionResponse[]> {
+    // Backwards-compat: accept a bare status string from existing callers.
+    const params = new URLSearchParams();
+    if (typeof opts === 'string') {
+        if (opts) params.set('status', opts);
+    } else if (opts) {
+        if (opts.status) params.set('status', opts.status);
+        if (opts.source) params.set('source', opts.source);
+        if (opts.eventId) params.set('event_id', opts.eventId);
+    }
+    const qs = params.toString() ? `?${params.toString()}` : '';
     const res = await fetch(`${BASE}/admin/tags/suggestions${qs}`, {
         credentials: 'include',
     });
@@ -1006,6 +1024,42 @@ export async function rejectTagSuggestion(id: number, adminNotes?: string): Prom
         credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to reject tag suggestion');
+}
+
+/** Run the heuristic auto tag-suggestion engine for a single event. */
+export async function runTagSuggestionsForEvent(
+    eventId: string,
+    opts: { replaceExistingPending?: boolean } = {},
+): Promise<TagSuggestionRunResponse> {
+    const res = await fetch(
+        `${BASE}/admin/events/${encodeURIComponent(eventId)}/suggest-tags`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ replace_existing_pending: !!opts.replaceExistingPending }),
+            credentials: 'include',
+        },
+    );
+    if (!res.ok) throw new Error('Failed to generate tag suggestions');
+    return res.json();
+}
+
+/** Run the heuristic auto tag-suggestion engine for many events at once (max 200). */
+export async function runTagSuggestionsBulk(
+    eventIds: string[],
+    opts: { replaceExistingPending?: boolean } = {},
+): Promise<BulkTagSuggestionRunResponse> {
+    const res = await fetch(`${BASE}/admin/events/bulk-suggest-tags`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            event_ids: eventIds,
+            replace_existing_pending: !!opts.replaceExistingPending,
+        }),
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to bulk-generate tag suggestions');
+    return res.json();
 }
 
 export async function updateEventTags(eventId: string, tagIds: number[]): Promise<void> {
@@ -1080,6 +1134,45 @@ export async function updateTag(tagId: number, data: { label?: string; color?: s
     });
     if (!res.ok) throw new Error('Failed to update tag');
     return res.json();
+}
+
+// --- Tag Synonyms (heuristic suggester) ---
+
+export interface TagSynonymResponse {
+    id: number;
+    tag_id: number;
+    term: string;
+    created_at: string;
+}
+
+export async function fetchTagSynonyms(tagId: number): Promise<TagSynonymResponse[]> {
+    const res = await fetch(`${BASE}/admin/tags/${tagId}/synonyms`, {
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to fetch tag synonyms');
+    return res.json();
+}
+
+export async function createTagSynonym(tagId: number, term: string): Promise<TagSynonymResponse> {
+    const res = await fetch(`${BASE}/admin/tags/${tagId}/synonyms`, {
+        method: 'POST',
+        headers: adminJsonHeaders,
+        body: JSON.stringify({ term }),
+        credentials: 'include',
+    });
+    if (!res.ok) {
+        if (res.status === 409) throw new Error('Synonym already exists');
+        throw new Error('Failed to create synonym');
+    }
+    return res.json();
+}
+
+export async function deleteTagSynonym(synonymId: number): Promise<void> {
+    const res = await fetch(`${BASE}/admin/tags/synonyms/${synonymId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to delete synonym');
 }
 
 // --- Single Event Geocoding ---

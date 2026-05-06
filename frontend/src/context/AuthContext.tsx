@@ -28,6 +28,10 @@ interface AuthContextType {
     ) => Promise<void>;
     logout: () => Promise<void>;
     deleteAccount: () => Promise<void>;
+    /** Re-fetch the current user. Use after mutations that change
+     * server-side preferences (e.g. PATCH /auth/preferences) so all
+     * consumers re-render without a full page reload. */
+    refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -103,8 +107,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
     }, []);
 
+    const refreshUser = useCallback(async () => {
+        const gen = ++generation.current;
+        try {
+            const u = await fetchMe();
+            if (generation.current === gen) setUser(u);
+        } catch {
+            // Leave existing user state intact on failure; the next
+            // auto-load on next mount will reconcile.
+        }
+    }, []);
+
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout, deleteAccount }}>
+        <AuthContext.Provider value={{ user, loading, login, logout, deleteAccount, refreshUser }}>
             {children}
         </AuthContext.Provider>
     );

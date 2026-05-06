@@ -78,8 +78,8 @@ tasks:
         fi
 
   staging:remote:frontend:
-    desc: "Build + deploy staging frontend to Cloudflare Pages (→
-      develop.movida.pages.dev)"
+    desc: "Build + deploy staging frontend to Cloudflare Pages (public:
+      develop.joinmovida.com, alias: develop.movida.pages.dev)"
     dotenv: [ "config/secrets.env", "config/secrets.staging.env" ]
     vars:
       PROJECT_NAME: "{{.PROJECT_NAME | default \"movida\"}}"
@@ -106,7 +106,7 @@ tasks:
         npx --yes wrangler pages deploy dist \
           --project-name={{.PROJECT_NAME}} \
           --branch=develop
-        echo "✅ Staging frontend deployed: https://develop.movida.pages.dev"
+        echo "✅ Staging frontend deployed: https://develop.joinmovida.com (alias: https://develop.movida.pages.dev)"
 
   # ──────────────────────────────────────────────────────────────────────────
   # STAGING REMOTE — full deploy (calls atomic tasks in sequence)
@@ -129,7 +129,7 @@ tasks:
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo "  Deploying REMOTE STAGING"
         echo "  Backend:  https://movida-staging.fly.dev"
-        echo "  Frontend: https://develop.movida.pages.dev"
+        echo "  Frontend: https://develop.joinmovida.com (alias: https://develop.movida.pages.dev)"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       - echo "━━━━ [1/3] DB migrations ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       - task: staging:remote:db
@@ -142,7 +142,7 @@ tasks:
         echo "═══════════════════════════════════════════════════════════════"
         echo "✅ Remote staging fully deployed"
         echo "   Backend:  https://movida-staging.fly.dev"
-        echo "   Frontend: https://develop.movida.pages.dev"
+        echo "   Frontend: https://develop.joinmovida.com (alias: https://develop.movida.pages.dev)"
         echo ""
         echo "Verify:"
         echo "   task db:check:staging:remote  → DB migration state"
@@ -204,7 +204,7 @@ tasks:
         fi
 
   prod:remote:frontend:
-    desc: "Build + deploy prod frontend to Cloudflare Pages (→ movida.pages.dev)"
+    desc: "Build + deploy prod frontend to Cloudflare Pages (public: joinmovida.com, alias: movida.pages.dev)"
     dotenv: [ "config/secrets.env", "config/secrets.prod.env" ]
     vars:
       PROJECT_NAME: "{{.PROJECT_NAME | default \"movida\"}}"
@@ -231,7 +231,7 @@ tasks:
         npx --yes wrangler pages deploy dist \
           --project-name={{.PROJECT_NAME}} \
           --branch=main
-        echo "✅ Prod frontend deployed: https://movida.pages.dev"
+        echo "✅ Prod frontend deployed: https://joinmovida.com (alias: https://movida.pages.dev)"
 
   # ──────────────────────────────────────────────────────────────────────────
   # PROD REMOTE — full deploy (calls atomic tasks in sequence)
@@ -254,7 +254,7 @@ tasks:
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo "  Deploying PRODUCTION"
         echo "  Backend:  https://movida.fly.dev"
-        echo "  Frontend: https://movida.pages.dev"
+        echo "  Frontend: https://joinmovida.com (alias: https://movida.pages.dev)"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       - echo "━━━━ [1/3] DB migrations ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       - task: prod:remote:db
@@ -267,7 +267,7 @@ tasks:
         echo "═══════════════════════════════════════════════════════════════"
         echo "✅ Production fully deployed"
         echo "   Backend:  https://movida.fly.dev"
-        echo "   Frontend: https://movida.pages.dev"
+        echo "   Frontend: https://joinmovida.com (alias: https://movida.pages.dev)"
         echo ""
         echo "Verify:"
         echo "   task db:check:prod   → DB migration state"

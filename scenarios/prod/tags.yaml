@@ -19,16 +19,22 @@ tag_groups:
         label: Social
         is_hero_filter: true
         hero_ordinal: 0
+      - slug: party
+        label: Party
       - slug: class
         label: Class
       - slug: workshop
         label: Workshop
       - slug: festival
         label: Festival
-      - slug: bootcamp
-        label: Bootcamp
       - slug: congress
         label: Congress
+      - slug: marathon
+        label: Marathon
+      - slug: weekender
+        label: Weekender
+      - slug: bootcamp
+        label: Bootcamp
       - slug: practice
         label: Practice
 
@@ -83,6 +89,10 @@ tag_groups:
         label: Salsa
         is_hero_filter: true
         hero_ordinal: 1
+      - slug: cuban
+        label: Cuban (Casino)
+      - slug: mambo
+        label: Mambo (On2)
       - slug: bachata
         label: Bachata
         is_hero_filter: true
@@ -91,6 +101,8 @@ tag_groups:
         label: Kizomba
       - slug: semba
         label: Semba
+      - slug: konpa
+        label: Konpa
       - slug: zouk
         label: Zouk
       - slug: rueda

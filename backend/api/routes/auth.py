@@ -376,6 +376,9 @@ def update_preferences(
     """Partial update of the authenticated user's preferences."""
     if payload.share_attendance_default is not None:
         user.share_attendance_default = payload.share_attendance_default
+        # Mark the preference as explicitly chosen so future default-flip
+        # migrations skip this user.
+        user.share_attendance_default_set_by_user = True
     session.add(user)
     session.commit()
     session.refresh(user)

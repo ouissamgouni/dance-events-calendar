@@ -356,7 +356,7 @@ export default function Home() {
                             </div>
                         </div>
                         {/* Map: order-2 on mobile, right column on desktop */}
-                        <div className="order-2 lg:order-2 h-[250px] lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
+                        <div className="order-2 lg:order-2 h-[180px] lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
                             <EventMap
                                 events={filteredEvents}
                                 onEventClick={handleExplorerMapEventClick}

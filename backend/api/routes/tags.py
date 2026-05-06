@@ -1,5 +1,6 @@
 import logging
 import re
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from slowapi import Limiter
@@ -18,10 +19,19 @@ from backend.api.schemas import (
     TagSuggestionCreate,
     TagSuggestionRejectRequest,
     TagSuggestionResponse,
+    TagSynonymCreateRequest,
+    TagSynonymResponse,
     TagUpdate,
 )
 from backend.db.database import get_session
-from backend.db.models import CachedEvent, EventTag, Tag, TagGroup, TagSuggestion
+from backend.db.models import (
+    CachedEvent,
+    EventTag,
+    Tag,
+    TagGroup,
+    TagSuggestion,
+    TagSynonym,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +75,36 @@ def _group_to_response(group: TagGroup) -> TagGroupResponse:
         enabled=group.enabled,
         scope=group.scope,
         tags=[_tag_to_response(t) for t in sorted(group.tags, key=lambda t: t.ordinal)],
+    )
+
+
+def _suggestion_to_response(
+    suggestion: TagSuggestion,
+    *,
+    tag: Optional[Tag] = None,
+    event_title: Optional[str] = None,
+    event: Optional[CachedEvent] = None,
+) -> TagSuggestionResponse:
+    """Centralised serialiser so heuristic metadata (source/confidence/matched_terms)
+    is always carried through, regardless of which endpoint built the row."""
+    return TagSuggestionResponse(
+        id=suggestion.id,
+        event_id=suggestion.event_id,
+        event_title=event_title if event_title is not None else (event.title if event else None),
+        event_description=getattr(event, "description", None) if event else None,
+        event_start=getattr(event, "start", None) if event else None,
+        event_location=getattr(event, "location", None) if event else None,
+        tag=_tag_to_response(tag) if tag else None,
+        free_text=suggestion.free_text,
+        group_slug=suggestion.group_slug,
+        status=suggestion.status,
+        submitter_device_id=suggestion.submitter_device_id,
+        admin_notes=suggestion.admin_notes,
+        reviewed_at=suggestion.reviewed_at,
+        created_at=suggestion.created_at,
+        source=suggestion.source,
+        confidence=suggestion.confidence,
+        matched_terms=suggestion.matched_terms,
     )
 
 
@@ -279,23 +319,8 @@ def submit_tag_suggestion(
     session.commit()
     session.refresh(suggestion)
 
-    # Build response
-    tag_resp = None
-    if suggestion.tag_id:
-        tag = session.get(Tag, suggestion.tag_id)
-        if tag:
-            tag_resp = _tag_to_response(tag)
-
-    return TagSuggestionResponse(
-        id=suggestion.id,
-        event_id=suggestion.event_id,
-        event_title=event.title,
-        tag=tag_resp,
-        free_text=suggestion.free_text,
-        status=suggestion.status,
-        submitter_device_id=suggestion.submitter_device_id,
-        created_at=suggestion.created_at,
-    )
+    tag = session.get(Tag, suggestion.tag_id) if suggestion.tag_id else None
+    return _suggestion_to_response(suggestion, tag=tag, event=event)
 
 
 # ── Admin: Tag Group listing with event counts ───────────────────────
@@ -572,13 +597,19 @@ def remove_event_tag(
 @router.get("/api/admin/tags/suggestions", response_model=list[TagSuggestionResponse])
 def list_tag_suggestions(
     status: str | None = Query(default=None),
+    source: str | None = Query(default=None, regex="^(user|heuristic)$"),
+    event_id: str | None = Query(default=None),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
-    """List tag suggestions, optionally filtered by status."""
+    """List tag suggestions, optionally filtered by status, source, or event."""
     query = select(TagSuggestion).order_by(col(TagSuggestion.created_at).desc())
     if status:
         query = query.where(TagSuggestion.status == status)
+    if source:
+        query = query.where(TagSuggestion.source == source)
+    if event_id:
+        query = query.where(TagSuggestion.event_id == event_id)
     suggestions = session.exec(query).all()
 
     # Enrich with event titles and tag info
@@ -592,33 +623,14 @@ def list_tag_suggestions(
 
     result = []
     for s in suggestions:
-        tag_resp = None
-        if s.tag_id:
-            tag = session.get(Tag, s.tag_id)
-            if tag:
-                tag_resp = _tag_to_response(tag)
+        tag = session.get(Tag, s.tag_id) if s.tag_id else None
+        ev = events_map.get(s.event_id)
         result.append(
-            TagSuggestionResponse(
-                id=s.id,
-                event_id=s.event_id,
-                event_title=events_map.get(
-                    s.event_id,
-                    CachedEvent(
-                        event_id="",
-                        calendar_id="",
-                        title="Unknown",
-                        start=s.created_at,
-                        end=s.created_at,
-                    ),
-                ).title,
-                tag=tag_resp,
-                free_text=s.free_text,
-                group_slug=s.group_slug,
-                status=s.status,
-                submitter_device_id=s.submitter_device_id,
-                admin_notes=s.admin_notes,
-                reviewed_at=s.reviewed_at,
-                created_at=s.created_at,
+            _suggestion_to_response(
+                s,
+                tag=tag,
+                event=ev,
+                event_title=ev.title if ev else "Unknown",
             )
         )
     return result
@@ -677,20 +689,12 @@ def approve_tag_suggestion(
     session.commit()
     session.refresh(suggestion)
 
-    tag_resp = _tag_to_response(tag)
     event = session.get(CachedEvent, suggestion.event_id)
-    return TagSuggestionResponse(
-        id=suggestion.id,
-        event_id=suggestion.event_id,
+    return _suggestion_to_response(
+        suggestion,
+        tag=tag,
+        event=event,
         event_title=event.title if event else "Unknown",
-        tag=tag_resp,
-        free_text=suggestion.free_text,
-        group_slug=suggestion.group_slug,
-        status=suggestion.status,
-        submitter_device_id=suggestion.submitter_device_id,
-        admin_notes=suggestion.admin_notes,
-        reviewed_at=suggestion.reviewed_at,
-        created_at=suggestion.created_at,
     )
 
 
@@ -722,23 +726,95 @@ def reject_tag_suggestion(
     session.commit()
     session.refresh(suggestion)
 
-    tag_resp = None
-    if suggestion.tag_id:
-        tag = session.get(Tag, suggestion.tag_id)
-        if tag:
-            tag_resp = _tag_to_response(tag)
-
+    tag = session.get(Tag, suggestion.tag_id) if suggestion.tag_id else None
     event = session.get(CachedEvent, suggestion.event_id)
-    return TagSuggestionResponse(
-        id=suggestion.id,
-        event_id=suggestion.event_id,
+    return _suggestion_to_response(
+        suggestion,
+        tag=tag,
+        event=event,
         event_title=event.title if event else "Unknown",
-        tag=tag_resp,
-        free_text=suggestion.free_text,
-        group_slug=suggestion.group_slug,
-        status=suggestion.status,
-        submitter_device_id=suggestion.submitter_device_id,
-        admin_notes=suggestion.admin_notes,
-        reviewed_at=suggestion.reviewed_at,
-        created_at=suggestion.created_at,
     )
+
+
+# ── Admin: Tag synonyms (heuristic suggester) ────────────────────────
+
+
+def _synonym_to_response(syn: TagSynonym) -> TagSynonymResponse:
+    return TagSynonymResponse(
+        id=syn.id,
+        tag_id=syn.tag_id,
+        term=syn.term,
+        created_at=syn.created_at,
+    )
+
+
+@router.get(
+    "/api/admin/tags/{tag_id}/synonyms",
+    response_model=list[TagSynonymResponse],
+)
+def list_tag_synonyms(
+    tag_id: int,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """List all synonym terms configured for a tag (used by the heuristic suggester)."""
+    tag = session.get(Tag, tag_id)
+    if not tag:
+        raise HTTPException(status_code=404, detail=f"Tag {tag_id} not found")
+    rows = session.exec(
+        select(TagSynonym)
+        .where(TagSynonym.tag_id == tag_id)
+        .order_by(TagSynonym.term)
+    ).all()
+    return [_synonym_to_response(r) for r in rows]
+
+
+@router.post(
+    "/api/admin/tags/{tag_id}/synonyms",
+    response_model=TagSynonymResponse,
+    status_code=201,
+)
+def create_tag_synonym(
+    tag_id: int,
+    body: TagSynonymCreateRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Add a synonym term to a tag."""
+    tag = session.get(Tag, tag_id)
+    if not tag:
+        raise HTTPException(status_code=404, detail=f"Tag {tag_id} not found")
+    term = (body.term or "").strip().lower()
+    if not term:
+        raise HTTPException(status_code=422, detail="term must not be empty")
+    existing = session.exec(
+        select(TagSynonym).where(
+            TagSynonym.tag_id == tag_id,
+            TagSynonym.term == term,
+        )
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Synonym already exists for this tag")
+    syn = TagSynonym(tag_id=tag_id, term=term)
+    session.add(syn)
+    session.commit()
+    session.refresh(syn)
+    return _synonym_to_response(syn)
+
+
+@router.delete(
+    "/api/admin/tags/synonyms/{synonym_id}",
+    status_code=204,
+)
+def delete_tag_synonym(
+    synonym_id: int,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Remove a synonym term."""
+    syn = session.get(TagSynonym, synonym_id)
+    if not syn:
+        raise HTTPException(status_code=404, detail="Synonym not found")
+    session.delete(syn)
+    session.commit()
+    return None

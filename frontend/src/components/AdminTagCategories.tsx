@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { AdminTag, AdminTagGroup } from '../api';
 import { fetchAdminTagGroups, createTagGroup, updateTagGroup, createTag, updateTag } from '../api';
+import TagSynonymsEditor from './TagSynonymsEditor';
 
 const CARD_BG_COLORS = [
     'bg-rose-50', 'bg-sky-50', 'bg-amber-50', 'bg-emerald-50',
@@ -29,6 +30,7 @@ export default function AdminTagCategories() {
     const [reorderError, setReorderError] = useState<string | null>(null);
     const [editingTagId, setEditingTagId] = useState<number | null>(null);
     const [editingTagLabel, setEditingTagLabel] = useState('');
+    const [synonymsOpenTagId, setSynonymsOpenTagId] = useState<number | null>(null);
 
     const load = () => {
         fetchAdminTagGroups()
@@ -301,7 +303,7 @@ export default function AdminTagCategories() {
                                             {group.tags.map((tag) => (
                                                 <span
                                                     key={tag.id}
-                                                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-white ${!tag.enabled ? 'opacity-40 line-through' : ''}`}
+                                                    className={`relative inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-white ${!tag.enabled ? 'opacity-40 line-through' : ''}`}
                                                     style={{ backgroundColor: groupColor }}
                                                 >
                                                     {editingTagId === tag.id ? (
@@ -347,6 +349,23 @@ export default function AdminTagCategories() {
                                                     >
                                                         {tag.enabled ? '●' : '○'}
                                                     </button>
+                                                    <button
+                                                        onClick={() => setSynonymsOpenTagId(
+                                                            synonymsOpenTagId === tag.id ? null : tag.id,
+                                                        )}
+                                                        className="ml-0.5 hover:opacity-80 transition text-[10px] leading-none"
+                                                        title="Edit synonyms"
+                                                        aria-label="Edit synonyms"
+                                                    >
+                                                        ☰
+                                                    </button>
+                                                    {synonymsOpenTagId === tag.id && (
+                                                        <TagSynonymsEditor
+                                                            tagId={tag.id}
+                                                            tagLabel={tag.label}
+                                                            onClose={() => setSynonymsOpenTagId(null)}
+                                                        />
+                                                    )}
                                                 </span>
                                             ))}
 

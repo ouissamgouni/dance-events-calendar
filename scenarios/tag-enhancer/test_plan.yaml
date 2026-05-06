@@ -1,0 +1,145 @@
+test_plan:
+  name: "Tag Enhancer — Auto Tag Suggestions"
+  description: >
+    End-to-end coverage of the heuristic auto tag-suggestion feature. Kept
+    deliberately focused on the major paths: post-sync generation, admin review
+    (approve / reject), exclusions (already-applied + recently-rejected), the
+    new review-modal UX (admin side panel + description see-more), and the
+    admin-configurable synonym editor.
+
+    Pre-seeded data (db-events.yaml):
+      - evt-001..004: untagged events designed to trigger heuristic hits
+      - evt-005: pre-tagged with salsa+social → engine must skip those
+      - evt-006: a recently-rejected auto 'workshop' suggestion (suppressed)
+      - evt-008: three pre-seeded pending auto rows for review-UI testing
+      - one user-submitted "Live Music" suggestion on evt-001
+
+    Mock-sync data (mock-sync-events.yaml):
+      - sync-evt-001, sync-evt-002: delivered by the mock calendar on sync;
+        they enter the DB via the enrichment pipeline so the heuristic
+        TagSuggestionStage runs against them automatically.
+
+  steps:
+    # ── 1. Post-sync auto suggestions ───────────────────────────
+    - id: 1
+      title: "Sync generates pending auto suggestions"
+      description: >
+        Sign in as Dev Admin. Trigger a manual sync via the admin "Sync Now"
+        button (mock calendar service delivers sync-evt-001 + sync-evt-002).
+      expected: >
+        After sync completes, both events appear in the Events panel. The Tag
+        Suggestions panel pending count increases by ~9 rows (heuristic-source).
+        Opening sync-evt-001 ("Salsa Bootcamp Sunday Brunch") shows pending auto
+        suggestions: Salsa, Bootcamp, Beginner, Indoor, Free Entry. Opening
+        sync-evt-002 ("Urban Kiz Open-Air Social") shows: Kizomba, Social, DJ,
+        Outdoor. No tags are auto-applied — every match is a *pending*
+        suggestion awaiting admin review.
+
+    # ── 2. Review panel + Source filter ─────────────────────────
+    - id: 2
+      title: "Tag Suggestions panel + Source filter"
+      description: >
+        Open the Tag Suggestions side panel. Cycle the Source filter chips (All
+        → User → Auto).
+      expected: >
+        - All: shows both auto and user rows. - User: only the "Live Music"
+        suggestion on evt-001 remains. - Auto: only heuristic rows remain, each
+        with a green "Auto"
+          badge + confidence percent next to the date.
+        - Event-id link uses neutral slate colour (no red).
+
+    # ── 3. Review modal UX ──────────────────────────────────────
+    - id: 3
+      title: "Review modal — View event opens admin side panel"
+      description: >
+        Click any pending auto-suggestion row to open the review modal. Verify
+        the event description renders in the event-info card with a "See more"
+        toggle when long. Click "View event →".
+      expected: >
+        - Event card shows the description (truncated at ~3 lines) with a
+          "See more" / "See less" toggle that expands the full text.
+        - "View event →" closes the modal and opens the admin
+          AdminEventDetailPanel side panel for that event (NOT the
+          public-facing event modal).
+        - Approve button is sky-blue (`bg-sky-600`); Reject button is
+          neutral grey (`bg-slate-200`). No red anywhere.
+
+    # ── 4. Approve / Reject from event detail ───────────────────
+    - id: 4
+      title: "Approve and reject from event detail page"
+      description: >
+        Open the admin detail page for evt-001 ("Friday Salsa Social with DJ
+        Mambo"). The "Auto Tag Suggestions" block runs the engine on mount.
+        Click ✓ on "Salsa" and ✗ on "All Levels".
+      expected: >
+        - "Salsa" disappears from the auto list and now appears as an
+          applied tag in the Tags block above.
+        - "All Levels" disappears (status → rejected). - ✓ button uses sky-blue;
+        ✗ button uses neutral slate. - Re-running the engine on this event does
+        NOT re-suggest "Salsa"
+          (already applied) or "All Levels" (recently rejected).
+
+    # ── 5. Recently-rejected auto tags are suppressed ───────────
+    - id: 5
+      title: "Recently-rejected auto tags are suppressed (≤ 30 days)"
+      description: >
+        Open the admin detail page for evt-006 ("Bachata Workshop & Social").
+        'workshop' was rejected 5 days ago. Click "Re-run".
+      expected: >
+        Suggestion list includes bachata, social, dj — but NOT workshop, even
+        though "workshop" appears verbatim in the title.
+
+    # ── 6. Bulk run + idempotency ───────────────────────────────
+    - id: 6
+      title: "Bulk Suggest Tags (auto) is idempotent"
+      description: >
+        In the admin Events panel, select evt-002, evt-003, evt-004. Click
+        "Suggest Tags (auto)" once → check results, then click again.
+      expected: >
+        - First run: success message "Generated N suggestions across 3 events".
+          Each event now has pending heuristic rows visible from its
+          detail page.
+        - Second run: 0 new suggestions generated, 3 events skipped
+          (each already has at least one auto suggestion).
+
+    # ── 7. Configurable synonyms ────────────────────────────────
+    - id: 7
+      title: "Admin can edit per-tag synonyms; engine picks them up"
+      description: >
+        Open the Admin → Tags configuration page. On the "Salsa" tag chip, click
+        the ☰ button to open the Synonyms popover. Add a custom term ("rueda de
+        casino"), close the popover. Edit any untagged event's description to
+        include "rueda de casino" and click "Re-run" in its Auto Tag Suggestions
+        block.
+      expected: >
+        - Popover lists existing synonyms as removable chips and lets the
+          admin add a new one inline.
+        - Adding shows the new chip; outside-click closes the popover. - The
+        engine immediately matches the new term and suggests "Salsa". - Removing
+        the chip and re-running no longer produces that match. - Adding a
+        duplicate term shows an "already exists" inline error.
+
+    # ── 8. "Live DJ set" no longer triggers Live music ──────────
+    - id: 8
+      title: "Live DJ events suggest DJ but NOT Live Music"
+      description: >
+        Open the admin detail page for evt-001 (title mentions "DJ Mambo",
+        description mentions "Live DJ set"). Click "Re-run".
+      expected: >
+        Suggestions include DJ but NOT Live Music. (The "live dj set" term was
+        moved from the live-music synonyms to the dj synonyms.) Live Music can
+        still be triggered for evt-002 / evt-005 via "live band" / "live
+        orchestra".
+
+    # ── 9. Migration sanity ─────────────────────────────────────
+    - id: 9
+      title: "tag_synonyms table exists and is seeded"
+      description: >
+        Connect to the scenario DB. Run:
+          \\d tag_synonyms
+          SELECT tag_id, count(*) FROM tag_synonyms GROUP BY tag_id;
+      expected: >
+        Table tag_synonyms exists with columns (id, tag_id, term, created_at)
+        and a unique index on (tag_id, term). After scenario seed, well-known
+        tags (salsa, bachata, kizomba, dj, live-music, …) each have ≥ 1 row
+        populated from the static default synonym map.

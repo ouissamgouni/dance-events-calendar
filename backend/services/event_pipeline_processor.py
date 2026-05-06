@@ -96,6 +96,7 @@ class PipelineStage(str, Enum):
     LINK_EXTRACTION = "link_extraction"
     PRICE_EXTRACTION = "price_extraction"
     GEOCODING = "geocoding"
+    TAG_SUGGESTION = "tag_suggestion"
     PERSISTENCE = "persistence"
 
 
@@ -122,6 +123,7 @@ _ENRICHMENT_STAGE_NAMES = (
     PipelineStage.LINK_EXTRACTION.value,
     PipelineStage.PRICE_EXTRACTION.value,
     PipelineStage.GEOCODING.value,
+    PipelineStage.TAG_SUGGESTION.value,
 )
 _ALL_STAGE_NAMES = _ENRICHMENT_STAGE_NAMES + (PipelineStage.PERSISTENCE.value,)
 

@@ -59,8 +59,8 @@ task start:dev        # DB + backend (--reload) + frontend (vite)
 |-------------|---------|------|---------|----------|
 | **dev** | Local development, hot-reload | localhost:5434 | localhost:8001 | localhost:5173 |
 | **staging:local** | Docker-compose integration test | localhost:5436 | localhost:8002 | localhost:3001 |
-| **staging:remote** | Cloud staging (Fly.io + Neon + Cloudflare) | Neon develop | movida-staging.fly.dev | develop.movida.pages.dev |
-| **prod:remote** | Cloud production | Neon main | movida.fly.dev | movida.pages.dev |
+| **staging:remote** | Cloud staging (Fly.io + Neon + Cloudflare) | Neon develop | movida-staging.fly.dev | develop.joinmovida.com (alias: develop.movida.pages.dev) |
+| **prod:remote** | Cloud production | Neon main | movida.fly.dev | joinmovida.com (alias: movida.pages.dev) |
 | **scenario** | Isolated manual QA with seeded data | localhost:5437+ | localhost:8003+ | localhost:3002+ |
 
 ---
@@ -193,7 +193,7 @@ What `backend:staging:remote` does:
 
 URLs after deploy:
 - Backend: <https://movida-staging.fly.dev\>
-- Frontend: <https://develop.movida.pages.dev\>
+- Frontend: <https://develop.joinmovida.com\> (alias: <https://develop.movida.pages.dev\>)
 
 Verify:
 ```bash
@@ -224,7 +224,7 @@ Env files loaded: `secrets.env` + `secrets.prod.env` + `.env.prod`
 
 URLs after deploy:
 - Backend: <https://movida.fly.dev\>
-- Frontend: <https://movida.pages.dev\>
+- Frontend: <https://joinmovida.com\> (alias: <https://movida.pages.dev\>)
 
 Verify:
 ```bash

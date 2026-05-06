@@ -15,11 +15,17 @@
 #       VITE_API_URL          = https://movida.fly.dev
 #       VITE_UMAMI_URL        = https://cloud.umami.is
 #       VITE_UMAMI_WEBSITE_ID = <prod-uuid>          (encrypted)
+#       Custom domain         = joinmovida.com
 #     Preview (staging):
 #       NODE_VERSION          = 22
 #       VITE_API_URL          = https://movida-staging.fly.dev
 #       VITE_UMAMI_URL        = https://cloud.umami.is
 #       VITE_UMAMI_WEBSITE_ID = <staging-uuid>       (encrypted)
+#       Custom domain         = develop.joinmovida.com
+
+# Legacy Pages hostnames remain available during transition:
+#   Production alias: movida.pages.dev
+#   Staging alias:    develop.movida.pages.dev
 
 name = "movida"
 compatibility_date = "2026-04-30"

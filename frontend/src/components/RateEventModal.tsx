@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { EventRating, TagGroup } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { deleteMyRating, fetchTagGroups, submitFeedback } from '../api';
@@ -115,9 +116,9 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
         }
     };
 
-    return (
+    return createPortal(
         <div
-            className="fixed inset-0 z-[100] bg-slate-900/50 flex items-center justify-center p-4"
+            className="fixed inset-0 z-[1100] bg-slate-900/50 flex items-center justify-center p-4"
             onClick={onClose}
         >
             <div
@@ -309,6 +310,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                     </div>
                 )}
             </div>
-        </div>
+        </div>,
+        document.body,
     );
 }

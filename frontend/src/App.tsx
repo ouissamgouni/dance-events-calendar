@@ -12,6 +12,7 @@ import { QaTestPlanProvider, useQaPinnedWidth } from './components/QaTestPlanPan
 import { StatusBar } from './components/StatusBar';
 import InstagramBadge from './components/InstagramBadge';
 import ProtectedRoute from './components/ProtectedRoute';
+import SignUpBanner from './components/SignUpBanner';
 import Home from './pages/Home';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
@@ -28,8 +29,8 @@ export default function App() {
     <AuthProvider>
       <ConsentProvider>
         <FeatureFlagsProvider>
-          <SavedEventsProvider>
-            <AttendanceSummariesProvider>
+          <AttendanceSummariesProvider>
+            <SavedEventsProvider>
               <RatingAggregatesProvider>
                 <MyRatingsProvider>
                   <AttendingEventsProvider>
@@ -39,8 +40,8 @@ export default function App() {
                   </AttendingEventsProvider>
                 </MyRatingsProvider>
               </RatingAggregatesProvider>
-            </AttendanceSummariesProvider>
-          </SavedEventsProvider>
+            </SavedEventsProvider>
+          </AttendanceSummariesProvider>
         </FeatureFlagsProvider>
       </ConsentProvider>
     </AuthProvider>
@@ -100,6 +101,7 @@ function AppShell() {
             <InstagramBadge />
           </div>
         </div>
+        <SignUpBanner />
         <main className="flex-1 overflow-auto">
           <Routes>
             <Route path="/" element={<Home />} />

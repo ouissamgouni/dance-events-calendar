@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react';
 import { trackSave } from '../utils/tracking';
 import { useAuth } from './AuthContext';
+import { useInvalidateAttendanceSummary } from './AttendanceSummariesContext';
 import { fetchMySavedEventIds } from '../api';
 
 const STORAGE_KEY = 'movida_saved_events';
@@ -33,6 +34,7 @@ function writeToStorage(ids: Set<string>) {
 
 export function SavedEventsProvider({ children }: { children: ReactNode }) {
     const [savedIds, setSavedIds] = useState<Set<string>>(() => readFromStorage());
+    const invalidateSummary = useInvalidateAttendanceSummary();
     const { user } = useAuth();
     const lastSyncedUserId = useRef<string | null | undefined>(undefined);
 
@@ -76,7 +78,10 @@ export function SavedEventsProvider({ children }: { children: ReactNode }) {
         // Side effect outside the updater — safe under StrictMode double-invoke
         const action = savedIds.has(eventId) ? 'unsave' : 'save';
         trackSave(eventId, action);
-    }, [savedIds]);
+        // Invalidate cached attendance summary so total_saved on event cards
+        // updates without a page reload.
+        invalidateSummary(eventId);
+    }, [savedIds, invalidateSummary]);
 
     const isSaved = useCallback((eventId: string) => savedIds.has(eventId), [savedIds]);
 

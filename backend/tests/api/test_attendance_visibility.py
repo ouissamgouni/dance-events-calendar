@@ -24,7 +24,7 @@ from backend.api.main import app  # noqa: E402
 from backend.api.routes import auth as auth_module  # noqa: E402
 from backend.api.routes import tracking as tracking_module  # noqa: E402
 from backend.db.database import get_session  # noqa: E402
-from backend.db.models import User, UserEventAttendance  # noqa: E402
+from backend.db.models import User, UserEventAttendance, UserSavedEvent  # noqa: E402
 
 
 @pytest.fixture
@@ -253,3 +253,92 @@ def test_track_event_attendance_persists_share_publicly(client, session):
     ).first()
     assert anon.user_id is None
     assert anon.share_publicly is False
+
+
+def _save(session: Session, *, event_id: str, device_id: str, user: User | None = None):
+    session.add(
+        UserSavedEvent(
+            event_id=event_id,
+            device_id=device_id,
+            user_id=user.id if user else None,
+        )
+    )
+    session.commit()
+
+
+@pytest.mark.unit
+def test_attendance_summary_includes_total_saved_anonymous(client, session):
+    """Anonymous viewer sees total_saved alongside total_going."""
+    alice = _make_user(session, "alice@example.com", "Alice")
+    event_id = "evt-saved-1"
+    _seed(session, event_id=event_id, user=alice, device_id="d-a", share_publicly=True)
+    _save(session, event_id=event_id, device_id="d-anon-1")
+    _save(session, event_id=event_id, device_id="d-anon-2", user=alice)
+
+    r = client.get(f"/api/events/{event_id}/attendance-summary")
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["total_going"] == 1
+    assert data["total_saved"] == 2
+    assert data["can_view_attendees"] is False
+
+
+@pytest.mark.unit
+def test_attendance_summary_includes_total_saved_authenticated(client, session):
+    """Authenticated viewer sees total_saved alongside the going breakdown."""
+    alice = _make_user(session, "alice@example.com", "Alice")
+    _make_user(session, "viewer@example.com", "Viewer")
+
+    event_id = "evt-saved-2"
+    _seed(session, event_id=event_id, user=alice, device_id="d-a", share_publicly=True)
+    _save(session, event_id=event_id, device_id="d-s1")
+    _save(session, event_id=event_id, device_id="d-s2")
+    _save(session, event_id=event_id, device_id="d-s3")
+
+    _login(client, "viewer@example.com")
+    r = client.get(f"/api/events/{event_id}/attendance-summary")
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["total_going"] == 1
+    assert data["public_going"] == 1
+    assert data["total_saved"] == 3
+
+
+@pytest.mark.unit
+def test_attendance_summary_total_saved_zero_when_no_saves(client, session):
+    """total_saved defaults to 0 when there are no UserSavedEvent rows."""
+    event_id = "evt-saved-empty"
+    r = client.get(f"/api/events/{event_id}/attendance-summary")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["total_going"] == 0
+    assert data["total_saved"] == 0
+
+
+@pytest.mark.unit
+def test_attendance_summary_batch_includes_total_saved(client, session):
+    """Batch endpoint returns total_saved per event in one round-trip,
+    independently of total_going."""
+    alice = _make_user(session, "alice@example.com", "Alice")
+
+    event_a = "evt-batch-saved-a"
+    event_b = "evt-batch-saved-b"  # has saves but no goings
+    event_c = "evt-batch-saved-c"  # has neither
+
+    _seed(session, event_id=event_a, user=alice, device_id="d-a", share_publicly=True)
+    _save(session, event_id=event_a, device_id="d-sa1")
+    _save(session, event_id=event_b, device_id="d-sb1")
+    _save(session, event_id=event_b, device_id="d-sb2")
+
+    r = client.post(
+        "/api/events/attendance-summary",
+        json={"event_ids": [event_a, event_b, event_c]},
+    )
+    assert r.status_code == 200, r.text
+    by_id = {row["event_id"]: row for row in r.json()}
+    assert by_id[event_a]["total_going"] == 1
+    assert by_id[event_a]["total_saved"] == 1
+    assert by_id[event_b]["total_going"] == 0
+    assert by_id[event_b]["total_saved"] == 2
+    assert by_id[event_c]["total_going"] == 0
+    assert by_id[event_c]["total_saved"] == 0

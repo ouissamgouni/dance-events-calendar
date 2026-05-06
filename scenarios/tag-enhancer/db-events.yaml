@@ -1,0 +1,222 @@
+# Events for the tag-enhancer scenario.
+#
+# Layout designed to exercise every code path of the auto tag-suggestion stage:
+#
+#  - evt-001..004: untagged events whose title/description deliberately hit
+#    canonical labels and curated synonyms → admin can run the bulk
+#    "Suggest Tags (auto)" action and get high-confidence pending suggestions.
+#  - evt-005: already has some tags applied → the engine must EXCLUDE those tag_ids
+#    and only suggest the missing ones.
+#  - evt-006: has a recent rejected auto suggestion (< 30 days) → that tag must
+#    NOT be re-suggested (rejection-suppression window).
+#  - evt-007: has an old rejected auto suggestion (> 30 days) → suppression
+#    window expired, tag CAN be re-suggested.
+#  - evt-008: already has pre-seeded pending auto suggestions so the admin
+#    can review them in the UI without first running the engine.
+
+base_week: 0
+
+events:
+  # ── 1. Untagged, strong canonical hits ──────────────────────
+  - id: "evt-001"
+    calendar_id: "salsa-cal-001"
+    title: "Friday Salsa Social with DJ Mambo"
+    description: >
+      Weekly salsa social. Live DJ set, free entry before 22:00, all levels welcome.
+      Indoor venue with great sound.
+    location: "Dance Studio, Paris, France"
+    latitude: 48.8566
+    longitude: 2.3522
+    start: "w0 Fri 21:00"
+    end: "w0 Sat 02:00"
+    price_is_free: true
+    # No tags → the engine should suggest: salsa, social, dj, free, indoor, all-levels.
+
+  # ── 2. Untagged, synonym-driven hits ────────────────────────
+  - id: "evt-002"
+    calendar_id: "bachata-cal-002"
+    title: "Bachata Sensual Weekender — Open Air Edition"
+    description: >
+      A two-day bachata sensual marathon in the park. Workshops with international
+      artists in the morning, fiesta with live band at night. Tous niveaux bienvenus.
+    location: "Parc de la Ciutadella, Barcelona, Spain"
+    latitude: 41.3879
+    longitude: 2.1840
+    start: "w0 Sat 11:00"
+    end: "w0 Sun 23:59"
+    price_is_free: false
+    price_min: 60
+    price_currency: "EUR"
+    # No tags → synonyms should hit:
+    #   "bachata sensual" → bachata, "weekender"/"marathon" → festival,
+    #   "open air"/"park" → outdoor, "fiesta" → social, "live band" → live-music,
+    #   "workshops" → workshop, "tous niveaux" → all-levels.
+
+  # ── 3. Untagged, advanced + intensive ───────────────────────
+  - id: "evt-003"
+    calendar_id: "salsa-cal-001"
+    title: "Advanced Salsa Shines Bootcamp"
+    description: >
+      Intensive two-day boot camp for advanced dancers. Solo footwork shines and
+      partnerwork drills. Indoor studio.
+    location: "Latin Motion, Milan, Italy"
+    latitude: 45.4642
+    longitude: 9.1900
+    start: "w1 Sat 10:00"
+    end: "w1 Sun 18:00"
+    price_is_free: false
+    price_min: 90
+    price_currency: "EUR"
+    # No tags → the engine should suggest: salsa, advanced, bootcamp, indoor.
+    # (Level group is single-pick → only 'advanced' should win that group.)
+
+  # ── 4. Untagged, kizomba synonyms ───────────────────────────
+  - id: "evt-004"
+    calendar_id: "kizomba-cal-003"
+    title: "Urban Kiz & Tarraxo Night"
+    description: >
+      Late-night ghetto zouk and tarraxinha social with a Lisbon DJ.
+    location: "Casa Latina, Lisbon, Portugal"
+    latitude: 38.7223
+    longitude: -9.1393
+    start: "w0 Fri 22:00"
+    end: "w0 Sat 03:00"
+    price_is_free: false
+    price_min: 8
+    price_currency: "EUR"
+    # No tags → synonyms should hit kizomba ("urban kiz", "tarraxo",
+    # "ghetto zouk", "tarraxinha"), social, dj.
+
+  # ── 5. Already tagged → applied tags must be excluded ───────
+  - id: "evt-005"
+    calendar_id: "salsa-cal-001"
+    title: "Salsa Social on the Rooftop with Live Band"
+    description: >
+      Open-air salsa party with live orchestra. Beginners welcome.
+    location: "Skybar, Brussels, Belgium"
+    latitude: 50.8503
+    longitude: 4.3517
+    start: "w1 Sat 20:00"
+    end: "w1 Sun 00:00"
+    price_is_free: false
+    price_min: 12
+    price_currency: "EUR"
+    tags:
+      # Salsa & social are pre-applied → the engine must NOT re-suggest them.
+      - "dance-style:salsa"
+      - "format:social"
+    # the engine is expected to suggest only the *missing* matches:
+    # outdoor (open-air), live-music (live band/orchestra), beginner.
+
+  # ── 6. Recently rejected auto suggestion → suppressed ─────────
+  - id: "evt-006"
+    calendar_id: "bachata-cal-002"
+    title: "Bachata Workshop & Social"
+    description: >
+      Bachata workshop followed by a social with DJ.
+    location: "Tanzhaus, Berlin, Germany"
+    latitude: 52.5200
+    longitude: 13.4050
+    start: "w0 Wed 19:00"
+    end: "w0 Wed 23:00"
+    price_is_free: false
+    price_min: 15
+    price_currency: "EUR"
+    # See `tag_suggestions:` below — 'workshop' was rejected 5 days ago and
+    # must NOT reappear when admin re-runs auto suggestions for this event.
+
+  # ── 7. Old rejected auto suggestion → window expired ──────────
+  - id: "evt-007"
+    calendar_id: "kizomba-cal-003"
+    title: "Kizomba Festival Weekender"
+    description: >
+      International kizomba festival with workshops and parties.
+    location: "Casa Latina, Lisbon, Portugal"
+    latitude: 38.7223
+    longitude: -9.1393
+    start: "w2 Fri 18:00"
+    end: "w2 Sun 22:00"
+    price_is_free: false
+    price_min: 80
+    price_currency: "EUR"
+    # See `tag_suggestions:` below — 'festival' rejected 60 days ago. Outside
+    # REJECTION_SUPPRESSION_DAYS=30 → admin re-run SHOULD re-suggest it.
+
+  # ── 8. Pre-seeded pending auto suggestions for review UI ──────
+  - id: "evt-008"
+    calendar_id: "salsa-cal-001"
+    title: "Salsa Class for Beginners"
+    description: >
+      Intro salsa class for absolute beginners. Free first lesson.
+    location: "Dance Lab, Rome, Italy"
+    latitude: 41.8967
+    longitude: 12.4822
+    start: "w0 Tue 19:00"
+    end: "w0 Tue 20:30"
+    price_is_free: true
+    # See `tag_suggestions:` below — three pending auto-source rows pre-seeded so the
+    # Tag Suggestions side panel shows them immediately under Source=Auto.
+
+
+# ── Pre-seeded TagSuggestion rows ──────────────────────────────
+# Used to verify the auto source/confidence/matched_terms columns,
+# the "Source" filter in the Tag Suggestions panel, and the
+# rejection-suppression logic in `excluded_tag_ids_for_event`.
+tag_suggestions:
+  # evt-006: the engine rejected 'workshop' recently → suppression window active.
+  - event_id: "evt-006"
+    tag: "format:workshop"
+    status: "rejected"
+    source: "heuristic"
+    confidence: 0.95
+    matched_terms: ["workshop"]
+    device_id: "auto-engine"
+
+  # evt-007: the engine rejected 'festival' long ago → suppression window expired.
+  # NOTE: the seeder doesn't expose `reviewed_at` directly; the migration
+  # default for rejected rows is null/now. For test_plan purposes this row
+  # represents the "old rejection" case — the test plan's run-engine step still
+  # verifies that a re-run produces a 'festival' suggestion provided the
+  # row's reviewed_at has been manually backdated to > 30 days ago, OR the
+  # admin pressing "Re-run" on the event detail page (which uses
+  # delete_pending_ai_suggestions) restages the engine after the cutoff.
+  - event_id: "evt-007"
+    tag: "format:festival"
+    status: "rejected"
+    source: "heuristic"
+    confidence: 0.90
+    matched_terms: ["festival"]
+    device_id: "auto-engine"
+
+  # evt-008: three pending auto-source rows for the side-panel review UI.
+  - event_id: "evt-008"
+    tag: "dance-style:salsa"
+    status: "pending"
+    source: "heuristic"
+    confidence: 0.95
+    matched_terms: ["salsa"]
+    device_id: "auto-engine"
+
+  - event_id: "evt-008"
+    tag: "level:beginner"
+    status: "pending"
+    source: "heuristic"
+    confidence: 0.93
+    matched_terms: ["beginner", "absolute beginner"]
+    device_id: "auto-engine"
+
+  - event_id: "evt-008"
+    tag: "vibe:free"
+    status: "pending"
+    source: "heuristic"
+    confidence: 0.85
+    matched_terms: ["free"]
+    device_id: "auto-engine"
+
+  # A regular user-submitted suggestion (source=user) so the admin Source
+  # filter has at least one row in each category.
+  - event_id: "evt-001"
+    tag: "vibe:live-music"
+    status: "pending"
+    source: "user"
+    device_id: "user-device-001"

@@ -5,6 +5,7 @@ import { fetchAdminCalendars, fetchTagGroups, retryGeocodingSingle } from '../ap
 import { parseLinks } from '../utils/parseLinks';
 import { deriveLinkLabel } from '../utils/deriveLinkLabel';
 import AddressAutocomplete from './AddressAutocomplete';
+import AdminAutoTagSuggestions from './AdminAutoTagSuggestions';
 import EventTagEditor from './EventTagEditor';
 import LocationBadge from './LocationBadge';
 import TagBadges from './TagBadges';
@@ -440,6 +441,12 @@ export default function AdminEventDetailContent({
                     onClick={() => setEditingField('tags')}
                 >+ Add tags</div>
             )}
+
+            {/* Auto-generated tag suggestions (heuristic; admin approves/rejects). */}
+            <AdminAutoTagSuggestions
+                eventId={event.event_id}
+                onApproved={() => onTagsUpdated?.()}
+            />
 
             {/* Description */}
             {editingField === 'description' ? (

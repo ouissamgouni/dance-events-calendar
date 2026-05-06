@@ -38,6 +38,9 @@ export interface TagSuggestionResponse {
     id: number;
     event_id: string;
     event_title: string | null;
+    event_description?: string | null;
+    event_start?: string | null;
+    event_location?: string | null;
     tag: Tag | null;
     free_text: string | null;
     group_slug: string | null;
@@ -46,6 +49,26 @@ export interface TagSuggestionResponse {
     admin_notes: string | null;
     reviewed_at: string | null;
     created_at: string;
+    /** 'user' for end-user submissions, 'heuristic' for pipeline-generated suggestions. */
+    source?: 'user' | 'heuristic' | string;
+    /** 0.0-1.0 confidence score, populated for auto-generated rows only. */
+    confidence?: number | null;
+    /** Lower-cased terms that triggered a heuristic match (admin transparency tooltip). */
+    matched_terms?: string[] | null;
+}
+
+export interface TagSuggestionRunResponse {
+    generated: number;
+    skipped: number;
+    replaced: number;
+    suggestions: TagSuggestionResponse[];
+}
+
+export interface BulkTagSuggestionRunResponse {
+    generated: number;
+    skipped: number;
+    replaced: number;
+    events_processed: number;
 }
 
 export interface LinkItem {
@@ -91,6 +114,7 @@ export interface Attendee {
 export interface AttendanceSummary {
     event_id: string;
     total_going: number;
+    total_saved: number;
     public_going: number;
     anonymous_going: number;
     can_view_attendees: boolean;

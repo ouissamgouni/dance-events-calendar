@@ -50,6 +50,18 @@ class EnrichmentStage(ABC):
     def process(self, event: CachedEvent) -> bool:
         """Enrich the event in-place. Return True on success, False on failure."""
 
+    def process_with_session(
+        self, session: Session, event: CachedEvent
+    ) -> bool:
+        """Session-aware variant. Defaults to ``process(event)`` for stages
+        that only mutate the event in place. Override when the stage needs to
+        write to *other* tables (e.g. the ``tag_suggestions`` table).
+
+        The pipeline always calls this method; subclasses keep working without
+        touching the session.
+        """
+        return self.process(event)
+
 
 class EnrichmentPipeline:
     """Runs events through a sequence of enrichment stages."""
@@ -118,7 +130,7 @@ class EnrichmentPipeline:
                 result.skipped += 1
                 continue
             try:
-                ok = stage.process(event)
+                ok = stage.process_with_session(session, event)
                 if ok:
                     result.processed += 1
                 else:
@@ -171,7 +183,7 @@ class EnrichmentPipeline:
                         result.skipped += 1
                         continue
                     try:
-                        ok = stage.process(event)
+                        ok = stage.process_with_session(session, event)
                         if ok:
                             result.processed += 1
                         else:

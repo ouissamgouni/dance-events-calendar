@@ -10,6 +10,8 @@ from backend.api.deps import require_admin
 from backend.api.schemas import (
     BulkEventIdsRequest,
     BulkTagAssignRequest,
+    BulkTagSuggestionRunRequest,
+    BulkTagSuggestionRunResponse,
     CalendarAddRequest,
     CalendarDefaultTagsResponse,
     CalendarDefaultTagsUpdate,
@@ -25,8 +27,10 @@ from backend.api.schemas import (
     SyncJobListResponse,
     SyncJobStartRequest,
     SyncLogResponse,
+    TagSuggestionRunRequest,
+    TagSuggestionRunResponse,
 )
-from backend.api.routes.tags import get_event_tags
+from backend.api.routes.tags import _suggestion_to_response, get_event_tags
 from backend.db.database import get_engine, get_session
 from backend.db.models import (
     CalendarDefaultTag,
@@ -40,6 +44,7 @@ from backend.db.models import (
     EventView,
     SyncLog,
     Tag,
+    TagSuggestion,
     UserEventAttendance,
 )
 from backend.services.geocoding import geocode_location, search_locations
@@ -1234,6 +1239,155 @@ def retry_geocoding_single(
         "geocoded": geo.processed if geo else 0,
         "failed": geo.failed if geo else 0,
     }
+
+
+# ── Auto Tag Suggestions: on-demand re-run endpoints ───────────────────
+
+
+def _run_tag_suggestion_for_event(
+    session: Session,
+    event: CachedEvent,
+    *,
+    snapshot,
+    replace_existing_pending: bool,
+) -> tuple[int, int, list[TagSuggestion]]:
+    """Generate auto tag suggestions for one event. Returns
+    ``(generated, replaced, inserted_rows)``."""
+    from backend.services.pipeline.stages.tag_suggestion import (
+        delete_pending_ai_suggestions,
+        excluded_tag_ids_for_event,
+        persist_suggestions,
+    )
+    from backend.services.tag_suggester import suggest_tags
+
+    replaced = 0
+    if replace_existing_pending:
+        replaced = delete_pending_ai_suggestions(session, event.event_id)
+
+    excluded = excluded_tag_ids_for_event(session, event.event_id)
+    candidates = suggest_tags(
+        snapshot,
+        title=event.title,
+        description=event.description,
+        location=event.location,
+        excluded_tag_ids=excluded,
+    )
+    inserted = persist_suggestions(session, event.event_id, candidates)
+    return len(inserted), replaced, inserted
+
+
+@router.post(
+    "/events/{event_id}/suggest-tags",
+    response_model=TagSuggestionRunResponse,
+)
+def suggest_tags_single(
+    event_id: str,
+    body: TagSuggestionRunRequest | None = None,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Generate auto tag suggestions for a single event on demand.
+
+    Used by:
+    * The admin event-detail panel auto-run when first opened.
+    * The "Re-run suggestions" button (pass ``replace_existing_pending=true``).
+    """
+    from backend.services.tag_suggester import load_taxonomy
+
+    body = body or TagSuggestionRunRequest()
+
+    event = session.get(CachedEvent, event_id)
+    if not event or event.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    snapshot = load_taxonomy(session)
+    generated, replaced, inserted = _run_tag_suggestion_for_event(
+        session,
+        event,
+        snapshot=snapshot,
+        replace_existing_pending=body.replace_existing_pending,
+    )
+    session.commit()
+
+    # Build response payload (refresh inserted rows so id/created_at populate).
+    suggestions_payload = []
+    for row in inserted:
+        session.refresh(row)
+        tag = session.get(Tag, row.tag_id) if row.tag_id else None
+        suggestions_payload.append(
+            _suggestion_to_response(row, tag=tag, event=event, event_title=event.title)
+        )
+
+    return TagSuggestionRunResponse(
+        generated=generated,
+        skipped=1 if (generated == 0 and replaced == 0) else 0,
+        replaced=replaced,
+        suggestions=suggestions_payload,
+    )
+
+
+@router.post(
+    "/events/bulk-suggest-tags",
+    response_model=BulkTagSuggestionRunResponse,
+)
+def suggest_tags_bulk(
+    body: BulkTagSuggestionRunRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Generate auto tag suggestions for many events at once.
+
+    Bounded at 200 events per call to keep request latency predictable;
+    callers paginate larger sets.
+    """
+    from backend.services.tag_suggester import load_taxonomy
+
+    if not body.event_ids:
+        return BulkTagSuggestionRunResponse(
+            generated=0, skipped=0, replaced=0, events_processed=0
+        )
+    if len(body.event_ids) > 200:
+        raise HTTPException(
+            status_code=400,
+            detail="bulk-suggest-tags accepts at most 200 event_ids per call",
+        )
+
+    events = session.exec(
+        select(CachedEvent).where(
+            CachedEvent.event_id.in_(body.event_ids),
+            CachedEvent.deleted_at == None,
+        )
+    ).all()
+
+    snapshot = load_taxonomy(session)
+    total_generated = 0
+    total_replaced = 0
+    total_skipped = 0
+    for event in events:
+        try:
+            generated, replaced, _ = _run_tag_suggestion_for_event(
+                session,
+                event,
+                snapshot=snapshot,
+                replace_existing_pending=body.replace_existing_pending,
+            )
+            total_generated += generated
+            total_replaced += replaced
+            if generated == 0 and replaced == 0:
+                total_skipped += 1
+        except Exception:
+            logger.exception(
+                "bulk-suggest-tags failed for event %s", event.event_id
+            )
+            total_skipped += 1
+    session.commit()
+
+    return BulkTagSuggestionRunResponse(
+        generated=total_generated,
+        skipped=total_skipped,
+        replaced=total_replaced,
+        events_processed=len(events),
+    )
 
 
 @router.get("/events/ids", response_model=EventIdsResponse)

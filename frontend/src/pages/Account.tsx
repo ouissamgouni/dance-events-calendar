@@ -8,7 +8,7 @@ import { fetchMyRatings, updateUserPreferences } from '../api';
 import type { MyRating } from '../types';
 
 export default function Account() {
-    const { user, loading, logout, deleteAccount } = useAuth();
+    const { user, loading, logout, deleteAccount, refreshUser } = useAuth();
     const navigate = useNavigate();
     const { savedCount } = useSavedEvents();
     const { attendingCount } = useAttendingEvents();
@@ -160,6 +160,10 @@ export default function Account() {
                             setShareSaving(true);
                             try {
                                 await updateUserPreferences({ share_attendance_default: next });
+                                // Refresh AuthContext so other consumers
+                                // (e.g. GoingButton on the same page) see
+                                // the new value without a full reload.
+                                await refreshUser();
                             } catch {
                                 setShareDefault(!next);
                             } finally {

@@ -22,6 +22,7 @@ from backend.db.models import (
     Tag,
     TagGroup,
     TagSuggestion,
+    TagSynonym,
     User,
     UserEventAttendance,
 )
@@ -75,6 +76,7 @@ class DatabaseSeeder:
         uses_mock_calendar = get_calendar_service_type() == "mock"
 
         self._seed_tags(scenario_dir / "tags.yaml")
+        self._seed_tag_synonyms_defaults()
         self._seed_calendars(scenario_dir / "calendars.yaml")
         self._seed_calendar_default_tags(scenario_dir / "calendars.yaml")
         if uses_mock_calendar:
@@ -216,6 +218,34 @@ class DatabaseSeeder:
                             hero_ordinal=tag_hero_ordinal,
                         )
                     )
+
+    def _seed_tag_synonyms_defaults(self) -> None:
+        """Idempotently seed default heuristic synonyms from the static map.
+
+        For each tag whose slug appears in
+        :data:`backend.services.tag_synonyms.TAG_SYNONYMS` and which currently
+        has zero rows in ``tag_synonyms``, bulk-insert the default terms. This
+        runs after ``_seed_tags`` so all tag ids exist; admin-edited tags keep
+        their custom set untouched.
+        """
+        from backend.services.tag_synonyms import TAG_SYNONYMS
+
+        tags = self.session.exec(select(Tag)).all()
+        for tag in tags:
+            defaults = TAG_SYNONYMS.get(tag.slug)
+            if not defaults:
+                continue
+            existing = self.session.exec(
+                select(TagSynonym).where(TagSynonym.tag_id == tag.id)
+            ).first()
+            if existing:
+                continue
+            for term in defaults:
+                normalised = (term or "").strip().lower()
+                if not normalised:
+                    continue
+                self.session.add(TagSynonym(tag_id=tag.id, term=normalised))
+        self.session.flush()
 
     def _seed_calendars(self, path: Path):
         if not path.exists():
@@ -503,6 +533,9 @@ class DatabaseSeeder:
             free_text = sug.get("free_text")
             status = sug.get("status", "pending")
             device_id = sug.get("device_id", "seed-device")
+            source = sug.get("source", "user")
+            confidence = sug.get("confidence")
+            matched_terms = sug.get("matched_terms")
 
             tag_id = tag_lookup.get(tag_slug) if tag_slug else None
 
@@ -513,6 +546,9 @@ class DatabaseSeeder:
                     free_text=free_text,
                     status=status,
                     submitter_device_id=device_id,
+                    source=source,
+                    confidence=confidence,
+                    matched_terms=matched_terms,
                 )
             )
             logger.info(

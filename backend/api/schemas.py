@@ -106,6 +106,7 @@ class AttendanceSummaryResponse(BaseModel):
 
     event_id: str
     total_going: int = 0
+    total_saved: int = 0
     public_going: int = 0
     anonymous_going: int = 0
     can_view_attendees: bool = False
@@ -401,6 +402,9 @@ class TagSuggestionResponse(BaseModel):
     id: int
     event_id: str
     event_title: Optional[str] = None
+    event_description: Optional[str] = None
+    event_start: Optional[datetime] = None
+    event_location: Optional[str] = None
     tag: Optional[TagResponse] = None
     free_text: Optional[str] = None
     group_slug: Optional[str] = None
@@ -409,6 +413,10 @@ class TagSuggestionResponse(BaseModel):
     admin_notes: Optional[str] = None
     reviewed_at: Optional[datetime] = None
     created_at: datetime
+    # auto-generated suggestion metadata (NULL/'user' for legacy user submissions).
+    source: str = "user"
+    confidence: Optional[float] = None
+    matched_terms: Optional[list[str]] = None
 
 
 class TagSuggestionApproveRequest(BaseModel):
@@ -419,6 +427,44 @@ class TagSuggestionApproveRequest(BaseModel):
 
 class TagSuggestionRejectRequest(BaseModel):
     admin_notes: Optional[str] = None
+
+
+class TagSynonymResponse(BaseModel):
+    id: int
+    tag_id: int
+    term: str
+    created_at: datetime
+
+
+class TagSynonymCreateRequest(BaseModel):
+    term: str
+
+
+class TagSuggestionRunRequest(BaseModel):
+    """Body for POST /api/admin/events/{id}/suggest-tags."""
+
+    # When True, existing pending auto suggestions for the event are deleted
+    # before generating fresh ones (e.g. for the "Re-run" button).
+    replace_existing_pending: bool = False
+
+
+class BulkTagSuggestionRunRequest(BaseModel):
+    event_ids: list[str]
+    replace_existing_pending: bool = False
+
+
+class TagSuggestionRunResponse(BaseModel):
+    generated: int
+    skipped: int
+    replaced: int
+    suggestions: list[TagSuggestionResponse] = []
+
+
+class BulkTagSuggestionRunResponse(BaseModel):
+    generated: int
+    skipped: int
+    replaced: int
+    events_processed: int
 
 
 # --- Admin Events: Paginated List & Filter Options ---

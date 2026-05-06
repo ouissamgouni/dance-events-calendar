@@ -91,10 +91,16 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
             const label =
                 offset === 0
                     ? `This ${seasons[seasonIdx].icon}`
-                    : `Next ${seasons[seasonIdx].icon}`;
+                    : `→ ${seasons[seasonIdx].icon}`;
+            // Mobile (Option D): icon only; current season prefixed with a small dot.
+            const mobileLabel =
+                offset === 0
+                    ? `•${seasons[seasonIdx].icon}`
+                    : seasons[seasonIdx].icon;
 
             return {
                 label,
+                mobileLabel,
                 start: formatDate(offset === 0 ? thisSeasonStart : range.start),
                 end: formatDate(range.end),
             };
@@ -102,10 +108,10 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
 
         // ── Build in fixed display order ─────────────────────
         return [
-            { label: weekendLabel, start: formatDate(weekendSat), end: formatDate(weekendSun) },
-            { label: 'Next week', start: formatDate(today), end: formatDate(nextWeek) },
-            { label: 'Next month', start: formatDate(today), end: formatDate(nextMonth) },
-            { label: 'Next 6m', start: formatDate(today), end: formatDate(next6Months) },
+            { label: weekendLabel, mobileLabel: 'Wknd', start: formatDate(weekendSat), end: formatDate(weekendSun) },
+            { label: '→ Week', mobileLabel: '→ 7d', start: formatDate(today), end: formatDate(nextWeek) },
+            { label: '→ Month', mobileLabel: '→ 30d', start: formatDate(today), end: formatDate(nextMonth) },
+            { label: '→ 6 months', mobileLabel: '→ 6mo', start: formatDate(today), end: formatDate(next6Months) },
             ...seasonPresets,
         ];
     }, []);
@@ -140,16 +146,23 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
                 </label>
             </div>
             <div className="date-range-presets">
-                {presets.map((p) => (
-                    <button
-                        key={p.label}
-                        type="button"
-                        className={`preset-btn ${startDate === p.start && endDate === p.end ? 'active' : ''}`}
-                        onClick={() => onChange(p.start, p.end)}
-                    >
-                        {p.label}
-                    </button>
-                ))}
+                {presets.map((p) => {
+                    const active = startDate === p.start && endDate === p.end;
+                    return (
+                        <button
+                            key={p.label}
+                            type="button"
+                            className={`preset-btn ${active ? 'active' : ''}`}
+                            onClick={() => onChange(p.start, p.end)}
+                            aria-label={p.label}
+                            title={p.label}
+                        >
+                            {/* Short label on mobile, full label on sm+ */}
+                            <span className="sm:hidden">{p.mobileLabel}</span>
+                            <span className="hidden sm:inline">{p.label}</span>
+                        </button>
+                    );
+                })}
             </div>
         </div>
     );

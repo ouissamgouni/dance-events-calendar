@@ -24,7 +24,7 @@ from backend.api.schemas import (
     AttendeeResponse,
 )
 from backend.db.database import get_session
-from backend.db.models import User, UserEventAttendance
+from backend.db.models import User, UserEventAttendance, UserSavedEvent
 
 router = APIRouter(prefix="/api/events", tags=["attendance"])
 
@@ -42,6 +42,10 @@ def _summarize_for_event(
     rows = session.exec(
         select(UserEventAttendance).where(UserEventAttendance.event_id == event_id)
     ).all()
+    saved_rows = session.exec(
+        select(UserSavedEvent).where(UserSavedEvent.event_id == event_id)
+    ).all()
+    saved_count = len(saved_rows)
 
     total = len(rows)
     if viewer is None:
@@ -49,6 +53,7 @@ def _summarize_for_event(
         return AttendanceSummaryResponse(
             event_id=event_id,
             total_going=total,
+            total_saved=saved_count,
             can_view_attendees=False,
         )
 
@@ -76,6 +81,7 @@ def _summarize_for_event(
     return AttendanceSummaryResponse(
         event_id=event_id,
         total_going=total,
+        total_saved=saved_count,
         public_going=public_count,
         anonymous_going=total - public_count,
         can_view_attendees=True,
@@ -110,6 +116,15 @@ def get_attendance_summary_batch(
     for r in rows:
         by_event[r.event_id].append(r)
 
+    # Saved counts per event in one query (anonymous + authenticated combined,
+    # since UserSavedEvent is unique per device).
+    saved_rows = session.exec(
+        select(UserSavedEvent).where(UserSavedEvent.event_id.in_(payload.event_ids))
+    ).all()
+    saved_count_by_event: dict[str, int] = defaultdict(int)
+    for r in saved_rows:
+        saved_count_by_event[r.event_id] += 1
+
     # Resolve every public user in one query for the whole batch.
     public_user_ids: set[UUID] = {
         r.user_id for r in rows if r.share_publicly and r.user_id is not None
@@ -125,11 +140,13 @@ def get_attendance_summary_batch(
     for event_id in payload.event_ids:
         event_rows = by_event.get(event_id, [])
         total = len(event_rows)
+        saved_count = saved_count_by_event.get(event_id, 0)
         if viewer is None:
             results.append(
                 AttendanceSummaryResponse(
                     event_id=event_id,
                     total_going=total,
+                    total_saved=saved_count,
                     can_view_attendees=False,
                 )
             )
@@ -157,6 +174,7 @@ def get_attendance_summary_batch(
             AttendanceSummaryResponse(
                 event_id=event_id,
                 total_going=total,
+                total_saved=saved_count,
                 public_going=len(public_rows),
                 anonymous_going=total - len(public_rows),
                 can_view_attendees=True,

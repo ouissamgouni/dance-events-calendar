@@ -13,6 +13,7 @@ import {
     bulkReviewEvents,
     bulkRetryGeocoding,
     bulkAssignTags,
+    runTagSuggestionsBulk,
 } from '../api';
 import type { AdminTagGroup } from '../api';
 import LocationBadge from './LocationBadge';
@@ -241,6 +242,28 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             loadEvents();
         } catch {
             setMessage('Failed to retry geocoding.');
+        } finally {
+            setBusy('');
+        }
+    };
+
+    const handleBulkSuggestTags = async () => {
+        if (selectedIds.size === 0) return;
+        // Bulk endpoint caps at 200; clamp client-side for clearer UX.
+        const ids = [...selectedIds].slice(0, 200);
+        const truncated = selectedIds.size > 200;
+        setBusy('bulk-suggest-tags');
+        try {
+            const result = await runTagSuggestionsBulk(ids);
+            const trailer = truncated ? ' (capped at 200)' : '';
+            setMessage(
+                `auto tag suggestions: generated ${result.generated} across ` +
+                `${result.events_processed} events${trailer}. Review in the ` +
+                `Tag Suggestions panel.`,
+            );
+            setSelectedIds(new Set());
+        } catch {
+            setMessage('Failed to generate tag suggestions.');
         } finally {
             setBusy('');
         }
@@ -637,6 +660,14 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                             className="text-[10px] font-medium px-2 py-1 bg-gray-700 text-white hover:bg-gray-800 disabled:opacity-50 transition"
                         >
                             {busy === 'bulk-geo' ? 'Retrying…' : 'Retry Geocoding'}
+                        </button>
+                        <button
+                            onClick={handleBulkSuggestTags}
+                            disabled={!!busy}
+                            className="text-[10px] font-medium px-2 py-1 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition"
+                            title="Run the heuristic tag suggester on the selected events. Suggestions land as pending — review in the Tag Suggestions panel."
+                        >
+                            {busy === 'bulk-suggest-tags' ? 'Suggesting…' : 'Auto-suggest Tags'}
                         </button>
                         <button
                             onClick={() => { setSelectedIds(new Set()); setAllMatchingSelected(false); setBulkTagPickerOpen(false); }}

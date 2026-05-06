@@ -32,6 +32,7 @@ from backend.services.pipeline.base import EnrichmentPipeline
 from backend.services.pipeline.stages.geocoding import GeocodingStage
 from backend.services.pipeline.stages.link_extraction import LinkExtractionStage
 from backend.services.pipeline.stages.price_extraction import PriceExtractionStage
+from backend.services.pipeline.stages.tag_suggestion import TagSuggestionStage
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,11 @@ class SyncService:
                 LinkExtractionStage(),
                 PriceExtractionStage(),
                 GeocodingStage(),
+                # auto tag suggestions run last: cheap, depends only on text
+                # already present on the event. Skipped silently in the
+                # parallel processor path (no session); admins can run it
+                # on demand via the bulk "Suggest tags" admin action.
+                TagSuggestionStage(),
             ]
         )
 

@@ -1,0 +1,60 @@
+# Same taxonomy as event-tags so the heuristic engine has a realistic
+# taxonomy to match against. Slugs/labels here align with curated synonyms
+# in backend/services/tag_synonyms.py to maximise hit quality.
+
+tag_groups:
+  - slug: format
+    label: Format
+    ordinal: 10
+    allow_multiple: true
+    color: "#f472b6"
+    tags:
+      - { slug: social,   label: Social, is_hero_filter: true, hero_ordinal: 0 }
+      - { slug: workshop, label: Workshop }
+      - { slug: festival, label: Festival }
+      - { slug: bootcamp, label: Bootcamp }
+      - { slug: show,     label: Show }
+
+  - slug: dance-style
+    label: Dance Style
+    ordinal: 20
+    allow_multiple: true
+    color: "#fb923c"
+    tags:
+      - { slug: salsa,    label: Salsa,   is_hero_filter: true, hero_ordinal: 1 }
+      - { slug: bachata,  label: Bachata, is_hero_filter: true, hero_ordinal: 2 }
+      - { slug: kizomba,  label: Kizomba }
+      - { slug: zouk,     label: Zouk }
+      - { slug: cha-cha,  label: Cha-Cha }
+
+  - slug: level
+    label: Level
+    ordinal: 30
+    # single-pick to exercise the "allow_multiple=false → top per group only"
+    # branch in the suggester.
+    allow_multiple: false
+    color: "#60a5fa"
+    tags:
+      - { slug: beginner,     label: Beginner, is_hero_filter: true, hero_ordinal: 3 }
+      - { slug: intermediate, label: Intermediate }
+      - { slug: advanced,     label: Advanced }
+      - { slug: all-levels,   label: All Levels }
+
+  - slug: venue
+    label: Venue
+    ordinal: 40
+    allow_multiple: true
+    color: "#34d399"
+    tags:
+      - { slug: indoor,  label: Indoor }
+      - { slug: outdoor, label: Outdoor }
+
+  - slug: vibe
+    label: Vibe
+    ordinal: 50
+    allow_multiple: true
+    color: "#e879f9"
+    tags:
+      - { slug: live-music, label: Live Music }
+      - { slug: dj,         label: DJ }
+      - { slug: free,       label: Free Entry }

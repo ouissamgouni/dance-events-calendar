@@ -111,9 +111,9 @@ export default function SignInNudge({ anchorRef, trigger, onClose }: Props) {
             <p className="text-xs font-semibold text-slate-800">{HEADLINE[trigger]}</p>
             <ul className="mt-1.5 space-y-0.5 text-[11px] text-slate-600 list-disc pl-4">
                 <li>See who else is going</li>
-                <li>Save events to your calendar</li>
+                <li>Save events to your calendar and share it with others</li>
                 <li>Rate events and read reviews</li>
-                <li>Share your calendar with others</li>
+                <li>Get notifications for upcoming events</li>
             </ul>
             <div className="mt-3 flex justify-end gap-2">
                 <button

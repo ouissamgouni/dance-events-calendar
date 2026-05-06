@@ -71,7 +71,9 @@ export default function EventDetailPage() {
 
     const handleTagsUpdated = () => {
         if (!eventId) return;
-        fetchEvent(eventId).then((e) => { setEvent(e); setTitleValue(e.title); }).catch(() => { });
+        fetchEvent(eventId, { fresh: true })
+            .then((e) => { setEvent(e); setTitleValue(e.title); })
+            .catch(() => { });
     };
 
     const handleTitleBlur = async () => {

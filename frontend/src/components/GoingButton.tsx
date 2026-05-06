@@ -4,6 +4,12 @@ import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useAuth } from '../context/AuthContext';
 import { updateUserPreferences } from '../api';
 import SignInNudge, { useSignInNudge } from './SignInNudge';
+import { useToast } from './Toast';
+
+// Module-level set of user ids that have already seen the
+// "auto-public RSVP" advisory toast this browser session. Prevents
+// the toast from spamming users who RSVP to many events in one sitting.
+const autoPublicToastShownForUser = new Set<string>();
 
 interface Props {
     eventId: string;
@@ -72,7 +78,8 @@ export default function GoingButton({
     className = '',
 }: Props) {
     const { isAttending, isSharingPublicly, toggleAttending, setSharePublicly } = useAttendingEvents();
-    const { user } = useAuth();
+    const { user, refreshUser } = useAuth();
+    const toast = useToast();
     const going = isAttending(eventId);
     const sharing = isSharingPublicly(eventId);
 
@@ -143,6 +150,18 @@ export default function GoingButton({
             if (user.share_attendance_default === true) {
                 toggleAttending(eventId, true);
                 triggerToast();
+                // One-time-per-session advisory: remind the user their
+                // name is public for this RSVP and how to override it.
+                const uid = user.user_id;
+                if (uid && !autoPublicToastShownForUser.has(uid)) {
+                    autoPublicToastShownForUser.add(uid);
+                    toast.push({
+                        title: `You're going as ${user.name}`,
+                        message: 'You can hide your name for this event from the visibility toggle next to "Going".',
+                        variant: 'info',
+                        duration: 7000,
+                    });
+                }
                 return;
             }
             setPendingShare(user.share_attendance_default ?? false);
@@ -161,10 +180,12 @@ export default function GoingButton({
     const persistRememberIfNeeded = useCallback((value: boolean) => {
         if (!rememberDefault) return;
         if ((user?.share_attendance_default ?? false) === value) return;
-        // Fire-and-forget: failure is non-blocking; user can re-toggle later
-        // from /account.
-        updateUserPreferences({ share_attendance_default: value }).catch(() => { /* ignore */ });
-    }, [rememberDefault, user?.share_attendance_default]);
+        // Refresh AuthContext after success so subsequent RSVPs read the
+        // new default without requiring a page reload.
+        updateUserPreferences({ share_attendance_default: value })
+            .then(() => refreshUser())
+            .catch(() => { /* ignore */ });
+    }, [rememberDefault, user?.share_attendance_default, refreshUser]);
 
     const confirmGoing = (e: React.MouseEvent<HTMLButtonElement>) => {
         e.stopPropagation();
