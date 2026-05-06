@@ -37,6 +37,8 @@ tag_groups:
         label: Bootcamp
       - slug: practice
         label: Practice
+      - slug: trip
+        label: Trip
 
   - slug: scale
     label: Scale
