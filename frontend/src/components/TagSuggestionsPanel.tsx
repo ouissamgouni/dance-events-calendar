@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { TagSuggestionResponse, TagGroup } from '../types';
-import { fetchAdminTagSuggestions, fetchTagGroups } from '../api';
+import {
+    approveTagSuggestion,
+    fetchAdminTagSuggestions,
+    fetchTagGroups,
+    rejectTagSuggestion,
+} from '../api';
 import TagSuggestionReviewModal from './TagSuggestionReviewModal';
 import AdminEventDetailPanel from './AdminEventDetailPanel';
 
@@ -24,6 +29,42 @@ export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: 
     const [loading, setLoading] = useState(false);
     const [reviewing, setReviewing] = useState<TagSuggestionResponse | null>(null);
     const [adminDetailEventId, setAdminDetailEventId] = useState<string | null>(null);
+    const [actionInFlight, setActionInFlight] = useState<number | null>(null);
+
+    const applyStatusUpdate = useCallback((id: number, status: 'approved' | 'rejected') => {
+        setSuggestions((prev) => {
+            const next = prev.map((s) => (s.id === id ? { ...s, status } : s));
+            onCountChange(next.filter((x) => x.status === 'pending').length);
+            return next;
+        });
+    }, [onCountChange]);
+
+    const handleQuickApprove = async (s: TagSuggestionResponse) => {
+        if (actionInFlight) return;
+        setActionInFlight(s.id);
+        try {
+            await approveTagSuggestion(s.id);
+            applyStatusUpdate(s.id, 'approved');
+        } catch {
+            // surface via list refresh
+            load();
+        } finally {
+            setActionInFlight(null);
+        }
+    };
+
+    const handleQuickReject = async (s: TagSuggestionResponse) => {
+        if (actionInFlight) return;
+        setActionInFlight(s.id);
+        try {
+            await rejectTagSuggestion(s.id);
+            applyStatusUpdate(s.id, 'rejected');
+        } catch {
+            load();
+        } finally {
+            setActionInFlight(null);
+        }
+    };
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -205,7 +246,31 @@ export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: 
                                                 )}
                                             </p>
                                         </div>
-                                        {statusBadge(s.status)}
+                                        <div className="flex flex-col items-end gap-1.5 shrink-0">
+                                            {statusBadge(s.status)}
+                                            {s.status === 'pending' && (
+                                                <div className="flex items-center gap-1">
+                                                    {s.tag && (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleQuickApprove(s); }}
+                                                            disabled={actionInFlight === s.id}
+                                                            className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-50"
+                                                            title="Approve suggestion"
+                                                        >
+                                                            ✓
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleQuickReject(s); }}
+                                                        disabled={actionInFlight === s.id}
+                                                        className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-slate-200 text-slate-700 hover:bg-slate-300 disabled:opacity-50"
+                                                        title="Reject suggestion"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </li>
                             ))}
