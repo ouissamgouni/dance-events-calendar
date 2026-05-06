@@ -4,3 +4,22 @@
 name = "movida"
 compatibility_date = "2026-04-30"
 pages_build_output_dir = "frontend/dist"
+
+# Build command used by the CF Pages Git integration (auto-deploy on push).
+# NODE_VERSION pins the runtime so CF doesn't fall back to an older default.
+# Manual deploys via `task deploy:staging:remote:frontend` ignore this section.
+[build]
+command = "cd frontend && npm ci && npm run build"
+
+[build.environment_variables]
+NODE_VERSION = "22"
+# VITE_UMAMI_URL is not secret — set it here so Git-triggered builds get it
+# without requiring a dashboard entry.
+VITE_UMAMI_URL = "https://cloud.umami.is"
+# VITE_API_URL and VITE_UMAMI_WEBSITE_ID differ per environment and/or are
+# sensitive — set them in the CF Pages dashboard:
+#   Settings → Environment variables → Production / Preview
+#   VITE_API_URL          = https://movida.fly.dev          (Production)
+#                         = https://movida-staging.fly.dev  (Preview)
+#   VITE_UMAMI_WEBSITE_ID = <prod-uuid>                     (Production, encrypted)
+#                         = <staging-uuid>                   (Preview, encrypted)

@@ -49,9 +49,9 @@ export function loadUmami(): void {
     const umamiUrl = import.meta.env.VITE_UMAMI_URL as string | undefined;
 
     if (!websiteId || !umamiUrl) {
-        if (import.meta.env.DEV) {
-            console.debug('[umami] VITE_UMAMI_WEBSITE_ID or VITE_UMAMI_URL not set — tracking calls will be logged only');
-        }
+        // Warn in all environments so a missing build-time variable is visible in the
+        // browser console even after a production deployment.
+        console.warn('[umami] VITE_UMAMI_WEBSITE_ID or VITE_UMAMI_URL not set at build time — analytics disabled. Set these in the Cloudflare Pages dashboard (Environment variables).');
         return;
     }
 
