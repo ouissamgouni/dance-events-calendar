@@ -204,7 +204,8 @@ tasks:
         fi
 
   prod:remote:frontend:
-    desc: "Build + deploy prod frontend to Cloudflare Pages (public: joinmovida.com, alias: movida.pages.dev)"
+    desc: "Build + deploy prod frontend to Cloudflare Pages (public: joinmovida.com,
+      alias: movida.pages.dev)"
     dotenv: [ "config/secrets.env", "config/secrets.prod.env" ]
     vars:
       PROJECT_NAME: "{{.PROJECT_NAME | default \"movida\"}}"
