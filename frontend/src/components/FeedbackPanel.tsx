@@ -84,6 +84,17 @@ export default function FeedbackPanel({ isOpen, onClose, onCountChange }: Props)
                 {/* Header */}
                 <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-50">
                     <div className="flex items-center gap-2">
+                        <button
+                            onClick={load}
+                            className={`text-slate-400 hover:text-slate-700 p-1 transition-transform ${loading ? 'animate-spin' : ''}`}
+                            title="Refresh"
+                            aria-label="Refresh"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="23 4 23 10 17 10" />
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                            </svg>
+                        </button>
                         <h2 className="text-[11px] font-semibold text-slate-700 uppercase tracking-wide">Feedback &amp; Reviews</h2>
                         {pendingTotal > 0 && (
                             <span className="inline-flex items-center justify-center bg-slate-700 text-white text-[10px] font-semibold px-1.5 py-0.5 min-w-[18px]">

@@ -73,6 +73,8 @@ export default function Admin() {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
 
+    const refreshSuggestions = () => fetchSuggestions().then(setSuggestions).catch(() => { });
+
     const loadCalendars = () => {
         fetchAdminCalendars()
             .then((cals) => {
@@ -896,6 +898,7 @@ export default function Admin() {
                 onUpdated={(updated) => {
                     setSuggestions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
                 }}
+                onRefresh={refreshSuggestions}
             />
             <UnsyncedSuggestionsPanel
                 isOpen={unsyncedPanelOpen}
@@ -905,6 +908,7 @@ export default function Admin() {
                 onUpdated={(updated) => {
                     setSuggestions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
                 }}
+                onRefresh={refreshSuggestions}
             />
             <TagSuggestionsPanel
                 isOpen={tagSuggestionsPanelOpen}
