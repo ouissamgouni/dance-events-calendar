@@ -20,7 +20,14 @@ from backend.db.models import Tag, TagGroup
 
 
 def _tag(
-    id, slug, label, group_id=1, group_ordinal=0, tag_ordinal=0, allow_multiple=True
+    id,
+    slug,
+    label,
+    group_id=1,
+    group_ordinal=0,
+    tag_ordinal=0,
+    allow_multiple=True,
+    synonyms=None,
 ):
     t = Tag(id=id, group_id=group_id, slug=slug, label=label, ordinal=tag_ordinal)
     g = TagGroup(
@@ -30,7 +37,7 @@ def _tag(
         ordinal=group_ordinal,
         allow_multiple=allow_multiple,
     )
-    return _build_indexed_tag(t, g)
+    return _build_indexed_tag(t, g, synonyms=list(synonyms or []))
 
 
 def _snap(*tags: _IndexedTag) -> TaxonomySnapshot:
@@ -57,11 +64,11 @@ def test_exact_label_match_in_title_scores_exact():
 
 
 def test_synonym_match_scores_synonym():
-    snap = _snap(_tag(1, "kizomba", "Kizomba"))
+    snap = _snap(_tag(1, "kizomba", "Kizomba", synonyms=["urban kiz", "kiz"]))
     out = suggest_tags(snap, title="Urban Kiz Night", description=None)
     assert len(out) == 1
     assert out[0].tag_id == 1
-    # 'urban kiz' is a curated synonym → SYNONYM tier (no canonical hit).
+    # 'urban kiz' is a configured synonym → SYNONYM tier (no canonical hit).
     assert out[0].confidence == SCORE_SYNONYM
 
 
@@ -81,7 +88,9 @@ def test_description_only_match_scores_lowest():
 
 def test_synonym_in_description_only_stays_at_synonym_or_below():
     # 'pwyc' is a synonym for 'donation'; only in description.
-    snap = _snap(_tag(1, "donation", "Donation"))
+    snap = _snap(
+        _tag(1, "donation", "Donation", synonyms=["pwyc", "pay what you want"])
+    )
     out = suggest_tags(
         snap, title="Wednesday Class", description="Entry: pwyc at the door."
     )
@@ -166,7 +175,7 @@ def test_top_n_cap_enforced():
 def test_results_sorted_by_confidence_desc():
     # 'salsa' canonical hit in title (EXACT) + 'kiz' synonym only (SYNONYM).
     snap = _snap(
-        _tag(1, "kizomba", "Kizomba"),
+        _tag(1, "kizomba", "Kizomba", synonyms=["kiz"]),
         _tag(2, "salsa", "Salsa"),
     )
     out = suggest_tags(
@@ -191,7 +200,7 @@ def test_whole_word_match_avoids_substring_false_positives():
 
 
 def test_accent_insensitive_match():
-    snap = _snap(_tag(1, "social", "Social"))
+    snap = _snap(_tag(1, "social", "Social", synonyms=["soirée", "soiree"]))
     # 'soirée' is a synonym for 'social'; with accents.
     out = suggest_tags(snap, title="Grande Soirée Salsa", description=None)
     assert len(out) == 1

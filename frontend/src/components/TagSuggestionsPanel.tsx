@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { TagSuggestionResponse, TagGroup } from '../types';
 import {
     approveTagSuggestion,
+    fetchAdminEventIds,
     fetchAdminTagSuggestions,
     fetchTagGroups,
     rejectTagSuggestion,
+    runTagSuggestionsBulk,
 } from '../api';
 import TagSuggestionReviewModal from './TagSuggestionReviewModal';
 import AdminEventDetailPanel from './AdminEventDetailPanel';
@@ -30,6 +32,10 @@ export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: 
     const [reviewing, setReviewing] = useState<TagSuggestionResponse | null>(null);
     const [adminDetailEventId, setAdminDetailEventId] = useState<string | null>(null);
     const [actionInFlight, setActionInFlight] = useState<number | null>(null);
+    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+    const [bulkBusy, setBulkBusy] = useState(false);
+    const [runUpcomingBusy, setRunUpcomingBusy] = useState(false);
+    const [banner, setBanner] = useState<string | null>(null);
 
     const applyStatusUpdate = useCallback((id: number, status: 'approved' | 'rejected') => {
         setSuggestions((prev) => {
@@ -101,6 +107,95 @@ export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: 
         return true;
     });
 
+    // Only pending rows are bulk-selectable.
+    const bulkable = useMemo(
+        () => filtered.filter((s) => s.status === 'pending'),
+        [filtered],
+    );
+    const allBulkableSelected = bulkable.length > 0 && bulkable.every((s) => selectedIds.has(s.id));
+
+    // Reset selection when filters change.
+    useEffect(() => {
+        setSelectedIds(new Set());
+    }, [activeTab, sourceFilter, isOpen]);
+
+    const toggleSelect = (id: number) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const toggleSelectAll = () => {
+        setSelectedIds((prev) => {
+            if (allBulkableSelected) return new Set();
+            const next = new Set(prev);
+            bulkable.forEach((s) => next.add(s.id));
+            return next;
+        });
+    };
+
+    const handleBulk = async (action: 'approve' | 'reject') => {
+        const ids = Array.from(selectedIds);
+        if (ids.length === 0 || bulkBusy) return;
+        setBulkBusy(true);
+        setBanner(null);
+        const fn = action === 'approve' ? approveTagSuggestion : rejectTagSuggestion;
+        let ok = 0;
+        let failed = 0;
+        // Process serially to keep things simple and avoid hammering the API.
+        for (const id of ids) {
+            try {
+                await fn(id);
+                applyStatusUpdate(id, action === 'approve' ? 'approved' : 'rejected');
+                ok++;
+            } catch {
+                failed++;
+            }
+        }
+        setSelectedIds(new Set());
+        setBulkBusy(false);
+        setBanner(
+            failed === 0
+                ? `${action === 'approve' ? 'Approved' : 'Rejected'} ${ok} suggestion${ok === 1 ? '' : 's'}.`
+                : `${action} done — ${ok} ok, ${failed} failed.`,
+        );
+        if (failed > 0) load();
+    };
+
+    const handleRunOnUpcoming = async () => {
+        if (runUpcomingBusy) return;
+        setRunUpcomingBusy(true);
+        setBanner(null);
+        try {
+            const { ids } = await fetchAdminEventIds({ future_only: true });
+            if (ids.length === 0) {
+                setBanner('No upcoming events to process.');
+                return;
+            }
+            // Backend caps at 200 per call — chunk if larger.
+            const CHUNK = 200;
+            let totalGenerated = 0;
+            let totalProcessed = 0;
+            for (let i = 0; i < ids.length; i += CHUNK) {
+                const chunk = ids.slice(i, i + CHUNK);
+                const res = await runTagSuggestionsBulk(chunk, { replaceExistingPending: false });
+                totalGenerated += res.generated;
+                totalProcessed += res.events_processed;
+            }
+            setBanner(
+                `Ran on ${totalProcessed} upcoming event${totalProcessed === 1 ? '' : 's'} — ${totalGenerated} new suggestion${totalGenerated === 1 ? '' : 's'} generated.`,
+            );
+            await load();
+        } catch (e) {
+            setBanner((e as Error).message || 'Failed to run on upcoming events.');
+        } finally {
+            setRunUpcomingBusy(false);
+        }
+    };
+
     const statusBadge = (status: string) => {
         const colors: Record<string, string> = {
             pending: 'bg-amber-100 text-amber-700',
@@ -125,7 +220,7 @@ export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: 
             )}
 
             <div
-                className={`fixed top-0 right-0 h-full w-[420px] bg-white shadow-lg border-l border-gray-200 z-50 transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+                className={`fixed top-0 right-0 h-full w-[420px] bg-white shadow-lg border-l border-gray-200 z-50 flex flex-col transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
             >
                 {/* Header */}
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 bg-gray-50">
@@ -148,13 +243,23 @@ export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: 
                             </span>
                         )}
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 text-sm leading-none p-1"
-                        aria-label="Close"
-                    >
-                        ✕
-                    </button>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={handleRunOnUpcoming}
+                            disabled={runUpcomingBusy}
+                            className="text-[10px] font-semibold uppercase tracking-wide bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-40 px-2 py-1"
+                            title="Run heuristic auto-suggester on all upcoming events"
+                        >
+                            {runUpcomingBusy ? 'Running…' : 'Run on upcoming'}
+                        </button>
+                        <button
+                            onClick={onClose}
+                            className="text-gray-400 hover:text-gray-600 text-sm leading-none p-1"
+                            aria-label="Close"
+                        >
+                            ✕
+                        </button>
+                    </div>
                 </div>
 
                 {/* Tabs */}
@@ -181,7 +286,7 @@ export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: 
                         <button
                             key={sf}
                             onClick={() => setSourceFilter(sf)}
-                            className={`text-[10px] uppercase font-medium px-2 py-0.5 rounded transition ${sourceFilter === sf
+                            className={`text-[10px] uppercase font-medium px-2 py-0.5 transition ${sourceFilter === sf
                                 ? 'bg-violet-100 text-violet-700'
                                 : 'text-gray-400 hover:text-gray-600'
                                 }`}
@@ -191,8 +296,45 @@ export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: 
                     ))}
                 </div>
 
+                {/* Bulk-action bar — only when there are pending rows visible. */}
+                {bulkable.length > 0 && (
+                    <div className="flex items-center justify-between gap-2 px-3 py-1.5 border-b border-gray-100 bg-white">
+                        <label className="flex items-center gap-1.5 text-[10px] text-slate-600 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={allBulkableSelected}
+                                onChange={toggleSelectAll}
+                                className="accent-sky-600"
+                            />
+                            {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select all'}
+                        </label>
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => handleBulk('approve')}
+                                disabled={selectedIds.size === 0 || bulkBusy}
+                                className="text-[10px] font-semibold uppercase px-2 py-0.5 bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-40"
+                            >
+                                {bulkBusy ? '…' : 'Approve'}
+                            </button>
+                            <button
+                                onClick={() => handleBulk('reject')}
+                                disabled={selectedIds.size === 0 || bulkBusy}
+                                className="text-[10px] font-semibold uppercase px-2 py-0.5 bg-slate-200 text-slate-700 hover:bg-slate-300 disabled:opacity-40"
+                            >
+                                {bulkBusy ? '…' : 'Reject'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {banner && (
+                    <p className="px-3 py-1.5 text-[10px] text-slate-600 bg-sky-50 border-b border-sky-100">
+                        {banner}
+                    </p>
+                )}
+
                 {/* List */}
-                <div className="overflow-y-auto" style={{ height: 'calc(100% - 124px)' }}>
+                <div className="overflow-y-auto flex-1">
                     {loading ? (
                         <p className="text-center text-[11px] text-gray-400 mt-8">Loading…</p>
                     ) : filtered.length === 0 ? (
@@ -205,7 +347,17 @@ export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: 
                                     className="px-4 py-3 hover:bg-gray-50 cursor-pointer transition"
                                     onClick={() => setReviewing(s)}
                                 >
-                                    <div className="flex items-start justify-between gap-2">
+                                    <div className="flex items-start gap-2">
+                                        {s.status === 'pending' && (
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.has(s.id)}
+                                                onChange={(e) => { e.stopPropagation(); toggleSelect(s.id); }}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="mt-1 accent-sky-600"
+                                                aria-label="Select suggestion"
+                                            />
+                                        )}
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-1.5">
                                                 <p className="text-[12px] font-medium text-gray-800 truncate">
@@ -254,7 +406,7 @@ export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: 
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); handleQuickApprove(s); }}
                                                             disabled={actionInFlight === s.id}
-                                                            className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-50"
+                                                            className="text-[10px] font-semibold uppercase px-2 py-0.5 bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-50"
                                                             title="Approve suggestion"
                                                         >
                                                             ✓
@@ -263,7 +415,7 @@ export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: 
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); handleQuickReject(s); }}
                                                         disabled={actionInFlight === s.id}
-                                                        className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-slate-200 text-slate-700 hover:bg-slate-300 disabled:opacity-50"
+                                                        className="text-[10px] font-semibold uppercase px-2 py-0.5 bg-slate-200 text-slate-700 hover:bg-slate-300 disabled:opacity-50"
                                                         title="Reject suggestion"
                                                     >
                                                         ✕

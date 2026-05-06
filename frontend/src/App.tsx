@@ -120,6 +120,14 @@ function AppShell() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/admin/:tab"
+              element={
+                <ProtectedRoute>
+                  <Admin />
+                </ProtectedRoute>
+              }
+            />
           </Routes>
           <footer className="py-3 text-center">
             <Link to="/privacy" className="text-[11px] text-gray-400 hover:text-gray-600 transition">

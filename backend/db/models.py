@@ -221,6 +221,17 @@ class EventSuggestion(SQLModel, table=True):
     synced_to_google: bool = Field(default=False)
     google_event_id: Optional[str] = Field(default=None)
     suggested_tag_ids: Optional[list] = Field(default=None, sa_column=Column(JSON))
+    # User-entered new-tag suggestions submitted with the event. Each item:
+    #   {"free_text": str, "group_slug": str | None}
+    # On approval these become regular TagSuggestion rows tied to the new event.
+    suggested_new_tags: Optional[list] = Field(default=None, sa_column=Column(JSON))
+
+    # Optional pricing hints from the submitter (copied to CachedEvent on approval)
+    price_min: Optional[float] = Field(default=None)
+    price_max: Optional[float] = Field(default=None)
+    price_currency: Optional[str] = Field(default=None)
+    price_is_free: bool = Field(default=False)
+
     created_at: datetime = Field(default_factory=datetime.utcnow)
     reviewed_at: Optional[datetime] = Field(default=None)
     reviewed_by: Optional[str] = Field(default=None)

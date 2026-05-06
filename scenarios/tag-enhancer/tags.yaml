@@ -1,6 +1,13 @@
-# Same taxonomy as event-tags so the heuristic engine has a realistic
-# taxonomy to match against. Slugs/labels here align with curated synonyms
-# in backend/services/tag_synonyms.py to maximise hit quality.
+# Tag taxonomy for the tag-enhancer scenario.
+#
+# Synonyms are configured INLINE per tag (see `synonyms:` key) so this
+# scenario is fully self-contained and reproducible: re-seeding wipes and
+# rewrites the `tag_synonyms` rows for every tag listed below. The runtime
+# engine reads exclusively from the DB — there is no static fallback — so
+# the matching behavior here is exactly what the YAML describes.
+#
+# Empty `synonyms: []` explicitly clears any prior rows for that tag (useful
+# when you want a tag to match only on its slug + label).
 
 tag_groups:
   - slug: format
@@ -9,11 +16,35 @@ tag_groups:
     allow_multiple: true
     color: "#f472b6"
     tags:
-      - { slug: social,   label: Social, is_hero_filter: true, hero_ordinal: 0 }
-      - { slug: workshop, label: Workshop }
-      - { slug: festival, label: Festival }
-      - { slug: bootcamp, label: Bootcamp }
-      - { slug: show,     label: Show }
+      - slug: social
+        label: Social
+        is_hero_filter: true
+        hero_ordinal: 0
+        synonyms: [ "social dance", "fiesta", "party", "soirée", "soiree", "noche" ]
+      - slug: workshop
+        label: Workshop
+        synonyms:
+          [
+            "workshops",
+            "class",
+            "classes",
+            "lesson",
+            "lessons",
+            "course",
+            "stage",
+          ]
+      - slug: festival
+        label: Festival
+        # NOTE: "marathon" is intentionally NOT a festival synonym — a dance
+        # marathon is its own format. "weekender" / "encuentro" / "congress"
+        # are commonly multi-day festivals.
+        synonyms: [ "congress", "weekender", "encuentro" ]
+      - slug: bootcamp
+        label: Bootcamp
+        synonyms: [ "intensive", "boot camp" ]
+      - slug: show
+        label: Show
+        synonyms: [ "showcase", "performance", "demo", "exhibition" ]
 
   - slug: dance-style
     label: Dance Style
@@ -21,11 +52,25 @@ tag_groups:
     allow_multiple: true
     color: "#fb923c"
     tags:
-      - { slug: salsa,    label: Salsa,   is_hero_filter: true, hero_ordinal: 1 }
-      - { slug: bachata,  label: Bachata, is_hero_filter: true, hero_ordinal: 2 }
-      - { slug: kizomba,  label: Kizomba }
-      - { slug: zouk,     label: Zouk }
-      - { slug: cha-cha,  label: Cha-Cha }
+      - slug: salsa
+        label: Salsa
+        is_hero_filter: true
+        hero_ordinal: 1
+        synonyms: [ "salsa cubana", "salsa on1", "salsa on2", "casino", "rueda" ]
+      - slug: bachata
+        label: Bachata
+        is_hero_filter: true
+        hero_ordinal: 2
+        synonyms: [ "bachata sensual", "bachata moderna", "bachata dominicana" ]
+      - slug: kizomba
+        label: Kizomba
+        synonyms: [ "urban kiz", "kiz", "tarraxo", "tarraxinha", "ghetto zouk" ]
+      - slug: zouk
+        label: Zouk
+        synonyms: [ "brazilian zouk", "lambazouk" ]
+      - slug: cha-cha
+        label: Cha-Cha
+        synonyms: [ "chachacha", "cha cha cha", "cha-cha-cha" ]
 
   - slug: level
     label: Level
@@ -35,10 +80,20 @@ tag_groups:
     allow_multiple: false
     color: "#60a5fa"
     tags:
-      - { slug: beginner,     label: Beginner, is_hero_filter: true, hero_ordinal: 3 }
-      - { slug: intermediate, label: Intermediate }
-      - { slug: advanced,     label: Advanced }
-      - { slug: all-levels,   label: All Levels }
+      - slug: beginner
+        label: Beginner
+        is_hero_filter: true
+        hero_ordinal: 3
+        synonyms: [ "beginners", "absolute beginner", "intro", "introduction", "starter" ]
+      - slug: intermediate
+        label: Intermediate
+        synonyms: [ "improver", "improvers", "int", "intermediate-advanced" ]
+      - slug: advanced
+        label: Advanced
+        synonyms: [ "advanced level", "adv" ]
+      - slug: all-levels
+        label: All Levels
+        synonyms: [ "all level", "open level", "tous niveaux" ]
 
   - slug: venue
     label: Venue
@@ -46,8 +101,12 @@ tag_groups:
     allow_multiple: true
     color: "#34d399"
     tags:
-      - { slug: indoor,  label: Indoor }
-      - { slug: outdoor, label: Outdoor }
+      - slug: indoor
+        label: Indoor
+        synonyms: [ "indoors" ]
+      - slug: outdoor
+        label: Outdoor
+        synonyms: [ "open air", "open-air", "park", "rooftop", "terrace", "beach" ]
 
   - slug: vibe
     label: Vibe
@@ -55,6 +114,12 @@ tag_groups:
     allow_multiple: true
     color: "#e879f9"
     tags:
-      - { slug: live-music, label: Live Music }
-      - { slug: dj,         label: DJ }
-      - { slug: free,       label: Free Entry }
+      - slug: live-music
+        label: Live Music
+        synonyms: [ "live band", "live orchestra", "live percussion", "live drummers" ]
+      - slug: dj
+        label: DJ
+        synonyms: [ "dj set", "djs", "live dj set" ]
+      - slug: free
+        label: Free Entry
+        synonyms: [ "free entry", "no cover", "gratis", "gratuit", "free admission" ]

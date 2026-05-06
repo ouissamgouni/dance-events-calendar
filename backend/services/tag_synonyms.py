@@ -1,13 +1,18 @@
-"""Curated synonym map for the heuristic tag suggester.
+"""Default seed for tag synonyms (used on first install only).
 
 Keys are tag *slugs* (matching ``Tag.slug``). Values are lists of additional
 terms (lowercase, whole-word matched) that should also count as a hit for that
 tag — beyond the tag's own ``slug`` and ``label``.
 
-This is intentionally a hand-curated module rather than a DB-backed table so
-the v1 ships without an admin editor. A future iteration can move this into
-a ``tag_synonyms`` table with a Configuration-tab editor; the engine in
-``tag_suggester.py`` only depends on the dict shape.
+This map is **only** consumed by
+:meth:`backend.db.seed.SeedManager._seed_tag_synonyms_defaults` to populate
+the ``tag_synonyms`` DB table on fresh installs. The runtime engine
+(:func:`backend.services.tag_suggester.load_taxonomy`) reads exclusively
+from that table, so admins can add/edit/delete synonyms via the UI without
+any code change — and deleted terms stay deleted (no silent re-injection).
+
+Scenarios may also override these defaults declaratively by adding a
+``synonyms:`` list under each tag entry in their ``tags.yaml``.
 
 Notes:
 - Multi-word phrases are matched as substrings (no word boundary at internal
@@ -39,7 +44,7 @@ TAG_SYNONYMS: dict[str, list[str]] = {
         "course",
         "stage",
     ],
-    "festival": ["congress", "weekender", "marathon", "encuentro"],
+    "festival": ["congress", "encuentro"],
     "bootcamp": ["intensive", "boot camp"],
     "show": ["showcase", "performance", "demo", "exhibition"],
     "competition": ["jack and jill", "j&j", "battle", "contest"],

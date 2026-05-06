@@ -163,6 +163,11 @@ export interface EventSuggestionCreate {
     submitter_name?: string;
     submitter_email?: string;
     suggested_tag_ids?: number[];
+    suggested_new_tags?: { free_text: string; group_slug?: string | null }[];
+    price_min?: number | null;
+    price_max?: number | null;
+    price_currency?: string | null;
+    price_is_free?: boolean;
     website?: string; // honeypot
     screen_size?: string;
     timezone?: string;
@@ -197,6 +202,11 @@ export interface EventSuggestion {
     created_event_id: string | null;
     synced_to_google: boolean;
     google_event_id: string | null;
+    suggested_tag_ids?: number[] | null;
+    price_min?: number | null;
+    price_max?: number | null;
+    price_currency?: string | null;
+    price_is_free?: boolean;
     created_at: string;
     reviewed_at: string | null;
     reviewed_by: string | null;

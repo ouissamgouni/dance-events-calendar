@@ -115,6 +115,12 @@ class DatabaseSeeder:
             tags:
               - slug: social
                 label: Social
+                # Optional: explicit synonyms for the heuristic tag suggester.
+                # When present, this list is the authoritative set for the
+                # tag — existing rows in `tag_synonyms` for this tag are
+                # wiped and replaced. Omit the key (or set null) to leave
+                # existing rows untouched.
+                synonyms: ["soiree", "fiesta"]
         """
         if not path.exists():
             logger.info("No tags.yaml found at %s", path)
@@ -206,18 +212,45 @@ class DatabaseSeeder:
                     tag.hero_ordinal = tag_hero_ordinal
                     self.session.add(tag)
                 else:
-                    self.session.add(
-                        Tag(
-                            group_id=group.id,
-                            slug=tag_slug,
-                            label=tag_label,
-                            ordinal=tag_ordinal,
-                            color=tag_color,
-                            enabled=tag_enabled,
-                            is_hero_filter=tag_is_hero,
-                            hero_ordinal=tag_hero_ordinal,
-                        )
+                    tag = Tag(
+                        group_id=group.id,
+                        slug=tag_slug,
+                        label=tag_label,
+                        ordinal=tag_ordinal,
+                        color=tag_color,
+                        enabled=tag_enabled,
+                        is_hero_filter=tag_is_hero,
+                        hero_ordinal=tag_hero_ordinal,
                     )
+                    self.session.add(tag)
+                    self.session.flush()
+
+                # Optional per-tag synonyms (scenario-driven, fully reproducible).
+                # When `synonyms:` is provided, it is treated as the authoritative
+                # set for this tag — existing DB rows for this tag are replaced.
+                # Omit the key (or pass null) to leave existing rows untouched.
+                if "synonyms" in tag_data:
+                    raw_syns = tag_data.get("synonyms") or []
+                    if not isinstance(raw_syns, list):
+                        logger.warning(
+                            "Tag %s/%s: `synonyms` must be a list; got %r",
+                            slug,
+                            tag_slug,
+                            type(raw_syns).__name__,
+                        )
+                    else:
+                        # Wipe & rewrite: scenarios stay deterministic across reseeds.
+                        for old in self.session.exec(
+                            select(TagSynonym).where(TagSynonym.tag_id == tag.id)
+                        ).all():
+                            self.session.delete(old)
+                        seen: set[str] = set()
+                        for raw in raw_syns:
+                            term = (str(raw) or "").strip().lower()
+                            if not term or term in seen:
+                                continue
+                            seen.add(term)
+                            self.session.add(TagSynonym(tag_id=tag.id, term=term))
 
     def _seed_tag_synonyms_defaults(self) -> None:
         """Idempotently seed default heuristic synonyms from the static map.
@@ -314,6 +347,11 @@ class DatabaseSeeder:
             ).all()
             for row in existing:
                 self.session.delete(row)
+            # Flush deletes before inserts so SQLAlchemy's unit-of-work doesn't
+            # reorder the new INSERTs ahead of the DELETEs and trip the
+            # uq_calendar_default_tag unique constraint.
+            if existing:
+                self.session.flush()
 
             for slug in tag_slugs:
                 tag_id = tag_lookup.get(slug)

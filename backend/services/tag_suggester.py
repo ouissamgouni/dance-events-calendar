@@ -43,7 +43,6 @@ from typing import Iterable, Optional, Sequence
 from sqlmodel import Session, select
 
 from backend.db.models import Tag, TagGroup
-from backend.services.tag_synonyms import TAG_SYNONYMS
 
 logger = logging.getLogger(__name__)
 
@@ -123,9 +122,7 @@ def _build_indexed_tag(
     group: TagGroup,
     synonyms: Optional[list[str]] = None,
 ) -> _IndexedTag:
-    if synonyms is None:
-        synonyms = list(TAG_SYNONYMS.get(tag.slug, []))
-    raw_terms = _candidate_terms(tag.slug, tag.label, synonyms)
+    raw_terms = _candidate_terms(tag.slug, tag.label, list(synonyms or []))
     terms: list[tuple[str, bool]] = []
     for term in raw_terms:
         terms.append((term, " " in term))
@@ -144,10 +141,12 @@ def _build_indexed_tag(
 def load_taxonomy(session: Session) -> TaxonomySnapshot:
     """Load enabled, event-scope tags + their groups into an immutable snapshot.
 
-    Synonym terms are read from the ``tag_synonyms`` table. Tags without any
-    DB-configured synonyms fall back to the static seed map
-    (:data:`backend.services.tag_synonyms.TAG_SYNONYMS`) so fresh installs and
-    tests work without an explicit seed step.
+    Synonym terms come exclusively from the ``tag_synonyms`` table — the
+    runtime engine never falls back to the static seed map. The static map
+    in :mod:`backend.services.tag_synonyms` is a one-time *seed* used by
+    :meth:`backend.db.seed.SeedManager._seed_tag_synonyms_defaults` on fresh
+    installs and by scenario seeds; admins are then free to add, edit or
+    delete every term via the admin UI without the deleted terms re-appearing.
     """
     from backend.db.models import TagSynonym  # local import: avoid cycles in tests
 
@@ -173,7 +172,7 @@ def load_taxonomy(session: Session) -> TaxonomySnapshot:
     for tag, group in rows:
         if not tag.id:
             continue
-        synonyms = syn_map.get(tag.id) or list(TAG_SYNONYMS.get(tag.slug, []))
+        synonyms = syn_map.get(tag.id, [])
         indexed.append(_build_indexed_tag(tag, group, synonyms))
     return TaxonomySnapshot(tags=tuple(indexed))
 

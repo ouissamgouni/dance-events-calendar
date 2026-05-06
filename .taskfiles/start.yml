@@ -348,7 +348,7 @@ tasks:
         npx concurrently \
           --names "API,WEB,OPEN" \
           --prefix-colors "blue,green,yellow" \
-          "cd {{.BACKEND_DIR}} && PYTHONPATH={{.ROOT_DIR}} ENV_NAME=$ENV_NAME DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${SC_DB_PORT}/${SC_DB_NAME} CALENDAR_SERVICE=$CALENDAR_SVC SCENARIO_DIR=$SCENARIO_DIR GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-} GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-} ADMIN_EMAIL=${ADMIN_EMAIL:-} SESSION_SECRET=${SESSION_SECRET:-scenario-secret} GOOGLE_SERVICE_ACCOUNT_FILE=${GOOGLE_SERVICE_ACCOUNT_FILE:-} {{.ROOT_DIR}}/.venv/bin/uvicorn backend.api.main:app --reload --host 0.0.0.0 --port $SC_API_PORT" \
+          "cd {{.BACKEND_DIR}} && PYTHONPATH={{.ROOT_DIR}} ENV_NAME=$ENV_NAME DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${SC_DB_PORT}/${SC_DB_NAME} CALENDAR_SERVICE=$CALENDAR_SVC SCENARIO_DIR=$SCENARIO_DIR GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-} GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-} ADMIN_EMAIL=${ADMIN_EMAIL:-} SESSION_SECRET=${SESSION_SECRET:-scenario-secret} GOOGLE_SERVICE_ACCOUNT_FILE=${GOOGLE_SERVICE_ACCOUNT_FILE:-} SMTP_HOST=${SMTP_HOST:-} SMTP_PORT=${SMTP_PORT:-} SMTP_USER=${SMTP_USER:-} SMTP_PASSWORD=${SMTP_PASSWORD:-} SMTP_FROM=${SMTP_FROM:-} {{.ROOT_DIR}}/.venv/bin/uvicorn backend.api.main:app --reload --host 0.0.0.0 --port $SC_API_PORT" \
           "cd {{.FRONTEND_DIR}} && VITE_API_URL=http://localhost:$SC_API_PORT VITE_UMAMI_URL=http://localhost:${SC_UMAMI_PORT} VITE_UMAMI_WEBSITE_ID=${SC_UMAMI_WEBSITE_ID} npm run dev -- --port $SC_WEB_PORT --strictPort" \
           "until curl -sf http://localhost:$SC_WEB_PORT >/dev/null 2>&1; do sleep 1; done && {{.ROOT_DIR}}/.taskfiles/open-browser.sh http://localhost:$SC_WEB_PORT"
 

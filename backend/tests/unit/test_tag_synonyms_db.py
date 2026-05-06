@@ -1,8 +1,8 @@
 """Tests for the DB-backed synonym loader (`load_taxonomy`).
 
-Verifies that synonyms come from the ``tag_synonyms`` table when present,
-fall back to the static seed map otherwise, and that admin-edited synonyms
-flow into the heuristic suggester's term index.
+Verifies that synonyms come from the ``tag_synonyms`` table only — the runtime
+engine no longer falls back to the static seed map, so admin deletions stay
+deleted.
 """
 
 from datetime import datetime
@@ -66,22 +66,22 @@ def test_load_taxonomy_uses_db_synonyms_when_present(session):
     assert "salsa" in salsa_terms
 
 
-def test_load_taxonomy_falls_back_to_static_map_when_no_db_rows(session):
-    """Tags without DB rows should still pick up the seed-map defaults."""
+def test_load_taxonomy_does_not_fall_back_to_static_map(session):
+    """Tags without DB rows should expose ONLY their slug + label — no static
+    fallback. The static map is a one-time install seed, not a runtime source.
+    """
     _seed(session)
     session.commit()
 
     snapshot = load_taxonomy(session)
-    # The static map ships defaults for "salsa" — confirm at least one
-    # well-known synonym shows up via fallback.
     salsa_terms = _terms_for(snapshot, "salsa")
-    # "salsa" itself is always present; the fallback should add more terms.
-    assert len(salsa_terms) > 1
+    # Only the slug/label survive ("salsa" itself); no "casino" / "rueda" / etc.
+    assert salsa_terms == {"salsa"}
 
 
-def test_db_rows_replace_static_map_for_that_tag(session):
-    """If admin configures any synonyms for a tag, the static fallback is ignored."""
-    salsa_id, bachata_id = _seed(session)
+def test_db_rows_are_the_only_synonym_source(session):
+    """Admin-configured synonyms are the sole runtime source."""
+    salsa_id, _ = _seed(session)
     session.add(
         TagSynonym(tag_id=salsa_id, term="only-this", created_at=datetime.utcnow())
     )
@@ -91,7 +91,7 @@ def test_db_rows_replace_static_map_for_that_tag(session):
     salsa_terms = _terms_for(snapshot, "salsa")
     bachata_terms = _terms_for(snapshot, "bachata")
 
-    # Admin synonym present.
-    assert "only-this" in salsa_terms
-    # Bachata still gets the fallback (it has no DB rows).
-    assert len(bachata_terms) >= 1
+    # Admin synonym present + slug. Hyphenated terms also gain a space variant.
+    assert salsa_terms == {"salsa", "only-this", "only this"}
+    # Bachata has no DB rows → only slug/label.
+    assert bachata_terms == {"bachata"}

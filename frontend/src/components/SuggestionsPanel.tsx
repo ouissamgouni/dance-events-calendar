@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { EventSuggestion, CalendarSetting } from '../types';
+import { syncSuggestionToGoogle } from '../api';
 import SuggestionReviewModal from './SuggestionReviewModal';
 import AdminEventDetailPanel from './AdminEventDetailPanel';
 
@@ -19,6 +20,19 @@ export default function SuggestionsPanel({ isOpen, onClose, suggestions, calenda
     const [activeTab, setActiveTab] = useState<Tab>('pending');
     const [reviewingSuggestion, setReviewingSuggestion] = useState<EventSuggestion | null>(null);
     const [adminDetailEventId, setAdminDetailEventId] = useState<string | null>(null);
+    const [syncingId, setSyncingId] = useState<string | null>(null);
+
+    const handleSync = async (s: EventSuggestion) => {
+        setSyncingId(s.id);
+        try {
+            const updated = await syncSuggestionToGoogle(s.id);
+            onUpdated(updated);
+        } catch {
+            // surface via badge — no red
+        } finally {
+            setSyncingId(null);
+        }
+    };
 
     const filtered = activeTab === 'all'
         ? suggestions
@@ -35,10 +49,10 @@ export default function SuggestionsPanel({ isOpen, onClose, suggestions, calenda
         const colors: Record<string, string> = {
             pending: 'bg-amber-100 text-amber-700',
             approved: 'bg-emerald-100 text-emerald-700',
-            rejected: 'bg-red-100 text-red-700',
+            rejected: 'bg-slate-200 text-slate-700',
         };
         return (
-            <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${colors[status] ?? 'bg-gray-100 text-gray-600'}`}>
+            <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 ${colors[status] ?? 'bg-gray-100 text-gray-600'}`}>
                 {status}
             </span>
         );
@@ -74,7 +88,7 @@ export default function SuggestionsPanel({ isOpen, onClose, suggestions, calenda
                         )}
                         <h2 className="text-xs font-semibold text-gray-800 uppercase tracking-wide">Suggestions</h2>
                         {counts.pending > 0 && (
-                            <span className="inline-flex items-center justify-center bg-rose-500 text-white text-[10px] font-semibold px-1.5 py-0.5 min-w-[18px] rounded">
+                            <span className="inline-flex items-center justify-center bg-blue-600 text-white text-[10px] font-semibold px-1.5 py-0.5 min-w-[18px]">
                                 {counts.pending}
                             </span>
                         )}
@@ -95,7 +109,7 @@ export default function SuggestionsPanel({ isOpen, onClose, suggestions, calenda
                             key={tab}
                             onClick={() => setActiveTab(tab)}
                             className={`flex-1 py-2 text-[11px] font-medium capitalize transition border-b-2 ${activeTab === tab
-                                ? 'border-rose-500 text-rose-600'
+                                ? 'border-blue-600 text-blue-700'
                                 : 'border-transparent text-gray-400 hover:text-gray-600'
                                 }`}
                         >
@@ -110,35 +124,54 @@ export default function SuggestionsPanel({ isOpen, onClose, suggestions, calenda
                         <p className="text-center text-[11px] text-gray-400 mt-8">No suggestions</p>
                     ) : (
                         <ul className="divide-y divide-gray-100">
-                            {filtered.map((s) => (
-                                <li
-                                    key={s.id}
-                                    className="px-4 py-3 hover:bg-gray-50 cursor-pointer transition"
-                                    onClick={() => setReviewingSuggestion(s)}
-                                >
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-[12px] font-medium text-gray-800 truncate">{s.title}</p>
-                                            <p className="text-[10px] text-gray-400 mt-0.5">
-                                                {fmtDate(s.start)}
-                                                {s.submitter_name && ` • ${s.submitter_name}`}
-                                            </p>
+                            {filtered.map((s) => {
+                                const isApproved = s.status === 'approved';
+                                const needsSync = isApproved && !s.synced_to_google;
+                                return (
+                                    <li
+                                        key={s.id}
+                                        className="px-4 py-3 hover:bg-gray-50 cursor-pointer transition"
+                                        onClick={() => setReviewingSuggestion(s)}
+                                    >
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-[12px] font-medium text-gray-800 truncate">{s.title}</p>
+                                                <p className="text-[10px] text-gray-400 mt-0.5">
+                                                    {fmtDate(s.start)}
+                                                    {s.submitter_name && ` • ${s.submitter_name}`}
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                {statusBadge(s.status)}
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-1.5 shrink-0">
-                                            {s.status === 'approved' && s.created_event_id && (
+                                        {isApproved && s.created_event_id && (
+                                            <div className="mt-2 flex items-center gap-2">
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); setAdminDetailEventId(s.created_event_id!); }}
-                                                    className="text-[10px] font-mono text-rose-500 hover:text-rose-700 hover:underline"
+                                                    className="text-[10px] font-medium text-blue-700 hover:text-blue-900 hover:underline"
                                                     title="View linked event"
                                                 >
-                                                    #{s.created_event_id.slice(0, 8)}
+                                                    Open created event →
                                                 </button>
-                                            )}
-                                            {statusBadge(s.status)}
-                                        </div>
-                                    </div>
-                                </li>
-                            ))}
+                                                {needsSync && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); handleSync(s); }}
+                                                        disabled={syncingId === s.id}
+                                                        className="bg-blue-600 text-white text-[10px] font-medium px-2 py-0.5 hover:bg-blue-700 disabled:opacity-50 transition"
+                                                        title="Sync this event back to Google Calendar"
+                                                    >
+                                                        {syncingId === s.id ? 'Syncing…' : 'Sync to Google'}
+                                                    </button>
+                                                )}
+                                                {isApproved && s.synced_to_google && (
+                                                    <span className="text-[10px] text-emerald-600">✓ Synced</span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </li>
+                                );
+                            })}
                         </ul>
                     )}
                 </div>

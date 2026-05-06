@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import type { CalendarSetting, EventSuggestion } from '../types';
 import type { AdminTagGroup } from '../api';
 import {
@@ -69,9 +69,31 @@ export default function Admin() {
     const [expandedDefaultTagsCalId, setExpandedDefaultTagsCalId] = useState<string | null>(null);
     const [tagGroups, setTagGroups] = useState<AdminTagGroup[]>([]);
     const [calendarDefaultTagIds, setCalendarDefaultTagIds] = useState<Record<string, number[]>>({});
-    const [activeTab, setActiveTab] = useState<AdminTab>('data');
+    const { tab: tabParam } = useParams<{ tab?: string }>();
+    const isValidTab = (t: string | undefined): t is AdminTab =>
+        t === 'data' || t === 'configuration' || t === 'analytics';
+    const [activeTab, setActiveTab] = useState<AdminTab>(isValidTab(tabParam) ? tabParam : 'data');
     const { user, logout } = useAuth();
     const navigate = useNavigate();
+
+    // Sync activeTab with URL param (and redirect /admin -> /admin/data)
+    useEffect(() => {
+        if (!tabParam) {
+            navigate('/admin/data', { replace: true });
+            return;
+        }
+        if (isValidTab(tabParam)) {
+            if (tabParam !== activeTab) setActiveTab(tabParam);
+        } else {
+            navigate('/admin/data', { replace: true });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tabParam]);
+
+    const changeTab = (tab: AdminTab) => {
+        setActiveTab(tab);
+        navigate(`/admin/${tab}`);
+    };
 
     const refreshSuggestions = () => fetchSuggestions().then(setSuggestions).catch(() => { });
 
@@ -394,9 +416,9 @@ export default function Admin() {
                 <h1 className="-mt-2 text-sm font-semibold text-gray-900 uppercase tracking-wide">Admin</h1>
                 <div className="flex flex-wrap items-start gap-2 sm:items-start sm:justify-between">
                     <div className="flex items-center gap-1.5 sm:gap-2">
-                        <button onClick={() => setActiveTab('data')} className={tabBtnClass('data')}>Data</button>
-                        <button onClick={() => setActiveTab('configuration')} className={tabBtnClass('configuration')}>Configuration</button>
-                        <button onClick={() => setActiveTab('analytics')} className={tabBtnClass('analytics')}>Analytics</button>
+                        <button onClick={() => changeTab('data')} className={tabBtnClass('data')}>Data</button>
+                        <button onClick={() => changeTab('configuration')} className={tabBtnClass('configuration')}>Configuration</button>
+                        <button onClick={() => changeTab('analytics')} className={tabBtnClass('analytics')}>Analytics</button>
                     </div>
                     <div className="ml-auto flex min-w-0 flex-col items-end gap-1">
                         <button
@@ -742,7 +764,7 @@ export default function Admin() {
 
             {/* ── Configuration Tab ── */}
             {activeTab === 'configuration' && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
                     {/* Settings */}
                     <div className="border border-gray-200 bg-white">
                         <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50">
@@ -771,6 +793,31 @@ export default function Admin() {
                                 <p className="mt-1 text-[10px] text-gray-400">
                                     Display only — events older than this date are hidden in the calendar shown to users.
                                 </p>
+                            </div>
+                            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                                <div>
+                                    <span className="text-[11px] font-medium text-gray-700">Event bar color</span>
+                                    <p className="text-[10px] text-gray-400">Background of event bars in the calendar</p>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <input
+                                        type="color"
+                                        value={eventColorBarColor}
+                                        onChange={(e) => setEventColorBarColor(e.target.value)}
+                                        onBlur={(e) => handleEventColorBarColorChange(e.target.value)}
+                                        className="h-6 w-8 cursor-pointer border border-gray-200 rounded p-0"
+                                        aria-label="Event bar color picker"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={eventColorBarColor}
+                                        onChange={(e) => setEventColorBarColor(e.target.value)}
+                                        onBlur={(e) => handleEventColorBarColorChange(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleEventColorBarColorChange(eventColorBarColor)}
+                                        placeholder="#64748b"
+                                        className="w-20 text-[11px] font-mono text-gray-900 border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -835,36 +882,11 @@ export default function Admin() {
                                     />
                                 </div>
                             )}
-                            <div className="flex items-center justify-between mt-2">
-                                <div>
-                                    <span className="text-[11px] font-medium text-gray-700">Event bar color</span>
-                                    <p className="text-[10px] text-gray-400">Background of event bars in the calendar</p>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <input
-                                        type="color"
-                                        value={eventColorBarColor}
-                                        onChange={(e) => setEventColorBarColor(e.target.value)}
-                                        onBlur={(e) => handleEventColorBarColorChange(e.target.value)}
-                                        className="h-6 w-8 cursor-pointer border border-gray-200 rounded p-0"
-                                        aria-label="Event bar color picker"
-                                    />
-                                    <input
-                                        type="text"
-                                        value={eventColorBarColor}
-                                        onChange={(e) => setEventColorBarColor(e.target.value)}
-                                        onBlur={(e) => handleEventColorBarColorChange(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleEventColorBarColorChange(eventColorBarColor)}
-                                        placeholder="#64748b"
-                                        className="w-20 text-[11px] font-mono border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                                    />
-                                </div>
-                            </div>
                         </div>
                     </div>
 
                     {/* Tag Categories */}
-                    <div className="border border-gray-200 bg-white lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto">
+                    <div className="lg:col-span-2 border border-gray-200 bg-white lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto">
                         <AdminTagCategories />
                     </div>
                 </div>

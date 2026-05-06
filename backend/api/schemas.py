@@ -258,6 +258,11 @@ class AppInfoResponse(BaseModel):
 # --- Event Suggestions ---
 
 
+class NewTagSuggestionItem(BaseModel):
+    free_text: str = Field(..., min_length=1, max_length=100)
+    group_slug: Optional[str] = Field(default=None, max_length=100)
+
+
 class EventSuggestionCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
@@ -274,6 +279,11 @@ class EventSuggestionCreate(BaseModel):
     screen_size: Optional[str] = None
     timezone: Optional[str] = None
     suggested_tag_ids: list[int] = Field(default_factory=list)
+    suggested_new_tags: list[NewTagSuggestionItem] = Field(default_factory=list)
+    price_min: Optional[float] = Field(default=None, ge=0)
+    price_max: Optional[float] = Field(default=None, ge=0)
+    price_currency: Optional[str] = Field(default=None, max_length=8)
+    price_is_free: bool = False
 
 
 class EventSuggestionResponse(BaseModel):
@@ -305,6 +315,12 @@ class EventSuggestionResponse(BaseModel):
     created_event_id: Optional[str] = None
     synced_to_google: bool = False
     google_event_id: Optional[str] = None
+    suggested_tag_ids: Optional[list[int]] = None
+    suggested_new_tags: Optional[list[NewTagSuggestionItem]] = None
+    price_min: Optional[float] = None
+    price_max: Optional[float] = None
+    price_currency: Optional[str] = None
+    price_is_free: bool = False
     created_at: datetime
     reviewed_at: Optional[datetime] = None
     reviewed_by: Optional[str] = None

@@ -140,6 +140,25 @@ test_plan:
           SELECT tag_id, count(*) FROM tag_synonyms GROUP BY tag_id;
       expected: >
         Table tag_synonyms exists with columns (id, tag_id, term, created_at)
-        and a unique index on (tag_id, term). After scenario seed, well-known
-        tags (salsa, bachata, kizomba, dj, live-music, …) each have ≥ 1 row
-        populated from the static default synonym map.
+        and a unique index on (tag_id, term). After scenario seed, every tag
+        listed in tags.yaml with a `synonyms:` block has exactly the configured
+        rows — no static-map fallback is applied at runtime.
+
+    # ── 10. Removing a synonym stops the engine matching it ─────
+    - id: 10
+      title: "Synonym removal is permanent (no static-map re-injection)"
+      description: >
+        Pre-condition: tag-enhancer/tags.yaml lists "festival" with synonyms
+        ["congress", "weekender", "encuentro"] and intentionally OMITS
+        "marathon" (a dance marathon is its own format, not a festival). Create
+        an event titled "Salsa Marathon Weekender". Click "Re-run" in the Auto
+        Tag Suggestions block.
+      expected: >
+        - Festival IS suggested (matches "weekender"). - Now: open Admin → Tags,
+        click ☰ on the Festival tag, remove the
+          "weekender" chip, close popover, and click "Re-run" on the event.
+        - Festival is NO LONGER suggested. Re-seeding the scenario does not
+          re-add "weekender" silently — it follows tags.yaml exactly.
+        - Verify in DB: `SELECT term FROM tag_synonyms s
+          JOIN tags t ON t.id=s.tag_id WHERE t.slug='festival'` returns only
+          ["congress", "encuentro"].

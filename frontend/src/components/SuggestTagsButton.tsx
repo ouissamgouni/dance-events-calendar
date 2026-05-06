@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { TagGroup } from '../types';
 import { submitTagSuggestion } from '../api';
+import TagsPicker, { type TagsPickerValue } from './TagsPicker';
 
 export interface InlineTagSuggestion {
     tag_id?: number;
@@ -22,51 +23,38 @@ interface Props {
     onChange?: (suggestions: InlineTagSuggestion[]) => void;
 }
 
-export default function SuggestTagsButton({ eventId, tagGroups, existingTagIds, deviceId, onClose, mode = 'standalone', onChange }: Props) {
-    const [selectedGroupSlug, setSelectedGroupSlug] = useState<string | null>(tagGroups[0]?.slug ?? null);
-    const [selectedTagIds, setSelectedTagIds] = useState<Set<number>>(new Set());
-    const [freeTexts, setFreeTexts] = useState<Record<string, string>>({});
-    const [showFreeText, setShowFreeText] = useState(false);
+export default function SuggestTagsButton({
+    eventId,
+    tagGroups,
+    existingTagIds,
+    deviceId,
+    onClose,
+    mode = 'standalone',
+    onChange,
+}: Props) {
+    const [value, setValue] = useState<TagsPickerValue>({ selectedTagIds: [], freeTexts: {} });
     const [website, setWebsite] = useState(''); // honeypot
     const [submitting, setSubmitting] = useState(false);
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState('');
 
-    const activeGroup = tagGroups.find((g) => g.slug === selectedGroupSlug);
-    const availableTags = activeGroup?.tags.filter((t) => !existingTagIds.has(t.id)) ?? [];
-
-    const totalCount =
-        selectedTagIds.size +
-        Object.values(freeTexts).filter((v) => v.trim()).length;
+    const totalCount = useMemo(() => {
+        return value.selectedTagIds.length
+            + Object.values(value.freeTexts).filter((v) => v.trim()).length;
+    }, [value]);
 
     // Embedded mode: emit collected suggestions whenever selection changes so
-    // the parent (RateEventModal) can submit them in the unified envelope.
+    // the parent (e.g. RateEventModal) can submit them in the unified envelope.
     useEffect(() => {
         if (mode !== 'embedded' || !onChange) return;
         const out: InlineTagSuggestion[] = [];
-        for (const tagId of selectedTagIds) out.push({ tag_id: tagId });
-        for (const [groupSlug, text] of Object.entries(freeTexts)) {
+        for (const tagId of value.selectedTagIds) out.push({ tag_id: tagId });
+        for (const [groupSlug, text] of Object.entries(value.freeTexts)) {
             const trimmed = text.trim();
             if (trimmed) out.push({ free_text: trimmed, group_slug: groupSlug });
         }
         onChange(out);
-    }, [selectedTagIds, freeTexts, mode, onChange]);
-
-    const toggleTag = (tagId: number) => {
-        setSelectedTagIds((prev) => {
-            const next = new Set(prev);
-            if (next.has(tagId)) next.delete(tagId);
-            else next.add(tagId);
-            return next;
-        });
-    };
-
-    const handleFreeTextChange = (text: string) => {
-        if (!selectedGroupSlug) return;
-        setFreeTexts((prev) => ({ ...prev, [selectedGroupSlug]: text }));
-    };
-
-    const currentFreeText = selectedGroupSlug ? (freeTexts[selectedGroupSlug] ?? '') : '';
+    }, [value, mode, onChange]);
 
     const handleSubmit = async () => {
         if (totalCount === 0) {
@@ -76,8 +64,7 @@ export default function SuggestTagsButton({ eventId, tagGroups, existingTagIds, 
         setSubmitting(true);
         setError('');
         try {
-            // Submit selected tags
-            for (const tagId of selectedTagIds) {
+            for (const tagId of value.selectedTagIds) {
                 await submitTagSuggestion({
                     event_id: eventId,
                     tag_id: tagId,
@@ -85,8 +72,7 @@ export default function SuggestTagsButton({ eventId, tagGroups, existingTagIds, 
                     website: website || undefined,
                 });
             }
-            // Submit free-text entries
-            for (const [groupSlug, text] of Object.entries(freeTexts)) {
+            for (const [groupSlug, text] of Object.entries(value.freeTexts)) {
                 if (!text.trim()) continue;
                 await submitTagSuggestion({
                     event_id: eventId,
@@ -107,7 +93,7 @@ export default function SuggestTagsButton({ eventId, tagGroups, existingTagIds, 
     if (success) {
         return (
             <div className="p-4 text-center">
-                <p className="text-green-600 font-medium text-sm">
+                <p className="text-emerald-600 font-medium text-sm">
                     Thank you! {totalCount} suggestion{totalCount !== 1 ? 's' : ''} submitted.
                 </p>
                 <button onClick={onClose} className="mt-2 text-xs text-gray-500 hover:text-gray-700">
@@ -123,83 +109,12 @@ export default function SuggestTagsButton({ eventId, tagGroups, existingTagIds, 
         <div className={isEmbedded ? 'space-y-3' : 'p-4 space-y-3'}>
             {!isEmbedded && <h3 className="text-sm font-semibold text-gray-700">Suggest Tags</h3>}
 
-            {/* Category pills */}
-            <div className="flex flex-wrap gap-1.5">
-                {tagGroups.map((group) => {
-                    const c = group.color ?? '#6b7280';
-                    const active = group.slug === selectedGroupSlug;
-                    return (
-                        <button
-                            key={group.slug}
-                            onClick={() => { setSelectedGroupSlug(group.slug); setShowFreeText(false); }}
-                            className={`px-2.5 py-1 text-xs font-medium border transition-colors ${active ? 'text-white' : ''
-                                }`}
-                            style={
-                                active
-                                    ? { backgroundColor: c, borderColor: c }
-                                    : { borderColor: `${c}50`, color: c, backgroundColor: `${c}10` }
-                            }
-                        >
-                            {group.label}
-                        </button>
-                    );
-                })}
-            </div>
-
-            {/* Tags for selected category */}
-            {activeGroup && (
-                <div className="space-y-2">
-                    {availableTags.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                            {availableTags.map((tag) => {
-                                const c = tag.group_color ?? tag.color ?? '#6b7280';
-                                const selected = selectedTagIds.has(tag.id);
-                                return (
-                                    <button
-                                        key={tag.id}
-                                        onClick={() => toggleTag(tag.id)}
-                                        className={`px-2 py-0.5 text-xs border transition-colors ${selected ? 'text-white' : 'bg-white'
-                                            }`}
-                                        style={
-                                            selected
-                                                ? { backgroundColor: c, borderColor: c }
-                                                : { borderColor: `${c}60`, color: c }
-                                        }
-                                    >
-                                        {selected && '✓ '}{tag.label}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    ) : (
-                        <p className="text-xs text-gray-400 italic">All tags in this category are already on this event.</p>
-                    )}
-
-                    {/* Suggest new tag toggle */}
-                    {!showFreeText ? (
-                        <button
-                            onClick={() => setShowFreeText(true)}
-                            className="text-xs text-rose-500 hover:text-rose-700 font-medium"
-                        >
-                            + Suggest new tag
-                        </button>
-                    ) : (
-                        <div>
-                            <label className="text-xs text-gray-500">
-                                New tag for <span className="font-medium">{activeGroup.label}</span>:
-                            </label>
-                            <input
-                                type="text"
-                                value={currentFreeText}
-                                onChange={(e) => handleFreeTextChange(e.target.value)}
-                                placeholder={`e.g. new ${activeGroup.label.toLowerCase()} tag`}
-                                className="mt-1 w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-rose-400"
-                                maxLength={100}
-                            />
-                        </div>
-                    )}
-                </div>
-            )}
+            <TagsPicker
+                tagGroups={tagGroups}
+                value={value}
+                onChange={setValue}
+                excludeTagIds={existingTagIds}
+            />
 
             {/* Honeypot */}
             <input
@@ -212,20 +127,20 @@ export default function SuggestTagsButton({ eventId, tagGroups, existingTagIds, 
                 aria-hidden="true"
             />
 
-            {error && <p className="text-xs text-red-500">{error}</p>}
+            {error && <p className="text-xs text-slate-700 bg-slate-100 px-2 py-1">{error}</p>}
 
             {!isEmbedded && (
                 <div className="flex gap-2">
                     <button
                         onClick={handleSubmit}
                         disabled={submitting || totalCount === 0}
-                        className="flex-1 rounded bg-rose-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-600 disabled:opacity-50"
+                        className="flex-1 bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
                     >
                         {submitting ? 'Submitting…' : totalCount > 0 ? `Submit ${totalCount} suggestion${totalCount !== 1 ? 's' : ''}` : 'Submit'}
                     </button>
                     <button
                         onClick={onClose}
-                        className="rounded border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+                        className="border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
                     >
                         Cancel
                     </button>

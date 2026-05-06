@@ -1,0 +1,6 @@
+# Mock users pre-seeded for this scenario.
+users:
+  - email: dev-user@example.com
+    name: Dev User
+  - email: g.ouissam@gmail.com # matches ADMIN_EMAIL → admin badge on /account
+    name: Admin
