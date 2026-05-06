@@ -17,11 +17,11 @@ export default function Account() {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [myRatings, setMyRatings] = useState<MyRating[] | null>(null);
-    const [shareDefault, setShareDefault] = useState<boolean>(user?.share_attendance_default ?? false);
+    const [shareDefault, setShareDefault] = useState<boolean>(user?.share_attendance_default ?? true);
     const [shareSaving, setShareSaving] = useState(false);
 
     useEffect(() => {
-        setShareDefault(user?.share_attendance_default ?? false);
+        setShareDefault(user?.share_attendance_default ?? true);
     }, [user?.share_attendance_default]);
 
     useEffect(() => {

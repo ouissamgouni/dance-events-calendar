@@ -291,6 +291,7 @@ def login_with_google(
             "avatar_url": user.avatar_url,
             "is_admin": is_admin,
             "is_new_user": is_new_user,
+            "share_attendance_default": user.share_attendance_default,
         }
     )
     return _set_session_cookie(response, user, is_admin)

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import { useAuth } from '../context/AuthContext';
+import { useAnchoredToast, SIGN_IN_TOAST_MESSAGE } from './AnchoredToast';
 import SignInNudge, { useSignInNudge } from './SignInNudge';
 
 interface Props {
@@ -23,6 +24,7 @@ export default function SaveEventButton({
     const saved = isSaved(eventId);
     const iconSizeClass = size === 'sm' ? 'w-4 h-4' : 'w-5 h-5';
     const buttonRef = useRef<HTMLButtonElement | null>(null);
+    const toast = useAnchoredToast(buttonRef);
     const nudge = useSignInNudge('save');
     const [showNudge, setShowNudge] = useState(false);
 
@@ -30,11 +32,19 @@ export default function SaveEventButton({
         if (stopPropagation) event.stopPropagation();
         const wasSaved = saved;
         toggleSave(eventId);
-        // Only nudge on save (not unsave) for anonymous users.
-        if (!user && !wasSaved && nudge.shouldShow) {
+        if (wasSaved) {
+            // Unsaving: dismiss any lingering toast.
+            toast.hide();
+            return;
+        }
+        if (!user && nudge.shouldShow) {
+            // First anonymous save in this session: show the rich popover
+            // with a Sign-in CTA. Subsequent saves fall through to the toast.
             nudge.markShown();
             setShowNudge(true);
+            return;
         }
+        toast.show(user ? 'Saved' : SIGN_IN_TOAST_MESSAGE, user ? 1400 : 2800);
     };
 
     const nudgeNode = showNudge && !user ? (
@@ -55,6 +65,7 @@ export default function SaveEventButton({
                     </svg>
                     {saved ? 'Saved' : 'Save'}
                 </button>
+                {toast.node}
                 {nudgeNode}
             </span>
         );
@@ -72,6 +83,7 @@ export default function SaveEventButton({
                     <path d="M5 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14l-5-2.5L5 18V4Z" />
                 </svg>
             </button>
+            {toast.node}
             {nudgeNode}
         </span>
     );

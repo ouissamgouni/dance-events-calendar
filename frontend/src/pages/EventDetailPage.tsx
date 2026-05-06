@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { fetchEvent, updateEvent, fetchTagGroups } from '../api';
-import { useSavedEvents } from '../context/SavedEventsContext';
 import { useAuth } from '../context/AuthContext';
 import { trackView } from '../utils/tracking';
 import EventDetailContent from '../components/EventDetailContent';
@@ -10,6 +9,7 @@ import AdminEventDetailContent from '../components/AdminEventDetailContent';
 import EventMap from '../components/EventMap';
 import SuggestTagsButton from '../components/SuggestTagsButton';
 import GoingButton from '../components/GoingButton';
+import SaveEventButton from '../components/SaveEventButton';
 import RateEventButton from '../components/RateEventButton';
 import EventReviewsSection from '../components/EventReviewsSection';
 import AttendeeList from '../components/AttendeeList';
@@ -24,7 +24,6 @@ export default function EventDetailPage() {
     const [event, setEvent] = useState<CalendarEvent | null>(null);
     const [error, setError] = useState(false);
     const [loading, setLoading] = useState(true);
-    const { isSaved, toggleSave } = useSavedEvents();
     const { user } = useAuth();
     const { showRatings } = useFeatureFlags();
 
@@ -249,15 +248,7 @@ export default function EventDetailPage() {
 
                                 {/* Actions bar */}
                                 <div className="border-t border-slate-100 px-4 py-2 flex items-center gap-1.5 flex-wrap">
-                                    <button
-                                        onClick={() => toggleSave(event.event_id)}
-                                        className={`text-xs rounded px-2.5 py-1 transition flex items-center gap-1 shrink-0 ${isSaved(event.event_id) ? 'text-slate-800 bg-slate-200 hover:bg-slate-300' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'}`}
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-                                            <path d="M5 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14l-5-2.5L5 18V4Z" />
-                                        </svg>
-                                        {isSaved(event.event_id) ? 'Saved' : 'Save'}
-                                    </button>
+                                    <SaveEventButton eventId={event.event_id} appearance="pill" />
                                     <GoingButton eventId={event.event_id} appearance="pill" />
                                     {showRatings && <RateEventButton eventId={event.event_id} appearance="pill" eventHasReviews={reviewCount > 0} />}
                                     <ShareButton

@@ -51,8 +51,13 @@ export default function SignUpBanner() {
             aria-label="Sign in promotion"
             className="flex items-center justify-between gap-3 bg-blue-50 border-b border-blue-100 px-4 py-1.5 text-xs text-slate-700"
         >
-            <p className="min-w-0 truncate">
-                Sign in to save events, see who's going, and rate.
+            <p className="min-w-0 sm:truncate truncate sm:whitespace-normal">
+                <span className="hidden sm:inline">
+                    Sign in to save events across your devices, see who else is going, share your calendar, and rate events.
+                </span>
+                <span className="sm:hidden">
+                    Sign in to save, see who's going, and rate.
+                </span>
             </p>
             <div className="flex items-center gap-2 shrink-0">
                 <Link

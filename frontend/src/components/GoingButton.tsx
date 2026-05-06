@@ -3,13 +3,8 @@ import { createPortal } from 'react-dom';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useAuth } from '../context/AuthContext';
 import { updateUserPreferences } from '../api';
+import { useAnchoredToast, SIGN_IN_GOING_TOAST_MESSAGE } from './AnchoredToast';
 import SignInNudge, { useSignInNudge } from './SignInNudge';
-import { useToast } from './Toast';
-
-// Module-level set of user ids that have already seen the
-// "auto-public RSVP" advisory toast this browser session. Prevents
-// the toast from spamming users who RSVP to many events in one sitting.
-const autoPublicToastShownForUser = new Set<string>();
 
 interface Props {
     eventId: string;
@@ -79,14 +74,12 @@ export default function GoingButton({
 }: Props) {
     const { isAttending, isSharingPublicly, toggleAttending, setSharePublicly } = useAttendingEvents();
     const { user, refreshUser } = useAuth();
-    const toast = useToast();
     const going = isAttending(eventId);
     const sharing = isSharingPublicly(eventId);
 
     const triggerRef = useRef<HTMLButtonElement | null>(null);
     const popoverRef = useRef<HTMLDivElement | null>(null);
-    const [toastVisible, setToastVisible] = useState(false);
-    const [toastFading, setToastFading] = useState(false);
+    const toast = useAnchoredToast(triggerRef);
     // 'confirm' = off→going prompt, 'edit' = already going, edit visibility.
     const [popoverKind, setPopoverKind] = useState<'confirm' | 'edit' | null>(null);
     const [pendingShare, setPendingShare] = useState<boolean>(false);
@@ -94,14 +87,6 @@ export default function GoingButton({
     const [popoverPos, setPopoverPos] = useState<PopoverPos | null>(null);
     const nudge = useSignInNudge('going');
     const [showNudge, setShowNudge] = useState(false);
-
-    const triggerToast = useCallback(() => {
-        setToastVisible(true);
-        setToastFading(false);
-        const fade = setTimeout(() => setToastFading(true), 700);
-        const hide = setTimeout(() => { setToastVisible(false); setToastFading(false); }, 1300);
-        return () => { clearTimeout(fade); clearTimeout(hide); };
-    }, []);
 
     // Position the popover under the trigger and keep it positioned on
     // scroll/resize while open.
@@ -141,27 +126,23 @@ export default function GoingButton({
     const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
         if (stopPropagation) e.stopPropagation();
         if (going) {
+            // Toggling off: dismiss any lingering toast so we never show
+            // an "I'm going!" message on a "not going" click.
+            toast.hide();
             toggleAttending(eventId);
             return;
         }
         if (user) {
             // If the user has already opted in to sharing by default, skip the
-            // confirmation popover and mark going publicly immediately.
+            // confirmation popover and mark going publicly immediately. Show
+            // an inline advisory under the button so the user knows their
+            // name is public and where to change it.
             if (user.share_attendance_default === true) {
                 toggleAttending(eventId, true);
-                triggerToast();
-                // One-time-per-session advisory: remind the user their
-                // name is public for this RSVP and how to override it.
-                const uid = user.user_id;
-                if (uid && !autoPublicToastShownForUser.has(uid)) {
-                    autoPublicToastShownForUser.add(uid);
-                    toast.push({
-                        title: `You're going as ${user.name}`,
-                        message: 'You can hide your name for this event from the visibility toggle next to "Going".',
-                        variant: 'info',
-                        duration: 7000,
-                    });
-                }
+                toast.show(
+                    `You're going as ${user.name} \u2014 use the eye icon to hide your name.`,
+                    3500,
+                );
                 return;
             }
             setPendingShare(user.share_attendance_default ?? false);
@@ -169,10 +150,13 @@ export default function GoingButton({
             setPopoverKind('confirm');
         } else {
             toggleAttending(eventId);
-            triggerToast();
             if (nudge.shouldShow) {
+                // First anonymous "I'm going" in this session: show the rich
+                // sign-in popover. Subsequent clicks fall through to the toast.
                 nudge.markShown();
                 setShowNudge(true);
+            } else {
+                toast.show(SIGN_IN_GOING_TOAST_MESSAGE, 3200);
             }
         }
     };
@@ -192,7 +176,7 @@ export default function GoingButton({
         toggleAttending(eventId, pendingShare);
         persistRememberIfNeeded(pendingShare);
         setPopoverKind(null);
-        triggerToast();
+        toast.show("You're going!", 1800);
     };
 
     const openEditShare = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -211,6 +195,8 @@ export default function GoingButton({
 
     const iconSizeClass = size === 'sm' ? 'w-4 h-4' : 'w-5 h-5';
     const tooltip = going ? 'Not going' : "I'm going";
+
+    const inlineToast = toast.node;
 
     const popover = popoverKind && popoverPos && createPortal(
         <div
@@ -325,6 +311,7 @@ export default function GoingButton({
                     <RaisedHandIcon solid={going} className="w-3.5 h-3.5" />
                     {going ? 'Going' : "I'm going"}
                 </button>
+                {inlineToast}
                 {popover}
                 {nudgeNode}
             </div>
@@ -343,14 +330,7 @@ export default function GoingButton({
                 <RaisedHandIcon solid={going} className={iconSizeClass} />
             </button>
 
-            {toastVisible && (
-                <span
-                    className={`pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1 whitespace-nowrap text-[10px] font-semibold text-emerald-600 transition-opacity duration-500 ${toastFading ? 'opacity-0' : 'opacity-100'}`}
-                    aria-hidden
-                >
-                    I'm going!
-                </span>
-            )}
+            {inlineToast}
 
             {popover}
             {nudgeNode}

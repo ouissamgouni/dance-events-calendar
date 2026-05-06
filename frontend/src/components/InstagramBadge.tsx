@@ -22,7 +22,7 @@ export default function InstagramBadge() {
                 <circle cx="12" cy="12" r="5" />
                 <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
             </svg>
-            <span>Follow @ogouni.dance</span>
+            <span>@ogouni.dance</span>
         </a>
     );
 }
