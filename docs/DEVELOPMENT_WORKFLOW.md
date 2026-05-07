@@ -193,9 +193,9 @@ task deploy:staging:remote:frontend  # build frontend + wrangler pages deploy --
 Env files loaded: `secrets.env` + `secrets.staging.remote.env`
 
 What `backend:staging:remote` does:
-1. `fly secrets import -c fly.staging.toml --stage` (filtered: no `VITE_*`, no `CLOUDFLARE_*`)
+1. `fly secrets import -c config/fly.staging.toml --stage` (filtered: no `VITE_*`, no `CLOUDFLARE_*`)
 2. `fly secrets set --stage GOOGLE_SERVICE_ACCOUNT_JSON=...`
-3. `fly deploy --remote-only -c fly.staging.toml` (staged secrets + code applied atomically)
+3. `fly deploy --remote-only -c config/fly.staging.toml` (staged secrets + code applied atomically)
 4. Smoke test: `GET https://movida-staging.fly.dev/health`
 
 URLs after deploy:

@@ -9,10 +9,14 @@ const resolveApiBase = (): string => {
     const rawApiUrl = (__VITE_API_URL__ || import.meta.env.VITE_API_URL || '').trim();
     if (!rawApiUrl) {
         // Fallback for Pages deployments if build env injection is missing.
+        // Custom-domain hosts use same-site API subdomains so the session
+        // cookie is treated as first-party (avoids third-party cookie blocking
+        // by Chrome/Safari ITP). Pages preview hostnames fall back to the
+        // direct Fly host (cross-site, but not used in normal user flow).
         if (typeof window !== 'undefined') {
             const host = window.location.hostname;
-            if (host === 'joinmovida.com') return 'https://movida.fly.dev/api';
-            if (host === 'develop.joinmovida.com') return 'https://movida-staging.fly.dev/api';
+            if (host === 'joinmovida.com') return 'https://api.joinmovida.com/api';
+            if (host === 'develop.joinmovida.com') return 'https://api-develop.joinmovida.com/api';
             if (host === 'movida.pages.dev') return 'https://movida.fly.dev/api';
             if (host.endsWith('.movida.pages.dev')) return 'https://movida-staging.fly.dev/api';
         }

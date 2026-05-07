@@ -8,7 +8,6 @@ interface Props {
     event: CalendarEvent;
     onClose?: () => void;
     onEdit?: (event: CalendarEvent) => void;
-    compact?: boolean;
     surface?: 'plain' | 'card';
     className?: string;
     bodyClassName?: string;
@@ -20,7 +19,6 @@ export default function EventDetailsPanel({
     event,
     onClose,
     onEdit,
-    compact = false,
     surface = 'card',
     className = '',
     bodyClassName = '',

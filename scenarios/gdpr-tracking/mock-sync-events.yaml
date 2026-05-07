@@ -1,90 +1,141 @@
 base_week: 0
-
 events:
-  - id: "evt-gdpr-001"
-    calendar_id: "salsa-cal-001"
-    title: "Friday Salsa Night"
-    description: "Weekly social dance with DJ Mambo. Beginners welcome!"
-    location: "Dance Studio, 10 Rue de Rivoli, Paris, France"
-    latitude: 48.8566
-    longitude: 2.3522
-    start: "w0 Fri 21:00"
-    end: "w0 Sat 01:00"
-    price_is_free: true
-    links:
-      - url: "https://example.com/salsa-night-tickets"
-        label: "Tickets"
-      - url: "https://facebook.com/events/salsa-night"
-        label: "Facebook Event"
-
-  - id: "evt-gdpr-002"
-    calendar_id: "bachata-cal-002"
-    title: "Bachata Sensual Workshop"
-    description: "Intensive workshop with Carlos & Maria. Level: Intermediate."
-    location: "Tanzhaus, Friedrichstr. 100, Berlin, Germany"
-    latitude: 52.5200
-    longitude: 13.4050
-    start: "w0 Sat 14:00"
-    end: "w0 Sat 17:00"
-    price_is_free: false
-    price_min: 25
-    price_max: 35
-    price_currency: "EUR"
-    links:
-      - url: "https://example.com/bachata-register"
-        label: "Registration"
-
-  - id: "evt-gdpr-003"
-    calendar_id: "salsa-cal-001"
-    title: "Kizomba Social"
-    description: "Monthly social with DJ Afro. All levels."
-    location: "Skybar, Av. de la Liberté, Brussels, Belgium"
-    latitude: 50.8503
-    longitude: 4.3517
-    start: "w1 Sat 20:00"
-    end: "w1 Sun 00:00"
-    price_is_free: false
-    price_min: 10
-    price_currency: "EUR"
-    links:
-      - url: "https://instagram.com/kizomba-social"
-        label: "Instagram"
-
-  - id: "evt-gdpr-004"
-    calendar_id: "bachata-cal-002"
-    title: "Salsa Congress 2026"
-    description: "Full weekend of workshops and parties. 3 rooms, 20 artists."
-    location: "Congress Center, Dam Square, Amsterdam, Netherlands"
-    latitude: 52.3676
-    longitude: 4.9041
-    start: "w1 Fri 18:00"
-    end: "w1 Sun 23:00"
-    price_is_free: false
-    price_min: 80
-    price_max: 120
-    price_currency: "EUR"
-    links:
-      - url: "https://example.com/congress-tickets"
-        label: "Tickets"
-      - url: "https://example.com/congress-lineup"
-        label: "Lineup"
-
-  - id: "evt-gdpr-005"
-    calendar_id: "salsa-cal-001"
-    title: "Rueda de Casino Night"
-    description: >
-      Group rueda dancing. All levels. No partner needed.
-      More info: https://example.com/rueda-info
-    location: "Online (Zoom)"
-    start: "w2 Wed 19:30"
-    end: "w2 Wed 21:00"
-    price_is_free: true
-
-  - id: "evt-gdpr-006"
-    calendar_id: "bachata-cal-002"
-    title: "Street Salsa Flash Mob"
-    description: "Surprise outdoor dance. Location announced on the day."
-    start: "w2 Sat 15:00"
-    end: "w2 Sat 16:30"
-    price_is_free: true
-    # No location/lat/lon — tests null geo handling in analytics
+- id: evt-gdpr-001
+  calendar_id: salsa-cal-001
+  title: Friday Salsa Night
+  description: |
+    Weekly social dance with DJ Mambo. Beginners welcome!
+    The dance floor is open from the first beat to the last.
+    All skill levels are welcome — no partner or prior experience needed.
+    Expect a warm, inclusive crowd of local and visiting dancers.
+    The venue features a full bar, cloakroom, and water stations throughout.
+    Dress smart-casual; smooth-soled dance shoes strongly recommended.
+    Follow the organiser's social pages for last-minute updates and playlists.
+  location: Dance Studio, 10 Rue de Rivoli, Paris, France
+  latitude: 48.8566
+  longitude: 2.3522
+  start: w0 Fri 21:00
+  end: w0 Sat 01:00
+  price_is_free: true
+  links:
+  - url: https://example.com/salsa-night-tickets
+    label: Tickets
+  - url: https://facebook.com/events/salsa-night
+    label: Facebook Event
+- id: evt-gdpr-002
+  calendar_id: bachata-cal-002
+  title: Bachata Sensual Workshop
+  description: |
+    Intensive workshop with Carlos & Maria. Level: Intermediate.
+    Each session is broken into clear, manageable steps with individual feedback.
+    The instructor will address both leading and following roles equally.
+    Comfortable dance shoes with a smooth, non-rubber sole are essential.
+    No prior partner is required — participants rotate throughout the session.
+    Water and light refreshments are provided during breaks.
+    Spaces are strictly limited to maintain a high quality of teaching.
+    Video recording of the technique segments is encouraged for personal review.
+    A brief Q&A with the instructor follows each teaching block.
+    Check the event page for warm-up videos and preparation tips in advance.
+    Book early — this event has sold out in previous editions.
+  location: Tanzhaus, Friedrichstr. 100, Berlin, Germany
+  latitude: 52.52
+  longitude: 13.405
+  start: w0 Sat 14:00
+  end: w0 Sat 17:00
+  price_is_free: false
+  price_min: 25
+  price_max: 35
+  price_currency: EUR
+  links:
+  - url: https://example.com/bachata-register
+    label: Registration
+- id: evt-gdpr-003
+  calendar_id: salsa-cal-001
+  title: Kizomba Social
+  description: |
+    Monthly social with DJ Afro. All levels.
+    The dance floor is open from the first beat to the last.
+    All skill levels are welcome — no partner or prior experience needed.
+    Expect a warm, inclusive crowd of local and visiting dancers.
+    The venue features a full bar, cloakroom, and water stations throughout.
+    Dress smart-casual; smooth-soled dance shoes strongly recommended.
+    Follow the organiser's social pages for last-minute updates and playlists.
+  location: Skybar, Av. de la Liberté, Brussels, Belgium
+  latitude: 50.8503
+  longitude: 4.3517
+  start: w1 Sat 20:00
+  end: w1 Sun 00:00
+  price_is_free: false
+  price_min: 10
+  price_currency: EUR
+  links:
+  - url: https://instagram.com/kizomba-social
+    label: Instagram
+- id: evt-gdpr-004
+  calendar_id: bachata-cal-002
+  title: Salsa Congress 2026
+  description: |
+    Full weekend of workshops and parties. 3 rooms, 20 artists.
+    The programme spans multiple days with tracks for beginner, intermediate and advanced dancers.
+    Evening parties take place across several rooms, each with its own themed DJ lineup.
+    VIP passes include backstage access, a priority show seat, and an exclusive warm-up session.
+    Day passes are available for those who can only join for part of the weekend.
+    The venue is fully accessible with a dedicated cloakroom and coat-check service.
+    An on-site registration desk opens from 9 am on the first day of the event.
+    A gala show on Saturday evening features performances by the resident instructors.
+    Solo and couples competitions run on Sunday afternoon with prizes for the top finishers.
+    A warm-up DJ set kicks off each evening at 9 pm before the main programme begins.
+    Healthy food options and a full bar are available on-site throughout the weekend.
+    Local accommodation partners offer discounted rates — see the official event website.
+    Airport transfer packages can be arranged through the event website; book in advance.
+    Participants are encouraged to share highlights using the official event hashtag.
+    An after-party follows the gala show and runs until the early hours of the morning.
+    Organisers will provide a dedicated event photographer and live social media coverage.
+    All levels from complete beginners to professional dancers are warmly welcomed here.
+    Emergency medical assistance and a first-aid station are available on site at all times.
+    The event team is on hand throughout the weekend to answer questions and assist you.
+    Check the event website for the full timetable, artist bios and ticketing information.
+    We look forward to sharing the dance floor with you — see you there!
+  location: Congress Center, Dam Square, Amsterdam, Netherlands
+  latitude: 52.3676
+  longitude: 4.9041
+  start: w1 Fri 18:00
+  end: w1 Sun 23:00
+  price_is_free: false
+  price_min: 80
+  price_max: 120
+  price_currency: EUR
+  links:
+  - url: https://example.com/congress-tickets
+    label: Tickets
+  - url: https://example.com/congress-lineup
+    label: Lineup
+- id: evt-gdpr-005
+  calendar_id: salsa-cal-001
+  title: Rueda de Casino Night
+  description: |
+    Group rueda dancing. All levels. No partner needed. More info: https://example.com/rueda-info
+    The dance floor is open from the first beat to the last.
+    All skill levels are welcome — no partner or prior experience needed.
+    Expect a warm, inclusive crowd of local and visiting dancers.
+    The venue features a full bar, cloakroom, and water stations throughout.
+    Dress smart-casual; smooth-soled dance shoes strongly recommended.
+    Follow the organiser's social pages for last-minute updates and playlists.
+  location: Online (Zoom)
+  start: w2 Wed 19:30
+  end: w2 Wed 21:00
+  price_is_free: true
+- id: evt-gdpr-006
+  calendar_id: bachata-cal-002
+  title: Street Salsa Flash Mob
+  description: |
+    Surprise outdoor dance. Location announced on the day.
+    The dance floor is open from the first beat to the last.
+    All skill levels are welcome — no partner or prior experience needed.
+    Expect a warm, inclusive crowd of local and visiting dancers.
+    The venue features a full bar, cloakroom, and water stations throughout.
+    Dress smart-casual; smooth-soled dance shoes strongly recommended.
+    Follow the organiser's social pages for last-minute updates and playlists.
+  start: w2 Sat 15:00
+  end: w2 Sat 16:30
+  price_is_free: true

@@ -29,7 +29,6 @@ function getPanelStyle(anchorRect: DOMRect | null): CSSProperties {
     }
 
     const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
     const panelWidth = Math.min(PANEL_WIDTH, viewportWidth - VIEWPORT_PADDING * 2);
     const openToRight = anchorRect.left <= viewportWidth - anchorRect.right;
     const unclampedLeft = openToRight

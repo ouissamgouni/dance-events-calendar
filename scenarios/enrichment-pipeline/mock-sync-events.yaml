@@ -1,108 +1,146 @@
 base_week: 0
-
 events:
-  # ═══════════════════════════════════════════════════════════
-  #  EVENTS WITH LOCATION + PRICE + LINKS
-  #  → All three pipeline stages fire (link → price → geocoding)
-  # ═══════════════════════════════════════════════════════════
-  - id: "enrich-001"
-    calendar_id: "salsa-cal-001"
-    title: "Salsa Congress – Paris"
-    description: >
-      The biggest salsa congress of the year! Tickets: 45€ early bird,
-      60€ at the door. More info at https://example.com/salsa-congress
-      and https://facebook.com/events/salsa-paris-2026
-    location: "Le Balajo, 9 Rue de Lappe, 75011 Paris, France"
-    start: "w1 Fri 18:00"
-    end: "w1 Sun 23:00"
-
-  - id: "enrich-002"
-    calendar_id: "bachata-cal-002"
-    title: "Bachata Sensual Festival – Berlin"
-    description: >
-      Three-day intensive festival. Workshops 35€/day, full pass 90€.
-      Register now at https://example.com/bachata-berlin
-    location: "Friedrichstraße 112, 10117 Berlin, Germany"
-    start: "w2 Fri 14:00"
-    end: "w2 Sun 22:00"
-
-  # ═══════════════════════════════════════════════════════════
-  #  EVENTS WITH LOCATION + DESCRIPTION (no links, no price)
-  #  → Geocoding fires, others skip
-  # ═══════════════════════════════════════════════════════════
-  - id: "enrich-003"
-    calendar_id: "salsa-cal-001"
-    title: "Salsa Social Night – London"
-    description: "Weekly social dance with live band. Beginners welcome!"
-    location: "96 Charing Cross Road, London, United Kingdom"
-    start: "w1 Sat 21:00"
-    end: "w1 Sun 02:00"
-
-  - id: "enrich-004"
-    calendar_id: "bachata-cal-002"
-    title: "Bachata Rooftop – Rome"
-    description: "Romantic bachata evening with sunset views over the Tiber."
-    location: "Piazza Trilussa, 00153 Roma, Italy"
-    start: "w2 Sat 19:00"
-    end: "w2 Sat 23:30"
-
-  # ═══════════════════════════════════════════════════════════
-  #  EVENTS WITH LOCATION ONLY (no description)
-  #  → Only geocoding fires
-  # ═══════════════════════════════════════════════════════════
-  - id: "enrich-005"
-    calendar_id: "salsa-cal-001"
-    title: "Salsa Open Air – Barcelona"
-    location: "Plaça Reial, 08002 Barcelona, Spain"
-    start: "w3 Sat 20:00"
-    end: "w3 Sun 01:00"
-
-  - id: "enrich-006"
-    calendar_id: "bachata-cal-002"
-    title: "Bachata in the Park – Amsterdam"
-    location: "Vondelpark, Amsterdam, Netherlands"
-    start: "w3 Sun 15:00"
-    end: "w3 Sun 19:00"
-
-  # ═══════════════════════════════════════════════════════════
-  #  EVENTS WITH DESCRIPTION + LINKS (no location)
-  #  → Link extraction + price extraction fire, geocoding skips
-  # ═══════════════════════════════════════════════════════════
-  - id: "enrich-007"
-    calendar_id: "salsa-cal-001"
-    title: "Online Salsa Masterclass"
-    description: >
-      Join from home! 15€ per session. Stream at https://zoom.us/salsa-class
-      Details: https://example.com/online-masterclass
-    start: "w1 Wed 19:00"
-    end: "w1 Wed 21:00"
-
-  - id: "enrich-008"
-    calendar_id: "bachata-cal-002"
-    title: "Virtual Bachata Challenge"
-    description: >
-      Free online bachata challenge – 5 days, 5 routines! Sign up:
-      https://example.com/bachata-challenge
-    start: "w2 Mon 18:00"
-    end: "w2 Fri 20:00"
-
-  # ═══════════════════════════════════════════════════════════
-  #  EVENT WITH DESCRIPTION + PRICE (no location, no links)
-  #  → Only price extraction fires
-  # ═══════════════════════════════════════════════════════════
-  - id: "enrich-009"
-    calendar_id: "salsa-cal-001"
-    title: "Private Salsa Lesson Package"
-    description: "Book 5 private lessons for 150€ (normally 200€). Contact the instructor directly."
-    start: "w4 Mon 10:00"
-    end: "w4 Mon 11:00"
-
-  # ═══════════════════════════════════════════════════════════
-  #  EVENT WITH NOTHING TO ENRICH (no location, no description)
-  #  → All stages skip
-  # ═══════════════════════════════════════════════════════════
-  - id: "enrich-010"
-    calendar_id: "salsa-cal-001"
-    title: "TBD – Details Coming Soon"
-    start: "w4 Sat 20:00"
-    end: "w4 Sat 23:00"
+- id: enrich-001
+  calendar_id: salsa-cal-001
+  title: Salsa Congress – Paris
+  description: |
+    The biggest salsa congress of the year! Tickets: 45€ early bird, 60€ at the door. More info at https://example.com/salsa-congress and https://facebook.com/events/salsa-paris-2026
+    The programme spans multiple days with tracks for beginner, intermediate and advanced dancers.
+    Evening parties take place across several rooms, each with its own themed DJ lineup.
+    VIP passes include backstage access, a priority show seat, and an exclusive warm-up session.
+    Day passes are available for those who can only join for part of the weekend.
+    The venue is fully accessible with a dedicated cloakroom and coat-check service.
+    An on-site registration desk opens from 9 am on the first day of the event.
+    A gala show on Saturday evening features performances by the resident instructors.
+    Solo and couples competitions run on Sunday afternoon with prizes for the top finishers.
+    A warm-up DJ set kicks off each evening at 9 pm before the main programme begins.
+    Healthy food options and a full bar are available on-site throughout the weekend.
+    Local accommodation partners offer discounted rates — see the official event website.
+    Airport transfer packages can be arranged through the event website; book in advance.
+    Participants are encouraged to share highlights using the official event hashtag.
+    An after-party follows the gala show and runs until the early hours of the morning.
+    Organisers will provide a dedicated event photographer and live social media coverage.
+    All levels from complete beginners to professional dancers are warmly welcomed here.
+    Emergency medical assistance and a first-aid station are available on site at all times.
+    The event team is on hand throughout the weekend to answer questions and assist you.
+    Check the event website for the full timetable, artist bios and ticketing information.
+    We look forward to sharing the dance floor with you — see you there!
+  location: Le Balajo, 9 Rue de Lappe, 75011 Paris, France
+  start: w1 Fri 18:00
+  end: w1 Sun 23:00
+- id: enrich-002
+  calendar_id: bachata-cal-002
+  title: Bachata Sensual Festival – Berlin
+  description: |
+    Three-day intensive festival. Workshops 35€/day, full pass 90€. Register now at https://example.com/bachata-berlin
+    The programme spans multiple days with tracks for beginner, intermediate and advanced dancers.
+    Evening parties take place across several rooms, each with its own themed DJ lineup.
+    VIP passes include backstage access, a priority show seat, and an exclusive warm-up session.
+    Day passes are available for those who can only join for part of the weekend.
+    The venue is fully accessible with a dedicated cloakroom and coat-check service.
+    An on-site registration desk opens from 9 am on the first day of the event.
+    A gala show on Saturday evening features performances by the resident instructors.
+    Solo and couples competitions run on Sunday afternoon with prizes for the top finishers.
+    A warm-up DJ set kicks off each evening at 9 pm before the main programme begins.
+    Healthy food options and a full bar are available on-site throughout the weekend.
+    Local accommodation partners offer discounted rates — see the official event website.
+    Airport transfer packages can be arranged through the event website; book in advance.
+    Participants are encouraged to share highlights using the official event hashtag.
+    An after-party follows the gala show and runs until the early hours of the morning.
+    Organisers will provide a dedicated event photographer and live social media coverage.
+    All levels from complete beginners to professional dancers are warmly welcomed here.
+    Emergency medical assistance and a first-aid station are available on site at all times.
+    The event team is on hand throughout the weekend to answer questions and assist you.
+    Check the event website for the full timetable, artist bios and ticketing information.
+    We look forward to sharing the dance floor with you — see you there!
+  location: Friedrichstraße 112, 10117 Berlin, Germany
+  start: w2 Fri 14:00
+  end: w2 Sun 22:00
+- id: enrich-003
+  calendar_id: salsa-cal-001
+  title: Salsa Social Night – London
+  description: |
+    Weekly social dance with live band. Beginners welcome!
+    The dance floor is open from the first beat to the last.
+    All skill levels are welcome — no partner or prior experience needed.
+    Expect a warm, inclusive crowd of local and visiting dancers.
+    The venue features a full bar, cloakroom, and water stations throughout.
+    Dress smart-casual; smooth-soled dance shoes strongly recommended.
+    Follow the organiser's social pages for last-minute updates and playlists.
+  location: 96 Charing Cross Road, London, United Kingdom
+  start: w1 Sat 21:00
+  end: w1 Sun 02:00
+- id: enrich-004
+  calendar_id: bachata-cal-002
+  title: Bachata Rooftop – Rome
+  description: |
+    Romantic bachata evening with sunset views over the Tiber.
+    The dance floor is open from the first beat to the last.
+    All skill levels are welcome — no partner or prior experience needed.
+    Expect a warm, inclusive crowd of local and visiting dancers.
+    The venue features a full bar, cloakroom, and water stations throughout.
+    Dress smart-casual; smooth-soled dance shoes strongly recommended.
+    Follow the organiser's social pages for last-minute updates and playlists.
+  location: Piazza Trilussa, 00153 Roma, Italy
+  start: w2 Sat 19:00
+  end: w2 Sat 23:30
+- id: enrich-005
+  calendar_id: salsa-cal-001
+  title: Salsa Open Air – Barcelona
+  location: Plaça Reial, 08002 Barcelona, Spain
+  start: w3 Sat 20:00
+  end: w3 Sun 01:00
+- id: enrich-006
+  calendar_id: bachata-cal-002
+  title: Bachata in the Park – Amsterdam
+  location: Vondelpark, Amsterdam, Netherlands
+  start: w3 Sun 15:00
+  end: w3 Sun 19:00
+- id: enrich-007
+  calendar_id: salsa-cal-001
+  title: Online Salsa Masterclass
+  description: |
+    Join from home! 15€ per session. Stream at https://zoom.us/salsa-class Details: https://example.com/online-masterclass
+    Each session is broken into clear, manageable steps with individual feedback.
+    The instructor will address both leading and following roles equally.
+    Comfortable dance shoes with a smooth, non-rubber sole are essential.
+    No prior partner is required — participants rotate throughout the session.
+    Water and light refreshments are provided during breaks.
+    Spaces are strictly limited to maintain a high quality of teaching.
+    Video recording of the technique segments is encouraged for personal review.
+    A brief Q&A with the instructor follows each teaching block.
+    Check the event page for warm-up videos and preparation tips in advance.
+    Book early — this event has sold out in previous editions.
+  start: w1 Wed 19:00
+  end: w1 Wed 21:00
+- id: enrich-008
+  calendar_id: bachata-cal-002
+  title: Virtual Bachata Challenge
+  description: |
+    Free online bachata challenge – 5 days, 5 routines! Sign up: https://example.com/bachata-challenge
+    The dance floor is open from the first beat to the last.
+    All skill levels are welcome — no partner or prior experience needed.
+    Expect a warm, inclusive crowd of local and visiting dancers.
+    The venue features a full bar, cloakroom, and water stations throughout.
+    Dress smart-casual; smooth-soled dance shoes strongly recommended.
+    Follow the organiser's social pages for last-minute updates and playlists.
+  start: w2 Mon 18:00
+  end: w2 Fri 20:00
+- id: enrich-009
+  calendar_id: salsa-cal-001
+  title: Private Salsa Lesson Package
+  description: |
+    Book 5 private lessons for 150€ (normally 200€). Contact the instructor directly.
+    The dance floor is open from the first beat to the last.
+    All skill levels are welcome — no partner or prior experience needed.
+    Expect a warm, inclusive crowd of local and visiting dancers.
+    The venue features a full bar, cloakroom, and water stations throughout.
+    Dress smart-casual; smooth-soled dance shoes strongly recommended.
+    Follow the organiser's social pages for last-minute updates and playlists.
+  start: w4 Mon 10:00
+  end: w4 Mon 11:00
+- id: enrich-010
+  calendar_id: salsa-cal-001
+  title: TBD – Details Coming Soon
+  start: w4 Sat 20:00
+  end: w4 Sat 23:00

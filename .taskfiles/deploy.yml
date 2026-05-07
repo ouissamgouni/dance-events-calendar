@@ -23,7 +23,13 @@ tasks:
 
   staging:remote:db:
     desc: "Run DB migrations on Neon staging (develop branch)"
-    dotenv: [ "config/secrets.env", "config/secrets.staging.env" ]
+    dotenv:
+      [
+        "config/base.env",
+        "config/staging.remote.env",
+        "config/secrets.env",
+        "config/secrets.staging.env",
+      ]
     cmds:
       - |
         if [ -z "$DATABASE_URL" ]; then
@@ -37,7 +43,7 @@ tasks:
 
   staging:remote:backend:
     desc: "Stage Fly secrets + deploy backend to movida-staging.fly.dev"
-    dotenv: [ "config/secrets.env", "config/secrets.staging.env" ]
+    dotenv: [ "config/base.env", "config/secrets.env", "config/secrets.staging.env" ]
     vars:
       LOG_LEVEL: "{{.LOG_LEVEL | default \"\"}}"
     cmds:
@@ -49,23 +55,23 @@ tasks:
         echo "Staging secrets into Fly (applied atomically on deploy)..."
         cat config/secrets.env config/secrets.staging.env \
           | grep -v '^[[:space:]]*$' \
-          | grep -v '^VITE_' \
           | grep -v '^CLOUDFLARE_' \
-          | fly secrets import -c fly.staging.toml --stage
+          | grep -v '^VITE_' \
+          | fly secrets import -c config/fly.staging.toml --stage
         if [ -f backend/credentials/service-account.json ]; then
-          fly secrets set -c fly.staging.toml --stage \
+          fly secrets set -c config/fly.staging.toml --stage \
             GOOGLE_SERVICE_ACCOUNT_JSON="$(cat backend/credentials/service-account.json)"
           echo "✅ GOOGLE_SERVICE_ACCOUNT_JSON staged"
         else
           echo "⚠️  backend/credentials/service-account.json not found — GOOGLE_SERVICE_ACCOUNT_JSON not staged"
         fi
         if [ -n "{{.LOG_LEVEL}}" ]; then
-          fly secrets set -c fly.staging.toml --stage LOG_LEVEL="{{.LOG_LEVEL}}"
+          fly secrets set -c config/fly.staging.toml --stage LOG_LEVEL="{{.LOG_LEVEL}}"
           echo "✅ LOG_LEVEL staged: {{.LOG_LEVEL}}"
         fi
       - |
         echo "Deploying backend to movida-staging.fly.dev..."
-        fly deploy --remote-only -c fly.staging.toml
+        fly deploy --remote-only -c config/fly.staging.toml
       - |
         echo "Waiting for machine to be ready..."
         sleep 5
@@ -80,17 +86,23 @@ tasks:
   staging:remote:frontend:
     desc: "Build + deploy staging frontend to Cloudflare Pages (public:
       develop.joinmovida.com, alias: develop.movida.pages.dev)"
-    dotenv: [ "config/secrets.env", "config/secrets.staging.env" ]
+    dotenv:
+      [
+        "config/base.env",
+        "config/staging.remote.env",
+        "config/secrets.env",
+        "config/secrets.staging.env",
+      ]
     vars:
       PROJECT_NAME: "{{.PROJECT_NAME | default \"movida\"}}"
     cmds:
       - |
         if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-          echo "❌ CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID not set in config/secrets.env"
+          echo "❌ CLOUDFLARE_API_TOKEN not set in config/secrets.env or CLOUDFLARE_ACCOUNT_ID not set in config/base.env"
           exit 1
         fi
         if [ -z "$VITE_API_URL" ]; then
-          echo "❌ VITE_API_URL not set in config/secrets.staging.env"
+          echo "❌ VITE_API_URL not set in config/staging.remote.env"
           exit 1
         fi
         echo "Validating Cloudflare token..."
@@ -115,7 +127,13 @@ tasks:
   staging:remote:
     desc: "Full remote staging deploy: DB migrations + backend (secrets+fly) +
       frontend"
-    dotenv: [ "config/secrets.env", "config/secrets.staging.env" ]
+    dotenv:
+      [
+        "config/base.env",
+        "config/staging.remote.env",
+        "config/secrets.env",
+        "config/secrets.staging.env",
+      ]
     cmds:
       - |
         if [ ! -f config/secrets.staging.env ]; then
@@ -155,7 +173,13 @@ tasks:
 
   prod:remote:db:
     desc: "Run DB migrations on Neon prod (main branch)"
-    dotenv: [ "config/secrets.env", "config/secrets.prod.env" ]
+    dotenv:
+      [
+        "config/base.env",
+        "config/prod.remote.env",
+        "config/secrets.env",
+        "config/secrets.prod.env",
+      ]
     cmds:
       - |
         if [ -z "$DATABASE_URL" ]; then
@@ -169,7 +193,7 @@ tasks:
 
   prod:remote:backend:
     desc: "Stage Fly secrets + deploy backend to movida.fly.dev"
-    dotenv: [ "config/secrets.env", "config/secrets.prod.env" ]
+    dotenv: [ "config/base.env", "config/secrets.env", "config/secrets.prod.env" ]
     cmds:
       - |
         if [ ! -f config/secrets.prod.env ]; then
@@ -179,11 +203,11 @@ tasks:
         echo "Staging secrets into Fly (applied atomically on deploy)..."
         cat config/secrets.env config/secrets.prod.env \
           | grep -v '^[[:space:]]*$' \
-          | grep -v '^VITE_' \
           | grep -v '^CLOUDFLARE_' \
-          | fly secrets import -c fly.toml --stage
+          | grep -v '^VITE_' \
+          | fly secrets import -c config/fly.prod.toml --stage
         if [ -f backend/credentials/service-account.json ]; then
-          fly secrets set -c fly.toml --stage \
+          fly secrets set -c config/fly.prod.toml --stage \
             GOOGLE_SERVICE_ACCOUNT_JSON="$(cat backend/credentials/service-account.json)"
           echo "✅ GOOGLE_SERVICE_ACCOUNT_JSON staged"
         else
@@ -191,7 +215,7 @@ tasks:
         fi
       - |
         echo "Deploying backend to movida.fly.dev..."
-        fly deploy --remote-only -c fly.toml
+        fly deploy --remote-only -c config/fly.prod.toml
       - |
         echo "Waiting for machine to be ready..."
         sleep 5
@@ -206,17 +230,23 @@ tasks:
   prod:remote:frontend:
     desc: "Build + deploy prod frontend to Cloudflare Pages (public: joinmovida.com,
       alias: movida.pages.dev)"
-    dotenv: [ "config/secrets.env", "config/secrets.prod.env" ]
+    dotenv:
+      [
+        "config/base.env",
+        "config/prod.remote.env",
+        "config/secrets.env",
+        "config/secrets.prod.env",
+      ]
     vars:
       PROJECT_NAME: "{{.PROJECT_NAME | default \"movida\"}}"
     cmds:
       - |
         if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-          echo "❌ CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID not set in config/secrets.env"
+          echo "❌ CLOUDFLARE_API_TOKEN not set in config/secrets.env or CLOUDFLARE_ACCOUNT_ID not set in config/base.env"
           exit 1
         fi
         if [ -z "$VITE_API_URL" ]; then
-          echo "❌ VITE_API_URL not set in config/secrets.prod.env"
+          echo "❌ VITE_API_URL not set in config/prod.remote.env"
           exit 1
         fi
         echo "Validating Cloudflare token..."
@@ -241,7 +271,13 @@ tasks:
   prod:remote:
     desc: "Full remote prod deploy: DB migrations + backend (secrets+fly) + frontend"
     prompt: "This will deploy to PRODUCTION. Continue?"
-    dotenv: [ "config/secrets.env", "config/secrets.prod.env" ]
+    dotenv:
+      [
+        "config/base.env",
+        "config/prod.remote.env",
+        "config/secrets.env",
+        "config/secrets.prod.env",
+      ]
     cmds:
       - |
         if [ ! -f config/secrets.prod.env ]; then

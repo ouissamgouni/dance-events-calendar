@@ -1,105 +1,99 @@
 base_week: 0
-
 events:
-  - id: "evt-share-001"
-    calendar_id: "salsa-cal-001"
-    title: "Salsa Social Friday"
-    description: "Weekly social with DJ Mambo. Beginners welcome."
-    location: "Dance Studio, 10 Rue de Rivoli, Paris, France"
-    latitude: 48.8566
-    longitude: 2.3522
-    start: "w0 Fri 21:00"
-    end: "w0 Sat 01:00"
-    price_is_free: true
-
-  - id: "evt-share-002"
-    calendar_id: "bachata-cal-002"
-    title: "Bachata Workshop"
-    description: "Sensual workshop with Carlos & Maria. Intermediate level."
-    location: "Tanzhaus, Friedrichstr. 100, Berlin, Germany"
-    latitude: 52.5200
-    longitude: 13.4050
-    start: "w0 Sat 14:00"
-    end: "w0 Sat 17:00"
-    price_is_free: false
-    price_min: 25
-    price_max: 35
-    price_currency: "EUR"
-
-  - id: "evt-share-003"
-    calendar_id: "salsa-cal-001"
-    title: "Cuban Night"
-    description: "Live Cuban band + rueda for all levels."
-    location: "Skybar, Av. de la Liberté, Brussels, Belgium"
-    latitude: 50.8503
-    longitude: 4.3517
-    start: "w1 Sat 20:00"
-    end: "w1 Sun 00:00"
-    price_is_free: false
-    price_min: 10
-    price_currency: "EUR"
-
-# Pre-seeded attendances. Lets us exercise the "Show all N" collapse on the
-# Who's going section (>10 public attendees on evt-share-003) without
-# manual clicking. See _seed_attendances in backend/db/seed.py.
+- id: evt-share-001
+  calendar_id: salsa-cal-001
+  title: Salsa Social Friday
+  description: |
+    Weekly social with DJ Mambo. Beginners welcome.
+    The dance floor is open from the first beat to the last.
+    All skill levels are welcome — no partner or prior experience needed.
+    Expect a warm, inclusive crowd of local and visiting dancers.
+    The venue features a full bar, cloakroom, and water stations throughout.
+    Dress smart-casual; smooth-soled dance shoes strongly recommended.
+    Follow the organiser's social pages for last-minute updates and playlists.
+  location: Dance Studio, 10 Rue de Rivoli, Paris, France
+  latitude: 48.8566
+  longitude: 2.3522
+  start: w0 Fri 21:00
+  end: w0 Sat 01:00
+  price_is_free: true
+- id: evt-share-002
+  calendar_id: bachata-cal-002
+  title: Bachata Workshop
+  description: |
+    Sensual workshop with Carlos & Maria. Intermediate level.
+    Each session is broken into clear, manageable steps with individual feedback.
+    The instructor will address both leading and following roles equally.
+    Comfortable dance shoes with a smooth, non-rubber sole are essential.
+    No prior partner is required — participants rotate throughout the session.
+    Water and light refreshments are provided during breaks.
+    Spaces are strictly limited to maintain a high quality of teaching.
+    Video recording of the technique segments is encouraged for personal review.
+    A brief Q&A with the instructor follows each teaching block.
+    Check the event page for warm-up videos and preparation tips in advance.
+    Book early — this event has sold out in previous editions.
+  location: Tanzhaus, Friedrichstr. 100, Berlin, Germany
+  latitude: 52.52
+  longitude: 13.405
+  start: w0 Sat 14:00
+  end: w0 Sat 17:00
+  price_is_free: false
+  price_min: 25
+  price_max: 35
+  price_currency: EUR
+- id: evt-share-003
+  calendar_id: salsa-cal-001
+  title: Cuban Night
+  description: |
+    Live Cuban band + rueda for all levels.
+    The dance floor is open from the first beat to the last.
+    All skill levels are welcome — no partner or prior experience needed.
+    Expect a warm, inclusive crowd of local and visiting dancers.
+    The venue features a full bar, cloakroom, and water stations throughout.
+    Dress smart-casual; smooth-soled dance shoes strongly recommended.
+    Follow the organiser's social pages for last-minute updates and playlists.
+  location: Skybar, Av. de la Liberté, Brussels, Belgium
+  latitude: 50.8503
+  longitude: 4.3517
+  start: w1 Sat 20:00
+  end: w1 Sun 00:00
+  price_is_free: false
+  price_min: 10
+  price_currency: EUR
 attendances:
-  - {
-      event_id: "evt-share-003",
-      email: "dancer01@example.com",
-      share_publicly: true,
-    }
-  - {
-      event_id: "evt-share-003",
-      email: "dancer02@example.com",
-      share_publicly: true,
-    }
-  - {
-      event_id: "evt-share-003",
-      email: "dancer03@example.com",
-      share_publicly: true,
-    }
-  - {
-      event_id: "evt-share-003",
-      email: "dancer04@example.com",
-      share_publicly: true,
-    }
-  - {
-      event_id: "evt-share-003",
-      email: "dancer05@example.com",
-      share_publicly: true,
-    }
-  - {
-      event_id: "evt-share-003",
-      email: "dancer06@example.com",
-      share_publicly: true,
-    }
-  - {
-      event_id: "evt-share-003",
-      email: "dancer07@example.com",
-      share_publicly: true,
-    }
-  - {
-      event_id: "evt-share-003",
-      email: "dancer08@example.com",
-      share_publicly: true,
-    }
-  - {
-      event_id: "evt-share-003",
-      email: "dancer09@example.com",
-      share_publicly: true,
-    }
-  - {
-      event_id: "evt-share-003",
-      email: "dancer10@example.com",
-      share_publicly: true,
-    }
-  - {
-      event_id: "evt-share-003",
-      email: "dancer11@example.com",
-      share_publicly: true,
-    }
-  - {
-      event_id: "evt-share-003",
-      email: "dancer12@example.com",
-      share_publicly: true,
-    }
+- event_id: evt-share-003
+  email: dancer01@example.com
+  share_publicly: true
+- event_id: evt-share-003
+  email: dancer02@example.com
+  share_publicly: true
+- event_id: evt-share-003
+  email: dancer03@example.com
+  share_publicly: true
+- event_id: evt-share-003
+  email: dancer04@example.com
+  share_publicly: true
+- event_id: evt-share-003
+  email: dancer05@example.com
+  share_publicly: true
+- event_id: evt-share-003
+  email: dancer06@example.com
+  share_publicly: true
+- event_id: evt-share-003
+  email: dancer07@example.com
+  share_publicly: true
+- event_id: evt-share-003
+  email: dancer08@example.com
+  share_publicly: true
+- event_id: evt-share-003
+  email: dancer09@example.com
+  share_publicly: true
+- event_id: evt-share-003
+  email: dancer10@example.com
+  share_publicly: true
+- event_id: evt-share-003
+  email: dancer11@example.com
+  share_publicly: true
+- event_id: evt-share-003
+  email: dancer12@example.com
+  share_publicly: true

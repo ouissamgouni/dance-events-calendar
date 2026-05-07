@@ -1,17 +1,25 @@
-# Fly.io app configuration
+# Fly.io production app configuration
 # https://fly.io/docs/reference/configuration/
+#
+# Always pass -c config/fly.prod.toml to flyctl commands.
 
 app = "movida"
 primary_region = "cdg"
 
 [build]
-  dockerfile = "backend/Dockerfile"
+  # Path is relative to this toml file (config/ → repo root → backend/Dockerfile)
+  dockerfile = "../backend/Dockerfile"
 
 [env]
   PYTHONPATH = "/app"
   PYTHONUNBUFFERED = "1"
   ENV_NAME = "production"
   CALENDAR_SERVICE = "google"
+  CORS_ORIGINS = "https://movida.pages.dev,https://joinmovida.com"
+  # SMTP host/port/from (credentials are fly secrets)
+  SMTP_HOST = "smtp-relay.brevo.com"
+  SMTP_PORT = "587"
+  SMTP_FROM = "noreply@joinmovida.com"
 
 [http_service]
   internal_port = 8000

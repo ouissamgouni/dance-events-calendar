@@ -12,16 +12,23 @@
 #   Pages → movida → Settings → Environment variables
 #     Production:
 #       NODE_VERSION          = 22
-#       VITE_API_URL          = https://movida.fly.dev
+#       VITE_API_URL          = https://api.joinmovida.com
 #       VITE_UMAMI_URL        = https://cloud.umami.is
 #       VITE_UMAMI_WEBSITE_ID = <prod-uuid>          (encrypted)
 #       Custom domain         = joinmovida.com
 #     Preview (staging):
 #       NODE_VERSION          = 22
-#       VITE_API_URL          = https://movida-staging.fly.dev
+#       VITE_API_URL          = https://api-develop.joinmovida.com
 #       VITE_UMAMI_URL        = https://cloud.umami.is
 #       VITE_UMAMI_WEBSITE_ID = <staging-uuid>       (encrypted)
 #       Custom domain         = develop.joinmovida.com
+#
+# Why a same-site API subdomain (api[-develop].joinmovida.com)?
+# The session_token cookie is HttpOnly + SameSite=None + Secure. When the API
+# lives on movida[-staging].fly.dev the cookie is third-party relative to the
+# frontend, which Chrome/Safari (ITP) increasingly block. Putting the API on a
+# subdomain of joinmovida.com makes the cookie first-party (same registrable
+# domain) and reliably persisted across reloads.
 
 # Legacy Pages hostnames remain available during transition:
 #   Production alias: movida.pages.dev
