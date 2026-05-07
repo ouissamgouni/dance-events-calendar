@@ -683,6 +683,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             <AdminEventDetailPanel
                 eventId={adminDetailEventId}
                 onClose={() => setAdminDetailEventId(null)}
+                onEventUpdated={() => loadEvents()}
             />
         </>
     );

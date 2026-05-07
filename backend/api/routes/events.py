@@ -250,6 +250,7 @@ def get_event(
         price_max=event.price_max,
         price_currency=event.price_currency,
         price_is_free=event.price_is_free,
+        review_status=event.review_status,
         links=event.links,
         tags=tags_map.get(event_id, []),
     )

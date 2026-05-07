@@ -116,7 +116,58 @@ export default function AdminAutoTagSuggestions({ eventId, onApproved, onChanged
         }
     };
 
-    const busy = loading || running;
+    const [bulkBusy, setBulkBusy] = useState(false);
+
+    const handleApproveAll = async () => {
+        if (suggestions.length === 0) return;
+        setBulkBusy(true);
+        setError(null);
+        const rows = [...suggestions];
+        let approved = false;
+        try {
+            for (const s of rows) {
+                try {
+                    await approveTagSuggestion(s.id);
+                    setSuggestions((prev) => prev.filter((row) => row.id !== s.id));
+                    approved = true;
+                } catch (e) {
+                    setError((e as Error).message || 'Approve failed');
+                    break;
+                }
+            }
+        } finally {
+            setBulkBusy(false);
+            if (approved) {
+                onApproved?.();
+                onChanged?.();
+            }
+        }
+    };
+
+    const handleRejectAll = async () => {
+        if (suggestions.length === 0) return;
+        setBulkBusy(true);
+        setError(null);
+        const rows = [...suggestions];
+        let rejected = false;
+        try {
+            for (const s of rows) {
+                try {
+                    await rejectTagSuggestion(s.id);
+                    setSuggestions((prev) => prev.filter((row) => row.id !== s.id));
+                    rejected = true;
+                } catch (e) {
+                    setError((e as Error).message || 'Reject failed');
+                    break;
+                }
+            }
+        } finally {
+            setBulkBusy(false);
+            if (rejected) onChanged?.();
+        }
+    };
+
+    const busy = loading || running || bulkBusy;
     const hasAny = suggestions.length > 0;
 
     if (!hasAny && !busy && !error) {
@@ -145,14 +196,37 @@ export default function AdminAutoTagSuggestions({ eventId, onApproved, onChanged
                     </span>
                     {busy && <span className="text-[10px] text-slate-400">Working…</span>}
                 </div>
-                <button
-                    type="button"
-                    onClick={() => runEngine(true)}
-                    disabled={busy}
-                    className="text-[11px] text-sky-600 hover:text-sky-800 disabled:text-slate-300"
-                >
-                    Re-run
-                </button>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                    <button
+                        type="button"
+                        onClick={() => runEngine(true)}
+                        disabled={busy}
+                        className="text-[11px] text-sky-600 hover:text-sky-800 disabled:text-slate-300 px-1"
+                    >
+                        Re-run
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleApproveAll}
+                        disabled={busy || actionInFlight !== null}
+                        className="px-2 py-0.5 text-[11px] bg-sky-600 text-white hover:bg-sky-700 disabled:opacity-40"
+                        aria-label="Approve all suggestions"
+                        title="Approve all"
+                    >
+                        ✓
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleRejectAll}
+                        disabled={busy || actionInFlight !== null}
+                        className="px-2 py-0.5 text-[11px] bg-slate-200 text-slate-700 hover:bg-slate-300 disabled:opacity-40"
+                        aria-label="Reject all suggestions"
+                        title="Reject all"
+                    >
+                        ✗
+                    </button>
+
+                </div>
             </div>
             {error && <p className="px-3 py-1.5 text-[11px] text-slate-600">{error}</p>}
             <ul className="divide-y divide-slate-200">

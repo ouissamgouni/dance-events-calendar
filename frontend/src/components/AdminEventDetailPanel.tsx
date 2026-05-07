@@ -7,9 +7,10 @@ import type { CalendarEvent } from '../types';
 interface Props {
     eventId: string | null;
     onClose: () => void;
+    onEventUpdated?: (eventId: string) => void;
 }
 
-export default function AdminEventDetailPanel({ eventId, onClose }: Props) {
+export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated }: Props) {
     const [event, setEvent] = useState<CalendarEvent | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(false);
@@ -32,7 +33,7 @@ export default function AdminEventDetailPanel({ eventId, onClose }: Props) {
         setLoading(true);
         setError(false);
         setEvent(null);
-        fetchEvent(eventId)
+        fetchEvent(eventId, { fresh: true })
             .then((e) => { setEvent(e); setTitleValue(e.title); })
             .catch(() => setError(true))
             .finally(() => setLoading(false));
@@ -51,6 +52,7 @@ export default function AdminEventDetailPanel({ eventId, onClose }: Props) {
         const updated = await updateEvent(event.event_id, changes);
         setEvent(updated);
         setTitleValue(updated.title);
+        onEventUpdated?.(updated.event_id);
     };
 
     const handleTagsUpdated = () => {
@@ -76,6 +78,7 @@ export default function AdminEventDetailPanel({ eventId, onClose }: Props) {
         try {
             const updated = await updateEvent(event.event_id, { title: titleValue });
             setEvent(updated);
+            onEventUpdated?.(updated.event_id);
         } finally {
             setSavingTitle(false);
             setEditingTitle(false);
@@ -173,6 +176,7 @@ export default function AdminEventDetailPanel({ eventId, onClose }: Props) {
                             event={event}
                             onFieldSave={handleFieldSave}
                             onTagsUpdated={handleTagsUpdated}
+                            compact
                         />
                     )}
                 </div>

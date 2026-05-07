@@ -44,7 +44,7 @@ export default function EventDetailPage() {
     useEffect(() => {
         if (!eventId) return;
         let cancelled = false;
-        fetchEvent(eventId)
+        fetchEvent(eventId, { fresh: true })
             .then((e) => {
                 if (cancelled) return;
                 setEvent(e);

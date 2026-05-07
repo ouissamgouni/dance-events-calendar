@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import type { CalendarEvent, CalendarSetting, TagGroup } from '../types';
+import type { CalendarEvent, CalendarSetting } from '../types';
 import type { GeocodeSuggestion } from '../api';
-import { fetchAdminCalendars, fetchTagGroups, retryGeocodingSingle } from '../api';
+import { fetchAdminCalendars, retryGeocodingSingle } from '../api';
 import { parseLinks } from '../utils/parseLinks';
 import { deriveLinkLabel } from '../utils/deriveLinkLabel';
 import AddressAutocomplete from './AddressAutocomplete';
 import AdminAutoTagSuggestions from './AdminAutoTagSuggestions';
-import EventTagEditor from './EventTagEditor';
+import InlineTagsPicker from './InlineTagsPicker';
 import LocationBadge from './LocationBadge';
 import TagBadges from './TagBadges';
 import ExpandableDescription from './ExpandableDescription';
@@ -62,13 +62,8 @@ export default function AdminEventDetailContent({
         fetchAdminCalendars().then(setCalendars).catch(() => { });
     }, []);
 
-    // Tag groups (for the inline editor)
-    const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
-    useEffect(() => {
-        if (editingField === 'tags' && tagGroups.length === 0) {
-            fetchTagGroups().then(setTagGroups).catch(() => { });
-        }
-    }, [editingField, tagGroups.length]);
+    // Collapsible state for the tags section (collapsed shows applied tags inline).
+    const [tagsExpanded, setTagsExpanded] = useState(false);
 
     const startEdit = (field: string, value = '') => {
         setSaveError(null);
@@ -146,7 +141,7 @@ export default function AdminEventDetailContent({
     const currentCalendar = calendars.find((c) => c.calendar_id === event.calendar_id);
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-2">
             {/* Calendar + review status (admin-only) */}
             <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                 <label className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">
@@ -235,50 +230,52 @@ export default function AdminEventDetailContent({
                         </div>
                     </div>
                 ) : (
-                    <div
-                        className="group relative cursor-pointer hover:bg-slate-50 -mx-2 px-2 py-1 rounded transition"
-                        onClick={startDatetimeEdit}
-                    >
-                        <p className={`text-slate-500 ${compact ? 'text-xs' : 'text-sm'}`}>
-                            🗓 {event.all_day
-                                ? formatDate(start)
-                                : `${formatDate(start)} · ${formatTime(start)} – ${formatTime(end)}`}
-                        </p>
-                        <EditHint />
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <div
+                            className="group relative cursor-pointer hover:bg-slate-50 -mx-2 px-2 py-1 rounded transition"
+                            onClick={startDatetimeEdit}
+                        >
+                            <p className="text-slate-500 text-xs">
+                                🗓 {event.all_day
+                                    ? formatDate(start)
+                                    : `${formatDate(start)} · ${formatTime(start)} – ${formatTime(end)}`}
+                            </p>
+                            <EditHint />
+                        </div>
+
+                        {/* Price (always shown for admin — feature flags ignored) */}
+                        {editingField !== 'price' && (event.price_is_free || event.price_min != null) ? (
+                            <div
+                                className="ml-auto flex items-center gap-2 flex-wrap group relative cursor-pointer hover:bg-slate-50 px-2 py-1 rounded transition"
+                                onClick={startPriceEdit}
+                            >
+                                {event.price_is_free && (
+                                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                                        Free
+                                    </span>
+                                )}
+                                {!event.price_is_free && event.price_min != null && (
+                                    <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                                        {event.price_max != null && event.price_max !== event.price_min
+                                            ? `${event.price_currency ?? ''} ${event.price_min}\u2013${event.price_max}`
+                                            : `${event.price_currency ?? ''} ${event.price_min}`}
+                                    </span>
+                                )}
+                                {event.view_count > 0 && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                                        {event.view_count >= 10 ? '\uD83D\uDD25' : '\uD83D\uDC41'} {event.view_count}
+                                    </span>
+                                )}
+                                <EditHint />
+                            </div>
+                        ) : editingField !== 'price' ? (
+                            <div
+                                className="ml-auto cursor-pointer text-[11px] text-slate-400 hover:text-slate-600 border border-dashed border-slate-200 rounded px-3 py-1.5 transition w-fit"
+                                onClick={startPriceEdit}
+                            >+ Add price</div>
+                        ) : null}
                     </div>
                 )}
-
-                {/* Price (always shown for admin — feature flags ignored) */}
-                {editingField !== 'price' && (event.price_is_free || event.price_min != null) ? (
-                    <div
-                        className="flex items-center gap-2 mt-2 flex-wrap group relative cursor-pointer hover:bg-slate-50 -mx-2 px-2 py-1 rounded transition"
-                        onClick={startPriceEdit}
-                    >
-                        {event.price_is_free && (
-                            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                                Free
-                            </span>
-                        )}
-                        {!event.price_is_free && event.price_min != null && (
-                            <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-                                {event.price_max != null && event.price_max !== event.price_min
-                                    ? `${event.price_currency ?? ''} ${event.price_min}\u2013${event.price_max}`
-                                    : `${event.price_currency ?? ''} ${event.price_min}`}
-                            </span>
-                        )}
-                        {event.view_count > 0 && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-                                {event.view_count >= 10 ? '\uD83D\uDD25' : '\uD83D\uDC41'} {event.view_count} view{event.view_count !== 1 ? 's' : ''}
-                            </span>
-                        )}
-                        <EditHint />
-                    </div>
-                ) : editingField !== 'price' ? (
-                    <div
-                        className="mt-2 cursor-pointer text-[11px] text-slate-400 hover:text-slate-600 border border-dashed border-slate-200 rounded px-3 py-1.5 transition w-fit"
-                        onClick={startPriceEdit}
-                    >+ Add price info</div>
-                ) : null}
 
                 {editingField === 'price' && (
                     <div className="mt-2 rounded-lg bg-slate-50 p-3 border border-slate-200 space-y-2">
@@ -402,7 +399,7 @@ export default function AdminEventDetailContent({
                             disabled={retryingGeo}
                             title="Retry geocoding"
                             className="shrink-0 self-start text-[10px] font-medium px-1.5 py-0.5 border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 transition"
-                        >{retryingGeo ? '…' : retryGeoMsg ?? '↻ Retry'}</button>
+                        >{retryingGeo ? '…' : retryGeoMsg ?? '↻ Retry geoloc'}</button>
                     </p>
                     <EditHint />
                 </div>
@@ -413,34 +410,34 @@ export default function AdminEventDetailContent({
                 >+ Add location</div>
             )}
 
-            {/* Tags */}
-            {editingField === 'tags' ? (
-                <div className="border border-slate-200 rounded-lg bg-slate-50 overflow-hidden">
-                    <div className="max-h-72 overflow-y-auto p-3">
-                        <EventTagEditor
+            {/* Tags (collapsible, auto-saves on toggle) */}
+            <div className="border border-slate-200 rounded-lg bg-slate-50 overflow-hidden">
+                <button
+                    type="button"
+                    onClick={() => setTagsExpanded((v) => !v)}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 transition"
+                >
+                    <span className="text-slate-400 text-[10px]">{tagsExpanded ? '▾' : '▸'}</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Tags</span>
+                    {!tagsExpanded && event.tags?.length > 0 && (
+                        <span className="flex-1 min-w-0">
+                            <TagBadges tags={event.tags} maxVisible={event.tags.length} />
+                        </span>
+                    )}
+                    {!tagsExpanded && (!event.tags || event.tags.length === 0) && (
+                        <span className="text-[11px] text-slate-400 italic">none</span>
+                    )}
+                </button>
+                {tagsExpanded && (
+                    <div className="border-t border-slate-200 bg-white max-h-72 overflow-y-auto p-3">
+                        <InlineTagsPicker
                             eventId={event.event_id}
                             currentTags={event.tags || []}
-                            onUpdated={() => { onTagsUpdated?.(); setEditingField(null); }}
+                            onUpdated={() => onTagsUpdated?.()}
                         />
                     </div>
-                    <div className="border-t border-slate-200 px-3 py-2 bg-white">
-                        <button onClick={cancelEdit} className="text-[11px] text-slate-500 hover:text-slate-700">Cancel</button>
-                    </div>
-                </div>
-            ) : event.tags?.length > 0 ? (
-                <div
-                    className="group relative cursor-pointer hover:bg-slate-50 -mx-2 px-2 py-1 rounded transition"
-                    onClick={() => setEditingField('tags')}
-                >
-                    <TagBadges tags={event.tags} maxVisible={event.tags.length} />
-                    <EditHint />
-                </div>
-            ) : (
-                <div
-                    className="cursor-pointer text-[11px] text-slate-400 hover:text-slate-600 border border-dashed border-slate-200 rounded px-3 py-1.5 transition w-fit"
-                    onClick={() => setEditingField('tags')}
-                >+ Add tags</div>
-            )}
+                )}
+            </div>
 
             {/* Auto-generated tag suggestions (heuristic; admin approves/rejects). */}
             <AdminAutoTagSuggestions
@@ -465,7 +462,7 @@ export default function AdminEventDetailContent({
                 </div>
             ) : event.description ? (
                 <div
-                    className="group relative cursor-text hover:bg-slate-50 -mx-2 px-2 py-1 rounded transition"
+                    className="group relative cursor-text rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 hover:bg-slate-100 transition"
                     onClick={() => startEdit('description', event.description ?? '')}
                 >
                     <ExpandableDescription text={event.description} compact={compact} />
@@ -473,7 +470,7 @@ export default function AdminEventDetailContent({
                 </div>
             ) : (
                 <div
-                    className="cursor-pointer text-[11px] text-slate-400 hover:text-slate-600 border border-dashed border-slate-200 rounded p-2 transition"
+                    className="cursor-pointer text-[11px] text-slate-400 hover:text-slate-600 border border-dashed border-slate-200 rounded-lg px-3 py-2 transition"
                     onClick={() => startEdit('description', '')}
                 >+ Add description</div>
             )}
