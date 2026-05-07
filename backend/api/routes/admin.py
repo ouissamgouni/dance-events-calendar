@@ -53,6 +53,33 @@ from backend.services.sync_service import SyncService
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
+
+def _apply_upcoming_filter(
+    stmt, *, include_past: bool, future_only: Optional[bool] = None
+):
+    """Apply the upcoming-only filter to a select() over CachedEvent.
+
+    The admin app is forward-looking: by default we hide events that have
+    already finished. Pass ``include_past=True`` to opt into the legacy
+    "show everything" behaviour (still useful for analytics / audit).
+
+    ``future_only`` is the legacy query param; when explicitly set it wins
+    so existing clients/tests that pass it don't change behaviour.
+    Uses ``CachedEvent.end > now`` so events in progress remain visible.
+    """
+    from datetime import datetime as _dt
+
+    # Legacy explicit param wins.
+    if future_only is True:
+        return stmt.where(CachedEvent.start > _dt.utcnow())
+    if future_only is False:
+        return stmt
+    # New default: upcoming-only unless caller opted in to past.
+    if include_past:
+        return stmt
+    return stmt.where(CachedEvent.end > _dt.utcnow())
+
+
 # Visually distinct palette — cycled when more calendars are added
 CALENDAR_COLORS = [
     "#e11d48",  # rose-600
@@ -74,6 +101,7 @@ def _run_sync_job_worker(
     calendar_service,
     mode: str,
     since_date: str | None,
+    calendar_ids: list[str] | None = None,
 ):
     """Streaming fetch+enrich sync job worker.
 
@@ -115,9 +143,10 @@ def _run_sync_job_worker(
     # --- Reseed: clear all sync tokens ---
     if mode == "reseed":
         with Session(engine) as session:
-            calendars = session.exec(
-                select(CalendarSetting).where(CalendarSetting.enabled == True)
-            ).all()
+            q = select(CalendarSetting).where(CalendarSetting.enabled == True)
+            if calendar_ids:
+                q = q.where(CalendarSetting.calendar_id.in_(calendar_ids))
+            calendars = session.exec(q).all()
             for cal in calendars:
                 cal.sync_token = None
                 session.add(cal)
@@ -126,9 +155,10 @@ def _run_sync_job_worker(
 
     # --- Load enabled calendars ---
     with Session(engine) as session:
-        enabled = session.exec(
-            select(CalendarSetting).where(CalendarSetting.enabled == True)
-        ).all()
+        q = select(CalendarSetting).where(CalendarSetting.enabled == True)
+        if calendar_ids:
+            q = q.where(CalendarSetting.calendar_id.in_(calendar_ids))
+        enabled = session.exec(q).all()
         # Snapshot the fields we need (avoid detached-instance issues across threads)
         calendar_snapshots = [
             {
@@ -425,12 +455,6 @@ def start_sync_job(
     request: Request,
     _admin: dict = Depends(require_admin),
 ):
-    if body.calendar_ids:
-        raise HTTPException(
-            status_code=400,
-            detail="calendar_ids filtering is not implemented yet",
-        )
-
     job_service = get_sync_job_service()
     calendar_service = request.app.state.calendar_service
 
@@ -442,6 +466,7 @@ def start_sync_job(
                 calendar_service,
                 body.mode,
                 body.since_date,
+                body.calendar_ids or None,
             ),
             mode=body.mode,
             since_date=body.since_date,
@@ -484,6 +509,56 @@ def abort_sync_job(job_id: str, _admin: dict = Depends(require_admin)):
         return get_sync_job_service().abort_job(job_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Sync job not found") from exc
+
+
+@router.post("/sync-jobs/{job_id}/retry-calendar")
+def retry_calendar_in_job(
+    job_id: str,
+    calendar_id: str = Query(..., min_length=1),
+    request: Request = None,
+    _admin: dict = Depends(require_admin),
+):
+    """Re-run an incremental sync for a single calendar that failed in a prior job.
+
+    Validates that the calendar exists and is enabled. Starts a new sync job
+    scoped to this single calendar. Returns 409 if another sync job is already
+    running, 404 if the calendar is unknown, 400 if it is disabled.
+    """
+    job_service = get_sync_job_service()
+    calendar_service = request.app.state.calendar_service
+
+    # Validate calendar exists & is enabled — fail fast with a clear error.
+    from backend.db.database import get_engine
+
+    engine = get_engine()
+    with Session(engine) as session:
+        cal = session.get(CalendarSetting, calendar_id)
+        if cal is None:
+            raise HTTPException(status_code=404, detail="Calendar not found")
+        if not cal.enabled:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Calendar '{cal.name or calendar_id}' is disabled — enable it before retrying.",
+            )
+
+    try:
+        job = job_service.start_job(
+            worker=lambda jid, service: _run_sync_job_worker(
+                jid,
+                service,
+                calendar_service,
+                "incremental",
+                None,
+                [calendar_id],
+            ),
+            mode="incremental",
+            since_date=None,
+            calendar_ids=[calendar_id],
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    return job
 
 
 @router.post("/calendars/{calendar_id}/toggle", response_model=CalendarSettingResponse)
@@ -798,11 +873,15 @@ def list_admin_events(
     tag_ids: Optional[str] = Query(default=None),
     ungeolocated: Optional[bool] = Query(default=None),
     future_only: Optional[bool] = Query(default=None),
+    include_past: bool = Query(default=False),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
-    """List non-deleted events with pagination and filters."""
-    from datetime import datetime as dt
+    """List non-deleted events with pagination and filters.
+
+    By default returns only events whose ``end > now`` (upcoming + in progress).
+    Pass ``include_past=true`` to include finished events.
+    """
     from sqlalchemy import cast, String
 
     calendars = session.exec(select(CalendarSetting)).all()
@@ -820,8 +899,9 @@ def list_admin_events(
             CachedEvent.location != None,
             CachedEvent.latitude == None,
         )
-    if future_only:
-        base = base.where(CachedEvent.start > dt.utcnow())
+    base = _apply_upcoming_filter(
+        base, include_past=include_past, future_only=future_only
+    )
     if search:
         pattern = f"%{search}%"
         base = base.where(
@@ -985,11 +1065,15 @@ def event_filter_options(
     tag_ids: Optional[str] = Query(default=None),
     ungeolocated: Optional[bool] = Query(default=None),
     future_only: Optional[bool] = Query(default=None),
+    include_past: bool = Query(default=False),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
-    """Return available filter values with counts, scoped to current filters."""
-    from datetime import datetime as dt
+    """Return available filter values with counts, scoped to current filters.
+
+    Defaults to upcoming-only (``end > now``); pass ``include_past=true`` to
+    aggregate over the full archive.
+    """
     from sqlalchemy import cast, String, case, and_, literal_column
 
     # Build filtered base (same logic as list_admin_events)
@@ -1000,8 +1084,9 @@ def event_filter_options(
         base = base.where(CachedEvent.calendar_id == calendar_id)
     if ungeolocated:
         base = base.where(CachedEvent.location != None, CachedEvent.latitude == None)
-    if future_only:
-        base = base.where(CachedEvent.start > dt.utcnow())
+    base = _apply_upcoming_filter(
+        base, include_past=include_past, future_only=future_only
+    )
     if search:
         pattern = f"%{search}%"
         base = base.where(
@@ -1376,9 +1461,7 @@ def suggest_tags_bulk(
             if generated == 0 and replaced == 0:
                 total_skipped += 1
         except Exception:
-            logger.exception(
-                "bulk-suggest-tags failed for event %s", event.event_id
-            )
+            logger.exception("bulk-suggest-tags failed for event %s", event.event_id)
             total_skipped += 1
     session.commit()
 
@@ -1398,11 +1481,14 @@ def list_admin_event_ids(
     tag_ids: Optional[str] = Query(default=None),
     ungeolocated: Optional[bool] = Query(default=None),
     future_only: Optional[bool] = Query(default=None),
+    include_past: bool = Query(default=False),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
-    """Return all matching event IDs (no pagination). Used for cross-page select-all."""
-    from datetime import datetime as dt
+    """Return all matching event IDs (no pagination). Used for cross-page select-all.
+
+    Defaults to upcoming-only; pass ``include_past=true`` to widen the scope.
+    """
     from sqlalchemy import cast, String
 
     base = select(CachedEvent.event_id).where(CachedEvent.deleted_at == None)
@@ -1416,8 +1502,9 @@ def list_admin_event_ids(
             CachedEvent.location != None,
             CachedEvent.latitude == None,
         )
-    if future_only:
-        base = base.where(CachedEvent.start > dt.utcnow())
+    base = _apply_upcoming_filter(
+        base, include_past=include_past, future_only=future_only
+    )
     if search:
         pattern = f"%{search}%"
         base = base.where(

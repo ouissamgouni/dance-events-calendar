@@ -622,6 +622,22 @@ class EventPipelineProcessor:
             with DBSession(engine) as session:
                 db_event, action = self._persist_with_dedup(session, task, buffer)
                 session.commit()
+                # Run automatic tag suggestions in the same session as a
+                # post-persist step. Skipped for "deduped" (default tags
+                # already merged into the canonical event) and "unchanged"
+                # (the suggester is idempotent so it's safe to run, just a
+                # waste of CPU on a no-op re-pull). Failures here are
+                # non-fatal — the event itself is already saved.
+                if action in ("new", "updated"):
+                    try:
+                        self._run_tag_suggestion(session, db_event)
+                        session.commit()
+                    except Exception:
+                        session.rollback()
+                        logger.exception(
+                            "Tag suggestion stage failed for event %s",
+                            cal_event.event_id,
+                        )
                 # Snapshot attributes BEFORE the session closes — otherwise
                 # accessing them later raises DetachedInstanceError because
                 # commit() expires loaded attributes by default.
@@ -736,13 +752,30 @@ class EventPipelineProcessor:
                 )
             )
 
+    def _run_tag_suggestion(self, session: Session, db_event: CachedEvent) -> None:
+        """Run the heuristic tag suggester for ``db_event``.
+
+        Imported lazily so this module doesn't pull tag-suggestion deps at
+        import time (and to keep the dependency tree one-way: pipeline
+        stages depend on the processor, not the other way around).
+        Idempotent: ``TagSuggestionStage`` skips events that already have
+        heuristic suggestions.
+        """
+        from backend.services.pipeline.stages.tag_suggestion import TagSuggestionStage
+
+        stage = TagSuggestionStage()
+        if not stage.should_process(db_event):
+            return
+        stage.process_with_session(session, db_event)
+
     def _persist_with_dedup(
         self, session: Session, task: EventTask, buffer: CachedEvent
     ) -> tuple[CachedEvent, str]:
         """Persist an enriched event buffer with content-hash dedup.
 
-        Returns (db_event, action) where action is 'new', 'updated', or 'deduped'.
-        Single transaction; the caller is responsible for ``session.commit()``.
+        Returns (db_event, action) where action is 'new', 'updated', 'deduped',
+        or 'unchanged'. Single transaction; the caller is responsible for
+        ``session.commit()``.
         """
         from datetime import datetime as _dt
 

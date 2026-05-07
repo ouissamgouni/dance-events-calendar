@@ -549,13 +549,17 @@ def delete_tag(
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
 
-    # Cascade: delete event_tags and tag_suggestions referencing this tag
+    # Cascade: delete event_tags, tag_suggestions, and tag_synonyms referencing this tag
     for et in session.exec(select(EventTag).where(EventTag.tag_id == tag_id)).all():
         session.delete(et)
     for ts in session.exec(
         select(TagSuggestion).where(TagSuggestion.tag_id == tag_id)
     ).all():
         session.delete(ts)
+    for syn in session.exec(
+        select(TagSynonym).where(TagSynonym.tag_id == tag_id)
+    ).all():
+        session.delete(syn)
     session.delete(tag)
     session.commit()
 
@@ -642,10 +646,18 @@ def list_tag_suggestions(
     status: str | None = Query(default=None),
     source: str | None = Query(default=None, regex="^(user|heuristic)$"),
     event_id: str | None = Query(default=None),
+    include_past: bool = Query(default=False),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
-    """List tag suggestions, optionally filtered by status, source, or event."""
+    """List tag suggestions, optionally filtered by status, source, or event.
+
+    Defaults to suggestions whose underlying event has not finished yet
+    (``CachedEvent.end > now``). Pass ``include_past=true`` to include
+    suggestions for past events too — typically only useful for audits.
+    """
+    from datetime import datetime as _dt
+
     query = select(TagSuggestion).order_by(col(TagSuggestion.created_at).desc())
     if status:
         query = query.where(TagSuggestion.status == status)
@@ -653,6 +665,12 @@ def list_tag_suggestions(
         query = query.where(TagSuggestion.source == source)
     if event_id:
         query = query.where(TagSuggestion.event_id == event_id)
+    if not include_past:
+        upcoming_ids = select(CachedEvent.event_id).where(
+            CachedEvent.deleted_at == None,  # noqa: E711
+            CachedEvent.end > _dt.utcnow(),
+        )
+        query = query.where(TagSuggestion.event_id.in_(upcoming_ids))
     suggestions = session.exec(query).all()
 
     # Enrich with event titles and tag info

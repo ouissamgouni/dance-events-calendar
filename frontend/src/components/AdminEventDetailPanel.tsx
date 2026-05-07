@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchEvent, updateEvent } from '../api';
+import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
 import AdminEventDetailContent from './AdminEventDetailContent';
 import type { CalendarEvent } from '../types';
 
@@ -53,6 +54,9 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
         setEvent(updated);
         setTitleValue(updated.title);
         onEventUpdated?.(updated.event_id);
+        // Refresh badge counters — e.g. flipping review_status from
+        // "pending" to "reviewed" needs to update the Pending Review badge.
+        notifyAdminDataChanged();
     };
 
     const handleTagsUpdated = () => {
@@ -60,6 +64,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
         fetchEvent(eventId, { fresh: true })
             .then((e) => { setEvent(e); setTitleValue(e.title); })
             .catch(() => { });
+        notifyAdminDataChanged();
     };
 
     const handleManualRefresh = () => {

@@ -5,12 +5,11 @@ import type { AdminTagGroup } from '../api';
 import {
     fetchAdminCalendars, updateCalendar, discoverCalendars, addCalendar,
     fetchSettings, updateSettings, startSyncJob,
-    fetchSuggestions, fetchMostSavedEvents, fetchMostViewedEvents, fetchAdminTagSuggestions,
-    fetchEventFilterOptions, fetchAdminTagGroups,
+    fetchSuggestions, fetchMostSavedEvents, fetchMostViewedEvents,
+    fetchAdminTagGroups,
     fetchCalendarDefaultTags, updateCalendarDefaultTags,
     fetchSourceBreakdown, fetchTopCountries, fetchTopLinks, fetchExportStats,
     fetchMostAttendedEvents, getCurrentSyncJob,
-    fetchAdminRatings,
 } from '../api';
 import type { MostSavedEvent, MostViewedEvent, MostAttendedEvent, SourceBreakdown, CountryBreakdown, TopLink, ExportStat } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -24,6 +23,7 @@ import TagSuggestionsPanel from '../components/TagSuggestionsPanel';
 import FeedbackPanel from '../components/FeedbackPanel';
 import AdminTagCategories from '../components/AdminTagCategories';
 import AdminAnalytics from '../components/AdminAnalytics';
+import { useAdminCounters, notifyAdminDataChanged } from '../hooks/useAdminCounters';
 
 type AdminTab = 'data' | 'configuration' | 'analytics';
 type SyncMode = 'incremental' | 'reseed';
@@ -54,10 +54,12 @@ export default function Admin() {
     const [unsyncedPanelOpen, setUnsyncedPanelOpen] = useState(false);
     const [tagSuggestionsPanelOpen, setTagSuggestionsPanelOpen] = useState(false);
     const [feedbackPanelOpen, setFeedbackPanelOpen] = useState(false);
-    const [feedbackPendingCount, setFeedbackPendingCount] = useState(0);
-    const [tagSuggestionCount, setTagSuggestionCount] = useState(0);
-    const [pendingReviewCount, setPendingReviewCount] = useState(0);
-    const [ungeolocatedCount, setUngeolocatedCount] = useState(0);
+    const { counters: adminCounters, refresh: refreshAdminCounters } = useAdminCounters();
+    const feedbackPendingCount = adminCounters.feedbackPending;
+    const tagSuggestionCount = adminCounters.tagSuggestions;
+    const pendingReviewCount = adminCounters.pendingReview;
+    const ungeolocatedCount = adminCounters.ungeolocated;
+    const setFeedbackPendingCount = (_n: number) => refreshAdminCounters();
     const [suggestions, setSuggestions] = useState<EventSuggestion[]>([]);
     const [mostSaved, setMostSaved] = useState<MostSavedEvent[]>([]);
     const [mostViewed, setMostViewed] = useState<MostViewedEvent[]>([]);
@@ -139,12 +141,9 @@ export default function Admin() {
         fetchTopCountries().then(setTopCountries).catch(() => { });
         fetchTopLinks().then(setTopLinks).catch(() => { });
         fetchExportStats().then(setExportStats).catch(() => { });
-        fetchAdminTagSuggestions('pending').then((s) => setTagSuggestionCount(s.length)).catch(() => { });
-        fetchAdminRatings({ status: 'pending', page: 1, pageSize: 1 }).then((res) => setFeedbackPendingCount(res.total)).catch(() => { });
-        fetchEventFilterOptions({ future_only: true }).then((opts) => {
-            setPendingReviewCount(opts.review_statuses.find((s) => s.value === 'pending')?.count ?? 0);
-            setUngeolocatedCount(opts.geo_statuses.find((s) => s.value === 'ungeolocated')?.count ?? 0);
-        }).catch(() => { });
+        // Counters (pending review, ungeolocated, tag suggestions, feedback)
+        // are loaded & kept fresh by the useAdminCounters hook above — no
+        // need to fetch them here.
         getCurrentSyncJob()
             .then((j) => {
                 if (j && (j.status === 'running' || j.status === 'abort_requested')) {
@@ -752,7 +751,12 @@ export default function Admin() {
                             <SyncProgressCard
                                 visible={showSyncProgress}
                                 onDismiss={() => setShowSyncProgress(false)}
-                                onJobComplete={() => { /* table auto-refreshes */ }}
+                                onJobComplete={() => {
+                                    // Refresh admin badges (pending review,
+                                    // ungeolocated, tag suggestions, …) so
+                                    // they reflect the freshly-synced state.
+                                    notifyAdminDataChanged();
+                                }}
                             />
                         )}
                         <div className="flex-1 min-h-0">

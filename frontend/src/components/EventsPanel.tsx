@@ -18,6 +18,7 @@ import {
 import type { AdminTagGroup } from '../api';
 import LocationBadge from './LocationBadge';
 import AdminEventDetailPanel from './AdminEventDetailPanel';
+import { useAdminPrefs } from '../context/AdminPrefsContext';
 
 export type EventsPanelPreset = 'all' | 'pending' | 'ungeolocated';
 
@@ -62,8 +63,14 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
     const [tagGroups, setTagGroups] = useState<AdminTagGroup[]>([]);
     const [bulkTagPickerOpen, setBulkTagPickerOpen] = useState(false);
     const [bulkTagIds, setBulkTagIds] = useState<number[]>([]);
-    // Hide past events by default; toggle to include them.
-    const [hidePast, setHidePast] = useState(true);
+    // Hide past events by default; toggle (here or in the admin header) to
+    // include them. Mirrors the global admin pref so all panels stay in sync.
+    const { includePast, setIncludePast } = useAdminPrefs();
+    const hidePast = !includePast;
+    const setHidePast = (value: boolean | ((prev: boolean) => boolean)) => {
+        const next = typeof value === 'function' ? (value as (p: boolean) => boolean)(hidePast) : value;
+        setIncludePast(!next);
+    };
     const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
     // Build filter params from current state
@@ -78,7 +85,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 calendar_id: selectedCalendar || undefined,
                 tag_ids: selectedTagIds || undefined,
                 ungeolocated: selectedGeoStatus === 'ungeolocated' || presetFilters.ungeolocated || undefined,
-                future_only: hidePast || undefined,
+                include_past: !hidePast || undefined,
             };
         },
         [preset, page, debouncedSearch, selectedReviewStatus, selectedCalendar, selectedTagIds, selectedGeoStatus, hidePast],
@@ -125,7 +132,8 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             setAdminDetailEventId(null);
             setBulkTagPickerOpen(false);
             setBulkTagIds([]);
-            setHidePast(true);
+            // Don't reset hidePast here — it's now driven by the global
+            // admin pref so reopening the panel respects the user's choice.
         }
     }, [isOpen, preset, initialCalendarId]);
 

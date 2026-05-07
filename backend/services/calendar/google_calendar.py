@@ -2,7 +2,7 @@ import logging
 import os
 import socket
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from backend.services.calendar.base import (
@@ -162,6 +162,7 @@ class GoogleCalendarService(BaseCalendarService):
                 if (
                     "timed out" in error_str.lower()
                     or "connection reset" in error_str.lower()
+                    or "eof occurred" in error_str.lower()
                 ) and retries < 3:
                     wait = 2**retries
                     logger.warning(
@@ -193,6 +194,16 @@ class GoogleCalendarService(BaseCalendarService):
                     end = datetime.fromisoformat(
                         end_data["dateTime"].replace("Z", "+00:00")
                     )
+                    # Normalize to naive UTC. The DB stores `start`/`end` as
+                    # TIMESTAMP WITHOUT TIME ZONE, so values read back from
+                    # the DB are tz-naive. Keeping incoming values tz-aware
+                    # makes equality comparisons (`existing.start != event.start`)
+                    # always True, which spuriously bumps `review_status` to
+                    # "pending" on every re-sync of an unchanged event.
+                    if start.tzinfo is not None:
+                        start = start.astimezone(timezone.utc).replace(tzinfo=None)
+                    if end.tzinfo is not None:
+                        end = end.astimezone(timezone.utc).replace(tzinfo=None)
 
                 # Client-side time_min filter on full fetches (we cannot push
                 # this to the server without losing nextSyncToken — see note

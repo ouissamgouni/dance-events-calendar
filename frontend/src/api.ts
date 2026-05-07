@@ -462,15 +462,16 @@ export async function getSyncJob(jobId: string): Promise<SyncJobRecord> {
 }
 
 export async function retryCalendarInJob(
-    _jobId: string,
+    jobId: string,
     calendarId: string,
 ): Promise<SyncJobRecord> {
-    const res = await fetch(`${BASE}/admin/sync-jobs`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'incremental', since_date: null, calendar_ids: [calendarId] }),
-        credentials: 'include',
-    });
+    const res = await fetch(
+        `${BASE}/admin/sync-jobs/${encodeURIComponent(jobId)}/retry-calendar?calendar_id=${encodeURIComponent(calendarId)}`,
+        {
+            method: 'POST',
+            credentials: 'include',
+        },
+    );
     if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error((data as { detail?: string }).detail || 'Failed to retry calendar sync');
@@ -521,6 +522,12 @@ export interface EventFilterParams {
     tag_ids?: string;
     ungeolocated?: boolean;
     future_only?: boolean;
+    /**
+     * When true, include events that have already finished. The backend now
+     * defaults to upcoming-only (CachedEvent.end > now); set this to true to
+     * widen the scope (audits, archives, etc.).
+     */
+    include_past?: boolean;
 }
 
 export interface FilterOption {
@@ -547,6 +554,7 @@ export async function fetchAdminEvents(params: EventFilterParams = {}): Promise<
     if (params.tag_ids) qs.set('tag_ids', params.tag_ids);
     if (params.ungeolocated) qs.set('ungeolocated', 'true');
     if (params.future_only) qs.set('future_only', 'true');
+    if (params.include_past) qs.set('include_past', 'true');
     const res = await fetch(`${BASE}/admin/events?${qs}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch events');
     return res.json();
@@ -560,6 +568,7 @@ export async function fetchEventFilterOptions(params: EventFilterParams = {}): P
     if (params.tag_ids) qs.set('tag_ids', params.tag_ids);
     if (params.ungeolocated) qs.set('ungeolocated', 'true');
     if (params.future_only) qs.set('future_only', 'true');
+    if (params.include_past) qs.set('include_past', 'true');
     const res = await fetch(`${BASE}/admin/events/filter-options?${qs}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch filter options');
     return res.json();
@@ -991,7 +1000,9 @@ export async function submitTagSuggestion(body: TagSuggestionCreate): Promise<vo
 }
 
 export async function fetchAdminTagSuggestions(
-    opts?: { status?: string; source?: 'user' | 'heuristic'; eventId?: string } | string,
+    opts?:
+        | { status?: string; source?: 'user' | 'heuristic'; eventId?: string; includePast?: boolean }
+        | string,
 ): Promise<TagSuggestionResponse[]> {
     // Backwards-compat: accept a bare status string from existing callers.
     const params = new URLSearchParams();
@@ -1001,6 +1012,7 @@ export async function fetchAdminTagSuggestions(
         if (opts.status) params.set('status', opts.status);
         if (opts.source) params.set('source', opts.source);
         if (opts.eventId) params.set('event_id', opts.eventId);
+        if (opts.includePast) params.set('include_past', 'true');
     }
     const qs = params.toString() ? `?${params.toString()}` : '';
     const res = await fetch(`${BASE}/admin/tags/suggestions${qs}`, {
@@ -1229,6 +1241,7 @@ export async function fetchAdminEventIds(params: EventFilterParams = {}): Promis
     if (params.tag_ids) qs.set('tag_ids', params.tag_ids);
     if (params.ungeolocated) qs.set('ungeolocated', 'true');
     if (params.future_only) qs.set('future_only', 'true');
+    if (params.include_past) qs.set('include_past', 'true');
     const res = await fetch(`${BASE}/admin/events/ids?${qs}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch event IDs');
     return res.json();
