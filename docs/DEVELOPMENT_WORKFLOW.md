@@ -16,6 +16,7 @@ This document describes the full workflow for the Movida project — from local 
   - [Production Remote](#production-remote-fly--neon--cloudflare)
 - [Scenario Environment](#scenario-environment)
 - [Testing](#testing)
+- [Performance Testing](#performance-testing)
 - [Safety Features](#safety-features)
 - [Task Commands Reference](#task-commands-reference)
 - [Port Reference](#port-reference)
@@ -304,6 +305,84 @@ task test:ci            # simulate CI locally via Act
 
 ---
 
+## Performance Testing
+
+Load tests are written in [k6](https://k6.io) and live under `perf/k6/`.
+Profiles live in `perf/k6/profiles/*.env`. Per-developer tweaks go in a sibling `*.override.env` (gitignored), and ad-hoc CLI envs (e.g. `VUS=10 task perf:staging`) win over both.
+
+```bash
+brew install k6
+task perf:check            # verify k6 is installed
+```
+
+### Layout
+
+```
+perf/
+├── k6/
+│   ├── main.js                 # browse_events + sitemap_seo scenarios
+│   └── profiles/
+│       ├── dev.env             # localhost:8001
+│       ├── perf.env            # perf scenario (BASE_URL auto-injected)
+│       ├── staging.env         # https://api-develop.joinmovida.com
+│       └── prod.env            # https://api.joinmovida.com (smoke only)
+└── results/                    # summary-*.html / summary-*.json
+```
+
+### Recommended local workflow (perf scenario)
+
+The perf scenario is just another entry under `scenarios/` — it reuses the
+standard scenario harness for an isolated DB, deterministic ports, mock
+calendar, seeded events, and a rate-limit kill switch (`RATE_LIMIT_ENABLED=false`
+in [scenarios/perf/config.env](scenarios/perf/config.env)).
+
+```bash
+# terminal 1 — boot the perf scenario (foreground, blocking)
+task perf:scenario:up
+
+# terminal 2 — run k6 (auto-derives BASE_URL from .taskfiles/.scenario-state/perf.env)
+task perf:run
+task perf:report           # open the HTML summary in your browser
+
+# terminal 1 — Ctrl-C, then drop the DB:
+task perf:scenario:down
+```
+
+### Other targets
+
+| Command | Description |
+|---------|-------------|
+| `task perf:dev` | Run against an ad-hoc dev backend (`localhost:8001`). |
+| `task perf:staging` | Run against remote staging (`https://api-develop.joinmovida.com`, 15 VUs × 5m). Staging is rate-limited unless `RATE_LIMIT_ENABLED=false` is set on the Fly app, so expect 429s in default profile. |
+| `task perf:prod:smoke` | Read-only smoke against production (5 VUs × 2m). |
+| `task perf:scenario:logs` | Tail the perf scenario backend logs. |
+| `task perf:report` | Open `perf/results/summary-latest.html`. |
+| `task perf:clean` | Remove old summary files. |
+
+### Overriding BASE_URL or VUs
+
+Three precedence levels (each wins over the previous):
+
+1. Committed profile: `perf/k6/profiles/<profile>.env`
+2. Per-developer overrides: `perf/k6/profiles/<profile>.override.env` (gitignored)
+3. CLI envs: `VUS=15 DURATION=2m KILL_LIMITER=1 task perf:staging`
+
+Supported CLI overrides: `VUS`, `DURATION`, `RAMP`, `THINK_MIN`, `THINK_MAX`, `BASE_URL`.
+
+```bash
+# Quick ad-hoc tweak (no file edits):
+VUS=15 DURATION=2m KILL_LIMITER=1 task perf:staging
+
+# Persistent personal override:
+cat > perf/k6/profiles/staging.override.env <<'EOF'
+VUS=5
+DURATION=1m
+EOF
+task perf:staging
+```
+
+---
+
 ## Safety Features
 
 All destructive operations support `DRY_RUN=1` to preview without executing:
@@ -459,6 +538,21 @@ All scenario commands accept `SCENARIO=<name>`.
 | `task test:int:full` | Setup + integration |
 | `task test:all` | All tests |
 | `task test:ci` | Simulate CI via Act |
+
+### Performance (k6)
+
+| Command | Description |
+|---------|-------------|
+| `task perf:check` | Verify k6 is installed |
+| `task perf:scenario:up` | Start the perf scenario (delegates to `start:scenario SCENARIO=perf`) |
+| `task perf:scenario:down` | Stop perf scenario, drop DB |
+| `task perf:scenario:logs` | Tail perf scenario logs |
+| `task perf:run` | Run k6 against the running perf scenario (auto-port) |
+| `task perf:dev` | Run k6 against `localhost:8001` |
+| `task perf:staging` | Run k6 against remote staging |
+| `task perf:prod:smoke` | Read-only smoke against prod (5 VUs × 2m) |
+| `task perf:report` | Open the latest HTML summary |
+| `task perf:clean` | Remove old summary files |
 
 ### Utilities
 

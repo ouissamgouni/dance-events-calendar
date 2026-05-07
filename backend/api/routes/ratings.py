@@ -28,7 +28,7 @@ from fastapi import (
     Request,
 )
 from slowapi import Limiter
-from slowapi.util import get_remote_address
+from backend.api.rate_limit import client_ip
 from sqlalchemy import func
 from sqlmodel import Session, col, select
 
@@ -63,7 +63,7 @@ from backend.services.profanity import contains_profanity
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["ratings"])
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=client_ip)
 
 
 # ── Helpers ──────────────────────────────────────────────────────────

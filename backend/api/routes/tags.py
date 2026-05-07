@@ -4,7 +4,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from slowapi import Limiter
-from slowapi.util import get_remote_address
+from backend.api.rate_limit import client_ip
 from sqlmodel import Session, col, select
 
 from backend.api.deps import get_client_ip, require_admin
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["tags"])
 
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=client_ip)
 
 
 def _slugify(text: str) -> str:

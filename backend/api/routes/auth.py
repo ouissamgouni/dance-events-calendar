@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from slowapi import Limiter
-from slowapi.util import get_remote_address
+from backend.api.rate_limit import client_ip
 from sqlmodel import Session, delete, select
 
 from backend.api.deps import (
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=client_ip)
 
 _COOKIE_NAME = "session_token"
 _MAX_AGE = 60 * 60 * 24 * 7  # 7 days

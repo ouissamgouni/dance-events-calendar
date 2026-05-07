@@ -136,6 +136,7 @@ def get_settings(session: Session = Depends(get_session)):
         event_color_bar_color=_get_str_setting(
             session, "event_color_bar_color", "#64748b"
         ),
+        tag_sort_mode=_get_str_setting(session, "tag_sort_mode", "group"),
     )
 
 
@@ -215,6 +216,14 @@ def update_settings(
             )
         session.add(row)
 
+    if body.tag_sort_mode is not None:
+        row = session.get(SiteSetting, "tag_sort_mode")
+        if row:
+            row.value = body.tag_sort_mode
+        else:
+            row = SiteSetting(key="tag_sort_mode", value=body.tag_sort_mode)
+        session.add(row)
+
     session.commit()
 
     return SiteSettingsResponse(
@@ -230,4 +239,5 @@ def update_settings(
         event_color_bar_color=_get_str_setting(
             session, "event_color_bar_color", "#64748b"
         ),
+        tag_sort_mode=_get_str_setting(session, "tag_sort_mode", "group"),
     )

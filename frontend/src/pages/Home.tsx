@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { CalendarEvent, TagGroup } from '../types';
 import { fetchEvents, fetchSettings, fetchTagGroups } from '../api';
 import { trackView } from '../utils/tracking';
@@ -27,9 +27,21 @@ function formatDate(date: Date): string {
 
 export default function Home() {
     const { user } = useAuth();
-    const { showPrices, showPopularity, popularityThreshold } = useFeatureFlags();
+    const { showPrices, showPopularity, popularityThreshold, tagSortMode } = useFeatureFlags();
     const [showSuggestModal, setShowSuggestModal] = useState(false);
     const location = useLocation();
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    // Allow opening the suggest modal from anywhere via ?submit=1 (e.g. mobile header link).
+    useEffect(() => {
+        if (searchParams.get('submit') === '1') {
+            setShowSuggestModal(true);
+            const next = new URLSearchParams(searchParams);
+            next.delete('submit');
+            setSearchParams(next, { replace: true });
+        }
+    }, [searchParams, setSearchParams]);
+
     const viewMode: ViewMode = location.pathname === '/calendar' ? 'calendar' : 'explorer';
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [sinceDate, setSinceDate] = useState<string | null>(null);
@@ -79,7 +91,7 @@ export default function Home() {
     // Explorer state
     const today = formatDate(new Date());
     const defaultEndDate = new Date();
-    defaultEndDate.setMonth(defaultEndDate.getMonth() + 1);
+    defaultEndDate.setMonth(defaultEndDate.getMonth() + 6);
     const [startDate, setStartDate] = useState(today);
     const [endDate, setEndDate] = useState(formatDate(defaultEndDate));
     const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
@@ -138,25 +150,116 @@ export default function Home() {
     const handleToggleTag = useCallback((tagId: number) => {
         setActiveTagIds((prev) => {
             const next = new Set(prev);
-            if (next.has(tagId)) next.delete(tagId);
-            else next.add(tagId);
+            if (next.has(tagId)) {
+                next.delete(tagId);
+                return next;
+            }
+            // Enforce single-select for groups where allow_multiple === false:
+            // adding this tag deselects any sibling tags from the same group.
+            const group = tagGroups.find((g) => g.tags.some((t) => t.id === tagId));
+            if (group && group.allow_multiple === false) {
+                const siblingIds = new Set(group.tags.map((t) => t.id));
+                for (const id of Array.from(next)) {
+                    if (siblingIds.has(id)) next.delete(id);
+                }
+            }
+            next.add(tagId);
             return next;
         });
-    }, []);
+    }, [tagGroups]);
 
     const handleClearTags = useCallback(() => {
         setActiveTagIds(new Set());
     }, []);
 
     const filteredEvents = useMemo(() => {
-        let result = events;
-        if (activeTagIds.size > 0) {
-            result = result.filter((e) =>
-                [...activeTagIds].every((tagId) => e.tags?.some((t) => t.id === tagId))
-            );
+        if (activeTagIds.size === 0) return events;
+
+        // Disjunctive faceting filter logic:
+        //  - Within a multi-select group: OR (event must match ANY selected tag in that group)
+        //  - Across groups: AND (event must satisfy every group that has a selection)
+        // Single-select groups behave the same as OR (only one tag can be selected).
+        const tagToGroupSlug = new Map<number, string>();
+        for (const g of tagGroups) {
+            for (const t of g.tags) tagToGroupSlug.set(t.id, g.slug);
         }
-        return result;
-    }, [events, activeTagIds]);
+        const groupBuckets = new Map<string, number[]>();
+        const ungrouped: number[] = [];
+        for (const id of activeTagIds) {
+            const slug = tagToGroupSlug.get(id);
+            if (!slug) { ungrouped.push(id); continue; }
+            const arr = groupBuckets.get(slug);
+            if (arr) arr.push(id);
+            else groupBuckets.set(slug, [id]);
+        }
+
+        return events.filter((e) => {
+            const tagSet = new Set((e.tags ?? []).map((t) => t.id));
+            for (const ids of groupBuckets.values()) {
+                if (!ids.some((id) => tagSet.has(id))) return false;
+            }
+            for (const id of ungrouped) {
+                if (!tagSet.has(id)) return false;
+            }
+            return true;
+        });
+    }, [events, activeTagIds, tagGroups]);
+
+    // Disjunctive facet counts.
+    //
+    // Filter semantics (must match `filteredEvents` above):
+    //   - Within a group: OR (event matches ANY selected tag in that group)
+    //   - Across groups: AND (every group with a selection must be satisfied)
+    //
+    // For each tag T in group G, the displayed count is the number of events
+    // that would match if the user *also* selected T — i.e., satisfying all
+    // OTHER groups' selections, plus containing T. Selections within G itself
+    // are intentionally ignored so siblings in a multi-select group don't
+    // suppress each other's counts (Algolia / Amazon convention).
+    const tagCountMap = useMemo(() => {
+        const map = new Map<number, number>();
+        if (!tagGroups.length) return map;
+
+        const tagToGroupSlug = new Map<number, string>();
+        for (const g of tagGroups) {
+            for (const t of g.tags) tagToGroupSlug.set(t.id, g.slug);
+        }
+
+        // Active tag IDs grouped by their group slug.
+        const activeByGroup = new Map<string, number[]>();
+        for (const id of activeTagIds) {
+            const slug = tagToGroupSlug.get(id);
+            if (!slug) continue;
+            const arr = activeByGroup.get(slug);
+            if (arr) arr.push(id);
+            else activeByGroup.set(slug, [id]);
+        }
+
+        const eventTagSets = events.map((e) => new Set((e.tags ?? []).map((t) => t.id)));
+
+        for (const g of tagGroups) {
+            // Each entry is one OTHER group's selected IDs; event must contain
+            // at least one ID from EACH such entry (OR within group, AND across).
+            const otherGroupBuckets: number[][] = [];
+            for (const [slug, ids] of activeByGroup) {
+                if (slug === g.slug) continue;
+                otherGroupBuckets.push(ids);
+            }
+            for (const t of g.tags) {
+                let count = 0;
+                for (const tagSet of eventTagSets) {
+                    if (!tagSet.has(t.id)) continue;
+                    let ok = true;
+                    for (const bucket of otherGroupBuckets) {
+                        if (!bucket.some((id) => tagSet.has(id))) { ok = false; break; }
+                    }
+                    if (ok) count++;
+                }
+                map.set(t.id, count);
+            }
+        }
+        return map;
+    }, [events, tagGroups, activeTagIds]);
 
     const handleDatesChange = useCallback((start: Date, end: Date) => {
         setVisibleRange((prev) => {
@@ -307,7 +410,7 @@ export default function Home() {
                                 <SavedEventsFab />
                                 <button
                                     onClick={() => setShowSuggestModal(true)}
-                                    className="px-3 py-1 text-sm transition bg-white text-slate-900 font-medium shadow-sm hover:bg-slate-50"
+                                    className="hidden sm:inline-flex px-3 py-1 text-sm transition bg-white text-slate-900 font-medium shadow-sm hover:bg-slate-50"
                                 >
                                     <span className="sm:hidden">Submit</span>
                                     <span className="hidden sm:inline">Submit Event</span>
@@ -337,6 +440,8 @@ export default function Home() {
                                     activeTagIds={activeTagIds}
                                     onToggle={handleToggleTag}
                                     onClear={handleClearTags}
+                                    countOverrides={tagCountMap}
+                                    sortMode={tagSortMode}
                                 />
                             )}
                             {/* Event list: hidden on mobile until after map, fills remaining height on desktop */}
@@ -435,6 +540,8 @@ export default function Home() {
                                     activeTagIds={activeTagIds}
                                     onToggle={handleToggleTag}
                                     onClear={handleClearTags}
+                                    countOverrides={tagCountMap}
+                                    sortMode={tagSortMode}
                                 />
                             </div>
                         )}

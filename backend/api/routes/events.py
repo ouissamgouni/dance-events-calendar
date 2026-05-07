@@ -4,10 +4,10 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, Response
 from slowapi import Limiter
-from slowapi.util import get_remote_address
 from sqlalchemy import func
 from sqlmodel import Session, select
 
+from backend.api.rate_limit import client_ip
 from backend.api.routes.settings import _get_since_date
 from backend.api.schemas import (
     CalendarSettingResponse,
@@ -20,11 +20,11 @@ from backend.db.models import CachedEvent, CalendarSetting, EventTag, EventView
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=client_ip)
 
 
 @router.get("/calendars", response_model=list[CalendarSettingResponse])
-@limiter.limit("60/minute")
+@limiter.limit("300/minute")
 def get_calendars(
     request: Request,
     session: Session = Depends(get_session),
@@ -37,7 +37,7 @@ def get_calendars(
 
 
 @router.get("", response_model=list[EventResponse])
-@limiter.limit("60/minute")
+@limiter.limit("300/minute")
 def get_events(
     request: Request,
     session: Session = Depends(get_session),
@@ -139,7 +139,7 @@ def get_events(
 
 
 @router.post("/by-ids", response_model=list[EventResponse])
-@limiter.limit("30/minute")
+@limiter.limit("120/minute")
 def get_events_by_ids(
     request: Request,
     payload: EventBatchRequest,
@@ -201,7 +201,7 @@ def get_events_by_ids(
 
 
 @router.get("/{event_id}", response_model=EventResponse)
-@limiter.limit("60/minute")
+@limiter.limit("300/minute")
 def get_event(
     event_id: str,
     request: Request,

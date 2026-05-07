@@ -9,6 +9,7 @@ interface FeatureFlags {
     showRatings: boolean;
     popularityThreshold: number;
     eventColorBarColor: string;
+    tagSortMode: 'group' | 'event_count';
 }
 
 const FeatureFlagsContext = createContext<FeatureFlags>({
@@ -17,6 +18,7 @@ const FeatureFlagsContext = createContext<FeatureFlags>({
     showRatings: false,
     popularityThreshold: 10,
     eventColorBarColor: DEFAULT_EVENT_COLOR_BAR_COLOR,
+    tagSortMode: 'group',
 });
 
 export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
@@ -26,6 +28,7 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
         showRatings: false,
         popularityThreshold: 10,
         eventColorBarColor: DEFAULT_EVENT_COLOR_BAR_COLOR,
+        tagSortMode: 'group',
     });
 
     useEffect(() => {
@@ -37,6 +40,7 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     showRatings: s.show_ratings,
                     popularityThreshold: s.popularity_threshold,
                     eventColorBarColor: s.event_color_bar_color || DEFAULT_EVENT_COLOR_BAR_COLOR,
+                    tagSortMode: s.tag_sort_mode === 'event_count' ? 'event_count' : 'group',
                 });
             })
             .catch(() => {

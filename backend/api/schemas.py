@@ -203,6 +203,7 @@ class SiteSettingsResponse(BaseModel):
     show_ratings: bool = False
     popularity_threshold: int = 10
     event_color_bar_color: str = "#64748b"
+    tag_sort_mode: str = "group"  # "group" | "event_count"
 
 
 class SiteSettingsUpdateRequest(BaseModel):
@@ -219,6 +220,9 @@ class SiteSettingsUpdateRequest(BaseModel):
     popularity_threshold: Optional[int] = Field(default=None, ge=1, le=10000)
     event_color_bar_color: Optional[str] = Field(
         default=None, pattern="^#[0-9a-fA-F]{6}$"
+    )
+    tag_sort_mode: Optional[str] = Field(
+        default=None, pattern="^(group|event_count)$"
     )
 
 

@@ -58,6 +58,11 @@ includes:
       ROOT_DIR: "{{.ROOT_DIR}}"
       BACKEND_DIR: "{{.BACKEND_DIR}}"
       FRONTEND_DIR: "{{.FRONTEND_DIR}}"
+  perf:
+    taskfile: .taskfiles/perf.yml
+    dir: "{{.ROOT_DIR}}"
+    vars:
+      ROOT_DIR: "{{.ROOT_DIR}}"
 
 tasks:
   default:
@@ -172,7 +177,13 @@ tasks:
         echo "  task db:reset               Reset database (dev) ⚠️"
         echo "  task db:status:dev          Migration status"
         echo ""
-        echo "  ── Testing ──────────────────────────────────────────────"
+        echo "
+        echo "  ── Performance ──────────────────────────────────────────"
+        echo "  task perf:dev               Load test against local dev"
+        echo "  task perf:staging           Load test against staging (15 VUs x 5m)"
+        echo "  task perf:prod:smoke        Read-only smoke against prod"
+        echo "  task perf:report            Open latest HTML summary"
+        echo "" ── Testing ──────────────────────────────────────────────"
         echo "  task test                   Quick unit tests"
         echo "  task test:unit:backend      Backend tests only"
         echo "  task test:unit:frontend     Frontend type check + build"

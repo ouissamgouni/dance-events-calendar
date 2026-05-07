@@ -1,19 +1,42 @@
-import { useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { TagGroup } from '../types';
-
-const MAX_VISIBLE = 8;
 
 interface Props {
     tagGroups: TagGroup[];
     activeTagIds: Set<number>;
     onToggle: (tagId: number) => void;
     onClear: () => void;
+    /**
+     * Optional map of tagId -> residual count under the currently active filters
+     * (disjunctive faceting). Overrides static `tag.event_count` for display
+     * and renders zero-count pills as disabled.
+     */
+    countOverrides?: Map<number, number>;
+    /**
+     * Sort order for non-hero pills:
+     *  - "group" (default): respect admin group/tag ordinals
+     *  - "event_count": sort by event_count descending
+     * Hero pills are always rendered first regardless of this setting.
+     */
+    sortMode?: 'group' | 'event_count';
 }
 
-export default function TagFilterPills({ tagGroups, activeTagIds, onToggle, onClear }: Props) {
-    const [expanded, setExpanded] = useState(false);
+// Pill height (text-[11px] + py-px + 1px borders) ≈ 20px.
+// Row gap (gap-1) = 4px.
+const ROW_HEIGHT_PX = 20;
+const ROW_GAP_PX = 4;
+const COLLAPSED_ROWS = 2;
+const EXPANDED_ROWS = 4;
+const COLLAPSED_MAX_PX = ROW_HEIGHT_PX * COLLAPSED_ROWS + ROW_GAP_PX * (COLLAPSED_ROWS - 1); // 44
+const EXPANDED_MAX_PX = ROW_HEIGHT_PX * EXPANDED_ROWS + ROW_GAP_PX * (EXPANDED_ROWS - 1);    // 92
 
-    const allTags = tagGroups
+type EnrichedTag = TagGroup['tags'][number] & {
+    _groupColor: string;
+    _groupOrdinal: number;
+};
+
+function flattenAndSort(tagGroups: TagGroup[]): EnrichedTag[] {
+    return tagGroups
         .filter((g) => g.enabled !== false)
         .flatMap((g) =>
             g.tags
@@ -24,15 +47,15 @@ export default function TagFilterPills({ tagGroups, activeTagIds, onToggle, onCl
                     _groupOrdinal: g.ordinal,
                 })),
         )
-        // Respect admin ordering: group ordinal, then tag ordinal, then label.
         .sort((a, b) => {
             if (a._groupOrdinal !== b._groupOrdinal) return a._groupOrdinal - b._groupOrdinal;
             if (a.ordinal !== b.ordinal) return a.ordinal - b.ordinal;
             return a.label.localeCompare(b.label);
         });
+}
 
-    // Hero tags: sorted by hero_ordinal (nulls last), then canonical fallback
-    const heroTags = allTags
+function selectHeroes(allTags: EnrichedTag[]): EnrichedTag[] {
+    return allTags
         .filter((t) => t.is_hero_filter)
         .sort((a, b) => {
             const ao = a.hero_ordinal ?? Infinity;
@@ -42,30 +65,112 @@ export default function TagFilterPills({ tagGroups, activeTagIds, onToggle, onCl
             if (a.ordinal !== b.ordinal) return a.ordinal - b.ordinal;
             return a.label.localeCompare(b.label);
         });
+}
 
-    // Remainder: all non-hero tags, in canonical order
+function selectRemainder(
+    allTags: EnrichedTag[],
+    heroTags: EnrichedTag[],
+    sortMode: 'group' | 'event_count',
+): EnrichedTag[] {
     const heroIds = new Set(heroTags.map((t) => t.id));
-    const remainderTags = allTags.filter((t) => !heroIds.has(t.id));
+    const rest = allTags.filter((t) => !heroIds.has(t.id));
+    if (sortMode === 'event_count') {
+        return [...rest].sort((a, b) => {
+            const ac = a.event_count ?? 0;
+            const bc = b.event_count ?? 0;
+            if (ac !== bc) return bc - ac;
+            return a.label.localeCompare(b.label);
+        });
+    }
+    return rest;
+}
+
+/**
+ * Move pills with no remaining matches (residual count = 0 and not active)
+ * to the end, preserving order otherwise.
+ */
+function partitionEnabledFirst(
+    arr: EnrichedTag[],
+    activeTagIds: Set<number>,
+    countOverrides: Map<number, number> | undefined,
+): EnrichedTag[] {
+    const enabled: EnrichedTag[] = [];
+    const disabled: EnrichedTag[] = [];
+    for (const t of arr) {
+        const isActive = activeTagIds.has(t.id);
+        const c = countOverrides?.get(t.id) ?? t.event_count ?? null;
+        const isDisabled = !isActive && c === 0;
+        (isDisabled ? disabled : enabled).push(t);
+    }
+    return [...enabled, ...disabled];
+}
+
+export default function TagFilterPills({
+    tagGroups,
+    activeTagIds,
+    onToggle,
+    onClear,
+    countOverrides,
+    sortMode = 'group',
+}: Props) {
+    // Default state on every page/refresh: collapsed (2 rows).
+    const [expanded, setExpanded] = useState(false);
+    const [hasOverflow, setHasOverflow] = useState(false);
+    const containerRef = useRef<HTMLDivElement | null>(null);
+
+    const allTags = useMemo(() => flattenAndSort(tagGroups), [tagGroups]);
+    const heroTags = useMemo(() => selectHeroes(allTags), [allTags]);
+    const remainderTags = useMemo(
+        () => selectRemainder(allTags, heroTags, sortMode),
+        [allTags, heroTags, sortMode],
+    );
+    const heroTagsOrdered = useMemo(
+        () => partitionEnabledFirst(heroTags, activeTagIds, countOverrides),
+        [heroTags, activeTagIds, countOverrides],
+    );
+    const remainderTagsOrdered = useMemo(
+        () => partitionEnabledFirst(remainderTags, activeTagIds, countOverrides),
+        [remainderTags, activeTagIds, countOverrides],
+    );
+    const allOrdered = useMemo(
+        () => [...heroTagsOrdered, ...remainderTagsOrdered],
+        [heroTagsOrdered, remainderTagsOrdered],
+    );
+
+    // Detect whether natural pill content overflows 2 rows. We always render
+    // every pill; CSS clips overflow. scrollHeight reflects full content
+    // height regardless of clipping.
+    useLayoutEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        setHasOverflow(el.scrollHeight > COLLAPSED_MAX_PX + 1);
+    }, [allOrdered.length, expanded]);
+
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        const ro = new ResizeObserver(() => {
+            setHasOverflow(el.scrollHeight > COLLAPSED_MAX_PX + 1);
+        });
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
 
     if (!allTags.length) return null;
 
-    const hasMore = remainderTags.length > MAX_VISIBLE;
-    // When collapsed, show the first MAX_VISIBLE remainder tags plus any active ones outside that window
-    const visibleRemainder = expanded
-        ? remainderTags
-        : remainderTags.filter((t, i) => i < MAX_VISIBLE || activeTagIds.has(t.id));
-
-    const renderPill = (tag: (typeof allTags)[number]) => {
+    const renderPill = (tag: EnrichedTag) => {
         const active = activeTagIds.has(tag.id);
+        const displayCount = countOverrides?.get(tag.id) ?? tag.event_count ?? null;
+        const disabled = !active && displayCount === 0;
         const c = tag._groupColor;
         return (
             <button
                 key={tag.id}
-                onClick={() => onToggle(tag.id)}
-                className={`inline-flex items-center gap-0.5 px-2 py-px text-[11px] font-medium transition-colors border ${active
-                    ? 'text-white shadow-sm'
-                    : 'text-gray-700'
-                    }`}
+                onClick={() => { if (!disabled) onToggle(tag.id); }}
+                disabled={disabled}
+                aria-disabled={disabled}
+                className={`inline-flex items-center gap-0.5 px-2 py-px text-[11px] font-medium transition-colors border ${active ? 'text-white shadow-sm' : 'text-gray-700'
+                    } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
                 style={
                     active
                         ? { backgroundColor: c, borderColor: c }
@@ -73,47 +178,69 @@ export default function TagFilterPills({ tagGroups, activeTagIds, onToggle, onCl
                 }
             >
                 {tag.label}
-                {tag.event_count != null && (
-                    <span
-                        className={`text-[9px] font-semibold ${active ? 'opacity-80' : 'opacity-60'
-                            }`}
-                    >
-                        {tag.event_count}
+                {displayCount != null && (
+                    <span className={`text-[9px] font-semibold ${active ? 'opacity-80' : 'opacity-60'}`}>
+                        {displayCount}
                     </span>
                 )}
             </button>
         );
     };
 
-    const allVisible = [...heroTags, ...visibleRemainder];
+    const containerStyle: React.CSSProperties = expanded
+        ? { maxHeight: `${EXPANDED_MAX_PX}px`, overflowY: 'auto' }
+        : { maxHeight: `${COLLAPSED_MAX_PX}px`, overflow: 'hidden' };
 
     return (
-        <div className="flex flex-wrap gap-1 items-center">
-            {activeTagIds.size > 0 && (
-                <button
-                    onClick={onClear}
-                    className="inline-flex h-5 w-5 items-center justify-center text-rose-500 hover:text-rose-700 font-semibold mr-1"
-                    aria-label="Clear tag filters"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
-                        <path fillRule="evenodd" d="M4.22 4.22a.75.75 0 0 1 1.06 0L10 8.94l4.72-4.72a.75.75 0 1 1 1.06 1.06L11.06 10l4.72 4.72a.75.75 0 1 1-1.06 1.06L10 11.06l-4.72 4.72a.75.75 0 0 1-1.06-1.06L8.94 10 4.22 5.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
-                    </svg>
-                </button>
+        <div className="relative">
+            <div
+                ref={containerRef}
+                className="flex flex-wrap gap-1 items-center"
+                style={containerStyle}
+            >
+                {activeTagIds.size > 0 && (
+                    <button
+                        onClick={onClear}
+                        className="inline-flex h-5 w-5 items-center justify-center text-rose-500 hover:text-rose-700 font-semibold mr-1"
+                        aria-label="Clear tag filters"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                            <path fillRule="evenodd" d="M4.22 4.22a.75.75 0 0 1 1.06 0L10 8.94l4.72-4.72a.75.75 0 1 1 1.06 1.06L11.06 10l4.72 4.72a.75.75 0 1 1-1.06 1.06L10 11.06l-4.72 4.72a.75.75 0 0 1-1.06-1.06L8.94 10 4.22 5.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+                        </svg>
+                    </button>
+                )}
+                {allOrdered.map(renderPill)}
+            </div>
+
+            {/* Collapsed overflow: floating "Show more" with gradient fade so
+                pills underneath fade into white instead of being abruptly hidden. */}
+            {!expanded && hasOverflow && (
+                <>
+                    <div
+                        aria-hidden
+                        className="pointer-events-none absolute right-0 bottom-0 h-5 w-24 bg-gradient-to-l from-white via-white/95 to-transparent"
+                    />
+                    <button
+                        onClick={() => setExpanded(true)}
+                        className="absolute bottom-0 right-0 border border-slate-200 bg-white px-2 py-px text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition"
+                        aria-label="Show more tags"
+                    >
+                        Show more
+                    </button>
+                </>
             )}
-            {allVisible.map(renderPill)}
-            {hasMore && (
+
+            {expanded && (
                 <button
-                    onClick={() => setExpanded((v) => !v)}
-                    className="inline-flex items-center justify-center h-5 w-5 rounded-full border border-gray-300 text-gray-400 hover:border-gray-400 hover:text-gray-600 transition"
-                    aria-label={expanded ? 'Show fewer tags' : 'Show more tags'}
-                    title={expanded ? 'Show fewer' : `Show ${remainderTags.length - MAX_VISIBLE} more`}
+                    onClick={() => {
+                        // Reset scroll so collapsing always shows the first 2 rows.
+                        if (containerRef.current) containerRef.current.scrollTop = 0;
+                        setExpanded(false);
+                    }}
+                    className="mt-1 border border-slate-200 bg-white px-2 py-px text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition"
+                    aria-label="Show fewer tags"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3">
-                        {expanded
-                            ? <path fillRule="evenodd" d="M9.47 6.47a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 1 1-1.06 1.06L10 8.06l-3.72 3.72a.75.75 0 0 1-1.06-1.06l4.25-4.25Z" clipRule="evenodd" />
-                            : <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
-                        }
-                    </svg>
+                    Show less
                 </button>
             )}
         </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { CalendarSetting, EventSuggestion } from '../types';
 import type { AdminTagGroup } from '../api';
@@ -44,6 +44,7 @@ export default function Admin() {
     const [showRatings, setShowRatings] = useState(false);
     const [popularityThreshold, setPopularityThreshold] = useState(10);
     const [eventColorBarColor, setEventColorBarColor] = useState('#64748b');
+    const [tagSortMode, setTagSortMode] = useState<'group' | 'event_count'>('group');
     const [editingCalId, setEditingCalId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
     const [showSyncProgress, setShowSyncProgress] = useState(false);
@@ -59,7 +60,8 @@ export default function Admin() {
     const tagSuggestionCount = adminCounters.tagSuggestions;
     const pendingReviewCount = adminCounters.pendingReview;
     const ungeolocatedCount = adminCounters.ungeolocated;
-    const setFeedbackPendingCount = (_n: number) => refreshAdminCounters();
+    const setFeedbackPendingCount = useCallback((_n: number) => refreshAdminCounters(), [refreshAdminCounters]);
+    const setTagSuggestionCount = useCallback((_n: number) => refreshAdminCounters(), [refreshAdminCounters]);
     const [suggestions, setSuggestions] = useState<EventSuggestion[]>([]);
     const [mostSaved, setMostSaved] = useState<MostSavedEvent[]>([]);
     const [mostViewed, setMostViewed] = useState<MostViewedEvent[]>([]);
@@ -132,6 +134,7 @@ export default function Admin() {
             setShowRatings(s.show_ratings);
             setPopularityThreshold(s.popularity_threshold ?? 10);
             setEventColorBarColor(s.event_color_bar_color || '#64748b');
+            setTagSortMode(s.tag_sort_mode === 'event_count' ? 'event_count' : 'group');
         }).catch(() => { });
         fetchSuggestions().then(setSuggestions).catch(() => { });
         fetchMostSavedEvents().then(setMostSaved).catch(() => { });
@@ -380,6 +383,18 @@ export default function Admin() {
             await updateSettings({ popularity_threshold: value });
         } catch {
             setMessage('Failed to update popularity threshold.');
+        }
+    };
+
+    const handleTagSortModeChange = async (mode: 'group' | 'event_count') => {
+        const prev = tagSortMode;
+        setTagSortMode(mode);
+        try {
+            await updateSettings({ tag_sort_mode: mode });
+            setMessage(`Tag pill order: ${mode === 'event_count' ? 'by event count' : 'by group'}.`);
+        } catch {
+            setTagSortMode(prev);
+            setMessage('Failed to update tag sort order.');
         }
     };
 
@@ -886,6 +901,20 @@ export default function Admin() {
                                     />
                                 </div>
                             )}
+                            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                                <div>
+                                    <span className="text-[11px] font-medium text-gray-700">Tag pill order</span>
+                                    <p className="text-[10px] text-gray-400">Hero pills always come first</p>
+                                </div>
+                                <select
+                                    value={tagSortMode}
+                                    onChange={(e) => handleTagSortModeChange(e.target.value as 'group' | 'event_count')}
+                                    className="text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                >
+                                    <option value="group">By group</option>
+                                    <option value="event_count">By event count</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 

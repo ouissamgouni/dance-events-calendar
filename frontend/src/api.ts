@@ -93,6 +93,7 @@ export interface SiteSettings {
     show_ratings: boolean;
     popularity_threshold: number;
     event_color_bar_color: string;
+    tag_sort_mode: 'group' | 'event_count';
 }
 
 export async function fetchSettings(): Promise<SiteSettings> {

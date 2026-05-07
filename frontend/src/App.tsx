@@ -14,6 +14,7 @@ import { StatusBar } from './components/StatusBar';
 import InstagramBadge from './components/InstagramBadge';
 import ProtectedRoute from './components/ProtectedRoute';
 import SignUpBanner from './components/SignUpBanner';
+import MyCalendarFab from './components/MyCalendarFab';
 import Home from './pages/Home';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
@@ -76,6 +77,12 @@ function AppShell() {
             <Link to="/" className="text-sm font-bold text-white tracking-tight hover:text-gray-200 transition">Movida</Link>
           </div>
           <div className="flex items-center gap-3">
+            <Link
+              to="/?submit=1"
+              className="sm:hidden text-xs font-medium text-white hover:text-gray-200 transition"
+            >
+              + Submit
+            </Link>
             {user ? (
               <>
                 {user.is_admin && (
@@ -139,6 +146,7 @@ function AppShell() {
           </footer>
         </main>
         <StatusBar />
+        <MyCalendarFab />
       </div>
     </>
   );

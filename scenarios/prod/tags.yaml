@@ -19,10 +19,10 @@ tag_groups:
         label: Social
         is_hero_filter: true
         hero_ordinal: 0
-        synonyms: [ "social dance", "fiesta", "soirée", "soiree", "noche", "night out" ]
-      - slug: party
-        label: Party
-        synonyms: [ "fiesta", "celebration", "bash" ]
+        synonyms: [ "social dance", "fiesta", "soirée", "soiree", "noche", "night out", "party", "celebration", "bash" ]
+      - slug: day-social
+        label: Day Social
+        synonyms: [ "daytime social", "afternoon social", "day party", "rooftop social", "park social" ]
       - slug: class
         label: Class
         synonyms: [ "classes", "lesson", "lessons", "course", "courses" ]
@@ -32,10 +32,8 @@ tag_groups:
       - slug: festival
         label: Festival
         # NOTE: a dance "marathon" is its own format — keep it out of festival.
-        synonyms: [ "congress", "weekender", "encuentro" ]
-      - slug: congress
-        label: Congress
-        synonyms: [ "congreso" ]
+        # Congress merged into festival (2026-05): treat congress/congreso as synonyms.
+        synonyms: [ "congress", "congreso", "weekender", "encuentro" ]
       - slug: marathon
         label: Marathon
         synonyms: [ "dance marathon" ]

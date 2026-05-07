@@ -16,6 +16,9 @@ scenarios/*/secrets.env
 scenarios/staging/calendars.yaml
 scenarios/prod/calendars.yaml
 
+# Per-developer perf profile overrides (committed defaults live in *.env)
+perf/k6/profiles/*.override.env
+
 # Google service-account keys & other credentials
 credentials/
 *.json.bak

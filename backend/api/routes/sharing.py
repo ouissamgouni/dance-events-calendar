@@ -2,7 +2,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from slowapi import Limiter
-from slowapi.util import get_remote_address
+from backend.api.rate_limit import client_ip
 from sqlalchemy import func, or_
 from sqlmodel import Session, select
 
@@ -27,7 +27,7 @@ from backend.db.models import (
 
 router = APIRouter(prefix="/api/share", tags=["sharing"])
 
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=client_ip)
 
 
 @router.post("/calendar", response_model=ShareTokenResponse, status_code=201)
