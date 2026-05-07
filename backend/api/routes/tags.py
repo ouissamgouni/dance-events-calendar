@@ -90,7 +90,9 @@ def _suggestion_to_response(
     return TagSuggestionResponse(
         id=suggestion.id,
         event_id=suggestion.event_id,
-        event_title=event_title if event_title is not None else (event.title if event else None),
+        event_title=event_title
+        if event_title is not None
+        else (event.title if event else None),
         event_description=getattr(event, "description", None) if event else None,
         event_start=getattr(event, "start", None) if event else None,
         event_location=getattr(event, "location", None) if event else None,
@@ -488,6 +490,45 @@ def update_tag(
         raise HTTPException(status_code=404, detail="Tag not found")
 
     update_data = body.model_dump(exclude_unset=True)
+
+    # Handle moving the tag to another group/category.
+    new_group_id = update_data.pop("group_id", None)
+    if new_group_id is not None and new_group_id != tag.group_id:
+        target_group = session.get(TagGroup, new_group_id)
+        if not target_group:
+            raise HTTPException(status_code=404, detail="Target tag group not found")
+        current_group = session.get(TagGroup, tag.group_id)
+        if current_group and target_group.scope != current_group.scope:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Cannot move tag across scopes "
+                    f"({current_group.scope} → {target_group.scope})"
+                ),
+            )
+        # Slug collision check against the target group's existing tags.
+        collision = session.exec(
+            select(Tag.id).where(
+                Tag.group_id == new_group_id,
+                Tag.slug == tag.slug,
+                Tag.id != tag.id,
+            )
+        ).first()
+        if collision is not None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Target group already has a tag with slug '{tag.slug}'",
+            )
+        # Append at the end of the target group unless caller also set ordinal.
+        if "ordinal" not in update_data:
+            max_ordinal = session.exec(
+                select(Tag.ordinal)
+                .where(Tag.group_id == new_group_id)
+                .order_by(col(Tag.ordinal).desc())
+            ).first()
+            update_data["ordinal"] = (max_ordinal or 0) + 1
+        tag.group_id = new_group_id
+
     for field, value in update_data.items():
         setattr(tag, field, value)
     session.add(tag)
@@ -762,9 +803,7 @@ def list_tag_synonyms(
     if not tag:
         raise HTTPException(status_code=404, detail=f"Tag {tag_id} not found")
     rows = session.exec(
-        select(TagSynonym)
-        .where(TagSynonym.tag_id == tag_id)
-        .order_by(TagSynonym.term)
+        select(TagSynonym).where(TagSynonym.tag_id == tag_id).order_by(TagSynonym.term)
     ).all()
     return [_synonym_to_response(r) for r in rows]
 
@@ -794,7 +833,9 @@ def create_tag_synonym(
         )
     ).first()
     if existing:
-        raise HTTPException(status_code=409, detail="Synonym already exists for this tag")
+        raise HTTPException(
+            status_code=409, detail="Synonym already exists for this tag"
+        )
     syn = TagSynonym(tag_id=tag_id, term=term)
     session.add(syn)
     session.commit()

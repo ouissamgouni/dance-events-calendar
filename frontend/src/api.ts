@@ -1129,15 +1129,30 @@ export async function createTag(data: { group_id: number; label: string; color?:
     return res.json();
 }
 
-export async function updateTag(tagId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean; is_hero_filter?: boolean; hero_ordinal?: number | null }): Promise<Tag> {
+export async function updateTag(tagId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean; is_hero_filter?: boolean; hero_ordinal?: number | null; group_id?: number }): Promise<Tag> {
     const res = await fetch(`${BASE}/admin/tags/${tagId}`, {
         method: 'PATCH',
         headers: adminJsonHeaders,
         body: JSON.stringify(data),
         credentials: 'include',
     });
-    if (!res.ok) throw new Error('Failed to update tag');
+    if (!res.ok) {
+        let detail = 'Failed to update tag';
+        try {
+            const body = await res.json();
+            if (body?.detail) detail = body.detail;
+        } catch { /* ignore */ }
+        throw new Error(detail);
+    }
     return res.json();
+}
+
+export async function deleteTag(tagId: number): Promise<void> {
+    const res = await fetch(`${BASE}/admin/tags/${tagId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to delete tag');
 }
 
 // --- Tag Synonyms (heuristic suggester) ---

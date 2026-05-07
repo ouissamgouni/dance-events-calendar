@@ -399,6 +399,7 @@ class TagUpdate(BaseModel):
     enabled: Optional[bool] = None
     is_hero_filter: Optional[bool] = None
     hero_ordinal: Optional[int] = None
+    group_id: Optional[int] = None
 
 
 class EventTagAssignment(BaseModel):
