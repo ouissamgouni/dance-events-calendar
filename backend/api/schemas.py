@@ -446,6 +446,16 @@ class TagSuggestionRejectRequest(BaseModel):
     admin_notes: Optional[str] = None
 
 
+class BulkTagSuggestionReviewRequest(BaseModel):
+    ids: list[int]
+    action: str  # 'approve' | 'reject'
+
+
+class BulkTagSuggestionReviewResponse(BaseModel):
+    ok: int
+    skipped: int  # already-reviewed or free-text approve without tag_id
+
+
 class TagSynonymResponse(BaseModel):
     id: int
     tag_id: int

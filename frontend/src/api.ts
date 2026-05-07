@@ -1030,6 +1030,20 @@ export async function rejectTagSuggestion(id: number, adminNotes?: string): Prom
     if (!res.ok) throw new Error('Failed to reject tag suggestion');
 }
 
+export async function bulkReviewTagSuggestions(
+    ids: number[],
+    action: 'approve' | 'reject',
+): Promise<{ ok: number; skipped: number }> {
+    const res = await fetch(`${BASE}/admin/tags/suggestions/bulk-review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, action }),
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to bulk review tag suggestions');
+    return res.json();
+}
+
 /** Run the heuristic auto tag-suggestion engine for a single event. */
 export async function runTagSuggestionsForEvent(
     eventId: string,

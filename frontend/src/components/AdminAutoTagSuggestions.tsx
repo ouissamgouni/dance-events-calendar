@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
     approveTagSuggestion,
+    bulkReviewTagSuggestions,
     fetchAdminTagSuggestions,
     rejectTagSuggestion,
     runTagSuggestionsForEvent,
@@ -122,25 +123,19 @@ export default function AdminAutoTagSuggestions({ eventId, onApproved, onChanged
         if (suggestions.length === 0) return;
         setBulkBusy(true);
         setError(null);
-        const rows = [...suggestions];
-        let approved = false;
         try {
-            for (const s of rows) {
-                try {
-                    await approveTagSuggestion(s.id);
-                    setSuggestions((prev) => prev.filter((row) => row.id !== s.id));
-                    approved = true;
-                } catch (e) {
-                    setError((e as Error).message || 'Approve failed');
-                    break;
-                }
-            }
-        } finally {
-            setBulkBusy(false);
-            if (approved) {
+            const ids = suggestions.map((s) => s.id);
+            const { ok, skipped } = await bulkReviewTagSuggestions(ids, 'approve');
+            setSuggestions((prev) => prev.filter((s) => !ids.includes(s.id)));
+            if (ok > 0) {
                 onApproved?.();
                 onChanged?.();
             }
+            if (skipped > 0) setError(`${skipped} suggestion${skipped === 1 ? '' : 's'} skipped — need manual review.`);
+        } catch (e) {
+            setError((e as Error).message || 'Approve all failed');
+        } finally {
+            setBulkBusy(false);
         }
     };
 
@@ -148,22 +143,15 @@ export default function AdminAutoTagSuggestions({ eventId, onApproved, onChanged
         if (suggestions.length === 0) return;
         setBulkBusy(true);
         setError(null);
-        const rows = [...suggestions];
-        let rejected = false;
         try {
-            for (const s of rows) {
-                try {
-                    await rejectTagSuggestion(s.id);
-                    setSuggestions((prev) => prev.filter((row) => row.id !== s.id));
-                    rejected = true;
-                } catch (e) {
-                    setError((e as Error).message || 'Reject failed');
-                    break;
-                }
-            }
+            const ids = suggestions.map((s) => s.id);
+            const { ok } = await bulkReviewTagSuggestions(ids, 'reject');
+            setSuggestions((prev) => prev.filter((s) => !ids.includes(s.id)));
+            if (ok > 0) onChanged?.();
+        } catch (e) {
+            setError((e as Error).message || 'Reject all failed');
         } finally {
             setBulkBusy(false);
-            if (rejected) onChanged?.();
         }
     };
 

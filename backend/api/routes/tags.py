@@ -9,6 +9,8 @@ from sqlmodel import Session, col, select
 
 from backend.api.deps import get_client_ip, require_admin
 from backend.api.schemas import (
+    BulkTagSuggestionReviewRequest,
+    BulkTagSuggestionReviewResponse,
     EventTagAssignment,
     TagCreate,
     TagGroupCreate,
@@ -775,6 +777,74 @@ def reject_tag_suggestion(
         event=event,
         event_title=event.title if event else "Unknown",
     )
+
+
+@router.post(
+    "/api/admin/tags/suggestions/bulk-review",
+    response_model=BulkTagSuggestionReviewResponse,
+)
+def bulk_review_tag_suggestions(
+    body: BulkTagSuggestionReviewRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Approve or reject multiple tag suggestions in a single transaction.
+
+    Free-text suggestions (no tag_id) cannot be bulk-approved — they are
+    counted as skipped. All other pending suggestions are processed.
+    """
+    from datetime import datetime
+
+    if body.action not in ("approve", "reject"):
+        raise HTTPException(
+            status_code=422, detail="action must be 'approve' or 'reject'"
+        )
+    if not body.ids:
+        return BulkTagSuggestionReviewResponse(ok=0, skipped=0)
+
+    suggestions = session.exec(
+        select(TagSuggestion).where(TagSuggestion.id.in_(body.ids))
+    ).all()
+
+    now = datetime.utcnow()
+    ok = 0
+    skipped = 0
+
+    for suggestion in suggestions:
+        if suggestion.status != "pending":
+            skipped += 1
+            continue
+
+        if body.action == "approve":
+            tag_id = suggestion.tag_id
+            if not tag_id:
+                # Free-text suggestion — requires manual tag assignment
+                skipped += 1
+                continue
+            # Validate tag is event-scoped
+            tag = session.get(Tag, tag_id)
+            if not tag:
+                skipped += 1
+                continue
+            # Create EventTag idempotently
+            existing = session.exec(
+                select(EventTag).where(
+                    EventTag.event_id == suggestion.event_id,
+                    EventTag.tag_id == tag_id,
+                )
+            ).first()
+            if not existing:
+                session.add(EventTag(event_id=suggestion.event_id, tag_id=tag_id))
+            suggestion.status = "approved"
+        else:
+            suggestion.status = "rejected"
+
+        suggestion.reviewed_at = now
+        session.add(suggestion)
+        ok += 1
+
+    session.commit()
+    return BulkTagSuggestionReviewResponse(ok=ok, skipped=skipped)
 
 
 # ── Admin: Tag synonyms (heuristic suggester) ────────────────────────

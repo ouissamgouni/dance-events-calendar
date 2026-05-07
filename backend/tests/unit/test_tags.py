@@ -397,3 +397,166 @@ class TestHeroFilterMetadata:
 
         data = _group_to_response(group)
         assert [t.slug for t in data.tags] == ["c", "a", "b"]
+
+
+@pytest.mark.unit
+class TestBulkReviewTagSuggestions:
+    def _make_suggestion(self, id, tag_id=1, status="pending"):
+        return TagSuggestion(
+            id=id,
+            event_id="evt-001",
+            tag_id=tag_id,
+            status=status,
+            submitter_device_id="dev-x",
+        )
+
+    def test_bulk_approve_pending_suggestions(self, admin_client):
+        c, session = admin_client
+        s1 = self._make_suggestion(id=10, tag_id=1)
+        s2 = self._make_suggestion(id=11, tag_id=2)
+        tag1 = _make_tag(id=1)
+        tag2 = _make_tag(id=2, slug="class", label="Class")
+        event = _make_event()
+
+        session.exec.return_value.all.return_value = [s1, s2]
+        session.exec.return_value.first.return_value = None  # no existing EventTag
+        session.get.side_effect = lambda model, id: {
+            (Tag, 1): tag1,
+            (Tag, 2): tag2,
+            (CachedEvent, "evt-001"): event,
+        }.get((model, id))
+
+        resp = c.post(
+            "/api/admin/tags/suggestions/bulk-review",
+            json={"ids": [10, 11], "action": "approve"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] == 2
+        assert data["skipped"] == 0
+        assert s1.status == "approved"
+        assert s2.status == "approved"
+        event_tags = [a for a in session._added if isinstance(a, EventTag)]
+        assert len(event_tags) == 2
+
+    def test_bulk_reject_pending_suggestions(self, admin_client):
+        c, session = admin_client
+        s1 = self._make_suggestion(id=20, tag_id=1)
+        s2 = self._make_suggestion(id=21, tag_id=1)
+
+        session.exec.return_value.all.return_value = [s1, s2]
+
+        resp = c.post(
+            "/api/admin/tags/suggestions/bulk-review",
+            json={"ids": [20, 21], "action": "reject"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] == 2
+        assert data["skipped"] == 0
+        assert s1.status == "rejected"
+        assert s2.status == "rejected"
+
+    def test_bulk_approve_skips_free_text_suggestions(self, admin_client):
+        """Free-text suggestions (no tag_id) cannot be bulk-approved — counted as skipped."""
+        c, session = admin_client
+        free_text_suggestion = TagSuggestion(
+            id=30,
+            event_id="evt-001",
+            tag_id=None,
+            free_text="lindy hop",
+            status="pending",
+            submitter_device_id="dev-x",
+        )
+        normal = self._make_suggestion(id=31, tag_id=1)
+        tag = _make_tag(id=1)
+        event = _make_event()
+
+        session.exec.return_value.all.return_value = [free_text_suggestion, normal]
+        session.exec.return_value.first.return_value = None
+        session.get.side_effect = lambda model, id: {
+            (Tag, 1): tag,
+            (CachedEvent, "evt-001"): event,
+        }.get((model, id))
+
+        resp = c.post(
+            "/api/admin/tags/suggestions/bulk-review",
+            json={"ids": [30, 31], "action": "approve"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] == 1
+        assert data["skipped"] == 1
+        assert free_text_suggestion.status == "pending"
+        assert normal.status == "approved"
+
+    def test_bulk_review_skips_already_reviewed_suggestions(self, admin_client):
+        """Suggestions that are not pending are skipped."""
+        c, session = admin_client
+        already_approved = self._make_suggestion(id=40, status="approved")
+        pending = self._make_suggestion(id=41, tag_id=1)
+        tag = _make_tag(id=1)
+        event = _make_event()
+
+        session.exec.return_value.all.return_value = [already_approved, pending]
+        session.exec.return_value.first.return_value = None
+        session.get.side_effect = lambda model, id: {
+            (Tag, 1): tag,
+            (CachedEvent, "evt-001"): event,
+        }.get((model, id))
+
+        resp = c.post(
+            "/api/admin/tags/suggestions/bulk-review",
+            json={"ids": [40, 41], "action": "approve"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] == 1
+        assert data["skipped"] == 1
+
+    def test_bulk_review_empty_ids_returns_zero(self, admin_client):
+        c, session = admin_client
+
+        resp = c.post(
+            "/api/admin/tags/suggestions/bulk-review",
+            json={"ids": [], "action": "reject"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ok"] == 0
+        assert data["skipped"] == 0
+
+    def test_bulk_review_invalid_action_rejected(self, admin_client):
+        c, session = admin_client
+        session.exec.return_value.all.return_value = []
+
+        resp = c.post(
+            "/api/admin/tags/suggestions/bulk-review",
+            json={"ids": [1], "action": "delete"},
+        )
+        assert resp.status_code == 422
+
+    def test_bulk_approve_skips_existing_event_tag(self, admin_client):
+        """If the EventTag already exists, no duplicate is added but suggestion is still approved."""
+        c, session = admin_client
+        s = self._make_suggestion(id=50, tag_id=1)
+        tag = _make_tag(id=1)
+        event = _make_event()
+        existing_et = EventTag(event_id="evt-001", tag_id=1)
+
+        session.exec.return_value.all.return_value = [s]
+        session.exec.return_value.first.return_value = existing_et
+        session.get.side_effect = lambda model, id: {
+            (Tag, 1): tag,
+            (CachedEvent, "evt-001"): event,
+        }.get((model, id))
+
+        resp = c.post(
+            "/api/admin/tags/suggestions/bulk-review",
+            json={"ids": [50], "action": "approve"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["ok"] == 1
+        new_ets = [a for a in session._added if isinstance(a, EventTag)]
+        assert len(new_ets) == 0  # no duplicate added
+        assert s.status == "approved"

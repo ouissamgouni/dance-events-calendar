@@ -19,3 +19,10 @@ calendars:
     enabled: true
     default_tags:
       - "scope:local"
+  - id: "0b45c3f50802bc67a86e921fe6cd0f9c6d1a0d05c2e922407677d95af78ee5ac@group.cal\
+      endar.google.com"
+    name: "Bachata"
+    color: "#db2777"
+    enabled: true
+    default_tags:
+      - "dance-style:bachata"
