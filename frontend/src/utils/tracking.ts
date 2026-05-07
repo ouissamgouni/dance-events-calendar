@@ -1,6 +1,6 @@
 import { trackEventView, trackEventSave, trackEventAttendance, trackLinkClick, trackExport } from '../api';
 import { getDeviceId } from './deviceId';
-import { umamiTrack } from './umami';
+import { isAnalyticsDisabled, umamiTrack } from './umami';
 
 /**
  * ── Analytics conventions ────────────────────────────────────────────────
@@ -28,6 +28,12 @@ import { umamiTrack } from './umami';
  * up-to-date regardless of CookieConsent module initialisation timing or HMR state.
  */
 function readConsent(): { analytics: boolean; personalization: boolean } {
+    // Admin sessions are excluded from analytics entirely so admin moderation
+    // activity (page views, event clicks, saves, ratings) does not pollute
+    // the product KPIs and ranking signals derived from these events.
+    if (isAnalyticsDisabled()) {
+        return { analytics: false, personalization: false };
+    }
     try {
         const match = document.cookie.match(/(?:^|;\s*)cc_cookie=([^;]+)/);
         if (match) {

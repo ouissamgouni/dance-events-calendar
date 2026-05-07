@@ -11,6 +11,7 @@ from backend.api.schemas import (
     EventLinkClickRequest,
     EventExportRequest,
 )
+from backend.config.loader import get_admin_email
 from backend.db.database import get_session
 from backend.db.models import (
     EventAttendance,
@@ -28,6 +29,17 @@ from backend.services.ip_geolocation import geolocate_ip
 router = APIRouter(prefix="/api", tags=["tracking"])
 
 limiter = Limiter(key_func=get_remote_address)
+
+
+def _is_admin(user: User | None) -> bool:
+    """Admin sessions are excluded from analytics so moderation activity
+    does not skew product KPIs and ranking signals. Functional state
+    (UserSavedEvent, UserEventAttendance) is still maintained — only the
+    analytics rows and geolocation lookups are skipped."""
+    if user is None:
+        return False
+    admin_email = get_admin_email()
+    return bool(admin_email) and user.email == admin_email
 
 
 async def _update_view_geo(view_id: int, ip: str) -> None:
@@ -71,7 +83,10 @@ async def track_event_view(
     payload: EventViewRequest,
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
+    if _is_admin(current_user):
+        return {"status": "skipped", "reason": "admin"}
     view = EventView(
         event_id=payload.event_id,
         device_id=payload.device_id,
@@ -93,7 +108,7 @@ def track_event_save(
     session: Session = Depends(get_session),
     current_user: User | None = Depends(get_current_user_optional),
 ):
-    if payload.record_analytics:
+    if payload.record_analytics and not _is_admin(current_user):
         session.add(
             EventSave(
                 event_id=payload.event_id,
@@ -157,7 +172,7 @@ def track_event_attendance(
     session: Session = Depends(get_session),
     current_user: User | None = Depends(get_current_user_optional),
 ):
-    if payload.record_analytics:
+    if payload.record_analytics and not _is_admin(current_user):
         session.add(
             EventAttendance(
                 event_id=payload.event_id,
@@ -232,7 +247,10 @@ async def track_link_click(
     payload: EventLinkClickRequest,
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
+    if _is_admin(current_user):
+        return {"status": "skipped", "reason": "admin"}
     click = EventLinkClick(
         event_id=payload.event_id,
         url=payload.url,
@@ -252,7 +270,10 @@ def track_export(
     request: Request,
     payload: EventExportRequest,
     session: Session = Depends(get_session),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
+    if _is_admin(current_user):
+        return {"status": "skipped", "reason": "admin"}
     export = EventExport(
         format=payload.format,
         event_count=payload.event_count,

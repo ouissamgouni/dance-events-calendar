@@ -19,6 +19,23 @@ let umamiLoaded = false;
  */
 let baseContext: Record<string, string | number | boolean> = {};
 
+/**
+ * When true, ALL analytics output is suppressed: Umami script load, page
+ * views, custom events, identify calls, and the server-side `/track/*`
+ * POSTs gated via `isAnalyticsDisabled()` in `tracking.ts`. Set to true
+ * for admin sessions so admin moderation activity does not skew the
+ * product analytics that drive UX decisions and ranking signals.
+ */
+let analyticsDisabled = false;
+
+export function setAnalyticsDisabled(disabled: boolean): void {
+    analyticsDisabled = disabled;
+}
+
+export function isAnalyticsDisabled(): boolean {
+    return analyticsDisabled;
+}
+
 export function setUmamiBaseContext(ctx: Record<string, string | number | boolean>): void {
     baseContext = { ...baseContext, ...ctx };
 }
@@ -44,6 +61,7 @@ function isDebugMode(): boolean {
  */
 export function loadUmami(): void {
     if (umamiLoaded) return;
+    if (analyticsDisabled) return;
 
     const websiteId = import.meta.env.VITE_UMAMI_WEBSITE_ID as string | undefined;
     const umamiUrl = import.meta.env.VITE_UMAMI_URL as string | undefined;
@@ -74,6 +92,7 @@ export function loadUmami(): void {
  * Properties: low-cardinality primitives only. Never include PII or free text.
  */
 export function umamiTrack(event: string, props?: Record<string, string | number | boolean>): void {
+    if (analyticsDisabled) return;
     const merged = { ...baseContext, ...(props ?? {}) };
     if (isDebugMode() || (import.meta.env.DEV && !window.umami)) {
         console.debug('[umami] track', event, merged);
@@ -85,6 +104,7 @@ export function umamiTrack(event: string, props?: Record<string, string | number
 
 /** Send a page view for the current URL to Umami. No-ops if not loaded. */
 export function umamiPageView(): void {
+    if (analyticsDisabled) return;
     if (window.umami) {
         const websiteId = import.meta.env.VITE_UMAMI_WEBSITE_ID as string | undefined;
         window.umami.track({
@@ -103,6 +123,7 @@ export function umamiPageView(): void {
  * Umami v2+ supports `window.umami.identify`; older builds will silently no-op.
  */
 export function umamiIdentify(userId: string): void {
+    if (analyticsDisabled) return;
     if (isDebugMode() || (import.meta.env.DEV && !window.umami)) {
         console.debug('[umami] identify', userId);
     }

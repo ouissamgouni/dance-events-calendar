@@ -7,7 +7,7 @@ import {
     type AuthUser,
 } from '../api';
 import { rotateDeviceId } from '../utils/deviceId';
-import { clearUmamiBaseContext, setUmamiBaseContext, umamiIdentify } from '../utils/umami';
+import { clearUmamiBaseContext, setAnalyticsDisabled, setUmamiBaseContext, umamiIdentify } from '../utils/umami';
 import {
     trackLoginCompleted,
     trackLogout,
@@ -49,10 +49,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .then((u) => {
                 if (generation.current === gen) {
                     setUser(u);
-                    // Restore Umami session identity on page reload (no event fired —
-                    // this is not a new login, just session restoration).
-                    if (u.user_id) umamiIdentify(u.user_id);
-                    setUmamiBaseContext({ is_authenticated: true });
+                    // Exclude admin sessions from analytics entirely (Umami
+                    // load, page views, custom events, and server-side
+                    // /track/* POSTs) so moderation activity does not skew
+                    // product KPIs.
+                    setAnalyticsDisabled(u.is_admin === true);
+                    if (u.is_admin === true) {
+                        clearUmamiBaseContext();
+                    } else {
+                        // Restore Umami session identity on page reload (no event fired —
+                        // this is not a new login, just session restoration).
+                        if (u.user_id) umamiIdentify(u.user_id);
+                        setUmamiBaseContext({ is_authenticated: true });
+                    }
                 }
             })
             .catch(() => {
@@ -75,6 +84,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const u = await apiLogin(credential, deviceId, mockEmail, mockName);
         setUser(u);
         setLoading(false);
+        // Admin sessions are excluded from analytics — see fetchMe handler above.
+        setAnalyticsDisabled(u.is_admin === true);
+        if (u.is_admin === true) {
+            clearUmamiBaseContext();
+            return;
+        }
         // Analytics: distinguish first-time signup from returning login, then
         // identify the Umami session by internal user id (no PII).
         const method: AuthMethod = mockEmail ? 'dev' : 'google';
@@ -96,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // activity that happened during this user's session.
         rotateDeviceId();
         clearUmamiBaseContext();
+        setAnalyticsDisabled(false);
         setUser(null);
     }, []);
 
@@ -104,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await apiDeleteMe();
         rotateDeviceId();
         clearUmamiBaseContext();
+        setAnalyticsDisabled(false);
         setUser(null);
     }, []);
 
