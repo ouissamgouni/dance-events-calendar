@@ -185,11 +185,22 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                 onTagsUpdated={handleTagsUpdated}
                                 compact
                             />
-                            {event.latitude != null && event.longitude != null && (
-                                <div className="mt-4 h-[300px] border border-gray-200 overflow-hidden">
-                                    <EventMap events={[event]} />
-                                </div>
-                            )}
+                            <div className="mt-4 border border-gray-200 overflow-hidden">
+                                {event.latitude != null && event.longitude != null ? (
+                                    <div className="h-[300px]">
+                                        <EventMap events={[event]} />
+                                    </div>
+                                ) : (
+                                    <div className="px-3 py-4 bg-slate-50">
+                                        <p className="text-xs font-medium text-slate-700">Map unavailable</p>
+                                        <p className="mt-1 text-xs text-slate-500">
+                                            {event.location
+                                                ? 'This event has a location text but is not geocoded yet.'
+                                                : 'This event has no location set yet.'}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
                         </>
                     )}
                 </div>
