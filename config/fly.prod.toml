@@ -39,10 +39,7 @@ primary_region = "cdg"
 [[services.scheduled_jobs]]
   timeout = "1h"
   cron = "0 */15 * * * ?"
-  http = {
-    method = "POST"
-    uri = "/admin/trigger-sync"
-  }
+  http = { method = "POST", uri = "/admin/trigger-sync" }
 
 [[vm]]
   size = "shared-cpu-1x"
