@@ -162,14 +162,22 @@ tasks:
     internal: true
     vars:
       ENV: "{{.ENV}}"
+      COMPONENT: "{{.COMPONENT | default \"\"}}"
     cmds:
       - |
         ENV="{{.ENV}}"
+        COMPONENT="{{.COMPONENT}}"
         case "$ENV" in
           prod)    BRANCH=main ;;
           staging) BRANCH=develop ;;
           *)
             echo "❌ Internal error: ENV must be prod|staging (got '$ENV')"
+            exit 1 ;;
+        esac
+        case "$COMPONENT" in
+          ""|db|backend|frontend) ;;
+          *)
+            echo "❌ COMPONENT must be db, backend, or frontend (got '$COMPONENT')"
             exit 1 ;;
         esac
         echo "Fetching deployment refs for $ENV..."
@@ -180,9 +188,16 @@ tasks:
         if [ -n "$LATEST" ]; then
           LATEST_NAME=$(git describe --tags --always "$LATEST" 2>/dev/null || git rev-parse --short=7 "$LATEST")
         fi
+
+        if [ -n "$COMPONENT" ]; then
+          COMPONENTS="$COMPONENT"
+        else
+          COMPONENTS="db backend frontend"
+        fi
+
         printf "\n%-12s %-22s %-22s %-10s %s\n" "Component" "Released (latest tag)" "Deployed" "Drift" "When"
         echo "------------------------------------------------------------------------------------------"
-        for COMP in db backend frontend; do
+        for COMP in $COMPONENTS; do
           REF_PATH="refs/deploys/$ENV/$COMP"
           # Latest released tag for this component (per-component, fall back to legacy bare vX.Y.Z for prod)
           RELEASED="(none)"
@@ -223,6 +238,24 @@ tasks:
       - task: _status
         vars: { ENV: "prod" }
 
+  prod:status:db:
+    desc: "Show status for currently deployed prod DB component."
+    cmds:
+      - task: _status
+        vars: { ENV: "prod", COMPONENT: "db" }
+
+  prod:status:backend:
+    desc: "Show status for currently deployed prod backend component."
+    cmds:
+      - task: _status
+        vars: { ENV: "prod", COMPONENT: "backend" }
+
+  prod:status:frontend:
+    desc: "Show status for currently deployed prod frontend component."
+    cmds:
+      - task: _status
+        vars: { ENV: "prod", COMPONENT: "frontend" }
+
   staging:status:
     desc: "Show what is currently deployed to staging per component (deployed SHA +
       drift vs origin/develop)."
@@ -242,6 +275,173 @@ tasks:
           echo "(never deployed)"
           exit 1
         fi
+
+  _status-diff-prod:
+    internal: true
+    vars:
+      REF: "{{.REF}}"
+      COMPONENT: "{{.COMPONENT | default \"\"}}"
+    cmds:
+      - |
+        TARGET_REF="{{.REF}}"
+        COMPONENT="{{.COMPONENT}}"
+
+        if [ -z "$TARGET_REF" ]; then
+          TARGET_REF="origin/main"
+        fi
+
+        case "$COMPONENT" in
+          ""|db|backend|frontend) ;;
+          *)
+            echo "❌ COMPONENT must be db, backend, or frontend (got '$COMPONENT')"
+            exit 1
+            ;;
+        esac
+
+        echo "Fetching prod deployment refs..."
+        git fetch origin "+refs/deploys/prod/*:refs/deploys/prod/*" --quiet 2>/dev/null || true
+        git fetch origin main --tags --quiet 2>/dev/null || true
+
+        if ! git rev-parse --verify "$TARGET_REF^{commit}" >/dev/null 2>&1; then
+          echo "❌ Target ref '$TARGET_REF' could not be resolved to a commit."
+          echo "   Try REF=origin/main or REF=<tag>."
+          exit 1
+        fi
+
+        TARGET_SHA=$(git rev-parse "$TARGET_REF^{commit}")
+        TARGET_SHORT=$(git rev-parse --short=7 "$TARGET_SHA")
+
+        if [ -n "$COMPONENT" ]; then
+          COMPONENTS="$COMPONENT"
+        else
+          COMPONENTS="db backend frontend"
+        fi
+
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "  PROD STATUS DIFF"
+        echo "  Target: $TARGET_REF ($TARGET_SHORT)"
+        echo "═══════════════════════════════════════════════════════════════"
+
+        for COMP in $COMPONENTS; do
+          REF_PATH="refs/deploys/prod/$COMP"
+          echo ""
+          echo "[$COMP]"
+
+          if ! DEPLOYED_SHA=$(git rev-parse "$REF_PATH" 2>/dev/null); then
+            echo "  deployed: (never deployed)"
+            echo "  target:   $TARGET_REF ($TARGET_SHORT)"
+            continue
+          fi
+
+          DEPLOYED_SHORT=$(git rev-parse --short=7 "$DEPLOYED_SHA")
+          DEPLOYED_NAME=$(git tag -l --points-at "$DEPLOYED_SHA" "${COMP}-v*" --sort=-version:refname | head -1)
+          if [ -z "$DEPLOYED_NAME" ]; then
+            DEPLOYED_NAME=$(git tag -l --points-at "$DEPLOYED_SHA" "v*" --sort=-version:refname | head -1)
+          fi
+          if [ -z "$DEPLOYED_NAME" ]; then
+            DEPLOYED_NAME="$DEPLOYED_SHORT"
+          fi
+          TARGET_ONLY=$(git rev-list --count "$DEPLOYED_SHA..$TARGET_SHA" 2>/dev/null || echo "?")
+          PROD_ONLY=$(git rev-list --count "$TARGET_SHA..$DEPLOYED_SHA" 2>/dev/null || echo "?")
+
+          if [ "$DEPLOYED_SHA" = "$TARGET_SHA" ]; then
+            RELATION="up-to-date"
+          elif [ "$PROD_ONLY" = "0" ]; then
+            RELATION="prod behind target by $TARGET_ONLY commit(s)"
+          elif [ "$TARGET_ONLY" = "0" ]; then
+            RELATION="prod ahead of target by $PROD_ONLY commit(s)"
+          else
+            RELATION="diverged (prod-only: $PROD_ONLY, target-only: $TARGET_ONLY)"
+          fi
+
+          echo "  deployed: $DEPLOYED_NAME ($DEPLOYED_SHORT)"
+          echo "  target:   $TARGET_REF ($TARGET_SHORT)"
+          echo "  relation: $RELATION"
+
+          if [ "$DEPLOYED_SHA" = "$TARGET_SHA" ]; then
+            echo "  commits:  none"
+            echo "  files:    none"
+            continue
+          fi
+
+          echo "  commits:"
+          COMMITS=$(git log --left-right --cherry-pick --oneline "$DEPLOYED_SHA...$TARGET_SHA" 2>/dev/null || true)
+          if [ -n "$COMMITS" ]; then
+            printf '%s\n' "$COMMITS" | sed 's/^/    /'
+          else
+            echo "    (none)"
+          fi
+
+          echo "  files:"
+          FILES=$(git diff --name-status "$DEPLOYED_SHA" "$TARGET_SHA" 2>/dev/null || true)
+          if [ -n "$FILES" ]; then
+            printf '%s\n' "$FILES" | sed 's/^/    /'
+          else
+            echo "    (none)"
+          fi
+        done
+        echo ""
+
+  prod:status:diff:
+    desc: "Show git diff report between deployed prod refs and a target ref
+      (default: origin/main)."
+    vars:
+      REF: "{{if .REF}}{{.REF}}{{else}}{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}origin/main{{end}}{{end}}"
+    cmds:
+      - task: _status-diff-prod
+        vars: { REF: "{{.REF}}" }
+
+  prod:status:diff:db:
+    desc: "Alias of deploy:prod:status:db:diff (backward compatibility)."
+    vars:
+      REF: "{{if .REF}}{{.REF}}{{else}}{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}origin/main{{end}}{{end}}"
+    cmds:
+      - task: prod:status:db:diff
+        vars: { REF: "{{.REF}}" }
+
+  prod:status:diff:backend:
+    desc: "Alias of deploy:prod:status:backend:diff (backward compatibility)."
+    vars:
+      REF: "{{if .REF}}{{.REF}}{{else}}{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}origin/main{{end}}{{end}}"
+    cmds:
+      - task: prod:status:backend:diff
+        vars: { REF: "{{.REF}}" }
+
+  prod:status:diff:frontend:
+    desc: "Alias of deploy:prod:status:frontend:diff (backward compatibility)."
+    vars:
+      REF: "{{if .REF}}{{.REF}}{{else}}{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}origin/main{{end}}{{end}}"
+    cmds:
+      - task: prod:status:frontend:diff
+        vars: { REF: "{{.REF}}" }
+
+  prod:status:db:diff:
+    desc: "Show git diff report between prod DB deploy ref and a target ref
+      (default: origin/main)."
+    vars:
+      REF: "{{if .REF}}{{.REF}}{{else}}{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}origin/main{{end}}{{end}}"
+    cmds:
+      - task: _status-diff-prod
+        vars: { REF: "{{.REF}}", COMPONENT: "db" }
+
+  prod:status:backend:diff:
+    desc: "Show git diff report between prod backend deploy ref and a target ref
+      (default: origin/main)."
+    vars:
+      REF: "{{if .REF}}{{.REF}}{{else}}{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}origin/main{{end}}{{end}}"
+    cmds:
+      - task: _status-diff-prod
+        vars: { REF: "{{.REF}}", COMPONENT: "backend" }
+
+  prod:status:frontend:diff:
+    desc: "Show git diff report between prod frontend deploy ref and a target ref
+      (default: origin/main)."
+    vars:
+      REF: "{{if .REF}}{{.REF}}{{else}}{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}origin/main{{end}}{{end}}"
+    cmds:
+      - task: _status-diff-prod
+        vars: { REF: "{{.REF}}", COMPONENT: "frontend" }
 
   # ══════════════════════════════════════════════════════════════════════════
   # PRIMITIVES (`:remote:cwd:*`)
