@@ -1,14 +1,11 @@
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useSavedEvents } from '../context/SavedEventsContext';
-import { useAttendingEvents } from '../context/AttendingEventsContext';
-import SavedEventsFab from './SavedEventsFab';
+import MineButton from './MineButton';
 
 /**
- * Always-visible floating "Mine" CTA at the bottom-right of the viewport.
- * Wraps `SavedEventsFab` so the floater and the fixed top-bar entry point
- * are literally the same UI — same label, same badges, same click target
- * (navigates straight to `/my-calendar`).
+ * Always-visible floating Mine CTA at the bottom-right of the viewport.
+ * Wraps `MineButton` so the floater and the fixed top-bar entry point
+ * share the same label, counts, icons, and navigation target.
  *
  * - Visible on every route where the FAB makes sense (including `/`).
  * - Hidden on routes where it would be redundant (`/my-calendar`) or out of
@@ -17,12 +14,10 @@ import SavedEventsFab from './SavedEventsFab';
  *   remainder of the session (sessionStorage-backed). Reload to bring it
  *   back.
  */
-const DISMISS_KEY = 'myCalendarFab.dismissed';
+const DISMISS_KEY = 'floatingMineButton.dismissed';
 
-export default function MyCalendarFab() {
+export default function FloatingMineButton() {
     const location = useLocation();
-    const { savedEventIds } = useSavedEvents();
-    const { attendingEventIds } = useAttendingEvents();
     const [dismissed, setDismissed] = useState<boolean>(() => {
         if (typeof window === 'undefined') return false;
         return window.sessionStorage.getItem(DISMISS_KEY) === '1';
@@ -38,9 +33,6 @@ export default function MyCalendarFab() {
     if (hideOnRoute) return null;
     if (dismissed) return null;
 
-    const total = new Set([...savedEventIds, ...attendingEventIds]).size;
-    if (total === 0) return null;
-
     const handleDismiss = () => {
         setDismissed(true);
         try { window.sessionStorage.setItem(DISMISS_KEY, '1'); } catch { /* ignore quota */ }
@@ -48,7 +40,7 @@ export default function MyCalendarFab() {
 
     return (
         <div className="fixed bottom-4 right-4 z-[8000] flex items-center shadow-lg">
-            <SavedEventsFab />
+            <MineButton />
             <button
                 type="button"
                 onClick={handleDismiss}

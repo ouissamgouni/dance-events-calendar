@@ -298,16 +298,16 @@ export default function MyCalendar() {
                 {/* Anonymous users: dismissable invite to sign in to keep calendar across devices. */}
                 {!user && allEventIds.length > 0 && !signInNudgeDismissed && (
                     <div className="mb-4 flex flex-wrap items-center gap-3 border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                        <p className="flex-1 min-w-[14rem]">
+                            <span className="font-medium text-slate-800">Your calendar is taking shape.</span>{' '}
+                            You&apos;ve already added {allEventIds.length} event{allEventIds.length === 1 ? '' : 's'}. Sign in to keep them synced across devices and ready to share.
+                        </p>
                         <Link
                             to={`/login?next=${encodeURIComponent('/my-calendar')}`}
                             className="shrink-0 bg-blue-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-blue-600 transition"
                         >
                             Sign in
                         </Link>
-                        <p className="flex-1 min-w-[14rem]">
-                            <span className="font-medium text-slate-800">Keep your calendar across devices.</span>{' '}
-                            Sign in to sync your saved events, “I’m going” list, and share link wherever you go.
-                        </p>
                         <button
                             type="button"
                             onClick={dismissSignInNudge}
@@ -373,7 +373,7 @@ export default function MyCalendar() {
                         </p>
                         <Link
                             to="/"
-                            className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold px-5 py-2 shadow-sm transition"
+                            className="mt-6 inline-flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold px-5 py-2 shadow-sm transition"
                         >
                             Browse events →
                         </Link>

@@ -53,10 +53,10 @@ export default function SignUpBanner() {
         >
             <p className="min-w-0 sm:truncate truncate sm:whitespace-normal">
                 <span className="hidden sm:inline">
-                    Sign in to save events across your devices, see who else is going, share your calendar, and rate events.
+                    Sign in to save events across your devices, see who else is going, share your calendar, rate events, get notifications and more.
                 </span>
                 <span className="sm:hidden">
-                    Sign in to save, see who's going, and rate.
+                    Sign in to save, see who's going, rate, share and more.
                 </span>
             </p>
             <div className="flex items-center gap-2 shrink-0">

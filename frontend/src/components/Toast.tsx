@@ -86,7 +86,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                     return (
                         <div
                             key={t.id}
-                            className={`pointer-events-auto rounded-lg border shadow-lg px-3 py-2 text-sm flex gap-2 ${VARIANT_STYLES[variant]}`}
+                            className={`pointer-events-auto border shadow-lg px-3 py-2 text-sm flex gap-2 ${VARIANT_STYLES[variant]}`}
                             role="status"
                         >
                             <span className={`mt-1.5 inline-block w-2 h-2 rounded-full flex-shrink-0 ${VARIANT_DOT[variant]}`} />

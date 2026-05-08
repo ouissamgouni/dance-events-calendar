@@ -1,99 +1,181 @@
 base_week: 0
 events:
-- id: evt-share-001
-  calendar_id: salsa-cal-001
-  title: Salsa Social Friday
-  description: |
-    Weekly social with DJ Mambo. Beginners welcome.
-    The dance floor is open from the first beat to the last.
-    All skill levels are welcome — no partner or prior experience needed.
-    Expect a warm, inclusive crowd of local and visiting dancers.
-    The venue features a full bar, cloakroom, and water stations throughout.
-    Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
-  location: Dance Studio, 10 Rue de Rivoli, Paris, France
-  latitude: 48.8566
-  longitude: 2.3522
-  start: w0 Fri 21:00
-  end: w0 Sat 01:00
-  price_is_free: true
-- id: evt-share-002
-  calendar_id: bachata-cal-002
-  title: Bachata Workshop
-  description: |
-    Sensual workshop with Carlos & Maria. Intermediate level.
-    Each session is broken into clear, manageable steps with individual feedback.
-    The instructor will address both leading and following roles equally.
-    Comfortable dance shoes with a smooth, non-rubber sole are essential.
-    No prior partner is required — participants rotate throughout the session.
-    Water and light refreshments are provided during breaks.
-    Spaces are strictly limited to maintain a high quality of teaching.
-    Video recording of the technique segments is encouraged for personal review.
-    A brief Q&A with the instructor follows each teaching block.
-    Check the event page for warm-up videos and preparation tips in advance.
-    Book early — this event has sold out in previous editions.
-  location: Tanzhaus, Friedrichstr. 100, Berlin, Germany
-  latitude: 52.52
-  longitude: 13.405
-  start: w0 Sat 14:00
-  end: w0 Sat 17:00
-  price_is_free: false
-  price_min: 25
-  price_max: 35
-  price_currency: EUR
-- id: evt-share-003
-  calendar_id: salsa-cal-001
-  title: Cuban Night
-  description: |
-    Live Cuban band + rueda for all levels.
-    The dance floor is open from the first beat to the last.
-    All skill levels are welcome — no partner or prior experience needed.
-    Expect a warm, inclusive crowd of local and visiting dancers.
-    The venue features a full bar, cloakroom, and water stations throughout.
-    Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
-  location: Skybar, Av. de la Liberté, Brussels, Belgium
-  latitude: 50.8503
-  longitude: 4.3517
-  start: w1 Sat 20:00
-  end: w1 Sun 00:00
-  price_is_free: false
-  price_min: 10
-  price_currency: EUR
+  - id: evt-share-001
+    calendar_id: salsa-cal-001
+    title: Salsa Social Friday
+    description: |
+      Weekly social with DJ Mambo. Beginners welcome.
+      The dance floor is open from the first beat to the last.
+      All skill levels are welcome — no partner or prior experience needed.
+      Expect a warm, inclusive crowd of local and visiting dancers.
+      The venue features a full bar, cloakroom, and water stations throughout.
+      Dress smart-casual; smooth-soled dance shoes strongly recommended.
+      Follow the organiser's social pages for last-minute updates and playlists.
+    location: Dance Studio, 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w0 Fri 21:00
+    end: w0 Sat 01:00
+    price_is_free: true
+  - id: evt-share-002
+    calendar_id: bachata-cal-002
+    title: Bachata Workshop
+    description: |
+      Sensual workshop with Carlos & Maria. Intermediate level.
+      Each session is broken into clear, manageable steps with individual feedback.
+      The instructor will address both leading and following roles equally.
+      Comfortable dance shoes with a smooth, non-rubber sole are essential.
+      No prior partner is required — participants rotate throughout the session.
+      Water and light refreshments are provided during breaks.
+      Spaces are strictly limited to maintain a high quality of teaching.
+      Video recording of the technique segments is encouraged for personal review.
+      A brief Q&A with the instructor follows each teaching block.
+      Check the event page for warm-up videos and preparation tips in advance.
+      Book early — this event has sold out in previous editions.
+    location: Tanzhaus, Friedrichstr. 100, Berlin, Germany
+    latitude: 52.52
+    longitude: 13.405
+    start: w0 Sat 14:00
+    end: w0 Sat 17:00
+    price_is_free: false
+    price_min: 25
+    price_max: 35
+    price_currency: EUR
+  - id: evt-share-003
+    calendar_id: salsa-cal-001
+    title: Cuban Night
+    description: |
+      Live Cuban band + rueda for all levels.
+      The dance floor is open from the first beat to the last.
+      All skill levels are welcome — no partner or prior experience needed.
+      Expect a warm, inclusive crowd of local and visiting dancers.
+      The venue features a full bar, cloakroom, and water stations throughout.
+      Dress smart-casual; smooth-soled dance shoes strongly recommended.
+      Follow the organiser's social pages for last-minute updates and playlists.
+    location: Skybar, Av. de la Liberté, Brussels, Belgium
+    latitude: 50.8503
+    longitude: 4.3517
+    start: w1 Sat 20:00
+    end: w1 Sun 00:00
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+  - id: evt-share-004
+    calendar_id: bachata-cal-002
+    title: Bachata Beginners Bootcamp
+    description: |
+      Half-day crash course for absolute beginners. Partner rotations every 20 min.
+      Each session is broken into clear, manageable steps with individual feedback.
+      The instructor will address both leading and following roles equally.
+      Comfortable dance shoes with a smooth, non-rubber sole are essential.
+      No prior partner is required — participants rotate throughout the session.
+      Water and light refreshments are provided during breaks.
+      Spaces are strictly limited to maintain a high quality of teaching.
+      Video recording of the technique segments is encouraged for personal review.
+      A brief Q&A with the instructor follows each teaching block.
+      Book early — this event has sold out in previous editions.
+    location: London Dance Academy, 12 Soho Square, London, UK
+    latitude: 51.5143
+    longitude: -0.1323
+    start: w1 Sun 15:00
+    end: w1 Sun 18:00
+    price_is_free: false
+    price_min: 30
+    price_currency: GBP
+  - id: evt-share-005
+    calendar_id: salsa-cal-001
+    title: Salsa Tuesday Night
+    description: |
+      Weekly Tuesday social with resident DJ. Free entry all night.
+      The dance floor is open from the first beat to the last.
+      All skill levels are welcome — no partner or prior experience needed.
+      Expect a warm, inclusive crowd of local and visiting dancers.
+      The venue features a full bar, cloakroom, and water stations throughout.
+      Dress smart-casual; smooth-soled dance shoes strongly recommended.
+      Follow the organiser's social pages for last-minute updates and playlists.
+    location: Sala Rossa, Calle de Atocha 34, Madrid, Spain
+    latitude: 40.4168
+    longitude: -3.7038
+    start: w2 Tue 20:30
+    end: w2 Wed 00:00
+    price_is_free: true
+  - id: evt-share-006
+    calendar_id: bachata-cal-002
+    title: Bachata Fusion Social
+    description: |
+      Bachata sensual meets urban kiz in a late-night fusion social. 2 rooms.
+      The dance floor is open from the first beat to the last.
+      All skill levels are welcome — no partner or prior experience needed.
+      Expect a warm, inclusive crowd of local and visiting dancers.
+      The venue features a full bar, cloakroom, and water stations throughout.
+      Dress smart-casual; smooth-soled dance shoes strongly recommended.
+      Follow the organiser's social pages for last-minute updates and playlists.
+    location: Terrazza Trastevere, Piazza Trilussa, Rome, Italy
+    latitude: 41.8892
+    longitude: 12.4691
+    start: w3 Fri 22:00
+    end: w3 Sat 02:00
+    price_is_free: false
+    price_min: 12
+    price_currency: EUR
 attendances:
-- event_id: evt-share-003
-  email: dancer01@example.com
-  share_publicly: true
-- event_id: evt-share-003
-  email: dancer02@example.com
-  share_publicly: true
-- event_id: evt-share-003
-  email: dancer03@example.com
-  share_publicly: true
-- event_id: evt-share-003
-  email: dancer04@example.com
-  share_publicly: true
-- event_id: evt-share-003
-  email: dancer05@example.com
-  share_publicly: true
-- event_id: evt-share-003
-  email: dancer06@example.com
-  share_publicly: true
-- event_id: evt-share-003
-  email: dancer07@example.com
-  share_publicly: true
-- event_id: evt-share-003
-  email: dancer08@example.com
-  share_publicly: true
-- event_id: evt-share-003
-  email: dancer09@example.com
-  share_publicly: true
-- event_id: evt-share-003
-  email: dancer10@example.com
-  share_publicly: true
-- event_id: evt-share-003
-  email: dancer11@example.com
-  share_publicly: true
-- event_id: evt-share-003
-  email: dancer12@example.com
-  share_publicly: true
+  - event_id: evt-share-003
+    email: dancer01@example.com
+    share_publicly: true
+  - event_id: evt-share-003
+    email: dancer02@example.com
+    share_publicly: true
+  - event_id: evt-share-003
+    email: dancer03@example.com
+    share_publicly: true
+  - event_id: evt-share-003
+    email: dancer04@example.com
+    share_publicly: true
+  - event_id: evt-share-003
+    email: dancer05@example.com
+    share_publicly: true
+  - event_id: evt-share-003
+    email: dancer06@example.com
+    share_publicly: true
+  - event_id: evt-share-003
+    email: dancer07@example.com
+    share_publicly: true
+  - event_id: evt-share-003
+    email: dancer08@example.com
+    share_publicly: true
+  - event_id: evt-share-003
+    email: dancer09@example.com
+    share_publicly: true
+  - event_id: evt-share-003
+    email: dancer10@example.com
+    share_publicly: true
+  - event_id: evt-share-003
+    email: dancer11@example.com
+    share_publicly: true
+  - event_id: evt-share-003
+    email: dancer12@example.com
+    share_publicly: true
+  - event_id: evt-share-005
+    email: dancer01@example.com
+    share_publicly: true
+  - event_id: evt-share-005
+    email: dancer02@example.com
+    share_publicly: true
+  - event_id: evt-share-005
+    email: dancer03@example.com
+    share_publicly: false
+  - event_id: evt-share-005
+    email: dancer04@example.com
+    share_publicly: false
+  - event_id: evt-share-006
+    email: dancer05@example.com
+    share_publicly: true
+  - event_id: evt-share-006
+    email: dancer06@example.com
+    share_publicly: true
+  - event_id: evt-share-006
+    email: dancer07@example.com
+    share_publicly: true
+  - event_id: evt-share-006
+    email: dancer08@example.com
+    share_publicly: false

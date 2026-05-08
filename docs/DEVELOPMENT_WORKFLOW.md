@@ -104,11 +104,12 @@ task start:dev:debug    # same + debugpy on port 5678
 task start:dev:mock     # same but with mock calendar (no Google creds needed)
 ```
 
-Add `NEW_BROWSER=1` to any `start:*` command that opens a browser to get a fresh, fully-isolated Chrome session (separate cookie jar and localStorage — useful for testing multi-user flows):
+Add `BROWSERS=N` to any `start:*` command that opens a browser to control how many browser instances open. `BROWSERS=0` (default) reuses your existing Chrome window; `BROWSERS=N` opens N fresh, fully-isolated Chrome sessions (separate cookie jar and localStorage — useful for testing multi-user flows):
 
 ```bash
-task start:dev NEW_BROWSER=1
-SCENARIO=share-im-going task start:scenario NEW_BROWSER=1
+task start:dev BROWSERS=1          # one fresh isolated session
+task start:dev BROWSERS=3          # three isolated sessions at once
+SCENARIO=share-im-going task start:scenario BROWSERS=2
 ```
 
 ### 3. Attach VSCode Debugger
@@ -272,7 +273,8 @@ scenarios/<name>/
 ```bash
 task start:scenario                                       # default scenario (local code + Docker DB)
 SCENARIO=locations-map task start:scenario                # named scenario (own DB + ports)
-SCENARIO=share-im-going task start:scenario NEW_BROWSER=1 # open in a fresh isolated Chrome session
+SCENARIO=share-im-going task start:scenario BROWSERS=1    # open one fresh isolated Chrome session
+SCENARIO=share-im-going task start:scenario BROWSERS=2    # open two isolated sessions (multi-user)
 
 # From a git ref (all-Docker)
 task start:scenario:ref -- feature/my-branch
@@ -409,7 +411,8 @@ Tasks that prompt for confirmation before executing:
 | Command | Description |
 |---------|-------------|
 | `task start:dev` | DB + backend (reload) + frontend |
-| `task start:dev NEW_BROWSER=1` | Same, opens in a fresh isolated Chrome session |
+| `task start:dev BROWSERS=1` | Same, opens one fresh isolated Chrome session |
+| `task start:dev BROWSERS=N` | Same, opens N fresh isolated Chrome sessions |
 | `task start:dev:debug` | Same + debugpy on port 5678 |
 | `task start:dev:mock` | Same with mock calendar (no Google creds) |
 | `task start:dev:db` | Dev database only |
@@ -443,7 +446,8 @@ Tasks that prompt for confirmation before executing:
 | `task deploy:staging:local` | Build from develop + docker-compose up |
 | `task deploy:staging:local:ref -- <ref>` | Build from git ref + docker-compose up |
 | `task deploy:staging:local:dirty` | Build from working directory + docker-compose up |
-| `task start:staging:local NEW_BROWSER=1` | Same, opens in a fresh isolated Chrome session |
+| `task start:staging:local BROWSERS=1` | Same, opens one fresh isolated Chrome session |
+| `task start:staging:local BROWSERS=N` | Same, opens N fresh isolated Chrome sessions |
 | `task start:staging:local` | Start staging with existing images |
 | `task stop:staging:local` | Stop staging stack |
 | `task stop:staging:local:volumes` | Stop + destroy data ⚠️ |
@@ -492,7 +496,8 @@ Tasks that prompt for confirmation before executing:
 | Command | Description |
 |---------|-------------|
 | `task start:scenario` | Local code + Docker DB + live reload |
-| `task start:scenario NEW_BROWSER=1` | Same, opens in a fresh isolated Chrome session |
+| `task start:scenario BROWSERS=1` | Same, opens one fresh isolated Chrome session |
+| `task start:scenario BROWSERS=N` | Same, opens N fresh isolated Chrome sessions |
 | `task start:scenario:ref -- <ref>` | All-Docker from git ref |
 | `task stop:scenario` | Stop one scenario |
 | `task stop:scenario:all` | Stop all running scenarios |

@@ -121,7 +121,7 @@ export default function PostRsvpPopover({
             role="dialog"
             aria-label="You're going"
             style={{ position: 'fixed', top: pos.top, left: pos.left, width: POPOVER_WIDTH }}
-            className="z-[1100] rounded-lg border border-rose-200 bg-white p-3 shadow-xl text-left"
+            className="z-[1100] border border-slate-200 bg-white p-3 shadow-xl text-left"
         >
             <button
                 type="button"
@@ -141,7 +141,7 @@ export default function PostRsvpPopover({
                 <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); onShare(); }}
-                    className="flex-1 rounded-md bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 transition"
+                    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 transition"
                 >
                     Share with friends
                 </button>
@@ -149,7 +149,7 @@ export default function PostRsvpPopover({
                     <Link
                         to={`/login?next=${next}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="text-xs px-2.5 py-1.5 rounded-md bg-blue-500 text-white hover:bg-blue-600 font-semibold whitespace-nowrap"
+                        className="text-xs px-2.5 py-1.5 bg-blue-500 text-white hover:bg-blue-600 font-semibold whitespace-nowrap"
                     >
                         Sign in
                     </Link>

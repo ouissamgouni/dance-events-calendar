@@ -272,7 +272,7 @@ export default function GoingButton({
             role="dialog"
             aria-label="Attendance visibility"
             style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left, width: POPOVER_WIDTH }}
-            className="z-[1000] rounded-lg border border-slate-200 bg-white p-3 shadow-xl text-left"
+            className="z-[1000] border border-slate-200 bg-white p-3 shadow-xl text-left"
         >
             <p className="text-xs font-medium text-slate-800 mb-2">
                 {popoverKind === 'confirm' ? "You're going!" : 'Edit visibility'}
@@ -311,14 +311,14 @@ export default function GoingButton({
                 <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setPopoverKind(null); }}
-                    className="text-xs px-2 py-1 rounded text-slate-600 hover:bg-slate-100"
+                    className="text-xs px-2 py-1 text-slate-600 hover:bg-slate-100"
                 >
                     Cancel
                 </button>
                 <button
                     type="button"
                     onClick={popoverKind === 'confirm' ? confirmGoing : applyEditShare}
-                    className="text-xs px-3 py-1 rounded bg-emerald-600 text-white hover:bg-emerald-700"
+                    className="text-xs px-3 py-1 bg-emerald-600 text-white hover:bg-emerald-700"
                 >
                     {popoverKind === 'confirm' ? "I'm going" : 'Save'}
                 </button>

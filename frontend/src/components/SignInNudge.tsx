@@ -172,7 +172,7 @@ export default function SignInNudge({ anchorRef, trigger, onClose }: Props) {
             role="dialog"
             aria-label="Sign in suggestion"
             style={{ position: 'fixed', top: pos.top, left: pos.left, width: POPOVER_WIDTH }}
-            className="z-[1000] rounded-lg border border-slate-200 bg-white p-3 shadow-xl text-left"
+            className="z-[1000] border border-slate-200 bg-white p-3 shadow-xl text-left"
         >
             <p className="text-xs font-semibold text-slate-800">{HEADLINE[trigger]}</p>
             <ul className="mt-1.5 space-y-0.5 text-[11px] text-slate-600 list-disc pl-4">

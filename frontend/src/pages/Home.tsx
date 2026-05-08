@@ -15,7 +15,7 @@ import AdminEventDetailPanel from '../components/AdminEventDetailPanel';
 import DateRangePicker from '../components/DateRangePicker';
 import EventListPanel from '../components/EventListPanel';
 import TagFilterPills from '../components/TagFilterPills';
-import SavedEventsFab from '../components/SavedEventsFab';
+import MineButton from '../components/MineButton';
 import SuggestEventModal from '../components/SuggestEventModal';
 import EventAnchoredDetailPanel from '../components/EventAnchoredDetailPanel';
 
@@ -407,7 +407,7 @@ export default function Home() {
                                 </Link>
                             </div>
                             <div className="flex gap-1 bg-slate-200 p-1 shrink-0 w-fit">
-                                <SavedEventsFab />
+                                <MineButton />
                                 <button
                                     onClick={() => setShowSuggestModal(true)}
                                     className="hidden sm:inline-flex px-3 py-1 text-sm transition bg-white text-slate-900 font-medium shadow-sm hover:bg-slate-50"

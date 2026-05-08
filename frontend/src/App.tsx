@@ -14,7 +14,7 @@ import { StatusBar } from './components/StatusBar';
 import InstagramBadge from './components/InstagramBadge';
 import ProtectedRoute from './components/ProtectedRoute';
 import SignUpBanner from './components/SignUpBanner';
-import MyCalendarFab from './components/MyCalendarFab';
+import FloatingMineButton from './components/FloatingMineButton';
 import Home from './pages/Home';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
@@ -153,7 +153,7 @@ function AppShell() {
           </footer>
         </main>
         <StatusBar />
-        <MyCalendarFab />
+        <FloatingMineButton />
       </div>
     </>
   );
