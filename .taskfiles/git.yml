@@ -276,6 +276,7 @@ tasks:
     desc: Tag a release on main and push (e.g., task git:release:tag -- v1.2.0)
     vars:
       VERSION: "{{if .VERSION}}{{.VERSION}}{{else}}{{.CLI_ARGS}}{{end}}"
+    deps: [ _provision-main-worktree ]
     preconditions:
       - sh: "[ -n \"{{.VERSION}}\" ]"
         msg: |
@@ -308,19 +309,22 @@ tasks:
       - |
         VERSION="{{.VERSION}}"
         echo "Updating main worktree..."
-        if [ -d "{{.WORKTREE_MAIN}}" ]; then
-          cd {{.WORKTREE_MAIN}} && git pull origin main
-        else
-          git fetch origin main
+        if [ ! -d "{{.WORKTREE_MAIN}}" ]; then
+          echo "❌ Missing {{.WORKTREE_MAIN}} after worktree setup."
+          echo "   Refusing to use current checkout for release tagging."
+          exit 1
         fi
+        cd {{.WORKTREE_MAIN}}
+        git fetch origin main --quiet
+        git merge --ff-only origin/main --quiet
       - |
         VERSION="{{.VERSION}}"
-        if [ -d "{{.WORKTREE_MAIN}}" ]; then
-          cd {{.WORKTREE_MAIN}}
-        else
-          git checkout main
-          git pull origin main
+        if [ ! -d "{{.WORKTREE_MAIN}}" ]; then
+          echo "❌ Missing {{.WORKTREE_MAIN}} after worktree setup."
+          echo "   Refusing to use current checkout for release tagging."
+          exit 1
         fi
+        cd {{.WORKTREE_MAIN}}
         git tag -a "$VERSION" -m "Release $VERSION"
         git push origin "$VERSION"
         echo ""
@@ -340,6 +344,7 @@ tasks:
       TAG: "{{.COMPONENT}}-{{.VERSION}}"
       REUSE: "{{.REUSE | default \"0\"}}"
       FORCE: "{{.FORCE | default \"0\"}}"
+    deps: [ _provision-main-worktree ]
     preconditions:
       - sh: "echo \"{{.COMPONENT}}\" | grep -Eq \"^(db|backend|frontend)$\""
         msg: "COMPONENT must be db, backend, or frontend"
@@ -365,14 +370,14 @@ tasks:
           git fetch origin --tags --quiet 2>/dev/null || true
 
         # Pick working dir
-        if [ -d "{{.WORKTREE_MAIN}}" ]; then
-          cd {{.WORKTREE_MAIN}}
-          git pull origin main --quiet
-        else
-          git fetch origin main --quiet
-          git checkout main --quiet
-          git pull origin main --quiet
+        if [ ! -d "{{.WORKTREE_MAIN}}" ]; then
+          echo "❌ Missing {{.WORKTREE_MAIN}} after worktree setup."
+          echo "   Refusing to use current checkout for release tagging."
+          exit 1
         fi
+        cd {{.WORKTREE_MAIN}}
+        git fetch origin main --quiet
+        git merge --ff-only origin/main --quiet
         MAIN_HEAD=$(git rev-parse HEAD)
 
         TAG_LOCAL=$(git rev-parse --verify "refs/tags/$TAG" 2>/dev/null || true)
@@ -427,12 +432,6 @@ tasks:
               exit 0
               ;;
             f|F|force)
-              printf "Re-type the version to confirm forced retag (%s): " "{{.VERSION}}"
-              read -r CONFIRM
-              if [ "$CONFIRM" != "{{.VERSION}}" ]; then
-                echo "❌ Confirmation mismatch. Aborting."
-                exit 1
-              fi
               echo "⚠️  Moving $TAG → $MAIN_HEAD"
               git tag -d "$TAG" 2>/dev/null || true
               if [ -n "$TAG_REMOTE" ]; then
@@ -488,69 +487,76 @@ tasks:
   # Worktree Management
   # ════════════════════════════════════════════════════════════════
 
-  worktree:setup:
-    desc: Create persistent worktrees for main and develop branches
-    cmds:
-      - mkdir -p {{.WORKTREE_DIR}}
-      - |
-        if ! git rev-parse HEAD >/dev/null 2>&1; then
-          echo "⚠️  No commits yet — skipping worktree setup."
-          echo "   Run this again after making your initial commit."
-          exit 0
-        fi
-        if [ ! -d "{{.WORKTREE_MAIN}}" ]; then
-          echo "Creating worktree for main branch..."
-          git worktree add {{.WORKTREE_MAIN}} main
-          echo "✅ Created {{.WORKTREE_MAIN}}"
-        else
-          echo "✅ Worktree {{.WORKTREE_MAIN}} already exists"
-        fi
-        if [ ! -d "{{.WORKTREE_DEVELOP}}" ]; then
-          echo "Creating worktree for develop branch..."
-          if ! git rev-parse --verify develop >/dev/null 2>&1; then
-            echo "⚠️  develop branch doesn't exist, creating from main..."
-            git branch develop main
-          fi
-          git worktree add {{.WORKTREE_DEVELOP}} develop
-          echo "✅ Created {{.WORKTREE_DEVELOP}}"
-        else
-          echo "✅ Worktree {{.WORKTREE_DEVELOP}} already exists"
-        fi
-      - |
-        echo ""
-        echo "═══════════════════════════════════════════════════════════════"
-        echo "✅ Worktrees ready"
-        echo ""
-        echo "   {{.WORKTREE_MAIN}}     → main branch"
-        echo "   {{.WORKTREE_DEVELOP}} → develop branch"
-        echo ""
-        echo "These directories are used for safe builds/deploys without"
-        echo "disrupting your current working directory."
-        echo "═══════════════════════════════════════════════════════════════"
-
-  worktree:setup:ref:
-    desc: Create temporary worktree for specific git ref
+  worktree:create:
+    desc: "Create a worktree for any branch (e.g., task git:worktree:create -- main,
+      or task git:worktree:create -- origin/develop)"
     vars:
-      REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
-    deps:
-      - task: _resolve-ref
-        vars: { REF: "{{.REF}}" }
+      BRANCH: "{{if .BRANCH}}{{.BRANCH}}{{else}}{{.CLI_ARGS}}{{end}}"
     cmds:
       - mkdir -p {{.WORKTREE_DIR}}
       - |
-        REF="{{.REF}}"
-        SHA=$(git rev-parse --short=7 "$REF")
-        WORKTREE_PATH="{{.WORKTREE_DIR}}/ref-$SHA"
+        BRANCH="{{.BRANCH}}"
+        if [ -z "$BRANCH" ]; then
+          echo "❌ BRANCH required"
+          echo "   Usage: task git:worktree:create -- <branch>"
+          echo "   Examples:"
+          echo "      task git:worktree:create -- main"
+          echo "      task git:worktree:create -- origin/develop"
+          echo "      task git:worktree:create -- feature/my-feature"
+          exit 1
+        fi
+
+        if ! git rev-parse HEAD >/dev/null 2>&1; then
+          echo "⚠️  No commits yet — cannot create worktree."
+          exit 1
+        fi
+
+        # Fetch to ensure origin refs are current
+        git fetch origin "$BRANCH" --quiet 2>/dev/null || true
+
+        # Determine worktree path and target ref
+        case "$BRANCH" in
+          origin/*)
+            # Detached worktree from remote ref
+            REF="$BRANCH"
+            SHORT=$(git rev-parse --short=7 "$REF" 2>/dev/null || echo "unknown")
+            WORKTREE_PATH="{{.WORKTREE_DIR}}/ref-$SHORT"
+            ;;
+          *)
+            # Named local branch worktree
+            REF="$BRANCH"
+            WORKTREE_PATH="{{.WORKTREE_DIR}}/$BRANCH"
+            ;;
+        esac
 
         if [ -d "$WORKTREE_PATH" ]; then
-          echo "✅ Worktree for $REF ($SHA) already exists at $WORKTREE_PATH"
+          echo "✅ Worktree for $BRANCH already exists at $WORKTREE_PATH"
+          exit 0
+        fi
+
+        # Check if branch is currently checked out in primary worktree
+        CUR_BRANCH=$(git branch --show-current)
+        if [ "$CUR_BRANCH" = "$BRANCH" ]; then
+          echo "⚠️  $BRANCH is checked out in primary worktree."
+          echo "   Creating worktree as detached from origin/$BRANCH for reproducibility..."
+          git worktree add --detach "$WORKTREE_PATH" "origin/$BRANCH"
+          echo "✅ Created $WORKTREE_PATH (detached @ origin/$BRANCH)"
         else
-          echo "Creating temporary worktree for $REF ($SHA)..."
+          # Ensure local branch exists; create from origin if needed
+          if ! git rev-parse --verify "$REF" >/dev/null 2>&1; then
+            if git rev-parse --verify "origin/$BRANCH" >/dev/null 2>&1; then
+              echo "Creating local branch $BRANCH from origin/$BRANCH..."
+              git branch "$BRANCH" "origin/$BRANCH"
+            else
+              echo "❌ Branch $BRANCH not found locally or on origin"
+              exit 1
+            fi
+          fi
+
+          echo "Creating worktree for $BRANCH..."
           git worktree add "$WORKTREE_PATH" "$REF"
           echo "✅ Created $WORKTREE_PATH"
         fi
-
-        echo "$WORKTREE_PATH"
 
   worktree:clean:
     desc: Remove all worktrees
@@ -564,20 +570,6 @@ tasks:
           done
           rm -rf {{.WORKTREE_DIR}}
           echo "✅ All worktrees removed"
-        else
-          echo "No worktrees to clean"
-        fi
-
-  worktree:clean:ref:
-    desc: Remove temporary ref worktrees (keeps main/develop)
-    cmds:
-      - |
-        if [ -d "{{.WORKTREE_DIR}}" ]; then
-          for WT in {{.WORKTREE_DIR}}/ref-*/; do
-            [ -d "$WT" ] && git worktree remove --force "$WT" 2>/dev/null && echo "Removed $WT" || true
-          done
-          git worktree prune
-          echo "✅ Ref worktrees cleaned"
         else
           echo "No worktrees to clean"
         fi
@@ -606,14 +598,16 @@ tasks:
           echo "Updating main..."
           cd {{.WORKTREE_MAIN}} && git pull origin main
         else
-          echo "⚠️  main worktree not found — run task git:worktree:setup"
+          echo "⚠️  main worktree not found — create it with:"
+          echo "   task git:worktree:create -- main"
         fi
 
         if [ -d "{{.WORKTREE_DEVELOP}}" ]; then
           echo "Updating develop..."
           cd {{.WORKTREE_DEVELOP}} && git pull origin develop
         else
-          echo "⚠️  develop worktree not found — run task git:worktree:setup"
+          echo "⚠️  develop worktree not found — create it with:"
+          echo "   task git:worktree:create -- develop"
         fi
 
         echo "✅ Worktrees updated"
@@ -655,6 +649,18 @@ tasks:
           exit 1
         fi
         git push -u origin "$BRANCH"
+
+  _provision-main-worktree:
+    internal: true
+    cmds:
+      - task: worktree:create
+        vars: { BRANCH: main }
+
+  _provision-develop-worktree:
+    internal: true
+    cmds:
+      - task: worktree:create
+        vars: { BRANCH: develop }
 
   _resolve-ref:
     internal: true

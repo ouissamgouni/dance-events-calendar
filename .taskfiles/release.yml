@@ -116,12 +116,6 @@ tasks:
           printf "Type the version to release [%s]: " "$SUGGESTED"
           read -r INPUT
           VERSION="${INPUT:-$SUGGESTED}"
-          printf "Confirm by retyping the version: "
-          read -r CONFIRM
-          if [ "$CONFIRM" != "$VERSION" ]; then
-            echo "❌ Confirmation does not match ('$CONFIRM' vs '$VERSION'). Aborting."
-            exit 1
-          fi
           echo ""
           echo "→ Releasing ${COMPONENT}-$VERSION"
         fi
