@@ -1,28 +1,129 @@
 version: "3"
 
+# ════════════════════════════════════════════════════════════════════════════
+# open:session — open one or more fresh, fully-isolated Chrome sessions
+# pointing at any environment.
+#
+# Each session has its own --user-data-dir → independent cookie jar /
+# localStorage. Better than incognito (which shares state within a Chrome
+# process). Profile dirs live under /tmp/chrome-* until you close the
+# window or run `task open:clean`.
+#
+# All sub-tasks accept BROWSERS=N (default 1). N=2 is useful for
+# multi-user flows (Alice + Bob).
+#
+#   task open:session:dev               # http://localhost:5173
+#   task open:session:scenario          # http://localhost:<scenario-web-port>
+#       SCENARIO=share-im-going BROWSERS=2
+#   task open:session:staging:local     # http://localhost:3001
+#   task open:session:staging:remote    # https://develop.joinmovida.com
+#   task open:session:prod              # https://joinmovida.com
+#
+# `task open:session` (no suffix) is kept as a back-compat alias for
+# the scenario form.
+# ════════════════════════════════════════════════════════════════════════════
+
 vars:
   SCENARIO_PORTS_SH: .taskfiles/scenario_ports.sh
 
 tasks:
-  session:
-    desc: >-
-      Open a fresh isolated Chrome session for a scenario. Usage: task
-      open:session SCENARIO=share-im-going [N=2] N lets you open multiple
-      independent sessions for the same scenario (e.g. Alice=N=1, Bob=N=2). Each
-      gets its own cookie jar / localStorage.
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Internal: open BROWSERS isolated sessions pointing at URL
+  # ─────────────────────────────────────────────────────────────────────
+  _open:
+    internal: true
+    cmds:
+      - |
+        URL="{{.URL}}"
+        LABEL="{{.LABEL | default `session`}}"
+        BROWSERS="{{.BROWSERS | default `1`}}"
+        if ! echo "$BROWSERS" | grep -Eq '^[0-9]+$' || [ "$BROWSERS" -lt 1 ]; then
+          echo "❌ BROWSERS must be a positive integer (got '$BROWSERS')"
+          exit 1
+        fi
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "  Opening $BROWSERS fresh isolated session(s)"
+        echo "  Target: $URL"
+        echo "  Label : $LABEL"
+        echo "═══════════════════════════════════════════════════════════════"
+        i=1
+        while [ "$i" -le "$BROWSERS" ]; do
+          {{.ROOT_DIR}}/.taskfiles/open-fresh-session.sh "$URL" "${LABEL}-${i}"
+          i=$((i+1))
+        done
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Per-environment shortcuts
+  # ─────────────────────────────────────────────────────────────────────
+
+  session:dev:
+    desc: "Open BROWSERS=N (default 1) fresh isolated Chrome sessions on dev
+      (http://localhost:5173)."
+    dotenv: [ "config/base.env", "config/dev.env" ]
+    cmds:
+      - task: _open
+        vars:
+          URL: "http://localhost:${FRONTEND_PORT:-5173}"
+          LABEL: "dev"
+          BROWSERS: "{{.BROWSERS | default \"1\"}}"
+
+  session:scenario:
+    desc: "Open BROWSERS=N (default 1) fresh isolated Chrome sessions on a scenario.
+      SCENARIO=name."
     vars:
       SCENARIO: "{{.SCENARIO | default \"default\"}}"
-      N: "{{.N | default \"1\"}}"
     cmds:
       - |
         source {{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
-        URL="http://localhost:${SC_WEB_PORT}"
-        LABEL="{{.SCENARIO}}-{{.N}}"
-        echo "═══════════════════════════════════════════════════════════════"
-        echo "  Fresh session #{{.N}} → scenario: {{.SCENARIO}}"
-        echo "  URL: $URL"
-        echo "═══════════════════════════════════════════════════════════════"
-        {{.ROOT_DIR}}/.taskfiles/open-fresh-session.sh "$URL" "$LABEL"
+        task open:_open URL="http://localhost:${SC_WEB_PORT}" LABEL="{{.SCENARIO}}" BROWSERS="{{.BROWSERS | default `1`}}"
+
+  session:staging:local:
+    desc: "Open BROWSERS=N (default 1) fresh isolated Chrome sessions on local
+      staging (docker-compose, http://localhost:3001)."
+    dotenv: [ "config/base.env", "config/staging.local.env" ]
+    cmds:
+      - task: _open
+        vars:
+          URL: "http://localhost:${FRONTEND_PORT:-3001}"
+          LABEL: "staging-local"
+          BROWSERS: "{{.BROWSERS | default \"1\"}}"
+
+  session:staging:remote:
+    desc: "Open BROWSERS=N (default 1) fresh isolated Chrome sessions on remote
+      staging (https://develop.joinmovida.com)."
+    cmds:
+      - task: _open
+        vars:
+          URL: "https://develop.joinmovida.com"
+          LABEL: "staging-remote"
+          BROWSERS: "{{.BROWSERS | default \"1\"}}"
+
+  session:prod:
+    desc: "Open BROWSERS=N (default 1) fresh isolated Chrome sessions on production
+      (https://joinmovida.com)."
+    cmds:
+      - task: _open
+        vars:
+          URL: "https://joinmovida.com"
+          LABEL: "prod"
+          BROWSERS: "{{.BROWSERS | default \"1\"}}"
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Back-compat: bare `open:session` defaults to scenario form (legacy
+  # callers that pass SCENARIO=... and N=index still work because the
+  # script de-dupes profile dirs by random suffix).
+  # ─────────────────────────────────────────────────────────────────────
+  session:
+    desc: "Alias of open:session:scenario (back-compat). Prefer the explicit form."
+    vars:
+      SCENARIO: "{{.SCENARIO | default \"default\"}}"
+      BROWSERS: "{{if .BROWSERS}}{{.BROWSERS}}{{else if .N}}{{.N}}{{else}}1{{end}}"
+    cmds:
+      - task: session:scenario
+        vars:
+          SCENARIO: "{{.SCENARIO}}"
+          BROWSERS: "{{.BROWSERS}}"
 
   clean:
     desc: Remove all temporary Chrome profile dirs created by open:session

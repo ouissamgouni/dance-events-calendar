@@ -8,16 +8,17 @@ This document describes the full workflow for the Movida project — from local 
 - [Quick Start](#quick-start)
 - [Environment Overview](#environment-overview)
 - [Env & Secrets Files](#env--secrets-files)
-- [Daily Development Workflow](#daily-development-workflow)
 - [Branching Strategy](#branching-strategy)
+- [Daily Development Workflow](#daily-development-workflow)
+- [Scenario Environment](#scenario-environment)
+- [Testing](#testing)
+- [Performance Testing](#performance-testing)
 - [Deployment](#deployment)
   - [Staging Local](#staging-local-docker-compose)
   - [Staging Remote](#staging-remote-fly--neon--cloudflare)
   - [Production Remote](#production-remote-fly--neon--cloudflare)
-- [Scenario Environment](#scenario-environment)
-- [Testing](#testing)
-- [Performance Testing](#performance-testing)
 - [Safety Features](#safety-features)
+- [Common Workflows](#common-workflows)
 - [Task Commands Reference](#task-commands-reference)
 - [Port Reference](#port-reference)
 - [Troubleshooting](#troubleshooting)
@@ -87,6 +88,27 @@ Each environment tier loads exactly its own files — no file appears in two tie
 
 ---
 
+## Branching Strategy
+
+```
+main (production)
+└── hotfix/*     → PR directly to main
+
+develop (integration)
+├── feature/*    → PR to develop
+└── fix/*        → PR to develop
+```
+
+| Type | Base | Command |
+|------|------|---------|
+| `feature/*` | develop | `task git:feature -- <name>` |
+| `fix/*` | develop | `task git:fix -- <name>` |
+| `hotfix/*` | main | `task git:hotfix -- <name>` |
+
+See [Common Workflows](#common-workflows) for end-to-end journeys built on top of this branching model.
+
+---
+
 ## Daily Development Workflow
 
 ### 1. Start your day
@@ -135,121 +157,6 @@ task git:pr             # push + open draft PR (auto-detects target branch)
 
 ```bash
 task stop:dev
-```
-
----
-
-## Branching Strategy
-
-```
-main (production)
-└── hotfix/*     → PR directly to main
-
-develop (integration)
-├── feature/*    → PR to develop
-└── fix/*        → PR to develop
-```
-
-| Type | Base | Command |
-|------|------|---------|
-| `feature/*` | develop | `task git:feature -- <name>` |
-| `fix/*` | develop | `task git:fix -- <name>` |
-| `hotfix/*` | main | `task git:hotfix -- <name>` |
-
----
-
-## Deployment
-
-### Staging Local (docker-compose)
-
-Validates the Docker images in a fully containerised stack before pushing to cloud.
-
-```bash
-task deploy:staging:local                    # build from develop branch
-task deploy:staging:local:ref -- feature/x  # build from any git ref
-task deploy:staging:local:dirty             # build from working directory (uncommitted)
-
-DRY_RUN=1 task deploy:staging:local        # preview without executing
-```
-
-Env files loaded: `secrets.env` + `.env.staging.local`
-
----
-
-### Staging Remote (Fly + Neon + Cloudflare)
-
-**Full deploy (all three components in sequence):**
-
-```bash
-task deploy:staging:remote
-```
-
-**Deploy only one component:**
-
-```bash
-task deploy:staging:remote:db        # alembic migrations → Neon develop branch
-task deploy:staging:remote:backend   # stage Fly secrets + fly deploy + smoke test
-task deploy:staging:remote:frontend  # build frontend + wrangler pages deploy --branch=develop
-```
-
-Env files loaded: `secrets.env` + `secrets.staging.remote.env`
-
-What `backend:staging:remote` does:
-1. `fly secrets import -c config/fly.staging.toml --stage` (filtered: no `VITE_*`, no `CLOUDFLARE_*`)
-2. `fly secrets set --stage GOOGLE_SERVICE_ACCOUNT_JSON=...`
-3. `fly deploy --remote-only -c config/fly.staging.toml` (staged secrets + code applied atomically)
-4. Smoke test: `GET https://movida-staging.fly.dev/health`
-
-URLs after deploy:
-- Backend: <https://movida-staging.fly.dev\>
-- Frontend: <https://develop.joinmovida.com\> (alias: <https://develop.movida.pages.dev\>)
-
-Verify:
-```bash
-task db:check:staging:remote    # migration state on Neon develop
-task logs:staging:remote        # fly logs stream
-task fly:staging:status         # machine status
-```
-
----
-
-### Production Remote (Fly + Neon + Cloudflare)
-
-**Full deploy (prompts for confirmation):**
-
-```bash
-task deploy:prod:remote
-```
-
-**Deploy only one component:**
-
-```bash
-task deploy:prod:remote:db        # alembic migrations → Neon main branch
-task deploy:prod:remote:backend   # stage Fly secrets + fly deploy + smoke test
-task deploy:prod:remote:frontend  # build frontend + wrangler pages deploy --branch=main
-```
-
-Env files loaded: `secrets.env` + `secrets.prod.env` + `.env.prod`
-
-URLs after deploy:
-- Backend: <https://movida.fly.dev\>
-- Frontend: <https://joinmovida.com\> (alias: <https://movida.pages.dev\>)
-
-Verify:
-```bash
-task db:check:prod
-task fly:logs
-task fly:status
-```
-
-**Release flow (local prod via docker-compose):**
-
-```bash
-task git:release:prepare    # create develop → main PR
-task git:release:ready      # mark ready for review
-task git:release:merge      # merge
-task git:release:tag -- v1.2.0
-task deploy:prod -- v1.2.0  # docker-compose local prod
 ```
 
 ---
@@ -385,6 +292,155 @@ task perf:staging
 
 ---
 
+## Deployment
+
+### Staging Local (docker-compose)
+
+Validates the Docker images in a fully containerised stack before pushing to cloud.
+
+```bash
+task deploy:staging:local                    # build from develop branch
+task deploy:staging:local:ref -- feature/x  # build from any git ref
+task deploy:staging:local:cwd             # build from working directory (uncommitted, current CWD)
+
+DRY_RUN=1 task deploy:staging:local        # preview without executing
+```
+
+Env files loaded: `secrets.env` + `.env.staging.local`
+
+---
+
+### Staging Remote (Fly + Neon + Cloudflare)
+
+All remote staging deploys are **isolated from your working directory**: the
+task creates a SHA-pinned worktree at `.worktrees/ref-<sha>` and runs every
+deploy command from inside it. Your local checkout, uncommitted changes, and
+current branch are never touched.
+
+Gates:
+
+- `REF` must be supplied and reachable from `origin/develop` (no feature branches)
+- `git fetch origin develop` runs automatically before validation
+
+**Full deploy (all three components in sequence):**
+
+```bash
+task deploy:staging:remote -- develop
+# or any develop commit / SHA:
+task deploy:staging:remote -- abc1234
+```
+
+No `git checkout` required — you can be on a feature branch with uncommitted
+changes and the staging deploy still runs reproducibly from the requested ref.
+
+**Deploy only one component:**
+
+```bash
+task deploy:staging:remote:db       -- develop  # alembic migrations → Neon develop branch
+task deploy:staging:remote:backend  -- develop  # stage Fly secrets + fly deploy + smoke test
+task deploy:staging:remote:frontend -- develop  # build frontend + wrangler pages deploy --branch=develop
+```
+
+Env files loaded: `secrets.env` + `secrets.staging.remote.env` (always read
+from your host repo, never from the worktree, since they are gitignored).
+
+What `backend:staging:remote` does:
+1. `fly secrets import -c config/fly.staging.toml --stage` (filtered: no `VITE_*`, no `CLOUDFLARE_*`)
+2. `fly secrets set --stage GOOGLE_SERVICE_ACCOUNT_JSON=...`
+3. `fly deploy --remote-only -c config/fly.staging.toml` (staged secrets + code applied atomically)
+4. Smoke test: `GET https://movida-staging.fly.dev/health`
+
+URLs after deploy:
+- Backend: <https://movida-staging.fly.dev\>
+- Frontend: <https://develop.joinmovida.com\> (alias: <https://develop.movida.pages.dev\>)
+
+Verify:
+```bash
+task db:check:staging:remote    # migration state on Neon develop
+task logs:staging:remote        # fly logs stream
+task fly:staging:status         # machine status
+```
+
+---
+
+### Production Remote (Fly + Neon + Cloudflare)
+
+Same worktree-isolated model as staging — your local checkout is never touched.
+
+**Components release independently.** Each component (`db`, `backend`, `frontend`) has its
+own version counter and its own annotated tag of the form `<component>-vX.Y.Z` on `main`.
+
+Gates (stricter than staging):
+
+- `REF` must be an **annotated** tag: `<component>-vX.Y.Z` (or legacy bare `vX.Y.Z`)
+- Tag's component prefix must match the deploy task (e.g. `backend-v1.2.0` for `deploy:prod:remote:backend`)
+- Tag must be reachable from `origin/main`
+- `git fetch origin main --tags` runs automatically before validation
+
+**Deploy a single component:**
+
+```bash
+task deploy:prod:remote:db       -- db-v1.2.0        # alembic migrations → Neon main branch
+task deploy:prod:remote:backend  -- backend-v1.2.0   # stage Fly secrets + fly deploy + smoke test
+task deploy:prod:remote:frontend -- frontend-v1.2.0  # build frontend + wrangler pages deploy --branch=main
+```
+
+Env files loaded: `secrets.env` + `secrets.prod.env` + `.env.prod` (always
+read from your host repo, never from the worktree).
+
+URLs after deploy:
+- Backend: <https://movida.fly.dev\>
+- Frontend: <https://joinmovida.com\> (alias: <https://movida.pages.dev\>)
+
+Verify:
+```bash
+task db:check:prod
+task fly:logs
+task fly:status
+```
+
+**Release flow (per-component):**
+
+Each component releases on its own cadence. The release task tags `main` with
+`<component>-vX.Y.Z` and then deploys it.
+
+```bash
+task git:release:prepare    # create develop → main PR
+task git:release:ready      # mark ready for review
+task git:release:merge      # merge develop → main
+
+# Per-component release (tag + deploy):
+task release:prod:backend  -- v1.2.0     # creates backend-v1.2.0, deploys backend
+task release:prod:frontend -- v1.2.0     # creates frontend-v1.2.0, deploys frontend
+task release:prod:db       -- v1.2.0     # creates db-v1.2.0, runs db migrations
+
+# Interactive (suggests next patch from latest <comp>-v* tag, retype-confirm):
+task release:prod:backend
+
+# Aggregate (prompts y/N for each component in db → backend → frontend order):
+task release:prod
+```
+
+**Inspecting releases vs deploys:**
+
+```bash
+task deploy:prod:status      # table: per-component released (latest tag) vs deployed (ref) vs drift
+task deploy:staging:status   # same for staging (no release tags — drift vs origin/develop)
+task deploy:prod:current        # one-line: current prod backend tag
+```
+
+Two distinct concepts:
+
+- **Released** (`<comp>-vX.Y.Z` tag): immutable, append-only — what's been blessed for release.
+- **Deployed** (`refs/deploys/prod/<comp>`): mutable pointer — what's actually running. Moves on every deploy, including rollbacks.
+
+A gap between *released* and *deployed* means a tag exists that hasn't been pushed yet (or has been rolled back).
+Each successful component deploy pushes the deployed SHA to its ref on `origin`,
+so every developer sees the same authoritative view (no local state files,
+no platform-specific introspection).
+
+---
+
 ## Safety Features
 
 All destructive operations support `DRY_RUN=1` to preview without executing:
@@ -399,8 +455,208 @@ Tasks that prompt for confirmation before executing:
 - All `db:reset:*`
 - All `stop:*:volumes`
 - `deploy:prod:remote`
-- `deploy:prod`
 - `stop:scenario`, `stop:scenario:all`
+
+---
+
+## Common Workflows
+
+End-to-end journeys from `git:feature` to a deployed release. Pick the one that
+matches the shape of your change. Steps that are common to most journeys
+(scenario QA, perf testing) are folded in where they normally happen, with
+links back to their dedicated sections for the full reference.
+
+### A. Feature or fix (full release — backend + frontend + DB)
+
+The canonical end-to-end journey. Use this when your change touches more than
+one component, or when you're unsure.
+
+```bash
+# 1. Branch off develop
+git checkout develop && git pull
+task git:feature -- my-feature              # or: task git:fix -- bug-123
+
+# 2. Code locally
+task start:dev                              # DB + backend + frontend, hot-reload
+#    ...edit, commit as you go...
+
+# 3. Fast tests + scenario QA
+task test                                   # unit (backend + frontend)
+task test:int:full                          # integration (isolated DB)
+SCENARIO=share-im-going task start:scenario # reproduce specific data/state
+#    → see Scenario Environment for the full list and authoring guide
+
+# 4. Push + draft PR → develop
+git add . && git commit -m "feat: …"
+task git:pr                                 # push + open draft PR
+task git:pr:checks                          # watch CI
+task git:pr:ready                           # mark ready, get review, merge
+
+# 5. Stage from develop
+task deploy:staging:remote -- develop       # db + backend + frontend
+task deploy:staging:status                  # confirm SHAs match develop
+#    → manual QA on https://develop.joinmovida.com
+
+# 6. (Optional) perf gate before promotion
+task perf:staging                           # see Performance Testing
+
+# 7. Promote develop → main
+task git:release:prepare                    # opens develop → main PR
+task git:release:ready
+task git:release:merge
+
+# 8. Tag + deploy per component
+task release:prod                           # interactive: prompts y/N for db, backend, frontend
+#    → enforces order: db → backend → frontend
+
+# 9. Verify
+task deploy:prod:status                     # released tag vs deployed SHA per component
+```
+
+Details: [Branching Strategy](#branching-strategy) · [Scenario Environment](#scenario-environment) · [Testing](#testing) · [Performance Testing](#performance-testing) · [Deployment](#deployment)
+
+### B. Backend-only change
+
+API/service code, no schema migration, no UI work.
+
+```bash
+task git:feature -- faster-search
+
+task start:dev:backend
+task test:unit:backend
+
+# Scenario QA when the change affects observable behaviour
+SCENARIO=event-suggestions task start:scenario
+
+# Perf gate when touching hot paths (list endpoints, geocoding, dedup, etc.)
+task perf:scenario:up                       # see Performance Testing
+task perf:run
+task perf:report
+task perf:scenario:down
+
+task git:pr && task git:pr:ready            # PR → develop, merge
+
+task deploy:staging:remote:backend -- develop
+task deploy:staging:status
+# (optional) task perf:staging
+
+task git:release:prepare && task git:release:merge
+task release:prod:backend                   # interactive: suggests next patch from latest backend-v*
+#    or explicit:  task release:prod:backend -- v1.4.0
+task deploy:prod:status                     # db + frontend rows show no drift — expected
+```
+
+### C. Frontend-only change
+
+UI/UX change, no API contract change.
+
+```bash
+task git:feature -- redesign-event-card
+
+task start:dev:frontend
+task test:unit:frontend
+
+# Multi-user / share flows benefit from isolated browsers
+SCENARIO=share-im-going task start:scenario BROWSERS=2
+
+task git:pr && task git:pr:ready
+
+task deploy:staging:remote:frontend -- develop
+task deploy:staging:status                  # manual QA on https://develop.joinmovida.com
+
+task git:release:prepare && task git:release:merge
+task release:prod:frontend
+task deploy:prod:status
+```
+
+### D. DB migration
+
+New alembic revision. Usually paired with a backend release in the same cycle.
+
+```bash
+task git:feature -- add-event-rating-column
+
+# Author + apply locally
+task db:migrate:dev
+task db:check:dev
+
+# Validate against scenario data so you catch backfill issues
+SCENARIO=event-rating task db:reset:scenario
+SCENARIO=event-rating task start:scenario
+
+task git:pr && task git:pr:ready
+
+task deploy:staging:remote:db -- develop
+task db:check:staging:remote
+
+task git:release:prepare && task git:release:merge
+task release:prod:db                        # → then release:prod:backend if backend code depends on it
+task db:check:prod
+```
+
+⚠️ When migrations and backend code ship together: **`db` first, then `backend`** — the new schema must be in place before the new code runs. `task release:prod` enforces this order automatically.
+
+### E. Hotfix on prod (urgent)
+
+Bug in production, must ship without waiting for develop.
+
+```bash
+task git:hotfix -- nullpointer-on-share     # branches from main
+#    ...fix + commit...
+
+task test
+task git:pr                                 # PR → main
+task git:pr:ready                           # review, merge
+
+task release:prod:backend                   # (or :frontend / :db) — patch bump
+task deploy:prod:status
+
+# Back-merge so develop has the fix
+git checkout develop && git pull
+git merge --no-ff origin/main && git push
+```
+
+### F. Rollback
+
+Re-deploy a previous tag. The deploy ref moves backward; release-tag history is untouched.
+
+```bash
+task deploy:prod:status                              # find the previous tag
+task deploy:prod:remote:backend -- backend-v1.3.0    # roll backend back
+task deploy:prod:status                              # backend now points at v1.3.0
+```
+
+### G. Local-stack validation (no remote)
+
+Validate the Docker images end-to-end before touching staging — useful when
+debugging container-only issues (entrypoints, env wiring, build args).
+
+```bash
+task deploy:staging:local                   # build from develop + docker-compose up
+task deploy:staging:local:cwd               # build from working directory (uncommitted)
+task stop:staging                           # tear down
+```
+
+### H. Infra-only redeploy (fly.toml, Dockerfile, env)
+
+When the change is **not** in source code — tweaking Fly memory/cpu/scaling,
+adjusting the Dockerfile, fixing env wiring — there's nothing worth tagging.
+Use the CWD path: it deploys the working directory as-is, with no git
+checkout, no tag bump, and no change to release history.
+
+```bash
+# Test on staging first
+task deploy:staging:remote:cwd:backend      # deploy CWD (uncommitted) to staging Fly app
+task deploy:staging:status                  # confirm
+
+# Apply to prod
+task deploy:prod:remote:cwd:backend         # deploy CWD (uncommitted) to prod Fly app
+# (or :db / :frontend for those components)
+```
+
+⚠️ Skips the release flow entirely — no `<comp>-vX.Y.Z` tag is created and
+`refs/deploys/prod/<comp>` still points at the last tagged release. Commit the
+infra change to `develop` afterwards so the next real release picks it up.
 
 ---
 
@@ -423,21 +679,45 @@ Tasks that prompt for confirmation before executing:
 
 ### Deploy — Staging Remote (atomic)
 
+All require `REF` (a develop commit). Runs from an isolated `.worktrees/ref-<sha>` — your working tree is not touched.
+
 | Command | Description |
 |---------|-------------|
-| `task deploy:staging:remote:db` | Alembic migrations → Neon develop |
-| `task deploy:staging:remote:backend` | Stage secrets + fly deploy + smoke test |
-| `task deploy:staging:remote:frontend` | Build + wrangler pages deploy --branch=develop |
-| `task deploy:staging:remote` | All three in sequence |
+| `task deploy:staging:remote:db -- <ref>` | Alembic migrations → Neon develop |
+| `task deploy:staging:remote:backend -- <ref>` | Stage secrets + fly deploy + smoke test |
+| `task deploy:staging:remote:frontend -- <ref>` | Build + wrangler pages deploy --branch=develop |
+| `task deploy:staging:remote -- <ref>` | All three in sequence |
 
 ### Deploy — Prod Remote (atomic)
 
+All require `REF` (an annotated tag `vX.Y.Z` on main). Runs from an isolated `.worktrees/ref-<sha>` — your working tree is not touched.
+
 | Command | Description |
 |---------|-------------|
-| `task deploy:prod:remote:db` | Alembic migrations → Neon main |
-| `task deploy:prod:remote:backend` | Stage secrets + fly deploy + smoke test |
-| `task deploy:prod:remote:frontend` | Build + wrangler pages deploy --branch=main |
-| `task deploy:prod:remote` | All three in sequence (prompts) |
+| `task deploy:prod:remote:db -- <tag>` | Alembic migrations → Neon main |
+| `task deploy:prod:remote:backend -- <tag>` | Stage secrets + fly deploy + smoke test |
+| `task deploy:prod:remote:frontend -- <tag>` | Build + wrangler pages deploy --branch=main |
+| `task deploy:prod:remote -- <tag>` | All three in sequence (prompts with current → next + diff) |
+
+Each `prod:remote*` task prompts with the **current deployed tag → next tag** and the
+commit diff before proceeding. The deploy uses an isolated worktree so your working tree
+is never touched.
+
+### Deploy — CWD variants (no git checks)
+
+For CI runners (which already check out the SHA they want to deploy), thin variants skip
+all git validation, worktree provisioning, and prompts. They run `fly deploy` / `wrangler
+pages deploy` / `alembic upgrade head` directly from the current working directory.
+
+| Command | Description |
+|---------|-------------|
+| `task deploy:staging:remote:cwd` | Full staging deploy from CWD |
+| `task deploy:staging:remote:cwd:db\|backend\|frontend` | Single staging component from CWD |
+| `task deploy:prod:remote:cwd` | Full prod deploy from CWD |
+| `task deploy:prod:remote:cwd:db\|backend\|frontend` | Single prod component from CWD |
+
+Set `HOST_DIR=<path>` if secrets/credentials live outside the CI checkout, and
+`ALEMBIC=alembic` if alembic is on `$PATH` rather than at `$HOST_DIR/.venv/bin/alembic`.
 
 ### Deploy — Staging Local (docker-compose)
 
@@ -445,7 +725,7 @@ Tasks that prompt for confirmation before executing:
 |---------|-------------|
 | `task deploy:staging:local` | Build from develop + docker-compose up |
 | `task deploy:staging:local:ref -- <ref>` | Build from git ref + docker-compose up |
-| `task deploy:staging:local:dirty` | Build from working directory + docker-compose up |
+| `task deploy:staging:local:cwd` | Build from working directory + docker-compose up |
 | `task start:staging:local BROWSERS=1` | Same, opens one fresh isolated Chrome session |
 | `task start:staging:local BROWSERS=N` | Same, opens N fresh isolated Chrome sessions |
 | `task start:staging:local` | Start staging with existing images |
@@ -520,7 +800,10 @@ All scenario commands accept `SCENARIO=<name>`.
 | `task git:pr:merge` | Squash merge |
 | `task git:release:prepare` | Create develop → main release PR |
 | `task git:release:tag -- v1.0.0` | Tag release on main |
-| `task release -- v1.0.0` | Tag + local prod deploy |
+| `task release:prod -- v1.0.0` | Tag main + remote prod deploy (combined) |
+| `task release:prod` | Interactive: suggest next patch (BUMP=minor/major to override) |
+| `task deploy:prod:status\|staging` | Show what's currently deployed per component |
+| `task deploy:prod:current` | Print the currently deployed prod backend tag |
 
 ### Build
 
@@ -529,7 +812,7 @@ All scenario commands accept `SCENARIO=<name>`.
 | `task build:staging` | Build images from develop |
 | `task build:prod -- v1.0.0` | Build from main |
 | `task build:ref -- <ref>` | Build from any git ref |
-| `task build:dirty` | Build from working directory |
+| `task build:cwd` | Build from working directory |
 | `task build:list` | List Docker images |
 | `task build:clean` | Remove old images |
 

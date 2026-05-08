@@ -173,6 +173,10 @@ tasks:
         echo "✅ Local staging started"
         echo "   Frontend: http://localhost:${FRONTEND_PORT:-3001}"
         echo "   Backend:  http://localhost:${BACKEND_PORT:-8002}"
+        echo ""
+        echo "Open in a fresh isolated browser:"
+        echo "   task open:session:staging:local              → 1 session"
+        echo "   task open:session:staging:local BROWSERS=2   → multi-user QA"
         {{.ROOT_DIR}}/.taskfiles/open-browsers.sh "http://localhost:${FRONTEND_PORT:-3001}" {{.BROWSERS}}
 
   # ════════════════════════════════════════════════════════════════
@@ -419,4 +423,8 @@ tasks:
         echo "✅ Scenario running from $REF"
         echo "   Frontend: http://localhost:$SC_WEB_PORT"
         echo "   Backend:  http://localhost:$SC_API_PORT"
+        echo ""
+        echo "Open in a fresh isolated browser:"
+        echo "   task open:session:scenario SCENARIO={{.SCENARIO}}              → 1 session"
+        echo "   task open:session:scenario SCENARIO={{.SCENARIO}} BROWSERS=2  → multi-user QA"
         {{.ROOT_DIR}}/.taskfiles/open-browsers.sh "http://localhost:$SC_WEB_PORT" {{.BROWSERS}}

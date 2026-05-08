@@ -276,11 +276,7 @@ tasks:
     desc: "Run Alembic migrations (prod — Neon). Requires secrets.prod.env with
       DATABASE_URL."
     dir: backend
-    dotenv:
-      [
-        "{{.ROOT_DIR}}/config/secrets.env",
-        "{{.ROOT_DIR}}/config/secrets.prod.env",
-      ]
+    dotenv: [ "{{.ROOT_DIR}}/config/secrets.env", "{{.ROOT_DIR}}/config/secrets.prod.env" ]
     cmds:
       - |
         if [ -z "$DATABASE_URL" ]; then
@@ -294,11 +290,7 @@ tasks:
     desc: "Seed prod database. SCENARIO=<name> to override (default: 'prod').
       Requires secrets.prod.env with DATABASE_URL."
     dir: backend
-    dotenv:
-      [
-        "{{.ROOT_DIR}}/config/secrets.env",
-        "{{.ROOT_DIR}}/config/secrets.prod.env",
-      ]
+    dotenv: [ "{{.ROOT_DIR}}/config/secrets.env", "{{.ROOT_DIR}}/config/secrets.prod.env" ]
     prompt: "⚠️  This will seed the PRODUCTION database. Continue?"
     vars:
       SCENARIO: "{{.SCENARIO | default \"prod\"}}"
@@ -314,11 +306,7 @@ tasks:
   status:prod:
     desc: "Show migration status for prod database (Neon)"
     dir: backend
-    dotenv:
-      [
-        "{{.ROOT_DIR}}/config/secrets.env",
-        "{{.ROOT_DIR}}/config/secrets.prod.env",
-      ]
+    dotenv: [ "{{.ROOT_DIR}}/config/secrets.env", "{{.ROOT_DIR}}/config/secrets.prod.env" ]
     cmds:
       - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c
         {{.BACKEND_DIR}}/alembic.ini current
@@ -328,11 +316,7 @@ tasks:
   check:prod:
     desc: "Test connectivity + validate migration state for prod database (Neon)"
     dir: backend
-    dotenv:
-      [
-        "{{.ROOT_DIR}}/config/secrets.env",
-        "{{.ROOT_DIR}}/config/secrets.prod.env",
-      ]
+    dotenv: [ "{{.ROOT_DIR}}/config/secrets.env", "{{.ROOT_DIR}}/config/secrets.prod.env" ]
     cmds:
       - |
         if [ -z "$DATABASE_URL" ]; then
@@ -349,24 +333,30 @@ tasks:
         PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini current
 
   reset:prod:
-    desc: "Reset prod database (🚨 DESTRUCTIVE). DRY_RUN=1 to preview."
+    desc: "Reset PROD database — drops all tables, re-migrates, and re-seeds from
+      scenarios/prod/. 🚨 DESTRUCTIVE. DRY_RUN=1 to preview."
     dir: backend
-    dotenv:
-      [
-        "{{.ROOT_DIR}}/config/secrets.env",
-        "{{.ROOT_DIR}}/config/secrets.prod.env",
-      ]
+    dotenv: [ "{{.ROOT_DIR}}/config/secrets.env", "{{.ROOT_DIR}}/config/secrets.prod.env" ]
     vars:
       DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
-    prompt: "🚨 This will DESTROY ALL PRODUCTION DATA. Are you absolutely sure?"
+    prompt: "🚨🚨🚨 This will DROP ALL TABLES on PRODUCTION (Neon main branch),
+      re-run migrations, and re-seed from scenarios/prod/. ALL USER DATA WILL BE
+      LOST. Are you absolutely sure?"
     cmds:
       - |
+        if [ -z "$DATABASE_URL" ]; then
+          echo "❌ DATABASE_URL not set — fill in config/secrets.prod.env"
+          exit 1
+        fi
         if [ "{{.DRY_RUN}}" = "1" ]; then
-          echo "🔍 DRY RUN — would reset prod database (Neon)"
+          echo "🔍 DRY RUN — would reset prod (Neon): $(echo $DATABASE_URL | sed 's/:.*@/@/')"
+          echo "   Then: migrate:prod + seed:prod (scenarios/prod/)"
           exit 0
         fi
+        echo "Resetting prod (Neon): $(echo $DATABASE_URL | sed 's/:.*@/@/')"
         PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.reset
       - task: migrate:prod
+      - task: seed:prod
 
   # ════════════════════════════════════════════════════════════════
   # Scenario
@@ -486,6 +476,76 @@ tasks:
         PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/alembic -c {{.BACKEND_DIR}}/alembic.ini check 2>&1 && \
           echo "✅ Migrations are up to date" || \
           echo "⚠️  Migrations need attention"
+
+  # ════════════════════════════════════════════════════════════════
+  # Tag-drift checks (DB tag_groups/tags vs scenarios/<name>/tags.yaml)
+  # Useful after deploys: Alembic migrations may seed reference rows
+  # (e.g. review-tags) that drift from the curated YAML over time.
+  # ════════════════════════════════════════════════════════════════
+
+  check:tags-drift:dev:
+    desc: "Diff DB tag_groups/tags vs scenarios/default/tags.yaml. SCENARIO=<name>
+      to override."
+    dir: backend
+    dotenv: [ "{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/dev.env" ]
+    vars:
+      SCENARIO: "{{.SCENARIO | default \"default\"}}"
+    cmds:
+      - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m
+        backend.scripts.check_tags_drift --scenario {{.SCENARIO}}
+
+  check:tags-drift:staging:local:
+    desc: "Diff local-staging DB tag_groups/tags vs scenarios/staging/tags.yaml.
+      SCENARIO=<name> to override."
+    dir: backend
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/config/base.env",
+        "{{.ROOT_DIR}}/config/staging.local.env",
+        "{{.ROOT_DIR}}/config/secrets.staging.local.env",
+      ]
+    vars:
+      SCENARIO: "{{.SCENARIO | default \"staging\"}}"
+    cmds:
+      - |
+        DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${POSTGRES_PORT:-5436}/${POSTGRES_DB}" \
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.check_tags_drift --scenario {{.SCENARIO}}
+
+  check:tags-drift:staging:remote:
+    desc: "Diff remote-staging (Neon develop) DB tag_groups/tags vs
+      scenarios/staging/tags.yaml. SCENARIO=<name> to override."
+    dir: backend
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/config/secrets.env",
+        "{{.ROOT_DIR}}/config/secrets.staging.env",
+      ]
+    vars:
+      SCENARIO: "{{.SCENARIO | default \"staging\"}}"
+    cmds:
+      - |
+        if [ -z "$DATABASE_URL" ]; then
+          echo "❌ DATABASE_URL not set — fill in config/secrets.staging.env"
+          exit 1
+        fi
+        echo "Checking against: $(echo $DATABASE_URL | sed 's/:.*@/@/')"
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.check_tags_drift --scenario {{.SCENARIO}}
+
+  check:tags-drift:prod:
+    desc: "Diff prod (Neon main) DB tag_groups/tags vs scenarios/prod/tags.yaml.
+      SCENARIO=<name> to override."
+    dir: backend
+    dotenv: [ "{{.ROOT_DIR}}/config/secrets.env", "{{.ROOT_DIR}}/config/secrets.prod.env" ]
+    vars:
+      SCENARIO: "{{.SCENARIO | default \"prod\"}}"
+    cmds:
+      - |
+        if [ -z "$DATABASE_URL" ]; then
+          echo "❌ DATABASE_URL not set — fill in config/secrets.prod.env"
+          exit 1
+        fi
+        echo "Checking against: $(echo $DATABASE_URL | sed 's/:.*@/@/')"
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.check_tags_drift --scenario {{.SCENARIO}}
 
   # ════════════════════════════════════════════════════════════════
   # Migration Recovery Tools

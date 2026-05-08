@@ -1,12 +1,219 @@
 version: "3"
 
+# ════════════════════════════════════════════════════════════════════════════
+# Release tasks (per-component)
+#
+# Components release independently. Each release creates an annotated tag
+# of the form `<component>-vX.Y.Z` on main, then deploys it to prod.
+#
+#   task release:prod:backend  -- v1.2.0   — tag backend-v1.2.0 + deploy backend
+#   task release:prod:frontend -- v1.2.0   — tag frontend-v1.2.0 + deploy frontend
+#   task release:prod:db       -- v1.2.0   — tag db-v1.2.0 + deploy db migrations
+#   task release:prod:backend              — interactive: suggests next patch
+#                                            from latest backend-v* tag
+#   task release:prod                      — aggregate: prompts per component
+#
+# Each per-component task computes "suggested next" from the latest
+# `<component>-v*` tag (NOT from refs/deploys/prod/<component>, which only
+# tracks the currently-deployed SHA — releases append to tag history).
+#
+# Override the suggested bump with BUMP=patch|minor|major (default: patch).
+# ════════════════════════════════════════════════════════════════════════════
+
 tasks:
-  default:
-    desc: "Tag release + deploy to prod (e.g., task release -- v1.2.0)"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Internal: suggest next version for a component
+  # ──────────────────────────────────────────────────────────────────────────
+  _suggest-version:
+    internal: true
+    cmds:
+      - |
+        COMPONENT="{{.COMPONENT}}"
+        BUMP="{{.BUMP | default "patch"}}"
+        git fetch origin main --tags --quiet 2>/dev/null || true
+        LATEST=$(git tag -l "${COMPONENT}-v*" --sort=-version:refname | head -1)
+        if [ -z "$LATEST" ]; then
+          # Fall back to legacy bare vX.Y.Z if no per-component tag yet
+          LATEST=$(git tag -l "v*" --sort=-version:refname | head -1)
+          [ -z "$LATEST" ] && LATEST="${COMPONENT}-v0.0.0"
+        fi
+        # Strip COMPONENT- prefix if present, then strip leading v
+        CORE=$(echo "$LATEST" | sed -E "s/^${COMPONENT}-//; s/^v//; s/-.*$//")
+        MAJ=$(echo "$CORE" | cut -d. -f1); MAJ=${MAJ:-0}
+        MIN=$(echo "$CORE" | cut -d. -f2); MIN=${MIN:-0}
+        PAT=$(echo "$CORE" | cut -d. -f3); PAT=${PAT:-0}
+        case "$BUMP" in
+          major) MAJ=$((MAJ+1)); MIN=0; PAT=0 ;;
+          minor) MIN=$((MIN+1)); PAT=0 ;;
+          patch|*) PAT=$((PAT+1)) ;;
+        esac
+        echo "v$MAJ.$MIN.$PAT"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Internal: per-component interactive release flow
+  #
+  # Called by prod:db / prod:backend / prod:frontend. If VERSION is empty,
+  # prompts (with retype-confirm), then dispatches to tag-component + deploy
+  # via shell `task` calls (single sub-task chain — no re-exec, so the parent
+  # task does not double-run the tag step).
+  # ──────────────────────────────────────────────────────────────────────────
+  _do-component:
+    internal: true
+    vars:
+      COMPONENT: "{{.COMPONENT}}"
+      VERSION: "{{.VERSION}}"
+      BUMP: "{{.BUMP | default \"patch\"}}"
+    cmds:
+      - |
+        set -e
+        COMPONENT="{{.COMPONENT}}"
+        VERSION="{{.VERSION}}"
+        if [ -z "$VERSION" ]; then
+          git fetch origin main --tags --quiet 2>/dev/null || true
+          LATEST=$(git tag -l "${COMPONENT}-v*" --sort=-version:refname | head -1)
+          [ -z "$LATEST" ] && LATEST="(none)"
+          BASE=$(git tag -l "${COMPONENT}-v*" --sort=-version:refname | head -1)
+          [ -z "$BASE" ] && BASE=$(git tag -l "v*" --sort=-version:refname | head -1)
+          [ -z "$BASE" ] && BASE="${COMPONENT}-v0.0.0"
+          CORE=$(echo "$BASE" | sed -E "s/^${COMPONENT}-//; s/^v//; s/-.*$//")
+          MAJ=$(echo "$CORE" | cut -d. -f1); MAJ=${MAJ:-0}
+          MIN=$(echo "$CORE" | cut -d. -f2); MIN=${MIN:-0}
+          PAT=$(echo "$CORE" | cut -d. -f3); PAT=${PAT:-0}
+          case "{{.BUMP}}" in
+            major) MAJ=$((MAJ+1)); MIN=0; PAT=0 ;;
+            minor) MIN=$((MIN+1)); PAT=0 ;;
+            patch|*) PAT=$((PAT+1)) ;;
+          esac
+          SUGGESTED="v$MAJ.$MIN.$PAT"
+          # Heads-up: any uncommitted CWD changes (fly.toml, Dockerfile,
+          # source code, etc.) will NOT be deployed by this flow — the
+          # release deploys the tagged commit on main from a clean worktree.
+          DIRTY=""
+          if ! git diff --quiet HEAD -- 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+            DIRTY="yes"
+          fi
+          echo ""
+          echo "═══════════════════════════════════════════════════════════════"
+          echo "  RELEASE ${COMPONENT} TO PRODUCTION"
+          echo ""
+          echo "  Latest ${COMPONENT} tag: $LATEST"
+          echo "  Suggested next:          ${COMPONENT}-$SUGGESTED  (bump={{.BUMP}})"
+          echo ""
+          echo "  Override with BUMP=minor or BUMP=major, or pass an explicit"
+          echo "  version: task release:prod:${COMPONENT} -- v2.0.0"
+          if [ -n "$DIRTY" ]; then
+            echo ""
+            echo "  ⚠️  Uncommitted changes detected in your working tree."
+            echo "      The release flow deploys the TAG on main from a clean"
+            echo "      worktree — your local edits will NOT be included."
+            echo "      For an infra-only redeploy (e.g. fly.toml memory tweak,"
+            echo "      Dockerfile, env), use the CWD path instead:"
+            echo "        task deploy:prod:remote:cwd:${COMPONENT}"
+            echo "      (or :staging:remote:cwd:${COMPONENT} to test on staging first)"
+          fi
+          echo "═══════════════════════════════════════════════════════════════"
+          printf "Type the version to release [%s]: " "$SUGGESTED"
+          read -r INPUT
+          VERSION="${INPUT:-$SUGGESTED}"
+          printf "Confirm by retyping the version: "
+          read -r CONFIRM
+          if [ "$CONFIRM" != "$VERSION" ]; then
+            echo "❌ Confirmation does not match ('$CONFIRM' vs '$VERSION'). Aborting."
+            exit 1
+          fi
+          echo ""
+          echo "→ Releasing ${COMPONENT}-$VERSION"
+        fi
+        # Single dispatch: tag, then deploy. No re-exec — this script is the
+        # only place that drives the chain, so the parent task cannot run it
+        # twice. tag-component may itself prompt (when the tag exists) and
+        # write a different chosen tag to .git/.last-release-tag.
+        rm -f .git/.last-release-tag
+        task git:release:tag-component COMPONENT="$COMPONENT" VERSION="$VERSION" REUSE="{{.REUSE | default "0"}}" FORCE="{{.FORCE | default "0"}}"
+        DEPLOY_TAG="${COMPONENT}-${VERSION}"
+        if [ -f .git/.last-release-tag ]; then
+          DEPLOY_TAG=$(cat .git/.last-release-tag)
+          rm -f .git/.last-release-tag
+          echo "→ Deploying chosen tag: $DEPLOY_TAG"
+        fi
+        task deploy:prod:remote:"$COMPONENT" REF="$DEPLOY_TAG"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Per-component release tasks
+  # ──────────────────────────────────────────────────────────────────────────
+
+  prod:db:
+    desc: "Tag db-vX.Y.Z + run prod DB migrations. Without VERSION, suggests next
+      patch."
     vars:
       VERSION: "{{if .VERSION}}{{.VERSION}}{{else}}{{.CLI_ARGS}}{{end}}"
+      BUMP: "{{.BUMP | default \"patch\"}}"
     cmds:
-      - task: :git:release:tag
-        vars: { VERSION: "{{.VERSION}}" }
-      - task: :deploy:prod
-        vars: { REF: "{{.VERSION}}" }
+      - task: _do-component
+        vars: { COMPONENT: "db", VERSION: "{{.VERSION}}", BUMP: "{{.BUMP}}" }
+
+  prod:backend:
+    desc: "Tag backend-vX.Y.Z + deploy backend to prod. Without VERSION, suggests
+      next patch."
+    vars:
+      VERSION: "{{if .VERSION}}{{.VERSION}}{{else}}{{.CLI_ARGS}}{{end}}"
+      BUMP: "{{.BUMP | default \"patch\"}}"
+    cmds:
+      - task: _do-component
+        vars: { COMPONENT: "backend", VERSION: "{{.VERSION}}", BUMP: "{{.BUMP}}" }
+
+  prod:frontend:
+    desc: "Tag frontend-vX.Y.Z + deploy frontend to prod. Without VERSION, suggests
+      next patch."
+    vars:
+      VERSION: "{{if .VERSION}}{{.VERSION}}{{else}}{{.CLI_ARGS}}{{end}}"
+      BUMP: "{{.BUMP | default \"patch\"}}"
+    cmds:
+      - task: _do-component
+        vars: { COMPONENT: "frontend", VERSION: "{{.VERSION}}", BUMP: "{{.BUMP}}" }
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Aggregator: release one or more components in sequence
+  #
+  # Walks db → backend → frontend, prompting for each (skip with empty input).
+  # Each accepted component runs its full tag-and-deploy flow before moving on.
+  # ──────────────────────────────────────────────────────────────────────────
+
+  prod:
+    desc: "Release one or more components to prod (interactive: prompts per
+      component, skip with empty)."
+    cmds:
+      - |
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "  RELEASE TO PRODUCTION (per-component)"
+        echo ""
+        echo "  You will be prompted for each component (db, backend, frontend)."
+        echo "  Press Enter on an empty line to skip a component."
+        echo "  For per-component shortcuts, use:"
+        echo "    task release:prod:backend  -- v1.2.0"
+        echo "    task release:prod:frontend -- v1.2.0"
+        echo "    task release:prod:db       -- v1.2.0"
+        echo "═══════════════════════════════════════════════════════════════"
+      - |
+        for COMPONENT in db backend frontend; do
+          printf "\nRelease %s? [y/N] " "$COMPONENT"
+          read -r ANS
+          case "$ANS" in
+            y|Y|yes)
+              task release:prod:${COMPONENT} || { echo "❌ ${COMPONENT} release aborted; stopping."; exit 1; }
+              ;;
+            *)
+              echo "→ skipped ${COMPONENT}"
+              ;;
+          esac
+        done
+        echo ""
+        echo "✅ Aggregate release complete."
+
+  # Backward-compat: `task release:default` is what `task release` resolves to.
+  default:
+    desc: "Alias of release:prod (kept for backward compat)."
+    cmds:
+      - task: prod

@@ -17,7 +17,7 @@ tasks:
       NAME: "{{.CLI_ARGS}}"
       CURRENT_BRANCH:
         sh: git branch --show-current
-    deps: [_check-clean]
+    deps: [ _check-clean ]
     prompt: |
       Create feature/{{.NAME}} from develop branch?
 
@@ -35,7 +35,7 @@ tasks:
       NAME: "{{.CLI_ARGS}}"
       CURRENT_BRANCH:
         sh: git branch --show-current
-    deps: [_check-clean]
+    deps: [ _check-clean ]
     prompt: |
       Create fix/{{.NAME}} from develop branch?
 
@@ -53,7 +53,7 @@ tasks:
       NAME: "{{.CLI_ARGS}}"
       CURRENT_BRANCH:
         sh: git branch --show-current
-    deps: [_check-clean]
+    deps: [ _check-clean ]
     prompt: |
       Create hotfix/{{.NAME}} from main branch?
 
@@ -165,10 +165,18 @@ tasks:
         echo ""
 
         if [ "$TARGET" = "main" ]; then
-          echo "Next steps:"
-          echo "   task git:release:tag -- vX.Y.Z     → Tag the release"
-          echo "   task deploy:prod -- vX.Y.Z         → Deploy to prod"
-          echo "   task release -- vX.Y.Z             → Tag + deploy combined"
+          # Suggest next patch version based on latest tag on main
+          LATEST=$(git describe --tags --abbrev=0 origin/main 2>/dev/null || echo "v0.0.0")
+          CORE=$(echo "$LATEST" | sed -E 's/^v//; s/-.*$//')
+          MAJ=$(echo "$CORE" | cut -d. -f1); MAJ=${MAJ:-0}
+          MIN=$(echo "$CORE" | cut -d. -f2); MIN=${MIN:-0}
+          PAT=$(echo "$CORE" | cut -d. -f3); PAT=${PAT:-0}
+          NEXT="v${MAJ}.${MIN}.$((PAT+1))"
+          echo "Next steps (latest tag: $LATEST):"
+          echo "   task git:release:tag -- $NEXT          → Tag the release"
+          echo "   task deploy:prod:remote -- $NEXT       → Deploy tagged release to prod"
+          echo "   task release:prod -- $NEXT             → Tag + deploy (combined)"
+          echo "   task release:prod                      → Interactive: prompts for version"
           echo ""
           echo "⚠️  Don't forget to cherry-pick into develop if needed:"
           echo "   git checkout develop && git cherry-pick <commit>"
@@ -251,17 +259,25 @@ tasks:
         echo ""
         echo "✅ Release merged: develop → main"
         echo ""
-        echo "Next steps:"
-        echo "   task git:release:tag -- vX.Y.Z      → Tag the release"
-        echo "   task deploy:prod -- vX.Y.Z          → Deploy to prod"
-        echo "   task release -- vX.Y.Z              → Tag + deploy combined"
-
+        # Suggest next patch version based on latest tag on main
+        git fetch origin main --tags --quiet 2>/dev/null || true
+        LATEST=$(git describe --tags --abbrev=0 origin/main 2>/dev/null || echo "v0.0.0")
+        CORE=$(echo "$LATEST" | sed -E 's/^v//; s/-.*$//')
+        MAJ=$(echo "$CORE" | cut -d. -f1); MAJ=${MAJ:-0}
+        MIN=$(echo "$CORE" | cut -d. -f2); MIN=${MIN:-0}
+        PAT=$(echo "$CORE" | cut -d. -f3); PAT=${PAT:-0}
+        NEXT="v${MAJ}.${MIN}.$((PAT+1))"
+        echo "Next steps (latest tag: $LATEST):"
+        echo "   task git:release:tag -- $NEXT          → Tag the release"
+        echo "   task deploy:prod:remote -- $NEXT       → Deploy tagged release to prod"
+        echo "   task release:prod -- $NEXT             → Tag + deploy (combined)"
+        echo "   task release:prod                      → Interactive: prompts for version"
   release:tag:
     desc: Tag a release on main and push (e.g., task git:release:tag -- v1.2.0)
     vars:
       VERSION: "{{if .VERSION}}{{.VERSION}}{{else}}{{.CLI_ARGS}}{{end}}"
     preconditions:
-      - sh: '[ -n "{{.VERSION}}" ]'
+      - sh: "[ -n \"{{.VERSION}}\" ]"
         msg: |
           ❌ VERSION required
 
@@ -311,13 +327,162 @@ tasks:
         echo "✅ Tagged $VERSION"
         echo ""
         echo "Next steps:"
-        echo "   task deploy:prod -- $VERSION         → Build + deploy to prod"
-        echo "   task release -- $VERSION             → Deploy to prod (combined)"
+        echo "   task deploy:prod:remote -- $VERSION         → Deploy to prod (no checkout needed)"
+        echo "   task release:prod -- $VERSION               → Tag + deploy (combined)"
+
+  release:tag-component:
+    desc: "Tag a per-component release on main and push
+      (COMPONENT=db|backend|frontend, VERSION=v1.2.0). REUSE=1 to skip tagging
+      if it already exists, FORCE=1 to move the tag to current main HEAD."
+    vars:
+      COMPONENT: "{{.COMPONENT}}"
+      VERSION: "{{.VERSION}}"
+      TAG: "{{.COMPONENT}}-{{.VERSION}}"
+      REUSE: "{{.REUSE | default \"0\"}}"
+      FORCE: "{{.FORCE | default \"0\"}}"
+    preconditions:
+      - sh: "echo \"{{.COMPONENT}}\" | grep -Eq \"^(db|backend|frontend)$\""
+        msg: "COMPONENT must be db, backend, or frontend"
+      - sh: "echo \"{{.VERSION}}\" | grep -Eq \"^v[0-9]+\\.[0-9]+\\.[0-9]+$\""
+        msg: "VERSION must be vX.Y.Z (got '{{.VERSION}}')"
+      - sh: |
+          git fetch origin main develop --tags 2>/dev/null
+          DEVELOP_HEAD=$(git rev-parse origin/develop)
+          git merge-base --is-ancestor "$DEVELOP_HEAD" origin/main
+        msg: |
+          ❌ main does not contain develop HEAD.
+          Merge develop into main first:
+            task git:release:prepare
+            task git:release:merge
+    cmds:
+      - |
+        set -e
+        TAG="{{.TAG}}"
+        REUSE="{{.REUSE}}"
+        FORCE="{{.FORCE}}"
+        # Refresh local tag refs from origin so existence checks are accurate
+        git fetch origin --tags --prune --prune-tags --quiet 2>/dev/null || \
+          git fetch origin --tags --quiet 2>/dev/null || true
+
+        # Pick working dir
+        if [ -d "{{.WORKTREE_MAIN}}" ]; then
+          cd {{.WORKTREE_MAIN}}
+          git pull origin main --quiet
+        else
+          git fetch origin main --quiet
+          git checkout main --quiet
+          git pull origin main --quiet
+        fi
+        MAIN_HEAD=$(git rev-parse HEAD)
+
+        TAG_LOCAL=$(git rev-parse --verify "refs/tags/$TAG" 2>/dev/null || true)
+        TAG_REMOTE=$(git ls-remote --tags origin "refs/tags/$TAG" | awk '{print $1}' | head -1)
+
+        if [ -n "$TAG_LOCAL" ] || [ -n "$TAG_REMOTE" ]; then
+          # Tag already exists somewhere
+          if [ "$REUSE" = "1" ]; then
+            # Make sure local matches remote, then proceed without tagging
+            if [ -n "$TAG_REMOTE" ] && [ "$TAG_LOCAL" != "$TAG_REMOTE" ]; then
+              git fetch origin "refs/tags/$TAG:refs/tags/$TAG" --quiet || true
+            fi
+            echo "♻️  REUSE=1 → keeping existing tag $TAG (skipping tag + push)"
+            echo "   Deploy: task deploy:prod:remote:{{.COMPONENT}} -- $TAG"
+            exit 0
+          fi
+          if [ "$FORCE" = "1" ]; then
+            echo "⚠️  FORCE=1 → moving $TAG to current main HEAD ($MAIN_HEAD)"
+            # Drop local + remote, recreate, push
+            git tag -d "$TAG" 2>/dev/null || true
+            if [ -n "$TAG_REMOTE" ]; then
+              git push origin ":refs/tags/$TAG" --quiet
+            fi
+            git tag -a "$TAG" -m "Release {{.COMPONENT}} {{.VERSION}} (forced retag)"
+            git push origin "$TAG"
+            echo "✅ Re-tagged $TAG → $MAIN_HEAD"
+            echo "   Deploy: task deploy:prod:remote:{{.COMPONENT}} -- $TAG"
+            exit 0
+          fi
+          # Interactive prompt
+          echo ""
+          echo "═══════════════════════════════════════════════════════════════"
+          echo "  ⚠️  Tag $TAG already exists"
+          [ -n "$TAG_LOCAL" ]  && echo "     local : $TAG_LOCAL"
+          [ -n "$TAG_REMOTE" ] && echo "     origin: $TAG_REMOTE"
+          echo "     main HEAD: $MAIN_HEAD"
+          echo ""
+          echo "  Choose:"
+          echo "    [r] reuse  → keep tag, just (re)deploy it"
+          echo "    [f] force  → move tag to current main HEAD, then deploy"
+          echo "    [n] new    → enter a different version (cut a new tag)"
+          echo "    [a] abort  (default)"
+          echo "═══════════════════════════════════════════════════════════════"
+          printf "Action [r/f/n/a]: "
+          read -r ANS
+          case "$ANS" in
+            r|R|reuse)
+              if [ -n "$TAG_REMOTE" ] && [ "$TAG_LOCAL" != "$TAG_REMOTE" ]; then
+                git fetch origin "refs/tags/$TAG:refs/tags/$TAG" --quiet || true
+              fi
+              echo "♻️  Reusing existing tag $TAG"
+              exit 0
+              ;;
+            f|F|force)
+              printf "Re-type the version to confirm forced retag (%s): " "{{.VERSION}}"
+              read -r CONFIRM
+              if [ "$CONFIRM" != "{{.VERSION}}" ]; then
+                echo "❌ Confirmation mismatch. Aborting."
+                exit 1
+              fi
+              echo "⚠️  Moving $TAG → $MAIN_HEAD"
+              git tag -d "$TAG" 2>/dev/null || true
+              if [ -n "$TAG_REMOTE" ]; then
+                git push origin ":refs/tags/$TAG" --quiet
+              fi
+              git tag -a "$TAG" -m "Release {{.COMPONENT}} {{.VERSION}} (forced retag)"
+              git push origin "$TAG"
+              echo "✅ Re-tagged $TAG → $MAIN_HEAD"
+              exit 0
+              ;;
+            n|N|new)
+              printf "New version (vX.Y.Z): "
+              read -r NEWVER
+              if ! echo "$NEWVER" | grep -Eq "^v[0-9]+\.[0-9]+\.[0-9]+$"; then
+                echo "❌ Invalid version '$NEWVER'. Aborting."
+                exit 1
+              fi
+              NEWTAG="{{.COMPONENT}}-${NEWVER}"
+              if git rev-parse --verify "refs/tags/$NEWTAG" >/dev/null 2>&1 \
+                 || [ -n "$(git ls-remote --tags origin "refs/tags/$NEWTAG" | head -1)" ]; then
+                echo "❌ Tag $NEWTAG also exists. Aborting."
+                exit 1
+              fi
+              git tag -a "$NEWTAG" -m "Release {{.COMPONENT}} $NEWVER"
+              git push origin "$NEWTAG"
+              echo "✅ Tagged $NEWTAG → $MAIN_HEAD"
+              echo "   Deploy: task deploy:prod:remote:{{.COMPONENT}} -- $NEWTAG"
+              # Caller (release flow) used the original VERSION for the deploy
+              # step; signal the new tag so it can adapt.
+              echo "$NEWTAG" > .git/.last-release-tag
+              exit 0
+              ;;
+            *)
+              echo "Aborted."
+              exit 1
+              ;;
+          esac
+        fi
+
+        # Fresh tag
+        git tag -a "$TAG" -m "Release {{.COMPONENT}} {{.VERSION}}"
+        git push origin "$TAG"
+        echo "✅ Tagged $TAG → $MAIN_HEAD"
+        echo "   Deploy: task deploy:prod:remote:{{.COMPONENT}} -- $TAG"
 
   tags:
     desc: List all release tags
     cmds:
       - git tag -l "v*" --sort=-version:refname
+      - git tag -l "*-v*" --sort=-version:refname
 
   # ════════════════════════════════════════════════════════════════
   # Worktree Management
@@ -389,7 +554,8 @@ tasks:
 
   worktree:clean:
     desc: Remove all worktrees
-    prompt: This will remove ALL worktrees. Any uncommitted changes in worktrees will be lost. Continue?
+    prompt: This will remove ALL worktrees. Any uncommitted changes in worktrees
+      will be lost. Continue?
     cmds:
       - |
         if [ -d "{{.WORKTREE_DIR}}" ]; then
@@ -459,7 +625,7 @@ tasks:
   _check-clean:
     internal: true
     preconditions:
-      - sh: '[ -z "$(git status --porcelain)" ]'
+      - sh: "[ -z \"$(git status --porcelain)\" ]"
         msg: |
           ❌ Working directory is not clean.
           Commit or stash your changes first.
@@ -493,7 +659,8 @@ tasks:
   _resolve-ref:
     internal: true
     preconditions:
-      - sh: 'git rev-parse --verify "{{.REF}}" >/dev/null 2>&1 || git fetch origin "{{.REF}}" 2>/dev/null'
+      - sh: "git rev-parse --verify \"{{.REF}}\" >/dev/null 2>&1 || git fetch origin
+          \"{{.REF}}\" 2>/dev/null"
         msg: |
           ❌ Cannot resolve git ref: {{.REF}}
           Make sure the branch/tag exists locally or on origin.

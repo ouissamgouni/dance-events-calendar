@@ -145,7 +145,7 @@ tasks:
         echo "   Backend:  movida-backend:$TAG"
         echo "   Frontend: movida-frontend:$TAG"
 
-  dirty:
+  cwd:
     desc: Build images from current working directory (uncommitted changes)
     prompt: |
       ⚠️  BUILD FROM WORKING DIRECTORY
@@ -182,7 +182,7 @@ tasks:
         echo "   Backend:  movida-backend:$TAG"
         echo "   Frontend: movida-frontend:$TAG"
         echo ""
-        echo "Deploy with: task deploy:staging:dirty"
+        echo "Deploy with: task deploy:staging:cwd"
 
   list:
     desc: List all movida Docker images

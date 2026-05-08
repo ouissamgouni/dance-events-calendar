@@ -355,6 +355,9 @@ export default function SyncProgressCard({ visible, onDismiss, onJobComplete }: 
     };
 
     if (!visible || !job) return null;
+    // Backend returns `{"status": "idle"}` (no totals/calendar_statuses) when
+    // no job is active — guard against rendering until a real job is present.
+    if (!job.totals) return null;
 
     const active = isActive(job.status);
     const started = new Date(job.started_at);

@@ -4,8 +4,14 @@ version: "3"
 # Deploy tasks
 #
 # Naming convention:
-#   deploy:<env>:<location>:<component>   — atomic single-component deploy
-#   deploy:<env>:<location>               — full deploy (calls atomic tasks in order)
+#   deploy:<env>:<location>:<component>      — atomic single-component deploy
+#                                              (worktree-aware, runs git gates)
+#   deploy:<env>:<location>                  — full deploy (atomic tasks in order)
+#   deploy:<env>:<location>:cwd[:component]   — CWD variant: assumes CWD is the
+#                                              pinned checkout (no git gates,
+#                                              no worktree). Use from CI runners
+#                                              and from inside ./deploy:prod:remote
+#                                              after worktree provisioning.
 #
 # Remote envs (Fly.io + Neon + Cloudflare):
 #   staging:remote   — Neon develop branch  + movida-staging.fly.dev
@@ -13,16 +19,249 @@ version: "3"
 #
 # Local envs (docker-compose):
 #   staging:local    — localhost:5436 / 8002 / 3001
+#
+# Status / introspection:
+#   deploy:<env>:status            — what's currently deployed (per component, per env)
+#   deploy:prod:current             — short form: just the prod backend tag
+#
+# Deployment tracking:
+#   After each successful component deploy we push the deployed SHA to
+#   refs/deploys/<env>/<component> on origin (best-effort, never blocks).
+#   This is the authoritative source of "what's running where" — it works
+#   uniformly for backend / frontend / db migrations, survives across
+#   developer machines, and gives a free audit log via `git reflog`.
 # ════════════════════════════════════════════════════════════════════════════
 
 tasks:
 
   # ──────────────────────────────────────────────────────────────────────────
-  # STAGING REMOTE — atomic components
+  # Internal: ref → worktree provisioner (called as deps by remote deploy tasks)
+  #
+  # Remote deploys use SHA-pinned worktrees so they NEVER touch the user's
+  # working tree. Each deploy resolves REF → SHA, ensures a worktree exists
+  # at .worktrees/ref-<sha>, and runs all commands from inside it via the
+  # corresponding `:cwd` primitive.
+  #
+  # Gates:
+  #   • REF must be supplied and resolvable (after `git fetch`)
+  #   • staging: REF must be reachable from origin/develop
+  #   • prod:    REF must be an annotated tag (vX.Y.Z) reachable from origin/main
+  #
+  # Secrets (config/secrets.*, backend/credentials/) live only in the host
+  # repo and are read from there explicitly — they are NOT copied into the
+  # worktree (which is a clean checkout of the SHA).
   # ──────────────────────────────────────────────────────────────────────────
 
-  staging:remote:db:
-    desc: "Run DB migrations on Neon staging (develop branch)"
+  _prepare-ref-staging:
+    internal: true
+    cmds:
+      - |
+        REF="{{.REF}}"
+        if [ -z "$REF" ]; then
+          echo "❌ REF required."
+          echo "   Usage:   task deploy:staging:remote -- <branch|sha>"
+          echo "   Example: task deploy:staging:remote -- develop"
+          exit 1
+        fi
+        git fetch origin develop --quiet 2>/dev/null || true
+        if ! git rev-parse --verify "$REF" >/dev/null 2>&1; then
+          echo "❌ Git ref '$REF' not found locally or on origin."
+          exit 1
+        fi
+        REF_SHA=$(git rev-parse "$REF^{commit}")
+        if ! git merge-base --is-ancestor "$REF_SHA" origin/develop 2>/dev/null; then
+          echo "❌ '$REF' ($REF_SHA) is not reachable from origin/develop."
+          echo "   Staging only deploys commits on the develop branch."
+          exit 1
+        fi
+        SHORT=$(git rev-parse --short=7 "$REF_SHA")
+        WT=".worktrees/ref-$SHORT"
+        if [ ! -d "$WT" ]; then
+          echo "→ Creating worktree $WT from $REF ($SHORT)..."
+          mkdir -p .worktrees
+          git worktree add --detach "$WT" "$REF_SHA" >/dev/null
+        fi
+        echo "✅ Staging deploy worktree ready: $WT (ref $REF @ $SHORT)"
+
+  _prepare-ref-prod:
+    internal: true
+    cmds:
+      - |
+        REF="{{.REF}}"
+        if [ -z "$REF" ]; then
+          echo "❌ REF required."
+          echo "   Usage:   task deploy:prod:remote -- <release-tag>"
+          echo "   Example: task deploy:prod:remote -- v1.2.0"
+          echo ""
+          echo "   Production only deploys annotated release tags (vX.Y.Z) on main."
+          echo "   Create one with: task git:release:tag -- v1.2.0"
+          exit 1
+        fi
+        git fetch origin main --tags --quiet 2>/dev/null || true
+        OBJ_TYPE=$(git cat-file -t "$REF" 2>/dev/null || echo "")
+        if [ "$OBJ_TYPE" != "tag" ]; then
+          echo "❌ '$REF' is not an annotated tag."
+          echo "   Production only deploys annotated release tags."
+          echo "   Create one with: task git:release:tag -- $REF"
+          exit 1
+        fi
+        case "$REF" in
+          v[0-9]*) ;;
+          db-v[0-9]*|backend-v[0-9]*|frontend-v[0-9]*) ;;
+          *)
+            echo "❌ Tag '$REF' does not match release pattern."
+            echo "   Expected: <component>-vX.Y.Z (e.g. backend-v1.2.0) or vX.Y.Z (legacy)."
+            exit 1
+            ;;
+        esac
+        REF_SHA=$(git rev-parse "$REF^{commit}")
+        if ! git merge-base --is-ancestor "$REF_SHA" origin/main 2>/dev/null; then
+          echo "❌ Tag '$REF' is not reachable from origin/main."
+          exit 1
+        fi
+        SHORT=$(git rev-parse --short=7 "$REF_SHA")
+        WT=".worktrees/ref-$SHORT"
+        if [ ! -d "$WT" ]; then
+          echo "→ Creating worktree $WT from $REF ($SHORT)..."
+          mkdir -p .worktrees
+          git worktree add --detach "$WT" "$REF_SHA" >/dev/null
+        fi
+        echo "✅ Prod deploy worktree ready: $WT (tag $REF @ $SHORT)"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Internal: deployment ref recorder
+  #
+  # Pushes the deployed SHA to refs/deploys/<env>/<component> on origin.
+  # Best-effort: failures are warned but do not fail the deploy (e.g. if the
+  # caller lacks push perms or runs without network).
+  # ──────────────────────────────────────────────────────────────────────────
+
+  _record-deploy:
+    internal: true
+    cmds:
+      - |
+        ENV="{{.ENV}}"
+        COMPONENT="{{.COMPONENT}}"
+        SHA="{{.SHA}}"
+        if [ -z "$ENV" ] || [ -z "$COMPONENT" ] || [ -z "$SHA" ]; then
+          echo "⚠️  _record-deploy: missing ENV/COMPONENT/SHA, skipping ref push"
+          exit 0
+        fi
+        REF_PATH="refs/deploys/$ENV/$COMPONENT"
+        if git push -f origin "$SHA:$REF_PATH" 2>/dev/null; then
+          echo "📌 Recorded deploy: $REF_PATH → $SHA"
+        else
+          echo "⚠️  Could not push $REF_PATH (no perms or offline) — skipped"
+        fi
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Status: what is currently deployed
+  # ──────────────────────────────────────────────────────────────────────────
+
+  _status:
+    internal: true
+    vars:
+      ENV: "{{.ENV}}"
+    cmds:
+      - |
+        ENV="{{.ENV}}"
+        case "$ENV" in
+          prod)    BRANCH=main ;;
+          staging) BRANCH=develop ;;
+          *)
+            echo "❌ Internal error: ENV must be prod|staging (got '$ENV')"
+            exit 1 ;;
+        esac
+        echo "Fetching deployment refs for $ENV..."
+        git fetch origin "+refs/deploys/$ENV/*:refs/deploys/$ENV/*" --quiet 2>/dev/null || true
+        git fetch origin "$BRANCH" --tags --quiet 2>/dev/null || true
+        LATEST=$(git rev-parse "origin/$BRANCH" 2>/dev/null || echo "")
+        LATEST_NAME=""
+        if [ -n "$LATEST" ]; then
+          LATEST_NAME=$(git describe --tags --always "$LATEST" 2>/dev/null || git rev-parse --short=7 "$LATEST")
+        fi
+        printf "\n%-12s %-22s %-22s %-10s %s\n" "Component" "Released (latest tag)" "Deployed" "Drift" "When"
+        echo "------------------------------------------------------------------------------------------"
+        for COMP in db backend frontend; do
+          REF_PATH="refs/deploys/$ENV/$COMP"
+          # Latest released tag for this component (per-component, fall back to legacy bare vX.Y.Z for prod)
+          RELEASED="(none)"
+          if [ "$ENV" = "prod" ]; then
+            T=$(git tag -l "${COMP}-v*" --sort=-version:refname | head -1)
+            if [ -z "$T" ]; then
+              T=$(git tag -l "v*" --sort=-version:refname | head -1)
+            fi
+            if [ -n "$T" ]; then
+              RELEASED="$T"
+            fi
+          else
+            RELEASED="(n/a)"
+          fi
+          if SHA=$(git rev-parse "$REF_PATH" 2>/dev/null); then
+            NAME=$(git describe --tags --always "$SHA" 2>/dev/null || git rev-parse --short=7 "$SHA")
+            DATE=$(git log -1 --format=%cd --date=short "$SHA" 2>/dev/null || echo "?")
+            if [ -n "$LATEST" ] && [ "$SHA" != "$LATEST" ]; then
+              AHEAD=$(git rev-list --count "$SHA..$LATEST" 2>/dev/null || echo "?")
+              DRIFT="-$AHEAD"
+            else
+              DRIFT="up-to-date"
+            fi
+            printf "%-12s %-22s %-22s %-10s %s\n" "$COMP" "$RELEASED" "$NAME" "$DRIFT" "$DATE"
+          else
+            printf "%-12s %-22s %-22s %-10s %s\n" "$COMP" "$RELEASED" "(never)" "-" "-"
+          fi
+        done
+        echo "------------------------------------------------------------------------------------------"
+        if [ -n "$LATEST" ]; then
+          printf "Latest origin/%s: %s (%s)\n\n" "$BRANCH" "$LATEST_NAME" "$(echo $LATEST | cut -c1-7)"
+        fi
+
+  prod:status:
+    desc: "Show what is currently deployed to prod per component (released tag vs
+      deployed SHA + drift)."
+    cmds:
+      - task: _status
+        vars: { ENV: "prod" }
+
+  staging:status:
+    desc: "Show what is currently deployed to staging per component (deployed SHA +
+      drift vs origin/develop)."
+    cmds:
+      - task: _status
+        vars: { ENV: "staging" }
+
+  prod:current:
+    desc: "Print the currently deployed prod backend tag (one line)."
+    cmds:
+      - |
+        git fetch origin '+refs/deploys/prod/*:refs/deploys/prod/*' --tags --quiet 2>/dev/null || true
+        if SHA=$(git rev-parse refs/deploys/prod/backend 2>/dev/null); then
+          NAME=$(git describe --tags --always "$SHA" 2>/dev/null || git rev-parse --short=7 "$SHA")
+          echo "$NAME"
+        else
+          echo "(never deployed)"
+          exit 1
+        fi
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PRIMITIVES (`:remote:cwd:*`)
+  #
+  # These do the actual work. They take two paths as Task vars:
+  #   • SOURCE_DIR (default ".")  — the checkout to deploy from. Commands
+  #                                  cd into it before running build/fly/wrangler.
+  #   • HOST_DIR   (default ".")  — the repo holding gitignored secrets and
+  #                                  credentials.
+  #
+  # In CI both default to "." (current checkout). In interactive worktree
+  # mode, the orchestrators below set SOURCE_DIR to the worktree path and
+  # HOST_DIR to the user's repo.
+  #
+  # `dotenv:` paths resolve relative to this Taskfile's directory (the host
+  # repo), so secrets are always loaded correctly.
+  # ══════════════════════════════════════════════════════════════════════════
+
+  staging:remote:cwd:db:
+    desc: "[CWD primitive] Run staging DB migrations from CWD/SOURCE_DIR."
     dotenv:
       [
         "config/base.env",
@@ -30,37 +269,59 @@ tasks:
         "config/secrets.env",
         "config/secrets.staging.env",
       ]
+    vars:
+      SOURCE_DIR: "{{.SOURCE_DIR | default \".\"}}"
+      HOST_DIR: "{{.HOST_DIR | default \".\"}}"
+      ALEMBIC: "{{.ALEMBIC | default \".venv/bin/alembic\"}}"
     cmds:
       - |
         if [ -z "$DATABASE_URL" ]; then
           echo "❌ DATABASE_URL not set — fill in config/secrets.staging.env"
           exit 1
         fi
-        echo "Running migrations on Neon staging (develop branch)..."
+        cd "{{.SOURCE_DIR}}"
+        # Resolve ALEMBIC: absolute path or path relative to HOST_DIR
+        ALEMBIC_BIN="{{.ALEMBIC}}"
+        case "$ALEMBIC_BIN" in
+          /*) ;;
+          *) ALEMBIC_BIN="$(cd "{{.HOST_DIR}}" && pwd)/$ALEMBIC_BIN" ;;
+        esac
+        echo "Running migrations on Neon staging (develop branch) from $(pwd)..."
         echo "  Host: $(echo $DATABASE_URL | sed 's|.*@||' | cut -d'/' -f1)"
-        PYTHONPATH=. .venv/bin/alembic -c backend/alembic.ini upgrade head
+        PYTHONPATH=. "$ALEMBIC_BIN" -c backend/alembic.ini upgrade head
         echo "✅ Migrations applied"
+        echo ""
+        echo "ℹ️  Schema only — no fixture data was written."
+        echo "   To reconcile reference data with scenarios/staging/ run:"
+        echo "     task db:seed:staging:remote"
+      - task: _record-deploy
+        vars: { ENV: staging, COMPONENT: db, SHA: "{{.GIT_SHA | default \"\"}}" }
 
-  staging:remote:backend:
-    desc: "Stage Fly secrets + deploy backend to movida-staging.fly.dev"
+  staging:remote:cwd:backend:
+    desc: "[CWD primitive] Stage Fly secrets + deploy backend from SOURCE_DIR
+      (default CWD)."
     dotenv: [ "config/base.env", "config/secrets.env", "config/secrets.staging.env" ]
     vars:
+      SOURCE_DIR: "{{.SOURCE_DIR | default \".\"}}"
+      HOST_DIR: "{{.HOST_DIR | default \".\"}}"
       LOG_LEVEL: "{{.LOG_LEVEL | default \"\"}}"
     cmds:
       - |
-        if [ ! -f config/secrets.staging.env ]; then
-          echo "❌ config/secrets.staging.env not found"
+        if [ ! -f "{{.HOST_DIR}}/config/secrets.staging.env" ]; then
+          echo "❌ {{.HOST_DIR}}/config/secrets.staging.env not found"
           exit 1
         fi
+        cd "{{.SOURCE_DIR}}"
+        HOST_ABS="$(cd "{{.HOST_DIR}}" && pwd)"
         echo "Staging secrets into Fly (applied atomically on deploy)..."
-        cat config/secrets.env config/secrets.staging.env \
+        cat "$HOST_ABS/config/secrets.env" "$HOST_ABS/config/secrets.staging.env" \
           | grep -v '^[[:space:]]*$' \
           | grep -v '^CLOUDFLARE_' \
           | grep -v '^VITE_' \
           | fly secrets import -c config/fly.staging.toml --stage
-        if [ -f backend/credentials/service-account.json ]; then
+        if [ -f "$HOST_ABS/backend/credentials/service-account.json" ]; then
           fly secrets set -c config/fly.staging.toml --stage \
-            GOOGLE_SERVICE_ACCOUNT_JSON="$(cat backend/credentials/service-account.json)"
+            GOOGLE_SERVICE_ACCOUNT_JSON="$(cat $HOST_ABS/backend/credentials/service-account.json)"
           echo "✅ GOOGLE_SERVICE_ACCOUNT_JSON staged"
         else
           echo "⚠️  backend/credentials/service-account.json not found — GOOGLE_SERVICE_ACCOUNT_JSON not staged"
@@ -70,7 +331,8 @@ tasks:
           echo "✅ LOG_LEVEL staged: {{.LOG_LEVEL}}"
         fi
       - |
-        echo "Deploying backend to movida-staging.fly.dev..."
+        cd "{{.SOURCE_DIR}}"
+        echo "Deploying backend to movida-staging.fly.dev (from $(pwd))..."
         fly deploy --remote-only -c config/fly.staging.toml
       - |
         echo "Waiting for machine to be ready..."
@@ -82,10 +344,12 @@ tasks:
         else
           echo "⚠️  Health check failed or timed out — check: task logs:staging:remote"
         fi
+      - task: _record-deploy
+        vars: { ENV: staging, COMPONENT: backend, SHA: "{{.GIT_SHA | default \"\"}}" }
 
-  staging:remote:frontend:
-    desc: "Build + deploy staging frontend to Cloudflare Pages (public:
-      develop.joinmovida.com, alias: develop.movida.pages.dev)"
+  staging:remote:cwd:frontend:
+    desc: "[CWD primitive] Build + deploy staging frontend to Cloudflare Pages from
+      SOURCE_DIR."
     dotenv:
       [
         "config/base.env",
@@ -94,6 +358,8 @@ tasks:
         "config/secrets.staging.env",
       ]
     vars:
+      SOURCE_DIR: "{{.SOURCE_DIR | default \".\"}}"
+      HOST_DIR: "{{.HOST_DIR | default \".\"}}"
       PROJECT_NAME: "{{.PROJECT_NAME | default \"movida\"}}"
     cmds:
       - |
@@ -110,74 +376,25 @@ tasks:
           echo "❌ Cloudflare authentication failed — check token in config/secrets.env"
           exit 1
         fi
-        echo "Building staging frontend (VITE_API_URL=$VITE_API_URL)..."
-        (cd frontend && VITE_API_URL=$VITE_API_URL VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" VITE_UMAMI_WEBSITE_ID="${VITE_UMAMI_WEBSITE_ID:-}" npm run build)
+        cd "{{.SOURCE_DIR}}/frontend"
+        echo "Building staging frontend in $(pwd) (VITE_API_URL=$VITE_API_URL)..."
+        if [ ! -d node_modules ]; then
+          echo "  Installing frontend deps (npm ci)..."
+          npm ci --no-audit --no-fund
+        fi
+        VITE_API_URL=$VITE_API_URL VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" VITE_UMAMI_WEBSITE_ID="${VITE_UMAMI_WEBSITE_ID:-}" npm run build
         echo "Deploying to Cloudflare Pages (branch: develop)..."
-        # Run wrangler from frontend/ so it discovers wrangler.toml,
-        # functions/ and dist/ as siblings — required for Pages Functions
-        # detection (Cloudflare expects functions/ adjacent to the build
-        # output dir).
-        cd frontend && \
         CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN \
         CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID \
         npx --yes wrangler pages deploy \
           --project-name={{.PROJECT_NAME}} \
           --branch=develop
         echo "✅ Staging frontend deployed: https://develop.joinmovida.com (alias: https://develop.movida.pages.dev)"
+      - task: _record-deploy
+        vars: { ENV: staging, COMPONENT: frontend, SHA: "{{.GIT_SHA | default \"\"}}" }
 
-  # ──────────────────────────────────────────────────────────────────────────
-  # STAGING REMOTE — full deploy (calls atomic tasks in sequence)
-  # ──────────────────────────────────────────────────────────────────────────
-
-  staging:remote:
-    desc: "Full remote staging deploy: DB migrations + backend (secrets+fly) +
-      frontend"
-    dotenv:
-      [
-        "config/base.env",
-        "config/staging.remote.env",
-        "config/secrets.env",
-        "config/secrets.staging.env",
-      ]
-    cmds:
-      - |
-        if [ ! -f config/secrets.staging.env ]; then
-          echo "❌ config/secrets.staging.env not found — copy config/secrets.staging.env.example and fill in values"
-          exit 1
-        fi
-        if [ -z "$DATABASE_URL" ]; then
-          echo "❌ DATABASE_URL not set — fill in config/secrets.staging.env"
-          exit 1
-        fi
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "  Deploying REMOTE STAGING"
-        echo "  Backend:  https://movida-staging.fly.dev"
-        echo "  Frontend: https://develop.joinmovida.com (alias: https://develop.movida.pages.dev)"
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-      - echo "━━━━ [1/3] DB migrations ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-      - task: staging:remote:db
-      - echo "━━━━ [2/3] Backend ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-      - task: staging:remote:backend
-      - echo "━━━━ [3/3] Frontend ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-      - task: staging:remote:frontend
-      - |
-        echo ""
-        echo "═══════════════════════════════════════════════════════════════"
-        echo "✅ Remote staging fully deployed"
-        echo "   Backend:  https://movida-staging.fly.dev"
-        echo "   Frontend: https://develop.joinmovida.com (alias: https://develop.movida.pages.dev)"
-        echo ""
-        echo "Verify:"
-        echo "   task db:check:staging:remote  → DB migration state"
-        echo "   task logs:staging:remote      → backend logs"
-        echo "═══════════════════════════════════════════════════════════════"
-
-  # ──────────────────────────────────────────────────────────────────────────
-  # PROD REMOTE — atomic components
-  # ──────────────────────────────────────────────────────────────────────────
-
-  prod:remote:db:
-    desc: "Run DB migrations on Neon prod (main branch)"
+  prod:remote:cwd:db:
+    desc: "[CWD primitive] Run prod DB migrations from CWD/SOURCE_DIR."
     dotenv:
       [
         "config/base.env",
@@ -185,41 +402,64 @@ tasks:
         "config/secrets.env",
         "config/secrets.prod.env",
       ]
+    vars:
+      SOURCE_DIR: "{{.SOURCE_DIR | default \".\"}}"
+      HOST_DIR: "{{.HOST_DIR | default \".\"}}"
+      ALEMBIC: "{{.ALEMBIC | default \".venv/bin/alembic\"}}"
     cmds:
       - |
         if [ -z "$DATABASE_URL" ]; then
           echo "❌ DATABASE_URL not set — fill in config/secrets.prod.env"
           exit 1
         fi
-        echo "Running migrations on Neon prod (main branch)..."
+        cd "{{.SOURCE_DIR}}"
+        ALEMBIC_BIN="{{.ALEMBIC}}"
+        case "$ALEMBIC_BIN" in
+          /*) ;;
+          *) ALEMBIC_BIN="$(cd "{{.HOST_DIR}}" && pwd)/$ALEMBIC_BIN" ;;
+        esac
+        echo "Running migrations on Neon prod (main branch) from $(pwd)..."
         echo "  Host: $(echo $DATABASE_URL | sed 's|.*@||' | cut -d'/' -f1)"
-        PYTHONPATH=. .venv/bin/alembic -c backend/alembic.ini upgrade head
+        PYTHONPATH=. "$ALEMBIC_BIN" -c backend/alembic.ini upgrade head
         echo "✅ Migrations applied"
+        echo ""
+        echo "ℹ️  Schema only — no fixture data was written."
+        echo "   To reconcile reference data with scenarios/prod/ run:"
+        echo "     task db:seed:prod"
+      - task: _record-deploy
+        vars: { ENV: prod, COMPONENT: db, SHA: "{{.GIT_SHA | default \"\"}}" }
 
-  prod:remote:backend:
-    desc: "Stage Fly secrets + deploy backend to movida.fly.dev"
+  prod:remote:cwd:backend:
+    desc: "[CWD primitive] Stage Fly secrets + deploy backend to movida.fly.dev from
+      SOURCE_DIR."
     dotenv: [ "config/base.env", "config/secrets.env", "config/secrets.prod.env" ]
+    vars:
+      SOURCE_DIR: "{{.SOURCE_DIR | default \".\"}}"
+      HOST_DIR: "{{.HOST_DIR | default \".\"}}"
     cmds:
       - |
-        if [ ! -f config/secrets.prod.env ]; then
-          echo "❌ config/secrets.prod.env not found"
+        if [ ! -f "{{.HOST_DIR}}/config/secrets.prod.env" ]; then
+          echo "❌ {{.HOST_DIR}}/config/secrets.prod.env not found"
           exit 1
         fi
+        cd "{{.SOURCE_DIR}}"
+        HOST_ABS="$(cd "{{.HOST_DIR}}" && pwd)"
         echo "Staging secrets into Fly (applied atomically on deploy)..."
-        cat config/secrets.env config/secrets.prod.env \
+        cat "$HOST_ABS/config/secrets.env" "$HOST_ABS/config/secrets.prod.env" \
           | grep -v '^[[:space:]]*$' \
           | grep -v '^CLOUDFLARE_' \
           | grep -v '^VITE_' \
           | fly secrets import -c config/fly.prod.toml --stage
-        if [ -f backend/credentials/service-account.json ]; then
+        if [ -f "$HOST_ABS/backend/credentials/service-account.json" ]; then
           fly secrets set -c config/fly.prod.toml --stage \
-            GOOGLE_SERVICE_ACCOUNT_JSON="$(cat backend/credentials/service-account.json)"
+            GOOGLE_SERVICE_ACCOUNT_JSON="$(cat $HOST_ABS/backend/credentials/service-account.json)"
           echo "✅ GOOGLE_SERVICE_ACCOUNT_JSON staged"
         else
           echo "⚠️  backend/credentials/service-account.json not found — GOOGLE_SERVICE_ACCOUNT_JSON not staged"
         fi
       - |
-        echo "Deploying backend to movida.fly.dev..."
+        cd "{{.SOURCE_DIR}}"
+        echo "Deploying backend to movida.fly.dev (from $(pwd))..."
         fly deploy --remote-only -c config/fly.prod.toml
       - |
         echo "Waiting for machine to be ready..."
@@ -231,10 +471,12 @@ tasks:
         else
           echo "⚠️  Health check failed or timed out — check: task fly:logs"
         fi
+      - task: _record-deploy
+        vars: { ENV: prod, COMPONENT: backend, SHA: "{{.GIT_SHA | default \"\"}}" }
 
-  prod:remote:frontend:
-    desc: "Build + deploy prod frontend to Cloudflare Pages (public: joinmovida.com,
-      alias: movida.pages.dev)"
+  prod:remote:cwd:frontend:
+    desc: "[CWD primitive] Build + deploy prod frontend to Cloudflare Pages from
+      SOURCE_DIR."
     dotenv:
       [
         "config/base.env",
@@ -243,6 +485,8 @@ tasks:
         "config/secrets.prod.env",
       ]
     vars:
+      SOURCE_DIR: "{{.SOURCE_DIR | default \".\"}}"
+      HOST_DIR: "{{.HOST_DIR | default \".\"}}"
       PROJECT_NAME: "{{.PROJECT_NAME | default \"movida\"}}"
     cmds:
       - |
@@ -259,56 +503,394 @@ tasks:
           echo "❌ Cloudflare authentication failed — check token in config/secrets.env"
           exit 1
         fi
-        echo "Building prod frontend (VITE_API_URL=$VITE_API_URL)..."
-        (cd frontend && VITE_API_URL=$VITE_API_URL VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" VITE_UMAMI_WEBSITE_ID="${VITE_UMAMI_WEBSITE_ID:-}" npm run build)
+        echo "Building prod frontend in {{.SOURCE_DIR}}/frontend (VITE_API_URL=$VITE_API_URL)..."
+        cd "{{.SOURCE_DIR}}/frontend"
+        if [ ! -d node_modules ]; then
+          echo "  Installing frontend deps (npm ci)..."
+          npm ci --no-audit --no-fund
+        fi
+        VITE_API_URL=$VITE_API_URL VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" VITE_UMAMI_WEBSITE_ID="${VITE_UMAMI_WEBSITE_ID:-}" npm run build
         echo "Deploying to Cloudflare Pages (branch: main)..."
-        # Run wrangler from frontend/ so it discovers wrangler.toml,
-        # functions/ and dist/ as siblings — required for Pages Functions
-        # detection (Cloudflare expects functions/ adjacent to the build
-        # output dir).
-        cd frontend && \
         CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN \
         CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID \
         npx --yes wrangler pages deploy \
           --project-name={{.PROJECT_NAME}} \
           --branch=main
         echo "✅ Prod frontend deployed: https://joinmovida.com (alias: https://movida.pages.dev)"
+      - task: _record-deploy
+        vars: { ENV: prod, COMPONENT: frontend, SHA: "{{.GIT_SHA | default \"\"}}" }
 
-  # ──────────────────────────────────────────────────────────────────────────
-  # PROD REMOTE — full deploy (calls atomic tasks in sequence)
-  # ──────────────────────────────────────────────────────────────────────────
+  # ══════════════════════════════════════════════════════════════════════════
+  # CI orchestrators — full deploy from CWD (no git checks, no worktree)
+  # ══════════════════════════════════════════════════════════════════════════
 
-  prod:remote:
-    desc: "Full remote prod deploy: DB migrations + backend (secrets+fly) + frontend"
-    prompt: "This will deploy to PRODUCTION. Continue?"
-    dotenv:
-      [
-        "config/base.env",
-        "config/prod.remote.env",
-        "config/secrets.env",
-        "config/secrets.prod.env",
-      ]
+  staging:remote:cwd:
+    desc: "[CWD] Full staging deploy from CWD: db + backend + frontend (no git
+      checks)."
+    cmds:
+      - task: staging:remote:cwd:db
+      - task: staging:remote:cwd:backend
+      - task: staging:remote:cwd:frontend
+
+  prod:remote:cwd:
+    desc: "[CWD] Full prod deploy from CWD: db + backend + frontend (no git checks)."
+    cmds:
+      - task: prod:remote:cwd:db
+      - task: prod:remote:cwd:backend
+      - task: prod:remote:cwd:frontend
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # STAGING REMOTE — worktree-aware orchestrators (interactive use)
+  # ══════════════════════════════════════════════════════════════════════════
+
+  staging:remote:db:
+    desc: "Run DB migrations on Neon staging (develop branch). REF must be a develop
+      commit."
+    vars:
+      REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+      WT_ABS:
+        sh: |
+          REF="{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+          [ -z "$REF" ] && exit 0
+          SHORT=$(git rev-parse --short=7 "$REF^{commit}" 2>/dev/null) || exit 0
+          echo "$(pwd)/.worktrees/ref-$SHORT"
+      HOST_ABS:
+        sh: pwd
+      GIT_SHA:
+        sh: |
+          REF="{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+          [ -z "$REF" ] && exit 0
+          git rev-parse "$REF^{commit}" 2>/dev/null || true
+    deps:
+      - task: _prepare-ref-staging
+        vars: { REF: "{{.REF}}" }
+    cmds:
+      - task: staging:remote:cwd:db
+        vars:
+          SOURCE_DIR: "{{.WT_ABS}}"
+          HOST_DIR: "{{.HOST_ABS}}"
+          GIT_SHA: "{{.GIT_SHA}}"
+
+  staging:remote:backend:
+    desc: "Stage Fly secrets + deploy backend to movida-staging.fly.dev. REF must be
+      a develop commit."
+    vars:
+      REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+      LOG_LEVEL: "{{.LOG_LEVEL | default \"\"}}"
+      WT_ABS:
+        sh: |
+          REF="{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+          [ -z "$REF" ] && exit 0
+          SHORT=$(git rev-parse --short=7 "$REF^{commit}" 2>/dev/null) || exit 0
+          echo "$(pwd)/.worktrees/ref-$SHORT"
+      HOST_ABS:
+        sh: pwd
+      GIT_SHA:
+        sh: |
+          REF="{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+          [ -z "$REF" ] && exit 0
+          git rev-parse "$REF^{commit}" 2>/dev/null || true
+    deps:
+      - task: _prepare-ref-staging
+        vars: { REF: "{{.REF}}" }
+    cmds:
+      - task: staging:remote:cwd:backend
+        vars:
+          SOURCE_DIR: "{{.WT_ABS}}"
+          HOST_DIR: "{{.HOST_ABS}}"
+          GIT_SHA: "{{.GIT_SHA}}"
+          LOG_LEVEL: "{{.LOG_LEVEL}}"
+
+  staging:remote:frontend:
+    desc: "Build + deploy staging frontend to Cloudflare Pages (public:
+      develop.joinmovida.com, alias: develop.movida.pages.dev). REF must be a
+      develop commit."
+    vars:
+      REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+      PROJECT_NAME: "{{.PROJECT_NAME | default \"movida\"}}"
+      WT_ABS:
+        sh: |
+          REF="{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+          [ -z "$REF" ] && exit 0
+          SHORT=$(git rev-parse --short=7 "$REF^{commit}" 2>/dev/null) || exit 0
+          echo "$(pwd)/.worktrees/ref-$SHORT"
+      HOST_ABS:
+        sh: pwd
+      GIT_SHA:
+        sh: |
+          REF="{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+          [ -z "$REF" ] && exit 0
+          git rev-parse "$REF^{commit}" 2>/dev/null || true
+    deps:
+      - task: _prepare-ref-staging
+        vars: { REF: "{{.REF}}" }
+    cmds:
+      - task: staging:remote:cwd:frontend
+        vars:
+          SOURCE_DIR: "{{.WT_ABS}}"
+          HOST_DIR: "{{.HOST_ABS}}"
+          GIT_SHA: "{{.GIT_SHA}}"
+          PROJECT_NAME: "{{.PROJECT_NAME}}"
+
+  staging:remote:
+    desc: "Full remote staging deploy: DB migrations + backend (secrets+fly) +
+      frontend. REF must be a develop commit (e.g., task deploy:staging:remote
+      -- develop)."
+    vars:
+      REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+    deps:
+      - task: _prepare-ref-staging
+        vars: { REF: "{{.REF}}" }
     cmds:
       - |
-        if [ ! -f config/secrets.prod.env ]; then
-          echo "❌ config/secrets.prod.env not found — copy config/secrets.prod.env.example and fill in values"
-          exit 1
-        fi
-        if [ -z "$DATABASE_URL" ]; then
-          echo "❌ DATABASE_URL not set — fill in config/secrets.prod.env"
-          exit 1
-        fi
+        SHORT=$(git rev-parse --short=7 "{{.REF}}^{commit}")
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "  Deploying REMOTE STAGING"
+        echo "  Ref:      {{.REF}} ($SHORT) — from worktree .worktrees/ref-$SHORT"
+        echo "  Backend:  https://movida-staging.fly.dev"
+        echo "  Frontend: https://develop.joinmovida.com (alias: https://develop.movida.pages.dev)"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      - echo "━━━━ [1/3] DB migrations ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      - task: staging:remote:db
+        vars: { REF: "{{.REF}}" }
+      - echo "━━━━ [2/3] Backend ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      - task: staging:remote:backend
+        vars: { REF: "{{.REF}}" }
+      - echo "━━━━ [3/3] Frontend ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      - task: staging:remote:frontend
+        vars: { REF: "{{.REF}}" }
+      - |
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "✅ Remote staging fully deployed"
+        echo "   Backend:  https://movida-staging.fly.dev"
+        echo "   Frontend: https://develop.joinmovida.com (alias: https://develop.movida.pages.dev)"
+        echo ""
+        echo "Verify:"
+        echo "   task open:session:staging:remote              → Open in fresh isolated browser"
+        echo "   task open:session:staging:remote BROWSERS=2   → Multi-user QA"
+        echo "   task deploy:staging:status  → what is currently deployed"
+        echo "   task db:check:staging:remote   → DB migration state"
+        echo "   task db:check:tags-drift:staging:remote → reference-tag drift vs scenarios/staging/"
+        echo "   task logs:staging:remote       → backend logs"
+        echo ""
+        echo "If reference data needs to match scenarios/staging/ exactly:"
+        echo "   task db:seed:staging:remote"
+        echo "═══════════════════════════════════════════════════════════════"
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # PROD REMOTE — worktree-aware orchestrators (interactive use)
+  #
+  # Each prod orchestrator displays "current → next + diff" before prompting.
+  # The prompt text is computed at parse time via vars.sh:.
+  # ══════════════════════════════════════════════════════════════════════════
+
+  prod:remote:db:
+    desc: "Run DB migrations on Neon prod (main branch). REF must be an annotated
+      release tag."
+    vars:
+      REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+      WT_ABS:
+        sh: |
+          REF="{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+          [ -z "$REF" ] && exit 0
+          SHORT=$(git rev-parse --short=7 "$REF^{commit}" 2>/dev/null) || exit 0
+          echo "$(pwd)/.worktrees/ref-$SHORT"
+      HOST_ABS:
+        sh: pwd
+      GIT_SHA:
+        sh: |
+          REF="{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+          [ -z "$REF" ] && exit 0
+          git rev-parse "$REF^{commit}" 2>/dev/null || true
+      DEPLOY_INFO:
+        sh: |
+          REF="{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+          [ -z "$REF" ] && exit 0
+          git fetch origin '+refs/deploys/prod/db:refs/deploys/prod/db' --quiet 2>/dev/null || true
+          CUR=$(git rev-parse refs/deploys/prod/db 2>/dev/null || echo "")
+          CUR_NAME="(none)"
+          [ -n "$CUR" ] && CUR_NAME=$(git describe --tags --always "$CUR" 2>/dev/null || echo "$CUR")
+          echo "current=$CUR_NAME → next=$REF"
+    deps:
+      - task: _prepare-ref-prod
+        vars: { REF: "{{.REF}}" }
+    preconditions:
+      - sh: |
+          REF="{{.REF}}"
+          case "$REF" in
+            db-v[0-9]*|v[0-9]*) exit 0 ;;
+            backend-v[0-9]*|frontend-v[0-9]*)
+              echo "❌ Tag '$REF' is for a different component. Use 'task deploy:prod:remote:db -- db-vX.Y.Z'." >&2; exit 1 ;;
+          esac
+        msg: "REF must be db-vX.Y.Z (or legacy vX.Y.Z)"
+    prompt: |
+      PROD DB MIGRATION
+      {{.DEPLOY_INFO}}
+      Continue?
+    cmds:
+      - task: prod:remote:cwd:db
+        vars:
+          SOURCE_DIR: "{{.WT_ABS}}"
+          HOST_DIR: "{{.HOST_ABS}}"
+          GIT_SHA: "{{.GIT_SHA}}"
+
+  prod:remote:backend:
+    desc: "Stage Fly secrets + deploy backend to movida.fly.dev. REF must be an
+      annotated release tag."
+    vars:
+      REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+      WT_ABS:
+        sh: |
+          REF="{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+          [ -z "$REF" ] && exit 0
+          SHORT=$(git rev-parse --short=7 "$REF^{commit}" 2>/dev/null) || exit 0
+          echo "$(pwd)/.worktrees/ref-$SHORT"
+      HOST_ABS:
+        sh: pwd
+      GIT_SHA:
+        sh: |
+          REF="{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+          [ -z "$REF" ] && exit 0
+          git rev-parse "$REF^{commit}" 2>/dev/null || true
+      DEPLOY_INFO:
+        sh: |
+          REF="{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+          [ -z "$REF" ] && exit 0
+          git fetch origin '+refs/deploys/prod/backend:refs/deploys/prod/backend' --quiet 2>/dev/null || true
+          CUR=$(git rev-parse refs/deploys/prod/backend 2>/dev/null || echo "")
+          CUR_NAME="(none)"
+          [ -n "$CUR" ] && CUR_NAME=$(git describe --tags --always "$CUR" 2>/dev/null || echo "$CUR")
+          DIFF=""
+          if [ -n "$CUR" ] && git rev-parse --verify "$REF" >/dev/null 2>&1; then
+            COUNT=$(git rev-list --count "$CUR..$REF^{commit}" 2>/dev/null || echo "?")
+            DIFF=" ($COUNT commits ahead)"
+          fi
+          echo "current=$CUR_NAME → next=$REF$DIFF"
+    deps:
+      - task: _prepare-ref-prod
+        vars: { REF: "{{.REF}}" }
+    preconditions:
+      - sh: |
+          REF="{{.REF}}"
+          case "$REF" in
+            backend-v[0-9]*|v[0-9]*) exit 0 ;;
+            db-v[0-9]*|frontend-v[0-9]*)
+              echo "❌ Tag '$REF' is for a different component. Use 'task deploy:prod:remote:backend -- backend-vX.Y.Z'." >&2; exit 1 ;;
+          esac
+        msg: "REF must be backend-vX.Y.Z (or legacy vX.Y.Z)"
+    prompt: |
+      PROD BACKEND DEPLOY
+      {{.DEPLOY_INFO}}
+      Continue?
+    cmds:
+      - task: prod:remote:cwd:backend
+        vars:
+          SOURCE_DIR: "{{.WT_ABS}}"
+          HOST_DIR: "{{.HOST_ABS}}"
+          GIT_SHA: "{{.GIT_SHA}}"
+
+  prod:remote:frontend:
+    desc: "Build + deploy prod frontend to Cloudflare Pages (public: joinmovida.com,
+      alias: movida.pages.dev). REF must be an annotated release tag."
+    vars:
+      REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+      PROJECT_NAME: "{{.PROJECT_NAME | default \"movida\"}}"
+      WT_ABS:
+        sh: |
+          REF="{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+          [ -z "$REF" ] && exit 0
+          SHORT=$(git rev-parse --short=7 "$REF^{commit}" 2>/dev/null) || exit 0
+          echo "$(pwd)/.worktrees/ref-$SHORT"
+      HOST_ABS:
+        sh: pwd
+      GIT_SHA:
+        sh: |
+          REF="{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+          [ -z "$REF" ] && exit 0
+          git rev-parse "$REF^{commit}" 2>/dev/null || true
+      DEPLOY_INFO:
+        sh: |
+          REF="{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+          [ -z "$REF" ] && exit 0
+          git fetch origin '+refs/deploys/prod/frontend:refs/deploys/prod/frontend' --quiet 2>/dev/null || true
+          CUR=$(git rev-parse refs/deploys/prod/frontend 2>/dev/null || echo "")
+          CUR_NAME="(none)"
+          [ -n "$CUR" ] && CUR_NAME=$(git describe --tags --always "$CUR" 2>/dev/null || echo "$CUR")
+          echo "current=$CUR_NAME → next=$REF"
+    deps:
+      - task: _prepare-ref-prod
+        vars: { REF: "{{.REF}}" }
+    preconditions:
+      - sh: |
+          REF="{{.REF}}"
+          case "$REF" in
+            frontend-v[0-9]*|v[0-9]*) exit 0 ;;
+            db-v[0-9]*|backend-v[0-9]*)
+              echo "❌ Tag '$REF' is for a different component. Use 'task deploy:prod:remote:frontend -- frontend-vX.Y.Z'." >&2; exit 1 ;;
+          esac
+        msg: "REF must be frontend-vX.Y.Z (or legacy vX.Y.Z)"
+    prompt: |
+      PROD FRONTEND DEPLOY
+      {{.DEPLOY_INFO}}
+      Continue?
+    cmds:
+      - task: prod:remote:cwd:frontend
+        vars:
+          SOURCE_DIR: "{{.WT_ABS}}"
+          HOST_DIR: "{{.HOST_ABS}}"
+          GIT_SHA: "{{.GIT_SHA}}"
+          PROJECT_NAME: "{{.PROJECT_NAME}}"
+
+  prod:remote:
+    desc: "Full remote prod deploy: DB migrations + backend (secrets+fly) +
+      frontend. REF must be an annotated release tag (e.g., task
+      deploy:prod:remote -- v1.2.0)."
+    vars:
+      REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+      DEPLOY_INFO:
+        sh: |
+          REF="{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
+          [ -z "$REF" ] && exit 0
+          git fetch origin '+refs/deploys/prod/*:refs/deploys/prod/*' --tags --quiet 2>/dev/null || true
+          CUR=$(git rev-parse refs/deploys/prod/backend 2>/dev/null || echo "")
+          CUR_NAME="(none)"
+          [ -n "$CUR" ] && CUR_NAME=$(git describe --tags --always "$CUR" 2>/dev/null || echo "$CUR")
+          DIFF=""
+          LOG=""
+          if [ -n "$CUR" ] && git rev-parse --verify "$REF" >/dev/null 2>&1; then
+            COUNT=$(git rev-list --count "$CUR..$REF^{commit}" 2>/dev/null || echo "?")
+            DIFF=" ($COUNT commits)"
+            LOG=$(git log --oneline "$CUR..$REF^{commit}" 2>/dev/null | head -20)
+          fi
+          printf "current=%s → next=%s%s\n%s" "$CUR_NAME" "$REF" "$DIFF" "$LOG"
+    deps:
+      - task: _prepare-ref-prod
+        vars: { REF: "{{.REF}}" }
+    prompt: |
+      ⚠️  DEPLOY TO PRODUCTION
+
+      {{.DEPLOY_INFO}}
+
+      Continue?
+    cmds:
+      - |
+        SHORT=$(git rev-parse --short=7 "{{.REF}}^{commit}")
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo "  Deploying PRODUCTION"
+        echo "  Tag:      {{.REF}} ($SHORT) — from worktree .worktrees/ref-$SHORT"
         echo "  Backend:  https://movida.fly.dev"
         echo "  Frontend: https://joinmovida.com (alias: https://movida.pages.dev)"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       - echo "━━━━ [1/3] DB migrations ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       - task: prod:remote:db
+        vars: { REF: "{{.REF}}" }
       - echo "━━━━ [2/3] Backend ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       - task: prod:remote:backend
+        vars: { REF: "{{.REF}}" }
       - echo "━━━━ [3/3] Frontend ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       - task: prod:remote:frontend
+        vars: { REF: "{{.REF}}" }
       - |
         echo ""
         echo "═══════════════════════════════════════════════════════════════"
@@ -317,8 +899,15 @@ tasks:
         echo "   Frontend: https://joinmovida.com (alias: https://movida.pages.dev)"
         echo ""
         echo "Verify:"
-        echo "   task db:check:prod   → DB migration state"
-        echo "   task fly:logs        → backend logs"
+        echo "   task open:session:prod              → Open in fresh isolated browser"
+        echo "   task open:session:prod BROWSERS=2   → Multi-user smoke check"
+        echo "   task deploy:prod:status  → what is currently deployed"
+        echo "   task db:check:prod          → DB migration state"
+        echo "   task db:check:tags-drift:prod → reference-tag drift vs scenarios/prod/"
+        echo "   task fly:logs               → backend logs"
+        echo ""
+        echo "If reference data needs to match scenarios/prod/ exactly:"
+        echo "   task db:seed:prod"
         echo "═══════════════════════════════════════════════════════════════"
 
   # ──────────────────────────────────────────────────────────────────────────
@@ -366,6 +955,8 @@ tasks:
         echo "   Database: localhost:${POSTGRES_PORT:-5436}"
         echo ""
         echo "Next steps:"
+        echo "   task open:session:staging:local              → Open in fresh isolated browser"
+        echo "   task open:session:staging:local BROWSERS=2   → Multi-user QA"
         echo "   task logs:staging:local   → View logs"
         echo "═══════════════════════════════════════════════════════════════"
 
@@ -410,7 +1001,7 @@ tasks:
         echo "   Backend:  http://localhost:${BACKEND_PORT:-8002}"
         echo "═══════════════════════════════════════════════════════════════"
 
-  staging:local:dirty:
+  staging:local:cwd:
     desc: "Build from working directory + deploy to local staging. DRY_RUN=1 to
       preview."
     dotenv:
@@ -427,7 +1018,7 @@ tasks:
           echo "🔍 DRY RUN — would deploy to local STAGING (from working directory)"
           exit 0
         fi
-      - task: :build:dirty
+      - task: :build:cwd
       - |
         TIMESTAMP=$(date +%Y%m%d-%H%M%S)
         TAG="dirty-$TIMESTAMP"
