@@ -196,8 +196,8 @@ class TestEnrichmentPipeline:
 @pytest.mark.unit
 class TestGeocodingStage:
     @patch(
-        "backend.services.pipeline.stages.geocoding.geocode_location",
-        return_value=(48.86, 2.35),
+        "backend.services.pipeline.stages.geocoding.geocode_candidates",
+        return_value=((48.86, 2.35), "Paris", "nominatim"),
     )
     def test_geocodes_event_with_location(self, mock_geo):
         from backend.services.pipeline.stages.geocoding import GeocodingStage
@@ -211,7 +211,8 @@ class TestGeocodingStage:
         assert event.longitude == 2.35
 
     @patch(
-        "backend.services.pipeline.stages.geocoding.geocode_location", return_value=None
+        "backend.services.pipeline.stages.geocoding.geocode_candidates",
+        return_value=None,
     )
     def test_returns_false_on_geocode_failure(self, mock_geo):
         from backend.services.pipeline.stages.geocoding import GeocodingStage
@@ -227,7 +228,11 @@ class TestGeocodingStage:
         stage = GeocodingStage()
         event = _make_event(location=None)
 
-        assert stage.should_process(event) is False
+        # Events without a location are still processed (so they surface as
+        # geocoding failures rather than silent skips), but `process` returns
+        # False because there's nothing to geocode.
+        assert stage.should_process(event) is True
+        assert stage.process(event) is False
 
     def test_skips_already_geocoded(self):
         from backend.services.pipeline.stages.geocoding import GeocodingStage
@@ -308,4 +313,8 @@ class TestLinkExtractionStage:
         stage = LinkExtractionStage()
         event = _make_event(description="No links here at all")
 
-        assert stage.process(event) is False
+        # No URLs in the description is a normal outcome (not a failure):
+        # the stage runs cleanly, returns True, and stores an empty list so
+        # we don't re-scan on every sync.
+        assert stage.process(event) is True
+        assert event.links == []

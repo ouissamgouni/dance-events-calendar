@@ -15,10 +15,12 @@ class PriceExtractionStage(EnrichmentStage):
 
     def process(self, event: CachedEvent) -> bool:
         price = extract_price(event.description)
-        if price:
-            event.price_min = price["min"]
-            event.price_max = price["max"]
-            event.price_currency = price["currency"]
-            event.price_is_free = price["is_free"]
+        if not price:
+            # No price found in the description is normal (most events are
+            # free or just don't mention a price) — not a failure.
             return True
-        return False
+        event.price_min = price["min"]
+        event.price_max = price["max"]
+        event.price_currency = price["currency"]
+        event.price_is_free = price["is_free"]
+        return True

@@ -1,0 +1,73 @@
+tag_groups:
+  - slug: format
+    label: Format
+    ordinal: 10
+    allow_multiple: true
+    color: "#f472b6"
+    tags:
+      - slug: social
+        label: Social
+      - slug: class
+        label: Class
+      - slug: workshop
+        label: Workshop
+      - slug: festival
+        label: Festival
+
+  - slug: dance-style
+    label: Dance Style
+    ordinal: 20
+    allow_multiple: true
+    color: "#fb923c"
+    tags:
+      - slug: salsa
+        label: Salsa
+      - slug: bachata
+        label: Bachata
+      - slug: kizomba
+        label: Kizomba
+      - slug: zouk
+        label: Zouk
+
+  - slug: level
+    label: Level
+    ordinal: 30
+    allow_multiple: true
+    color: "#60a5fa"
+    tags:
+      - slug: beginner-friendly
+        label: Beginner-Friendly
+      - slug: intermediate
+        label: Intermediate
+      - slug: advanced
+        label: Advanced
+      - slug: all-levels
+        label: All Levels
+
+  - slug: venue
+    label: Venue
+    ordinal: 40
+    allow_multiple: true
+    color: "#34d399"
+    tags:
+      - slug: indoor
+        label: Indoor
+      - slug: outdoor
+        label: Outdoor
+      - slug: rooftop
+        label: Rooftop
+
+  - slug: vibe
+    label: Vibe
+    ordinal: 50
+    allow_multiple: true
+    color: "#e879f9"
+    tags:
+      - slug: live-band
+        label: Live Band
+      - slug: social-atmosphere
+        label: Social Atmosphere
+      - slug: good-music
+        label: Good Music
+      - slug: crowded
+        label: Crowded

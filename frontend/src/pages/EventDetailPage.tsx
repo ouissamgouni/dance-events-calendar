@@ -2,13 +2,21 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { fetchEvent, updateEvent, fetchTagGroups } from '../api';
-import { useSavedEvents } from '../context/SavedEventsContext';
 import { useAuth } from '../context/AuthContext';
-import { trackView, trackLink } from '../utils/tracking';
+import { trackView } from '../utils/tracking';
+import { getDeviceId } from '../utils/deviceId';
+import { useReferralAttribution } from '../hooks/useReferralAttribution';
 import EventDetailContent from '../components/EventDetailContent';
+import AdminEventDetailContent from '../components/AdminEventDetailContent';
 import EventMap from '../components/EventMap';
 import SuggestTagsButton from '../components/SuggestTagsButton';
 import GoingButton from '../components/GoingButton';
+import SaveEventButton from '../components/SaveEventButton';
+import RateEventButton from '../components/RateEventButton';
+import EventReviewsSection from '../components/EventReviewsSection';
+import AttendeeList from '../components/AttendeeList';
+import ShareButton from '../components/ShareButton';
+import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import type { CalendarEvent, TagGroup } from '../types';
 
 export default function EventDetailPage() {
@@ -18,8 +26,8 @@ export default function EventDetailPage() {
     const [event, setEvent] = useState<CalendarEvent | null>(null);
     const [error, setError] = useState(false);
     const [loading, setLoading] = useState(true);
-    const { isSaved, toggleSave } = useSavedEvents();
     const { user } = useAuth();
+    const { showRatings } = useFeatureFlags();
 
     // Edit mode — admin must explicitly activate inline editing
     const [editMode, setEditMode] = useState(false);
@@ -32,12 +40,17 @@ export default function EventDetailPage() {
     const [editingTitle, setEditingTitle] = useState(false);
     const [titleValue, setTitleValue] = useState('');
     const [savingTitle, setSavingTitle] = useState(false);
+    const [reviewCount, setReviewCount] = useState(0);
     const titleCancelledRef = useRef(false);
+
+    // Capture `?ref=share&src=` from the URL so any subsequent RSVP on
+    // this event can be attributed back to the originating share_code.
+    useReferralAttribution(eventId);
 
     useEffect(() => {
         if (!eventId) return;
         let cancelled = false;
-        fetchEvent(eventId)
+        fetchEvent(eventId, { fresh: true })
             .then((e) => {
                 if (cancelled) return;
                 setEvent(e);
@@ -63,7 +76,9 @@ export default function EventDetailPage() {
 
     const handleTagsUpdated = () => {
         if (!eventId) return;
-        fetchEvent(eventId).then((e) => { setEvent(e); setTitleValue(e.title); }).catch(() => { });
+        fetchEvent(eventId, { fresh: true })
+            .then((e) => { setEvent(e); setTitleValue(e.title); })
+            .catch(() => { });
     };
 
     const handleTitleBlur = async () => {
@@ -186,9 +201,9 @@ export default function EventDetailPage() {
                         </div>
                     ) : (
                         <h1
-                            className={`text-2xl font-bold text-slate-900 leading-tight mb-6 ${editMode ? 'cursor-text hover:bg-slate-100 -mx-2 px-2 py-1 rounded transition' : ''}`}
-                            onClick={editMode ? () => setEditingTitle(true) : undefined}
-                            title={editMode ? 'Click to edit title' : undefined}
+                            className={`text-2xl font-bold text-slate-900 leading-tight mb-6 ${editMode && user?.is_admin ? 'cursor-text hover:bg-slate-100 -mx-2 px-2 py-1 rounded transition' : ''}`}
+                            onClick={editMode && user?.is_admin ? () => setEditingTitle(true) : undefined}
+                            title={editMode && user?.is_admin ? 'Click to edit title' : undefined}
                         >
                             {event.title}
                         </h1>
@@ -200,14 +215,20 @@ export default function EventDetailPage() {
                         <div className="lg:w-1/3 min-w-0">
                             <article className="bg-white rounded-2xl shadow-lg overflow-hidden">
                                 <div className="px-6 py-5">
-                                    <EventDetailContent
-                                        event={event}
-                                        editable={editMode}
-                                        onFieldSave={handleFieldSave}
-                                        onTagsUpdated={handleTagsUpdated}
-                                        maxTags={event.tags?.length ?? undefined}
-                                        showActions={false}
-                                    />
+                                    {editMode && user?.is_admin ? (
+                                        <AdminEventDetailContent
+                                            event={event}
+                                            onFieldSave={handleFieldSave}
+                                            onTagsUpdated={handleTagsUpdated}
+                                        />
+                                    ) : (
+                                        <EventDetailContent
+                                            event={event}
+                                            onTagsUpdated={handleTagsUpdated}
+                                            maxTags={event.tags?.length ?? undefined}
+                                            showActions={false}
+                                        />
+                                    )}
                                 </div>
 
                                 {/* Suggest tags panel */}
@@ -217,42 +238,32 @@ export default function EventDetailPage() {
                                             eventId={event.event_id}
                                             tagGroups={tagGroups}
                                             existingTagIds={new Set(event.tags?.map((t) => t.id) ?? [])}
-                                            deviceId={localStorage.getItem('device_id') || 'anonymous'}
+                                            deviceId={getDeviceId()}
                                             onClose={() => setShowSuggestTags(false)}
                                         />
                                     </div>
                                 )}
 
-                                {/* Actions bar */}
-                                <div className="border-t border-slate-100 px-4 py-2 flex items-center gap-1.5 flex-wrap">
-                                    <button
-                                        onClick={() => toggleSave(event.event_id)}
-                                        className={`text-xs rounded px-2.5 py-1 transition flex items-center gap-1 shrink-0 ${isSaved(event.event_id) ? 'text-slate-800 bg-slate-200 hover:bg-slate-300' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'}`}
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-                                            <path d="M5 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14l-5-2.5L5 18V4Z" />
-                                        </svg>
-                                        {isSaved(event.event_id) ? 'Saved' : 'Save'}
-                                    </button>
+                                {/* Interest — combined engagement section: going attendees + total saves. */}
+                                <div className="border-t border-slate-100 px-4 py-3">
+                                    <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                                        Interest
+                                    </h3>
+                                    <AttendeeList eventId={event.event_id} expanded />
+                                </div>
+
+                                {/* Actions bar — primary CTA (Going) is visually emphasised; the
+                                    rest are secondary. A sticky mobile bar mirrors the primary
+                                    action so users don't have to scroll back up to convert. */}
+                                <div className="border-t border-slate-100 px-4 py-3 flex items-center gap-2 flex-wrap">
                                     <GoingButton eventId={event.event_id} appearance="pill" />
-                                    <button
-                                        onClick={() => {
-                                            navigator.clipboard.writeText(shareUrl).catch(() => { });
-                                            trackLink(event.event_id, shareUrl);
-                                        }}
-                                        className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded px-2.5 py-1 transition shrink-0"
-                                    >
-                                        📋 Copy
-                                    </button>
-                                    <a
-                                        href={`https://wa.me/?text=${encodeURIComponent(event.title + ' — ' + shareUrl)}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        onClick={() => trackLink(event.event_id, `https://wa.me/?text=${encodeURIComponent(event.title + ' — ' + shareUrl)}`)}
-                                        className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded px-2.5 py-1 transition shrink-0"
-                                    >
-                                        💬 WhatsApp
-                                    </a>
+                                    <SaveEventButton eventId={event.event_id} appearance="pill" />
+                                    <ShareButton
+                                        eventId={event.event_id}
+                                        title={event.title}
+                                        url={shareUrl}
+                                    />
+                                    {showRatings && <RateEventButton eventId={event.event_id} appearance="pill" eventHasReviews={reviewCount > 0} />}
                                     {!editMode && (
                                         <button
                                             onClick={() => {
@@ -267,7 +278,7 @@ export default function EventDetailPage() {
                                             </svg>
                                         </button>
                                     )}
-                                    {user && (
+                                    {user?.is_admin && (
                                         <button
                                             onClick={() => setEditMode((m) => !m)}
                                             className={`ml-auto inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition shrink-0 ${editMode
@@ -293,6 +304,11 @@ export default function EventDetailPage() {
                                         </button>
                                     )}
                                 </div>
+                                {showRatings && (
+                                    <div className="px-6 pb-5">
+                                        <EventReviewsSection eventId={event.event_id} onAggregateLoaded={(a) => setReviewCount(a?.count ?? 0)} />
+                                    </div>
+                                )}
                             </article>
                         </div>
 
@@ -304,6 +320,26 @@ export default function EventDetailPage() {
                         )}
                     </div>
                 </div>
+
+                {/* Sticky mobile CTA bar — mirrors the in-card actions bar so
+                    every primary affordance (Going, Save, Rate, Share) is
+                    reachable without scrolling. Hidden on lg+ where the
+                    in-card action bar is visible alongside the description. */}
+                <div className="lg:hidden fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur px-3 py-2 shadow-[0_-2px_8px_rgba(0,0,0,0.04)] flex items-center gap-2 overflow-x-auto">
+                    <GoingButton eventId={event.event_id} appearance="pill" />
+                    <SaveEventButton eventId={event.event_id} appearance="pill" />
+                    {showRatings && (
+                        <RateEventButton eventId={event.event_id} appearance="pill" eventHasReviews={reviewCount > 0} />
+                    )}
+                    <ShareButton
+                        eventId={event.event_id}
+                        title={event.title}
+                        url={shareUrl}
+                    />
+                </div>
+                {/* Spacer so the sticky bar never overlaps page content on
+                    mobile. Matches the bar's vertical footprint. */}
+                <div className="lg:hidden h-16" aria-hidden="true" />
             </div>
 
         </>

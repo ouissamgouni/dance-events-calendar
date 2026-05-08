@@ -1,0 +1,67 @@
+# Cloudflare Pages configuration for the Movida frontend (React SPA)
+# Docs: https://developers.cloudflare.com/pages/functions/wrangler-configuration/
+#
+# NOTE: Pages does NOT support the [build] section in wrangler.toml (that is
+# Workers-only). Build command, NODE_VERSION, and all VITE_* environment
+# variables must be configured in the Cloudflare dashboard:
+#
+#   Pages → movida → Settings → Builds & deployments
+#     • Build command:        cd frontend && npm ci && npm run build
+#     • Build output dir:     frontend/dist
+#
+#   Pages → movida → Settings → Environment variables
+#     Production:
+#       NODE_VERSION          = 22
+#       VITE_API_URL          = https://api.joinmovida.com
+#       VITE_UMAMI_URL        = https://cloud.umami.is
+#       VITE_UMAMI_WEBSITE_ID = <prod-uuid>          (encrypted)
+#       Custom domain         = joinmovida.com
+#     Preview (staging):
+#       NODE_VERSION          = 22
+#       VITE_API_URL          = https://api-develop.joinmovida.com
+#       VITE_UMAMI_URL        = https://cloud.umami.is
+#       VITE_UMAMI_WEBSITE_ID = <staging-uuid>       (encrypted)
+#       Custom domain         = develop.joinmovida.com
+#
+# Why a same-site API subdomain (api[-develop].joinmovida.com)?
+# The session_token cookie is HttpOnly + SameSite=None + Secure. When the API
+# lives on movida[-staging].fly.dev the cookie is third-party relative to the
+# frontend, which Chrome/Safari (ITP) increasingly block. Putting the API on a
+# subdomain of joinmovida.com makes the cookie first-party (same registrable
+# domain) and reliably persisted across reloads.
+
+# Legacy Pages hostnames remain available during transition:
+#   Production alias: movida.pages.dev
+#   Staging alias:    develop.movida.pages.dev
+
+name = "movida"
+compatibility_date = "2026-04-30"
+pages_build_output_dir = "dist"
+
+# ─────────────────────────────────────────────────────────────────────────
+# Pages Functions runtime env vars (per environment).
+#
+# IMPORTANT: Once wrangler.toml is uploaded with a deploy, Cloudflare Pages
+# switches the project into "wrangler.toml-managed" mode. Dashboard env
+# vars become read-only and are wiped on each deploy. Only vars declared
+# here (plus secrets uploaded via `wrangler pages secret put`) are applied
+# at the edge.
+#
+# These vars are consumed by Pages Functions in `functions/` (e.g. the
+# OG/JSON-LD pre-render at functions/event/[eventId].ts). They are NOT
+# the same as the build-time VITE_* vars used by the Vite SPA — those
+# are injected into the bundle at `npm run build` and don't need to be
+# declared here.
+#
+# To add a secret (not committed):
+#   npx wrangler pages secret put NAME --project-name=movida --branch=develop
+#   npx wrangler pages secret put NAME --project-name=movida --branch=main
+# ─────────────────────────────────────────────────────────────────────────
+
+[env.production.vars]
+API_BASE = "https://api.joinmovida.com"
+PUBLIC_BASE = "https://joinmovida.com"
+
+[env.preview.vars]
+API_BASE = "https://api-develop.joinmovida.com"
+PUBLIC_BASE = "https://develop.joinmovida.com"

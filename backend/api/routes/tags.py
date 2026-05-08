@@ -1,13 +1,16 @@
 import logging
 import re
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from slowapi import Limiter
-from slowapi.util import get_remote_address
+from backend.api.rate_limit import client_ip
 from sqlmodel import Session, col, select
 
 from backend.api.deps import get_client_ip, require_admin
 from backend.api.schemas import (
+    BulkTagSuggestionReviewRequest,
+    BulkTagSuggestionReviewResponse,
     EventTagAssignment,
     TagCreate,
     TagGroupCreate,
@@ -18,16 +21,25 @@ from backend.api.schemas import (
     TagSuggestionCreate,
     TagSuggestionRejectRequest,
     TagSuggestionResponse,
+    TagSynonymCreateRequest,
+    TagSynonymResponse,
     TagUpdate,
 )
 from backend.db.database import get_session
-from backend.db.models import CachedEvent, EventTag, Tag, TagGroup, TagSuggestion
+from backend.db.models import (
+    CachedEvent,
+    EventTag,
+    Tag,
+    TagGroup,
+    TagSuggestion,
+    TagSynonym,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["tags"])
 
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=client_ip)
 
 
 def _slugify(text: str) -> str:
@@ -63,8 +75,63 @@ def _group_to_response(group: TagGroup) -> TagGroupResponse:
         ordinal=group.ordinal,
         allow_multiple=group.allow_multiple,
         enabled=group.enabled,
+        scope=group.scope,
         tags=[_tag_to_response(t) for t in sorted(group.tags, key=lambda t: t.ordinal)],
     )
+
+
+def _suggestion_to_response(
+    suggestion: TagSuggestion,
+    *,
+    tag: Optional[Tag] = None,
+    event_title: Optional[str] = None,
+    event: Optional[CachedEvent] = None,
+) -> TagSuggestionResponse:
+    """Centralised serialiser so heuristic metadata (source/confidence/matched_terms)
+    is always carried through, regardless of which endpoint built the row."""
+    return TagSuggestionResponse(
+        id=suggestion.id,
+        event_id=suggestion.event_id,
+        event_title=event_title
+        if event_title is not None
+        else (event.title if event else None),
+        event_description=getattr(event, "description", None) if event else None,
+        event_start=getattr(event, "start", None) if event else None,
+        event_location=getattr(event, "location", None) if event else None,
+        tag=_tag_to_response(tag) if tag else None,
+        free_text=suggestion.free_text,
+        group_slug=suggestion.group_slug,
+        status=suggestion.status,
+        submitter_device_id=suggestion.submitter_device_id,
+        admin_notes=suggestion.admin_notes,
+        reviewed_at=suggestion.reviewed_at,
+        created_at=suggestion.created_at,
+        source=suggestion.source,
+        confidence=suggestion.confidence,
+        matched_terms=suggestion.matched_terms,
+    )
+
+
+def _assert_event_scope_tag(session: Session, tag_id: int) -> Tag:
+    """Reject attempts to attach a review-scoped tag to an event.
+
+    Defence-in-depth: even if a future call site forgets to filter by scope,
+    the routes that mutate the event-tag namespace will refuse review-scope
+    ids. Returns the tag for convenience.
+    """
+    tag = session.get(Tag, tag_id)
+    if not tag:
+        raise HTTPException(status_code=404, detail=f"Tag {tag_id} not found")
+    group = session.get(TagGroup, tag.group_id)
+    if group and group.scope != "event":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Tag {tag_id} belongs to a '{group.scope}'-scope group "
+                f"and cannot be attached to events."
+            ),
+        )
+    return tag
 
 
 # ── helpers shared with other routes ──────────────────────────────────
@@ -110,24 +177,60 @@ def get_event_tags(
 def list_tag_groups(
     request: Request,
     session: Session = Depends(get_session),
+    start_date: str | None = Query(
+        default=None, description="ISO date string to scope event counts (YYYY-MM-DD)"
+    ),
+    end_date: str | None = Query(
+        default=None, description="ISO date string to scope event counts (YYYY-MM-DD)"
+    ),
+    scope: str = Query(
+        default="event",
+        pattern="^(event|review)$",
+        description=(
+            "Tag namespace. 'event' (default) returns groups used for "
+            "explorer filtering and event classification. 'review' returns "
+            "review-only aspect tags used inside the rate-event modal and "
+            "review-list filter chips."
+        ),
+    ),
 ):
-    """List all tag groups with nested tags (for filter UI & tag picker)."""
+    """List tag groups within a given scope (default: event).
+
+    Review-scope groups are kept on a separate namespace so reviewer
+    vocabulary cannot pollute the event filter taxonomy (mirrors how
+    Google/Yelp/Airbnb separate place attributes from review aspects).
+    """
+    from datetime import datetime, timezone
+
     from sqlalchemy import func
     from fastapi.responses import JSONResponse
 
     groups = session.exec(
-        select(TagGroup).where(TagGroup.enabled == True).order_by(TagGroup.ordinal)  # noqa: E712
+        select(TagGroup)
+        .where(TagGroup.enabled == True)  # noqa: E712
+        .where(TagGroup.scope == scope)
+        .order_by(TagGroup.ordinal)
     ).all()
 
-    # Count events per tag (only non-deleted events)
-    from backend.db.models import CachedEvent
-
-    count_rows = session.exec(
+    # Count events per tag (only non-deleted events), optionally scoped to a date range
+    count_q = (
         select(EventTag.tag_id, func.count(func.distinct(EventTag.event_id)))
         .join(CachedEvent, CachedEvent.event_id == EventTag.event_id)
         .where(CachedEvent.deleted_at == None)  # noqa: E711
-        .group_by(EventTag.tag_id)
-    ).all()
+    )
+    if start_date:
+        try:
+            dt_start = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
+            count_q = count_q.where(CachedEvent.end >= dt_start)
+        except ValueError:
+            pass
+    if end_date:
+        try:
+            dt_end = datetime.fromisoformat(end_date).replace(tzinfo=timezone.utc)
+            count_q = count_q.where(CachedEvent.start <= dt_end)
+        except ValueError:
+            pass
+    count_rows = session.exec(count_q.group_by(EventTag.tag_id)).all()
     count_map = {tid: cnt for tid, cnt in count_rows}
 
     data = [_group_to_response(g) for g in groups]
@@ -168,7 +271,7 @@ def submit_tag_suggestion(
     # Validate: at least one of tag_id or free_text
     if not body.tag_id and not body.free_text:
         raise HTTPException(
-            status_code=422,
+            status_code=400,
             detail="Either tag_id or free_text is required",
         )
 
@@ -182,6 +285,29 @@ def submit_tag_suggestion(
         tag = session.get(Tag, body.tag_id)
         if not tag:
             raise HTTPException(status_code=404, detail="Tag not found")
+        group = session.get(TagGroup, tag.group_id)
+        if group and group.scope != "event":
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Review-scope tags cannot be suggested as event tags. "
+                    "Attach them through the rate-event flow instead."
+                ),
+            )
+
+    # Free-text suggestions targeting a review-scope group are also rejected.
+    if body.group_slug:
+        target_group = session.exec(
+            select(TagGroup).where(TagGroup.slug == body.group_slug)
+        ).first()
+        if target_group and target_group.scope != "event":
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Group '{body.group_slug}' is review-scope and does not "
+                    "accept event-tag suggestions."
+                ),
+            )
 
     client_ip = get_client_ip(request)
 
@@ -197,23 +323,8 @@ def submit_tag_suggestion(
     session.commit()
     session.refresh(suggestion)
 
-    # Build response
-    tag_resp = None
-    if suggestion.tag_id:
-        tag = session.get(Tag, suggestion.tag_id)
-        if tag:
-            tag_resp = _tag_to_response(tag)
-
-    return TagSuggestionResponse(
-        id=suggestion.id,
-        event_id=suggestion.event_id,
-        event_title=event.title,
-        tag=tag_resp,
-        free_text=suggestion.free_text,
-        status=suggestion.status,
-        submitter_device_id=suggestion.submitter_device_id,
-        created_at=suggestion.created_at,
-    )
+    tag = session.get(Tag, suggestion.tag_id) if suggestion.tag_id else None
+    return _suggestion_to_response(suggestion, tag=tag, event=event)
 
 
 # ── Admin: Tag Group listing with event counts ───────────────────────
@@ -270,6 +381,7 @@ def create_tag_group(
         label=body.label,
         color=body.color,
         ordinal=(max_ordinal or 0) + 1,
+        scope=body.scope or "event",
     )
     session.add(group)
     session.commit()
@@ -380,6 +492,45 @@ def update_tag(
         raise HTTPException(status_code=404, detail="Tag not found")
 
     update_data = body.model_dump(exclude_unset=True)
+
+    # Handle moving the tag to another group/category.
+    new_group_id = update_data.pop("group_id", None)
+    if new_group_id is not None and new_group_id != tag.group_id:
+        target_group = session.get(TagGroup, new_group_id)
+        if not target_group:
+            raise HTTPException(status_code=404, detail="Target tag group not found")
+        current_group = session.get(TagGroup, tag.group_id)
+        if current_group and target_group.scope != current_group.scope:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Cannot move tag across scopes "
+                    f"({current_group.scope} → {target_group.scope})"
+                ),
+            )
+        # Slug collision check against the target group's existing tags.
+        collision = session.exec(
+            select(Tag.id).where(
+                Tag.group_id == new_group_id,
+                Tag.slug == tag.slug,
+                Tag.id != tag.id,
+            )
+        ).first()
+        if collision is not None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Target group already has a tag with slug '{tag.slug}'",
+            )
+        # Append at the end of the target group unless caller also set ordinal.
+        if "ordinal" not in update_data:
+            max_ordinal = session.exec(
+                select(Tag.ordinal)
+                .where(Tag.group_id == new_group_id)
+                .order_by(col(Tag.ordinal).desc())
+            ).first()
+            update_data["ordinal"] = (max_ordinal or 0) + 1
+        tag.group_id = new_group_id
+
     for field, value in update_data.items():
         setattr(tag, field, value)
     session.add(tag)
@@ -398,13 +549,17 @@ def delete_tag(
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
 
-    # Cascade: delete event_tags and tag_suggestions referencing this tag
+    # Cascade: delete event_tags, tag_suggestions, and tag_synonyms referencing this tag
     for et in session.exec(select(EventTag).where(EventTag.tag_id == tag_id)).all():
         session.delete(et)
     for ts in session.exec(
         select(TagSuggestion).where(TagSuggestion.tag_id == tag_id)
     ).all():
         session.delete(ts)
+    for syn in session.exec(
+        select(TagSynonym).where(TagSynonym.tag_id == tag_id)
+    ).all():
+        session.delete(syn)
     session.delete(tag)
     session.commit()
 
@@ -434,9 +589,7 @@ def set_event_tags(
 
     # Add new
     for tag_id in body.tag_ids:
-        tag = session.get(Tag, tag_id)
-        if not tag:
-            raise HTTPException(status_code=404, detail=f"Tag {tag_id} not found")
+        _assert_event_scope_tag(session, tag_id)
         session.add(EventTag(event_id=event_id, tag_id=tag_id))
 
     session.commit()
@@ -457,9 +610,7 @@ def add_event_tag(
     event = session.get(CachedEvent, event_id)
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
-    tag = session.get(Tag, tag_id)
-    if not tag:
-        raise HTTPException(status_code=404, detail="Tag not found")
+    _assert_event_scope_tag(session, tag_id)
 
     existing = session.exec(
         select(EventTag).where(EventTag.event_id == event_id, EventTag.tag_id == tag_id)
@@ -493,13 +644,33 @@ def remove_event_tag(
 @router.get("/api/admin/tags/suggestions", response_model=list[TagSuggestionResponse])
 def list_tag_suggestions(
     status: str | None = Query(default=None),
+    source: str | None = Query(default=None, regex="^(user|heuristic)$"),
+    event_id: str | None = Query(default=None),
+    include_past: bool = Query(default=False),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
-    """List tag suggestions, optionally filtered by status."""
+    """List tag suggestions, optionally filtered by status, source, or event.
+
+    Defaults to suggestions whose underlying event has not finished yet
+    (``CachedEvent.end > now``). Pass ``include_past=true`` to include
+    suggestions for past events too — typically only useful for audits.
+    """
+    from datetime import datetime as _dt
+
     query = select(TagSuggestion).order_by(col(TagSuggestion.created_at).desc())
     if status:
         query = query.where(TagSuggestion.status == status)
+    if source:
+        query = query.where(TagSuggestion.source == source)
+    if event_id:
+        query = query.where(TagSuggestion.event_id == event_id)
+    if not include_past:
+        upcoming_ids = select(CachedEvent.event_id).where(
+            CachedEvent.deleted_at == None,  # noqa: E711
+            CachedEvent.end > _dt.utcnow(),
+        )
+        query = query.where(TagSuggestion.event_id.in_(upcoming_ids))
     suggestions = session.exec(query).all()
 
     # Enrich with event titles and tag info
@@ -513,33 +684,14 @@ def list_tag_suggestions(
 
     result = []
     for s in suggestions:
-        tag_resp = None
-        if s.tag_id:
-            tag = session.get(Tag, s.tag_id)
-            if tag:
-                tag_resp = _tag_to_response(tag)
+        tag = session.get(Tag, s.tag_id) if s.tag_id else None
+        ev = events_map.get(s.event_id)
         result.append(
-            TagSuggestionResponse(
-                id=s.id,
-                event_id=s.event_id,
-                event_title=events_map.get(
-                    s.event_id,
-                    CachedEvent(
-                        event_id="",
-                        calendar_id="",
-                        title="Unknown",
-                        start=s.created_at,
-                        end=s.created_at,
-                    ),
-                ).title,
-                tag=tag_resp,
-                free_text=s.free_text,
-                group_slug=s.group_slug,
-                status=s.status,
-                submitter_device_id=s.submitter_device_id,
-                admin_notes=s.admin_notes,
-                reviewed_at=s.reviewed_at,
-                created_at=s.created_at,
+            _suggestion_to_response(
+                s,
+                tag=tag,
+                event=ev,
+                event_title=ev.title if ev else "Unknown",
             )
         )
     return result
@@ -580,9 +732,7 @@ def approve_tag_suggestion(
         # Admin can override the suggested tag
         tag_id = body.tag_id
 
-    tag = session.get(Tag, tag_id)
-    if not tag:
-        raise HTTPException(status_code=404, detail="Tag not found")
+    tag = _assert_event_scope_tag(session, tag_id)
 
     # Create EventTag (idempotent)
     existing_et = session.exec(
@@ -600,20 +750,12 @@ def approve_tag_suggestion(
     session.commit()
     session.refresh(suggestion)
 
-    tag_resp = _tag_to_response(tag)
     event = session.get(CachedEvent, suggestion.event_id)
-    return TagSuggestionResponse(
-        id=suggestion.id,
-        event_id=suggestion.event_id,
+    return _suggestion_to_response(
+        suggestion,
+        tag=tag,
+        event=event,
         event_title=event.title if event else "Unknown",
-        tag=tag_resp,
-        free_text=suggestion.free_text,
-        group_slug=suggestion.group_slug,
-        status=suggestion.status,
-        submitter_device_id=suggestion.submitter_device_id,
-        admin_notes=suggestion.admin_notes,
-        reviewed_at=suggestion.reviewed_at,
-        created_at=suggestion.created_at,
     )
 
 
@@ -645,23 +787,163 @@ def reject_tag_suggestion(
     session.commit()
     session.refresh(suggestion)
 
-    tag_resp = None
-    if suggestion.tag_id:
-        tag = session.get(Tag, suggestion.tag_id)
-        if tag:
-            tag_resp = _tag_to_response(tag)
-
+    tag = session.get(Tag, suggestion.tag_id) if suggestion.tag_id else None
     event = session.get(CachedEvent, suggestion.event_id)
-    return TagSuggestionResponse(
-        id=suggestion.id,
-        event_id=suggestion.event_id,
+    return _suggestion_to_response(
+        suggestion,
+        tag=tag,
+        event=event,
         event_title=event.title if event else "Unknown",
-        tag=tag_resp,
-        free_text=suggestion.free_text,
-        group_slug=suggestion.group_slug,
-        status=suggestion.status,
-        submitter_device_id=suggestion.submitter_device_id,
-        admin_notes=suggestion.admin_notes,
-        reviewed_at=suggestion.reviewed_at,
-        created_at=suggestion.created_at,
     )
+
+
+@router.post(
+    "/api/admin/tags/suggestions/bulk-review",
+    response_model=BulkTagSuggestionReviewResponse,
+)
+def bulk_review_tag_suggestions(
+    body: BulkTagSuggestionReviewRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Approve or reject multiple tag suggestions in a single transaction.
+
+    Free-text suggestions (no tag_id) cannot be bulk-approved — they are
+    counted as skipped. All other pending suggestions are processed.
+    """
+    from datetime import datetime
+
+    if body.action not in ("approve", "reject"):
+        raise HTTPException(
+            status_code=422, detail="action must be 'approve' or 'reject'"
+        )
+    if not body.ids:
+        return BulkTagSuggestionReviewResponse(ok=0, skipped=0)
+
+    suggestions = session.exec(
+        select(TagSuggestion).where(TagSuggestion.id.in_(body.ids))
+    ).all()
+
+    now = datetime.utcnow()
+    ok = 0
+    skipped = 0
+
+    for suggestion in suggestions:
+        if suggestion.status != "pending":
+            skipped += 1
+            continue
+
+        if body.action == "approve":
+            tag_id = suggestion.tag_id
+            if not tag_id:
+                # Free-text suggestion — requires manual tag assignment
+                skipped += 1
+                continue
+            # Validate tag is event-scoped
+            tag = session.get(Tag, tag_id)
+            if not tag:
+                skipped += 1
+                continue
+            # Create EventTag idempotently
+            existing = session.exec(
+                select(EventTag).where(
+                    EventTag.event_id == suggestion.event_id,
+                    EventTag.tag_id == tag_id,
+                )
+            ).first()
+            if not existing:
+                session.add(EventTag(event_id=suggestion.event_id, tag_id=tag_id))
+            suggestion.status = "approved"
+        else:
+            suggestion.status = "rejected"
+
+        suggestion.reviewed_at = now
+        session.add(suggestion)
+        ok += 1
+
+    session.commit()
+    return BulkTagSuggestionReviewResponse(ok=ok, skipped=skipped)
+
+
+# ── Admin: Tag synonyms (heuristic suggester) ────────────────────────
+
+
+def _synonym_to_response(syn: TagSynonym) -> TagSynonymResponse:
+    return TagSynonymResponse(
+        id=syn.id,
+        tag_id=syn.tag_id,
+        term=syn.term,
+        created_at=syn.created_at,
+    )
+
+
+@router.get(
+    "/api/admin/tags/{tag_id}/synonyms",
+    response_model=list[TagSynonymResponse],
+)
+def list_tag_synonyms(
+    tag_id: int,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """List all synonym terms configured for a tag (used by the heuristic suggester)."""
+    tag = session.get(Tag, tag_id)
+    if not tag:
+        raise HTTPException(status_code=404, detail=f"Tag {tag_id} not found")
+    rows = session.exec(
+        select(TagSynonym).where(TagSynonym.tag_id == tag_id).order_by(TagSynonym.term)
+    ).all()
+    return [_synonym_to_response(r) for r in rows]
+
+
+@router.post(
+    "/api/admin/tags/{tag_id}/synonyms",
+    response_model=TagSynonymResponse,
+    status_code=201,
+)
+def create_tag_synonym(
+    tag_id: int,
+    body: TagSynonymCreateRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Add a synonym term to a tag."""
+    tag = session.get(Tag, tag_id)
+    if not tag:
+        raise HTTPException(status_code=404, detail=f"Tag {tag_id} not found")
+    term = (body.term or "").strip().lower()
+    if not term:
+        raise HTTPException(status_code=422, detail="term must not be empty")
+    existing = session.exec(
+        select(TagSynonym).where(
+            TagSynonym.tag_id == tag_id,
+            TagSynonym.term == term,
+        )
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=409, detail="Synonym already exists for this tag"
+        )
+    syn = TagSynonym(tag_id=tag_id, term=term)
+    session.add(syn)
+    session.commit()
+    session.refresh(syn)
+    return _synonym_to_response(syn)
+
+
+@router.delete(
+    "/api/admin/tags/synonyms/{synonym_id}",
+    status_code=204,
+)
+def delete_tag_synonym(
+    synonym_id: int,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Remove a synonym term."""
+    syn = session.get(TagSynonym, synonym_id)
+    if not syn:
+        raise HTTPException(status_code=404, detail="Synonym not found")
+    session.delete(syn)
+    session.commit()
+    return None

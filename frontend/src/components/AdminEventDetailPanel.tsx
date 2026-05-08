@@ -1,15 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchEvent, updateEvent } from '../api';
-import EventDetailContent from './EventDetailContent';
+import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
+import AdminEventDetailContent from './AdminEventDetailContent';
 import type { CalendarEvent } from '../types';
 
 interface Props {
     eventId: string | null;
     onClose: () => void;
+    onEventUpdated?: (eventId: string) => void;
 }
 
-export default function AdminEventDetailPanel({ eventId, onClose }: Props) {
+export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated }: Props) {
     const [event, setEvent] = useState<CalendarEvent | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(false);
@@ -32,7 +34,7 @@ export default function AdminEventDetailPanel({ eventId, onClose }: Props) {
         setLoading(true);
         setError(false);
         setEvent(null);
-        fetchEvent(eventId)
+        fetchEvent(eventId, { fresh: true })
             .then((e) => { setEvent(e); setTitleValue(e.title); })
             .catch(() => setError(true))
             .finally(() => setLoading(false));
@@ -51,11 +53,27 @@ export default function AdminEventDetailPanel({ eventId, onClose }: Props) {
         const updated = await updateEvent(event.event_id, changes);
         setEvent(updated);
         setTitleValue(updated.title);
+        onEventUpdated?.(updated.event_id);
+        // Refresh badge counters — e.g. flipping review_status from
+        // "pending" to "reviewed" needs to update the Pending Review badge.
+        notifyAdminDataChanged();
     };
 
     const handleTagsUpdated = () => {
         if (!eventId) return;
-        fetchEvent(eventId).then((e) => { setEvent(e); setTitleValue(e.title); }).catch(() => { });
+        fetchEvent(eventId, { fresh: true })
+            .then((e) => { setEvent(e); setTitleValue(e.title); })
+            .catch(() => { });
+        notifyAdminDataChanged();
+    };
+
+    const handleManualRefresh = () => {
+        if (!eventId) return;
+        setLoading(true);
+        fetchEvent(eventId, { fresh: true })
+            .then((e) => { setEvent(e); setTitleValue(e.title); })
+            .catch(() => setError(true))
+            .finally(() => setLoading(false));
     };
 
     const handleTitleBlur = async () => {
@@ -65,6 +83,7 @@ export default function AdminEventDetailPanel({ eventId, onClose }: Props) {
         try {
             const updated = await updateEvent(event.event_id, { title: titleValue });
             setEvent(updated);
+            onEventUpdated?.(updated.event_id);
         } finally {
             setSavingTitle(false);
             setEditingTitle(false);
@@ -116,13 +135,37 @@ export default function AdminEventDetailPanel({ eventId, onClose }: Props) {
                         )}
                         <p className="text-[10px] text-gray-400 mt-0.5 uppercase tracking-wide">Event detail · admin</p>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 text-sm leading-none p-1 shrink-0"
-                        aria-label="Close"
-                    >
-                        ✕
-                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                        <button
+                            onClick={handleManualRefresh}
+                            disabled={loading || !event}
+                            className="text-gray-400 hover:text-gray-600 disabled:opacity-40 p-1"
+                            title="Refresh event"
+                            aria-label="Refresh event"
+                        >
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
+                            >
+                                <polyline points="23 4 23 10 17 10" />
+                                <polyline points="1 20 1 14 7 14" />
+                                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                            </svg>
+                        </button>
+                        <button
+                            onClick={onClose}
+                            className="text-gray-400 hover:text-gray-600 text-sm leading-none p-1"
+                            aria-label="Close"
+                        >
+                            ✕
+                        </button>
+                    </div>
                 </div>
 
                 {/* Body */}
@@ -134,14 +177,11 @@ export default function AdminEventDetailPanel({ eventId, onClose }: Props) {
                         <p className="text-xs text-red-500 text-center mt-8">Failed to load event.</p>
                     )}
                     {event && (
-                        <EventDetailContent
+                        <AdminEventDetailContent
                             event={event}
-                            editable
-                            disableTracking
                             onFieldSave={handleFieldSave}
                             onTagsUpdated={handleTagsUpdated}
-                            maxTags={event.tags?.length ?? undefined}
-                            showActions={false}
+                            compact
                         />
                     )}
                 </div>

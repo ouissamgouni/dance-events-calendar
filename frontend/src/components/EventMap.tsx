@@ -6,7 +6,9 @@ import L from 'leaflet';
 import type { CalendarEvent } from '../types';
 import SaveEventButton from './SaveEventButton';
 import GoingButton from './GoingButton';
+import RateEventButton from './RateEventButton';
 import TagBadges from './TagBadges';
+import { useFeatureFlags } from '../context/FeatureFlagsContext';
 
 export interface MapBounds {
     north: number;
@@ -152,6 +154,7 @@ function MapController({
 }
 
 export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource }: Props) {
+    const { showRatings, eventColorBarColor } = useFeatureFlags();
     const markerRefs = useRef(new Map<string, L.Marker>());
     const geoEvents = useMemo(
         () => events.filter((e) => e.latitude != null && e.longitude != null),
@@ -216,7 +219,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                     key={e.event_id}
                     ref={(marker) => registerMarker(e.event_id, marker)}
                     position={[e.latitude!, e.longitude!]}
-                    icon={hoveredEventId === e.event_id ? makeHighlightedIcon(e.color) : makeColoredIcon(e.color)}
+                    icon={hoveredEventId === e.event_id ? makeHighlightedIcon(eventColorBarColor) : makeColoredIcon(eventColorBarColor)}
                     eventHandlers={{
                         mouseover: () => onEventHover?.(e.event_id),
                         mouseout: () => onEventHover?.(null),
@@ -241,6 +244,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                                 <div className="flex items-center gap-1">
                                     <SaveEventButton eventId={e.event_id} appearance="icon" size="sm" stopPropagation />
                                     <GoingButton eventId={e.event_id} appearance="icon" size="sm" stopPropagation />
+                                    {showRatings && <RateEventButton eventId={e.event_id} appearance="icon" size="sm" stopPropagation />}
                                 </div>
                                 <Link
                                     to={`/event/${e.event_id}${detailLinkSource ? `?src=${detailLinkSource}` : ''}`}

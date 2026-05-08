@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import type { EventSuggestion, CalendarSetting, LinkItem } from '../types';
-import { updateSuggestion, approveSuggestion, rejectSuggestion, syncSuggestionToGoogle } from '../api';
+import type { EventSuggestion, CalendarSetting } from '../types';
+import { approveSuggestion, rejectSuggestion, syncSuggestionToGoogle } from '../api';
+import AdminEventDetailPanel from './AdminEventDetailPanel';
 
 interface Props {
     suggestion: EventSuggestion;
@@ -12,60 +13,34 @@ interface Props {
 const STATUS_COLORS: Record<string, string> = {
     pending: 'bg-amber-100 text-amber-700',
     approved: 'bg-emerald-100 text-emerald-700',
-    rejected: 'bg-red-100 text-red-700',
+    rejected: 'bg-slate-200 text-slate-700',
+};
+
+const fmtDate = (iso: string) => {
+    try { return new Date(iso).toLocaleString(); } catch { return iso; }
+};
+
+const fmtPrice = (s: EventSuggestion): string | null => {
+    if (s.price_is_free) return 'Free';
+    const cur = s.price_currency ?? '';
+    if (s.price_min != null && s.price_max != null) return `${s.price_min} – ${s.price_max} ${cur}`.trim();
+    if (s.price_min != null) return `From ${s.price_min} ${cur}`.trim();
+    if (s.price_max != null) return `Up to ${s.price_max} ${cur}`.trim();
+    return null;
 };
 
 export default function SuggestionReviewModal({ suggestion, calendars, onClose, onUpdated }: Props) {
-    const [title, setTitle] = useState(suggestion.title);
-    const [description, setDescription] = useState(suggestion.description ?? '');
-    const [location, setLocation] = useState(suggestion.location ?? '');
-    const [start, setStart] = useState(suggestion.start.slice(0, 16));
-    const [end, setEnd] = useState(suggestion.end.slice(0, 16));
-    const [allDay, setAllDay] = useState(suggestion.all_day);
-    const [editLinks, setEditLinks] = useState<{ url: string; label: string }[]>(
-        suggestion.links?.map((l) => ({ url: l.url, label: l.label ?? '' })) ?? [],
-    );
-    const [adminNotes, setAdminNotes] = useState(suggestion.admin_notes ?? '');
     const [selectedCalendarId, setSelectedCalendarId] = useState(
         suggestion.assigned_calendar_id ?? calendars.find((c) => c.enabled)?.calendar_id ?? '',
     );
+    const [adminNotes, setAdminNotes] = useState(suggestion.admin_notes ?? '');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [rejectMode, setRejectMode] = useState(false);
+    const [adminDetailEventId, setAdminDetailEventId] = useState<string | null>(null);
 
     const isPending = suggestion.status === 'pending';
     const isApproved = suggestion.status === 'approved';
-
-    const handleSave = async () => {
-        setSaving(true);
-        setError('');
-        try {
-            const data: Record<string, unknown> = {};
-            if (title !== suggestion.title) data.title = title;
-            if (description !== (suggestion.description ?? '')) data.description = description;
-            if (location !== (suggestion.location ?? '')) data.location = location;
-            if (start !== suggestion.start.slice(0, 16)) data.start = new Date(start).toISOString();
-            if (end !== suggestion.end.slice(0, 16)) data.end = new Date(end).toISOString();
-            if (allDay !== suggestion.all_day) data.all_day = allDay;
-            if (adminNotes !== (suggestion.admin_notes ?? '')) data.admin_notes = adminNotes;
-
-            const linksPayload: LinkItem[] = editLinks
-                .filter((l) => l.url.trim())
-                .map((l) => ({ url: l.url.trim(), label: l.label.trim() || null }));
-            if (JSON.stringify(linksPayload) !== JSON.stringify(suggestion.links ?? [])) {
-                data.links = linksPayload;
-            }
-
-            if (Object.keys(data).length > 0) {
-                const updated = await updateSuggestion(suggestion.id, data);
-                onUpdated(updated);
-            }
-        } catch {
-            setError('Failed to save changes.');
-        } finally {
-            setSaving(false);
-        }
-    };
 
     const handleApprove = async () => {
         if (!selectedCalendarId) {
@@ -90,6 +65,7 @@ export default function SuggestionReviewModal({ suggestion, calendars, onClose, 
         try {
             const updated = await rejectSuggestion(suggestion.id, adminNotes || undefined);
             onUpdated(updated);
+            setRejectMode(false);
         } catch {
             setError('Failed to reject.');
         } finally {
@@ -110,178 +86,220 @@ export default function SuggestionReviewModal({ suggestion, calendars, onClose, 
         }
     };
 
-    const fmtDate = (iso: string) => {
-        try { return new Date(iso).toLocaleString(); } catch { return iso; }
-    };
+    const price = fmtPrice(suggestion);
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
-            <div className="mx-4 w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
-                {/* Header */}
-                <div className="flex items-start justify-between mb-4">
-                    <div>
-                        <h2 className="text-base font-semibold text-slate-800">Review Suggestion</h2>
-                        <div className="mt-1 flex items-center gap-2">
-                            <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${STATUS_COLORS[suggestion.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                                {suggestion.status}
-                            </span>
-                            {suggestion.synced_to_google && (
-                                <span className="text-[10px] text-emerald-600 font-medium">✓ Synced to Google</span>
-                            )}
-                            {isApproved && !suggestion.synced_to_google && (
-                                <span className="text-[10px] text-amber-600 font-medium">⚠ Not synced</span>
-                            )}
-                        </div>
-                    </div>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-lg p-1">✕</button>
-                </div>
-
-                {/* Editable fields */}
-                <div className="space-y-3 mb-4">
-                    <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">Title</label>
-                        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                    </div>
-                    <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">Description</label>
-                        <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3}
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                    </div>
-                    <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-600">Location</label>
-                        <input type="text" value={location} onChange={(e) => setLocation(e.target.value)}
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
+        <>
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
+                <div className="mx-4 w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white p-6 shadow-xl">
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-4">
                         <div>
-                            <label className="mb-1 block text-xs font-medium text-slate-600">Start</label>
-                            <input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)}
-                                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                        </div>
-                        <div>
-                            <label className="mb-1 block text-xs font-medium text-slate-600">End</label>
-                            <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)}
-                                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                        </div>
-                    </div>
-                    <label className="flex items-center gap-2 text-sm text-slate-600">
-                        <input type="checkbox" checked={allDay} onChange={(e) => setAllDay(e.target.checked)} className="rounded border-slate-300" />
-                        All day event
-                    </label>
-
-                    {/* Links editor */}
-                    <div className="border-t border-slate-200 pt-3">
-                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Links</p>
-                        {editLinks.map((link, i) => (
-                            <div key={i} className="flex gap-2 mb-1.5">
-                                <input type="url" value={link.url}
-                                    onChange={(e) => setEditLinks((prev) => prev.map((l, j) => (j === i ? { ...l, url: e.target.value } : l)))}
-                                    placeholder="https://…"
-                                    className="flex-1 rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                                <input type="text" value={link.label}
-                                    onChange={(e) => setEditLinks((prev) => prev.map((l, j) => (j === i ? { ...l, label: e.target.value } : l)))}
-                                    placeholder="Label"
-                                    className="w-24 rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                                <button type="button" onClick={() => setEditLinks((prev) => prev.filter((_, j) => j !== i))}
-                                    className="text-slate-400 hover:text-red-500 text-sm px-1">✕</button>
+                            <h2 className="text-base font-semibold text-slate-800">Review Suggestion</h2>
+                            <div className="mt-1 flex items-center gap-2">
+                                <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 ${STATUS_COLORS[suggestion.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                                    {suggestion.status}
+                                </span>
+                                {suggestion.synced_to_google && (
+                                    <span className="text-[10px] text-emerald-600 font-medium">✓ Synced to Google</span>
+                                )}
+                                {isApproved && !suggestion.synced_to_google && (
+                                    <span className="text-[10px] text-amber-600 font-medium">⚠ Not synced</span>
+                                )}
                             </div>
-                        ))}
-                        {editLinks.length < 3 && (
-                            <button type="button" onClick={() => setEditLinks((prev) => [...prev, { url: '', label: '' }])}
-                                className="text-xs text-blue-600 hover:text-blue-700">+ Add link</button>
-                        )}
+                        </div>
+                        <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-lg p-1">✕</button>
                     </div>
 
-                    {/* Admin notes */}
-                    <div className="border-t border-slate-200 pt-3">
-                        <label className="mb-1 block text-xs font-medium text-slate-600">Admin Notes</label>
-                        <textarea value={adminNotes} onChange={(e) => setAdminNotes(e.target.value)} rows={2}
-                            placeholder="Internal notes…"
-                            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
-                    </div>
-                </div>
+                    {/* APPROVED → collapsed view: link to created event + suggest sync */}
+                    {isApproved ? (
+                        <div className="space-y-4">
+                            <div className="border border-slate-200 bg-slate-50 p-4">
+                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">Approved Suggestion</p>
+                                <p className="text-sm font-medium text-slate-800">{suggestion.title}</p>
+                                <p className="text-[11px] text-slate-500 mt-0.5">
+                                    {fmtDate(suggestion.start)}
+                                    {suggestion.location && ` • ${suggestion.location}`}
+                                </p>
+                                {suggestion.created_event_id && (
+                                    <button
+                                        onClick={() => setAdminDetailEventId(suggestion.created_event_id!)}
+                                        className="mt-3 inline-flex items-center gap-1 bg-blue-600 text-white text-xs font-medium px-3 py-1.5 hover:bg-blue-700 transition"
+                                    >
+                                        Open created event →
+                                    </button>
+                                )}
+                            </div>
 
-                {/* Submitter metadata */}
-                <div className="border-t border-slate-200 pt-3 mb-4">
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Submitter Info</p>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-600">
-                        {suggestion.submitter_name && <div><span className="text-slate-400">Name:</span> {suggestion.submitter_name}</div>}
-                        {suggestion.submitter_email && <div><span className="text-slate-400">Email:</span> {suggestion.submitter_email}</div>}
-                        {suggestion.submitter_ip && <div><span className="text-slate-400">IP:</span> {suggestion.submitter_ip}</div>}
-                        {(suggestion.submitter_city || suggestion.submitter_country) && (
-                            <div><span className="text-slate-400">Location:</span> {[suggestion.submitter_city, suggestion.submitter_country].filter(Boolean).join(', ')}</div>
-                        )}
-                        {suggestion.submitter_timezone && <div><span className="text-slate-400">Timezone:</span> {suggestion.submitter_timezone}</div>}
-                        {suggestion.submitter_language && <div><span className="text-slate-400">Language:</span> {suggestion.submitter_language}</div>}
-                        {suggestion.submitter_referrer && <div className="col-span-2"><span className="text-slate-400">Referrer:</span> {suggestion.submitter_referrer}</div>}
-                        {suggestion.submitter_screen_size && <div><span className="text-slate-400">Screen:</span> {suggestion.submitter_screen_size}</div>}
-                        {suggestion.submitter_user_agent && <div className="col-span-2 truncate"><span className="text-slate-400">UA:</span> {suggestion.submitter_user_agent}</div>}
-                        <div><span className="text-slate-400">Created:</span> {fmtDate(suggestion.created_at)}</div>
-                        {suggestion.reviewed_at && <div><span className="text-slate-400">Reviewed:</span> {fmtDate(suggestion.reviewed_at)}</div>}
-                        {suggestion.reviewed_by && <div><span className="text-slate-400">Reviewer:</span> {suggestion.reviewed_by}</div>}
-                    </div>
-                </div>
+                            {!suggestion.synced_to_google && (
+                                <div className="border border-amber-200 bg-amber-50 p-4">
+                                    <p className="text-xs text-amber-800 mb-2">
+                                        This event isn't synced to Google Calendar yet. Sync it so it appears on the source calendar.
+                                    </p>
+                                    <button
+                                        onClick={handleSync}
+                                        disabled={saving}
+                                        className="bg-blue-600 text-white text-xs font-medium px-3 py-1.5 hover:bg-blue-700 disabled:opacity-50 transition"
+                                    >
+                                        {saving ? 'Syncing…' : 'Sync to Google Calendar'}
+                                    </button>
+                                </div>
+                            )}
 
-                {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+                            {error && <p className="text-sm text-slate-700 bg-slate-100 px-2 py-1">{error}</p>}
 
-                {/* Action buttons */}
-                <div className="flex items-center gap-2 flex-wrap">
-                    <button onClick={handleSave} disabled={saving}
-                        className="bg-gray-800 text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-gray-700 disabled:opacity-50 transition">
-                        {saving ? 'Saving…' : 'Save Changes'}
-                    </button>
-
-                    {isPending && !rejectMode && (
+                            <div className="flex justify-end pt-2">
+                                <button onClick={onClose} className="text-xs text-slate-500 hover:text-slate-700">Close</button>
+                            </div>
+                        </div>
+                    ) : (
                         <>
-                            <div className="w-px h-5 bg-slate-200 mx-1" />
-                            <select value={selectedCalendarId} onChange={(e) => setSelectedCalendarId(e.target.value)}
-                                className="border border-slate-300 rounded text-xs px-2 py-1.5 focus:border-blue-500 focus:outline-none">
-                                <option value="">Select calendar…</option>
-                                {calendars.filter((c) => c.enabled).map((c) => (
-                                    <option key={c.calendar_id} value={c.calendar_id}>{c.name}</option>
-                                ))}
-                            </select>
-                            <button onClick={handleApprove} disabled={saving || !selectedCalendarId}
-                                className="bg-emerald-600 text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-emerald-700 disabled:opacity-50 transition">
-                                Approve
-                            </button>
-                            <button onClick={() => setRejectMode(true)}
-                                className="bg-red-600 text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-red-700 transition">
-                                Reject
-                            </button>
+                            {/* Submitter info — shown first */}
+                            <div className="mb-4 border border-slate-200 bg-slate-50 p-3">
+                                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Submitter</p>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-600">
+                                    <div><span className="text-slate-400">Name:</span> {suggestion.submitter_name || '—'}</div>
+                                    <div><span className="text-slate-400">Email:</span> {suggestion.submitter_email || '—'}</div>
+                                    {suggestion.submitter_ip && <div><span className="text-slate-400">IP:</span> {suggestion.submitter_ip}</div>}
+                                    {(suggestion.submitter_city || suggestion.submitter_country) && (
+                                        <div><span className="text-slate-400">Location:</span> {[suggestion.submitter_city, suggestion.submitter_country].filter(Boolean).join(', ')}</div>
+                                    )}
+                                    {suggestion.submitter_timezone && <div><span className="text-slate-400">Timezone:</span> {suggestion.submitter_timezone}</div>}
+                                    <div><span className="text-slate-400">Submitted:</span> {fmtDate(suggestion.created_at)}</div>
+                                </div>
+                            </div>
+
+                            {/* Suggestion details — read-only (event is editable after approval) */}
+                            <div className="space-y-3 mb-4">
+                                <Field label="Title" value={suggestion.title} />
+                                {suggestion.description && (
+                                    <Field label="Description" value={suggestion.description} multiline />
+                                )}
+                                {suggestion.location && (
+                                    <Field label="Location" value={suggestion.location} />
+                                )}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <Field label="Start" value={fmtDate(suggestion.start)} />
+                                    <Field label="End" value={fmtDate(suggestion.end)} />
+                                </div>
+                                {suggestion.all_day && (
+                                    <p className="text-[11px] text-slate-500">All day event</p>
+                                )}
+
+                                {price && <Field label="Price" value={price} />}
+
+                                {suggestion.links && suggestion.links.length > 0 && (
+                                    <div>
+                                        <p className="mb-1 text-xs font-medium text-slate-600">Links</p>
+                                        <ul className="text-xs space-y-1">
+                                            {suggestion.links.map((l, i) => (
+                                                <li key={i}>
+                                                    <a
+                                                        href={l.url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-600 hover:text-blue-800 hover:underline break-all"
+                                                    >
+                                                        {l.label || l.url}
+                                                    </a>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+
+                                {suggestion.suggested_tag_ids && suggestion.suggested_tag_ids.length > 0 && (
+                                    <div>
+                                        <p className="mb-1 text-xs font-medium text-slate-600">Suggested tag IDs</p>
+                                        <p className="text-xs text-slate-500">{suggestion.suggested_tag_ids.join(', ')}</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Admin notes */}
+                            <div className="mb-4">
+                                <label className="mb-1 block text-xs font-medium text-slate-600">Admin Notes</label>
+                                <textarea
+                                    value={adminNotes}
+                                    onChange={(e) => setAdminNotes(e.target.value)}
+                                    rows={2}
+                                    placeholder="Internal notes…"
+                                    className="w-full border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            {error && <p className="mb-3 text-sm text-slate-700 bg-slate-100 px-2 py-1">{error}</p>}
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                                {isPending && !rejectMode && (
+                                    <>
+                                        <select
+                                            value={selectedCalendarId}
+                                            onChange={(e) => setSelectedCalendarId(e.target.value)}
+                                            className="border border-slate-300 text-xs px-2 py-1.5 focus:border-blue-500 focus:outline-none"
+                                        >
+                                            <option value="">Select calendar…</option>
+                                            {calendars.filter((c) => c.enabled).map((c) => (
+                                                <option key={c.calendar_id} value={c.calendar_id}>{c.name}</option>
+                                            ))}
+                                        </select>
+                                        <button
+                                            onClick={handleApprove}
+                                            disabled={saving || !selectedCalendarId}
+                                            className="bg-sky-600 text-white text-xs font-medium px-3 py-1.5 hover:bg-sky-700 disabled:opacity-50 transition"
+                                        >
+                                            {saving ? 'Saving…' : 'Approve'}
+                                        </button>
+                                        <button
+                                            onClick={() => setRejectMode(true)}
+                                            className="bg-slate-200 text-slate-700 text-xs font-medium px-3 py-1.5 hover:bg-slate-300 transition"
+                                        >
+                                            Reject
+                                        </button>
+                                    </>
+                                )}
+
+                                {isPending && rejectMode && (
+                                    <>
+                                        <button
+                                            onClick={handleReject}
+                                            disabled={saving}
+                                            className="bg-slate-700 text-white text-xs font-medium px-3 py-1.5 hover:bg-slate-800 disabled:opacity-50 transition"
+                                        >
+                                            Confirm Reject
+                                        </button>
+                                        <button
+                                            onClick={() => setRejectMode(false)}
+                                            className="text-xs text-slate-500 hover:text-slate-700"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </>
+                                )}
+
+                                <button onClick={onClose} className="ml-auto text-xs text-slate-500 hover:text-slate-700">
+                                    Close
+                                </button>
+                            </div>
                         </>
                     )}
-
-                    {isPending && rejectMode && (
-                        <>
-                            <div className="w-px h-5 bg-slate-200 mx-1" />
-                            <button onClick={handleReject} disabled={saving}
-                                className="bg-red-600 text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-red-700 disabled:opacity-50 transition">
-                                Confirm Reject
-                            </button>
-                            <button onClick={() => setRejectMode(false)}
-                                className="text-xs text-slate-500 hover:text-slate-700">
-                                Cancel
-                            </button>
-                        </>
-                    )}
-
-                    {isApproved && !suggestion.synced_to_google && (
-                        <>
-                            <div className="w-px h-5 bg-slate-200 mx-1" />
-                            <button onClick={handleSync} disabled={saving}
-                                className="bg-blue-600 text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-blue-700 disabled:opacity-50 transition">
-                                Sync to Google
-                            </button>
-                        </>
-                    )}
-
-                    <button onClick={onClose} className="ml-auto text-xs text-slate-500 hover:text-slate-700">
-                        Close
-                    </button>
                 </div>
             </div>
+
+            <AdminEventDetailPanel
+                eventId={adminDetailEventId}
+                onClose={() => setAdminDetailEventId(null)}
+            />
+        </>
+    );
+}
+
+function Field({ label, value, multiline = false }: { label: string; value: string; multiline?: boolean }) {
+    return (
+        <div>
+            <p className="mb-1 text-xs font-medium text-slate-600">{label}</p>
+            <p className={`text-sm text-slate-800 ${multiline ? 'whitespace-pre-wrap' : ''}`}>{value}</p>
         </div>
     );
 }

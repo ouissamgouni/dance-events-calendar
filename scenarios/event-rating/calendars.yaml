@@ -1,0 +1,4 @@
+calendars:
+  - id: "rating-cal-001"
+    name: "Rating Test Calendar"
+    color: "#f59e0b"

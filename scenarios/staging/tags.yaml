@@ -1,0 +1,252 @@
+tag_groups:
+  - slug: misc
+    label: Misc
+    ordinal: 5
+    allow_multiple: true
+    color: "#f422b8"
+    tags:
+      - slug: ogouni-going
+        label: OGoing !
+        is_hero_filter: true
+        hero_ordinal: 0
+  - slug: format
+    label: Format
+    ordinal: 10
+    allow_multiple: true
+    color: "#f472b6"
+    tags:
+      - slug: social
+        label: Social
+        is_hero_filter: true
+        hero_ordinal: 0
+        synonyms: [ "social dance", "fiesta", "soirée", "soiree", "noche", "night out", "party", "celebration", "bash" ]
+      - slug: day-social
+        label: Day Social
+        synonyms: [ "daytime social", "afternoon social", "day party", "rooftop social", "park social" ]
+      - slug: class
+        label: Class
+        synonyms: [ "classes", "lesson", "lessons", "course", "courses" ]
+      - slug: workshop
+        label: Workshop
+        synonyms: [ "workshops", "stage", "masterclass", "master class" ]
+      - slug: festival
+        label: Festival
+        # NOTE: a dance "marathon" is its own format — keep it out of festival.
+        # Congress merged into festival (2026-05): treat congress/congreso as synonyms.
+        synonyms: [ "congress", "congreso", "weekender", "encuentro" ]
+      - slug: marathon
+        label: Marathon
+        synonyms: [ "dance marathon" ]
+      - slug: weekender
+        label: Weekender
+        synonyms: [ "weekend event", "weekend edition" ]
+      - slug: bootcamp
+        label: Bootcamp
+        synonyms: [ "boot camp", "intensive" ]
+      - slug: practice
+        label: Practice
+        synonyms: [ "practica", "práctica", "training", "drill", "drills" ]
+      - slug: trip
+        label: Trip
+        synonyms: [ "getaway", "retreat", "tour", "excursion" ]
+
+  - slug: scale
+    label: Scale
+    ordinal: 20
+    allow_multiple: false
+    color: "#38bdf8"
+    tags:
+      - slug: small
+        label: Small (<50)
+      - slug: medium
+        label: Medium (50-200)
+      - slug: large
+        label: Large (200+)
+
+  - slug: scope
+    label: Scope
+    ordinal: 30
+    allow_multiple: true
+    color: "#a78bfa"
+    tags:
+      - slug: local
+        label: Local
+      - slug: regional
+        label: Regional
+      - slug: international
+        label: International
+        synonyms: [ "world", "worldwide", "global" ]
+
+  - slug: venue
+    label: Venue
+    ordinal: 40
+    allow_multiple: true
+    color: "#34d399"
+    tags:
+      - slug: indoor
+        label: Indoor
+        synonyms: [ "indoors" ]
+      - slug: outdoor
+        label: Outdoor
+        synonyms: [ "outdoors", "open air", "open-air", "park", "beach", "terrace" ]
+      - slug: rooftop
+        label: Rooftop
+        synonyms: [ "roof top", "terrace" ]
+      - slug: live-band
+        label: Live band
+        synonyms: [ "live music", "live orchestra", "live percussion", "live drummers" ]
+
+  - slug: dance-style
+    label: Dance Style
+    ordinal: 50
+    allow_multiple: true
+    color: "#fb923c"
+    tags:
+      - slug: salsa
+        label: Salsa
+        is_hero_filter: true
+        hero_ordinal: 1
+        synonyms: [ "salsa on1", "salsa on2", "linea", "línea", "la" ]
+      - slug: cuban
+        label: Cuban (Casino)
+        synonyms: [ "cubana", "salsa cubana", "casino", "rueda de casino" ]
+      - slug: mambo
+        label: Mambo (On2)
+        synonyms: [ "ny style", "new york style", "on2" ]
+      - slug: bachata
+        label: Bachata
+        is_hero_filter: true
+        hero_ordinal: 2
+        synonyms: [ "bachata sensual", "bachata moderna", "bachata dominicana", "dominicana" ]
+      - slug: kizomba
+        label: Kizomba
+        synonyms: [ "urban kiz", "kiz", "tarraxo", "tarraxinha", "ghetto zouk" ]
+      - slug: semba
+        label: Semba
+      - slug: konpa
+        label: Konpa
+        synonyms: [ "kompa", "compas" ]
+      - slug: zouk
+        label: Zouk
+        synonyms: [ "brazilian zouk", "lambazouk" ]
+      - slug: rueda
+        label: Rueda
+        synonyms: [ "rueda de casino" ]
+      - slug: cha-cha
+        label: Cha-Cha
+        synonyms: [ "chachacha", "cha cha cha", "cha-cha-cha" ]
+      - slug: son
+        label: Son
+        synonyms: [ "son cubano" ]
+
+  - slug: level
+    label: Level
+    ordinal: 60
+    allow_multiple: true
+    color: "#60a5fa"
+    tags:
+      - slug: beginner-friendly
+        label: Beginner-Friendly
+        is_hero_filter: true
+        hero_ordinal: 3
+        synonyms: [ "beginner", "beginners", "absolute beginner", "intro", "introduction", "starter", "newcomers" ]
+      - slug: intermediate
+        label: Intermediate
+        synonyms: [ "improver", "improvers", "int" ]
+      - slug: advanced
+        label: Advanced
+        synonyms: [ "advanced level", "adv" ]
+      - slug: all-levels
+        label: All Levels
+        synonyms: [ "all level", "open level", "tous niveaux" ]
+
+  # NOTE: the previous "Vibe" group (good-music / crowded / spacious /
+  # high-level-dancers / social-atmosphere / live-band) was a mix of
+  # subjective experience tags and one factual property. Following the
+  # event-vs-review scope split:
+  #   - the subjective ones moved to the review-tags group below
+  #     (great-music, crowded, spacious, high-level-dancers, great-vibe);
+  #   - live-band (a factual property organisers can declare) moved to
+  #     the venue group above.
+  # Keeping subjective qualities out of the event taxonomy prevents
+  # organisers from self-claiming them (Google/Yelp/Airbnb pattern).
+
+  # Review-only aspect tags. scope: review keeps them out of the explorer
+  # filter and the public tag-suggestion form; they are surfaced only inside
+  # the rate-event modal and the per-event review-list filter chips.
+  # Curated to mirror Google/Yelp/TripAdvisor review-aspect vocabularies
+  # while staying relevant to the salsa/bachata/kizomba scene.
+  - slug: review-tags
+    label: Review tags
+    ordinal: 100
+    allow_multiple: true
+    color: "#f59e0b"
+    scope: review
+    tags:
+      # ── Music ──
+      - slug: great-music
+        label: Great music
+      - slug: great-dj
+        label: Great DJ
+      - slug: too-loud
+        label: Too loud
+      - slug: bad-sound
+        label: Bad sound
+      # ── Crowd & vibe ──
+      - slug: friendly-crowd
+        label: Friendly crowd
+      - slug: welcoming-to-newcomers
+        label: Welcoming to newcomers
+      - slug: great-vibe
+        label: Great vibe
+      - slug: cliquey
+        label: Cliquey
+      - slug: unsafe
+        label: Felt unsafe
+      # ── Dance level ──
+      - slug: beginner-friendly
+        label: Beginner-friendly
+      - slug: high-level-dancers
+        label: High-level dancers
+      - slug: balanced-leads-follows
+        label: Balanced leads/follows
+      - slug: not-enough-partners
+        label: Not enough partners
+      # ── Floor & venue ──
+      - slug: great-dance-floor
+        label: Great dance floor
+      - slug: slippery-floor
+        label: Slippery floor
+      - slug: sticky-floor
+        label: Sticky floor
+      - slug: spacious
+        label: Spacious
+      - slug: crowded
+        label: Crowded
+      - slug: good-ventilation
+        label: Good ventilation
+      - slug: too-hot
+        label: Too hot
+      # ── Service & logistics ──
+      - slug: easy-parking
+        label: Easy parking
+      - slug: good-drinks
+        label: Good drinks
+      - slug: friendly-staff
+        label: Friendly staff
+      - slug: long-wait
+        label: Long wait
+      - slug: poor-organization
+        label: Poor organization
+      # ── Value ──
+      - slug: good-value
+        label: Good value
+      - slug: overpriced
+        label: Overpriced
+      # ── Class / workshop specific ──
+      - slug: good-workshops
+        label: Good workshops
+      - slug: poor-workshops
+        label: Poor workshops
+      - slug: authentic
+        label: Authentic

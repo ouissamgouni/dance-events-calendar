@@ -21,6 +21,7 @@ export interface TagGroup {
     ordinal: number;
     allow_multiple: boolean;
     enabled: boolean;
+    scope?: 'event' | 'review';
     tags: Tag[];
 }
 
@@ -37,6 +38,9 @@ export interface TagSuggestionResponse {
     id: number;
     event_id: string;
     event_title: string | null;
+    event_description?: string | null;
+    event_start?: string | null;
+    event_location?: string | null;
     tag: Tag | null;
     free_text: string | null;
     group_slug: string | null;
@@ -45,6 +49,26 @@ export interface TagSuggestionResponse {
     admin_notes: string | null;
     reviewed_at: string | null;
     created_at: string;
+    /** 'user' for end-user submissions, 'heuristic' for pipeline-generated suggestions. */
+    source?: 'user' | 'heuristic' | string;
+    /** 0.0-1.0 confidence score, populated for auto-generated rows only. */
+    confidence?: number | null;
+    /** Lower-cased terms that triggered a heuristic match (admin transparency tooltip). */
+    matched_terms?: string[] | null;
+}
+
+export interface TagSuggestionRunResponse {
+    generated: number;
+    skipped: number;
+    replaced: number;
+    suggestions: TagSuggestionResponse[];
+}
+
+export interface BulkTagSuggestionRunResponse {
+    generated: number;
+    skipped: number;
+    replaced: number;
+    events_processed: number;
 }
 
 export interface LinkItem {
@@ -65,6 +89,7 @@ export interface CalendarEvent {
     all_day: boolean;
     color: string | null;
     view_count: number;
+    going_count?: number;
     price_min: number | null;
     price_max: number | null;
     price_currency: string | null;
@@ -79,6 +104,28 @@ export interface CalendarSetting {
     name: string;
     enabled: boolean;
     color: string | null;
+}
+
+export interface Attendee {
+    user_id: string;
+    display_name: string | null;
+    avatar_url: string | null;
+}
+
+export interface AttendanceSummary {
+    event_id: string;
+    total_going: number;
+    total_saved: number;
+    public_going: number;
+    anonymous_going: number;
+    can_view_attendees: boolean;
+    viewer_is_sharing: boolean;
+    preview_attendees: Attendee[];
+}
+
+export interface AttendingEventEntry {
+    event_id: string;
+    share_publicly: boolean;
 }
 
 export interface AppInfo {
@@ -117,6 +164,11 @@ export interface EventSuggestionCreate {
     submitter_name?: string;
     submitter_email?: string;
     suggested_tag_ids?: number[];
+    suggested_new_tags?: { free_text: string; group_slug?: string | null }[];
+    price_min?: number | null;
+    price_max?: number | null;
+    price_currency?: string | null;
+    price_is_free?: boolean;
     website?: string; // honeypot
     screen_size?: string;
     timezone?: string;
@@ -151,7 +203,113 @@ export interface EventSuggestion {
     created_event_id: string | null;
     synced_to_google: boolean;
     google_event_id: string | null;
+    suggested_tag_ids?: number[] | null;
+    price_min?: number | null;
+    price_max?: number | null;
+    price_currency?: string | null;
+    price_is_free?: boolean;
     created_at: string;
     reviewed_at: string | null;
     reviewed_by: string | null;
+}
+
+// --- Ratings / Feedback ---
+
+export interface RatingTagSuggestionInline {
+    tag_id?: number;
+    free_text?: string;
+    group_slug?: string;
+}
+
+export interface FeedbackSubmissionCreate {
+    stars: number;
+    comment?: string;
+    review_tag_ids: number[];
+    is_anonymous: boolean;
+    tag_suggestions: RatingTagSuggestionInline[];
+    website?: string; // honeypot
+}
+
+export interface EventRating {
+    id: string;
+    event_id: string;
+    stars: number;
+    comment: string | null;
+    review_tag_ids: number[];
+    is_anonymous: boolean;
+    status: 'pending' | 'approved' | 'rejected';
+    created_at: string;
+    updated_at: string;
+}
+
+export interface FeedbackSubmissionResponse {
+    feedback_submission_id: string;
+    rating: EventRating;
+    tag_suggestion_ids: number[];
+    message: string;
+}
+
+export interface EventRatingAggregate {
+    event_id: string;
+    average: number;
+    count: number;
+    distribution: Record<number, number>;
+}
+
+export interface EventReviewPublic {
+    id: string;
+    stars: number;
+    comment: string | null;
+    review_tags: Tag[];
+    reviewer_label: string;
+    created_at: string;
+}
+
+export interface EventReviewsList {
+    items: EventReviewPublic[];
+    total: number;
+}
+
+export interface AdminRating {
+    id: string;
+    event_id: string;
+    event_title: string | null;
+    user_email: string | null;
+    user_display_name: string | null;
+    is_anonymous: boolean;
+    stars: number;
+    comment: string | null;
+    review_tags: Tag[];
+    feedback_submission_id: string | null;
+    linked_tag_suggestion_ids: number[];
+    status: 'pending' | 'approved' | 'rejected';
+    admin_notes: string | null;
+    submitter_ip: string | null;
+    submitter_user_agent: string | null;
+    submitter_country: string | null;
+    auto_flagged: boolean;
+    reviewed_at: string | null;
+    reviewed_by: string | null;
+    created_at: string;
+}
+
+export interface AdminRatingList {
+    items: AdminRating[];
+    total: number;
+    page: number;
+    page_size: number;
+}
+
+export interface MyRating {
+    id: string;
+    event_id: string;
+    event_title: string | null;
+    event_start: string | null;
+    stars: number;
+    comment: string | null;
+    review_tag_ids: number[];
+    is_anonymous: boolean;
+    status: 'pending' | 'approved' | 'rejected';
+    created_at: string;
+    updated_at: string;
 }

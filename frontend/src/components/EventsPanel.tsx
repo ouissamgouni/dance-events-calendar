@@ -13,10 +13,12 @@ import {
     bulkReviewEvents,
     bulkRetryGeocoding,
     bulkAssignTags,
+    runTagSuggestionsBulk,
 } from '../api';
 import type { AdminTagGroup } from '../api';
 import LocationBadge from './LocationBadge';
 import AdminEventDetailPanel from './AdminEventDetailPanel';
+import { useAdminPrefs } from '../context/AdminPrefsContext';
 
 export type EventsPanelPreset = 'all' | 'pending' | 'ungeolocated';
 
@@ -31,8 +33,8 @@ const PAGE_SIZE = 25;
 
 const PRESET_FILTERS: Record<EventsPanelPreset, Partial<EventFilterParams>> = {
     all: {},
-    pending: { review_status: 'pending', future_only: true },
-    ungeolocated: { ungeolocated: true, future_only: true },
+    pending: { review_status: 'pending' },
+    ungeolocated: { ungeolocated: true },
 };
 
 const PRESET_TITLES: Record<EventsPanelPreset, string> = {
@@ -61,6 +63,14 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
     const [tagGroups, setTagGroups] = useState<AdminTagGroup[]>([]);
     const [bulkTagPickerOpen, setBulkTagPickerOpen] = useState(false);
     const [bulkTagIds, setBulkTagIds] = useState<number[]>([]);
+    // Hide past events by default; toggle (here or in the admin header) to
+    // include them. Mirrors the global admin pref so all panels stay in sync.
+    const { includePast, setIncludePast } = useAdminPrefs();
+    const hidePast = !includePast;
+    const setHidePast = (value: boolean | ((prev: boolean) => boolean)) => {
+        const next = typeof value === 'function' ? (value as (p: boolean) => boolean)(hidePast) : value;
+        setIncludePast(!next);
+    };
     const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
     // Build filter params from current state
@@ -75,10 +85,10 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 calendar_id: selectedCalendar || undefined,
                 tag_ids: selectedTagIds || undefined,
                 ungeolocated: selectedGeoStatus === 'ungeolocated' || presetFilters.ungeolocated || undefined,
-                future_only: presetFilters.future_only || undefined,
+                include_past: !hidePast || undefined,
             };
         },
-        [preset, page, debouncedSearch, selectedReviewStatus, selectedCalendar, selectedTagIds, selectedGeoStatus],
+        [preset, page, debouncedSearch, selectedReviewStatus, selectedCalendar, selectedTagIds, selectedGeoStatus, hidePast],
     );
 
     // Load events
@@ -122,6 +132,8 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             setAdminDetailEventId(null);
             setBulkTagPickerOpen(false);
             setBulkTagIds([]);
+            // Don't reset hidePast here — it's now driven by the global
+            // admin pref so reopening the panel respects the user's choice.
         }
     }, [isOpen, preset, initialCalendarId]);
 
@@ -243,6 +255,28 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
         }
     };
 
+    const handleBulkSuggestTags = async () => {
+        if (selectedIds.size === 0) return;
+        // Bulk endpoint caps at 200; clamp client-side for clearer UX.
+        const ids = [...selectedIds].slice(0, 200);
+        const truncated = selectedIds.size > 200;
+        setBusy('bulk-suggest-tags');
+        try {
+            const result = await runTagSuggestionsBulk(ids);
+            const trailer = truncated ? ' (capped at 200)' : '';
+            setMessage(
+                `auto tag suggestions: generated ${result.generated} across ` +
+                `${result.events_processed} events${trailer}. Review in the ` +
+                `Tag Suggestions panel.`,
+            );
+            setSelectedIds(new Set());
+        } catch {
+            setMessage('Failed to generate tag suggestions.');
+        } finally {
+            setBusy('');
+        }
+    };
+
     const handleSingleReview = async (eventId: string) => {
         try {
             await reviewEvent(eventId);
@@ -268,14 +302,27 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             >
                 {/* Header */}
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 bg-gray-50 shrink-0">
-                    <h2 className="text-xs font-semibold text-gray-800 uppercase tracking-wide">
-                        {PRESET_TITLES[preset]}
-                        {!loading && (
-                            <span className="ml-2 text-[10px] font-normal text-gray-400 normal-case">
-                                {total} event{total !== 1 ? 's' : ''}
-                            </span>
-                        )}
-                    </h2>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => loadEvents()}
+                            className={`text-gray-400 hover:text-gray-600 p-1 transition-transform ${loading ? 'animate-spin' : ''}`}
+                            title="Refresh"
+                            aria-label="Refresh"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="23 4 23 10 17 10" />
+                                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                            </svg>
+                        </button>
+                        <h2 className="text-xs font-semibold text-gray-800 uppercase tracking-wide">
+                            {PRESET_TITLES[preset]}
+                            {!loading && (
+                                <span className="ml-2 text-[10px] font-normal text-gray-400 normal-case">
+                                    {total} event{total !== 1 ? 's' : ''}
+                                </span>
+                            )}
+                        </h2>
+                    </div>
                     <button
                         onClick={onClose}
                         className="text-gray-400 hover:text-gray-600 text-sm leading-none p-1"
@@ -364,6 +411,18 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                     ))}
                                 </select>
                             )}
+
+                            {/* Hide past events toggle */}
+                            <button
+                                onClick={() => { setHidePast((v) => !v); setPage(0); }}
+                                className={`text-[10px] font-medium px-2 py-0.5 border transition ${hidePast
+                                    ? 'bg-blue-50 border-blue-300 text-blue-700'
+                                    : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                                    }`}
+                                title={hidePast ? 'Currently hiding past events. Click to include them.' : 'Currently including past events. Click to hide.'}
+                            >
+                                {hidePast ? 'Hide past' : 'Include past'}
+                            </button>
                         </div>
                     )}
                 </div>
@@ -611,6 +670,14 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                             {busy === 'bulk-geo' ? 'Retrying…' : 'Retry Geocoding'}
                         </button>
                         <button
+                            onClick={handleBulkSuggestTags}
+                            disabled={!!busy}
+                            className="text-[10px] font-medium px-2 py-1 bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition"
+                            title="Run the heuristic tag suggester on the selected events. Suggestions land as pending — review in the Tag Suggestions panel."
+                        >
+                            {busy === 'bulk-suggest-tags' ? 'Suggesting…' : 'Auto-suggest Tags'}
+                        </button>
+                        <button
                             onClick={() => { setSelectedIds(new Set()); setAllMatchingSelected(false); setBulkTagPickerOpen(false); }}
                             className="text-[10px] text-gray-500 hover:text-gray-700 px-1"
                         >
@@ -624,6 +691,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             <AdminEventDetailPanel
                 eventId={adminDetailEventId}
                 onClose={() => setAdminDetailEventId(null)}
+                onEventUpdated={() => loadEvents()}
             />
         </>
     );

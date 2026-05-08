@@ -149,15 +149,19 @@ class TestSubmitSuggestion:
 
     def test_submit_missing_title(self):
         """Missing title → 422 validation error."""
-        client = TestClient(app)
-        resp = client.post(
-            "/api/suggestions",
-            json={
-                "start": "2026-06-15T20:00:00",
-                "end": "2026-06-15T23:00:00",
-            },
-        )
-        assert resp.status_code == 422
+        app.dependency_overrides[get_session] = lambda: MagicMock(spec=Session)
+        try:
+            client = TestClient(app)
+            resp = client.post(
+                "/api/suggestions",
+                json={
+                    "start": "2026-06-15T20:00:00",
+                    "end": "2026-06-15T23:00:00",
+                },
+            )
+            assert resp.status_code == 422
+        finally:
+            app.dependency_overrides.pop(get_session, None)
 
 
 @pytest.mark.unit

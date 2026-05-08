@@ -38,6 +38,7 @@ class EventResponse(BaseModel):
     longitude: Optional[float] = None
     color: Optional[str] = None
     view_count: int = 0
+    going_count: int = 0
     price_min: Optional[float] = None
     price_max: Optional[float] = None
     price_currency: Optional[str] = None
@@ -77,12 +78,66 @@ class EventSaveRequest(BaseModel):
     event_id: str
     device_id: str = Field(..., min_length=1, max_length=64)
     action: str = Field(..., pattern="^(save|unsave)$")
+    # When False, the route updates only the functional UserSavedEvent state
+    # and skips writing the analytics EventSave log row.
+    record_analytics: bool = True
 
 
 class EventAttendanceRequest(BaseModel):
     event_id: str
     device_id: str = Field(..., min_length=1, max_length=64)
     action: str = Field(..., pattern="^(going|not_going)$")
+    record_analytics: bool = True
+    # When None on a "going" action: keep the existing value if the row already
+    # exists, otherwise fall back to ``user.share_attendance_default``. Logged-out
+    # callers always store user_id=NULL so the field is ignored for them.
+    share_publicly: Optional[bool] = None
+
+
+class AttendeeResponse(BaseModel):
+    user_id: UUID
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+
+class AttendanceSummaryResponse(BaseModel):
+    """Counts for one event. The ``public_*`` and ``anonymous_*`` breakdown is
+    only populated for authenticated callers — logged-out viewers see only the
+    total and a flag telling them to sign in for the rest."""
+
+    event_id: str
+    total_going: int = 0
+    total_saved: int = 0
+    public_going: int = 0
+    anonymous_going: int = 0
+    can_view_attendees: bool = False
+    viewer_is_sharing: bool = False
+    preview_attendees: list[AttendeeResponse] = []
+
+
+class AttendanceSummaryBatchRequest(BaseModel):
+    event_ids: list[str] = Field(..., min_length=1, max_length=200)
+
+
+class UpdatePreferencesRequest(BaseModel):
+    share_attendance_default: Optional[bool] = None
+
+
+class UpdateProfileRequest(BaseModel):
+    """Editable identity fields surfaced on the Account page.
+
+    ``handle`` is validated against ``HANDLE_PATTERN`` server-side; clients
+    should pre-validate but the server is the source of truth.
+    """
+
+    display_name: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    handle: Optional[str] = Field(default=None, min_length=3, max_length=24)
+
+
+class HandleAvailabilityResponse(BaseModel):
+    handle: str
+    available: bool
+    reason: Optional[str] = None
 
 
 class EventLinkClickRequest(BaseModel):
@@ -94,6 +149,22 @@ class EventLinkClickRequest(BaseModel):
 class EventExportRequest(BaseModel):
     format: str = Field(..., pattern="^(ics|xlsx)$")
     event_count: int = Field(..., ge=0, le=10000)
+    device_id: Optional[str] = Field(default=None, max_length=64)
+
+
+class ShareEventRequest(BaseModel):
+    """Payload for ``POST /api/track/share``.
+
+    ``action`` distinguishes the three funnel stages so a single endpoint
+    can serve all of them. ``share_code`` is required for click and
+    conversion (it identifies the originating sharer); for ``share`` the
+    code comes from the authenticated user's record so the field is
+    ignored.
+    """
+
+    event_id: str = Field(..., min_length=1, max_length=128)
+    action: str = Field(..., pattern="^(share|click|conversion)$")
+    share_code: Optional[str] = Field(default=None, min_length=4, max_length=12)
     device_id: Optional[str] = Field(default=None, max_length=64)
 
 
@@ -119,6 +190,10 @@ class ShareTokenResponse(BaseModel):
 
 class SharedCalendarResponse(BaseModel):
     events: list[EventResponse]
+    # First name (or email-local-part fallback) of the share-token owner when
+    # the token is user-scoped. None for anonymous (device-only) tokens. Used
+    # by the public /shared/:token page to render "{name}'s calendar".
+    owner_display_name: Optional[str] = None
 
 
 class MostViewedEvent(BaseModel):
@@ -153,35 +228,34 @@ class ExportStat(BaseModel):
 
 class SiteSettingsResponse(BaseModel):
     since_date: str
+    sync_since_date: str
     sync_interval_minutes: int
     auto_sync_enabled: bool = False
+    auto_sync_mode: str = "incremental"  # "incremental" | "reseed"
     show_prices: bool = False
     show_popularity: bool = False
+    show_ratings: bool = False
     popularity_threshold: int = 10
+    event_color_bar_color: str = "#64748b"
+    tag_sort_mode: str = "group"  # "group" | "event_count"
 
 
 class SiteSettingsUpdateRequest(BaseModel):
     since_date: Optional[str] = None
+    sync_since_date: Optional[str] = None
     sync_interval_minutes: Optional[int] = Field(default=None, ge=1, le=1440)
     auto_sync_enabled: Optional[bool] = None
+    auto_sync_mode: Optional[str] = Field(
+        default=None, pattern="^(incremental|reseed)$"
+    )
     show_prices: Optional[bool] = None
     show_popularity: Optional[bool] = None
+    show_ratings: Optional[bool] = None
     popularity_threshold: Optional[int] = Field(default=None, ge=1, le=10000)
-
-
-class SyncLogResponse(BaseModel):
-    id: int
-    started_at: datetime
-    finished_at: Optional[datetime] = None
-    status: str
-    trigger: str
-    calendars_synced: int
-    events_upserted: int
-    events_deleted: int
-    error_message: Optional[str] = None
-    enrichment_status: str = "pending"
-    enrichment_progress: Optional[dict] = None
-    dedup_log: Optional[list] = None
+    event_color_bar_color: Optional[str] = Field(
+        default=None, pattern="^#[0-9a-fA-F]{6}$"
+    )
+    tag_sort_mode: Optional[str] = Field(default=None, pattern="^(group|event_count)$")
 
 
 class EventUpdateRequest(BaseModel):
@@ -199,6 +273,8 @@ class EventUpdateRequest(BaseModel):
     price_is_free: Optional[bool] = None
     links: Optional[list[LinkItem]] = None
     tag_ids: Optional[list[int]] = None
+    calendar_id: Optional[str] = None
+    review_status: Optional[str] = Field(default=None, pattern="^(pending|reviewed)$")
 
 
 class GeocodeSuggestion(BaseModel):
@@ -218,6 +294,11 @@ class AppInfoResponse(BaseModel):
 # --- Event Suggestions ---
 
 
+class NewTagSuggestionItem(BaseModel):
+    free_text: str = Field(..., min_length=1, max_length=100)
+    group_slug: Optional[str] = Field(default=None, max_length=100)
+
+
 class EventSuggestionCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
@@ -234,6 +315,11 @@ class EventSuggestionCreate(BaseModel):
     screen_size: Optional[str] = None
     timezone: Optional[str] = None
     suggested_tag_ids: list[int] = Field(default_factory=list)
+    suggested_new_tags: list[NewTagSuggestionItem] = Field(default_factory=list)
+    price_min: Optional[float] = Field(default=None, ge=0)
+    price_max: Optional[float] = Field(default=None, ge=0)
+    price_currency: Optional[str] = Field(default=None, max_length=8)
+    price_is_free: bool = False
 
 
 class EventSuggestionResponse(BaseModel):
@@ -265,6 +351,12 @@ class EventSuggestionResponse(BaseModel):
     created_event_id: Optional[str] = None
     synced_to_google: bool = False
     google_event_id: Optional[str] = None
+    suggested_tag_ids: Optional[list[int]] = None
+    suggested_new_tags: Optional[list[NewTagSuggestionItem]] = None
+    price_min: Optional[float] = None
+    price_max: Optional[float] = None
+    price_currency: Optional[str] = None
+    price_is_free: bool = False
     created_at: datetime
     reviewed_at: Optional[datetime] = None
     reviewed_by: Optional[str] = None
@@ -305,6 +397,7 @@ class TagGroupResponse(BaseModel):
     ordinal: int = 0
     allow_multiple: bool = True
     enabled: bool = True
+    scope: str = "event"
     tags: list[TagResponse] = []
 
 
@@ -312,6 +405,11 @@ class TagGroupCreate(BaseModel):
     label: str = Field(..., min_length=1, max_length=100)
     slug: Optional[str] = Field(default=None, max_length=100)
     color: Optional[str] = None
+    scope: Optional[str] = Field(
+        default="event",
+        pattern="^(event|review)$",
+        description="'event' for taxonomy/filter tags, 'review' for review-only aspect tags",
+    )
 
 
 class TagGroupUpdate(BaseModel):
@@ -320,6 +418,7 @@ class TagGroupUpdate(BaseModel):
     allow_multiple: Optional[bool] = None
     color: Optional[str] = None
     enabled: Optional[bool] = None
+    scope: Optional[str] = Field(default=None, pattern="^(event|review)$")
 
 
 class TagCreate(BaseModel):
@@ -336,6 +435,7 @@ class TagUpdate(BaseModel):
     enabled: Optional[bool] = None
     is_hero_filter: Optional[bool] = None
     hero_ordinal: Optional[int] = None
+    group_id: Optional[int] = None
 
 
 class EventTagAssignment(BaseModel):
@@ -355,6 +455,9 @@ class TagSuggestionResponse(BaseModel):
     id: int
     event_id: str
     event_title: Optional[str] = None
+    event_description: Optional[str] = None
+    event_start: Optional[datetime] = None
+    event_location: Optional[str] = None
     tag: Optional[TagResponse] = None
     free_text: Optional[str] = None
     group_slug: Optional[str] = None
@@ -363,6 +466,10 @@ class TagSuggestionResponse(BaseModel):
     admin_notes: Optional[str] = None
     reviewed_at: Optional[datetime] = None
     created_at: datetime
+    # auto-generated suggestion metadata (NULL/'user' for legacy user submissions).
+    source: str = "user"
+    confidence: Optional[float] = None
+    matched_terms: Optional[list[str]] = None
 
 
 class TagSuggestionApproveRequest(BaseModel):
@@ -373,6 +480,54 @@ class TagSuggestionApproveRequest(BaseModel):
 
 class TagSuggestionRejectRequest(BaseModel):
     admin_notes: Optional[str] = None
+
+
+class BulkTagSuggestionReviewRequest(BaseModel):
+    ids: list[int]
+    action: str  # 'approve' | 'reject'
+
+
+class BulkTagSuggestionReviewResponse(BaseModel):
+    ok: int
+    skipped: int  # already-reviewed or free-text approve without tag_id
+
+
+class TagSynonymResponse(BaseModel):
+    id: int
+    tag_id: int
+    term: str
+    created_at: datetime
+
+
+class TagSynonymCreateRequest(BaseModel):
+    term: str
+
+
+class TagSuggestionRunRequest(BaseModel):
+    """Body for POST /api/admin/events/{id}/suggest-tags."""
+
+    # When True, existing pending auto suggestions for the event are deleted
+    # before generating fresh ones (e.g. for the "Re-run" button).
+    replace_existing_pending: bool = False
+
+
+class BulkTagSuggestionRunRequest(BaseModel):
+    event_ids: list[str]
+    replace_existing_pending: bool = False
+
+
+class TagSuggestionRunResponse(BaseModel):
+    generated: int
+    skipped: int
+    replaced: int
+    suggestions: list[TagSuggestionResponse] = []
+
+
+class BulkTagSuggestionRunResponse(BaseModel):
+    generated: int
+    skipped: int
+    replaced: int
+    events_processed: int
 
 
 # --- Admin Events: Paginated List & Filter Options ---
@@ -417,3 +572,154 @@ class CalendarDefaultTagsUpdate(BaseModel):
 
 class EventIdsResponse(BaseModel):
     ids: list[str]
+
+
+class SyncJobStartRequest(BaseModel):
+    mode: str = Field(default="incremental", pattern="^(incremental|reseed)$")
+    since_date: Optional[str] = None
+    calendar_ids: list[str] = Field(default_factory=list, max_length=200)
+
+
+class SyncJobListResponse(BaseModel):
+    items: list[dict]
+    total: int
+
+
+class SyncLogResponse(BaseModel):
+    id: int
+    started_at: datetime
+    finished_at: Optional[datetime] = None
+    status: str
+    trigger: str
+    calendars_synced: int
+    events_upserted: int
+    events_deleted: int
+    error_message: Optional[str] = None
+    enrichment_status: str
+    enrichment_progress: Optional[dict] = None
+    dedup_log: Optional[list] = None
+
+    class Config:
+        from_attributes = True
+
+
+# --- Ratings / Feedback ---
+
+
+class TagSuggestionInline(BaseModel):
+    """A tag suggestion submitted as part of a feedback envelope."""
+
+    tag_id: Optional[int] = None
+    free_text: Optional[str] = Field(default=None, max_length=100)
+    group_slug: Optional[str] = Field(default=None, max_length=64)
+
+
+class FeedbackSubmissionCreate(BaseModel):
+    """Unified envelope: rating + optional related tag suggestions."""
+
+    stars: int = Field(..., ge=1, le=5)
+    comment: Optional[str] = Field(default=None, max_length=2000)
+    review_tag_ids: list[int] = Field(default_factory=list, max_length=10)
+    is_anonymous: bool = False
+    tag_suggestions: list[TagSuggestionInline] = Field(
+        default_factory=list, max_length=10
+    )
+    website: str = ""  # honeypot
+
+
+class EventRatingResponse(BaseModel):
+    id: UUID
+    event_id: str
+    stars: int
+    comment: Optional[str] = None
+    review_tag_ids: list[int] = []
+    is_anonymous: bool = False
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class FeedbackSubmissionResponse(BaseModel):
+    feedback_submission_id: UUID
+    rating: EventRatingResponse
+    tag_suggestion_ids: list[int] = []
+    message: str = "Thanks for your feedback! Your review is being checked by our team."
+
+
+class EventRatingAggregate(BaseModel):
+    event_id: str
+    average: float = 0.0
+    count: int = 0
+    distribution: dict[int, int] = Field(default_factory=dict)
+
+
+class EventReviewPublic(BaseModel):
+    """Approved review shown publicly on the event detail page."""
+
+    id: UUID
+    stars: int
+    comment: Optional[str] = None
+    review_tags: list[TagResponse] = []
+    reviewer_label: str  # display name, "Anonymous", or initials
+    created_at: datetime
+
+
+class EventReviewsListResponse(BaseModel):
+    items: list[EventReviewPublic]
+    total: int
+
+
+class BatchAggregateRequest(BaseModel):
+    event_ids: list[str] = Field(..., min_length=1, max_length=200)
+
+
+class AdminRatingResponse(BaseModel):
+    id: UUID
+    event_id: str
+    event_title: Optional[str] = None
+    user_email: Optional[str] = None
+    user_display_name: Optional[str] = None
+    is_anonymous: bool = False
+    stars: int
+    comment: Optional[str] = None
+    review_tags: list[TagResponse] = []
+    feedback_submission_id: Optional[UUID] = None
+    linked_tag_suggestion_ids: list[int] = []
+    status: str
+    admin_notes: Optional[str] = None
+    submitter_ip: Optional[str] = None
+    submitter_user_agent: Optional[str] = None
+    submitter_country: Optional[str] = None
+    auto_flagged: bool = False
+    reviewed_at: Optional[datetime] = None
+    reviewed_by: Optional[str] = None
+    created_at: datetime
+
+
+class AdminRatingListResponse(BaseModel):
+    items: list[AdminRatingResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class RatingApproveRequest(BaseModel):
+    admin_notes: Optional[str] = Field(default=None, max_length=500)
+
+
+class RatingRejectRequest(BaseModel):
+    admin_notes: Optional[str] = Field(default=None, max_length=500)
+
+
+class MyRatingResponse(BaseModel):
+    id: UUID
+    event_id: str
+    event_title: Optional[str] = None
+    event_start: Optional[datetime] = None
+    stars: int
+    comment: Optional[str] = None
+    review_tag_ids: list[int] = []
+    is_anonymous: bool = False
+    status: str
+    created_at: datetime
+    updated_at: datetime

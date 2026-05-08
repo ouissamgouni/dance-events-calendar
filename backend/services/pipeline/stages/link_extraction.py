@@ -21,15 +21,19 @@ class LinkExtractionStage(EnrichmentStage):
 
     def process(self, event: CachedEvent) -> bool:
         urls = _URL_PATTERN.findall(event.description or "")
-        if urls:
-            # Deduplicate while preserving order
-            seen: set[str] = set()
-            unique: list[dict] = []
-            for url in urls:
-                normalized = url.rstrip(".,;:")
-                if normalized not in seen:
-                    seen.add(normalized)
-                    unique.append({"url": normalized, "label": None})
-            event.links = unique
+        if not urls:
+            # No URLs in the description is normal — not a failure.
+            # Mark as processed (stage ran cleanly) and store an empty list
+            # so we don't re-scan on every sync.
+            event.links = []
             return True
-        return False
+        # Deduplicate while preserving order
+        seen: set[str] = set()
+        unique: list[dict] = []
+        for url in urls:
+            normalized = url.rstrip(".,;:")
+            if normalized not in seen:
+                seen.add(normalized)
+                unique.append({"url": normalized, "label": None})
+        event.links = unique
+        return True

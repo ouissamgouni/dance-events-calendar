@@ -2,9 +2,9 @@ name: Deploy
 
 on:
     workflow_run:
-        workflows: ["CI"]
-        branches: [main, develop]
-        types: [completed]
+        workflows: [ "CI" ]
+        branches: [ main, develop ]
+        types: [ completed ]
 
 jobs:
     deploy-staging:
@@ -43,7 +43,7 @@ jobs:
             - name: Deploy backend to staging Fly.io app
               env:
                   FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-              run: flyctl deploy --remote-only -c fly.staging.toml
+              run: flyctl deploy --remote-only -c config/fly.staging.toml
 
     deploy-production:
         name: Deploy to Production
@@ -81,4 +81,4 @@ jobs:
             - name: Deploy backend to production Fly.io app
               env:
                   FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-              run: flyctl deploy --remote-only
+              run: flyctl deploy --remote-only -c config/fly.prod.toml

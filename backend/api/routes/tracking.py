@@ -1,15 +1,19 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response
 from slowapi import Limiter
-from slowapi.util import get_remote_address
+from backend.api.rate_limit import client_ip
 from sqlmodel import Session, select
 
+from backend.api.anon_id import get_or_set_anon_id
+from backend.api.deps import get_current_user_optional
 from backend.api.schemas import (
     EventAttendanceRequest,
     EventSaveRequest,
     EventViewRequest,
     EventLinkClickRequest,
     EventExportRequest,
+    ShareEventRequest,
 )
+from backend.config.loader import get_admin_email
 from backend.db.database import get_session
 from backend.db.models import (
     EventAttendance,
@@ -17,6 +21,8 @@ from backend.db.models import (
     EventView,
     EventLinkClick,
     EventExport,
+    ShareEvent,
+    User,
     UserEventAttendance,
     UserSavedEvent,
     ShareToken,
@@ -25,18 +31,29 @@ from backend.services.ip_geolocation import geolocate_ip
 
 router = APIRouter(prefix="/api", tags=["tracking"])
 
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=client_ip)
+
+
+def _is_admin(user: User | None) -> bool:
+    """Admin sessions are excluded from analytics so moderation activity
+    does not skew product KPIs and ranking signals. Functional state
+    (UserSavedEvent, UserEventAttendance) is still maintained — only the
+    analytics rows and geolocation lookups are skipped."""
+    if user is None:
+        return False
+    admin_email = get_admin_email()
+    return bool(admin_email) and user.email == admin_email
 
 
 async def _update_view_geo(view_id: int, ip: str) -> None:
     """Resolve IP geo and update the EventView row. Fire-and-forget — failures are silent."""
-    from backend.db.database import engine
-    from sqlmodel import Session as _Session
-
     geo = await geolocate_ip(ip)
     if not geo:
         return
-    with _Session(engine) as session:
+    from backend.db.database import get_engine
+    from sqlmodel import Session as _Session
+
+    with _Session(get_engine()) as session:
         view = session.get(EventView, view_id)
         if view:
             view.country = geo.get("country")
@@ -47,13 +64,13 @@ async def _update_view_geo(view_id: int, ip: str) -> None:
 
 async def _update_click_geo(click_id: int, ip: str) -> None:
     """Resolve IP geo and update the EventLinkClick row. Fire-and-forget — failures are silent."""
-    from backend.db.database import engine
-    from sqlmodel import Session as _Session
-
     geo = await geolocate_ip(ip)
     if not geo:
         return
-    with _Session(engine) as session:
+    from backend.db.database import get_engine
+    from sqlmodel import Session as _Session
+
+    with _Session(get_engine()) as session:
         click = session.get(EventLinkClick, click_id)
         if click:
             click.country = geo.get("country")
@@ -69,7 +86,10 @@ async def track_event_view(
     payload: EventViewRequest,
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
+    if _is_admin(current_user):
+        return {"status": "skipped", "reason": "admin"}
     view = EventView(
         event_id=payload.event_id,
         device_id=payload.device_id,
@@ -87,37 +107,86 @@ async def track_event_view(
 @limiter.limit("30/minute")
 def track_event_save(
     request: Request,
+    response: Response,
     payload: EventSaveRequest,
     session: Session = Depends(get_session),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
-    save = EventSave(
-        event_id=payload.event_id,
-        device_id=payload.device_id,
-        action=payload.action,
-    )
-    session.add(save)
+    if payload.record_analytics and not _is_admin(current_user):
+        session.add(
+            EventSave(
+                event_id=payload.event_id,
+                device_id=payload.device_id,
+                action=payload.action,
+            )
+        )
 
-    # Maintain materialized state table (source of truth for sharing)
+    user_id = current_user.id if current_user else None
+    # Stable anonymous identity (httpOnly cookie). Survives localStorage
+    # clears, so re-clicking save after wiping local data does not insert a
+    # second UserSavedEvent row and inflate total_saved.
+    anon_id = get_or_set_anon_id(request, response)
+    # For anonymous callers the cookie value is the dedupe key. For authed
+    # callers we keep the payload device_id (so cross-device dedupe via
+    # user_id keeps working as before).
+    state_key = anon_id if user_id is None else payload.device_id
+
+    # Maintain materialized state table (source of truth for sharing).
     if payload.action == "save":
         existing = session.exec(
             select(UserSavedEvent).where(
-                UserSavedEvent.device_id == payload.device_id,
+                UserSavedEvent.device_id == state_key,
                 UserSavedEvent.event_id == payload.event_id,
             )
         ).first()
-        if not existing:
+        if existing is None and user_id is None:
+            # Back-compat: an older client without the cookie may have
+            # written a row keyed by the legacy localStorage device_id.
+            # Reuse it instead of inserting a duplicate.
+            existing = session.exec(
+                select(UserSavedEvent).where(
+                    UserSavedEvent.device_id == payload.device_id,
+                    UserSavedEvent.event_id == payload.event_id,
+                    UserSavedEvent.user_id.is_(None),
+                )
+            ).first()
+        if existing:
+            if user_id and existing.user_id is None:
+                existing.user_id = user_id
+                session.add(existing)
+        else:
             session.add(
-                UserSavedEvent(device_id=payload.device_id, event_id=payload.event_id)
+                UserSavedEvent(
+                    device_id=state_key,
+                    event_id=payload.event_id,
+                    user_id=user_id,
+                )
             )
     else:
-        row = session.exec(
-            select(UserSavedEvent).where(
-                UserSavedEvent.device_id == payload.device_id,
-                UserSavedEvent.event_id == payload.event_id,
-            )
-        ).first()
-        if row:
-            session.delete(row)
+        # Unsave: when authed, remove every row for this event owned by the user
+        # across all their devices so the cross-device view is consistent.
+        if user_id:
+            user_rows = session.exec(
+                select(UserSavedEvent).where(
+                    UserSavedEvent.user_id == user_id,
+                    UserSavedEvent.event_id == payload.event_id,
+                )
+            ).all()
+            for row in user_rows:
+                session.delete(row)
+        # Anonymous unsave: remove the row for this anon identity. Also
+        # sweep the legacy device_id row for back-compat.
+        keys = {state_key, payload.device_id}
+        for key in keys:
+            row = session.exec(
+                select(UserSavedEvent).where(
+                    UserSavedEvent.device_id == key,
+                    UserSavedEvent.event_id == payload.event_id,
+                    UserSavedEvent.user_id.is_(None),
+                )
+            ).first()
+            if row:
+                session.delete(row)
 
     session.commit()
     return {"status": "tracked"}
@@ -127,39 +196,88 @@ def track_event_save(
 @limiter.limit("30/minute")
 def track_event_attendance(
     request: Request,
+    response: Response,
     payload: EventAttendanceRequest,
     session: Session = Depends(get_session),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
-    attendance = EventAttendance(
-        event_id=payload.event_id,
-        device_id=payload.device_id,
-        action=payload.action,
-    )
-    session.add(attendance)
+    if payload.record_analytics and not _is_admin(current_user):
+        session.add(
+            EventAttendance(
+                event_id=payload.event_id,
+                device_id=payload.device_id,
+                action=payload.action,
+            )
+        )
 
-    # Maintain materialized state table
+    user_id = current_user.id if current_user else None
+    anon_id = get_or_set_anon_id(request, response)
+    state_key = anon_id if user_id is None else payload.device_id
+
+    # Maintain materialized state table.
     if payload.action == "going":
         existing = session.exec(
             select(UserEventAttendance).where(
-                UserEventAttendance.device_id == payload.device_id,
+                UserEventAttendance.device_id == state_key,
                 UserEventAttendance.event_id == payload.event_id,
             )
         ).first()
-        if not existing:
+        if existing is None and user_id is None:
+            # Back-compat: pick up a pre-cookie row keyed by legacy device_id.
+            existing = session.exec(
+                select(UserEventAttendance).where(
+                    UserEventAttendance.device_id == payload.device_id,
+                    UserEventAttendance.event_id == payload.event_id,
+                    UserEventAttendance.user_id.is_(None),
+                )
+            ).first()
+        if existing:
+            if user_id and existing.user_id is None:
+                existing.user_id = user_id
+            # Only authenticated callers can change the visibility flag.
+            # Anonymous callers' field is ignored (rows with user_id=NULL
+            # are always treated as private/anonymous in the read path).
+            if current_user is not None and payload.share_publicly is not None:
+                existing.share_publicly = payload.share_publicly
+            session.add(existing)
+        else:
+            if current_user is not None:
+                share_publicly = (
+                    payload.share_publicly
+                    if payload.share_publicly is not None
+                    else current_user.share_attendance_default
+                )
+            else:
+                share_publicly = False
             session.add(
                 UserEventAttendance(
-                    device_id=payload.device_id, event_id=payload.event_id
+                    device_id=state_key,
+                    event_id=payload.event_id,
+                    user_id=user_id,
+                    share_publicly=share_publicly,
                 )
             )
     else:
-        row = session.exec(
-            select(UserEventAttendance).where(
-                UserEventAttendance.device_id == payload.device_id,
-                UserEventAttendance.event_id == payload.event_id,
-            )
-        ).first()
-        if row:
-            session.delete(row)
+        if user_id:
+            user_rows = session.exec(
+                select(UserEventAttendance).where(
+                    UserEventAttendance.user_id == user_id,
+                    UserEventAttendance.event_id == payload.event_id,
+                )
+            ).all()
+            for row in user_rows:
+                session.delete(row)
+        keys = {state_key, payload.device_id}
+        for key in keys:
+            row = session.exec(
+                select(UserEventAttendance).where(
+                    UserEventAttendance.device_id == key,
+                    UserEventAttendance.event_id == payload.event_id,
+                    UserEventAttendance.user_id.is_(None),
+                )
+            ).first()
+            if row:
+                session.delete(row)
 
     session.commit()
     return {"status": "tracked"}
@@ -172,7 +290,10 @@ async def track_link_click(
     payload: EventLinkClickRequest,
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
+    if _is_admin(current_user):
+        return {"status": "skipped", "reason": "admin"}
     click = EventLinkClick(
         event_id=payload.event_id,
         url=payload.url,
@@ -192,13 +313,53 @@ def track_export(
     request: Request,
     payload: EventExportRequest,
     session: Session = Depends(get_session),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
+    if _is_admin(current_user):
+        return {"status": "skipped", "reason": "admin"}
     export = EventExport(
         format=payload.format,
         event_count=payload.event_count,
         device_id=payload.device_id,
     )
     session.add(export)
+    session.commit()
+    return {"status": "tracked"}
+
+
+@router.post("/track/share", status_code=201)
+@limiter.limit("60/minute")
+def track_share(
+    request: Request,
+    payload: ShareEventRequest,
+    session: Session = Depends(get_session),
+    current_user: User | None = Depends(get_current_user_optional),
+):
+    """Append-only log row for the share funnel.
+
+    - ``share``: caller is the originator. We use the authenticated user's
+      ``share_code`` (if any) and ignore the payload's ``share_code`` to
+      prevent spoofing one user as another.
+    - ``click`` / ``conversion``: caller is the *recipient*. The payload
+      carries the originator's ``share_code`` (captured from the URL on
+      landing). We accept it as-is — worst case is an invalid code that
+      simply produces an unattributable row.
+    """
+    if _is_admin(current_user):
+        return {"status": "skipped", "reason": "admin"}
+
+    if payload.action == "share":
+        share_code = current_user.share_code if current_user else None
+    else:
+        share_code = payload.share_code
+
+    row = ShareEvent(
+        event_id=payload.event_id,
+        action=payload.action,
+        share_code=share_code,
+        device_id=payload.device_id,
+    )
+    session.add(row)
     session.commit()
     return {"status": "tracked"}
 

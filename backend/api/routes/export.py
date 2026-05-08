@@ -4,7 +4,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from slowapi import Limiter
-from slowapi.util import get_remote_address
+from backend.api.rate_limit import client_ip
 from sqlmodel import Session, select
 
 from backend.api.schemas import ExportRequest
@@ -13,7 +13,7 @@ from backend.db.models import CachedEvent
 
 router = APIRouter(prefix="/api/events/export", tags=["export"])
 
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=client_ip)
 
 
 def _fetch_events(session: Session, event_ids: list[str]) -> list[CachedEvent]:

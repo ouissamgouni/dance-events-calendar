@@ -192,7 +192,7 @@ class TestGetSharedCalendar:
                 # ShareToken lookup
                 result.first.return_value = share
             else:
-                # UserSavedEvent lookup
+                # UserSavedEvent / UserEventAttendance lookups
                 result.all.return_value = []
             call_count += 1
             return result
@@ -201,7 +201,7 @@ class TestGetSharedCalendar:
 
         resp = c.get("/api/share/calendar/test-token-uuid")
         assert resp.status_code == 200
-        assert resp.json() == {"events": []}
+        assert resp.json() == {"events": [], "owner_display_name": None}
 
     def test_valid_token_with_saved_events_returns_events(self, client):
         c, session = client
@@ -222,6 +222,9 @@ class TestGetSharedCalendar:
                 call_count += 1
             elif "user_saved_events" in sql_text:
                 result.all.return_value = [saved_row]
+                call_count += 1
+            elif "user_event_attendance" in sql_text:
+                result.all.return_value = []
                 call_count += 1
             elif "calendar_settings" in sql_text:
                 result.all.return_value = [cal]
@@ -264,6 +267,9 @@ class TestGetSharedCalendar:
             elif "user_saved_events" in sql_text:
                 result.all.return_value = [saved_row]
                 call_count += 1
+            elif "user_event_attendance" in sql_text:
+                result.all.return_value = []
+                call_count += 1
             elif "calendar_settings" in sql_text:
                 # No enabled calendars
                 result.all.return_value = []
@@ -277,4 +283,4 @@ class TestGetSharedCalendar:
 
         resp = c.get("/api/share/calendar/test-token-uuid")
         assert resp.status_code == 200
-        assert resp.json() == {"events": []}
+        assert resp.json() == {"events": [], "owner_display_name": None}

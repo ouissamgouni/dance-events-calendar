@@ -3,6 +3,7 @@
 Usage:
     python -m backend.scripts.backfill_prices --dry-run
     python -m backend.scripts.backfill_prices --commit
+    python -m backend.scripts.backfill_prices --commit --re-extract
 """
 
 import argparse
@@ -30,24 +31,44 @@ def main() -> None:
         action="store_true",
         help="Actually write price data to the database",
     )
+    parser.add_argument(
+        "--re-extract",
+        action="store_true",
+        help=(
+            "Also re-extract events that already have a price set "
+            "(useful after tightening the price regex). Events whose "
+            "description no longer matches will have their price cleared."
+        ),
+    )
     args = parser.parse_args()
 
     with Session(engine) as session:
-        events = session.exec(
-            select(CachedEvent).where(
-                CachedEvent.description != None,
-                CachedEvent.price_min == None,
-                CachedEvent.deleted_at == None,
-            )
-        ).all()
+        stmt = select(CachedEvent).where(
+            CachedEvent.description != None,
+            CachedEvent.deleted_at == None,
+        )
+        if not args.re_extract:
+            stmt = stmt.where(CachedEvent.price_min == None)
+        events = session.exec(stmt).all()
 
         total = len(events)
         extracted = 0
+        cleared = 0
         free_count = 0
 
         for event in events:
             price = extract_price(event.description)
             if price is None:
+                if args.re_extract and event.price_min is not None:
+                    cleared += 1
+                    if args.dry_run:
+                        print(f"  CLEAR {event.event_id}: {event.title}")
+                    else:
+                        event.price_min = None
+                        event.price_max = None
+                        event.price_currency = None
+                        event.price_is_free = False
+                        session.add(event)
                 continue
 
             extracted += 1
@@ -72,7 +93,8 @@ def main() -> None:
             session.commit()
 
         print(
-            f"\nSummary: {total} events scanned, {extracted} prices extracted, {free_count} free events"
+            f"\nSummary: {total} events scanned, {extracted} prices extracted, "
+            f"{free_count} free events, {cleared} cleared"
         )
         if args.dry_run:
             print("(dry run — no changes written)")

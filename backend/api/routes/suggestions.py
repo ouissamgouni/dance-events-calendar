@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from slowapi import Limiter
-from slowapi.util import get_remote_address
+from backend.api.rate_limit import client_ip
 from sqlmodel import Session, col, select
 
 from backend.api.deps import get_client_ip, require_admin
@@ -25,6 +25,7 @@ from backend.db.models import (
     EventSuggestion,
     EventTag,
     Tag,
+    TagSuggestion,
 )
 from backend.services.email import send_suggestion_notification
 from backend.services.geocoding import geocode_location
@@ -34,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["suggestions"])
 
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=client_ip)
 
 
 # --- Background tasks ---
@@ -112,6 +113,13 @@ def submit_suggestion(
         submitter_screen_size=body.screen_size,
         submitter_timezone=body.timezone,
         suggested_tag_ids=body.suggested_tag_ids if body.suggested_tag_ids else None,
+        suggested_new_tags=[item.model_dump() for item in body.suggested_new_tags]
+        if body.suggested_new_tags
+        else None,
+        price_min=body.price_min,
+        price_max=body.price_max,
+        price_currency=body.price_currency,
+        price_is_free=body.price_is_free,
     )
 
     session.add(suggestion)
@@ -267,6 +275,10 @@ def approve_suggestion(
         latitude=lat,
         longitude=lng,
         links=suggestion.links,
+        price_min=suggestion.price_min,
+        price_max=suggestion.price_max,
+        price_currency=suggestion.price_currency,
+        price_is_free=suggestion.price_is_free,
         review_status="reviewed",
     )
     session.add(cached_event)
@@ -277,6 +289,22 @@ def approve_suggestion(
             tag = session.get(Tag, tid)
             if tag:
                 session.add(EventTag(event_id=event_id, tag_id=tid))
+
+    # Promote inline new-tag suggestions to TagSuggestion rows for admin review
+    if suggestion.suggested_new_tags:
+        for item in suggestion.suggested_new_tags:
+            free_text = (item.get("free_text") or "").strip()
+            if not free_text:
+                continue
+            session.add(
+                TagSuggestion(
+                    event_id=event_id,
+                    free_text=free_text,
+                    group_slug=item.get("group_slug"),
+                    submitter_ip=suggestion.submitter_ip,
+                    source="user",
+                )
+            )
 
     # Update suggestion
     suggestion.status = "approved"

@@ -3,9 +3,11 @@ services:
     image: postgres:16-alpine
     container_name: calendar_db_${ENV_NAME}
     env_file:
-      - path: ../../.env
+      - path: ../../config/base.env
         required: false
-      - ../../.env.${ENV_NAME}
+      - ../../config/${ENV_NAME}.local.env
+      - path: ../../config/secrets.${ENV_NAME}.local.env
+        required: false
     ports:
       - "${POSTGRES_PORT:-5436}:5432"
     volumes:
@@ -23,9 +25,11 @@ services:
     image: movida-backend:${IMAGE_TAG:-latest}
     container_name: calendar_backend_${ENV_NAME}
     env_file:
-      - path: ../../.env
+      - path: ../../config/base.env
         required: false
-      - ../../.env.${ENV_NAME}
+      - ../../config/${ENV_NAME}.local.env
+      - path: ../../config/secrets.${ENV_NAME}.local.env
+        required: false
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     ports:

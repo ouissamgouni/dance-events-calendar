@@ -8,15 +8,16 @@ venv/
 .pip-audit-cache/
 
 # ── Environment / Secrets ─────────────────────────────
-# Only .env.example and secrets.env.example are committed
-.env
-.env.*
-!.env.example
-!.env.staging.local
-secrets.env
-secrets.*.env
+# config/*.env files are committed; only secrets are gitignored
+config/secrets.env
+config/secrets.*.env
+!config/secrets.*.env.example
 scenarios/*/secrets.env
-!secrets.env.example
+scenarios/staging/calendars.yaml
+scenarios/prod/calendars.yaml
+
+# Per-developer perf profile overrides (committed defaults live in *.env)
+perf/k6/profiles/*.override.env
 
 # Google service-account keys & other credentials
 credentials/

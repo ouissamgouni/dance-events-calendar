@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { AdminTag, AdminTagGroup } from '../api';
-import { fetchAdminTagGroups, createTagGroup, updateTagGroup, createTag, updateTag } from '../api';
+import { fetchAdminTagGroups, createTagGroup, updateTagGroup, createTag, updateTag, deleteTag } from '../api';
+import TagSynonymsEditor from './TagSynonymsEditor';
 
 const CARD_BG_COLORS = [
     'bg-rose-50', 'bg-sky-50', 'bg-amber-50', 'bg-emerald-50',
@@ -27,6 +28,12 @@ export default function AdminTagCategories() {
     const [draggingGroupId, setDraggingGroupId] = useState<number | null>(null);
     const [dragOverGroupId, setDragOverGroupId] = useState<number | null>(null);
     const [reorderError, setReorderError] = useState<string | null>(null);
+    const [editingTagId, setEditingTagId] = useState<number | null>(null);
+    const [editingTagLabel, setEditingTagLabel] = useState('');
+    const [synonymsOpenTagId, setSynonymsOpenTagId] = useState<number | null>(null);
+    const [draggingTagId, setDraggingTagId] = useState<number | null>(null);
+    const [tagDropTargetGroupId, setTagDropTargetGroupId] = useState<number | null>(null);
+    const [tagActionError, setTagActionError] = useState<string | null>(null);
 
     const load = () => {
         fetchAdminTagGroups()
@@ -107,6 +114,19 @@ export default function AdminTagCategories() {
         load();
     };
 
+    const handleTagLabelEdit = (tag: AdminTag) => {
+        setEditingTagId(tag.id);
+        setEditingTagLabel(tag.label);
+    };
+
+    const handleTagLabelSave = async (tagId: number) => {
+        const label = editingTagLabel.trim();
+        setEditingTagId(null);
+        if (!label) return;
+        await updateTag(tagId, { label });
+        load();
+    };
+
     const handleAddTag = async (groupId: number) => {
         const label = (newTagInputs[groupId] || '').trim();
         if (!label) return;
@@ -125,6 +145,51 @@ export default function AdminTagCategories() {
             setReorderError(null);
         } catch {
             setReorderError('Failed to save category order. Reloaded latest order from server.');
+            load();
+        }
+    };
+
+    const handleMoveTag = async (tagId: number, targetGroupId: number) => {
+        const sourceGroup = groups.find((g) => g.tags.some((t) => t.id === tagId));
+        if (!sourceGroup || sourceGroup.id === targetGroupId) return;
+        const tag = sourceGroup.tags.find((t) => t.id === tagId);
+        if (!tag) return;
+        // Optimistic move (append to target).
+        setGroups((prev) =>
+            prev.map((g) => {
+                if (g.id === sourceGroup.id) {
+                    return { ...g, tags: g.tags.filter((t) => t.id !== tagId) };
+                }
+                if (g.id === targetGroupId) {
+                    return { ...g, tags: [...g.tags, tag] };
+                }
+                return g;
+            }),
+        );
+        try {
+            setTagActionError(null);
+            await updateTag(tagId, { group_id: targetGroupId });
+            load();
+        } catch (e) {
+            setTagActionError((e as Error).message || 'Failed to move tag');
+            load();
+        }
+    };
+
+    const handleDeleteTag = async (tag: AdminTag) => {
+        const usage = tag.event_count
+            ? `\n\nThis tag is currently applied to ${tag.event_count} event${tag.event_count === 1 ? '' : 's'}; those assignments will be removed.`
+            : '';
+        if (!window.confirm(`Delete tag "${tag.label}"?${usage}`)) return;
+        // Optimistic remove.
+        setGroups((prev) =>
+            prev.map((g) => ({ ...g, tags: g.tags.filter((t) => t.id !== tag.id) })),
+        );
+        try {
+            setTagActionError(null);
+            await deleteTag(tag.id);
+        } catch (e) {
+            setTagActionError((e as Error).message || 'Failed to delete tag');
             load();
         }
     };
@@ -203,6 +268,9 @@ export default function AdminTagCategories() {
                 {reorderError && (
                     <p className="mb-2 text-[11px] text-rose-600">{reorderError}</p>
                 )}
+                {tagActionError && (
+                    <p className="mb-2 text-[11px] text-rose-600">{tagActionError}</p>
+                )}
                 {loading ? (
                     <p className="text-[11px] text-gray-400">Loading…</p>
                 ) : groups.length === 0 ? (
@@ -215,7 +283,7 @@ export default function AdminTagCategories() {
                             return (
                                 <div
                                     key={group.id}
-                                    className={`border border-gray-200 rounded ${bgClass} ${!group.enabled ? 'opacity-50' : ''} ${dragOverGroupId === group.id ? 'ring-2 ring-blue-300 ring-offset-1' : ''}`}
+                                    className={`border border-gray-200 rounded ${bgClass} ${!group.enabled ? 'opacity-50' : ''} ${dragOverGroupId === group.id ? 'ring-2 ring-blue-300 ring-offset-1' : ''} ${tagDropTargetGroupId === group.id ? 'ring-2 ring-emerald-400 ring-offset-1' : ''}`}
                                     draggable
                                     onDragStart={() => {
                                         setDraggingGroupId(group.id);
@@ -223,15 +291,28 @@ export default function AdminTagCategories() {
                                     }}
                                     onDragOver={(e) => {
                                         e.preventDefault();
-                                        if (dragOverGroupId !== group.id) setDragOverGroupId(group.id);
+                                        if (draggingTagId != null) {
+                                            if (tagDropTargetGroupId !== group.id) setTagDropTargetGroupId(group.id);
+                                        } else if (dragOverGroupId !== group.id) {
+                                            setDragOverGroupId(group.id);
+                                        }
                                     }}
                                     onDrop={(e) => {
                                         e.preventDefault();
+                                        if (draggingTagId != null) {
+                                            const movingTagId = draggingTagId;
+                                            setDraggingTagId(null);
+                                            setTagDropTargetGroupId(null);
+                                            void handleMoveTag(movingTagId, group.id);
+                                            return;
+                                        }
                                         handleGroupDrop(group.id);
                                     }}
                                     onDragEnd={() => {
                                         setDraggingGroupId(null);
                                         setDragOverGroupId(null);
+                                        setDraggingTagId(null);
+                                        setTagDropTargetGroupId(null);
                                     }}
                                 >
                                     {/* Category header */}
@@ -286,10 +367,46 @@ export default function AdminTagCategories() {
                                             {group.tags.map((tag) => (
                                                 <span
                                                     key={tag.id}
-                                                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-white ${!tag.enabled ? 'opacity-40 line-through' : ''}`}
+                                                    draggable={editingTagId !== tag.id}
+                                                    onDragStart={(e) => {
+                                                        if (editingTagId === tag.id) return;
+                                                        e.stopPropagation();
+                                                        setDraggingTagId(tag.id);
+                                                        setTagActionError(null);
+                                                        try { e.dataTransfer.effectAllowed = 'move'; } catch { /* noop */ }
+                                                    }}
+                                                    onDragEnd={(e) => {
+                                                        e.stopPropagation();
+                                                        setDraggingTagId(null);
+                                                        setTagDropTargetGroupId(null);
+                                                    }}
+                                                    className={`relative inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-white ${!tag.enabled ? 'opacity-40 line-through' : ''} ${draggingTagId === tag.id ? 'opacity-50' : ''} ${editingTagId === tag.id ? '' : 'cursor-grab active:cursor-grabbing'}`}
                                                     style={{ backgroundColor: groupColor }}
+                                                    title={editingTagId === tag.id ? undefined : 'Drag to another category to move'}
                                                 >
-                                                    {tag.label}
+                                                    {editingTagId === tag.id ? (
+                                                        <input
+                                                            type="text"
+                                                            value={editingTagLabel}
+                                                            onChange={(e) => setEditingTagLabel(e.target.value)}
+                                                            onBlur={() => handleTagLabelSave(tag.id)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') handleTagLabelSave(tag.id);
+                                                                if (e.key === 'Escape') setEditingTagId(null);
+                                                            }}
+                                                            autoFocus
+                                                            className="bg-white/20 text-white text-[10px] font-medium border-b border-white/60 focus:outline-none w-20 placeholder-white/60"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                        />
+                                                    ) : (
+                                                        <span
+                                                            className="cursor-pointer hover:underline"
+                                                            title="Click to rename tag"
+                                                            onClick={() => handleTagLabelEdit(tag)}
+                                                        >
+                                                            {tag.label}
+                                                        </span>
+                                                    )}
                                                     <span
                                                         className="inline-flex items-center justify-center rounded-full bg-white/30 text-[9px] font-semibold min-w-[14px] h-[14px] px-0.5"
                                                     >
@@ -310,6 +427,31 @@ export default function AdminTagCategories() {
                                                     >
                                                         {tag.enabled ? '●' : '○'}
                                                     </button>
+                                                    <button
+                                                        onClick={() => setSynonymsOpenTagId(
+                                                            synonymsOpenTagId === tag.id ? null : tag.id,
+                                                        )}
+                                                        className="ml-0.5 hover:opacity-80 transition text-[10px] leading-none"
+                                                        title="Edit synonyms"
+                                                        aria-label="Edit synonyms"
+                                                    >
+                                                        ☰
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteTag(tag)}
+                                                        className="ml-0.5 hover:opacity-80 transition text-[10px] leading-none"
+                                                        title="Delete tag"
+                                                        aria-label="Delete tag"
+                                                    >
+                                                        ✕
+                                                    </button>
+                                                    {synonymsOpenTagId === tag.id && (
+                                                        <TagSynonymsEditor
+                                                            tagId={tag.id}
+                                                            tagLabel={tag.label}
+                                                            onClose={() => setSynonymsOpenTagId(null)}
+                                                        />
+                                                    )}
                                                 </span>
                                             ))}
 

@@ -10,6 +10,8 @@ from backend.api.deps import require_admin
 from backend.api.schemas import (
     BulkEventIdsRequest,
     BulkTagAssignRequest,
+    BulkTagSuggestionRunRequest,
+    BulkTagSuggestionRunResponse,
     CalendarAddRequest,
     CalendarDefaultTagsResponse,
     CalendarDefaultTagsUpdate,
@@ -22,10 +24,14 @@ from backend.api.schemas import (
     FilterOption,
     GeocodeSuggestion,
     PaginatedEventsResponse,
+    SyncJobListResponse,
+    SyncJobStartRequest,
     SyncLogResponse,
+    TagSuggestionRunRequest,
+    TagSuggestionRunResponse,
 )
-from backend.api.routes.tags import get_event_tags
-from backend.db.database import get_session
+from backend.api.routes.tags import _suggestion_to_response, get_event_tags
+from backend.db.database import get_engine, get_session
 from backend.db.models import (
     CalendarDefaultTag,
     CachedEvent,
@@ -38,12 +44,41 @@ from backend.db.models import (
     EventView,
     SyncLog,
     Tag,
+    TagSuggestion,
     UserEventAttendance,
 )
-from backend.services.geocoding import geocode_location
+from backend.services.geocoding import geocode_location, search_locations
+from backend.services.sync_job_service import SyncJobStatus, get_sync_job_service
 from backend.services.sync_service import SyncService
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+def _apply_upcoming_filter(
+    stmt, *, include_past: bool, future_only: Optional[bool] = None
+):
+    """Apply the upcoming-only filter to a select() over CachedEvent.
+
+    The admin app is forward-looking: by default we hide events that have
+    already finished. Pass ``include_past=True`` to opt into the legacy
+    "show everything" behaviour (still useful for analytics / audit).
+
+    ``future_only`` is the legacy query param; when explicitly set it wins
+    so existing clients/tests that pass it don't change behaviour.
+    Uses ``CachedEvent.end > now`` so events in progress remain visible.
+    """
+    from datetime import datetime as _dt
+
+    # Legacy explicit param wins.
+    if future_only is True:
+        return stmt.where(CachedEvent.start > _dt.utcnow())
+    if future_only is False:
+        return stmt
+    # New default: upcoming-only unless caller opted in to past.
+    if include_past:
+        return stmt
+    return stmt.where(CachedEvent.end > _dt.utcnow())
+
 
 # Visually distinct palette — cycled when more calendars are added
 CALENDAR_COLORS = [
@@ -58,6 +93,263 @@ CALENDAR_COLORS = [
     "#ca8a04",  # yellow-600
     "#0d9488",  # teal-600
 ]
+
+
+def _run_sync_job_worker(
+    job_id: str,
+    job_service,
+    calendar_service,
+    mode: str,
+    since_date: str | None,
+    calendar_ids: list[str] | None = None,
+):
+    """Streaming fetch+enrich sync job worker.
+
+    Each enabled calendar runs in its own fetch thread.  Events are submitted
+    one-by-one into a bounded queue as they arrive.  A pool of enrichment
+    workers pulls from the queue, upserts each event and runs the pipeline
+    concurrently — so the first event can be geocoded before the last calendar
+    page has even been fetched.
+    """
+    import threading
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from datetime import datetime as _dt
+
+    from backend.services.calendar_sync_worker import CalendarSyncWorker
+    from backend.services.event_pipeline_processor import (
+        CalendarProgress,
+        EventPipelineProcessor,
+    )
+    from backend.services.pipeline.base import EnrichmentPipeline
+    from backend.services.pipeline.stages.geocoding import GeocodingStage
+    from backend.services.pipeline.stages.link_extraction import LinkExtractionStage
+    from backend.services.pipeline.stages.price_extraction import PriceExtractionStage
+
+    engine = get_engine()
+    job_service.heartbeat(job_id)
+
+    # --- Parse since_date ---
+    time_min: _dt | None = None
+    if since_date:
+        try:
+            time_min = _dt.fromisoformat(since_date)
+        except ValueError:
+            logger.warning(
+                "Invalid since_date '%s' in sync job %s — ignoring",
+                since_date,
+                job_id,
+            )
+
+    # --- Reseed: clear all sync tokens ---
+    if mode == "reseed":
+        with Session(engine) as session:
+            q = select(CalendarSetting).where(CalendarSetting.enabled == True)
+            if calendar_ids:
+                q = q.where(CalendarSetting.calendar_id.in_(calendar_ids))
+            calendars = session.exec(q).all()
+            for cal in calendars:
+                cal.sync_token = None
+                session.add(cal)
+            session.commit()
+        job_service.set_metadata(job_id, reseed_applied=True, since_date=since_date)
+
+    # --- Load enabled calendars ---
+    with Session(engine) as session:
+        q = select(CalendarSetting).where(CalendarSetting.enabled == True)
+        if calendar_ids:
+            q = q.where(CalendarSetting.calendar_id.in_(calendar_ids))
+        enabled = session.exec(q).all()
+        # Snapshot the fields we need (avoid detached-instance issues across threads)
+        calendar_snapshots = [
+            {
+                "calendar_id": cal.calendar_id,
+                "name": cal.name,
+                "sync_token": cal.sync_token,
+            }
+            for cal in enabled
+        ]
+
+    if not calendar_snapshots:
+        return {"status": SyncJobStatus.COMPLETED}
+
+    # --- Build per-calendar progress map ---
+    abort_event = threading.Event()
+    progress_map: dict[str, CalendarProgress] = {
+        snap["calendar_id"]: CalendarProgress(
+            calendar_id=snap["calendar_id"],
+            calendar_name=snap["name"] or snap["calendar_id"],
+        )
+        for snap in calendar_snapshots
+    }
+
+    def _publish_progress() -> None:
+        job_service.update_calendar_statuses(
+            job_id, {cid: p.to_dict() for cid, p in progress_map.items()}
+        )
+        # Roll up live totals so the cross-calendar metrics also update
+        # while the pipeline is still draining.
+        job_service.update_totals(
+            job_id,
+            calendars_synced=sum(
+                1
+                for p in progress_map.values()
+                if p.status in ("completed", "warning", "failed", "processing")
+            ),
+            events_fetched=sum(p.fetched for p in progress_map.values()),
+            events_upserted=sum(p.upserted for p in progress_map.values()),
+            events_deduped=sum(p.deduped for p in progress_map.values()),
+            events_enriched=sum(p.enriched_ok for p in progress_map.values()),
+            events_failed=sum(p.enriched_failed for p in progress_map.values()),
+        )
+        job_service.heartbeat(job_id)
+
+    # Periodic publisher: pushes live progress + totals to the job service
+    # every second so the UI sees per-stage counters and logs accumulate
+    # while enrichment is still running (rather than only after each fetch
+    # future completes).
+    publisher_stop = threading.Event()
+
+    def _publisher_loop() -> None:
+        while not publisher_stop.wait(1.0):
+            try:
+                _publish_progress()
+            except Exception:
+                logger.exception("Progress publisher tick failed")
+
+    publisher_thread = threading.Thread(
+        target=_publisher_loop,
+        name=f"sync-publisher-{job_id[:8]}",
+        daemon=True,
+    )
+    publisher_thread.start()
+
+    # --- Create pipeline (one instance, shared across workers — stages are stateless) ---
+    pipeline = EnrichmentPipeline(
+        [
+            LinkExtractionStage(),
+            PriceExtractionStage(),
+            GeocodingStage(),
+        ]
+    )
+
+    # --- Start enrichment worker pool ---
+    processor = EventPipelineProcessor(
+        pipeline=pipeline,
+        progress_map=progress_map,
+        abort_event=abort_event,
+        num_workers=4,
+        max_queue_size=500,
+    )
+    processor.start()
+
+    # --- Launch calendar fetch threads ---
+    with ThreadPoolExecutor(
+        max_workers=len(calendar_snapshots),
+        thread_name_prefix="calendar-fetch",
+    ) as fetch_pool:
+
+        def _make_worker(snap: dict) -> CalendarSyncWorker:
+            # We need a CalendarSetting-like object for the worker
+            class _CalSnap:
+                calendar_id = snap["calendar_id"]
+                sync_token = snap["sync_token"]
+
+            return CalendarSyncWorker(
+                cal=_CalSnap(),
+                calendar_name=snap["name"] or snap["calendar_id"],
+                calendar_service=calendar_service,
+                processor=processor,
+                progress=progress_map[snap["calendar_id"]],
+                time_min=time_min,
+                abort_event=abort_event,
+                engine=engine,
+            )
+
+        fetch_futures = {
+            fetch_pool.submit(_make_worker(snap).run): snap["calendar_id"]
+            for snap in calendar_snapshots
+        }
+
+        # Stream progress updates while calendars are fetching
+        for future in as_completed(fetch_futures):
+            cal_id = fetch_futures[future]
+            try:
+                future.result()
+            except Exception as exc:
+                logger.exception("Calendar fetch thread failed for %s", cal_id)
+                p = progress_map.get(cal_id)
+                if p:
+                    p.status = "failed"
+                    p.error = str(exc)
+            _publish_progress()
+
+        # Check abort after all fetches
+        if job_service.should_abort(job_id):
+            abort_event.set()
+
+    # --- Drain enrichment queue ---
+    processor.stop()
+
+    # Stop the periodic publisher before the final aggregation so it can't
+    # race with update_totals() below.
+    publisher_stop.set()
+    publisher_thread.join(timeout=2.0)
+
+    # Transition any calendars that finished fetching successfully from
+    # the intermediate "processing" state to "completed" now that the
+    # pipeline has drained.
+    for p in progress_map.values():
+        if p.status == "processing":
+            p.status = "completed"
+    _publish_progress()
+
+    # --- Aggregate totals ---
+    total_fetched = sum(p.fetched for p in progress_map.values())
+    total_upserted = sum(p.upserted for p in progress_map.values())
+    total_deduped = sum(p.deduped for p in progress_map.values())
+    total_enriched_ok = sum(p.enriched_ok for p in progress_map.values())
+    total_enriched_failed = sum(p.enriched_failed for p in progress_map.values())
+    # Real errors: enrichment exceptions + persistence failures (counted in
+    # error_count via inc_enriched_failed).
+    total_errors = sum(p.error_count for p in progress_map.values())
+    # Warnings: e.g. geocoding misses — non-fatal, event still saved.
+    total_warnings = sum(
+        sum(1 for f in p.failures if f.type == "ungeolocated")
+        for p in progress_map.values()
+    )
+    calendars_failed = sum(1 for p in progress_map.values() if p.status == "failed")
+
+    job_service.update_totals(
+        job_id,
+        calendars_synced=len(calendar_snapshots) - calendars_failed,
+        events_fetched=total_fetched,
+        events_upserted=total_upserted,
+        events_deduped=total_deduped,
+        events_enriched=total_enriched_ok,
+        events_failed=total_enriched_failed,
+    )
+
+    if abort_event.is_set():
+        return {"status": SyncJobStatus.ABORTED}
+
+    if calendars_failed > 0 or total_errors > 0 or total_warnings > 0:
+        parts: list[str] = []
+        if calendars_failed > 0:
+            parts.append(f"{calendars_failed} calendar(s) failed")
+        if total_errors > 0:
+            parts.append(f"{total_errors} error(s)")
+        if total_warnings > 0:
+            parts.append(f"{total_warnings} warning(s)")
+        return {
+            "status": SyncJobStatus.WARNING,
+            "warning_message": ", ".join(parts),
+            "calendar_statuses": {cid: p.to_dict() for cid, p in progress_map.items()},
+        }
+
+    return {
+        "status": SyncJobStatus.COMPLETED,
+        "calendar_statuses": {cid: p.to_dict() for cid, p in progress_map.items()},
+    }
 
 
 def _next_color(session: Session) -> str:
@@ -90,10 +382,19 @@ def add_calendar(
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
-    """Add a calendar by ID. Verifies the service account can access it."""
+    """Add a calendar by ID. Verifies the service account can access it.
+
+    Manually added calendars are enabled by default so they are immediately
+    eligible for sync.
+    """
     # Check if already exists
     existing = session.get(CalendarSetting, body.calendar_id)
     if existing:
+        if not existing.enabled:
+            existing.enabled = True
+            session.add(existing)
+            session.commit()
+            session.refresh(existing)
         return existing
 
     calendar_service = request.app.state.calendar_service
@@ -114,7 +415,7 @@ def add_calendar(
     cal = CalendarSetting(
         calendar_id=info.calendar_id,
         name=info.name,
-        enabled=False,
+        enabled=True,
         color=_next_color(session),
     )
     session.add(cal)
@@ -148,28 +449,116 @@ def discover_calendars(
     return {"discovered": discovered, "total": len(all_calendars)}
 
 
-@router.post("/sync")
-def trigger_sync(
+@router.post("/sync-jobs")
+def start_sync_job(
+    body: SyncJobStartRequest,
     request: Request,
-    session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
-    """Manually trigger a sync for all enabled calendars."""
+    job_service = get_sync_job_service()
     calendar_service = request.app.state.calendar_service
-    sync_service = SyncService(calendar_service)
+
     try:
-        stats = sync_service.sync_all(session, trigger="manual")
-    except FileNotFoundError as exc:
-        logger.exception("Service account file not found")
-        raise HTTPException(
-            status_code=502, detail=f"Service account file not found: {exc}"
-        ) from exc
-    except Exception as exc:
-        logger.exception("Failed to sync calendars")
-        raise HTTPException(
-            status_code=502, detail=f"Calendar service error: {exc}"
-        ) from exc
-    return stats
+        job = job_service.start_job(
+            worker=lambda job_id, service: _run_sync_job_worker(
+                job_id,
+                service,
+                calendar_service,
+                body.mode,
+                body.since_date,
+                body.calendar_ids or None,
+            ),
+            mode=body.mode,
+            since_date=body.since_date,
+            calendar_ids=body.calendar_ids,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    return job
+
+
+@router.get("/sync-jobs/current")
+def get_current_sync_job(_admin: dict = Depends(require_admin)):
+    job = get_sync_job_service().get_current_job()
+    if job is None:
+        return {"status": SyncJobStatus.IDLE}
+    return job
+
+
+@router.get("/sync-jobs/{job_id}")
+def get_sync_job(job_id: str, _admin: dict = Depends(require_admin)):
+    try:
+        return get_sync_job_service().get_job(job_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Sync job not found") from exc
+
+
+@router.get("/sync-jobs", response_model=SyncJobListResponse)
+def list_sync_jobs(
+    limit: int = Query(default=20, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    _admin: dict = Depends(require_admin),
+):
+    return get_sync_job_service().list_jobs(limit=limit, offset=offset)
+
+
+@router.post("/sync-jobs/{job_id}/abort")
+def abort_sync_job(job_id: str, _admin: dict = Depends(require_admin)):
+    try:
+        return get_sync_job_service().abort_job(job_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Sync job not found") from exc
+
+
+@router.post("/sync-jobs/{job_id}/retry-calendar")
+def retry_calendar_in_job(
+    job_id: str,
+    calendar_id: str = Query(..., min_length=1),
+    request: Request = None,
+    _admin: dict = Depends(require_admin),
+):
+    """Re-run an incremental sync for a single calendar that failed in a prior job.
+
+    Validates that the calendar exists and is enabled. Starts a new sync job
+    scoped to this single calendar. Returns 409 if another sync job is already
+    running, 404 if the calendar is unknown, 400 if it is disabled.
+    """
+    job_service = get_sync_job_service()
+    calendar_service = request.app.state.calendar_service
+
+    # Validate calendar exists & is enabled — fail fast with a clear error.
+    from backend.db.database import get_engine
+
+    engine = get_engine()
+    with Session(engine) as session:
+        cal = session.get(CalendarSetting, calendar_id)
+        if cal is None:
+            raise HTTPException(status_code=404, detail="Calendar not found")
+        if not cal.enabled:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Calendar '{cal.name or calendar_id}' is disabled — enable it before retrying.",
+            )
+
+    try:
+        job = job_service.start_job(
+            worker=lambda jid, service: _run_sync_job_worker(
+                jid,
+                service,
+                calendar_service,
+                "incremental",
+                None,
+                [calendar_id],
+            ),
+            mode="incremental",
+            since_date=None,
+            calendar_ids=[calendar_id],
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    return job
 
 
 @router.post("/calendars/{calendar_id}/toggle", response_model=CalendarSettingResponse)
@@ -484,11 +873,15 @@ def list_admin_events(
     tag_ids: Optional[str] = Query(default=None),
     ungeolocated: Optional[bool] = Query(default=None),
     future_only: Optional[bool] = Query(default=None),
+    include_past: bool = Query(default=False),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
-    """List non-deleted events with pagination and filters."""
-    from datetime import datetime as dt
+    """List non-deleted events with pagination and filters.
+
+    By default returns only events whose ``end > now`` (upcoming + in progress).
+    Pass ``include_past=true`` to include finished events.
+    """
     from sqlalchemy import cast, String
 
     calendars = session.exec(select(CalendarSetting)).all()
@@ -506,8 +899,9 @@ def list_admin_events(
             CachedEvent.location != None,
             CachedEvent.latitude == None,
         )
-    if future_only:
-        base = base.where(CachedEvent.start > dt.utcnow())
+    base = _apply_upcoming_filter(
+        base, include_past=include_past, future_only=future_only
+    )
     if search:
         pattern = f"%{search}%"
         base = base.where(
@@ -582,6 +976,12 @@ def update_event(
     # Handle tag_ids separately
     tag_ids = update_data.pop("tag_ids", None)
 
+    # Validate calendar_id (if changing) refers to an existing calendar
+    if "calendar_id" in update_data and update_data["calendar_id"] != event.calendar_id:
+        target_cal = session.get(CalendarSetting, update_data["calendar_id"])
+        if not target_cal:
+            raise HTTPException(status_code=400, detail="Unknown calendar_id")
+
     location_changed = (
         "location" in update_data and update_data["location"] != event.location
     )
@@ -645,28 +1045,13 @@ def geocode_search(
     q: str = Query(..., min_length=3, max_length=200),
     _admin: dict = Depends(require_admin),
 ):
-    """Search for address suggestions using Nominatim. Returns up to 5 results."""
-    from geopy.geocoders import Nominatim
-    from geopy.exc import GeocoderTimedOut, GeocoderServiceError
-
-    geocoder = Nominatim(user_agent="movida", timeout=5)
-    try:
-        results = geocoder.geocode(q, exactly_one=False, limit=5)
-    except (GeocoderTimedOut, GeocoderServiceError) as e:
-        logger.warning("Geocode search failed: %s", e)
-        return []
-    except Exception:
-        logger.exception("Unexpected geocode search error")
-        return []
-
-    if not results:
-        return []
-
+    """Search for address suggestions. Uses Google Geocoding API if configured, else Nominatim."""
+    results = search_locations(q, limit=5)
     return [
         GeocodeSuggestion(
-            display_name=r.address,
-            latitude=r.latitude,
-            longitude=r.longitude,
+            display_name=r["display_name"],
+            latitude=r["latitude"],
+            longitude=r["longitude"],
         )
         for r in results
     ]
@@ -680,11 +1065,15 @@ def event_filter_options(
     tag_ids: Optional[str] = Query(default=None),
     ungeolocated: Optional[bool] = Query(default=None),
     future_only: Optional[bool] = Query(default=None),
+    include_past: bool = Query(default=False),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
-    """Return available filter values with counts, scoped to current filters."""
-    from datetime import datetime as dt
+    """Return available filter values with counts, scoped to current filters.
+
+    Defaults to upcoming-only (``end > now``); pass ``include_past=true`` to
+    aggregate over the full archive.
+    """
     from sqlalchemy import cast, String, case, and_, literal_column
 
     # Build filtered base (same logic as list_admin_events)
@@ -695,8 +1084,9 @@ def event_filter_options(
         base = base.where(CachedEvent.calendar_id == calendar_id)
     if ungeolocated:
         base = base.where(CachedEvent.location != None, CachedEvent.latitude == None)
-    if future_only:
-        base = base.where(CachedEvent.start > dt.utcnow())
+    base = _apply_upcoming_filter(
+        base, include_past=include_past, future_only=future_only
+    )
     if search:
         pattern = f"%{search}%"
         base = base.where(
@@ -936,6 +1326,153 @@ def retry_geocoding_single(
     }
 
 
+# ── Auto Tag Suggestions: on-demand re-run endpoints ───────────────────
+
+
+def _run_tag_suggestion_for_event(
+    session: Session,
+    event: CachedEvent,
+    *,
+    snapshot,
+    replace_existing_pending: bool,
+) -> tuple[int, int, list[TagSuggestion]]:
+    """Generate auto tag suggestions for one event. Returns
+    ``(generated, replaced, inserted_rows)``."""
+    from backend.services.pipeline.stages.tag_suggestion import (
+        delete_pending_ai_suggestions,
+        excluded_tag_ids_for_event,
+        persist_suggestions,
+    )
+    from backend.services.tag_suggester import suggest_tags
+
+    replaced = 0
+    if replace_existing_pending:
+        replaced = delete_pending_ai_suggestions(session, event.event_id)
+
+    excluded = excluded_tag_ids_for_event(session, event.event_id)
+    candidates = suggest_tags(
+        snapshot,
+        title=event.title,
+        description=event.description,
+        location=event.location,
+        excluded_tag_ids=excluded,
+    )
+    inserted = persist_suggestions(session, event.event_id, candidates)
+    return len(inserted), replaced, inserted
+
+
+@router.post(
+    "/events/{event_id}/suggest-tags",
+    response_model=TagSuggestionRunResponse,
+)
+def suggest_tags_single(
+    event_id: str,
+    body: TagSuggestionRunRequest | None = None,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Generate auto tag suggestions for a single event on demand.
+
+    Used by:
+    * The admin event-detail panel auto-run when first opened.
+    * The "Re-run suggestions" button (pass ``replace_existing_pending=true``).
+    """
+    from backend.services.tag_suggester import load_taxonomy
+
+    body = body or TagSuggestionRunRequest()
+
+    event = session.get(CachedEvent, event_id)
+    if not event or event.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    snapshot = load_taxonomy(session)
+    generated, replaced, inserted = _run_tag_suggestion_for_event(
+        session,
+        event,
+        snapshot=snapshot,
+        replace_existing_pending=body.replace_existing_pending,
+    )
+    session.commit()
+
+    # Build response payload (refresh inserted rows so id/created_at populate).
+    suggestions_payload = []
+    for row in inserted:
+        session.refresh(row)
+        tag = session.get(Tag, row.tag_id) if row.tag_id else None
+        suggestions_payload.append(
+            _suggestion_to_response(row, tag=tag, event=event, event_title=event.title)
+        )
+
+    return TagSuggestionRunResponse(
+        generated=generated,
+        skipped=1 if (generated == 0 and replaced == 0) else 0,
+        replaced=replaced,
+        suggestions=suggestions_payload,
+    )
+
+
+@router.post(
+    "/events/bulk-suggest-tags",
+    response_model=BulkTagSuggestionRunResponse,
+)
+def suggest_tags_bulk(
+    body: BulkTagSuggestionRunRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Generate auto tag suggestions for many events at once.
+
+    Bounded at 200 events per call to keep request latency predictable;
+    callers paginate larger sets.
+    """
+    from backend.services.tag_suggester import load_taxonomy
+
+    if not body.event_ids:
+        return BulkTagSuggestionRunResponse(
+            generated=0, skipped=0, replaced=0, events_processed=0
+        )
+    if len(body.event_ids) > 200:
+        raise HTTPException(
+            status_code=400,
+            detail="bulk-suggest-tags accepts at most 200 event_ids per call",
+        )
+
+    events = session.exec(
+        select(CachedEvent).where(
+            CachedEvent.event_id.in_(body.event_ids),
+            CachedEvent.deleted_at == None,
+        )
+    ).all()
+
+    snapshot = load_taxonomy(session)
+    total_generated = 0
+    total_replaced = 0
+    total_skipped = 0
+    for event in events:
+        try:
+            generated, replaced, _ = _run_tag_suggestion_for_event(
+                session,
+                event,
+                snapshot=snapshot,
+                replace_existing_pending=body.replace_existing_pending,
+            )
+            total_generated += generated
+            total_replaced += replaced
+            if generated == 0 and replaced == 0:
+                total_skipped += 1
+        except Exception:
+            logger.exception("bulk-suggest-tags failed for event %s", event.event_id)
+            total_skipped += 1
+    session.commit()
+
+    return BulkTagSuggestionRunResponse(
+        generated=total_generated,
+        skipped=total_skipped,
+        replaced=total_replaced,
+        events_processed=len(events),
+    )
+
+
 @router.get("/events/ids", response_model=EventIdsResponse)
 def list_admin_event_ids(
     search: Optional[str] = Query(default=None, max_length=200),
@@ -944,11 +1481,14 @@ def list_admin_event_ids(
     tag_ids: Optional[str] = Query(default=None),
     ungeolocated: Optional[bool] = Query(default=None),
     future_only: Optional[bool] = Query(default=None),
+    include_past: bool = Query(default=False),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
-    """Return all matching event IDs (no pagination). Used for cross-page select-all."""
-    from datetime import datetime as dt
+    """Return all matching event IDs (no pagination). Used for cross-page select-all.
+
+    Defaults to upcoming-only; pass ``include_past=true`` to widen the scope.
+    """
     from sqlalchemy import cast, String
 
     base = select(CachedEvent.event_id).where(CachedEvent.deleted_at == None)
@@ -962,8 +1502,9 @@ def list_admin_event_ids(
             CachedEvent.location != None,
             CachedEvent.latitude == None,
         )
-    if future_only:
-        base = base.where(CachedEvent.start > dt.utcnow())
+    base = _apply_upcoming_filter(
+        base, include_past=include_past, future_only=future_only
+    )
     if search:
         pattern = f"%{search}%"
         base = base.where(

@@ -6,6 +6,45 @@ from sqlalchemy import Column, JSON, Text, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 
+class User(SQLModel, table=True):
+    """End-user account (distinct from the admin role gated by ADMIN_EMAIL)."""
+
+    __tablename__ = "users"
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    email: str = Field(unique=True, index=True, max_length=255)
+    display_name: Optional[str] = Field(default=None, max_length=120)
+    avatar_url: Optional[str] = Field(default=None, max_length=512)
+    # Public, user-chosen identifier used for /u/{handle} URLs and future
+    # social features. Nullable so existing accounts can claim one later.
+    # Case-insensitive uniqueness is enforced by a functional unique index
+    # on ``lower(handle)`` (see migration g1a2b3c4d5e7).
+    handle: Optional[str] = Field(default=None, max_length=24)
+    # Short opaque base32 identifier appended to shared URLs as
+    # ``?ref=share&src={share_code}``. Distinct from ``handle`` so users
+    # can change their handle without breaking attribution on previously
+    # shared links. Nullable for legacy rows; populated lazily by the
+    # auth layer when the user next signs in.
+    share_code: Optional[str] = Field(
+        default=None, max_length=12, index=True, unique=True
+    )
+    provider: str = Field(default="google", max_length=32)
+    provider_subject: Optional[str] = Field(
+        default=None, unique=True, index=True, max_length=255
+    )
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_login_at: Optional[datetime] = Field(default=None)
+    deleted_at: Optional[datetime] = Field(default=None, index=True)
+    # Pre-fills the "Share my name" toggle in the GoingButton confirmation
+    # popover. Defaults to True so attendee lists are populated by default;
+    # users can opt out via account settings or per-event in the popover.
+    # ``share_attendance_default_set_by_user`` is flipped to True the first
+    # time the user explicitly PATCHes the preference, so future bulk
+    # backfills can avoid overriding deliberate choices.
+    share_attendance_default: bool = Field(default=True, nullable=False)
+    share_attendance_default_set_by_user: bool = Field(default=False, nullable=False)
+
+
 class CalendarSetting(SQLModel, table=True):
     __tablename__ = "calendar_settings"
 
@@ -31,6 +70,8 @@ class CachedEvent(SQLModel, table=True):
     all_day: bool = Field(default=False)
     latitude: Optional[float] = Field(default=None)
     longitude: Optional[float] = Field(default=None)
+    geocode_query: Optional[str] = Field(default=None)
+    geocode_provider: Optional[str] = Field(default=None)
     price_min: Optional[float] = Field(default=None)
     price_max: Optional[float] = Field(default=None)
     price_currency: Optional[str] = Field(default=None)
@@ -85,6 +126,7 @@ class UserSavedEvent(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     device_id: str = Field(index=True, max_length=64)
     event_id: str = Field(index=True)
+    user_id: Optional[UUID] = Field(default=None, foreign_key="users.id", index=True)
     saved_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -94,6 +136,9 @@ class ShareToken(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     token: str = Field(unique=True, index=True)
     device_id: str = Field(unique=True, index=True, max_length=64)
+    user_id: Optional[UUID] = Field(
+        default=None, foreign_key="users.id", unique=True, index=True
+    )
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -119,6 +164,34 @@ class SyncLog(SQLModel, table=True):
     enrichment_status: str = Field(default="pending")  # pending | running | completed
     enrichment_progress: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     dedup_log: Optional[list] = Field(default=None, sa_column=Column(JSON))
+
+
+class SyncJobRun(SQLModel, table=True):
+    """Persisted snapshot of a SyncJobService job run.
+
+    The in-memory SyncJobService is the source of truth while a job is
+    running; rows here are written periodically (throttled) and on
+    finalization so Sync History survives backend restarts.
+    """
+
+    __tablename__ = "sync_job_runs"
+
+    job_id: str = Field(primary_key=True)
+    status: str = Field(index=True)
+    mode: Optional[str] = Field(default=None)
+    since_date: Optional[str] = Field(default=None)
+    started_at: datetime = Field(index=True)
+    finished_at: Optional[datetime] = Field(default=None)
+    heartbeat_at: Optional[datetime] = Field(default=None)
+    abort_requested: bool = Field(default=False)
+    warning_message: Optional[str] = Field(default=None, sa_column=Column(Text))
+    error_message: Optional[str] = Field(default=None, sa_column=Column(Text))
+    totals_json: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    stage_totals_json: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    calendar_statuses_json: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    metadata_json: Optional[dict] = Field(
+        default=None, sa_column=Column("metadata_json", JSON)
+    )
 
 
 class EventSuggestion(SQLModel, table=True):
@@ -161,6 +234,17 @@ class EventSuggestion(SQLModel, table=True):
     synced_to_google: bool = Field(default=False)
     google_event_id: Optional[str] = Field(default=None)
     suggested_tag_ids: Optional[list] = Field(default=None, sa_column=Column(JSON))
+    # User-entered new-tag suggestions submitted with the event. Each item:
+    #   {"free_text": str, "group_slug": str | None}
+    # On approval these become regular TagSuggestion rows tied to the new event.
+    suggested_new_tags: Optional[list] = Field(default=None, sa_column=Column(JSON))
+
+    # Optional pricing hints from the submitter (copied to CachedEvent on approval)
+    price_min: Optional[float] = Field(default=None)
+    price_max: Optional[float] = Field(default=None)
+    price_currency: Optional[str] = Field(default=None)
+    price_is_free: bool = Field(default=False)
+
     created_at: datetime = Field(default_factory=datetime.utcnow)
     reviewed_at: Optional[datetime] = Field(default=None)
     reviewed_by: Optional[str] = Field(default=None)
@@ -201,6 +285,12 @@ class TagGroup(SQLModel, table=True):
     ordinal: int = Field(default=0)
     allow_multiple: bool = Field(default=True)
     enabled: bool = Field(default=True)
+    # Scope separates first-class event taxonomy from review-only aspect tags.
+    # 'event' = appears in explorer filter, event tag pills, suggestion form.
+    # 'review' = appears in rate-event modal and review-list filter chips only.
+    # Mirrors the two-namespace pattern used by Google/Yelp/Airbnb (place
+    # attributes vs review aspects). Enforced in routes + suggestion validation.
+    scope: str = Field(default="event", index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     tags: List["Tag"] = Relationship(back_populates="group")
@@ -222,6 +312,25 @@ class Tag(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     group: Optional[TagGroup] = Relationship(back_populates="tags")
+
+
+class TagSynonym(SQLModel, table=True):
+    """Admin-configurable synonym terms used by the heuristic tag suggester.
+
+    Each row maps a free-text term (e.g. "live band") to a tag. The suggester
+    matches lowercased event text against these terms (plus the tag label and
+    slug) when scoring tag suggestions.
+    """
+
+    __tablename__ = "tag_synonyms"
+    __table_args__ = (
+        UniqueConstraint("tag_id", "term", name="uq_tag_synonym_tag_term"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    tag_id: int = Field(foreign_key="tags.id", index=True)
+    term: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class EventTag(SQLModel, table=True):
@@ -247,6 +356,57 @@ class TagSuggestion(SQLModel, table=True):
     admin_notes: Optional[str] = Field(default=None, sa_column=Column(Text))
     reviewed_at: Optional[datetime] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    # Links a TagSuggestion to the parent feedback envelope (rating + tag suggestions
+    # submitted together). NULL for legacy/standalone suggestions.
+    feedback_submission_id: Optional[UUID] = Field(default=None, index=True)
+    # Origin of the suggestion. 'user' = end-user submitted (legacy default).
+    # 'heuristic' = generated by the TagSuggestionStage in the enrichment
+    # pipeline using keyword/synonym matching against the tag taxonomy.
+    source: str = Field(default="user", index=True)
+    # Confidence score 0.0-1.0 for auto-generated rows; NULL for user submissions.
+    confidence: Optional[float] = Field(default=None)
+    # List of matched terms that triggered an auto suggestion (admin transparency).
+    matched_terms: Optional[list] = Field(default=None, sa_column=Column(JSON))
+
+
+class EventRating(SQLModel, table=True):
+    """User rating + review for an event. Pre-moderated by admin."""
+
+    __tablename__ = "event_ratings"
+    __table_args__ = (
+        # Partial unique constraint (one rating per user per event) is created
+        # in the Alembic migration as ``CREATE UNIQUE INDEX ... WHERE user_id IS NOT NULL``
+        # because SQLAlchemy/SQLModel cannot express partial uniques portably.
+    )
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    event_id: str = Field(foreign_key="cached_events.event_id", index=True)
+    # Nullable so account deletion can soft-anonymise (ON DELETE SET NULL on FK).
+    user_id: Optional[UUID] = Field(default=None, foreign_key="users.id", index=True)
+
+    stars: int = Field(ge=1, le=5)
+    comment: Optional[str] = Field(default=None, sa_column=Column(Text))
+    review_tag_ids: Optional[list] = Field(default=None, sa_column=Column(JSON))
+    is_anonymous: bool = Field(default=False)
+
+    # Groups together the rating and any tag-suggestions submitted in the same
+    # feedback envelope so the admin UI can show them together while still
+    # moderating each independently.
+    feedback_submission_id: Optional[UUID] = Field(default=None, index=True)
+
+    # Workflow
+    status: str = Field(default="pending", index=True)  # pending | approved | rejected
+    admin_notes: Optional[str] = Field(default=None, sa_column=Column(Text))
+    reviewed_at: Optional[datetime] = Field(default=None)
+    reviewed_by: Optional[str] = Field(default=None)
+
+    # Audit
+    submitter_ip: Optional[str] = Field(default=None)
+    submitter_user_agent: Optional[str] = Field(default=None)
+    submitter_country: Optional[str] = Field(default=None)
+
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class EventAttendance(SQLModel, table=True):
@@ -270,7 +430,13 @@ class UserEventAttendance(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     device_id: str = Field(index=True, max_length=64)
     event_id: str = Field(index=True)
+    user_id: Optional[UUID] = Field(default=None, foreign_key="users.id", index=True)
     attending_since: datetime = Field(default_factory=datetime.utcnow)
+    # When True AND user_id IS NOT NULL the row is eligible to appear in the
+    # public attendee list for the event. When False, the attendance is
+    # counted but the user is not named ("private going"). Anonymous device
+    # rows (user_id IS NULL) are always private regardless of this flag.
+    share_publicly: bool = Field(default=False, nullable=False)
 
 
 class CalendarDefaultTag(SQLModel, table=True):
@@ -284,4 +450,24 @@ class CalendarDefaultTag(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     calendar_id: str = Field(foreign_key="calendar_settings.calendar_id", index=True)
     tag_id: int = Field(foreign_key="tags.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ShareEvent(SQLModel, table=True):
+    """Append-only log of share funnel events.
+
+    One row per discrete action: a 'share' when the user activates the
+    share button, a 'click' when a referred visitor lands on the event
+    page (carries the originating ``share_code`` from the URL), and a
+    'conversion' when that referred visitor performs an attributable
+    action (currently RSVP "going").
+    """
+
+    __tablename__ = "share_events"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    event_id: str = Field(index=True)
+    action: str = Field(max_length=16)  # share | click | conversion
+    share_code: Optional[str] = Field(default=None, max_length=12, index=True)
+    device_id: Optional[str] = Field(default=None, max_length=64, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)

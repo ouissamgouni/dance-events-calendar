@@ -12,22 +12,24 @@ tasks:
   staging:local:
     desc: View local staging container logs (docker-compose)
     cmds:
-      - ENV_NAME=staging docker compose -f infra/docker/docker-compose.unified.yml -p movida-staging logs -f
+      - ENV_NAME=staging docker compose -f
+        infra/docker/docker-compose.unified.yml -p movida-staging logs -f
 
   staging:remote:
     desc: Stream remote staging backend logs (Fly.io)
     cmds:
-      - fly logs -c fly.staging.toml
+      - fly logs -c config/fly.staging.toml
 
   prod:
     desc: View prod container logs
     cmds:
-      - ENV_NAME=prod docker compose -f infra/docker/docker-compose.unified.yml -p movida-prod logs -f
+      - ENV_NAME=prod docker compose -f infra/docker/docker-compose.unified.yml
+        -p movida-prod logs -f
 
   scenario:
     desc: "View scenario container logs (SCENARIO=name)"
     vars:
-      SCENARIO: '{{.SCENARIO | default "default"}}'
+      SCENARIO: "{{.SCENARIO | default \"default\"}}"
     cmds:
       - |
         source {{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"

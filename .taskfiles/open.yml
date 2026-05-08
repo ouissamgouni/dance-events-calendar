@@ -1,0 +1,38 @@
+version: "3"
+
+vars:
+  SCENARIO_PORTS_SH: .taskfiles/scenario_ports.sh
+
+tasks:
+  session:
+    desc: >-
+      Open a fresh isolated Chrome session for a scenario. Usage: task
+      open:session SCENARIO=share-im-going [N=2] N lets you open multiple
+      independent sessions for the same scenario (e.g. Alice=N=1, Bob=N=2). Each
+      gets its own cookie jar / localStorage.
+    vars:
+      SCENARIO: "{{.SCENARIO | default \"default\"}}"
+      N: "{{.N | default \"1\"}}"
+    cmds:
+      - |
+        source {{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
+        URL="http://localhost:${SC_WEB_PORT}"
+        LABEL="{{.SCENARIO}}-{{.N}}"
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "  Fresh session #{{.N}} → scenario: {{.SCENARIO}}"
+        echo "  URL: $URL"
+        echo "═══════════════════════════════════════════════════════════════"
+        {{.ROOT_DIR}}/.taskfiles/open-fresh-session.sh "$URL" "$LABEL"
+
+  clean:
+    desc: Remove all temporary Chrome profile dirs created by open:session
+    cmds:
+      - |
+        COUNT=$(find /tmp -maxdepth 1 -type d -name 'chrome-*' 2>/dev/null | wc -l | tr -d ' ')
+        if [ "$COUNT" = "0" ]; then
+          echo "No temporary Chrome session dirs found."
+          exit 0
+        fi
+        echo "Removing $COUNT Chrome session dir(s) under /tmp/chrome-* ..."
+        find /tmp -maxdepth 1 -type d -name 'chrome-*' -exec rm -rf {} + 2>/dev/null || true
+        echo "✅ Done."

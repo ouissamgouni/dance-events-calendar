@@ -1,0 +1,667 @@
+base_week: 0
+events:
+- id: evt-tag-001
+  calendar_id: salsa-cal-001
+  title: Friday Salsa Social
+  description: |
+    Weekly social dance night with DJ Mambo. Beginners welcome!
+    The dance floor is open from the first beat to the last.
+    All skill levels are welcome — no partner or prior experience needed.
+    Expect a warm, inclusive crowd of local and visiting dancers.
+    The venue features a full bar, cloakroom, and water stations throughout.
+    Dress smart-casual; smooth-soled dance shoes strongly recommended.
+    Follow the organiser's social pages for last-minute updates and playlists.
+  location: Dance Studio, 10 Rue de Rivoli, Paris, France
+  latitude: 48.8566
+  longitude: 2.3522
+  start: w0 Fri 21:00
+  end: w0 Sat 01:00
+  price_is_free: true
+  tags:
+  - format:social
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - vibe:social-atmosphere
+- id: evt-tag-002
+  calendar_id: bachata-cal-002
+  title: Bachata Night
+  description: |
+    Sensual bachata social with classes beforehand.
+    The dance floor is open from the first beat to the last.
+    All skill levels are welcome — no partner or prior experience needed.
+    Expect a warm, inclusive crowd of local and visiting dancers.
+    The venue features a full bar, cloakroom, and water stations throughout.
+    Dress smart-casual; smooth-soled dance shoes strongly recommended.
+    Follow the organiser's social pages for last-minute updates and playlists.
+  location: Tanzhaus, Friedrichstr. 100, Berlin, Germany
+  latitude: 52.52
+  longitude: 13.405
+  start: w0 Sat 21:00
+  end: w0 Sun 02:00
+  price_is_free: false
+  price_min: 10
+  price_currency: EUR
+  tags:
+  - format:social
+  - dance-style:bachata
+  - level:all-levels
+  - venue:indoor
+  - vibe:good-music
+- id: evt-tag-003
+  calendar_id: salsa-cal-001
+  title: Salsa On2 Intermediate Workshop
+  description: |
+    Intensive salsa on2 workshop with Carlos & Maria.
+    Each session is broken into clear, manageable steps with individual feedback.
+    The instructor will address both leading and following roles equally.
+    Comfortable dance shoes with a smooth, non-rubber sole are essential.
+    No prior partner is required — participants rotate throughout the session.
+    Water and light refreshments are provided during breaks.
+    Spaces are strictly limited to maintain a high quality of teaching.
+    Video recording of the technique segments is encouraged for personal review.
+    A brief Q&A with the instructor follows each teaching block.
+    Check the event page for warm-up videos and preparation tips in advance.
+    Book early — this event has sold out in previous editions.
+  location: Salsero Studio, Calle Gran Vía, Madrid, Spain
+  latitude: 40.42
+  longitude: -3.7038
+  start: w0 Sat 14:00
+  end: w0 Sat 17:00
+  price_is_free: false
+  price_min: 25
+  price_max: 35
+  price_currency: EUR
+  tags:
+  - format:workshop
+  - dance-style:salsa
+  - level:intermediate
+  - venue:indoor
+  - scale:small
+- id: evt-tag-004
+  calendar_id: kizomba-cal-003
+  title: Kizomba Fundamentals
+  description: |
+    Learn the basics of kizomba in a relaxed setting.
+    The dance floor is open from the first beat to the last.
+    All skill levels are welcome — no partner or prior experience needed.
+    Expect a warm, inclusive crowd of local and visiting dancers.
+    The venue features a full bar, cloakroom, and water stations throughout.
+    Dress smart-casual; smooth-soled dance shoes strongly recommended.
+    Follow the organiser's social pages for last-minute updates and playlists.
+  location: Move Studio, Damrak 1, Amsterdam, Netherlands
+  latitude: 52.3738
+  longitude: 4.891
+  start: w0 Sun 15:00
+  end: w0 Sun 17:00
+  price_is_free: false
+  price_min: 15
+  price_currency: EUR
+  tags:
+  - format:class
+  - dance-style:kizomba
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:small
+- id: evt-tag-005
+  calendar_id: salsa-cal-001
+  title: Paris Salsa Congress 2025
+  description: |
+    3-day congress with international artists, 4 rooms, live bands.
+    The programme spans multiple days with tracks for beginner, intermediate and advanced dancers.
+    Evening parties take place across several rooms, each with its own themed DJ lineup.
+    VIP passes include backstage access, a priority show seat, and an exclusive warm-up session.
+    Day passes are available for those who can only join for part of the weekend.
+    The venue is fully accessible with a dedicated cloakroom and coat-check service.
+    An on-site registration desk opens from 9 am on the first day of the event.
+    A gala show on Saturday evening features performances by the resident instructors.
+    Solo and couples competitions run on Sunday afternoon with prizes for the top finishers.
+    A warm-up DJ set kicks off each evening at 9 pm before the main programme begins.
+    Healthy food options and a full bar are available on-site throughout the weekend.
+    Local accommodation partners offer discounted rates — see the official event website.
+    Airport transfer packages can be arranged through the event website; book in advance.
+    Participants are encouraged to share highlights using the official event hashtag.
+    An after-party follows the gala show and runs until the early hours of the morning.
+    Organisers will provide a dedicated event photographer and live social media coverage.
+    All levels from complete beginners to professional dancers are warmly welcomed here.
+    Emergency medical assistance and a first-aid station are available on site at all times.
+    The event team is on hand throughout the weekend to answer questions and assist you.
+    Check the event website for the full timetable, artist bios and ticketing information.
+    We look forward to sharing the dance floor with you — see you there!
+  location: Palais des Congrès, Paris, France
+  latitude: 48.8784
+  longitude: 2.283
+  start: w1 Fri 18:00
+  end: w1 Sun 23:00
+  price_is_free: false
+  price_min: 90
+  price_max: 150
+  price_currency: EUR
+  tags:
+  - format:congress
+  - dance-style:salsa
+  - dance-style:bachata
+  - dance-style:kizomba
+  - level:all-levels
+  - scale:large
+  - scope:international
+  - venue:indoor
+  - vibe:crowded
+  - vibe:high-level-dancers
+- id: evt-tag-006
+  calendar_id: bachata-cal-002
+  title: Bachata Beach Festival
+  description: |
+    Open-air bachata festival on the beach. Workshops + parties.
+    The programme spans multiple days with tracks for beginner, intermediate and advanced dancers.
+    Evening parties take place across several rooms, each with its own themed DJ lineup.
+    VIP passes include backstage access, a priority show seat, and an exclusive warm-up session.
+    Day passes are available for those who can only join for part of the weekend.
+    The venue is fully accessible with a dedicated cloakroom and coat-check service.
+    An on-site registration desk opens from 9 am on the first day of the event.
+    A gala show on Saturday evening features performances by the resident instructors.
+    Solo and couples competitions run on Sunday afternoon with prizes for the top finishers.
+    A warm-up DJ set kicks off each evening at 9 pm before the main programme begins.
+    Healthy food options and a full bar are available on-site throughout the weekend.
+    Local accommodation partners offer discounted rates — see the official event website.
+    Airport transfer packages can be arranged through the event website; book in advance.
+    Participants are encouraged to share highlights using the official event hashtag.
+    An after-party follows the gala show and runs until the early hours of the morning.
+    Organisers will provide a dedicated event photographer and live social media coverage.
+    All levels from complete beginners to professional dancers are warmly welcomed here.
+    Emergency medical assistance and a first-aid station are available on site at all times.
+    The event team is on hand throughout the weekend to answer questions and assist you.
+    Check the event website for the full timetable, artist bios and ticketing information.
+    We look forward to sharing the dance floor with you — see you there!
+  location: Playa de la Barceloneta, Barcelona, Spain
+  latitude: 41.3784
+  longitude: 2.1925
+  start: w1 Sat 12:00
+  end: w1 Sun 22:00
+  price_is_free: false
+  price_min: 60
+  price_max: 100
+  price_currency: EUR
+  tags:
+  - format:festival
+  - dance-style:bachata
+  - level:all-levels
+  - scale:large
+  - scope:international
+  - venue:outdoor
+  - vibe:social-atmosphere
+- id: evt-tag-007
+  calendar_id: salsa-cal-001
+  title: Salsa on the Rooftop
+  description: |
+    Open-air salsa party with live band Orquesta del Sol.
+    The dance floor is open from the first beat to the last.
+    All skill levels are welcome — no partner or prior experience needed.
+    Expect a warm, inclusive crowd of local and visiting dancers.
+    The venue features a full bar, cloakroom, and water stations throughout.
+    Dress smart-casual; smooth-soled dance shoes strongly recommended.
+    Follow the organiser's social pages for last-minute updates and playlists.
+  location: Skybar, Av. de la Liberté, Brussels, Belgium
+  latitude: 50.8503
+  longitude: 4.3517
+  start: w1 Sat 20:00
+  end: w1 Sun 00:00
+  price_is_free: false
+  price_min: 10
+  price_currency: EUR
+  tags:
+  - format:social
+  - dance-style:salsa
+  - level:all-levels
+  - venue:rooftop
+  - scale:medium
+  - vibe:live-band
+  - vibe:good-music
+  - vibe:spacious
+- id: evt-tag-008
+  calendar_id: salsa-cal-001
+  title: Rueda de Casino Practice
+  description: |
+    Group rueda practice. No partner needed.
+    The dance floor is open from the first beat to the last.
+    All skill levels are welcome — no partner or prior experience needed.
+    Expect a warm, inclusive crowd of local and visiting dancers.
+    The venue features a full bar, cloakroom, and water stations throughout.
+    Dress smart-casual; smooth-soled dance shoes strongly recommended.
+    Follow the organiser's social pages for last-minute updates and playlists.
+  location: Community Hall, Rue Neuve 50, Brussels, Belgium
+  latitude: 50.8512
+  longitude: 4.355
+  start: w0 Sun 11:00
+  end: w0 Sun 13:00
+  price_is_free: true
+  tags:
+  - format:practice
+  - dance-style:rueda
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:small
+  - scope:local
+- id: evt-tag-009
+  calendar_id: kizomba-cal-003
+  title: Kizomba & Semba Night
+  description: |
+    Kizomba and semba social with guest DJ from Lisbon.
+    The dance floor is open from the first beat to the last.
+    All skill levels are welcome — no partner or prior experience needed.
+    Expect a warm, inclusive crowd of local and visiting dancers.
+    The venue features a full bar, cloakroom, and water stations throughout.
+    Dress smart-casual; smooth-soled dance shoes strongly recommended.
+    Follow the organiser's social pages for last-minute updates and playlists.
+  location: Casa Latina, Lisbon, Portugal
+  latitude: 38.7223
+  longitude: -9.1393
+  start: w0 Fri 22:00
+  end: w0 Sat 03:00
+  price_is_free: false
+  price_min: 8
+  price_currency: EUR
+  tags:
+  - format:social
+  - dance-style:kizomba
+  - dance-style:semba
+  - level:all-levels
+  - venue:indoor
+  - vibe:good-music
+- id: evt-tag-010
+  calendar_id: salsa-cal-001
+  title: Advanced Salsa Shines
+  description: |
+    Solo footwork masterclass for advanced dancers.
+    Each session is broken into clear, manageable steps with individual feedback.
+    The instructor will address both leading and following roles equally.
+    Comfortable dance shoes with a smooth, non-rubber sole are essential.
+    No prior partner is required — participants rotate throughout the session.
+    Water and light refreshments are provided during breaks.
+    Spaces are strictly limited to maintain a high quality of teaching.
+    Video recording of the technique segments is encouraged for personal review.
+    A brief Q&A with the instructor follows each teaching block.
+    Check the event page for warm-up videos and preparation tips in advance.
+    Book early — this event has sold out in previous editions.
+  location: Latin Motion, Via Roma 42, Milan, Italy
+  latitude: 45.4642
+  longitude: 9.19
+  start: w1 Sun 16:00
+  end: w1 Sun 18:00
+  price_is_free: false
+  price_min: 30
+  price_currency: EUR
+  tags:
+  - format:workshop
+  - dance-style:salsa
+  - level:advanced
+  - venue:indoor
+  - scale:small
+  - vibe:high-level-dancers
+- id: evt-tag-011
+  calendar_id: bachata-cal-002
+  title: Bachata Bootcamp Weekend
+  description: |
+    Intensive 2-day training. Covers modern and sensual bachata.
+    The programme spans multiple days with tracks for beginner, intermediate and advanced dancers.
+    Evening parties take place across several rooms, each with its own themed DJ lineup.
+    VIP passes include backstage access, a priority show seat, and an exclusive warm-up session.
+    Day passes are available for those who can only join for part of the weekend.
+    The venue is fully accessible with a dedicated cloakroom and coat-check service.
+    An on-site registration desk opens from 9 am on the first day of the event.
+    A gala show on Saturday evening features performances by the resident instructors.
+    Solo and couples competitions run on Sunday afternoon with prizes for the top finishers.
+    A warm-up DJ set kicks off each evening at 9 pm before the main programme begins.
+    Healthy food options and a full bar are available on-site throughout the weekend.
+    Local accommodation partners offer discounted rates — see the official event website.
+    Airport transfer packages can be arranged through the event website; book in advance.
+    Participants are encouraged to share highlights using the official event hashtag.
+    An after-party follows the gala show and runs until the early hours of the morning.
+    Organisers will provide a dedicated event photographer and live social media coverage.
+    All levels from complete beginners to professional dancers are warmly welcomed here.
+    Emergency medical assistance and a first-aid station are available on site at all times.
+    The event team is on hand throughout the weekend to answer questions and assist you.
+    Check the event website for the full timetable, artist bios and ticketing information.
+    We look forward to sharing the dance floor with you — see you there!
+  location: Dance Academy, Königstraße, Stuttgart, Germany
+  latitude: 48.7758
+  longitude: 9.1829
+  start: w2 Sat 10:00
+  end: w2 Sun 18:00
+  price_is_free: false
+  price_min: 70
+  price_max: 90
+  price_currency: EUR
+  tags:
+  - format:bootcamp
+  - dance-style:bachata
+  - level:intermediate
+  - scale:small
+  - scope:regional
+  - venue:indoor
+- id: evt-tag-012
+  calendar_id: kizomba-cal-003
+  title: Sunday Kizomba Class
+  description: |
+    Drop-in kizomba class, all levels.
+    Each session is broken into clear, manageable steps with individual feedback.
+    The instructor will address both leading and following roles equally.
+    Comfortable dance shoes with a smooth, non-rubber sole are essential.
+    No prior partner is required — participants rotate throughout the session.
+    Water and light refreshments are provided during breaks.
+    Spaces are strictly limited to maintain a high quality of teaching.
+    Video recording of the technique segments is encouraged for personal review.
+    A brief Q&A with the instructor follows each teaching block.
+    Check the event page for warm-up videos and preparation tips in advance.
+    Book early — this event has sold out in previous editions.
+  location: Dance Lab, Corso Vittorio, Rome, Italy
+  latitude: 41.8967
+  longitude: 12.4822
+  start: w0 Sun 18:00
+  end: w0 Sun 19:30
+  price_is_free: true
+- id: evt-tag-013
+  calendar_id: kizomba-cal-003
+  title: Spring Kizomba Garden Party
+  description: |
+    Open-air kizomba in Vondelpark. Bring a blanket and your dancing shoes.
+    The dance floor is open from the first beat to the last.
+    All skill levels are welcome — no partner or prior experience needed.
+    Expect a warm, inclusive crowd of local and visiting dancers.
+    The venue features a full bar, cloakroom, and water stations throughout.
+    Dress smart-casual; smooth-soled dance shoes strongly recommended.
+    Follow the organiser's social pages for last-minute updates and playlists.
+  location: Vondelpark, Amsterdam, Netherlands
+  latitude: 52.3579
+  longitude: 4.8686
+  start: w3 Sat 16:00
+  end: w3 Sat 21:00
+  price_is_free: true
+  tags:
+  - format:social
+  - dance-style:kizomba
+  - level:all-levels
+  - venue:outdoor
+  - scale:medium
+  - vibe:social-atmosphere
+- id: evt-tag-014
+  calendar_id: salsa-cal-001
+  title: London Latin Fiesta
+  description: |
+    Bank holiday weekend mega salsa night. International DJs and live congas.
+    The programme spans multiple days with tracks for beginner, intermediate and advanced dancers.
+    Evening parties take place across several rooms, each with its own themed DJ lineup.
+    VIP passes include backstage access, a priority show seat, and an exclusive warm-up session.
+    Day passes are available for those who can only join for part of the weekend.
+    The venue is fully accessible with a dedicated cloakroom and coat-check service.
+    An on-site registration desk opens from 9 am on the first day of the event.
+    A gala show on Saturday evening features performances by the resident instructors.
+    Solo and couples competitions run on Sunday afternoon with prizes for the top finishers.
+    A warm-up DJ set kicks off each evening at 9 pm before the main programme begins.
+    Healthy food options and a full bar are available on-site throughout the weekend.
+    Local accommodation partners offer discounted rates — see the official event website.
+    Airport transfer packages can be arranged through the event website; book in advance.
+    Participants are encouraged to share highlights using the official event hashtag.
+    An after-party follows the gala show and runs until the early hours of the morning.
+    Organisers will provide a dedicated event photographer and live social media coverage.
+    All levels from complete beginners to professional dancers are warmly welcomed here.
+    Emergency medical assistance and a first-aid station are available on site at all times.
+    The event team is on hand throughout the weekend to answer questions and assist you.
+    Check the event website for the full timetable, artist bios and ticketing information.
+    We look forward to sharing the dance floor with you — see you there!
+  location: O2 Academy Brixton, Stockwell Rd, London, UK
+  latitude: 51.4652
+  longitude: -0.1152
+  start: w5 Fri 21:00
+  end: w5 Sat 03:00
+  price_is_free: false
+  price_min: 20
+  price_max: 30
+  price_currency: GBP
+  tags:
+  - format:social
+  - dance-style:salsa
+  - dance-style:bachata
+  - level:all-levels
+  - venue:indoor
+  - scale:large
+  - scope:international
+  - vibe:good-music
+  - vibe:crowded
+- id: evt-tag-015
+  calendar_id: bachata-cal-002
+  title: Bachata Summer Opener – Seville
+  description: |
+    First outdoor bachata of the season in Parque de María Luisa.
+    The dance floor is open from the first beat to the last.
+    All skill levels are welcome — no partner or prior experience needed.
+    Expect a warm, inclusive crowd of local and visiting dancers.
+    The venue features a full bar, cloakroom, and water stations throughout.
+    Dress smart-casual; smooth-soled dance shoes strongly recommended.
+    Follow the organiser's social pages for last-minute updates and playlists.
+  location: Parque de María Luisa, Seville, Spain
+  latitude: 37.3754
+  longitude: -5.9892
+  start: w7 Sat 20:00
+  end: w7 Sun 01:00
+  price_is_free: true
+  tags:
+  - format:social
+  - dance-style:bachata
+  - level:all-levels
+  - venue:outdoor
+  - scale:medium
+  - scope:regional
+  - vibe:social-atmosphere
+- id: evt-tag-016
+  calendar_id: salsa-cal-001
+  title: Salsa en Plein Air – Nice
+  description: |
+    Salsa on the Promenade des Anglais. Sunset dancing with live band.
+    The dance floor is open from the first beat to the last.
+    All skill levels are welcome — no partner or prior experience needed.
+    Expect a warm, inclusive crowd of local and visiting dancers.
+    The venue features a full bar, cloakroom, and water stations throughout.
+    Dress smart-casual; smooth-soled dance shoes strongly recommended.
+    Follow the organiser's social pages for last-minute updates and playlists.
+  location: Promenade des Anglais, Nice, France
+  latitude: 43.6956
+  longitude: 7.2659
+  start: w10 Sat 19:00
+  end: w10 Sun 00:00
+  price_is_free: true
+  tags:
+  - format:social
+  - dance-style:salsa
+  - level:all-levels
+  - venue:outdoor
+  - scale:medium
+  - vibe:live-band
+  - vibe:good-music
+- id: evt-tag-017
+  calendar_id: bachata-cal-002
+  title: European Bachata Summit – Vienna
+  description: |
+    3-day international congress. 5 rooms, 50 workshops, world-class shows.
+    The programme spans multiple days with tracks for beginner, intermediate and advanced dancers.
+    Evening parties take place across several rooms, each with its own themed DJ lineup.
+    VIP passes include backstage access, a priority show seat, and an exclusive warm-up session.
+    Day passes are available for those who can only join for part of the weekend.
+    The venue is fully accessible with a dedicated cloakroom and coat-check service.
+    An on-site registration desk opens from 9 am on the first day of the event.
+    A gala show on Saturday evening features performances by the resident instructors.
+    Solo and couples competitions run on Sunday afternoon with prizes for the top finishers.
+    A warm-up DJ set kicks off each evening at 9 pm before the main programme begins.
+    Healthy food options and a full bar are available on-site throughout the weekend.
+    Local accommodation partners offer discounted rates — see the official event website.
+    Airport transfer packages can be arranged through the event website; book in advance.
+    Participants are encouraged to share highlights using the official event hashtag.
+    An after-party follows the gala show and runs until the early hours of the morning.
+    Organisers will provide a dedicated event photographer and live social media coverage.
+    All levels from complete beginners to professional dancers are warmly welcomed here.
+    Emergency medical assistance and a first-aid station are available on site at all times.
+    The event team is on hand throughout the weekend to answer questions and assist you.
+    Check the event website for the full timetable, artist bios and ticketing information.
+    We look forward to sharing the dance floor with you — see you there!
+  location: Wiener Stadthalle, Roland-Rainer-Platz 1, Vienna, Austria
+  latitude: 48.2024
+  longitude: 16.331
+  start: w13 Fri 18:00
+  end: w13 Sun 23:00
+  price_is_free: false
+  price_min: 120
+  price_max: 200
+  price_currency: EUR
+  tags:
+  - format:congress
+  - dance-style:bachata
+  - dance-style:kizomba
+  - level:all-levels
+  - venue:indoor
+  - scale:large
+  - scope:international
+  - vibe:high-level-dancers
+  - vibe:crowded
+- id: evt-tag-018
+  calendar_id: kizomba-cal-003
+  title: Kizomba Sunset Rooftop – Rome
+  description: |
+    Intimate kizomba on a rooftop terrace with views of the Colosseum.
+    The dance floor is open from the first beat to the last.
+    All skill levels are welcome — no partner or prior experience needed.
+    Expect a warm, inclusive crowd of local and visiting dancers.
+    The venue features a full bar, cloakroom, and water stations throughout.
+    Dress smart-casual; smooth-soled dance shoes strongly recommended.
+    Follow the organiser's social pages for last-minute updates and playlists.
+  location: Terrazza Caffarelli, Piazza del Campidoglio, Rome, Italy
+  latitude: 41.8937
+  longitude: 12.4825
+  start: w15 Sat 20:00
+  end: w15 Sun 01:00
+  price_is_free: false
+  price_min: 15
+  price_currency: EUR
+  tags:
+  - format:social
+  - dance-style:kizomba
+  - dance-style:semba
+  - level:all-levels
+  - venue:rooftop
+  - scale:small
+  - vibe:good-music
+- id: evt-tag-019
+  calendar_id: salsa-cal-001
+  title: Salsa de Rentrée – Paris
+  description: |
+    Back-to-dance-season social. Warm-up class at 20:00, social until 3am.
+    Each session is broken into clear, manageable steps with individual feedback.
+    The instructor will address both leading and following roles equally.
+    Comfortable dance shoes with a smooth, non-rubber sole are essential.
+    No prior partner is required — participants rotate throughout the session.
+    Water and light refreshments are provided during breaks.
+    Spaces are strictly limited to maintain a high quality of teaching.
+    Video recording of the technique segments is encouraged for personal review.
+    A brief Q&A with the instructor follows each teaching block.
+    Check the event page for warm-up videos and preparation tips in advance.
+    Book early — this event has sold out in previous editions.
+  location: La Bellevilloise, 19 Rue Boyer, Paris, France
+  latitude: 48.8686
+  longitude: 2.392
+  start: w22 Sat 20:00
+  end: w22 Sun 03:00
+  price_is_free: false
+  price_min: 12
+  price_currency: EUR
+  tags:
+  - format:social
+  - dance-style:salsa
+  - level:all-levels
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
+- id: evt-tag-020
+  calendar_id: bachata-cal-002
+  title: Bachata Autumn Congress – Madrid
+  description: |
+    4-day autumn congress in the Spanish capital. 6 rooms, international artists.
+    The programme spans multiple days with tracks for beginner, intermediate and advanced dancers.
+    Evening parties take place across several rooms, each with its own themed DJ lineup.
+    VIP passes include backstage access, a priority show seat, and an exclusive warm-up session.
+    Day passes are available for those who can only join for part of the weekend.
+    The venue is fully accessible with a dedicated cloakroom and coat-check service.
+    An on-site registration desk opens from 9 am on the first day of the event.
+    A gala show on Saturday evening features performances by the resident instructors.
+    Solo and couples competitions run on Sunday afternoon with prizes for the top finishers.
+    A warm-up DJ set kicks off each evening at 9 pm before the main programme begins.
+    Healthy food options and a full bar are available on-site throughout the weekend.
+    Local accommodation partners offer discounted rates — see the official event website.
+    Airport transfer packages can be arranged through the event website; book in advance.
+    Participants are encouraged to share highlights using the official event hashtag.
+    An after-party follows the gala show and runs until the early hours of the morning.
+    Organisers will provide a dedicated event photographer and live social media coverage.
+    All levels from complete beginners to professional dancers are warmly welcomed here.
+    Emergency medical assistance and a first-aid station are available on site at all times.
+    The event team is on hand throughout the weekend to answer questions and assist you.
+    Check the event website for the full timetable, artist bios and ticketing information.
+    We look forward to sharing the dance floor with you — see you there!
+  location: Palacio Municipal de Congresos, Madrid, Spain
+  latitude: 40.463
+  longitude: -3.6873
+  start: w26 Thu 18:00
+  end: w26 Sun 23:00
+  price_is_free: false
+  price_min: 100
+  price_max: 180
+  price_currency: EUR
+  tags:
+  - format:congress
+  - dance-style:bachata
+  - level:all-levels
+  - venue:indoor
+  - scale:large
+  - scope:international
+  - vibe:high-level-dancers
+  - vibe:crowded
+- id: evt-tag-021
+  calendar_id: kizomba-cal-003
+  title: Kizomba Warmth – Amsterdam
+  description: |
+    Cozy autumn kizomba social in a historic canal warehouse.
+    The dance floor is open from the first beat to the last.
+    All skill levels are welcome — no partner or prior experience needed.
+    Expect a warm, inclusive crowd of local and visiting dancers.
+    The venue features a full bar, cloakroom, and water stations throughout.
+    Dress smart-casual; smooth-soled dance shoes strongly recommended.
+    Follow the organiser's social pages for last-minute updates and playlists.
+  location: Warehouse Elementenstraat, Amsterdam, Netherlands
+  latitude: 52.3602
+  longitude: 4.9186
+  start: w30 Sat 21:00
+  end: w30 Sun 03:00
+  price_is_free: false
+  price_min: 10
+  price_currency: EUR
+  tags:
+  - format:social
+  - dance-style:kizomba
+  - level:all-levels
+  - venue:indoor
+  - scale:medium
+  - scope:regional
+  - vibe:good-music
+tag_suggestions:
+- event_id: evt-tag-001
+  tag: vibe:good-music
+  status: pending
+  device_id: user-device-abc
+- event_id: evt-tag-002
+  free_text: romantic atmosphere
+  status: pending
+  device_id: user-device-def
+- event_id: evt-tag-007
+  tag: vibe:crowded
+  status: pending
+  device_id: user-device-ghi

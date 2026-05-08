@@ -33,9 +33,22 @@ _CURR_CODES = r"(?:EUR|USD|GBP|CHF|SEK|NOK|DKK|PLN|CZK)"
 _CURR = rf"(?:{_CURR_SYMBOLS}|{_CURR_CODES})"
 _NUM = r"\d+(?:[.,]\d{1,2})?"
 
-# Free patterns (case-insensitive)
+# "Free" patterns (case-insensitive).
+# Bare "free" is intentionally NOT matched: it produces too many false positives
+# ("free parking", "free wifi", "feel free to bring a partner", "free shuttle",
+# "free salsa night" → often refers to the style, not entry). We require an
+# explicit admission/entry context.
 _FREE_PATTERN = re.compile(
-    r"\b(?:free(?:\s+entry)?|gratis|gratuit(?:e)?|kostenlos|entr[ée]e?\s+libre|free\s+admission)\b",
+    r"\b(?:"
+    r"free\s+(?:entry|entrance|admission|admittance|event)"
+    r"|admission\s+free"
+    r"|no\s+(?:cover|charge|entry\s+fee|admission\s+fee)"
+    r"|gratis"
+    r"|gratuit(?:e|es)?"
+    r"|kostenlos"
+    r"|eintritt\s+frei"
+    r"|entr[ée]e?\s+(?:libre|gratuite)"
+    r")\b",
     re.IGNORECASE,
 )
 

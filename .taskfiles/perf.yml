@@ -1,0 +1,252 @@
+version: "3"
+
+# k6 perf load tests. Read-only browse-events journeys.
+# Profiles live in perf/k6/profiles/*.env and are passed to k6 via --env.
+# A *.override.env (gitignored) takes precedence when present, and CLI envs
+# (e.g. VUS=15 task perf:staging) win over both.
+#
+# Recommended workflow (uses the existing scenario harness — no bespoke stack):
+#
+#   # terminal 1 — bring up the perf scenario (isolated DB + seeded mock events,
+#   #              rate limit disabled via scenarios/perf/config.env)
+#   task perf:scenario:up
+#
+#   # terminal 2 — run k6 against it (BASE_URL is auto-derived from the
+#   #              perf scenario's state file at .taskfiles/.scenario-state/perf.env)
+#   task perf:run
+#
+#   # terminal 1 — Ctrl-C, then:
+#   task perf:scenario:down
+#
+# Other profiles:
+#   task perf:dev           - run against ad-hoc localhost:8001 dev backend
+#   task perf:staging       - run against remote staging
+#   task perf:prod:smoke    - read-only smoke against prod (5 VUs x 2m)
+
+vars:
+  K6_MAIN: "{{.ROOT_DIR}}/perf/k6/main.js"
+  PROFILES_DIR: "{{.ROOT_DIR}}/perf/k6/profiles"
+  RESULTS_DIR: "{{.ROOT_DIR}}/perf/results"
+  PERF_STATE_FILE: "{{.ROOT_DIR}}/.taskfiles/.scenario-state/perf.env"
+
+tasks:
+  default:
+    desc: Show perf help
+    cmds:
+      - |
+        echo "Perf load tests (k6, read-only browse-events):"
+        echo "  task perf:scenario:up    - start the perf scenario (foreground; wraps start:scenario SCENARIO=perf)"
+        echo "  task perf:scenario:down  - stop the perf scenario (drops its DB)"
+        echo "  task perf:scenario:logs  - tail perf scenario logs"
+        echo "  task perf:run            - run k6 against the running perf scenario (auto port)"
+        echo "  task perf:check          - verify k6 is installed"
+        echo "  task perf:dev            - run against ad-hoc http://localhost:8001"
+        echo "  task perf:staging        - run against remote staging"
+        echo "  task perf:prod:smoke     - read-only smoke against prod (5 VUs x 2m)"
+        echo "  task perf:report         - open the latest HTML summary"
+        echo "  task perf:clean          - remove old summary files"
+
+  check:
+    desc: Verify that k6 is installed
+    cmds:
+      - |
+        if ! command -v k6 >/dev/null 2>&1; then
+          echo "✗ k6 not found. Install with: brew install k6" >&2
+          exit 1
+        fi
+        k6 version
+
+  _ensure-results-dir:
+    internal: true
+    cmds:
+      - mkdir -p "{{.RESULTS_DIR}}"
+
+  # ---------------------------------------------------------------------------
+  # Perf scenario lifecycle (delegates to the standard scenario harness)
+  # ---------------------------------------------------------------------------
+  scenario:up:
+    desc: Start the perf scenario (isolated stack, seeded mock events, rate limit
+      disabled)
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - task start:scenario SCENARIO=perf
+
+  scenario:down:
+    desc: Stop the perf scenario and drop its database
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - task stop:scenario SCENARIO=perf
+
+  scenario:logs:
+    desc: Tail the perf scenario logs
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - task logs:scenario SCENARIO=perf
+
+  # ---------------------------------------------------------------------------
+  # k6 run targets
+  # ---------------------------------------------------------------------------
+  run:
+    desc: Run k6 against the running perf scenario (auto-detects its API port)
+    deps: [ check, _ensure-results-dir ]
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        set -euo pipefail
+        if [ ! -f "{{.PERF_STATE_FILE}}" ]; then
+          echo "✗ Perf scenario not running. Start it first:" >&2
+          echo "    task perf:scenario:up" >&2
+          exit 1
+        fi
+        # shellcheck disable=SC1090
+        . "{{.PERF_STATE_FILE}}"
+        if [ -z "${SC_API_PORT:-}" ]; then
+          echo "✗ SC_API_PORT missing from {{.PERF_STATE_FILE}}" >&2
+          exit 1
+        fi
+        BASE="http://localhost:${SC_API_PORT}"
+        if ! curl -fsS "${BASE}/health" >/dev/null 2>&1; then
+          echo "✗ Perf scenario backend not reachable at ${BASE}/health" >&2
+          exit 1
+        fi
+        echo "→ perf scenario API: ${BASE}"
+      - task: _run
+        vars:
+          PROFILE: perf
+          BASE_URL_OVERRIDE_CMD: ". \"{{.PERF_STATE_FILE}}\" && echo
+            \"http://localhost:$SC_API_PORT\""
+
+  dev:
+    desc: Run perf tests against ad-hoc local dev (localhost:8001)
+    deps: [ check, _ensure-results-dir ]
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - task: _run
+        vars:
+          PROFILE: dev
+
+  staging:
+    desc: |
+      Run perf tests against remote staging.
+      KILL_LIMITER=1 → set RATE_LIMIT_ENABLED=false on Fly before the run and
+                       restore it (unset) afterwards. Required if you want
+                       VUS>~5 from a single host without 429s.
+      FLY_APP=movida-staging (override only if your Fly app name differs).
+      Ad-hoc overrides: VUS=N DURATION=Xm RAMP=Xs THINK_MIN=N THINK_MAX=N BASE_URL=…
+        e.g. VUS=15 DURATION=2m KILL_LIMITER=1 task perf:staging
+    deps: [ check, _ensure-results-dir ]
+    dir: "{{.ROOT_DIR}}"
+    vars:
+      KILL_LIMITER: "{{.KILL_LIMITER | default \"0\"}}"
+      FLY_APP: "{{.FLY_APP | default \"movida-staging\"}}"
+    cmds:
+      - |
+        set -euo pipefail
+        if [ "{{.KILL_LIMITER}}" = "1" ]; then
+          if ! command -v fly >/dev/null 2>&1; then
+            echo "✗ flyctl not found (required for KILL_LIMITER=1)" >&2
+            exit 1
+          fi
+          echo "→ disabling rate limiter on Fly app '{{.FLY_APP}}'"
+          fly secrets set -a "{{.FLY_APP}}" RATE_LIMIT_ENABLED=false
+          # `fly secrets set` triggers a rolling deploy. Wait for /health.
+          echo "→ waiting for staging to come back online"
+          for i in $(seq 1 60); do
+            if curl -fsS https://api-develop.joinmovida.com/health >/dev/null 2>&1; then
+              echo "  staging is up"
+              break
+            fi
+            sleep 5
+            if [ "$i" = "60" ]; then
+              echo "✗ staging never recovered after secret push" >&2
+              exit 1
+            fi
+          done
+        fi
+      - defer: |
+          if [ "{{.KILL_LIMITER}}" = "1" ]; then
+            echo "→ restoring rate limiter on Fly app '{{.FLY_APP}}' (unset RATE_LIMIT_ENABLED)"
+            fly secrets unset -a "{{.FLY_APP}}" RATE_LIMIT_ENABLED || true
+          fi
+      - task: _run
+        vars:
+          PROFILE: staging
+
+  prod:smoke:
+    desc: Read-only smoke against production (low VUs, short duration)
+    deps: [ check, _ensure-results-dir ]
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - task: _run
+        vars:
+          PROFILE: prod
+
+  _run:
+    internal: true
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        set -euo pipefail
+        PROFILE_FILE="{{.PROFILES_DIR}}/{{.PROFILE}}.env"
+        LOCAL_OVERRIDE="{{.PROFILES_DIR}}/{{.PROFILE}}.override.env"
+        if [ ! -f "$PROFILE_FILE" ]; then
+          echo "✗ Missing profile: $PROFILE_FILE" >&2
+          exit 1
+        fi
+        # Build --env KEY=VAL args from the profile file(s). Local override
+        # is sourced second so it wins on duplicate keys.
+        ARGS=()
+        _add_envs() {
+          local f="$1"
+          while IFS= read -r line || [ -n "$line" ]; do
+            line="${line%%#*}"
+            line="${line## }"; line="${line%% }"
+            [ -z "$line" ] && continue
+            case "$line" in
+              *=*) ARGS+=( --env "$line" );;
+            esac
+          done < "$f"
+        }
+        _add_envs "$PROFILE_FILE"
+        if [ -f "$LOCAL_OVERRIDE" ]; then
+          echo "→ using override: $LOCAL_OVERRIDE"
+          _add_envs "$LOCAL_OVERRIDE"
+        fi
+        # Ad-hoc CLI overrides (e.g. `VUS=10 DURATION=2m task perf:staging`).
+        # These win over both the profile and the .override.env file.
+        for k in VUS DURATION RAMP THINK_MIN THINK_MAX BASE_URL; do
+          v="$(eval "printf '%s' \"\${$k:-}\"")"
+          if [ -n "$v" ]; then
+            ARGS+=( --env "$k=$v" )
+            echo "→ CLI override: $k=$v"
+          fi
+        done
+        # Optional dynamic BASE_URL override (used by perf:run to inject the
+        # current perf scenario's port).
+        OVERRIDE_CMD='{{.BASE_URL_OVERRIDE_CMD}}'
+        if [ -n "$OVERRIDE_CMD" ]; then
+          OVERRIDE_VAL="$(eval "$OVERRIDE_CMD")"
+          if [ -n "$OVERRIDE_VAL" ]; then
+            ARGS+=( --env "BASE_URL=$OVERRIDE_VAL" )
+            echo "→ BASE_URL override: $OVERRIDE_VAL"
+          fi
+        fi
+        echo "→ profile: {{.PROFILE}}"
+        k6 run "${ARGS[@]}" "{{.K6_MAIN}}"
+
+  report:
+    desc: Open the latest HTML summary in your browser
+    cmds:
+      - |
+        F="{{.RESULTS_DIR}}/summary-latest.html"
+        if [ ! -f "$F" ]; then
+          echo "✗ No report yet. Run task perf:run first." >&2
+          exit 1
+        fi
+        open "$F"
+
+  clean:
+    desc: Remove all perf result files
+    cmds:
+      - rm -f "{{.RESULTS_DIR}}"/summary-*.json "{{.RESULTS_DIR}}"/summary-*.html
+      - echo "✓ cleaned {{.RESULTS_DIR}}"

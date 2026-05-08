@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { CalendarEvent, TagGroup } from '../types';
 import { fetchEvents, fetchSettings, fetchTagGroups } from '../api';
 import { trackView } from '../utils/tracking';
@@ -7,14 +7,15 @@ import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import type FullCalendar from '@fullcalendar/react';
 import Calendar from '../components/Calendar';
+import type { CalendarViewMode } from '../components/Calendar';
 import EventMap from '../components/EventMap';
 import type { MapBounds } from '../components/EventMap';
 import EventModal from '../components/EventModal';
-import EventEditModal from '../components/EventEditModal';
+import AdminEventDetailPanel from '../components/AdminEventDetailPanel';
 import DateRangePicker from '../components/DateRangePicker';
 import EventListPanel from '../components/EventListPanel';
 import TagFilterPills from '../components/TagFilterPills';
-import SavedEventsFab from '../components/SavedEventsFab';
+import MineButton from '../components/MineButton';
 import SuggestEventModal from '../components/SuggestEventModal';
 import EventAnchoredDetailPanel from '../components/EventAnchoredDetailPanel';
 
@@ -26,9 +27,21 @@ function formatDate(date: Date): string {
 
 export default function Home() {
     const { user } = useAuth();
-    const { showPrices, showPopularity, popularityThreshold } = useFeatureFlags();
+    const { showPrices, showPopularity, popularityThreshold, tagSortMode } = useFeatureFlags();
     const [showSuggestModal, setShowSuggestModal] = useState(false);
     const location = useLocation();
+    const [searchParams, setSearchParams] = useSearchParams();
+
+    // Allow opening the suggest modal from anywhere via ?submit=1 (e.g. mobile header link).
+    useEffect(() => {
+        if (searchParams.get('submit') === '1') {
+            setShowSuggestModal(true);
+            const next = new URLSearchParams(searchParams);
+            next.delete('submit');
+            setSearchParams(next, { replace: true });
+        }
+    }, [searchParams, setSearchParams]);
+
     const viewMode: ViewMode = location.pathname === '/calendar' ? 'calendar' : 'explorer';
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [sinceDate, setSinceDate] = useState<string | null>(null);
@@ -36,7 +49,7 @@ export default function Home() {
     const [error, setError] = useState<string | null>(null);
     const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
     const [selectedEventSource, setSelectedEventSource] = useState<string | null>(null);
-    const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+    const [editingEventId, setEditingEventId] = useState<string | null>(null);
     const [sortBy, setSortBy] = useState<'date' | 'popularity'>('date');
     const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
     const [activeTagIds, setActiveTagIds] = useState<Set<number>>(new Set());
@@ -44,6 +57,25 @@ export default function Home() {
     // Calendar view section visibility
     const [showCalendarGrid, setShowCalendarGrid] = useState(true);
     const [showCalendarMap, setShowCalendarMap] = useState(true);
+
+    // Mobile calendar view: 3-week (default on mobile) vs full month. Persisted.
+    const [isMobileViewport, setIsMobileViewport] = useState(() => window.innerWidth < 640);
+    useEffect(() => {
+        const mq = window.matchMedia('(max-width: 639px)');
+        const handler = (e: MediaQueryListEvent) => setIsMobileViewport(e.matches);
+        mq.addEventListener('change', handler);
+        return () => mq.removeEventListener('change', handler);
+    }, []);
+    const [mobileCalendarView, setMobileCalendarView] = useState<CalendarViewMode>(() => {
+        const stored = typeof window !== 'undefined' ? window.localStorage.getItem('mobileCalendarView') : null;
+        return stored === 'month' ? 'month' : '3week';
+    });
+    useEffect(() => {
+        try {
+            window.localStorage.setItem('mobileCalendarView', mobileCalendarView);
+        } catch { /* ignore */ }
+    }, [mobileCalendarView]);
+    const calendarViewMode: CalendarViewMode = isMobileViewport ? mobileCalendarView : 'month';
 
     // Shared selection anchor for calendar desktop details
     const [selectedEventRect, setSelectedEventRect] = useState<DOMRect | null>(null);
@@ -59,7 +91,7 @@ export default function Home() {
     // Explorer state
     const today = formatDate(new Date());
     const defaultEndDate = new Date();
-    defaultEndDate.setMonth(defaultEndDate.getMonth() + 1);
+    defaultEndDate.setMonth(defaultEndDate.getMonth() + 6);
     const [startDate, setStartDate] = useState(today);
     const [endDate, setEndDate] = useState(formatDate(defaultEndDate));
     const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
@@ -96,7 +128,8 @@ export default function Home() {
             // Calendar mode initial load: use same default as explorer
             params = { startDate, endDate };
         }
-        Promise.all([fetchEvents(params), fetchSettings(), fetchTagGroups()])
+        const tagParams = params?.startDate || params?.endDate ? params : undefined;
+        Promise.all([fetchEvents(params), fetchSettings(), fetchTagGroups(tagParams)])
             .then(([evts, settings, groups]) => {
                 setEvents(evts);
                 setSinceDate(settings.since_date);
@@ -117,25 +150,116 @@ export default function Home() {
     const handleToggleTag = useCallback((tagId: number) => {
         setActiveTagIds((prev) => {
             const next = new Set(prev);
-            if (next.has(tagId)) next.delete(tagId);
-            else next.add(tagId);
+            if (next.has(tagId)) {
+                next.delete(tagId);
+                return next;
+            }
+            // Enforce single-select for groups where allow_multiple === false:
+            // adding this tag deselects any sibling tags from the same group.
+            const group = tagGroups.find((g) => g.tags.some((t) => t.id === tagId));
+            if (group && group.allow_multiple === false) {
+                const siblingIds = new Set(group.tags.map((t) => t.id));
+                for (const id of Array.from(next)) {
+                    if (siblingIds.has(id)) next.delete(id);
+                }
+            }
+            next.add(tagId);
             return next;
         });
-    }, []);
+    }, [tagGroups]);
 
     const handleClearTags = useCallback(() => {
         setActiveTagIds(new Set());
     }, []);
 
     const filteredEvents = useMemo(() => {
-        let result = events;
-        if (activeTagIds.size > 0) {
-            result = result.filter((e) =>
-                [...activeTagIds].every((tagId) => e.tags?.some((t) => t.id === tagId))
-            );
+        if (activeTagIds.size === 0) return events;
+
+        // Disjunctive faceting filter logic:
+        //  - Within a multi-select group: OR (event must match ANY selected tag in that group)
+        //  - Across groups: AND (event must satisfy every group that has a selection)
+        // Single-select groups behave the same as OR (only one tag can be selected).
+        const tagToGroupSlug = new Map<number, string>();
+        for (const g of tagGroups) {
+            for (const t of g.tags) tagToGroupSlug.set(t.id, g.slug);
         }
-        return result;
-    }, [events, activeTagIds]);
+        const groupBuckets = new Map<string, number[]>();
+        const ungrouped: number[] = [];
+        for (const id of activeTagIds) {
+            const slug = tagToGroupSlug.get(id);
+            if (!slug) { ungrouped.push(id); continue; }
+            const arr = groupBuckets.get(slug);
+            if (arr) arr.push(id);
+            else groupBuckets.set(slug, [id]);
+        }
+
+        return events.filter((e) => {
+            const tagSet = new Set((e.tags ?? []).map((t) => t.id));
+            for (const ids of groupBuckets.values()) {
+                if (!ids.some((id) => tagSet.has(id))) return false;
+            }
+            for (const id of ungrouped) {
+                if (!tagSet.has(id)) return false;
+            }
+            return true;
+        });
+    }, [events, activeTagIds, tagGroups]);
+
+    // Disjunctive facet counts.
+    //
+    // Filter semantics (must match `filteredEvents` above):
+    //   - Within a group: OR (event matches ANY selected tag in that group)
+    //   - Across groups: AND (every group with a selection must be satisfied)
+    //
+    // For each tag T in group G, the displayed count is the number of events
+    // that would match if the user *also* selected T — i.e., satisfying all
+    // OTHER groups' selections, plus containing T. Selections within G itself
+    // are intentionally ignored so siblings in a multi-select group don't
+    // suppress each other's counts (Algolia / Amazon convention).
+    const tagCountMap = useMemo(() => {
+        const map = new Map<number, number>();
+        if (!tagGroups.length) return map;
+
+        const tagToGroupSlug = new Map<number, string>();
+        for (const g of tagGroups) {
+            for (const t of g.tags) tagToGroupSlug.set(t.id, g.slug);
+        }
+
+        // Active tag IDs grouped by their group slug.
+        const activeByGroup = new Map<string, number[]>();
+        for (const id of activeTagIds) {
+            const slug = tagToGroupSlug.get(id);
+            if (!slug) continue;
+            const arr = activeByGroup.get(slug);
+            if (arr) arr.push(id);
+            else activeByGroup.set(slug, [id]);
+        }
+
+        const eventTagSets = events.map((e) => new Set((e.tags ?? []).map((t) => t.id)));
+
+        for (const g of tagGroups) {
+            // Each entry is one OTHER group's selected IDs; event must contain
+            // at least one ID from EACH such entry (OR within group, AND across).
+            const otherGroupBuckets: number[][] = [];
+            for (const [slug, ids] of activeByGroup) {
+                if (slug === g.slug) continue;
+                otherGroupBuckets.push(ids);
+            }
+            for (const t of g.tags) {
+                let count = 0;
+                for (const tagSet of eventTagSets) {
+                    if (!tagSet.has(t.id)) continue;
+                    let ok = true;
+                    for (const bucket of otherGroupBuckets) {
+                        if (!bucket.some((id) => tagSet.has(id))) { ok = false; break; }
+                    }
+                    if (ok) count++;
+                }
+                map.set(t.id, count);
+            }
+        }
+        return map;
+    }, [events, tagGroups, activeTagIds]);
 
     const handleDatesChange = useCallback((start: Date, end: Date) => {
         setVisibleRange((prev) => {
@@ -192,13 +316,19 @@ export default function Home() {
     const handleEditEvent = useCallback((evt: CalendarEvent) => {
         setSelectedEventRect(null);
         setSelectedEvent(null);
-        setEditingEvent(evt);
+        setEditingEventId(evt.event_id);
     }, []);
 
-    const handleEventSaved = useCallback((updated: CalendarEvent) => {
-        setEvents((prev) => prev.map((e) => (e.event_id === updated.event_id ? updated : e)));
-        setEditingEvent(null);
-    }, []);
+    const handleCloseEdit = useCallback(() => {
+        setEditingEventId(null);
+        // Refresh events list so any admin edits propagate to other surfaces.
+        const params = viewMode === 'explorer'
+            ? { startDate, endDate }
+            : visibleRange
+                ? { startDate: formatDate(visibleRange.start), endDate: formatDate(visibleRange.end) }
+                : { startDate, endDate };
+        fetchEvents(params).then(setEvents).catch(() => { });
+    }, [viewMode, startDate, endDate, visibleRange]);
 
     const handleBoundsChange = useCallback((bounds: MapBounds) => {
         setMapBounds(bounds);
@@ -235,6 +365,23 @@ export default function Home() {
 
     const calendarTitle = useMemo(() => {
         if (!visibleRange) return '';
+        const spanDays = (visibleRange.end.getTime() - visibleRange.start.getTime()) / (1000 * 60 * 60 * 24);
+        // Month view spans ~5-6 weeks (35-42 days). 3-week view spans 21 days.
+        if (spanDays <= 28) {
+            const start = visibleRange.start;
+            // FullCalendar's range end is exclusive; subtract one day for display.
+            const endInclusive = new Date(visibleRange.end.getTime() - 24 * 60 * 60 * 1000);
+            const sameYear = start.getFullYear() === endInclusive.getFullYear();
+            const sameMonth = sameYear && start.getMonth() === endInclusive.getMonth();
+            const startStr = start.toLocaleDateString('en-US', sameMonth
+                ? { month: 'short', day: 'numeric' }
+                : { month: 'short', day: 'numeric' });
+            const endStr = endInclusive.toLocaleDateString('en-US', sameYear
+                ? { month: sameMonth ? undefined : 'short', day: 'numeric' }
+                : { month: 'short', day: 'numeric', year: 'numeric' });
+            const yearSuffix = sameYear ? `, ${endInclusive.getFullYear()}` : '';
+            return `${startStr} – ${endStr}${yearSuffix}`;
+        }
         const mid = new Date((visibleRange.start.getTime() + visibleRange.end.getTime()) / 2);
         return mid.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     }, [visibleRange]);
@@ -260,10 +407,10 @@ export default function Home() {
                                 </Link>
                             </div>
                             <div className="flex gap-1 bg-slate-200 p-1 shrink-0 w-fit">
-                                <SavedEventsFab />
+                                <MineButton />
                                 <button
                                     onClick={() => setShowSuggestModal(true)}
-                                    className="px-3 py-1 text-sm transition bg-white text-slate-900 font-medium shadow-sm hover:bg-slate-50"
+                                    className="hidden sm:inline-flex px-3 py-1 text-sm transition bg-white text-slate-900 font-medium shadow-sm hover:bg-slate-50"
                                 >
                                     <span className="sm:hidden">Submit</span>
                                     <span className="hidden sm:inline">Submit Event</span>
@@ -293,6 +440,8 @@ export default function Home() {
                                     activeTagIds={activeTagIds}
                                     onToggle={handleToggleTag}
                                     onClear={handleClearTags}
+                                    countOverrides={tagCountMap}
+                                    sortMode={tagSortMode}
                                 />
                             )}
                             {/* Event list: hidden on mobile until after map, fills remaining height on desktop */}
@@ -308,11 +457,12 @@ export default function Home() {
                                     onSortChange={setSortBy}
                                     hoveredEventId={hoveredEventId}
                                     onEventHover={handleEventHover}
+                                    onSuggestEvent={() => setShowSuggestModal(true)}
                                 />
                             </div>
                         </div>
                         {/* Map: order-2 on mobile, right column on desktop */}
-                        <div className="order-2 lg:order-2 h-[250px] lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
+                        <div className="order-2 lg:order-2 h-[180px] lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
                             <EventMap
                                 events={filteredEvents}
                                 onEventClick={handleExplorerMapEventClick}
@@ -335,6 +485,7 @@ export default function Home() {
                                 onSortChange={setSortBy}
                                 hoveredEventId={hoveredEventId}
                                 onEventHover={handleEventHover}
+                                onSuggestEvent={() => setShowSuggestModal(true)}
                             />
                         </div>
                     </div>
@@ -363,8 +514,26 @@ export default function Home() {
                                     <button className="px-2.5 py-1 text-sm border-y border-slate-300 bg-white hover:bg-slate-50" onClick={handleCalToday}>today</button>
                                     <button className="px-2 py-1 text-sm border border-slate-300 bg-white hover:bg-slate-50" onClick={handleCalNext}>›</button>
                                 </div>
-                                <h2 className="text-lg font-semibold text-slate-800">{calendarTitle}</h2>
+                                <h2 className="text-sm sm:text-lg font-semibold text-slate-800 whitespace-nowrap">{calendarTitle}</h2>
                             </div>
+                            {isMobileViewport && (
+                                <div className="flex gap-1 bg-slate-200 p-1 shrink-0 sm:hidden">
+                                    <button
+                                        className={`px-2 py-1 text-xs font-medium transition ${mobileCalendarView === '3week' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        onClick={() => setMobileCalendarView('3week')}
+                                        aria-pressed={mobileCalendarView === '3week'}
+                                    >
+                                        3 wk
+                                    </button>
+                                    <button
+                                        className={`px-2 py-1 text-xs font-medium transition ${mobileCalendarView === 'month' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                        onClick={() => setMobileCalendarView('month')}
+                                        aria-pressed={mobileCalendarView === 'month'}
+                                    >
+                                        Month
+                                    </button>
+                                </div>
+                            )}
                         </div>
                         {tagGroups.length > 0 && (
                             <div className="mb-4">
@@ -373,6 +542,8 @@ export default function Home() {
                                     activeTagIds={activeTagIds}
                                     onToggle={handleToggleTag}
                                     onClear={handleClearTags}
+                                    countOverrides={tagCountMap}
+                                    sortMode={tagSortMode}
                                 />
                             </div>
                         )}
@@ -388,6 +559,7 @@ export default function Home() {
                                     hoveredEventId={hoveredEventId}
                                     onEventHover={handleEventHover}
                                     offMapEventIds={offMapEventIds}
+                                    viewMode={calendarViewMode}
                                 />
                             </div>
                             {showCalendarMap && (
@@ -420,7 +592,7 @@ export default function Home() {
                 <EventModal
                     event={selectedEvent}
                     onClose={handleCloseModal}
-                    onEdit={user ? handleEditEvent : undefined}
+                    onEdit={user?.is_admin ? handleEditEvent : undefined}
                     source={selectedEventSource ?? undefined}
                 />
             )}
@@ -430,18 +602,15 @@ export default function Home() {
                     event={selectedEvent}
                     anchorRect={selectedEventRect}
                     onClose={handleCloseModal}
-                    onEdit={user ? handleEditEvent : undefined}
+                    onEdit={user?.is_admin ? handleEditEvent : undefined}
                     source={selectedEventSource ?? undefined}
                 />
             )}
 
-            {editingEvent && (
-                <EventEditModal
-                    event={editingEvent}
-                    onClose={() => setEditingEvent(null)}
-                    onSaved={handleEventSaved}
-                />
-            )}
+            <AdminEventDetailPanel
+                eventId={editingEventId}
+                onClose={handleCloseEdit}
+            />
             {showSuggestModal && (
                 <SuggestEventModal onClose={() => setShowSuggestModal(false)} />
             )}

@@ -8,7 +8,6 @@ interface Props {
     event: CalendarEvent;
     onClose?: () => void;
     onEdit?: (event: CalendarEvent) => void;
-    compact?: boolean;
     surface?: 'plain' | 'card';
     className?: string;
     bodyClassName?: string;
@@ -20,7 +19,6 @@ export default function EventDetailsPanel({
     event,
     onClose,
     onEdit,
-    compact = false,
     surface = 'card',
     className = '',
     bodyClassName = '',
@@ -59,7 +57,7 @@ export default function EventDetailsPanel({
                 </div>
             </div>
             <div className={`modal-scroll overflow-y-auto overscroll-contain px-6 py-4 ${bodyClassName}`.trim()}>
-                <EventDetailContent event={event} onEdit={onEdit} compact={compact} />
+                <EventDetailContent event={event} onEdit={onEdit} compact={true} />
             </div>
         </div>
     );

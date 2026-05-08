@@ -1,158 +1,139 @@
 # Development Workflow
 
-This document describes the CI/CD workflow for the Movida project.
+This document describes the full workflow for the Movida project — from local development to cloud production.
 
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
 - [Quick Start](#quick-start)
 - [Environment Overview](#environment-overview)
+- [Env & Secrets Files](#env--secrets-files)
 - [Daily Development Workflow](#daily-development-workflow)
 - [Branching Strategy](#branching-strategy)
 - [Deployment](#deployment)
+  - [Staging Local](#staging-local-docker-compose)
+  - [Staging Remote](#staging-remote-fly--neon--cloudflare)
+  - [Production Remote](#production-remote-fly--neon--cloudflare)
 - [Scenario Environment](#scenario-environment)
 - [Testing](#testing)
+- [Performance Testing](#performance-testing)
 - [Safety Features](#safety-features)
 - [Task Commands Reference](#task-commands-reference)
+- [Port Reference](#port-reference)
+- [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Prerequisites
 
-Install these tools before starting:
-
 ```bash
 # macOS
 brew install go-task/tap/go-task  # Taskfile runner
-brew install gh                    # GitHub CLI
-brew install act                   # Local CI runner (optional)
+brew install flyctl               # Fly.io CLI
+brew install gh                   # GitHub CLI
+brew install act                  # Local CI runner (optional)
 
-# Verify installations
-task --version
-gh --version
-docker --version
+# Verify
+task --version && fly version && gh --version && docker --version
 ```
+
+---
 
 ## Quick Start
 
 ```bash
-# 1. Clone the repository
 git clone <repository-url>
 cd salsa-events-calendar
-
-# 2. Install dependencies
-task install
-
-# 3. Start development environment
-task start:dev:debug
-
-# 4. Open in browser
-# Frontend: http://localhost:5173
-# Backend:  http://localhost:8001/docs
+task install          # install Python venv + npm deps
+task start:dev        # DB + backend (--reload) + frontend (vite)
 ```
+
+- Frontend: <http://localhost:5173\>
+- Backend: <http://localhost:8001/docs\>
+- Umami: <http://localhost:3100\>
 
 ---
 
 ## Environment Overview
 
-| Environment | Purpose | Database Port | Backend Port | Frontend Port |
-|-------------|---------|---------------|--------------|---------------|
-| **Dev** | Local development with VSCode debugging | 5434 | 8001 | 5173 |
-| **Staging** | Containerized integration environment | 5436 | 8002 | 3001 |
-| **Scenario** | Isolated manual testing with scenario data | 5437+ | 8003+ | 3002+ |
-| **Prod** | Production (local or cloud) | 5438 | 8080 | 3000 |
+| Environment | Purpose | DB | Backend | Frontend |
+|-------------|---------|------|---------|----------|
+| **dev** | Local development, hot-reload | localhost:5434 | localhost:8001 | localhost:5173 |
+| **staging:local** | Docker-compose integration test | localhost:5436 | localhost:8002 | localhost:3001 |
+| **staging:remote** | Cloud staging (Fly.io + Neon + Cloudflare) | Neon develop | movida-staging.fly.dev | develop.joinmovida.com (alias: develop.movida.pages.dev) |
+| **prod:remote** | Cloud production | Neon main | movida.fly.dev | joinmovida.com (alias: movida.pages.dev) |
+| **scenario** | Isolated manual QA with seeded data | localhost:5437+ | localhost:8003+ | localhost:3002+ |
 
-> **Scenario ports** are per-instance. The default instance uses 5437/8003/3002. Each named scenario gets a deterministic offset (hash-based). See [Scenario Port Allocation](#scenario-port-allocation) for details.
+---
 
-### Dev Environment
+## Env & Secrets Files
 
-- **Database**: Docker container (PostgreSQL 16)
-- **Backend**: Local Python process (debuggable via debugpy)
-- **Frontend**: Vite dev server (hot reload)
+Each environment tier loads exactly its own files — no file appears in two tiers.
 
-### Staging Environment
+| File | Committed | Loaded by |
+|------|-----------|-----------|
+| `secrets.env` | no | all tasks (shared base: Cloudflare creds, Google SA file) |
+| `secrets.dev.env` | no | dev tasks |
+| `.env.dev` | yes | dev tasks (non-secret: ports, DB name) |
+| `.env.staging.local` | yes | `staging:local` tasks only — `DATABASE_URL` → localhost:5436 |
+| `secrets.staging.remote.env` | no | `staging:remote` tasks only — `DATABASE_URL` → Neon develop |
+| `secrets.prod.env` | no | `prod:remote` tasks |
+| `.env.prod` | yes | prod tasks (non-secret) |
+| `secrets.scenario.env` | no | scenario tasks |
+| `.env.scenario` | yes | scenario tasks |
 
-- Fully containerized (Docker Compose)
-- Built from `develop` branch
-- Uses `:develop` tagged images
-
-### Scenario Environment
-
-- Isolated full stack for manual scenario testing
-- Default mode: local code + Docker DB + live reload (like dev)
-- Optional `:ref` mode: all-Docker from any git ref, tag, or branch
-- Supports scenario data overlays (custom YAML seed folders)
-- **Multi-instance**: run multiple scenarios simultaneously with `SCENARIO=<name>`
-
-### Prod Environment
-
-- Fully containerized (Docker Compose)
-- Built from `main` branch with semantic version tags
-- Uses versioned images (e.g., `:v1.2.0`)
+> **Rule:** `DATABASE_URL` is never shared between local and remote staging.
+> Local tasks read it from `.env.staging.local` (localhost). Remote tasks read it from `secrets.staging.remote.env` (Neon).
 
 ---
 
 ## Daily Development Workflow
 
-### 1. Start Your Day
+### 1. Start your day
 
 ```bash
-# Update develop branch
-git checkout develop
-git pull origin develop
-
-# Create feature branch
+git checkout develop && git pull origin develop
 task git:feature -- my-feature-name
 ```
 
-### 2. Start Development Environment
+### 2. Start development environment
 
 ```bash
-# Start database + backend (with debugger) + frontend
-task start:dev:debug
+task start:dev          # DB + backend (reload) + frontend
+task start:dev:debug    # same + debugpy on port 5678
+task start:dev:mock     # same but with mock calendar (no Google creds needed)
 ```
 
-Services running:
+Add `BROWSERS=N` to any `start:*` command that opens a browser to control how many browser instances open. `BROWSERS=0` (default) reuses your existing Chrome window; `BROWSERS=N` opens N fresh, fully-isolated Chrome sessions (separate cookie jar and localStorage — useful for testing multi-user flows):
 
-- Frontend: <http://localhost:5173>
-- Backend API: <http://localhost:8001>
-- Swagger Docs: <http://localhost:8001/docs>
-- Debugger: Port 5678 (attach from VSCode)
+```bash
+task start:dev BROWSERS=1          # one fresh isolated session
+task start:dev BROWSERS=3          # three isolated sessions at once
+SCENARIO=share-im-going task start:scenario BROWSERS=2
+```
 
 ### 3. Attach VSCode Debugger
 
-1. Press `F5` in VSCode
-2. Select **"Backend: Attach"** or **"Full Stack Debug"**
-3. Set breakpoints and debug!
+Press `F5` → select **"Backend: Attach"** or **"Full Stack Debug"**.
 
 ### 4. Run Tests
 
 ```bash
-# Quick unit tests
-task test
-
-# Backend only
-task test:unit:backend
-
-# Frontend type check
-task test:unit:frontend
+task test               # quick unit tests
+task test:unit:backend  # backend only
+task test:unit:frontend # frontend type check + build
 ```
 
 ### 5. Commit and Create PR
 
 ```bash
-# Commit your changes
-git add .
-git commit -m "feat: add my feature"
-
-# Push and create draft PR (auto-detects target: develop or main for hotfix/*)
-task git:pr
+git add . && git commit -m "feat: my feature"
+task git:pr             # push + open draft PR (auto-detects target branch)
 ```
 
-### 6. End of Day
+### 6. End of day
 
 ```bash
-# Stop services
 task stop:dev
 ```
 
@@ -162,345 +143,421 @@ task stop:dev
 
 ```
 main (production)
-├── hotfix/critical-bug     → Direct PR to main
-│
+└── hotfix/*     → PR directly to main
+
 develop (integration)
-├── feature/new-feature     → PR to develop
-├── fix/bug-fix             → PR to develop
+├── feature/*    → PR to develop
+└── fix/*        → PR to develop
 ```
 
-### Branch Types
-
-| Type | Base | Purpose | Command |
-|------|------|---------|---------|
-| `feature/*` | develop | New features | `task git:feature -- <name>` |
-| `fix/*` | develop | Bug fixes | `task git:fix -- <name>` |
-| `hotfix/*` | main | Critical prod fixes | `task git:hotfix -- <name>` |
-
-### Pull Request Flow
-
-```bash
-# Create feature branch
-task git:feature -- my-feature
-
-# ... make changes ...
-
-# Create draft PR (auto-detects target)
-task git:pr
-
-# When ready for review
-task git:pr:ready
-
-# View PR status
-task git:pr:checks
-
-# After approval, merge (shows next steps)
-task git:pr:merge
-```
+| Type | Base | Command |
+|------|------|---------|
+| `feature/*` | develop | `task git:feature -- <name>` |
+| `fix/*` | develop | `task git:fix -- <name>` |
+| `hotfix/*` | main | `task git:hotfix -- <name>` |
 
 ---
 
 ## Deployment
 
-### Deploy to Staging
+### Staging Local (docker-compose)
+
+Validates the Docker images in a fully containerised stack before pushing to cloud.
 
 ```bash
-# Build and deploy to staging
-task deploy:staging
+task deploy:staging:local                    # build from develop branch
+task deploy:staging:local:ref -- feature/x  # build from any git ref
+task deploy:staging:local:dirty             # build from working directory (uncommitted)
 
-# Preview without executing
-DRY_RUN=1 task deploy:staging
+DRY_RUN=1 task deploy:staging:local        # preview without executing
 ```
 
-This will:
+Env files loaded: `secrets.env` + `.env.staging.local`
 
-1. Build Docker images from develop (via git worktree)
-2. Tag images as `:develop`
-3. Start the staging stack on ports 8002/3001
+---
 
-Access: <http://localhost:3001>
+### Staging Remote (Fly + Neon + Cloudflare)
 
-You can also deploy from any git ref or your working directory:
+**Full deploy (all three components in sequence):**
 
 ```bash
-# Deploy from a specific branch/tag
-task deploy:staging:ref -- feature/my-branch
-
-# Deploy from uncommitted working directory
-task deploy:staging:dirty
+task deploy:staging:remote
 ```
 
-### Deploy to Production
+**Deploy only one component:**
 
 ```bash
-# 1. Create release PR (develop → main)
-task git:release:prepare
+task deploy:staging:remote:db        # alembic migrations → Neon develop branch
+task deploy:staging:remote:backend   # stage Fly secrets + fly deploy + smoke test
+task deploy:staging:remote:frontend  # build frontend + wrangler pages deploy --branch=develop
+```
 
-# 2. Mark it ready for review
-task git:release:ready
+Env files loaded: `secrets.env` + `secrets.staging.remote.env`
 
-# 3. Merge the release PR
-task git:release:merge
+What `backend:staging:remote` does:
+1. `fly secrets import -c config/fly.staging.toml --stage` (filtered: no `VITE_*`, no `CLOUDFLARE_*`)
+2. `fly secrets set --stage GOOGLE_SERVICE_ACCOUNT_JSON=...`
+3. `fly deploy --remote-only -c config/fly.staging.toml` (staged secrets + code applied atomically)
+4. Smoke test: `GET https://movida-staging.fly.dev/health`
 
-# 4. Tag the release on main
+URLs after deploy:
+- Backend: <https://movida-staging.fly.dev\>
+- Frontend: <https://develop.joinmovida.com\> (alias: <https://develop.movida.pages.dev\>)
+
+Verify:
+```bash
+task db:check:staging:remote    # migration state on Neon develop
+task logs:staging:remote        # fly logs stream
+task fly:staging:status         # machine status
+```
+
+---
+
+### Production Remote (Fly + Neon + Cloudflare)
+
+**Full deploy (prompts for confirmation):**
+
+```bash
+task deploy:prod:remote
+```
+
+**Deploy only one component:**
+
+```bash
+task deploy:prod:remote:db        # alembic migrations → Neon main branch
+task deploy:prod:remote:backend   # stage Fly secrets + fly deploy + smoke test
+task deploy:prod:remote:frontend  # build frontend + wrangler pages deploy --branch=main
+```
+
+Env files loaded: `secrets.env` + `secrets.prod.env` + `.env.prod`
+
+URLs after deploy:
+- Backend: <https://movida.fly.dev\>
+- Frontend: <https://joinmovida.com\> (alias: <https://movida.pages.dev\>)
+
+Verify:
+```bash
+task db:check:prod
+task fly:logs
+task fly:status
+```
+
+**Release flow (local prod via docker-compose):**
+
+```bash
+task git:release:prepare    # create develop → main PR
+task git:release:ready      # mark ready for review
+task git:release:merge      # merge
 task git:release:tag -- v1.2.0
-
-# 5. Deploy the tagged version
-task deploy:prod -- v1.2.0
+task deploy:prod -- v1.2.0  # docker-compose local prod
 ```
-
-Or use the combo command:
-
-```bash
-task release -- v1.2.0
-```
-
-Access: <http://localhost:3000>
 
 ---
 
 ## Scenario Environment
 
-The scenario environment lets you spin up an isolated full stack, seed it with scenario-specific test data, and manually verify features.
+Isolated full stack with per-scenario seeded data. Useful for manual QA, demos, and feature validation without touching dev or staging.
 
-### Scenario Folders
+### Scenario folder structure
 
 ```
 scenarios/<name>/
 ├── config.yaml           # Required: calendar_service (google|mock)
-├── calendars.yaml        # Optional: calendar settings
-├── mock-sync-events.yaml # Optional: events served by MockCalendarService during sync
-├── db-events.yaml        # Optional: events pre-seeded directly into DB (before sync fires)
+├── calendars.yaml        # Optional
+├── events.yaml           # Optional: events pre-seeded into DB
 └── secrets.env           # Optional: per-scenario secret overrides (gitignored)
-```
-
-### Default Mode (Local Code + Live Reload)
-
-```bash
-# Default instance (ports 5437/8003/3002)
-task start:scenario
-
-# Named scenario — gets its own DB, ports, and containers
-task start:scenario SCENARIO=my-test
-
-# Run a second scenario simultaneously
-task start:scenario SCENARIO=another-test
-```
-
-### Docker Mode (From Git Ref)
-
-```bash
-# From a branch
-task start:scenario:ref -- feature/new-feature
-
-# From a branch with a named scenario
-task start:scenario:ref -- feature/new-feature SCENARIO=my-test
 ```
 
 ### Lifecycle
 
 ```bash
-# Tail logs
-task logs:scenario SCENARIO=my-test
+task start:scenario                                       # default scenario (local code + Docker DB)
+SCENARIO=locations-map task start:scenario                # named scenario (own DB + ports)
+SCENARIO=share-im-going task start:scenario BROWSERS=1    # open one fresh isolated Chrome session
+SCENARIO=share-im-going task start:scenario BROWSERS=2    # open two isolated sessions (multi-user)
 
-# Re-seed
-task db:seed:scenario SCENARIO=my-test
+# From a git ref (all-Docker)
+task start:scenario:ref -- feature/my-branch
 
-# Full reset
-task db:reset:scenario SCENARIO=my-test
+# DB operations
+SCENARIO=locations-map task db:seed:scenario
+SCENARIO=locations-map task db:reset:scenario
 
-# Stop one instance
-task stop:scenario SCENARIO=my-test
-
-# Stop ALL instances
+# Logs & teardown
+SCENARIO=locations-map task logs:scenario
+SCENARIO=locations-map task stop:scenario
 task stop:scenario:all
 ```
 
-### Scenario Port Allocation
-
-Each scenario gets a **deterministic port offset** from a hash of its name, added to the base ports (DB=5437, API=8003, WEB=3002).
-
-Run `task scenarios` to see all current assignments.
+Ports are deterministic per scenario name. Run `task scenarios` to see all assignments.
 
 ---
 
 ## Testing
 
-### Unit Tests
-
 ```bash
-task test               # All unit tests
-task test:unit:backend  # Backend only
-task test:unit:frontend # Frontend type check + build
+task test               # unit tests (fast)
+task test:unit:backend  # backend unit + API tests
+task test:unit:frontend # frontend type check + build
+task test:int           # integration tests (requires task db:setup:integ first)
+task test:int:full      # setup → test in one command
+task test:all           # unit + integration
+task test:ci            # simulate CI locally via Act
 ```
 
-### Integration Tests
+---
+
+## Performance Testing
+
+Load tests are written in [k6](https://k6.io) and live under `perf/k6/`.
+Profiles live in `perf/k6/profiles/*.env`. Per-developer tweaks go in a sibling `*.override.env` (gitignored), and ad-hoc CLI envs (e.g. `VUS=10 task perf:staging`) win over both.
 
 ```bash
-# Setup integration DB (one-time)
-task db:setup:integ
-
-# Run integration tests
-task test:int
-
-# Full cycle (setup → test)
-task test:int:full
+brew install k6
+task perf:check            # verify k6 is installed
 ```
 
-### All Tests
+### Layout
 
-```bash
-task test:all           # unit → integration
+```
+perf/
+├── k6/
+│   ├── main.js                 # browse_events + sitemap_seo scenarios
+│   └── profiles/
+│       ├── dev.env             # localhost:8001
+│       ├── perf.env            # perf scenario (BASE_URL auto-injected)
+│       ├── staging.env         # https://api-develop.joinmovida.com
+│       └── prod.env            # https://api.joinmovida.com (smoke only)
+└── results/                    # summary-*.html / summary-*.json
 ```
 
-### CI Simulation
+### Recommended local workflow (perf scenario)
+
+The perf scenario is just another entry under `scenarios/` — it reuses the
+standard scenario harness for an isolated DB, deterministic ports, mock
+calendar, seeded events, and a rate-limit kill switch (`RATE_LIMIT_ENABLED=false`
+in [scenarios/perf/config.env](scenarios/perf/config.env)).
 
 ```bash
-task test:ci            # Simulate CI locally via Act
+# terminal 1 — boot the perf scenario (foreground, blocking)
+task perf:scenario:up
+
+# terminal 2 — run k6 (auto-derives BASE_URL from .taskfiles/.scenario-state/perf.env)
+task perf:run
+task perf:report           # open the HTML summary in your browser
+
+# terminal 1 — Ctrl-C, then drop the DB:
+task perf:scenario:down
+```
+
+### Other targets
+
+| Command | Description |
+|---------|-------------|
+| `task perf:dev` | Run against an ad-hoc dev backend (`localhost:8001`). |
+| `task perf:staging` | Run against remote staging (`https://api-develop.joinmovida.com`, 15 VUs × 5m). Staging is rate-limited unless `RATE_LIMIT_ENABLED=false` is set on the Fly app, so expect 429s in default profile. |
+| `task perf:prod:smoke` | Read-only smoke against production (5 VUs × 2m). |
+| `task perf:scenario:logs` | Tail the perf scenario backend logs. |
+| `task perf:report` | Open `perf/results/summary-latest.html`. |
+| `task perf:clean` | Remove old summary files. |
+
+### Overriding BASE_URL or VUs
+
+Three precedence levels (each wins over the previous):
+
+1. Committed profile: `perf/k6/profiles/<profile>.env`
+2. Per-developer overrides: `perf/k6/profiles/<profile>.override.env` (gitignored)
+3. CLI envs: `VUS=15 DURATION=2m KILL_LIMITER=1 task perf:staging`
+
+Supported CLI overrides: `VUS`, `DURATION`, `RAMP`, `THINK_MIN`, `THINK_MAX`, `BASE_URL`.
+
+```bash
+# Quick ad-hoc tweak (no file edits):
+VUS=15 DURATION=2m KILL_LIMITER=1 task perf:staging
+
+# Persistent personal override:
+cat > perf/k6/profiles/staging.override.env <<'EOF'
+VUS=5
+DURATION=1m
+EOF
+task perf:staging
 ```
 
 ---
 
 ## Safety Features
 
-### DRY_RUN=1
-
-All destructive operations support `DRY_RUN=1`:
+All destructive operations support `DRY_RUN=1` to preview without executing:
 
 ```bash
+DRY_RUN=1 task deploy:staging:local
 DRY_RUN=1 task db:reset:dev
-DRY_RUN=1 task deploy:staging
-DRY_RUN=1 task deploy:prod -- v1.0.0
 DRY_RUN=1 task stop:dev:volumes
 ```
 
-### Confirmation Prompts
-
-Destructive tasks require interactive confirmation:
-
-- All `db:reset:*` tasks
-- All `stop:*:volumes` tasks
+Tasks that prompt for confirmation before executing:
+- All `db:reset:*`
+- All `stop:*:volumes`
+- `deploy:prod:remote`
 - `deploy:prod`
-- `stop:scenario` and `stop:scenario:all`
+- `stop:scenario`, `stop:scenario:all`
 
 ---
 
 ## Task Commands Reference
 
-### Branching (git:*)
-
-| Command | Description |
-|---------|-------------|
-| `task git:feature -- <name>` | Create feature branch from develop |
-| `task git:fix -- <name>` | Create fix branch from develop |
-| `task git:hotfix -- <name>` | Create hotfix branch from main |
-
-### Pull Requests (git:pr:*)
-
-| Command | Description |
-|---------|-------------|
-| `task git:pr` | Push and create draft PR (auto-detects target) |
-| `task git:pr:publish` | Push and create ready PR |
-| `task git:pr:ready` | Mark draft as ready for review |
-| `task git:pr:checks` | Show CI status |
-| `task git:pr:merge` | Squash and merge (shows next steps) |
-| `task git:pr:view` | Open PR in browser |
-
-### Release (git:release:*)
-
-| Command | Description |
-|---------|-------------|
-| `task git:release:prepare` | Create release PR (develop → main) |
-| `task git:release:ready` | Mark release PR as ready |
-| `task git:release:merge` | Merge release PR (shows next steps) |
-| `task git:release:tag -- v1.0.0` | Tag release on main |
-| `task git:tags` | List all release tags |
-| `task release -- v1.0.0` | Combo: tag + deploy to prod |
-
 ### Development
 
 | Command | Description |
 |---------|-------------|
-| `task start:dev` | Start full dev environment (DB + backend + frontend) |
-| `task start:dev:debug` | Start full stack with debugging (port 5678) |
-| `task start:dev:mock` | Start with mock calendar (no Google creds) |
-| `task start:dev:db` | Start dev database only |
-| `task start:dev:backend` | Start backend only |
-| `task start:dev:backend:debug` | Start backend with debugger |
-| `task start:dev:frontend` | Start frontend only |
+| `task start:dev` | DB + backend (reload) + frontend |
+| `task start:dev BROWSERS=1` | Same, opens one fresh isolated Chrome session |
+| `task start:dev BROWSERS=N` | Same, opens N fresh isolated Chrome sessions |
+| `task start:dev:debug` | Same + debugpy on port 5678 |
+| `task start:dev:mock` | Same with mock calendar (no Google creds) |
+| `task start:dev:db` | Dev database only |
+| `task start:dev:backend` | Backend only |
+| `task start:dev:frontend` | Frontend only |
 | `task stop:dev` | Stop all dev services |
+| `task stop:dev:volumes` | Stop dev + destroy DB data ⚠️ |
 
-### Staging
+### Deploy — Staging Remote (atomic)
 
 | Command | Description |
 |---------|-------------|
-| `task deploy:staging` | Build from develop + deploy |
-| `task deploy:staging:ref -- <ref>` | Build from git ref + deploy |
-| `task deploy:staging:dirty` | Build from working directory + deploy |
-| `task start:staging` | Start staging (existing images) |
-| `task stop:staging` | Stop staging stack |
+| `task deploy:staging:remote:db` | Alembic migrations → Neon develop |
+| `task deploy:staging:remote:backend` | Stage secrets + fly deploy + smoke test |
+| `task deploy:staging:remote:frontend` | Build + wrangler pages deploy --branch=develop |
+| `task deploy:staging:remote` | All three in sequence |
+
+### Deploy — Prod Remote (atomic)
+
+| Command | Description |
+|---------|-------------|
+| `task deploy:prod:remote:db` | Alembic migrations → Neon main |
+| `task deploy:prod:remote:backend` | Stage secrets + fly deploy + smoke test |
+| `task deploy:prod:remote:frontend` | Build + wrangler pages deploy --branch=main |
+| `task deploy:prod:remote` | All three in sequence (prompts) |
+
+### Deploy — Staging Local (docker-compose)
+
+| Command | Description |
+|---------|-------------|
+| `task deploy:staging:local` | Build from develop + docker-compose up |
+| `task deploy:staging:local:ref -- <ref>` | Build from git ref + docker-compose up |
+| `task deploy:staging:local:dirty` | Build from working directory + docker-compose up |
+| `task start:staging:local BROWSERS=1` | Same, opens one fresh isolated Chrome session |
+| `task start:staging:local BROWSERS=N` | Same, opens N fresh isolated Chrome sessions |
+| `task start:staging:local` | Start staging with existing images |
+| `task stop:staging:local` | Stop staging stack |
+| `task stop:staging:local:volumes` | Stop + destroy data ⚠️ |
+
+### Database
+
+| Command | Description |
+|---------|-------------|
+| `task db:migrate` | Dev — alembic upgrade head |
+| `task db:migrate:staging:local` | Local staging DB |
+| `task db:migrate:staging:remote` | Neon develop branch |
+| `task db:migrate:prod` | Neon main branch |
+| `task db:seed` | Seed dev DB |
+| `task db:seed:staging:local` | Seed local staging DB |
+| `task db:seed:staging:remote` | Seed Neon staging (prompts) |
+| `task db:seed:prod` | Seed Neon prod (prompts) |
+| `task db:check:dev` | Connectivity + migration state |
+| `task db:check:staging:local` | Local staging |
+| `task db:check:staging:remote` | Neon develop |
+| `task db:check:prod` | Neon main |
+| `task db:reset:dev` | Drop + remigrate + reseed dev ⚠️ |
+| `task db:reset:staging:local` | Local staging ⚠️ |
+| `task db:reset:staging:remote` | Neon develop ⚠️ |
+| `task db:reset:prod` | Neon main 🚨 |
+| `task db:status:dev` | Alembic current/history |
+| `task db:status:staging:remote` | Neon develop |
+| `task db:status:prod` | Neon main |
+
+### Fly.io Operations
+
+| Command | Description |
+|---------|-------------|
+| `task fly:status` | Prod machine status |
+| `task fly:logs` | Stream prod logs |
+| `task fly:ssh` | SSH into prod machine |
+| `task fly:secrets` | Push secrets to prod Fly (standalone) |
+| `task fly:secrets:list` | List prod secret names |
+| `task fly:staging:status` | Staging machine status |
+| `task fly:staging:logs` | Stream staging logs |
+| `task fly:staging:ssh` | SSH into staging machine |
+| `task fly:staging:secrets` | Push secrets to staging Fly (standalone) |
+| `task fly:staging:secrets:list` | List staging secret names |
 
 ### Scenario
 
 | Command | Description |
 |---------|-------------|
 | `task start:scenario` | Local code + Docker DB + live reload |
-| `task start:scenario:ref -- <ref>` | Build from git ref + deploy all-Docker |
-| `task stop:scenario` | Stop one scenario instance |
-| `task stop:scenario:all` | Stop ALL running scenario instances |
-| `task db:seed:scenario` | Seed scenario database |
-| `task db:reset:scenario` | Reset scenario database |
+| `task start:scenario BROWSERS=1` | Same, opens one fresh isolated Chrome session |
+| `task start:scenario BROWSERS=N` | Same, opens N fresh isolated Chrome sessions |
+| `task start:scenario:ref -- <ref>` | All-Docker from git ref |
+| `task stop:scenario` | Stop one scenario |
+| `task stop:scenario:all` | Stop all running scenarios |
+| `task db:seed:scenario` | Seed scenario DB |
+| `task db:reset:scenario` | Reset scenario DB ⚠️ |
 | `task logs:scenario` | Tail scenario logs |
 
-All scenario commands accept `SCENARIO=<name>` to target a specific instance.
+All scenario commands accept `SCENARIO=<name>`.
 
-### Production
-
-| Command | Description |
-|---------|-------------|
-| `task deploy:prod -- v1.2.0` | Deploy to local prod |
-| `task start:prod` | Start prod (existing images) |
-| `task stop:prod` | Stop prod stack |
-
-### Database
+### Git & Release
 
 | Command | Description |
 |---------|-------------|
-| `task db:migrate` | Run migrations (dev) |
-| `task db:migrate:staging` | Run migrations on staging |
-| `task db:migrate:prod` | Run migrations on prod |
-| `task db:seed` | Seed dev database |
-| `task db:seed:staging` | Seed staging database |
-| `task db:reset:dev` | ⚠️ Reset dev database (`DRY_RUN=1` to preview) |
-| `task db:reset:staging` | ⚠️ Reset staging database |
-| `task db:reset:prod` | 🚨 Reset prod database |
-| `task db:status:dev` | Show migration status |
-| `task db:check:dev` | Validate migration health |
+| `task git:feature -- <name>` | Create feature branch from develop |
+| `task git:fix -- <name>` | Create fix branch from develop |
+| `task git:hotfix -- <name>` | Create hotfix branch from main |
+| `task git:pr` | Push + create draft PR |
+| `task git:pr:ready` | Mark draft as ready |
+| `task git:pr:checks` | Show CI status |
+| `task git:pr:merge` | Squash merge |
+| `task git:release:prepare` | Create develop → main release PR |
+| `task git:release:tag -- v1.0.0` | Tag release on main |
+| `task release -- v1.0.0` | Tag + local prod deploy |
 
 ### Build
 
 | Command | Description |
 |---------|-------------|
 | `task build:staging` | Build images from develop |
-| `task build:prod -- v1.0.0` | Build images from main |
+| `task build:prod -- v1.0.0` | Build from main |
 | `task build:ref -- <ref>` | Build from any git ref |
 | `task build:dirty` | Build from working directory |
-| `task build:list` | List all Docker images |
-| `task build:clean` | Remove old/dangling images |
-| `task build:clean:all` | ⚠️ Remove ALL images |
+| `task build:list` | List Docker images |
+| `task build:clean` | Remove old images |
 
 ### Testing
 
 | Command | Description |
 |---------|-------------|
 | `task test` | Quick unit tests |
-| `task test:unit` | Full unit test suite (backend + frontend) |
-| `task test:unit:backend` | Backend unit + API tests |
-| `task test:unit:frontend` | Frontend type check + build |
+| `task test:unit` | Full unit suite |
 | `task test:int` | Integration tests |
-| `task test:int:full` | Full cycle (setup → test) |
-| `task test:all` | All tests (unit + integration) |
-| `task test:ci` | Simulate CI locally via Act |
+| `task test:int:full` | Setup + integration |
+| `task test:all` | All tests |
+| `task test:ci` | Simulate CI via Act |
+
+### Performance (k6)
+
+| Command | Description |
+|---------|-------------|
+| `task perf:check` | Verify k6 is installed |
+| `task perf:scenario:up` | Start the perf scenario (delegates to `start:scenario SCENARIO=perf`) |
+| `task perf:scenario:down` | Stop perf scenario, drop DB |
+| `task perf:scenario:logs` | Tail perf scenario logs |
+| `task perf:run` | Run k6 against the running perf scenario (auto-port) |
+| `task perf:dev` | Run k6 against `localhost:8001` |
+| `task perf:staging` | Run k6 against remote staging |
+| `task perf:prod:smoke` | Read-only smoke against prod (5 VUs × 2m) |
+| `task perf:report` | Open the latest HTML summary |
+| `task perf:clean` | Remove old summary files |
 
 ### Utilities
 
@@ -509,66 +566,65 @@ All scenario commands accept `SCENARIO=<name>` to target a specific instance.
 | `task install` | Install all dependencies |
 | `task status` | Show running containers |
 | `task scenarios` | List scenario instances + ports |
-| `task help` | Show quick reference |
+| `task help` | Quick reference |
 
 ---
 
 ## Port Reference
 
-| Service | Dev | Test | Staging | Scenario (default) | Prod |
-|---------|-----|------|---------|---------------------|------|
-| PostgreSQL | 5434 | 5435 | 5436 | 5437 | 5438 |
-| Backend | 8001 | — | 8002 | 8003 | 8080 |
-| Frontend | 5173 | — | 3001 | 3002 | 3000 |
-| Debugger | 5678 | — | — | — | — |
+| Service | dev | staging:local | scenario (default) | prod (local) |
+|---------|-----|--------------|---------------------|--------------|
+| PostgreSQL | 5434 | 5436 | 5437 | 5438 |
+| Backend | 8001 | 8002 | 8003 | 8080 |
+| Frontend | 5173 | 3001 | 3002 | 3000 |
+| Debugger | 5678 | — | — | — |
+| Umami | 3100 | — | — | — |
+
+> Scenario ports are deterministic per scenario name (hash-based offset). Run `task scenarios` to see all current assignments.
 
 ---
 
 ## Troubleshooting
 
+### DATABASE_URL not set
+
+Each remote task reads its `DATABASE_URL` from its own secrets file:
+- `staging:remote` tasks → `secrets.staging.remote.env`
+- `prod:remote` tasks → `secrets.prod.env`
+
+Copy the `.example` file and fill in the Neon connection string from the dashboard.
+
+### Cloudflare authentication failed
+
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` live in `secrets.env` (shared). The token needs **Account → Cloudflare Pages → Edit** permission.
+
 ### Database connection failed
 
 ```bash
-# Check if dev database is running
-docker ps | grep calendar_db_dev
-
-# Start it
-task start:dev:db
+docker ps | grep calendar_db_dev   # check container is running
+task start:dev:db                  # start it
+task db:check:dev                  # verify connectivity
 ```
 
 ### Port already in use
 
 ```bash
-# Find what's using the port
-lsof -i :8001
-
-# Kill the process
+lsof -i :8001    # find what's using the port
 kill -9 <PID>
 ```
 
-### Docker images not found
+### Fly machine not responding after deploy
 
 ```bash
-# List available images
-task build:list
-
-# Build them
-task build:staging       # For staging (from develop)
-task build:prod -- v1.0.0  # For prod (from main)
+task fly:staging:status   # check machine state
+task logs:staging:remote  # stream logs
+task fly:staging:ssh      # SSH in to debug
 ```
 
 ### Reset everything
 
 ```bash
-# Stop all services
-task stop:dev
-task stop:staging
-task stop:prod
-
-# Remove data (⚠️ destructive — prompts for confirmation)
-task stop:dev:volumes
-task stop:staging:volumes
-
-# Preview first with DRY_RUN
-DRY_RUN=1 task stop:dev:volumes
+task stop:dev && task stop:staging:local
+DRY_RUN=1 task stop:dev:volumes          # preview first
+task stop:dev:volumes                    # then confirm
 ```

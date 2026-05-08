@@ -1,10 +1,10 @@
 test_plan:
   name: "My Calendar — Save, View, Export"
   description: >
-    Verify the My Calendar feature: saving/unsaving events, FAB counter,
-    My Calendar explorer page (list + map), .ics and .xlsx exports,
-    clear all, and admin most-saved analytics. Uses mock calendar service
-    with 5 events across 2 calendars.
+    Verify the My Calendar feature: saving/unsaving events, FAB counter, My
+    Calendar explorer page (list + map), .ics and .xlsx exports, clear all,
+    past-events toggle, and admin most-saved analytics. Uses mock calendar
+    service with 5 future events and 2 past events across 2 calendars.
   steps:
     # ── Saving Events ───────────────────────────────────────────
     - id: 1
@@ -26,24 +26,24 @@ test_plan:
     - id: 3
       title: "Save event from modal"
       description: >
-        Click on "Bachata Sensual Workshop" to open the modal.
-        Click the heart icon in the modal header (next to close button).
+        Click on "Bachata Sensual Workshop" to open the modal. Click the heart
+        icon in the modal header (next to close button).
       expected: >
         Heart turns red. FAB count updates to "2".
 
     - id: 4
       title: "Save event from detail page"
       description: >
-        Navigate to /event/evt-save-003 (Salsa on the Rooftop).
-        Click the "🤍 Save" button in the share bar.
+        Navigate to /event/evt-save-003 (Salsa on the Rooftop). Click the "🤍
+        Save" button in the share bar.
       expected: >
         Button changes to "❤️ Saved". FAB count is "3".
 
     - id: 5
       title: "Unsave event from list"
       description: >
-        Go back to home page. Find "Friday Salsa Social" in the list.
-        Click the red heart (❤️) to unsave it.
+        Go back to home page. Find "Friday Salsa Social" in the list. Click the
+        red heart (❤️) to unsave it.
       expected: >
         Heart turns back to 🤍. FAB count drops to "2".
 
@@ -58,8 +58,8 @@ test_plan:
     - id: 7
       title: "FAB dropdown shows options"
       description: >
-        Click the FAB (heart with "3" badge).
-        A dropdown should appear with three options.
+        Click the FAB (heart with "3" badge). A dropdown should appear with
+        three options.
       expected: >
         Dropdown shows: "View My Calendar", "Export .ics", "Export .xlsx".
 
@@ -91,9 +91,10 @@ test_plan:
       description: >
         Check the left panel (event list) on the My Calendar page.
       expected: >
-        List shows 3 saved events: "Friday Salsa Social", "Bachata Sensual Workshop",
-        "Salsa on the Rooftop". Each has title, date, location. Events not saved
-        (Bachata Weekender, Rueda de Casino Night) are NOT shown.
+        List shows 3 saved events: "Friday Salsa Social", "Bachata Sensual
+        Workshop", "Salsa on the Rooftop". Each has title, date, location.
+        Events not saved (Bachata Weekender, Rueda de Casino Night) are NOT
+        shown.
 
     - id: 12
       title: "My Calendar map shows markers"
@@ -113,11 +114,10 @@ test_plan:
     - id: 14
       title: "Unsave from modal updates My Calendar"
       description: >
-        In the modal, click the red heart to unsave.
-        Close the modal.
+        In the modal, click the red heart to unsave. Close the modal.
       expected: >
-        Event disappears from the list. Counter updates to "2 events".
-        Map updates (Berlin marker removed).
+        Event disappears from the list. Counter updates to "2 events". Map
+        updates (Berlin marker removed).
 
     # ── Export ──────────────────────────────────────────────────
     - id: 15
@@ -125,8 +125,8 @@ test_plan:
       description: >
         On the My Calendar page, click "📅 Export .ics".
       expected: >
-        Browser downloads "my-movida-events.ics". File contains VCALENDAR
-        with 2 VEVENT entries (the remaining saved events).
+        Browser downloads "my-movida-events.ics". File contains VCALENDAR with 2
+        VEVENT entries (the remaining saved events).
 
     - id: 16
       title: "Export .xlsx from My Calendar page"
@@ -150,8 +150,8 @@ test_plan:
       description: >
         Navigate to /my-calendar. Click "Clear all" button.
       expected: >
-        All events cleared. Page shows empty state: "No events saved yet"
-        with "Browse events" link. FAB disappears from screen.
+        All events cleared. Page shows empty state: "No events saved yet" with
+        "Browse events" link. FAB disappears from screen.
 
     - id: 19
       title: "Empty state links back to browse"
@@ -166,14 +166,92 @@ test_plan:
       description: >
         Save 2 events. Reload the page (F5).
       expected: >
-        FAB shows count "2". Navigate to /my-calendar — saved events still listed.
+        FAB shows count "2". Navigate to /my-calendar — saved events still
+        listed.
 
     # ── Admin Analytics ─────────────────────────────────────────
     - id: 21
       title: "Admin shows most-saved events"
       description: >
-        Log in as admin (dev login). Check admin page for
-        "❤️ Most Saved Events" section.
+        Log in as admin via /login ("Sign in as Admin" if seeded, otherwise type
+        ADMIN_EMAIL into the dev email input). Check admin page for "❤️ Most
+        Saved Events" section.
       expected: >
-        Section appears showing events ranked by net saves.
-        Events that were saved appear with their save count.
+        Section appears showing events ranked by net saves. Events that were
+        saved appear with their save count.
+
+    # ── Past Events Toggle ──────────────────────────────────────
+    - id: 22
+      title: "Past events hidden by default"
+      description: >
+        Save "Last Week's Salsa Social" (evt-save-past-001) and "Old Bachata
+        Workshop" (evt-save-past-002) from the Explorer (find them via the
+        date-range picker or URL). Navigate to /my-calendar.
+      expected: >
+        The two past events do NOT appear in the list. A "Show 2 past events"
+        link is visible below the filter tabs. The event count in the header
+        reflects only the upcoming saved events.
+
+    - id: 23
+      title: "Show past events on demand"
+      description: >
+        On /my-calendar with past events saved, click the "Show 2 past events"
+        link.
+      expected: >
+        The link text changes to "Hide past events". A "Past events" section
+        divider appears at the bottom of the list. "Last Week's Salsa Social"
+        and "Old Bachata Workshop" appear below the divider, sorted
+        most-recent-first (last week before two weeks ago). Upcoming events
+        remain at the top, unaffected.
+
+    - id: 24
+      title: "Hide past events again"
+      description: >
+        Click "Hide past events".
+      expected: >
+        Past events disappear from the list. Link reverts to "Show 2 past
+        events". Upcoming events remain unchanged.
+
+    - id: 25
+      title: "Past events toggle respects active tab filter"
+      description: >
+        Mark "Last Week's Salsa Social" as Going (not saved). Save "Old Bachata
+        Workshop" only (not going). On /my-calendar, switch to the "Saved" tab,
+        then click "Show 1 past event".
+      expected: >
+        Only "Old Bachata Workshop" appears under "Past events" — "Last Week's
+        Salsa Social" is hidden because it is not in the Saved tab. The count in
+        the toggle link reflects only the past events visible in the current
+        tab.
+
+    - id: 26
+      title: "Past events toggle resets after navigation"
+      description: >
+        With past events visible, navigate away (e.g., to home page) then return
+        to /my-calendar.
+      expected: >
+        Past events are hidden again by default. "Show N past events" link is
+        shown (not "Hide past events").
+
+    - id: 27
+      title: "Ongoing events not treated as past"
+      description: >
+        Ensure an event that has already started but has not yet ended (start <
+        now < end) appears in the upcoming section, not hidden.
+      expected: >
+        The ongoing event is visible in the main list without toggling. It does
+        not appear under the "Past events" divider.
+
+    # ── Anti-inflation (anonymous identity is server cookie) ─────
+    - id: 28
+      title: "Saved count not inflated by clearing localStorage"
+      description: >
+        As an anonymous visitor, save "Friday Salsa Social". Note the total
+        saved count on the event card / admin metrics. Then clear localStorage
+        in devtools WITHOUT clearing cookies, reload, and click save again on
+        the same event.
+      expected: >
+        The total saved count is unchanged (still +1). The server-issued
+        httpOnly cookie ``movida_aid`` keeps the same anonymous identity
+        across the localStorage wipe, so re-clicking does not insert a second
+        UserSavedEvent row.

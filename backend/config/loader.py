@@ -1,7 +1,4 @@
 import os
-from pathlib import Path
-
-import yaml
 
 
 def get_database_url() -> str:
@@ -47,37 +44,27 @@ def _parse_bool(value: str | bool | None) -> bool | None:
     return None
 
 
-def _get_scenario_config_bool(key: str) -> bool | None:
-    scenario_dir = os.getenv("SCENARIO_DIR", "").strip()
-    if not scenario_dir:
-        return None
-
-    config_path = Path(scenario_dir) / "config.yaml"
-    if not config_path.exists():
-        return None
-
-    try:
-        with open(config_path) as f:
-            config = yaml.safe_load(f) or {}
-    except Exception:
-        return None
-
-    return _parse_bool(config.get(key))
-
-
 def get_auto_sync_enabled() -> bool:
     """Return whether automatic background sync is enabled.
 
-    Priority order: env var AUTO_SYNC_ENABLED -> SCENARIO_DIR/config.yaml
-    key auto_sync_enabled -> default False.
+    Priority order: env var AUTO_SYNC_ENABLED -> SCENARIO_DIR/config.yaml -> default False.
     """
     from_env = _parse_bool(os.getenv("AUTO_SYNC_ENABLED"))
     if from_env is not None:
         return from_env
 
-    from_scenario = _get_scenario_config_bool("auto_sync_enabled")
-    if from_scenario is not None:
-        return from_scenario
+    scenario_dir = os.getenv("SCENARIO_DIR")
+    if scenario_dir:
+        config_path = os.path.join(scenario_dir, "config.yaml")
+        if os.path.exists(config_path):
+            import yaml
+
+            with open(config_path) as f:
+                data = yaml.safe_load(f)
+            if data and "auto_sync_enabled" in data:
+                val = _parse_bool(data["auto_sync_enabled"])
+                if val is not None:
+                    return val
 
     return False
 
@@ -105,8 +92,10 @@ def get_google_client_id() -> str:
     return os.getenv("GOOGLE_CLIENT_ID", "")
 
 
-def get_mock_admin_auth() -> bool:
-    return os.getenv("MOCK_ADMIN_AUTH", "").lower() in ("true", "1")
+def get_dev_auth_enabled() -> bool:
+    """True when the dev sign-in bypass is enabled."""
+    val = os.getenv("DEV_AUTH")
+    return (val or "").lower() in ("true", "1")
 
 
 def get_env_name() -> str:

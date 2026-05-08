@@ -1,0 +1,11 @@
+# Mock users pre-seeded for this scenario.
+# At /login, dev mode renders one "Sign in as <Name>" button per entry.
+# Used by Group 10 (Auth funnel) and Group 11 (Rating funnel) tests.
+# Admin status is derived by matching the email to ADMIN_EMAIL.
+users:
+  - email: dev-user@example.com
+    name: Dev User
+  - email: returning@example.com # signed in once already → repeat-login path
+    name: Returning User
+  - email: admin@example.com # matches ADMIN_EMAIL → admin
+    name: Dev Admin

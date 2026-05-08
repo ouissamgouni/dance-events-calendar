@@ -1,10 +1,339 @@
 version: "3"
 
+# ════════════════════════════════════════════════════════════════════════════
+# Deploy tasks
+#
+# Naming convention:
+#   deploy:<env>:<location>:<component>   — atomic single-component deploy
+#   deploy:<env>:<location>               — full deploy (calls atomic tasks in order)
+#
+# Remote envs (Fly.io + Neon + Cloudflare):
+#   staging:remote   — Neon develop branch  + movida-staging.fly.dev
+#   prod:remote      — Neon main branch     + movida.fly.dev
+#
+# Local envs (docker-compose):
+#   staging:local    — localhost:5436 / 8002 / 3001
+# ════════════════════════════════════════════════════════════════════════════
+
 tasks:
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # STAGING REMOTE — atomic components
+  # ──────────────────────────────────────────────────────────────────────────
+
+  staging:remote:db:
+    desc: "Run DB migrations on Neon staging (develop branch)"
+    dotenv:
+      [
+        "config/base.env",
+        "config/staging.remote.env",
+        "config/secrets.env",
+        "config/secrets.staging.env",
+      ]
+    cmds:
+      - |
+        if [ -z "$DATABASE_URL" ]; then
+          echo "❌ DATABASE_URL not set — fill in config/secrets.staging.env"
+          exit 1
+        fi
+        echo "Running migrations on Neon staging (develop branch)..."
+        echo "  Host: $(echo $DATABASE_URL | sed 's|.*@||' | cut -d'/' -f1)"
+        PYTHONPATH=. .venv/bin/alembic -c backend/alembic.ini upgrade head
+        echo "✅ Migrations applied"
+
+  staging:remote:backend:
+    desc: "Stage Fly secrets + deploy backend to movida-staging.fly.dev"
+    dotenv: [ "config/base.env", "config/secrets.env", "config/secrets.staging.env" ]
+    vars:
+      LOG_LEVEL: "{{.LOG_LEVEL | default \"\"}}"
+    cmds:
+      - |
+        if [ ! -f config/secrets.staging.env ]; then
+          echo "❌ config/secrets.staging.env not found"
+          exit 1
+        fi
+        echo "Staging secrets into Fly (applied atomically on deploy)..."
+        cat config/secrets.env config/secrets.staging.env \
+          | grep -v '^[[:space:]]*$' \
+          | grep -v '^CLOUDFLARE_' \
+          | grep -v '^VITE_' \
+          | fly secrets import -c config/fly.staging.toml --stage
+        if [ -f backend/credentials/service-account.json ]; then
+          fly secrets set -c config/fly.staging.toml --stage \
+            GOOGLE_SERVICE_ACCOUNT_JSON="$(cat backend/credentials/service-account.json)"
+          echo "✅ GOOGLE_SERVICE_ACCOUNT_JSON staged"
+        else
+          echo "⚠️  backend/credentials/service-account.json not found — GOOGLE_SERVICE_ACCOUNT_JSON not staged"
+        fi
+        if [ -n "{{.LOG_LEVEL}}" ]; then
+          fly secrets set -c config/fly.staging.toml --stage LOG_LEVEL="{{.LOG_LEVEL}}"
+          echo "✅ LOG_LEVEL staged: {{.LOG_LEVEL}}"
+        fi
+      - |
+        echo "Deploying backend to movida-staging.fly.dev..."
+        fly deploy --remote-only -c config/fly.staging.toml
+      - |
+        echo "Waiting for machine to be ready..."
+        sleep 5
+        HEALTH_URL="https://movida-staging.fly.dev/health"
+        echo "Smoke test: GET $HEALTH_URL"
+        if curl -sf --retry 6 --retry-delay 5 --retry-connrefused "$HEALTH_URL" > /dev/null; then
+          echo "✅ Backend health check passed: $HEALTH_URL"
+        else
+          echo "⚠️  Health check failed or timed out — check: task logs:staging:remote"
+        fi
+
+  staging:remote:frontend:
+    desc: "Build + deploy staging frontend to Cloudflare Pages (public:
+      develop.joinmovida.com, alias: develop.movida.pages.dev)"
+    dotenv:
+      [
+        "config/base.env",
+        "config/staging.remote.env",
+        "config/secrets.env",
+        "config/secrets.staging.env",
+      ]
+    vars:
+      PROJECT_NAME: "{{.PROJECT_NAME | default \"movida\"}}"
+    cmds:
+      - |
+        if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+          echo "❌ CLOUDFLARE_API_TOKEN not set in config/secrets.env or CLOUDFLARE_ACCOUNT_ID not set in config/base.env"
+          exit 1
+        fi
+        if [ -z "$VITE_API_URL" ]; then
+          echo "❌ VITE_API_URL not set in config/staging.remote.env"
+          exit 1
+        fi
+        echo "Validating Cloudflare token..."
+        if ! CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID npx --yes wrangler whoami > /dev/null 2>&1; then
+          echo "❌ Cloudflare authentication failed — check token in config/secrets.env"
+          exit 1
+        fi
+        echo "Building staging frontend (VITE_API_URL=$VITE_API_URL)..."
+        (cd frontend && VITE_API_URL=$VITE_API_URL VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" VITE_UMAMI_WEBSITE_ID="${VITE_UMAMI_WEBSITE_ID:-}" npm run build)
+        echo "Deploying to Cloudflare Pages (branch: develop)..."
+        # Run wrangler from frontend/ so it discovers wrangler.toml,
+        # functions/ and dist/ as siblings — required for Pages Functions
+        # detection (Cloudflare expects functions/ adjacent to the build
+        # output dir).
+        cd frontend && \
+        CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN \
+        CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID \
+        npx --yes wrangler pages deploy \
+          --project-name={{.PROJECT_NAME}} \
+          --branch=develop
+        echo "✅ Staging frontend deployed: https://develop.joinmovida.com (alias: https://develop.movida.pages.dev)"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # STAGING REMOTE — full deploy (calls atomic tasks in sequence)
+  # ──────────────────────────────────────────────────────────────────────────
+
+  staging:remote:
+    desc: "Full remote staging deploy: DB migrations + backend (secrets+fly) +
+      frontend"
+    dotenv:
+      [
+        "config/base.env",
+        "config/staging.remote.env",
+        "config/secrets.env",
+        "config/secrets.staging.env",
+      ]
+    cmds:
+      - |
+        if [ ! -f config/secrets.staging.env ]; then
+          echo "❌ config/secrets.staging.env not found — copy config/secrets.staging.env.example and fill in values"
+          exit 1
+        fi
+        if [ -z "$DATABASE_URL" ]; then
+          echo "❌ DATABASE_URL not set — fill in config/secrets.staging.env"
+          exit 1
+        fi
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "  Deploying REMOTE STAGING"
+        echo "  Backend:  https://movida-staging.fly.dev"
+        echo "  Frontend: https://develop.joinmovida.com (alias: https://develop.movida.pages.dev)"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      - echo "━━━━ [1/3] DB migrations ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      - task: staging:remote:db
+      - echo "━━━━ [2/3] Backend ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      - task: staging:remote:backend
+      - echo "━━━━ [3/3] Frontend ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      - task: staging:remote:frontend
+      - |
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "✅ Remote staging fully deployed"
+        echo "   Backend:  https://movida-staging.fly.dev"
+        echo "   Frontend: https://develop.joinmovida.com (alias: https://develop.movida.pages.dev)"
+        echo ""
+        echo "Verify:"
+        echo "   task db:check:staging:remote  → DB migration state"
+        echo "   task logs:staging:remote      → backend logs"
+        echo "═══════════════════════════════════════════════════════════════"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # PROD REMOTE — atomic components
+  # ──────────────────────────────────────────────────────────────────────────
+
+  prod:remote:db:
+    desc: "Run DB migrations on Neon prod (main branch)"
+    dotenv:
+      [
+        "config/base.env",
+        "config/prod.remote.env",
+        "config/secrets.env",
+        "config/secrets.prod.env",
+      ]
+    cmds:
+      - |
+        if [ -z "$DATABASE_URL" ]; then
+          echo "❌ DATABASE_URL not set — fill in config/secrets.prod.env"
+          exit 1
+        fi
+        echo "Running migrations on Neon prod (main branch)..."
+        echo "  Host: $(echo $DATABASE_URL | sed 's|.*@||' | cut -d'/' -f1)"
+        PYTHONPATH=. .venv/bin/alembic -c backend/alembic.ini upgrade head
+        echo "✅ Migrations applied"
+
+  prod:remote:backend:
+    desc: "Stage Fly secrets + deploy backend to movida.fly.dev"
+    dotenv: [ "config/base.env", "config/secrets.env", "config/secrets.prod.env" ]
+    cmds:
+      - |
+        if [ ! -f config/secrets.prod.env ]; then
+          echo "❌ config/secrets.prod.env not found"
+          exit 1
+        fi
+        echo "Staging secrets into Fly (applied atomically on deploy)..."
+        cat config/secrets.env config/secrets.prod.env \
+          | grep -v '^[[:space:]]*$' \
+          | grep -v '^CLOUDFLARE_' \
+          | grep -v '^VITE_' \
+          | fly secrets import -c config/fly.prod.toml --stage
+        if [ -f backend/credentials/service-account.json ]; then
+          fly secrets set -c config/fly.prod.toml --stage \
+            GOOGLE_SERVICE_ACCOUNT_JSON="$(cat backend/credentials/service-account.json)"
+          echo "✅ GOOGLE_SERVICE_ACCOUNT_JSON staged"
+        else
+          echo "⚠️  backend/credentials/service-account.json not found — GOOGLE_SERVICE_ACCOUNT_JSON not staged"
+        fi
+      - |
+        echo "Deploying backend to movida.fly.dev..."
+        fly deploy --remote-only -c config/fly.prod.toml
+      - |
+        echo "Waiting for machine to be ready..."
+        sleep 5
+        HEALTH_URL="https://movida.fly.dev/health"
+        echo "Smoke test: GET $HEALTH_URL"
+        if curl -sf --retry 6 --retry-delay 5 --retry-connrefused "$HEALTH_URL" > /dev/null; then
+          echo "✅ Backend health check passed: $HEALTH_URL"
+        else
+          echo "⚠️  Health check failed or timed out — check: task fly:logs"
+        fi
+
+  prod:remote:frontend:
+    desc: "Build + deploy prod frontend to Cloudflare Pages (public: joinmovida.com,
+      alias: movida.pages.dev)"
+    dotenv:
+      [
+        "config/base.env",
+        "config/prod.remote.env",
+        "config/secrets.env",
+        "config/secrets.prod.env",
+      ]
+    vars:
+      PROJECT_NAME: "{{.PROJECT_NAME | default \"movida\"}}"
+    cmds:
+      - |
+        if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+          echo "❌ CLOUDFLARE_API_TOKEN not set in config/secrets.env or CLOUDFLARE_ACCOUNT_ID not set in config/base.env"
+          exit 1
+        fi
+        if [ -z "$VITE_API_URL" ]; then
+          echo "❌ VITE_API_URL not set in config/prod.remote.env"
+          exit 1
+        fi
+        echo "Validating Cloudflare token..."
+        if ! CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID npx --yes wrangler whoami > /dev/null 2>&1; then
+          echo "❌ Cloudflare authentication failed — check token in config/secrets.env"
+          exit 1
+        fi
+        echo "Building prod frontend (VITE_API_URL=$VITE_API_URL)..."
+        (cd frontend && VITE_API_URL=$VITE_API_URL VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" VITE_UMAMI_WEBSITE_ID="${VITE_UMAMI_WEBSITE_ID:-}" npm run build)
+        echo "Deploying to Cloudflare Pages (branch: main)..."
+        # Run wrangler from frontend/ so it discovers wrangler.toml,
+        # functions/ and dist/ as siblings — required for Pages Functions
+        # detection (Cloudflare expects functions/ adjacent to the build
+        # output dir).
+        cd frontend && \
+        CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN \
+        CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID \
+        npx --yes wrangler pages deploy \
+          --project-name={{.PROJECT_NAME}} \
+          --branch=main
+        echo "✅ Prod frontend deployed: https://joinmovida.com (alias: https://movida.pages.dev)"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # PROD REMOTE — full deploy (calls atomic tasks in sequence)
+  # ──────────────────────────────────────────────────────────────────────────
+
+  prod:remote:
+    desc: "Full remote prod deploy: DB migrations + backend (secrets+fly) + frontend"
+    prompt: "This will deploy to PRODUCTION. Continue?"
+    dotenv:
+      [
+        "config/base.env",
+        "config/prod.remote.env",
+        "config/secrets.env",
+        "config/secrets.prod.env",
+      ]
+    cmds:
+      - |
+        if [ ! -f config/secrets.prod.env ]; then
+          echo "❌ config/secrets.prod.env not found — copy config/secrets.prod.env.example and fill in values"
+          exit 1
+        fi
+        if [ -z "$DATABASE_URL" ]; then
+          echo "❌ DATABASE_URL not set — fill in config/secrets.prod.env"
+          exit 1
+        fi
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "  Deploying PRODUCTION"
+        echo "  Backend:  https://movida.fly.dev"
+        echo "  Frontend: https://joinmovida.com (alias: https://movida.pages.dev)"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      - echo "━━━━ [1/3] DB migrations ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      - task: prod:remote:db
+      - echo "━━━━ [2/3] Backend ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      - task: prod:remote:backend
+      - echo "━━━━ [3/3] Frontend ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      - task: prod:remote:frontend
+      - |
+        echo ""
+        echo "═══════════════════════════════════════════════════════════════"
+        echo "✅ Production fully deployed"
+        echo "   Backend:  https://movida.fly.dev"
+        echo "   Frontend: https://joinmovida.com (alias: https://movida.pages.dev)"
+        echo ""
+        echo "Verify:"
+        echo "   task db:check:prod   → DB migration state"
+        echo "   task fly:logs        → backend logs"
+        echo "═══════════════════════════════════════════════════════════════"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # STAGING LOCAL — docker-compose
+  # ──────────────────────────────────────────────────────────────────────────
+
   staging:local:
-    desc: "Build from develop and deploy to local staging (docker-compose).
-      DRY_RUN=1 to preview."
-    dotenv: [ .env.staging.local ]
+    desc: "Build from develop + deploy to local staging (docker-compose). DRY_RUN=1
+      to preview."
+    dotenv:
+      [
+        "config/base.env",
+        "config/staging.local.env",
+        "config/secrets.staging.local.env",
+      ]
     vars:
       DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
     cmds:
@@ -40,94 +369,14 @@ tasks:
         echo "   task logs:staging:local   → View logs"
         echo "═══════════════════════════════════════════════════════════════"
 
-  staging:remote:
-    desc: "Full remote staging deploy: stage secrets + migrate Neon develop + deploy
-      Fly backend + smoke test + deploy Cloudflare frontend"
-    dotenv: [ "secrets.env", "secrets.staging.remote.env", ".env.staging.local" ]
-    vars:
-      PROJECT_NAME: "{{.PROJECT_NAME | default \"movida\"}}"
-    cmds:
-      - |
-        if [ ! -f secrets.staging.remote.env ]; then
-          echo "❌ secrets.staging.remote.env not found — copy secrets.staging.remote.env.example and fill in values"
-          exit 1
-        fi
-        if [ -z "$DATABASE_URL" ]; then
-          echo "❌ DATABASE_URL not set — fill in secrets.staging.remote.env"
-          exit 1
-        fi
-      - |
-        echo "━━━━ [1/4] Staging secrets ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "Staging secrets (will be applied atomically with fly deploy)..."
-        grep -v '^#' secrets.staging.remote.env \
-          | grep -v '^[[:space:]]*$' \
-          | grep -v '^VITE_' \
-          | grep -v '^CLOUDFLARE_' \
-          | fly secrets import -c fly.staging.toml --stage
-        if [ -f backend/credentials/service-account.json ]; then
-          fly secrets set -c fly.staging.toml --stage \
-            GOOGLE_SERVICE_ACCOUNT_JSON="$(cat backend/credentials/service-account.json)"
-          echo "✅ GOOGLE_SERVICE_ACCOUNT_JSON staged"
-        else
-          echo "⚠️  backend/credentials/service-account.json not found — GOOGLE_SERVICE_ACCOUNT_JSON not staged"
-        fi
-        echo "✅ Secrets staged"
-      - |
-        echo "━━━━ [2/4] Database migrations ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "Running migrations on Neon staging (develop branch)..."
-        PYTHONPATH=. .venv/bin/alembic -c backend/alembic.ini upgrade head
-        echo "✅ Migrations applied"
-      - |
-        echo "━━━━ [3/4] Backend deploy ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        fly deploy --remote-only -c fly.staging.toml
-      - |
-        echo "Waiting for machine to be ready..."
-        sleep 5
-        HEALTH_URL="https://movida-staging.fly.dev/health"
-        echo "Smoke test: GET $HEALTH_URL"
-        if curl -sf --retry 6 --retry-delay 5 --retry-connrefused "$HEALTH_URL" > /dev/null; then
-          echo "✅ Backend health check passed"
-        else
-          echo "⚠️  Health check failed or timed out — check: task logs:staging:remote"
-        fi
-      - |
-        echo "━━━━ [4/4] Frontend deploy ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-          echo "ℹ️  CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID not set in secrets.env — skipping frontend"
-          echo "   Run manually: task deploy:cloudflare:pages:staging"
-        else
-          echo "Validating Cloudflare token..."
-          if ! CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID npx --yes wrangler whoami > /dev/null 2>&1; then
-            echo "❌ Cloudflare authentication failed (invalid/expired token or missing permissions)"
-            echo "   Required token permissions: Account:Cloudflare Pages:Edit"
-            echo "   Check token/account in secrets.env then retry"
-            exit 1
-          fi
-          echo "Building staging frontend (VITE_API_URL=https://movida-staging.fly.dev)..."
-          cd frontend && VITE_API_URL=https://movida-staging.fly.dev VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" npm run build
-          CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN \
-          CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID \
-          npx --yes wrangler pages deploy dist \
-            --project-name={{.PROJECT_NAME}} \
-            --branch=develop
-          echo "✅ Staging frontend deployed: https://develop.movida.pages.dev"
-        fi
-      - |
-        echo ""
-        echo "═══════════════════════════════════════════════════════════════"
-        echo "✅ Remote staging fully deployed"
-        echo "   Backend:  https://movida-staging.fly.dev"
-        echo "   Frontend: https://develop.movida.pages.dev"
-        echo ""
-        echo "Verify:"
-        echo "   task db:check:staging:remote  → DB migration state"
-        echo "   task logs:staging:remote      → backend logs"
-        echo "═══════════════════════════════════════════════════════════════"
-
   staging:local:ref:
-    desc: "Build from any git ref and deploy to local staging (docker-compose).
-      DRY_RUN=1 to preview."
-    dotenv: [ .env.staging.local ]
+    desc: "Build from any git ref + deploy to local staging. DRY_RUN=1 to preview."
+    dotenv:
+      [
+        "config/base.env",
+        "config/staging.local.env",
+        "config/secrets.staging.local.env",
+      ]
     vars:
       REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
       DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
@@ -135,21 +384,14 @@ tasks:
       - |
         REF="{{.REF}}"
         if [ -z "$REF" ]; then
-          echo "❌ Usage:"
-          echo "   task deploy:staging:local:ref -- feature/my-branch"
+          echo "❌ Usage: task deploy:staging:local:ref -- feature/my-branch"
           exit 1
         fi
       - |
         if [ "{{.DRY_RUN}}" = "1" ]; then
           REF="{{.REF}}"
           SHA=$(git rev-parse --short=7 "$REF" 2>/dev/null || echo "unknown")
-          TAG="ref-$SHA"
-          echo "🔍 DRY RUN — would deploy to local STAGING (from $REF)"
-          echo ""
-          echo "Steps:"
-          echo "  1. Build images from $REF (task build:ref)"
-          echo "  2. docker compose down (movida-staging)"
-          echo "  3. docker compose up -d with tag :$TAG"
+          echo "🔍 DRY RUN — would deploy to local STAGING (from $REF @ $SHA)"
           exit 0
         fi
       - task: :build:ref
@@ -158,273 +400,61 @@ tasks:
         REF="{{.REF}}"
         SHA=$(git rev-parse --short=7 "$REF")
         TAG="ref-$SHA"
-
         ENV_NAME=staging IMAGE_TAG=$TAG docker compose -f infra/docker/docker-compose.unified.yml -p movida-staging down
         ENV_NAME=staging IMAGE_TAG=$TAG docker compose -f infra/docker/docker-compose.unified.yml -p movida-staging up -d
         sleep 5
-
         echo ""
         echo "═══════════════════════════════════════════════════════════════"
-        echo "✅ Deployed to local STAGING (from $REF)"
-        echo ""
-        echo "   Git ref:  $REF"
-        echo "   SHA:      $SHA"
-        echo "   Tag:      :$TAG"
-        echo ""
+        echo "✅ Deployed to local STAGING (from $REF @ $SHA)"
         echo "   Frontend: http://localhost:${FRONTEND_PORT:-3001}"
         echo "   Backend:  http://localhost:${BACKEND_PORT:-8002}"
         echo "═══════════════════════════════════════════════════════════════"
 
   staging:local:dirty:
-    desc: "Build from current working directory and deploy to local staging.
-      DRY_RUN=1 to preview."
-    dotenv: [ .env.staging.local ]
+    desc: "Build from working directory + deploy to local staging. DRY_RUN=1 to
+      preview."
+    dotenv:
+      [
+        "config/base.env",
+        "config/staging.local.env",
+        "config/secrets.staging.local.env",
+      ]
     vars:
       DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
     cmds:
       - |
         if [ "{{.DRY_RUN}}" = "1" ]; then
-          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-          TAG="dirty-$TIMESTAMP"
           echo "🔍 DRY RUN — would deploy to local STAGING (from working directory)"
-          echo ""
-          echo "Steps:"
-          echo "  1. Build images from current directory (task build:dirty)"
-          echo "  2. docker compose down (movida-staging)"
-          echo "  3. docker compose up -d with tag :$TAG"
           exit 0
         fi
       - task: :build:dirty
       - |
         TIMESTAMP=$(date +%Y%m%d-%H%M%S)
         TAG="dirty-$TIMESTAMP"
-
         ENV_NAME=staging IMAGE_TAG=$TAG docker compose -f infra/docker/docker-compose.unified.yml -p movida-staging down
         ENV_NAME=staging IMAGE_TAG=$TAG docker compose -f infra/docker/docker-compose.unified.yml -p movida-staging up -d
         sleep 5
-
         echo ""
         echo "═══════════════════════════════════════════════════════════════"
-        echo "✅ Deployed to local STAGING (from working directory)"
-        echo ""
-        echo "   ⚠️  Built from uncommitted changes"
-        echo "   Tag: :$TAG"
-        echo ""
+        echo "✅ Deployed to local STAGING (from working directory, tag :$TAG)"
         echo "   Frontend: http://localhost:${FRONTEND_PORT:-3001}"
         echo "   Backend:  http://localhost:${BACKEND_PORT:-8002}"
         echo "═══════════════════════════════════════════════════════════════"
 
-  prod:remote:
-    desc: "Full remote prod deploy: stage secrets + migrate Neon main + deploy Fly
-      backend + smoke test + deploy Cloudflare frontend"
-    prompt: "This will deploy to PRODUCTION. Continue?"
-    dotenv: [ "secrets.env", "secrets.prod.env", ".env.prod" ]
-    vars:
-      PROJECT_NAME: "{{.PROJECT_NAME | default \"movida\"}}"
-    cmds:
-      - |
-        if [ ! -f secrets.prod.env ]; then
-          echo "❌ secrets.prod.env not found — copy secrets.prod.env.example and fill in values"
-          exit 1
-        fi
-        if [ -z "$DATABASE_URL" ]; then
-          echo "❌ DATABASE_URL not set — fill in secrets.prod.env"
-          exit 1
-        fi
-      - |
-        echo "━━━━ [1/4] Prod secrets ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "Staging secrets (will be applied atomically with fly deploy)..."
-        grep -v '^#' secrets.prod.env \
-          | grep -v '^[[:space:]]*$' \
-          | grep -v '^VITE_' \
-          | grep -v '^CLOUDFLARE_' \
-          | fly secrets import -c fly.toml --stage
-        if [ -f backend/credentials/service-account.json ]; then
-          fly secrets set -c fly.toml --stage \
-            GOOGLE_SERVICE_ACCOUNT_JSON="$(cat backend/credentials/service-account.json)"
-          echo "✅ GOOGLE_SERVICE_ACCOUNT_JSON staged"
-        else
-          echo "⚠️  backend/credentials/service-account.json not found — GOOGLE_SERVICE_ACCOUNT_JSON not staged"
-        fi
-        echo "✅ Secrets staged"
-      - |
-        echo "━━━━ [2/4] Database migrations ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "Running migrations on Neon prod (main branch)..."
-        PYTHONPATH=. .venv/bin/alembic -c backend/alembic.ini upgrade head
-        echo "✅ Migrations applied"
-      - |
-        echo "━━━━ [3/4] Backend deploy ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        fly deploy --remote-only -c fly.toml
-      - |
-        echo "Waiting for machine to be ready..."
-        sleep 5
-        HEALTH_URL="https://movida.fly.dev/health"
-        echo "Smoke test: GET $HEALTH_URL"
-        if curl -sf --retry 6 --retry-delay 5 --retry-connrefused "$HEALTH_URL" > /dev/null; then
-          echo "✅ Backend health check passed"
-        else
-          echo "⚠️  Health check failed or timed out — check: task fly:logs"
-        fi
-      - |
-        echo "━━━━ [4/4] Frontend deploy ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-          echo "ℹ️  CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID not set in secrets.env — skipping frontend"
-          echo "   Run manually: task deploy:cloudflare:pages"
-        else
-          echo "Validating Cloudflare token..."
-          if ! CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID npx --yes wrangler whoami > /dev/null 2>&1; then
-            echo "❌ Cloudflare authentication failed (invalid/expired token or missing permissions)"
-            echo "   Required token permissions: Account:Cloudflare Pages:Edit"
-            echo "   Check token/account in secrets.env then retry"
-            exit 1
-          fi
-          echo "Building prod frontend (VITE_API_URL=https://movida.fly.dev)..."
-          cd frontend && VITE_API_URL=https://movida.fly.dev VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" npm run build
-          CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN \
-          CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID \
-          npx --yes wrangler pages deploy dist \
-            --project-name={{.PROJECT_NAME}} \
-            --branch=main
-          echo "✅ Prod frontend deployed: https://movida.pages.dev"
-        fi
-      - |
-        echo ""
-        echo "═══════════════════════════════════════════════════════════════"
-        echo "✅ Production fully deployed"
-        echo "   Backend:  https://movida.fly.dev"
-        echo "   Frontend: https://movida.pages.dev"
-        echo ""
-        echo "Verify:"
-        echo "   task db:check:prod   → DB migration state"
-        echo "   task fly:logs        → backend logs"
-        echo "═══════════════════════════════════════════════════════════════"
+  # ──────────────────────────────────────────────────────────────────────────
+  # PROD LOCAL — docker-compose
+  # ──────────────────────────────────────────────────────────────────────────
 
-  cloudflare:pages:
-    desc: "Build + deploy prod frontend to Cloudflare Pages (manual — CI
-      auto-deploys on push to main)"
-    dotenv: [ "secrets.env", "secrets.prod.env", ".env.prod" ]
-    vars:
-      PROJECT_NAME: "{{.PROJECT_NAME | default \"movida\"}}"
-    cmds:
-      - |
-        if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-          echo "❌ Set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in secrets.env"
-          exit 1
-        fi
-        if [ -z "$VITE_API_URL" ]; then
-          echo "❌ Set VITE_API_URL in secrets.prod.env"
-          exit 1
-        fi
-      - |
-        echo "Building frontend (VITE_API_URL=$VITE_API_URL)..."
-        cd frontend && VITE_API_URL=$VITE_API_URL VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" npm run build
-      - |
-        echo "Deploying prod frontend to Cloudflare (branch: main)..."
-        if ! CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID npx --yes wrangler whoami > /dev/null 2>&1; then
-          echo "❌ Cloudflare authentication failed (invalid/expired token or missing permissions)"
-          echo "   Required token permissions: Account:Cloudflare Pages:Edit"
-          echo "   Check token/account in secrets.env then retry"
-          exit 1
-        fi
-        cd frontend && \
-          CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN \
-          CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID \
-          npx --yes wrangler pages deploy dist \
-            --project-name={{.PROJECT_NAME}} \
-            --branch=main
-        echo ""
-        echo "═══════════════════════════════════════════════════════════════"
-        echo "✅ Prod frontend deployed: https://movida.pages.dev"
-        echo "═══════════════════════════════════════════════════════════════"
+  # ──────────────────────────────────────────────────────────────────────────
+  # Backward-compat aliases (kept so existing scripts don't break)
+  # ──────────────────────────────────────────────────────────────────────────
 
   cloudflare:pages:staging:
-    desc: "Build + deploy staging frontend to Cloudflare Pages develop branch (→
-      develop.movida.pages.dev)"
-    # CLOUDFLARE_* come from secrets.env (shared); VITE_API_URL comes from secrets.staging.remote.env
-    dotenv: [ "secrets.env", "secrets.staging.remote.env" ]
-    vars:
-      PROJECT_NAME: "{{.PROJECT_NAME | default \"movida\"}}"
+    desc: "Alias → task deploy:staging:remote:frontend"
     cmds:
-      - |
-        if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-          echo "❌ CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID not set in secrets.env"
-          exit 1
-        fi
-        if [ -z "$VITE_API_URL" ]; then
-          echo "❌ VITE_API_URL not set in secrets.staging.remote.env"
-          exit 1
-        fi
-        echo "Building staging frontend (VITE_API_URL=$VITE_API_URL)..."
-        cd frontend && VITE_API_URL=$VITE_API_URL VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" npm run build
-      - |
-        echo "Deploying staging frontend to Cloudflare (branch: develop)..."
-        if ! CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID npx --yes wrangler whoami > /dev/null 2>&1; then
-          echo "❌ Cloudflare authentication failed (invalid/expired token or missing permissions)"
-          echo "   Required token permissions: Account:Cloudflare Pages:Edit"
-          echo "   Check token/account in secrets.env then retry"
-          exit 1
-        fi
-        cd frontend && \
-          CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN \
-          CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID \
-          npx --yes wrangler pages deploy dist \
-            --project-name={{.PROJECT_NAME}} \
-            --branch=develop
-        echo ""
-        echo "═══════════════════════════════════════════════════════════════"
-        echo "✅ Staging frontend deployed: https://develop.movida.pages.dev"
-        echo "═══════════════════════════════════════════════════════════════"
+      - task: staging:remote:frontend
 
-  prod:
-    desc: "Deploy to prod. DRY_RUN=1 to preview. (e.g., task deploy:prod -- v1.2.0)"
-    prompt: "This will deploy to PRODUCTION. Continue?"
-    dotenv: [ .env.prod ]
-    vars:
-      REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
-      DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
+  cloudflare:pages:
+    desc: "Alias → task deploy:prod:remote:frontend"
     cmds:
-      - |
-        REF="{{.REF}}"
-        if [ -z "$REF" ]; then
-          REF="latest"
-        fi
-
-        if [ "{{.DRY_RUN}}" = "1" ]; then
-          echo "🔍 DRY RUN — would deploy to PROD: $REF"
-          echo ""
-          if docker image inspect movida-backend:$REF > /dev/null 2>&1; then
-            echo "Image found: movida-backend:$REF"
-          else
-            echo "No image found for :$REF — would attempt to build from git ref"
-          fi
-          echo ""
-          echo "Steps:"
-          echo "  1. docker compose down (movida-prod)"
-          echo "  2. docker compose up -d with tag :$REF"
-          echo ""
-          echo "Compose config:"
-          ENV_NAME=prod IMAGE_TAG=$REF docker compose -f infra/docker/docker-compose.unified.yml -p movida-prod config
-          exit 0
-        fi
-
-        if docker image inspect movida-backend:$REF > /dev/null 2>&1; then
-          VERSION="$REF"
-          echo "Deploying existing image: $VERSION"
-        else
-          echo "No image found for :$REF — attempting to build from git ref..."
-          task build:ref -- "$REF" || { echo "❌ Failed to build from $REF"; exit 1; }
-          SHA=$(git rev-parse --short=7 "$REF")
-          VERSION="ref-$SHA"
-          echo "Built $REF → :$VERSION"
-        fi
-
-        ENV_NAME=prod IMAGE_TAG=$VERSION docker compose -f infra/docker/docker-compose.unified.yml -p movida-prod down
-        ENV_NAME=prod IMAGE_TAG=$VERSION docker compose -f infra/docker/docker-compose.unified.yml -p movida-prod up -d
-        sleep 5
-        echo ""
-        echo "═══════════════════════════════════════════════════════════════"
-        echo "✅ Deployed to PROD: $VERSION"
-        echo ""
-        echo "   Frontend: http://localhost:${FRONTEND_PORT:-3000}"
-        echo "   Backend:  http://localhost:${BACKEND_PORT:-8080}"
-        echo "═══════════════════════════════════════════════════════════════"
+      - task: prod:remote:frontend

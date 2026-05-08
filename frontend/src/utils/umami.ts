@@ -3,13 +3,55 @@ declare global {
         umami?: {
             track: (
                 event: string | { website?: string; url: string; referrer?: string },
-                props?: Record<string, string | number>,
+                props?: Record<string, string | number | boolean>,
             ) => void;
+            identify?: (data: Record<string, string | number | boolean>) => void;
         };
     }
 }
 
 let umamiLoaded = false;
+
+/**
+ * Module-level base context auto-merged into every `umamiTrack` call.
+ * Keep it small (low-cardinality only): `is_authenticated`, `auth_method`.
+ * Never put PII (email, name, user IDs) here.
+ */
+let baseContext: Record<string, string | number | boolean> = {};
+
+/**
+ * When true, ALL analytics output is suppressed: Umami script load, page
+ * views, custom events, identify calls, and the server-side `/track/*`
+ * POSTs gated via `isAnalyticsDisabled()` in `tracking.ts`. Set to true
+ * for admin sessions so admin moderation activity does not skew the
+ * product analytics that drive UX decisions and ranking signals.
+ */
+let analyticsDisabled = false;
+
+export function setAnalyticsDisabled(disabled: boolean): void {
+    analyticsDisabled = disabled;
+}
+
+export function isAnalyticsDisabled(): boolean {
+    return analyticsDisabled;
+}
+
+export function setUmamiBaseContext(ctx: Record<string, string | number | boolean>): void {
+    baseContext = { ...baseContext, ...ctx };
+}
+
+export function clearUmamiBaseContext(): void {
+    baseContext = {};
+}
+
+/** Returns true when ?debug_analytics=1 is present in the URL — forces console logging. */
+function isDebugMode(): boolean {
+    try {
+        return new URLSearchParams(window.location.search).get('debug_analytics') === '1';
+    } catch {
+        return false;
+    }
+}
 
 /**
  * Dynamically injects the Umami script after analytics consent is granted.
@@ -19,14 +61,15 @@ let umamiLoaded = false;
  */
 export function loadUmami(): void {
     if (umamiLoaded) return;
+    if (analyticsDisabled) return;
 
     const websiteId = import.meta.env.VITE_UMAMI_WEBSITE_ID as string | undefined;
     const umamiUrl = import.meta.env.VITE_UMAMI_URL as string | undefined;
 
     if (!websiteId || !umamiUrl) {
-        if (import.meta.env.DEV) {
-            console.debug('[umami] VITE_UMAMI_WEBSITE_ID or VITE_UMAMI_URL not set — tracking calls will be logged only');
-        }
+        // Warn in all environments so a missing build-time variable is visible in the
+        // browser console even after a production deployment.
+        console.warn('[umami] VITE_UMAMI_WEBSITE_ID or VITE_UMAMI_URL not set at build time — analytics disabled. Set these in the Cloudflare Pages dashboard (Environment variables).');
         return;
     }
 
@@ -42,17 +85,26 @@ export function loadUmami(): void {
     document.head.appendChild(script);
 }
 
-/** Send a named custom event to Umami with optional properties. No-ops if not loaded. */
-export function umamiTrack(event: string, props?: Record<string, string | number>): void {
+/**
+ * Send a named custom event to Umami. Properties are merged with `baseContext`.
+ *
+ * Naming convention: snake_case, past-tense `object_action` (e.g. `rating_submitted`).
+ * Properties: low-cardinality primitives only. Never include PII or free text.
+ */
+export function umamiTrack(event: string, props?: Record<string, string | number | boolean>): void {
+    if (analyticsDisabled) return;
+    const merged = { ...baseContext, ...(props ?? {}) };
+    if (isDebugMode() || (import.meta.env.DEV && !window.umami)) {
+        console.debug('[umami] track', event, merged);
+    }
     if (window.umami) {
-        window.umami.track(event, props);
-    } else if (import.meta.env.DEV) {
-        console.debug('[umami] track', event, props);
+        window.umami.track(event, merged);
     }
 }
 
 /** Send a page view for the current URL to Umami. No-ops if not loaded. */
 export function umamiPageView(): void {
+    if (analyticsDisabled) return;
     if (window.umami) {
         const websiteId = import.meta.env.VITE_UMAMI_WEBSITE_ID as string | undefined;
         window.umami.track({
@@ -60,7 +112,22 @@ export function umamiPageView(): void {
             url: window.location.pathname,
             referrer: document.referrer,
         });
-    } else if (import.meta.env.DEV) {
+    } else if (import.meta.env.DEV || isDebugMode()) {
         console.debug('[umami] pageview', window.location.pathname);
+    }
+}
+
+/**
+ * Associate the current Umami session with an internal user ID.
+ * Pass only opaque IDs — never email, name, or third-party subjects.
+ * Umami v2+ supports `window.umami.identify`; older builds will silently no-op.
+ */
+export function umamiIdentify(userId: string): void {
+    if (analyticsDisabled) return;
+    if (isDebugMode() || (import.meta.env.DEV && !window.umami)) {
+        console.debug('[umami] identify', userId);
+    }
+    if (window.umami?.identify) {
+        window.umami.identify({ userId });
     }
 }

@@ -2,51 +2,53 @@ test_plan:
   name: "Locations Map — Event Map, Editing & Geocoding"
   description: >
     Verify the event map displays seeded events correctly, admin can edit event
-    locations with address autocomplete, and geocoding fills missing coordinates.
-    Scenario uses mock calendar service with 31 events across 3 calendars.
+    locations with address autocomplete, and geocoding fills missing
+    coordinates. Scenario uses mock calendar service with 31 events across 3
+    calendars.
   steps:
     # ── Home Page & Map ─────────────────────────────────────────
     - id: 1
       title: "Home page loads with events on map"
       description: >
-        Open the home page. The calendar should show events and the map (right side)
-        should display markers for geolocated events. Map should auto-fit to show
-        all visible markers.
+        Open the home page. The calendar should show events and the map (right
+        side) should display markers for geolocated events. Map should auto-fit
+        to show all visible markers.
       expected: >
-        Calendar shows events. Map shows ~20+ markers across Europe and worldwide.
-        Map zooms to fit all markers (not stuck on Paris default).
+        Calendar shows events. Map shows ~20+ markers across Europe and
+        worldwide. Map zooms to fit all markers (not stuck on Paris default).
 
     - id: 2
       title: "Map markers show event popup and interact with explorer list"
       description: >
-        Click a marker on the map (e.g. Paris Salsa Congress).
-        A popup should appear with event title, date, and location.
-        While the popup is still open, click on a different event in the
-        explorer list on the left (e.g. Madrid event). The map should zoom to
-        the newly selected event and close the previous popup cleanly.
-        Finally, click the title in the new event's popup to verify it opens
-        the event detail modal.
+        Click a marker on the map (e.g. Paris Salsa Congress). A popup should
+        appear with event title, date, and location. While the popup is still
+        open, click on a different event in the explorer list on the left (e.g.
+        Madrid event). The map should zoom to the newly selected event and close
+        the previous popup cleanly. Finally, click the title in the new event's
+        popup to verify it opens the event detail modal.
       expected: >
-        Initial popup shows event info. Clicking a different event in the explorer
-        list causes the map to zoom to that event without reverting focus.
-        Previous popup closes automatically. New event detail modal opens when
-        clicking the title in the popup, showing full description, location, and dates.
+        Initial popup shows event info. Clicking a different event in the
+        explorer list causes the map to zoom to that event without reverting
+        focus. Previous popup closes automatically. New event detail modal opens
+        when clicking the title in the popup, showing full description,
+        location, and dates.
 
     - id: 3
       title: "Calendar date navigation filters map"
       description: >
         Navigate the calendar to a different month (e.g. forward to Sep 2025).
-        The map should update to show only events visible in the current date range.
+        The map should update to show only events visible in the current date
+        range.
       expected: >
-        Map markers update to match the calendar's visible range.
-        Events outside the range disappear from the map.
+        Map markers update to match the calendar's visible range. Events outside
+        the range disappear from the map.
 
     - id: 4
       title: "Events without coordinates don't appear on map"
       description: >
-        Check that events with vague/missing locations (Online Zoom, Dave's Place,
-        TBA, Studio 54) do NOT appear as markers on the map. They should still
-        appear in the calendar view.
+        Check that events with vague/missing locations (Online Zoom, Dave's
+        Place, TBA, Studio 54) do NOT appear as markers on the map. They should
+        still appear in the calendar view.
       expected: >
         No markers for locationless events. Calendar still lists them.
 
@@ -54,8 +56,10 @@ test_plan:
     - id: 5
       title: "Dev login works"
       description: >
-        Navigate to /login. Since GOOGLE_CLIENT_ID is not set in mock mode,
-        a dev login button should appear. Click it.
+        Navigate to /login. In DEV_AUTH mode the page shows mock-user buttons +
+        a free-form email input (no Google button). Click "Sign in as Dev Admin"
+        if seeded, otherwise type the ADMIN_EMAIL value into the input and
+        submit.
       expected: >
         Redirected to /admin. User shown as logged in (admin@example.com or
         configured ADMIN_EMAIL).
@@ -65,15 +69,17 @@ test_plan:
       title: "Admin shows 3 enabled calendars"
       description: >
         On the admin page, check the calendars section. All 3 seeded calendars
-        (Salsa, Bachata, Kizomba) should be listed and enabled with correct colors.
+        (Salsa, Bachata, Kizomba) should be listed and enabled with correct
+        colors.
       expected: >
-        3 calendars listed: Salsa (#e11d48), Bachata (#7c3aed), Kizomba (#2563eb).
-        All enabled (toggles on).
+        3 calendars listed: Salsa (#e11d48), Bachata (#7c3aed), Kizomba
+        (#2563eb). All enabled (toggles on).
 
     - id: 7
       title: "Manual sync completes"
       description: >
-        Click "Sync Now". A sync log entry should appear in the Sync Logs section.
+        Click "Sync Now". A sync log entry should appear in the Sync Logs
+        section.
       expected: >
         Sync log shows status=success, trigger=manual, calendars_synced=3.
 
@@ -81,9 +87,9 @@ test_plan:
     - id: 8
       title: "Edit event location with address autocomplete"
       description: >
-        In admin events list, click on "TBA" event (evt-vague-002).
-        In the edit modal, type "Salle Wagram Paris" in the location field.
-        Wait for autocomplete suggestions to appear. Select one.
+        In admin events list, click on "TBA" event (evt-vague-002). In the edit
+        modal, type "Salle Wagram Paris" in the location field. Wait for
+        autocomplete suggestions to appear. Select one.
       expected: >
         Autocomplete dropdown shows address suggestions from Nominatim.
         Selecting a suggestion fills the location field and populates
@@ -92,20 +98,20 @@ test_plan:
     - id: 9
       title: "Save edited event"
       description: >
-        After selecting the address in step 8, click Save.
-        Go back to Home page and check the map.
+        After selecting the address in step 8, click Save. Go back to Home page
+        and check the map.
       expected: >
-        Event saved successfully. The "TBA" event now appears on the map
-        at the correct location with updated coordinates.
+        Event saved successfully. The "TBA" event now appears on the map at the
+        correct location with updated coordinates.
 
     - id: 10
       title: "Edit event without changing location"
       description: >
-        In admin, click on any event (e.g. Paris Salsa Congress 2026).
-        Change only the description. Save.
+        In admin, click on any event (e.g. Paris Salsa Congress 2026). Change
+        only the description. Save.
       expected: >
-        Event updated. Original coordinates preserved (not re-geocoded).
-        Event still appears at same position on map.
+        Event updated. Original coordinates preserved (not re-geocoded). Event
+        still appears at same position on map.
 
     # ── Admin — Settings ────────────────────────────────────────
     - id: 11
@@ -119,17 +125,18 @@ test_plan:
     - id: 12
       title: "All-day event renders correctly"
       description: >
-        Find "Lyon Kizomba Open Air" (evt-allday-001) in the calendar.
-        It's a 3-day all-day event (Jul 17-19).
+        Find "Lyon Kizomba Open Air" (evt-allday-001) in the calendar. It's a
+        3-day all-day event (Jul 17-19).
       expected: >
-        Event spans across multiple days in calendar view (no specific time shown).
-        Marker appears on map at Lyon coordinates.
+        Event spans across multiple days in calendar view (no specific time
+        shown). Marker appears on map at Lyon coordinates.
 
     - id: 13
       title: "Null-island event (0,0) on map"
       description: >
-        Check if "Null Island Bachata" (evt-nullisland) appears on the map.
-        It has coordinates (0, 0) — Gulf of Guinea.
+        Check if "Null Island Bachata" (evt-nullisland) appears on the map. It
+        has coordinates (0, 0) — Gulf of Guinea.
       expected: >
-        Marker appears at (0,0) on the map. This is technically valid coordinates.
-        When map zooms to fit all markers, the worldwide view includes this point.
+        Marker appears at (0,0) on the map. This is technically valid
+        coordinates. When map zooms to fit all markers, the worldwide view
+        includes this point.

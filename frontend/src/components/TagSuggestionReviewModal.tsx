@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import type { TagSuggestionResponse, TagGroup, CalendarEvent } from '../types';
-import { approveTagSuggestion, rejectTagSuggestion, createTag, fetchEvent, fetchAdminTagSuggestions } from '../api';
-import EventModal from './EventModal';
+import type { TagSuggestionResponse, TagGroup } from '../types';
+import { approveTagSuggestion, rejectTagSuggestion, createTag, fetchAdminTagSuggestions } from '../api';
 
 interface FlatTag {
     id: number;
@@ -16,12 +15,14 @@ interface Props {
     tagGroups: TagGroup[];
     onClose: () => void;
     onUpdated: (s: TagSuggestionResponse) => void;
+    /** Open the admin event-detail side panel for the suggestion's event. */
+    onViewEvent?: (eventId: string) => void;
 }
 
 const STATUS_COLORS: Record<string, string> = {
     pending: 'bg-amber-100 text-amber-700',
     approved: 'bg-emerald-100 text-emerald-700',
-    rejected: 'bg-red-100 text-red-700',
+    rejected: 'bg-slate-200 text-slate-700',
 };
 
 type FreeTextMode = 'assign' | 'create';
@@ -32,11 +33,13 @@ export default function TagSuggestionReviewModal({
     tagGroups,
     onClose,
     onUpdated,
+    onViewEvent,
 }: Props) {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [rejectMode, setRejectMode] = useState(false);
     const [adminNotes, setAdminNotes] = useState(suggestion.admin_notes ?? '');
+    const [descExpanded, setDescExpanded] = useState(false);
 
     // Assign-existing-tag state
     const [assignTagId, setAssignTagId] = useState<number | ''>('');
@@ -54,9 +57,7 @@ export default function TagSuggestionReviewModal({
         }
     );
 
-    // Event detail overlay
-    const [viewEvent, setViewEvent] = useState<CalendarEvent | null>(null);
-    const [loadingEvent, setLoadingEvent] = useState(false);
+    // Event detail overlay handled by parent via onViewEvent.
 
     const isPending = suggestion.status === 'pending';
     const isFreeText = !suggestion.tag && !!suggestion.free_text;
@@ -112,15 +113,10 @@ export default function TagSuggestionReviewModal({
         }
     };
 
-    const handleViewEvent = async () => {
-        setLoadingEvent(true);
-        try {
-            const event = await fetchEvent(suggestion.event_id);
-            setViewEvent(event);
-        } catch {
-            setError('Could not load event details.');
-        } finally {
-            setLoadingEvent(false);
+    const handleViewEvent = () => {
+        if (onViewEvent) {
+            onViewEvent(suggestion.event_id);
+            onClose();
         }
     };
 
@@ -155,14 +151,41 @@ export default function TagSuggestionReviewModal({
                                 </p>
                                 <p className="text-[10px] text-slate-400 mt-0.5 font-mono">{suggestion.event_id}</p>
                             </div>
-                            <button
-                                onClick={handleViewEvent}
-                                disabled={loadingEvent}
-                                className="shrink-0 text-[11px] text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50"
-                            >
-                                {loadingEvent ? 'Loading…' : 'View event →'}
-                            </button>
+                            {onViewEvent && (
+                                <button
+                                    onClick={handleViewEvent}
+                                    className="shrink-0 text-[11px] text-sky-700 hover:text-sky-900 font-medium"
+                                >
+                                    View event →
+                                </button>
+                            )}
                         </div>
+                        {suggestion.event_description && (
+                            <div className="mt-2 text-[12px] text-slate-600 leading-snug">
+                                <p className={descExpanded ? '' : 'line-clamp-3'}>
+                                    {suggestion.event_description}
+                                </p>
+                                {suggestion.event_description.length > 180 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setDescExpanded((v) => !v)}
+                                        className="mt-1 text-[10px] uppercase tracking-wide text-slate-400 hover:text-slate-600"
+                                    >
+                                        {descExpanded ? 'See less' : 'See more'}
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                        {(suggestion.event_start || suggestion.event_location) && (
+                            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-slate-500">
+                                {suggestion.event_start && (
+                                    <span>📅 {fmtDate(suggestion.event_start)}</span>
+                                )}
+                                {suggestion.event_location && (
+                                    <span className="truncate">📍 {suggestion.event_location}</span>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     {/* Tag suggestion */}
@@ -293,7 +316,7 @@ export default function TagSuggestionReviewModal({
                         </div>
                     </div>
 
-                    {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+                    {error && <p className="mb-3 text-sm text-slate-600 bg-slate-100 px-2 py-1 rounded">{error}</p>}
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 flex-wrap">
@@ -302,13 +325,13 @@ export default function TagSuggestionReviewModal({
                                 <button
                                     onClick={handleApprove}
                                     disabled={saving}
-                                    className="bg-emerald-600 text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-emerald-700 disabled:opacity-50 transition"
+                                    className="bg-sky-600 text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-sky-700 disabled:opacity-50 transition"
                                 >
                                     {saving ? 'Saving…' : 'Approve'}
                                 </button>
                                 <button
                                     onClick={() => setRejectMode(true)}
-                                    className="bg-red-600 text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-red-700 transition"
+                                    className="bg-slate-200 text-slate-700 text-xs font-medium px-3 py-1.5 rounded hover:bg-slate-300 transition"
                                 >
                                     Reject
                                 </button>
@@ -320,7 +343,7 @@ export default function TagSuggestionReviewModal({
                                 <button
                                     onClick={handleReject}
                                     disabled={saving}
-                                    className="bg-red-600 text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-red-700 disabled:opacity-50 transition"
+                                    className="bg-slate-700 text-white text-xs font-medium px-3 py-1.5 rounded hover:bg-slate-800 disabled:opacity-50 transition"
                                 >
                                     {saving ? 'Saving…' : 'Confirm Reject'}
                                 </button>
@@ -339,13 +362,6 @@ export default function TagSuggestionReviewModal({
                     </div>
                 </div>
             </div>
-
-            {viewEvent && (
-                <EventModal
-                    event={viewEvent}
-                    onClose={() => setViewEvent(null)}
-                />
-            )}
         </>
     );
 }

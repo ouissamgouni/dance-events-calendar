@@ -15,7 +15,7 @@ tasks:
   unit:backend:
     desc: Run backend unit tests
     dir: backend
-    dotenv: [".env.test"]
+    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/test.env"]
     cmds:
       - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/pytest tests/unit/ tests/api/ -m "not integration" -v
 
@@ -30,7 +30,7 @@ tasks:
   int:
     desc: Run integration tests (requires test DB)
     dir: backend
-    dotenv: [".env.test"]
+    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/test.env"]
     cmds:
       - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/pytest tests/integration/ -m "integration" -v
 
@@ -49,7 +49,7 @@ tasks:
   e2e:
     desc: Run end-to-end tests (requires running database)
     dir: backend
-    dotenv: [".env.test"]
+    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/test.env"]
     cmds:
       - echo "⚠️  E2E tests not yet implemented"
       - echo "   Placeholder for future Playwright/Cypress tests"

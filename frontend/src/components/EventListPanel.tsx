@@ -1,9 +1,14 @@
 import { Fragment, useEffect, useRef, useState, useCallback } from 'react';
 import type { CalendarEvent } from '../types';
 import { useSavedEvents } from '../context/SavedEventsContext';
+import { useFeatureFlags } from '../context/FeatureFlagsContext';
+import { useAttendanceSummary } from '../context/AttendanceSummariesContext';
 import SaveEventButton from './SaveEventButton';
 import GoingButton from './GoingButton';
+import AttendeeAvatarStack from './AttendeeAvatarStack';
+import RateEventButton from './RateEventButton';
 import TagBadges from './TagBadges';
+import { getTagColors } from '../utils/eventColor';
 
 interface MapBounds {
     north: number;
@@ -24,6 +29,8 @@ interface EventListPanelProps {
     hoveredEventId?: string | null;
     onEventHover?: (eventId: string | null) => void;
     pastEventIds?: Set<string>;
+    /** Optional callback to open the "Suggest an event" flow from the empty state. */
+    onSuggestEvent?: () => void;
 }
 
 function PriceBadge({ event }: { event: CalendarEvent }) {
@@ -111,8 +118,10 @@ export default function EventListPanel({
     hoveredEventId,
     onEventHover,
     pastEventIds,
+    onSuggestEvent,
 }: EventListPanelProps) {
     const { isSaved } = useSavedEvents();
+    const { showRatings } = useFeatureFlags();
     const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const scrollRef = useRef<HTMLDivElement>(null);
     const [showBottomFade, setShowBottomFade] = useState(false);
@@ -206,6 +215,15 @@ export default function EventListPanel({
                         <div className="event-list-empty">
                             <p>No events in this area for the selected dates.</p>
                             <p className="text-xs text-slate-400 mt-1">Try zooming out or adjusting the date range.</p>
+                            {onSuggestEvent && (
+                                <button
+                                    type="button"
+                                    onClick={onSuggestEvent}
+                                    className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-4 py-2 shadow-sm transition"
+                                >
+                                    + Suggest an event
+                                </button>
+                            )}
                         </div>
                     ) : (
                         sortedEvents.map((event, idx) => {
@@ -229,7 +247,21 @@ export default function EventListPanel({
                                         onMouseEnter={() => onEventHover?.(event.event_id)}
                                         onMouseLeave={() => onEventHover?.(null)}
                                     >
-                                        <div className="event-card-color" style={{ backgroundColor: onMap ? (event.color || '#6b7280') : '#d1d5db' }} />
+                                        <div className="event-card-color event-tag-stripes" aria-hidden="true">
+                                            {(() => {
+                                                const colors = getTagColors(event);
+                                                if (colors.length === 0) {
+                                                    return <span className="event-tag-stripe" style={{ backgroundColor: onMap ? '#6b7280' : '#d1d5db' }} />;
+                                                }
+                                                return colors.map((c, i) => (
+                                                    <span
+                                                        key={i}
+                                                        className="event-tag-stripe"
+                                                        style={{ backgroundColor: onMap ? c : '#d1d5db' }}
+                                                    />
+                                                ));
+                                            })()}
+                                        </div>
                                         <div className="event-card-content relative">
                                             <h4 className="event-card-title">{event.title}</h4>
                                             <p className="event-card-date">
@@ -255,20 +287,11 @@ export default function EventListPanel({
                                                     <TagBadges tags={event.tags} maxVisible={3} />
                                                 </div>
                                             )}
-                                            <div className="absolute top-0 right-0 flex items-center gap-0.5">
-                                                <SaveEventButton
-                                                    eventId={event.event_id}
-                                                    appearance="icon"
-                                                    size="sm"
-                                                    stopPropagation
-                                                    className={isSaved(event.event_id) ? 'text-slate-700' : ''}
-                                                />
-                                                <GoingButton
-                                                    eventId={event.event_id}
-                                                    appearance="icon"
-                                                    size="sm"
-                                                    stopPropagation
-                                                />
+                                            <div className="mt-1">
+                                                <AttendeeAvatarStack eventId={event.event_id} />
+                                            </div>
+                                            <div className="absolute top-0 right-0 flex items-center gap-1.5">
+                                                <ActionCountCluster eventId={event.event_id} showRatings={!!showRatings} isSavedFlag={isSaved(event.event_id)} />
                                             </div>
                                         </div>
                                     </div>
@@ -280,5 +303,57 @@ export default function EventListPanel({
                 {showBottomFade && <div className="event-list-fade" />}
             </div>
         </div>
+    );
+}
+
+/**
+ * CTA cluster for an event card: each action icon is paired with its live
+ * count (saved / going), Twitter-style. Counts are hidden when zero so
+ * cards with no engagement stay quiet. Single source of truth for the
+ * number is the attendance summary — `AttendeeAvatarStack` shows *who*,
+ * not *how many*.
+ */
+function ActionCountCluster({ eventId, showRatings, isSavedFlag }: { eventId: string; showRatings: boolean; isSavedFlag: boolean }) {
+    const summary = useAttendanceSummary(eventId);
+    const savedCount = summary?.total_saved ?? 0;
+    const goingCount = summary?.total_going ?? 0;
+    return (
+        <>
+            <span className="inline-flex items-center">
+                <SaveEventButton
+                    eventId={eventId}
+                    appearance="icon"
+                    size="sm"
+                    stopPropagation
+                    className={isSavedFlag ? 'text-slate-700' : ''}
+                />
+                {savedCount > 0 && (
+                    <span className="text-[11px] text-slate-500 -ml-0.5 mr-1 tabular-nums" aria-label={`${savedCount} saved`}>
+                        {savedCount}
+                    </span>
+                )}
+            </span>
+            <span className="inline-flex items-center">
+                <GoingButton
+                    eventId={eventId}
+                    appearance="icon"
+                    size="sm"
+                    stopPropagation
+                />
+                {goingCount > 0 && (
+                    <span className="text-[11px] text-emerald-700 -ml-0.5 mr-1 tabular-nums" aria-label={`${goingCount} going`}>
+                        {goingCount}
+                    </span>
+                )}
+            </span>
+            {showRatings && (
+                <RateEventButton
+                    eventId={eventId}
+                    appearance="icon"
+                    size="sm"
+                    stopPropagation
+                />
+            )}
+        </>
     );
 }

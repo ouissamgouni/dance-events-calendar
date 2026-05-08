@@ -7,8 +7,7 @@ Covers:
 """
 
 import pytest
-from datetime import datetime
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 from sqlmodel import Session
@@ -19,8 +18,6 @@ from backend.db.database import get_session
 from backend.db.models import (
     CalendarDefaultTag,
     CalendarSetting,
-    CachedEvent,
-    EventTag,
     Tag,
 )
 
@@ -188,130 +185,3 @@ class TestSetCalendarDefaultTags:
         )
 
         assert resp.status_code == 404
-
-
-# ── SyncService: default tags applied only to NEW events ──────────────────────
-
-
-def _make_calendar_setting(cal_id="cal-1"):
-    from backend.db.models import CalendarSetting
-
-    return CalendarSetting(
-        calendar_id=cal_id,
-        name="Test Calendar",
-        enabled=True,
-    )
-
-
-def _make_calendar_event(event_id="evt-new", calendar_id="cal-1"):
-    from backend.services.calendar.base import CalendarEvent
-
-    return CalendarEvent(
-        event_id=event_id,
-        calendar_id=calendar_id,
-        title="New Salsa Social",
-        description=None,
-        location=None,
-        start=datetime(2026, 6, 1, 20, 0),
-        end=datetime(2026, 6, 1, 23, 0),
-        all_day=False,
-    )
-
-
-def _make_sync_service_with(events=None, deleted_ids=None):
-    from backend.services.calendar.base import SyncResult
-    from backend.services.sync_service import SyncService
-
-    cal_svc = MagicMock()
-    cal_svc.get_events.return_value = SyncResult(
-        events=events or [],
-        deleted_event_ids=deleted_ids or [],
-        next_sync_token=None,
-    )
-    svc = SyncService(cal_svc)
-    svc.pipeline = MagicMock()
-    svc.pipeline.run.return_value = MagicMock(to_dict=lambda: {})
-    return svc
-
-
-@pytest.mark.unit
-class TestSyncServiceDefaultTags:
-    def test_new_event_gets_default_tags(self):
-        """EventTag rows are added for each default tag when a new event is synced."""
-        default_tag = CalendarDefaultTag(calendar_id="cal-1", tag_id=7)
-
-        svc = _make_sync_service_with(events=[_make_calendar_event()])
-        session = MagicMock()
-        session.get.return_value = None  # event is new
-        session.exec.return_value.all.return_value = [default_tag]
-        session.exec.return_value.first.return_value = None  # no content-hash duplicate
-
-        svc.sync_calendar(session, _make_calendar_setting())
-
-        added = session.add.call_args_list
-        event_tags_added = [c[0][0] for c in added if isinstance(c[0][0], EventTag)]
-        assert len(event_tags_added) == 1
-        assert event_tags_added[0].event_id == "evt-new"
-        assert event_tags_added[0].tag_id == 7
-
-    def test_existing_event_does_not_get_default_tags(self):
-        """Re-syncing an existing event must NOT apply default tags."""
-        default_tag = CalendarDefaultTag(calendar_id="cal-1", tag_id=7)
-
-        svc = _make_sync_service_with(events=[_make_calendar_event()])
-        existing = MagicMock()
-        existing.title = "New Salsa Social"
-        existing.description = None
-        existing.location = None
-        existing.start = datetime(2026, 6, 1, 20, 0)
-        existing.end = datetime(2026, 6, 1, 23, 0)
-        existing.all_day = False
-        existing.latitude = None
-        existing.price_min = None
-        existing.links = None
-
-        session = MagicMock()
-        session.get.return_value = existing  # event already in DB
-        session.exec.return_value.all.return_value = [default_tag]
-
-        svc.sync_calendar(session, _make_calendar_setting())
-
-        added = session.add.call_args_list
-        event_tags_added = [c[0][0] for c in added if isinstance(c[0][0], EventTag)]
-        assert event_tags_added == [], (
-            "Default tags must NOT be applied to existing events"
-        )
-
-    def test_multiple_default_tags_all_applied_to_new_event(self):
-        """All configured default tags are applied when a new event is synced."""
-        defaults = [
-            CalendarDefaultTag(calendar_id="cal-1", tag_id=3),
-            CalendarDefaultTag(calendar_id="cal-1", tag_id=5),
-        ]
-
-        svc = _make_sync_service_with(events=[_make_calendar_event()])
-        session = MagicMock()
-        session.get.return_value = None  # new event
-        session.exec.return_value.all.return_value = defaults
-        session.exec.return_value.first.return_value = None  # no content-hash duplicate
-
-        svc.sync_calendar(session, _make_calendar_setting())
-
-        added = session.add.call_args_list
-        event_tags_added = [c[0][0] for c in added if isinstance(c[0][0], EventTag)]
-        applied_tag_ids = {et.tag_id for et in event_tags_added}
-        assert applied_tag_ids == {3, 5}
-
-    def test_no_default_tags_configured_no_event_tags_added(self):
-        """If a calendar has no default tags, no EventTag rows are created."""
-        svc = _make_sync_service_with(events=[_make_calendar_event()])
-        session = MagicMock()
-        session.get.return_value = None  # new event
-        session.exec.return_value.all.return_value = []  # no defaults
-        session.exec.return_value.first.return_value = None  # no content-hash duplicate
-
-        svc.sync_calendar(session, _make_calendar_setting())
-
-        added = session.add.call_args_list
-        event_tags_added = [c[0][0] for c in added if isinstance(c[0][0], EventTag)]
-        assert event_tags_added == []

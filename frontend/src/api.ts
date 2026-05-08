@@ -1,11 +1,27 @@
-import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse } from './types';
+import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry } from './types';
+
+declare const __VITE_API_URL__: string;
 
 const resolveApiBase = (): string => {
     // In Vite dev server, keep relative /api so proxy rules apply.
     if (import.meta.env.DEV) return '/api';
 
-    const rawApiUrl = (import.meta.env.VITE_API_URL || '').trim();
-    if (!rawApiUrl) return '/api';
+    const rawApiUrl = (__VITE_API_URL__ || import.meta.env.VITE_API_URL || '').trim();
+    if (!rawApiUrl) {
+        // Fallback for Pages deployments if build env injection is missing.
+        // Custom-domain hosts use same-site API subdomains so the session
+        // cookie is treated as first-party (avoids third-party cookie blocking
+        // by Chrome/Safari ITP). Pages preview hostnames fall back to the
+        // direct Fly host (cross-site, but not used in normal user flow).
+        if (typeof window !== 'undefined') {
+            const host = window.location.hostname;
+            if (host === 'joinmovida.com') return 'https://api.joinmovida.com/api';
+            if (host === 'develop.joinmovida.com') return 'https://api-develop.joinmovida.com/api';
+            if (host === 'movida.pages.dev') return 'https://movida.fly.dev/api';
+            if (host.endsWith('.movida.pages.dev')) return 'https://movida-staging.fly.dev/api';
+        }
+        return '/api';
+    }
     const normalized = rawApiUrl.replace(/\/+$/, '');
     return normalized.endsWith('/api') ? normalized : `${normalized}/api`;
 };
@@ -55,19 +71,29 @@ export async function fetchEvents(params?: { startDate?: string; endDate?: strin
     return parseJsonResponse<CalendarEvent[]>(res, 'Failed to fetch events');
 }
 
-export async function fetchEvent(eventId: string): Promise<CalendarEvent> {
-    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}`);
+export async function fetchEvent(eventId: string, opts?: { fresh?: boolean }): Promise<CalendarEvent> {
+    // `fresh: true` bypasses the browser HTTP cache. The public endpoint sets
+    // `Cache-Control: public, max-age=60`; admin flows that re-fetch after a
+    // mutation (approve a tag suggestion, edit a field, retry geocoding…) need
+    // the fresh server state immediately.
+    const init: RequestInit = opts?.fresh ? { cache: 'no-store' } : {};
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}`, init);
     if (!res.ok) throw new Error('Failed to fetch event');
     return res.json();
 }
 
 export interface SiteSettings {
     since_date: string;
+    sync_since_date: string;
     sync_interval_minutes: number;
     auto_sync_enabled: boolean;
+    auto_sync_mode: 'incremental' | 'reseed';
     show_prices: boolean;
     show_popularity: boolean;
+    show_ratings: boolean;
     popularity_threshold: number;
+    event_color_bar_color: string;
+    tag_sort_mode: 'group' | 'event_count';
 }
 
 export async function fetchSettings(): Promise<SiteSettings> {
@@ -113,7 +139,7 @@ export async function updateCalendar(
     calendarId: string,
     update: { enabled?: boolean; color?: string; name?: string },
 ): Promise<CalendarSetting> {
-    const res = await fetch(`${BASE}/admin/calendars/${calendarId}/toggle`, {
+    const res = await fetch(`${BASE}/admin/calendars/${encodeURIComponent(calendarId)}/toggle`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(update),
@@ -146,13 +172,11 @@ export async function addCalendar(calendarId: string): Promise<CalendarSetting> 
     return res.json();
 }
 
-export async function triggerSync(): Promise<Record<string, number>> {
-    const res = await fetch(`${BASE}/admin/sync`, {
-        method: 'POST',
-        credentials: 'include',
-    });
-    if (!res.ok) throw new Error('Failed to trigger sync');
-    return res.json();
+export interface SyncStats {
+    calendars_synced: number;
+    events_upserted: number;
+    events_deleted: number;
+    enrichment_queued: number;
 }
 
 // --- Auth ---
@@ -168,20 +192,55 @@ export async function fetchAuthMode(): Promise<AuthMode> {
     return res.json();
 }
 
+export interface AuthUser {
+    user_id?: string;
+    email: string;
+    name: string;
+    handle?: string | null;
+    /** Opaque attribution token appended to shared URLs as `?ref=share&src=`.
+     *  Present once the user record is post-`h2b3c4d5e6f8` (auto-backfilled
+     *  on the first /me call). Null only in transient pre-backfill states. */
+    share_code?: string | null;
+    avatar_url?: string | null;
+    is_admin?: boolean;
+    share_attendance_default?: boolean;
+    /** Only present on the /auth/google response — lets the client emit
+     * `signup_completed` vs `login_completed`. Absent on /auth/me. */
+    is_new_user?: boolean;
+}
+
 export async function loginWithGoogle(
     credential: string,
-): Promise<{ email: string; name: string }> {
+    deviceId?: string,
+    mockEmail?: string,
+    mockName?: string,
+): Promise<AuthUser> {
+    const body: Record<string, unknown> = { credential, device_id: deviceId };
+    if (mockEmail) body.mock_email = mockEmail;
+    if (mockName) body.mock_name = mockName;
     const res = await fetch(`${BASE}/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credential }),
+        body: JSON.stringify(body),
         credentials: 'include',
     });
     if (!res.ok) throw new Error('Login failed');
     return res.json();
 }
 
-export async function fetchMe(): Promise<{ email: string; name: string }> {
+export interface DevUser {
+    email: string;
+    name: string;
+}
+
+export async function fetchDevUsers(): Promise<DevUser[]> {
+    const res = await fetch(`${BASE}/auth/dev-users`);
+    if (!res.ok) return [];
+    const data = await res.json() as { users?: DevUser[] };
+    return data.users ?? [];
+}
+
+export async function fetchMe(): Promise<AuthUser> {
     const res = await fetch(`${BASE}/auth/me`, { credentials: 'include' });
     if (!res.ok) throw new Error('Not authenticated');
     return res.json();
@@ -192,6 +251,112 @@ export async function logout(): Promise<void> {
         method: 'POST',
         credentials: 'include',
     });
+}
+
+export async function deleteMyAccount(): Promise<void> {
+    const res = await fetch(`${BASE}/auth/me`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Account deletion failed');
+}
+
+export async function fetchMySavedEventIds(): Promise<string[]> {
+    const res = await fetch(`${BASE}/auth/saved-events`, { credentials: 'include' });
+    if (!res.ok) return [];
+    const data = await res.json() as { event_ids: string[] };
+    return data.event_ids ?? [];
+}
+
+export async function fetchMyAttendingEventIds(): Promise<string[]> {
+    const res = await fetch(`${BASE}/auth/attending-events`, { credentials: 'include' });
+    if (!res.ok) return [];
+    const data = await res.json() as { event_ids: string[] };
+    return data.event_ids ?? [];
+}
+
+export async function fetchMyAttendingEvents(): Promise<AttendingEventEntry[]> {
+    const res = await fetch(`${BASE}/auth/attending-events`, { credentials: 'include' });
+    if (!res.ok) return [];
+    const data = await res.json() as { events?: AttendingEventEntry[] };
+    return data.events ?? [];
+}
+
+export async function updateUserPreferences(prefs: { share_attendance_default?: boolean }): Promise<{ share_attendance_default: boolean }> {
+    const res = await fetch(`${BASE}/auth/preferences`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(prefs),
+    });
+    if (!res.ok) throw new Error('Failed to update preferences');
+    return res.json();
+}
+
+export async function updateUserProfile(
+    profile: { display_name?: string; handle?: string },
+): Promise<{ display_name: string | null; handle: string | null }> {
+    const res = await fetch(`${BASE}/auth/profile`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(profile),
+    });
+    if (!res.ok) {
+        let detail = 'Failed to update profile';
+        try {
+            const data = await res.json();
+            if (typeof data?.detail === 'string') detail = data.detail;
+        } catch { /* ignore */ }
+        throw new Error(detail);
+    }
+    return res.json();
+}
+
+export interface HandleAvailability {
+    handle: string;
+    available: boolean;
+    reason?: string | null;
+}
+
+export async function checkHandleAvailable(handle: string): Promise<HandleAvailability> {
+    const res = await fetch(
+        `${BASE}/auth/handle-available?handle=${encodeURIComponent(handle)}`,
+        { credentials: 'include' },
+    );
+    if (!res.ok) throw new Error('Handle check failed');
+    return res.json();
+}
+
+// --- Who's Going (attendee visibility) ---
+
+export async function fetchAttendanceSummary(eventId: string): Promise<AttendanceSummary> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/attendance-summary`, {
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to fetch attendance summary');
+    return res.json();
+}
+
+export async function fetchAttendanceSummaryBatch(eventIds: string[]): Promise<AttendanceSummary[]> {
+    if (eventIds.length === 0) return [];
+    const res = await fetch(`${BASE}/events/attendance-summary`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ event_ids: eventIds }),
+    });
+    if (!res.ok) return [];
+    return res.json();
+}
+
+export async function fetchEventAttendees(eventId: string): Promise<Attendee[] | { unauthorized: true }> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/attendees`, {
+        credentials: 'include',
+    });
+    if (res.status === 401) return { unauthorized: true };
+    if (!res.ok) throw new Error('Failed to fetch attendees');
+    return res.json();
 }
 
 // --- Sync Logs ---
@@ -219,6 +384,169 @@ export async function fetchSyncLogs(limit = 20, offset = 0): Promise<SyncLogEntr
     return res.json();
 }
 
+// --- Sync Jobs ---
+
+export interface SyncJobTotals {
+    calendars_synced: number;
+    events_fetched: number;
+    events_upserted: number;
+    events_deduped: number;
+    events_deleted: number;
+    events_enriched: number;
+    events_failed: number;
+}
+
+export interface LogEntry {
+    timestamp: string;
+    level: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';
+    message: string;
+}
+
+// Alias used by job-level views; structurally identical to LogEntry today.
+export type JobLogEntry = LogEntry;
+
+export type FailureType =
+    | 'ungeolocated'
+    | 'price_not_found'
+    | 'links_not_found'
+    | 'enrichment_exception'
+    | 'persistence_failed';
+
+export interface FailureEntry {
+    timestamp: string;
+    event_id: string;
+    title: string;
+    stage: string;
+    type: FailureType;
+    message: string;
+}
+
+export interface StageStats {
+    processed: number;
+    skipped: number;
+    failed: number;
+}
+
+export interface ProcessedEventSummary {
+    event_id: string;
+    title: string;
+    start_dt: string;
+    location: string | null;
+    action: 'new' | 'updated' | 'unchanged' | 'deduped' | 'failed' | 'processing';
+    pipeline_stage: string | null;
+    geocode_provider: string | null;
+    price: string | null;
+    links_count: number | null;
+    error: string | null;
+}
+
+export interface CalendarStatus {
+    calendar_id: string;
+    calendar_name: string;
+    status: 'queued' | 'running' | 'processing' | 'completed' | 'warning' | 'failed';
+    fetched: number;
+    upserted: number;
+    deduped: number;
+    enriched_ok: number;
+    enriched_failed: number;
+    error_count: number;
+    started_at: string | null;
+    finished_at: string | null;
+    error: string | null;
+    current_operation: string | null;
+    pipeline_stage: string | null;
+    stage_stats: Record<string, StageStats>;
+    logs: LogEntry[];
+    processed_events: ProcessedEventSummary[];
+    failures: FailureEntry[];
+}
+
+export interface SyncJobRecord {
+    job_id: string;
+    status: 'idle' | 'running' | 'abort_requested' | 'aborted' | 'completed' | 'warning' | 'failed';
+    started_at: string;
+    finished_at: string | null;
+    heartbeat_at: string;
+    mode: 'incremental' | 'reseed';
+    since_date: string | null;
+    abort_requested: boolean;
+    warning_message: string | null;
+    error_message: string | null;
+    totals: SyncJobTotals;
+    stage_totals: Record<string, { processed: number; skipped: number; failed: number }>;
+    metadata: Record<string, unknown>;
+    calendar_statuses: Record<string, CalendarStatus>;
+    is_stale?: boolean;
+}
+
+export async function startSyncJob(
+    mode: 'incremental' | 'reseed',
+    since_date?: string | null,
+): Promise<SyncJobRecord> {
+    const res = await fetch(`${BASE}/admin/sync-jobs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, since_date: since_date ?? null, calendar_ids: [] }),
+        credentials: 'include',
+    });
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { detail?: string }).detail || 'Failed to start sync job');
+    }
+    return res.json();
+}
+
+export async function getSyncJob(jobId: string): Promise<SyncJobRecord> {
+    const res = await fetch(`${BASE}/admin/sync-jobs/${jobId}`, { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to get sync job');
+    return res.json();
+}
+
+export async function retryCalendarInJob(
+    jobId: string,
+    calendarId: string,
+): Promise<SyncJobRecord> {
+    const res = await fetch(
+        `${BASE}/admin/sync-jobs/${encodeURIComponent(jobId)}/retry-calendar?calendar_id=${encodeURIComponent(calendarId)}`,
+        {
+            method: 'POST',
+            credentials: 'include',
+        },
+    );
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { detail?: string }).detail || 'Failed to retry calendar sync');
+    }
+    return res.json();
+}
+
+export async function getCurrentSyncJob(): Promise<SyncJobRecord> {
+    const res = await fetch(`${BASE}/admin/sync-jobs/current`, { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed to get current sync job');
+    return res.json();
+}
+
+export async function abortSyncJob(jobId: string): Promise<SyncJobRecord> {
+    const res = await fetch(`${BASE}/admin/sync-jobs/${jobId}/abort`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to abort sync job');
+    return res.json();
+}
+
+export async function fetchSyncJobs(
+    limit = 20,
+    offset = 0,
+): Promise<{ items: SyncJobRecord[]; total: number }> {
+    const res = await fetch(
+        `${BASE}/admin/sync-jobs?limit=${limit}&offset=${offset}`,
+        { credentials: 'include' },
+    );
+    if (!res.ok) throw new Error('Failed to fetch sync jobs');
+    return res.json();
+}
+
 // --- Admin Events ---
 
 export interface PaginatedEventsResponse {
@@ -235,6 +563,12 @@ export interface EventFilterParams {
     tag_ids?: string;
     ungeolocated?: boolean;
     future_only?: boolean;
+    /**
+     * When true, include events that have already finished. The backend now
+     * defaults to upcoming-only (CachedEvent.end > now); set this to true to
+     * widen the scope (audits, archives, etc.).
+     */
+    include_past?: boolean;
 }
 
 export interface FilterOption {
@@ -261,6 +595,7 @@ export async function fetchAdminEvents(params: EventFilterParams = {}): Promise<
     if (params.tag_ids) qs.set('tag_ids', params.tag_ids);
     if (params.ungeolocated) qs.set('ungeolocated', 'true');
     if (params.future_only) qs.set('future_only', 'true');
+    if (params.include_past) qs.set('include_past', 'true');
     const res = await fetch(`${BASE}/admin/events?${qs}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch events');
     return res.json();
@@ -274,6 +609,7 @@ export async function fetchEventFilterOptions(params: EventFilterParams = {}): P
     if (params.tag_ids) qs.set('tag_ids', params.tag_ids);
     if (params.ungeolocated) qs.set('ungeolocated', 'true');
     if (params.future_only) qs.set('future_only', 'true');
+    if (params.include_past) qs.set('include_past', 'true');
     const res = await fetch(`${BASE}/admin/events/filter-options?${qs}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch filter options');
     return res.json();
@@ -314,7 +650,10 @@ export async function bulkAssignTags(eventIds: string[], tagIds: number[]): Prom
 
 export async function updateEvent(
     eventId: string,
-    update: Partial<Omit<CalendarEvent, 'event_id' | 'calendar_id' | 'color'>>,
+    update: Partial<Omit<CalendarEvent, 'event_id' | 'color'>> & {
+        review_status?: string;
+        tag_ids?: number[];
+    },
 ): Promise<CalendarEvent> {
     const res = await fetch(`${BASE}/admin/events/${eventId}`, {
         method: 'PATCH',
@@ -449,11 +788,21 @@ export async function trackEventAttendance(
     eventId: string,
     deviceId: string,
     action: 'going' | 'not_going',
+    recordAnalytics: boolean = true,
+    sharePublicly?: boolean,
 ): Promise<void> {
+    const body: Record<string, unknown> = {
+        event_id: eventId,
+        device_id: deviceId,
+        action,
+        record_analytics: recordAnalytics,
+    };
+    if (sharePublicly !== undefined) body.share_publicly = sharePublicly;
     await fetch(`${BASE}/track/event-attendance`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event_id: eventId, device_id: deviceId, action }),
+        credentials: 'include',
+        body: JSON.stringify(body),
     });
 }
 
@@ -463,11 +812,13 @@ export async function trackEventSave(
     eventId: string,
     deviceId: string,
     action: 'save' | 'unsave',
+    recordAnalytics: boolean = true,
 ): Promise<void> {
     await fetch(`${BASE}/track/event-save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event_id: eventId, device_id: deviceId, action }),
+        credentials: 'include',
+        body: JSON.stringify({ event_id: eventId, device_id: deviceId, action, record_analytics: recordAnalytics }),
     });
 }
 
@@ -518,12 +869,20 @@ export async function createShareToken(deviceId: string): Promise<{ token: strin
     return res.json();
 }
 
-export async function fetchSharedCalendar(token: string): Promise<CalendarEvent[]> {
+export interface SharedCalendarPayload {
+    events: CalendarEvent[];
+    owner_display_name: string | null;
+}
+
+export async function fetchSharedCalendar(token: string): Promise<SharedCalendarPayload> {
     const res = await fetch(`${BASE}/share/calendar/${encodeURIComponent(token)}`);
     if (res.status === 404) throw new Error('not_found');
     if (!res.ok) throw new Error('Failed to fetch shared calendar');
     const data = await res.json();
-    return data.events;
+    return {
+        events: data.events ?? [],
+        owner_display_name: data.owner_display_name ?? null,
+    };
 }
 
 // --- Admin: Most Attended ---
@@ -650,6 +1009,30 @@ export async function trackExport(format: string, eventCount: number, deviceId?:
     });
 }
 
+// --- Share Funnel Tracking ---
+
+/** Server-side share funnel ping. ``share_code`` is sent only for click /
+ *  conversion (the originator on a `share` is read from the auth session). */
+export async function trackShare(args: {
+    eventId: string;
+    action: 'share' | 'click' | 'conversion';
+    shareCode?: string | null;
+    deviceId?: string;
+}): Promise<void> {
+    const body: Record<string, string> = {
+        event_id: args.eventId,
+        action: args.action,
+    };
+    if (args.shareCode) body.share_code = args.shareCode;
+    if (args.deviceId) body.device_id = args.deviceId;
+    await fetch(`${BASE}/track/share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        credentials: 'include',
+    });
+}
+
 // --- GDPR Data Deletion ---
 
 export async function deleteUserData(deviceId: string): Promise<{ deleted: Record<string, number> }> {
@@ -662,8 +1045,13 @@ export async function deleteUserData(deviceId: string): Promise<{ deleted: Recor
 
 // --- Tags ---
 
-export async function fetchTagGroups(): Promise<TagGroup[]> {
-    const res = await fetch(`${BASE}/tags`, { cache: 'no-cache' });
+export async function fetchTagGroups(params?: { startDate?: string; endDate?: string; scope?: 'event' | 'review' }): Promise<TagGroup[]> {
+    const qs = new URLSearchParams();
+    if (params?.startDate) qs.set('start_date', params.startDate);
+    if (params?.endDate) qs.set('end_date', params.endDate);
+    if (params?.scope) qs.set('scope', params.scope);
+    const url = qs.toString() ? `${BASE}/tags?${qs}` : `${BASE}/tags`;
+    const res = await fetch(url, { cache: 'no-cache' });
     return parseJsonResponse<TagGroup[]>(res, 'Failed to fetch tags');
 }
 
@@ -676,10 +1064,24 @@ export async function submitTagSuggestion(body: TagSuggestionCreate): Promise<vo
     if (!res.ok) throw new Error('Failed to submit tag suggestion');
 }
 
-export async function fetchAdminTagSuggestions(status?: string): Promise<TagSuggestionResponse[]> {
-    const qs = status ? `?status=${status}` : '';
+export async function fetchAdminTagSuggestions(
+    opts?:
+        | { status?: string; source?: 'user' | 'heuristic'; eventId?: string; includePast?: boolean }
+        | string,
+): Promise<TagSuggestionResponse[]> {
+    // Backwards-compat: accept a bare status string from existing callers.
+    const params = new URLSearchParams();
+    if (typeof opts === 'string') {
+        if (opts) params.set('status', opts);
+    } else if (opts) {
+        if (opts.status) params.set('status', opts.status);
+        if (opts.source) params.set('source', opts.source);
+        if (opts.eventId) params.set('event_id', opts.eventId);
+        if (opts.includePast) params.set('include_past', 'true');
+    }
+    const qs = params.toString() ? `?${params.toString()}` : '';
     const res = await fetch(`${BASE}/admin/tags/suggestions${qs}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('admin_token') || ''}` },
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to fetch tag suggestions');
     return res.json();
@@ -688,11 +1090,9 @@ export async function fetchAdminTagSuggestions(status?: string): Promise<TagSugg
 export async function approveTagSuggestion(id: number, tagId?: number): Promise<void> {
     const res = await fetch(`${BASE}/admin/tags/suggestions/${id}/approve`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('admin_token') || ''}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(tagId ? { tag_id: tagId } : {}),
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to approve tag suggestion');
 }
@@ -700,23 +1100,69 @@ export async function approveTagSuggestion(id: number, tagId?: number): Promise<
 export async function rejectTagSuggestion(id: number, adminNotes?: string): Promise<void> {
     const res = await fetch(`${BASE}/admin/tags/suggestions/${id}/reject`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('admin_token') || ''}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(adminNotes ? { admin_notes: adminNotes } : {}),
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to reject tag suggestion');
+}
+
+export async function bulkReviewTagSuggestions(
+    ids: number[],
+    action: 'approve' | 'reject',
+): Promise<{ ok: number; skipped: number }> {
+    const res = await fetch(`${BASE}/admin/tags/suggestions/bulk-review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, action }),
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to bulk review tag suggestions');
+    return res.json();
+}
+
+/** Run the heuristic auto tag-suggestion engine for a single event. */
+export async function runTagSuggestionsForEvent(
+    eventId: string,
+    opts: { replaceExistingPending?: boolean } = {},
+): Promise<TagSuggestionRunResponse> {
+    const res = await fetch(
+        `${BASE}/admin/events/${encodeURIComponent(eventId)}/suggest-tags`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ replace_existing_pending: !!opts.replaceExistingPending }),
+            credentials: 'include',
+        },
+    );
+    if (!res.ok) throw new Error('Failed to generate tag suggestions');
+    return res.json();
+}
+
+/** Run the heuristic auto tag-suggestion engine for many events at once (max 200). */
+export async function runTagSuggestionsBulk(
+    eventIds: string[],
+    opts: { replaceExistingPending?: boolean } = {},
+): Promise<BulkTagSuggestionRunResponse> {
+    const res = await fetch(`${BASE}/admin/events/bulk-suggest-tags`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            event_ids: eventIds,
+            replace_existing_pending: !!opts.replaceExistingPending,
+        }),
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to bulk-generate tag suggestions');
+    return res.json();
 }
 
 export async function updateEventTags(eventId: string, tagIds: number[]): Promise<void> {
     const res = await fetch(`${BASE}/admin/events/${encodeURIComponent(eventId)}/tags`, {
         method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('admin_token') || ''}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tag_ids: tagIds }),
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to update event tags');
 }
@@ -731,14 +1177,11 @@ export interface AdminTagGroup extends Omit<TagGroup, 'tags'> {
     tags: AdminTag[];
 }
 
-const adminHeaders = () => ({
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${localStorage.getItem('admin_token') || ''}`,
-});
+const adminJsonHeaders = { 'Content-Type': 'application/json' };
 
 export async function fetchAdminTagGroups(): Promise<AdminTagGroup[]> {
     const res = await fetch(`${BASE}/admin/tags/groups`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('admin_token') || ''}` },
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to fetch admin tag groups');
     return res.json();
@@ -747,8 +1190,9 @@ export async function fetchAdminTagGroups(): Promise<AdminTagGroup[]> {
 export async function createTagGroup(data: { label: string; color?: string }): Promise<TagGroup> {
     const res = await fetch(`${BASE}/admin/tags/groups`, {
         method: 'POST',
-        headers: adminHeaders(),
+        headers: adminJsonHeaders,
         body: JSON.stringify(data),
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to create tag group');
     return res.json();
@@ -757,8 +1201,9 @@ export async function createTagGroup(data: { label: string; color?: string }): P
 export async function updateTagGroup(groupId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean }): Promise<TagGroup> {
     const res = await fetch(`${BASE}/admin/tags/groups/${groupId}`, {
         method: 'PATCH',
-        headers: adminHeaders(),
+        headers: adminJsonHeaders,
         body: JSON.stringify(data),
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to update tag group');
     return res.json();
@@ -767,21 +1212,77 @@ export async function updateTagGroup(groupId: number, data: { label?: string; co
 export async function createTag(data: { group_id: number; label: string; color?: string }): Promise<Tag> {
     const res = await fetch(`${BASE}/admin/tags`, {
         method: 'POST',
-        headers: adminHeaders(),
+        headers: adminJsonHeaders,
         body: JSON.stringify(data),
+        credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to create tag');
     return res.json();
 }
 
-export async function updateTag(tagId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean; is_hero_filter?: boolean; hero_ordinal?: number | null }): Promise<Tag> {
+export async function updateTag(tagId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean; is_hero_filter?: boolean; hero_ordinal?: number | null; group_id?: number }): Promise<Tag> {
     const res = await fetch(`${BASE}/admin/tags/${tagId}`, {
         method: 'PATCH',
-        headers: adminHeaders(),
+        headers: adminJsonHeaders,
         body: JSON.stringify(data),
+        credentials: 'include',
     });
-    if (!res.ok) throw new Error('Failed to update tag');
+    if (!res.ok) {
+        let detail = 'Failed to update tag';
+        try {
+            const body = await res.json();
+            if (body?.detail) detail = body.detail;
+        } catch { /* ignore */ }
+        throw new Error(detail);
+    }
     return res.json();
+}
+
+export async function deleteTag(tagId: number): Promise<void> {
+    const res = await fetch(`${BASE}/admin/tags/${tagId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to delete tag');
+}
+
+// --- Tag Synonyms (heuristic suggester) ---
+
+export interface TagSynonymResponse {
+    id: number;
+    tag_id: number;
+    term: string;
+    created_at: string;
+}
+
+export async function fetchTagSynonyms(tagId: number): Promise<TagSynonymResponse[]> {
+    const res = await fetch(`${BASE}/admin/tags/${tagId}/synonyms`, {
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to fetch tag synonyms');
+    return res.json();
+}
+
+export async function createTagSynonym(tagId: number, term: string): Promise<TagSynonymResponse> {
+    const res = await fetch(`${BASE}/admin/tags/${tagId}/synonyms`, {
+        method: 'POST',
+        headers: adminJsonHeaders,
+        body: JSON.stringify({ term }),
+        credentials: 'include',
+    });
+    if (!res.ok) {
+        if (res.status === 409) throw new Error('Synonym already exists');
+        throw new Error('Failed to create synonym');
+    }
+    return res.json();
+}
+
+export async function deleteTagSynonym(synonymId: number): Promise<void> {
+    const res = await fetch(`${BASE}/admin/tags/synonyms/${synonymId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to delete synonym');
 }
 
 // --- Single Event Geocoding ---
@@ -805,6 +1306,7 @@ export async function fetchAdminEventIds(params: EventFilterParams = {}): Promis
     if (params.tag_ids) qs.set('tag_ids', params.tag_ids);
     if (params.ungeolocated) qs.set('ungeolocated', 'true');
     if (params.future_only) qs.set('future_only', 'true');
+    if (params.include_past) qs.set('include_past', 'true');
     const res = await fetch(`${BASE}/admin/events/ids?${qs}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch event IDs');
     return res.json();
@@ -829,4 +1331,104 @@ export async function updateCalendarDefaultTags(calendarId: string, tagIds: numb
     });
     if (!res.ok) throw new Error('Failed to update calendar default tags');
     return res.json();
+}
+
+// ── Ratings / Feedback ────────────────────────────────────────────────
+
+export async function submitFeedback(eventId: string, body: FeedbackSubmissionCreate): Promise<FeedbackSubmissionResponse> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        credentials: 'include',
+    });
+    return parseJsonResponse<FeedbackSubmissionResponse>(res, 'Failed to submit feedback');
+}
+
+export async function fetchMyRating(eventId: string): Promise<EventRating | null> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/rating/me`, {
+        credentials: 'include',
+    });
+    if (res.status === 401) return null;
+    if (!res.ok) throw new Error('Failed to fetch rating');
+    const text = await res.text();
+    if (!text || text === 'null') return null;
+    return JSON.parse(text) as EventRating;
+}
+
+export async function deleteMyRating(eventId: string): Promise<void> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/rating`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    if (!res.ok && res.status !== 204) throw new Error('Failed to delete rating');
+}
+
+export async function fetchRatingAggregate(eventId: string): Promise<EventRatingAggregate> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/rating`);
+    return parseJsonResponse<EventRatingAggregate>(res, 'Failed to fetch rating aggregate');
+}
+
+export async function fetchRatingAggregates(eventIds: string[]): Promise<EventRatingAggregate[]> {
+    if (!eventIds.length) return [];
+    const res = await fetch(`${BASE}/events/ratings/aggregate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_ids: eventIds }),
+    });
+    return parseJsonResponse<EventRatingAggregate[]>(res, 'Failed to fetch rating aggregates');
+}
+
+export async function fetchEventReviews(
+    eventId: string,
+    opts?: { limit?: number; offset?: number; sort?: 'recent' | 'highest' | 'lowest'; minStars?: number },
+): Promise<EventReviewsList> {
+    const sp = new URLSearchParams();
+    if (opts?.limit != null) sp.set('limit', String(opts.limit));
+    if (opts?.offset != null) sp.set('offset', String(opts.offset));
+    if (opts?.sort) sp.set('sort', opts.sort);
+    if (opts?.minStars != null) sp.set('min_stars', String(opts.minStars));
+    const qs = sp.toString();
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/reviews${qs ? `?${qs}` : ''}`);
+    return parseJsonResponse<EventReviewsList>(res, 'Failed to fetch reviews');
+}
+
+export async function fetchMyRatings(): Promise<MyRating[]> {
+    const res = await fetch(`${BASE}/users/me/ratings`, { credentials: 'include' });
+    return parseJsonResponse<MyRating[]>(res, 'Failed to fetch my ratings');
+}
+
+export async function fetchReviewTagGroup(): Promise<TagGroup | null> {
+    const groups = await fetchTagGroups({ scope: 'review' });
+    return groups.find((g) => g.slug === 'review-tags') ?? null;
+}
+
+// Admin
+export async function fetchAdminRatings(opts?: { status?: 'pending' | 'approved' | 'rejected'; page?: number; pageSize?: number }): Promise<AdminRatingList> {
+    const sp = new URLSearchParams();
+    if (opts?.status) sp.set('status', opts.status);
+    sp.set('page', String(opts?.page ?? 1));
+    sp.set('page_size', String(opts?.pageSize ?? 25));
+    const res = await fetch(`${BASE}/admin/feedback?${sp.toString()}`, { credentials: 'include' });
+    return parseJsonResponse<AdminRatingList>(res, 'Failed to fetch admin ratings');
+}
+
+export async function approveRating(ratingId: string, adminNotes?: string): Promise<AdminRating> {
+    const res = await fetch(`${BASE}/admin/ratings/${encodeURIComponent(ratingId)}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admin_notes: adminNotes ?? null }),
+        credentials: 'include',
+    });
+    return parseJsonResponse<AdminRating>(res, 'Failed to approve rating');
+}
+
+export async function rejectRating(ratingId: string, adminNotes?: string): Promise<AdminRating> {
+    const res = await fetch(`${BASE}/admin/ratings/${encodeURIComponent(ratingId)}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ admin_notes: adminNotes ?? null }),
+        credentials: 'include',
+    });
+    return parseJsonResponse<AdminRating>(res, 'Failed to reject rating');
 }

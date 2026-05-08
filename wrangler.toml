@@ -1,6 +1,0 @@
-# Cloudflare Pages configuration for the Movida frontend (React SPA)
-# Docs: https://developers.cloudflare.com/pages/functions/wrangler-configuration/
-
-name = "movida"
-compatibility_date = "2026-04-30"
-pages_build_output_dir = "frontend/dist"

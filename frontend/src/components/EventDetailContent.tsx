@@ -5,14 +5,19 @@ import { parseLinks } from '../utils/parseLinks';
 import { deriveLinkLabel } from '../utils/deriveLinkLabel';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { trackLink } from '../utils/tracking';
-import { fetchTagGroups } from '../api';
+import { getDeviceId } from '../utils/deviceId';
+import { fetchTagGroups, retryGeocodingSingle } from '../api';
 import AddressAutocomplete from './AddressAutocomplete';
 import EventTagEditor from './EventTagEditor';
 import LocationBadge from './LocationBadge';
 import SaveEventButton from './SaveEventButton';
 import GoingButton from './GoingButton';
+import AttendeeList from './AttendeeList';
+import RateEventButton from './RateEventButton';
 import TagBadges from './TagBadges';
 import SuggestTagsButton from './SuggestTagsButton';
+import ExpandableDescription from './ExpandableDescription';
+import ShareButton from './ShareButton';
 
 interface Props {
     event: CalendarEvent;
@@ -44,7 +49,7 @@ export default function EventDetailContent({
     maxTags,
     onTagsUpdated,
 }: Props) {
-    const { showPrices, showPopularity } = useFeatureFlags();
+    const { showPrices, showPopularity, showRatings } = useFeatureFlags();
     const [showSuggestTags, setShowSuggestTags] = useState(false);
     const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
 
@@ -73,6 +78,10 @@ export default function EventDetailContent({
     const [editLocationLat, setEditLocationLat] = useState<number | null>(null);
     const [editLocationLng, setEditLocationLng] = useState<number | null>(null);
     const [editLocationDirty, setEditLocationDirty] = useState(false);
+
+    // Retry geocoding state
+    const [retryingGeo, setRetryingGeo] = useState(false);
+    const [retryGeoMsg, setRetryGeoMsg] = useState<string | null>(null);
 
     // Close any open field editor when editable is toggled off
     React.useEffect(() => {
@@ -372,7 +381,38 @@ export default function EventDetailContent({
                             📍
                             <LocationBadge size="sm" location={event.location} latitude={event.latitude} longitude={event.longitude} />
                         </span>
-                        <span>{event.location}</span>
+                        <span className="flex-1">{event.location}</span>
+                        {editable && (
+                            <button
+                                onClick={async (e) => {
+                                    e.stopPropagation();
+                                    if (retryingGeo) return;
+                                    setRetryingGeo(true);
+                                    setRetryGeoMsg(null);
+                                    try {
+                                        const r = await retryGeocodingSingle(event.event_id);
+                                        setRetryGeoMsg(
+                                            r.geocoded > 0
+                                                ? '✓ geocoded'
+                                                : r.failed > 0
+                                                    ? '✗ still no match'
+                                                    : 'no change',
+                                        );
+                                        if (r.geocoded > 0) onTagsUpdated?.();
+                                    } catch {
+                                        setRetryGeoMsg('error');
+                                    } finally {
+                                        setRetryingGeo(false);
+                                        setTimeout(() => setRetryGeoMsg(null), 4000);
+                                    }
+                                }}
+                                disabled={retryingGeo}
+                                title="Retry geocoding"
+                                className="shrink-0 self-start text-[10px] font-medium px-1.5 py-0.5 border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 transition"
+                            >
+                                {retryingGeo ? '…' : retryGeoMsg ?? '↻ Retry'}
+                            </button>
+                        )}
                     </p>
                     {editable && <EditHint />}
                 </div>
@@ -439,9 +479,7 @@ export default function EventDetailContent({
                     className={editable ? 'group relative cursor-text hover:bg-slate-50 -mx-2 px-2 py-1 rounded transition' : ''}
                     onClick={editable ? () => startEdit('description', event.description ?? '') : undefined}
                 >
-                    <div className={`whitespace-pre-line leading-relaxed text-slate-600 ${compact ? 'text-xs' : 'text-sm'}`}>
-                        {event.description}
-                    </div>
+                    <ExpandableDescription text={event.description} compact={compact} />
                     {editable && <EditHint />}
                 </div>
             ) : editable ? (
@@ -554,9 +592,19 @@ export default function EventDetailContent({
                         eventId={event.event_id}
                         tagGroups={tagGroups}
                         existingTagIds={new Set(event.tags?.map((t) => t.id) ?? [])}
-                        deviceId={localStorage.getItem('device_id') || 'anonymous'}
+                        deviceId={getDeviceId()}
                         onClose={() => setShowSuggestTags(false)}
                     />
+                </div>
+            )}
+
+            {/* Who's going */}
+            {showActions && (
+                <div className="border-t border-slate-100 pt-3">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                        Who's going
+                    </h3>
+                    <AttendeeList eventId={event.event_id} expanded />
                 </div>
             )}
 
@@ -565,16 +613,13 @@ export default function EventDetailContent({
                 <div className="border-t border-slate-100 pt-3 flex items-center gap-2 flex-wrap">
                     <SaveEventButton eventId={event.event_id} appearance="pill" />
                     <GoingButton eventId={event.event_id} appearance="pill" />
-                    <button
-                        onClick={() => {
-                            const url = `${window.location.origin}/event/${event.event_id}`;
-                            navigator.clipboard.writeText(url).catch(() => { });
-                            trackLink(event.event_id, url);
-                        }}
+                    {showRatings && <RateEventButton eventId={event.event_id} appearance="pill" />}
+                    <ShareButton
+                        eventId={event.event_id}
+                        title={event.title}
+                        url={`${window.location.origin}/event/${event.event_id}`}
                         className="text-xs text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-full px-3 py-1 transition"
-                    >
-                        🔗 Copy link
-                    </button>
+                    />
                     {!editable && (
                         <button
                             onClick={() => {
