@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { fetchEvent, updateEvent } from '../api';
 import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
 import AdminEventDetailContent from './AdminEventDetailContent';
+import EventMap from './EventMap';
 import type { CalendarEvent } from '../types';
 
 interface Props {
@@ -177,12 +178,19 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                         <p className="text-xs text-red-500 text-center mt-8">Failed to load event.</p>
                     )}
                     {event && (
-                        <AdminEventDetailContent
-                            event={event}
-                            onFieldSave={handleFieldSave}
-                            onTagsUpdated={handleTagsUpdated}
-                            compact
-                        />
+                        <>
+                            <AdminEventDetailContent
+                                event={event}
+                                onFieldSave={handleFieldSave}
+                                onTagsUpdated={handleTagsUpdated}
+                                compact
+                            />
+                            {event.latitude != null && event.longitude != null && (
+                                <div className="mt-4 h-[300px] border border-gray-200 overflow-hidden">
+                                    <EventMap events={[event]} />
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
 
