@@ -48,6 +48,7 @@ export default function Admin() {
     const [editingCalId, setEditingCalId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
     const [showSyncProgress, setShowSyncProgress] = useState(false);
+    const [syncJobId, setSyncJobId] = useState<string | null>(null);
     const [eventsPanelOpen, setEventsPanelOpen] = useState(false);
     const [eventsPanelPreset, setEventsPanelPreset] = useState<EventsPanelPreset>('all');
     const [eventsPanelCalendarId, setEventsPanelCalendarId] = useState<string>('');
@@ -150,6 +151,7 @@ export default function Admin() {
         getCurrentSyncJob()
             .then((j) => {
                 if (j && (j.status === 'running' || j.status === 'abort_requested')) {
+                    setSyncJobId(j.job_id);
                     setShowSyncProgress(true);
                 }
             })
@@ -257,7 +259,8 @@ export default function Admin() {
         setBusy('sync');
         setMessage('');
         try {
-            await startSyncJob(mode, syncSinceDate || null);
+            const job = await startSyncJob(mode, syncSinceDate || null);
+            setSyncJobId(job.job_id);
             setShowSyncProgress(true);
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : '';
@@ -765,7 +768,8 @@ export default function Admin() {
                         {showSyncProgress && (
                             <SyncProgressCard
                                 visible={showSyncProgress}
-                                onDismiss={() => setShowSyncProgress(false)}
+                                jobId={syncJobId ?? undefined}
+                                onDismiss={() => { setShowSyncProgress(false); setSyncJobId(null); }}
                                 onJobComplete={() => {
                                     // Refresh admin badges (pending review,
                                     // ungeolocated, tag suggestions, …) so
