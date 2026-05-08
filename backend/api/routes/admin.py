@@ -478,6 +478,53 @@ def start_sync_job(
     return job
 
 
+@router.post("/trigger-sync")
+def trigger_sync(
+    mode: str = "incremental",
+    request: Request = None,
+    _admin: dict = Depends(require_admin),
+):
+    """Trigger a sync job (called by external scheduler or admin UI).
+
+    Checks auto_sync_enabled setting before starting.
+    Returns 200 with skipped reason if auto-sync is disabled.
+    Returns 409 if a job is already running.
+    """
+    from backend.db.database import get_engine
+
+    # Check if auto-sync is enabled
+    with Session(get_engine()) as session:
+        auto_sync_enabled = _get_auto_sync_enabled_setting(session)
+        if not auto_sync_enabled:
+            logger.info("Auto-sync disabled; skipping trigger-sync call")
+            return {
+                "status": "skipped",
+                "reason": "auto_sync_disabled",
+            }
+
+    # Try to start job
+    job_service = get_sync_job_service()
+    calendar_service = request.app.state.calendar_service
+    try:
+        job = job_service.start_job(
+            worker=lambda job_id, service: _run_sync_job_worker(
+                job_id,
+                service,
+                calendar_service,
+                mode,
+                since_date=None,
+            ),
+            mode=mode,
+            since_date=None,
+        )
+        logger.info("Auto-sync triggered: job %s (mode=%s)", job["job_id"], mode)
+        return {"status": "started", "job_id": job["job_id"]}
+    except RuntimeError as exc:
+        # Job already running
+        logger.info("Auto-sync trigger skipped: %s", exc)
+        return {"status": "skipped", "reason": str(exc)}
+
+
 @router.get("/sync-jobs/current")
 def get_current_sync_job(_admin: dict = Depends(require_admin)):
     job = get_sync_job_service().get_current_job()

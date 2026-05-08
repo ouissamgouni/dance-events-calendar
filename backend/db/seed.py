@@ -7,7 +7,7 @@ from typing import Any, Optional
 from uuid import uuid4
 
 import yaml
-from sqlmodel import Session, select
+from sqlmodel import Session, delete, select
 
 from backend.db.models import (
     CachedEvent,
@@ -145,9 +145,10 @@ class DatabaseSeeder:
                 )
                 continue
 
-            group = self.session.exec(
-                select(TagGroup).where(TagGroup.slug == slug)
-            ).first()
+            with self.session.no_autoflush:
+                group = self.session.exec(
+                    select(TagGroup).where(TagGroup.slug == slug)
+                ).first()
 
             ordinal = group_data.get("ordinal", group_idx)
             allow_multiple = group_data.get("allow_multiple", True)
@@ -193,9 +194,10 @@ class DatabaseSeeder:
                     logger.warning("Skipping tag with missing slug/label: %s", tag_data)
                     continue
 
-                tag = self.session.exec(
-                    select(Tag).where(Tag.group_id == group.id, Tag.slug == tag_slug)
-                ).first()
+                with self.session.no_autoflush:
+                    tag = self.session.exec(
+                        select(Tag).where(Tag.group_id == group.id, Tag.slug == tag_slug)
+                    ).first()
 
                 tag_ordinal = tag_data.get("ordinal", tag_idx)
                 tag_color = tag_data.get("color")
@@ -240,10 +242,13 @@ class DatabaseSeeder:
                         )
                     else:
                         # Wipe & rewrite: scenarios stay deterministic across reseeds.
-                        for old in self.session.exec(
-                            select(TagSynonym).where(TagSynonym.tag_id == tag.id)
-                        ).all():
-                            self.session.delete(old)
+                        self.session.exec(
+                            delete(TagSynonym).where(TagSynonym.tag_id == tag.id)
+                        )
+                        # Force deletes out before reinserting the authoritative
+                        # synonym set, otherwise a later autoflush can try to
+                        # insert duplicates before the old rows are removed.
+                        self.session.flush()
                         seen: set[str] = set()
                         for raw in raw_syns:
                             term = (str(raw) or "").strip().lower()

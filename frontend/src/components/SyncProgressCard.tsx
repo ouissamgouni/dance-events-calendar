@@ -11,12 +11,14 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import type { SyncJobRecord, CalendarStatus } from '../api';
-import { abortSyncJob, getCurrentSyncJob } from '../api';
+import { abortSyncJob, getCurrentSyncJob, getSyncJob } from '../api';
 import CalendarDetailDrawer from './CalendarDetailDrawer';
 
 interface SyncProgressCardProps {
     /** Whether the card is visible */
     visible: boolean;
+    /** When set, polls this specific job (avoids multi-instance split-brain on prod) */
+    jobId?: string;
     /** Called when user clicks X to dismiss */
     onDismiss: () => void;
     /** Called when an active job transitions to a terminal state */
@@ -296,7 +298,7 @@ function CalendarRow({
 // Main component
 // ---------------------------------------------------------------------------
 
-export default function SyncProgressCard({ visible, onDismiss, onJobComplete }: SyncProgressCardProps) {
+export default function SyncProgressCard({ visible, jobId, onDismiss, onJobComplete }: SyncProgressCardProps) {
     const [job, setJob] = useState<SyncJobRecord | null>(null);
     const [aborting, setAborting] = useState(false);
     const [expanded, setExpanded] = useState(true);
@@ -307,7 +309,7 @@ export default function SyncProgressCard({ visible, onDismiss, onJobComplete }: 
 
     const fetchJob = async () => {
         try {
-            const j = await getCurrentSyncJob();
+            const j = jobId ? await getSyncJob(jobId) : await getCurrentSyncJob();
             setJob(j);
             const nowActive = isActive(j.status);
             if (wasActiveRef.current && !nowActive) {
