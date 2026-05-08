@@ -98,6 +98,20 @@ def get_dev_auth_enabled() -> bool:
     return (val or "").lower() in ("true", "1")
 
 
+def get_auto_sync_scheduler_enabled() -> bool:
+    """Enable in-app scheduler loop.
+
+    When True: FastAPI startup runs the background sync scheduler loop.
+    When False: Expects external scheduler (e.g. Fly Machines cron) to call POST /admin/trigger-sync.
+
+    Typical config:
+      - dev/staging: True (in-app scheduler for convenience)
+      - prod: False (use external Fly Machines scheduled job)
+    """
+    val = os.getenv("AUTO_SYNC_SCHEDULER_ENABLED", "false")
+    return val.strip().lower() in ("true", "1")
+
+
 def get_env_name() -> str:
     return os.getenv("ENV_NAME", "unknown")
 

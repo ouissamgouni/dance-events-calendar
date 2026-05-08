@@ -24,7 +24,11 @@ from backend.api.routes.suggestions import router as suggestions_router
 from backend.api.routes.tags import router as tags_router
 from backend.api.routes.tracking import router as tracking_router
 from backend.api.schemas import HealthResponse
-from backend.config.loader import get_calendar_service_type, get_cors_origins
+from backend.config.loader import (
+    get_calendar_service_type,
+    get_cors_origins,
+    get_auto_sync_scheduler_enabled,
+)
 from backend.db.database import init_db
 from backend.services.scheduler import run_sync_loop
 
@@ -50,14 +54,29 @@ async def lifespan(app: FastAPI):
     init_db()
     calendar_service = _create_calendar_service()
     app.state.calendar_service = calendar_service
-    sync_task = asyncio.create_task(run_sync_loop(calendar_service))
-    logger.info("Started sync scheduler (service=%s)", type(calendar_service).__name__)
+
+    # Only run in-app scheduler if explicitly enabled (dev/single-instance)
+    # Production uses external Fly Machines scheduled jobs instead
+    sync_task = None
+    if get_auto_sync_scheduler_enabled():
+        sync_task = asyncio.create_task(run_sync_loop(calendar_service))
+        logger.info(
+            "Started in-app sync scheduler (service=%s)",
+            type(calendar_service).__name__,
+        )
+    else:
+        logger.info(
+            "In-app sync scheduler disabled; using external scheduler (call POST /admin/trigger-sync)"
+        )
+
     yield
-    sync_task.cancel()
-    try:
-        await sync_task
-    except asyncio.CancelledError:
-        pass
+
+    if sync_task:
+        sync_task.cancel()
+        try:
+            await sync_task
+        except asyncio.CancelledError:
+            pass
 
 
 _SECURITY_HEADERS = [

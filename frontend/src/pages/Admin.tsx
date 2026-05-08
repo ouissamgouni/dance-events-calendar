@@ -842,6 +842,20 @@ export default function Admin() {
                                     />
                                 </div>
                             </div>
+                            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                                <div>
+                                    <span className="text-[11px] font-medium text-gray-700">Tag pill order</span>
+                                    <p className="text-[10px] text-gray-400">Hero pills always come first</p>
+                                </div>
+                                <select
+                                    value={tagSortMode}
+                                    onChange={(e) => handleTagSortModeChange(e.target.value as 'group' | 'event_count')}
+                                    className="text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                >
+                                    <option value="group">By group</option>
+                                    <option value="event_count">By event count</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 
@@ -905,20 +919,6 @@ export default function Admin() {
                                     />
                                 </div>
                             )}
-                            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                                <div>
-                                    <span className="text-[11px] font-medium text-gray-700">Tag pill order</span>
-                                    <p className="text-[10px] text-gray-400">Hero pills always come first</p>
-                                </div>
-                                <select
-                                    value={tagSortMode}
-                                    onChange={(e) => handleTagSortModeChange(e.target.value as 'group' | 'event_count')}
-                                    className="text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                                >
-                                    <option value="group">By group</option>
-                                    <option value="event_count">By event count</option>
-                                </select>
-                            </div>
                         </div>
                     </div>
 

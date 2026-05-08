@@ -17,12 +17,32 @@ tag_groups:
     tags:
       - slug: social
         label: Social
+        ordinal: 0
         is_hero_filter: true
         hero_ordinal: 0
-        synonyms: [ "social dance", "fiesta", "soirée", "soiree", "noche", "night out", "party", "celebration", "bash" ]
+        synonyms:
+          [
+            "social dance",
+            "fiesta",
+            "soirée",
+            "soiree",
+            "noche",
+            "night out",
+            "party",
+            "celebration",
+            "bash",
+          ]
       - slug: day-social
         label: Day Social
-        synonyms: [ "daytime social", "afternoon social", "day party", "rooftop social", "park social" ]
+        ordinal: 0
+        synonyms:
+          [
+            "daytime social",
+            "afternoon social",
+            "day party",
+            "rooftop social",
+            "park social",
+          ]
       - slug: class
         label: Class
         synonyms: [ "classes", "lesson", "lessons", "course", "courses" ]
@@ -33,22 +53,39 @@ tag_groups:
         label: Festival
         # NOTE: a dance "marathon" is its own format — keep it out of festival.
         # Congress merged into festival (2026-05): treat congress/congreso as synonyms.
-        synonyms: [ "congress", "congreso", "weekender", "encuentro" ]
+        synonyms: [ "congress", "congreso", "encuentro" ]
       - slug: marathon
         label: Marathon
+        ordinal: 6
         synonyms: [ "dance marathon" ]
       - slug: weekender
         label: Weekender
-        synonyms: [ "weekend event", "weekend edition" ]
+        ordinal: 7
+        synonyms: [ "weekend event", "weekend edition", "marathon" ]
       - slug: bootcamp
         label: Bootcamp
+        ordinal: 8
         synonyms: [ "boot camp", "intensive" ]
       - slug: practice
         label: Practice
+        ordinal: 9
         synonyms: [ "practica", "práctica", "training", "drill", "drills" ]
       - slug: trip
         label: Trip
+        ordinal: 10
         synonyms: [ "getaway", "retreat", "tour", "excursion" ]
+      - slug: live-band
+        label: Live band
+        ordinal: 11
+        synonyms: [ "live music", "orchestra" ]
+      - slug: pool-party
+        label: Pool party
+        ordinal: 12
+        synonyms: [ "pool" ]
+      - slug: beach-side
+        label: Beach Side
+        ordinal: 13
+        synonyms: [ "beach" ]
 
   - slug: scale
     label: Scale
@@ -75,7 +112,7 @@ tag_groups:
         label: Regional
       - slug: international
         label: International
-        synonyms: [ "world", "worldwide", "global" ]
+        synonyms: [ "world", "worldwide", "global", "congress", "festival" ]
 
   - slug: venue
     label: Venue
@@ -94,7 +131,11 @@ tag_groups:
         synonyms: [ "roof top", "terrace" ]
       - slug: live-band
         label: Live band
+        enabled: false
         synonyms: [ "live music", "live orchestra", "live percussion", "live drummers" ]
+      - slug: pool
+        label: Pool
+        ordinal: 4
 
   - slug: dance-style
     label: Dance Style
