@@ -1,0 +1,12 @@
+# Mock users pre-seeded for the share-my-calendar scenario.
+#
+# Lets the test plan exercise multi-user sharing with named accounts (Alice
+# shares her calendar, Bob opens the link signed in as himself) instead of
+# only device-id-based anonymous sharing.
+users:
+  - email: alice@example.com
+    name: Alice
+  - email: bob@example.com
+    name: Bob
+  - email: admin@example.com # matches ADMIN_EMAIL → admin badge
+    name: Admin
