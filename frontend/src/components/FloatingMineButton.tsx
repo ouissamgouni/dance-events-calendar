@@ -24,13 +24,8 @@ export default function FloatingMineButton() {
     });
 
     const path = location.pathname;
-    const hideOnRoute =
-        path === '/my-calendar' ||
-        path.startsWith('/admin') ||
-        path.startsWith('/login') ||
-        path.startsWith('/shared') ||
-        path.startsWith('/privacy');
-    if (hideOnRoute) return null;
+    const showOnRoute = path === '/' || path === '/calendar';
+    if (!showOnRoute) return null;
     if (dismissed) return null;
 
     const handleDismiss = () => {
