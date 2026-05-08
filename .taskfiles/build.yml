@@ -8,17 +8,19 @@ vars:
 tasks:
   staging:
     desc: Build both backend and frontend images from develop branch
-    deps: [":git:worktree:setup", staging:backend, staging:frontend]
+    deps: [ staging:backend, staging:frontend ]
     cmds:
       - echo "✅ All staging images built (:develop)"
 
   staging:backend:
     desc: Build backend image from develop branch
-    deps: [":git:worktree:setup"]
+    deps: [ ":git:_provision-develop-worktree" ]
     cmds:
       - |
-        echo "Updating develop worktree..."
-        cd {{.WORKTREE_DEVELOP}} && git pull origin develop
+        echo "Updating develop worktree to origin/develop..."
+        cd {{.WORKTREE_DEVELOP}}
+        git fetch origin develop --quiet
+        git reset --hard origin/develop --quiet
       - |
         echo "Building backend from develop..."
         docker build -t movida-backend:develop -f {{.WORKTREE_DEVELOP}}/backend/Dockerfile {{.WORKTREE_DEVELOP}}
@@ -26,11 +28,13 @@ tasks:
 
   staging:frontend:
     desc: Build frontend image from develop branch
-    deps: [":git:worktree:setup"]
+    deps: [ ":git:_provision-develop-worktree" ]
     cmds:
       - |
-        echo "Updating develop worktree..."
-        cd {{.WORKTREE_DEVELOP}} && git pull origin develop
+        echo "Updating develop worktree to origin/develop..."
+        cd {{.WORKTREE_DEVELOP}}
+        git fetch origin develop --quiet
+        git reset --hard origin/develop --quiet
       - |
         echo "Building frontend from develop..."
         docker build -t movida-frontend:develop \
@@ -47,11 +51,12 @@ tasks:
         vars: { VERSION: "{{.CLI_ARGS}}" }
       - task: prod:frontend
         vars: { VERSION: "{{.CLI_ARGS}}" }
-      - cmd: echo "✅ All prod images built{{if .CLI_ARGS}} :{{.CLI_ARGS}} and :latest{{end}}"
+      - cmd: echo "✅ All prod images built{{if .CLI_ARGS}} :{{.CLI_ARGS}} and
+          :latest{{end}}"
 
   prod:backend:
     desc: Build backend image from main branch
-    deps: [":git:worktree:setup"]
+    deps: [ ":git:_provision-main-worktree" ]
     cmds:
       - |
         VERSION={{.VERSION}}{{.CLI_ARGS}}
@@ -72,7 +77,7 @@ tasks:
 
   prod:frontend:
     desc: Build frontend image from main branch
-    deps: [":git:worktree:setup"]
+    deps: [ ":git:_provision-main-worktree" ]
     cmds:
       - |
         VERSION={{.VERSION}}{{.CLI_ARGS}}
@@ -117,8 +122,8 @@ tasks:
           echo "   task build:ref REF=feature/my-branch"
           exit 1
         fi
-      - task: :git:worktree:setup:ref
-        vars: { REF: "{{.REF}}" }
+      - task: :git:worktree:create
+        vars: { BRANCH: "{{.REF}}" }
       - |
         REF="{{.REF}}"
         SHA=$(git rev-parse --short=7 "$REF")
@@ -187,7 +192,8 @@ tasks:
   list:
     desc: List all movida Docker images
     cmds:
-      - docker images movida-* --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedSince}}"
+      - docker images movida-* --format "table
+        {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedSince}}"
 
   clean:
     desc: Remove old/dangling Docker images
@@ -203,7 +209,7 @@ tasks:
   clean:all:
     desc: "Remove ALL movida Docker images"
     vars:
-      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+      DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
     prompt: "This will remove ALL movida Docker images. Continue?"
     cmds:
       - |
