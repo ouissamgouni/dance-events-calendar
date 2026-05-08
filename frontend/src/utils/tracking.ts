@@ -1,4 +1,4 @@
-import { trackEventView, trackEventSave, trackEventAttendance, trackLinkClick, trackExport } from '../api';
+import { trackEventView, trackEventSave, trackEventAttendance, trackLinkClick, trackExport, trackShare } from '../api';
 import { getDeviceId } from './deviceId';
 import { isAnalyticsDisabled, umamiTrack } from './umami';
 
@@ -97,6 +97,31 @@ export function trackExportAction(format: 'ics' | 'xlsx', eventCount: number): v
     if (!readConsent().analytics) return;
     trackExport(format, eventCount, getConsentedDeviceId()).catch(() => { });
     umamiTrack('export_completed', { format, event_count: eventCount });
+}
+
+/** A share button was activated. The originator's share_code is read
+ *  server-side from the auth session, so no need to send it here. */
+export function trackShareAction(eventId: string): void {
+    if (!readConsent().analytics) return;
+    trackShare({
+        eventId,
+        action: 'share',
+        deviceId: getConsentedDeviceId(),
+    }).catch(() => { });
+    umamiTrack('event_shared');
+}
+
+/** A referred visitor performed an attributable action (currently RSVP).
+ *  ``shareCode`` comes from the URL captured by useReferralAttribution. */
+export function trackShareConversion(eventId: string, shareCode: string): void {
+    if (!readConsent().analytics) return;
+    trackShare({
+        eventId,
+        action: 'conversion',
+        shareCode,
+        deviceId: getConsentedDeviceId(),
+    }).catch(() => { });
+    umamiTrack('share_converted');
 }
 
 /**

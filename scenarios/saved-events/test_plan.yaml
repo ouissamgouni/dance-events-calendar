@@ -241,3 +241,17 @@ test_plan:
       expected: >
         The ongoing event is visible in the main list without toggling. It does
         not appear under the "Past events" divider.
+
+    # ── Anti-inflation (anonymous identity is server cookie) ─────
+    - id: 28
+      title: "Saved count not inflated by clearing localStorage"
+      description: >
+        As an anonymous visitor, save "Friday Salsa Social". Note the total
+        saved count on the event card / admin metrics. Then clear localStorage
+        in devtools WITHOUT clearing cookies, reload, and click save again on
+        the same event.
+      expected: >
+        The total saved count is unchanged (still +1). The server-issued
+        httpOnly cookie ``movida_aid`` keeps the same anonymous identity
+        across the localStorage wipe, so re-clicking does not insert a second
+        UserSavedEvent row.

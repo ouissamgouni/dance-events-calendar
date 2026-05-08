@@ -1,21 +1,33 @@
-import { Link, useLocation } from 'react-router-dom';
+import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
-import { useScrollDirection } from '../hooks/useScrollDirection';
+import SavedEventsFab from './SavedEventsFab';
 
 /**
- * Mobile-only floating "Mine" CTA that links to the user's personal calendar.
- * - Hidden on desktop (sm:+)
- * - Hidden on routes where it would be redundant or out of place
- * - Slides out of view while the user scrolls down, returns on scroll up
+ * Always-visible floating "Mine" CTA at the bottom-right of the viewport.
+ * Wraps `SavedEventsFab` so the floater and the fixed top-bar entry point
+ * are literally the same UI — same label, same badges, same click target
+ * (navigates straight to `/my-calendar`).
+ *
+ * - Visible on every route where the FAB makes sense (including `/`).
+ * - Hidden on routes where it would be redundant (`/my-calendar`) or out of
+ *   place (admin, login, shared, privacy).
+ * - Has an inline dismiss button: clicking × hides the floater for the
+ *   remainder of the session (sessionStorage-backed). Reload to bring it
+ *   back.
  */
+const DISMISS_KEY = 'myCalendarFab.dismissed';
+
 export default function MyCalendarFab() {
     const location = useLocation();
-    const { savedCount } = useSavedEvents();
-    const { attendingCount } = useAttendingEvents();
-    const hidden = useScrollDirection();
+    const { savedEventIds } = useSavedEvents();
+    const { attendingEventIds } = useAttendingEvents();
+    const [dismissed, setDismissed] = useState<boolean>(() => {
+        if (typeof window === 'undefined') return false;
+        return window.sessionStorage.getItem(DISMISS_KEY) === '1';
+    });
 
-    // Hide on routes where the FAB doesn't make sense
     const path = location.pathname;
     const hideOnRoute =
         path === '/my-calendar' ||
@@ -24,25 +36,27 @@ export default function MyCalendarFab() {
         path.startsWith('/shared') ||
         path.startsWith('/privacy');
     if (hideOnRoute) return null;
+    if (dismissed) return null;
 
-    const total = savedCount + attendingCount;
+    const total = new Set([...savedEventIds, ...attendingEventIds]).size;
+    if (total === 0) return null;
+
+    const handleDismiss = () => {
+        setDismissed(true);
+        try { window.sessionStorage.setItem(DISMISS_KEY, '1'); } catch { /* ignore quota */ }
+    };
 
     return (
-        <Link
-            to="/my-calendar"
-            aria-label={`Open My Calendar${total > 0 ? ` (${total} event${total !== 1 ? 's' : ''})` : ''}`}
-            className={`sm:hidden fixed bottom-4 right-4 z-[8000] inline-flex items-center gap-2 bg-blue-500 px-4 py-3 text-sm font-medium text-white shadow-lg hover:bg-blue-600 transition-all duration-200 ${hidden ? 'translate-y-24 opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
-                }`}
-        >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-                <path d="M5 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14l-5-2.5L5 18V4Z" />
-            </svg>
-            <span>Mine</span>
-            {total > 0 && (
-                <span className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 bg-white text-blue-600 text-[11px] font-semibold">
-                    {total}
-                </span>
-            )}
-        </Link>
+        <div className="fixed bottom-4 right-4 z-[8000] flex items-center shadow-lg">
+            <SavedEventsFab />
+            <button
+                type="button"
+                onClick={handleDismiss}
+                aria-label="Hide"
+                className="ml-px bg-white text-slate-400 hover:text-slate-700 px-1.5 py-1 text-sm leading-none border-l border-slate-100"
+            >
+                ×
+            </button>
+        </div>
     );
 }

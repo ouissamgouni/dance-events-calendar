@@ -421,3 +421,73 @@ def test_share_link_includes_saved_and_attending_events(client, session, monkeyp
     assert resp.status_code == 200, resp.text
     returned = sorted(e["event_id"] for e in resp.json()["events"])
     assert returned == ["evt-attending-1", "evt-both", "evt-saved-1"]
+
+
+@pytest.mark.unit
+def test_anonymous_attendance_inherits_share_default_on_signup(
+    client, session, monkeypatch
+):
+    """Bug #2: anonymous "going" rows must adopt the user's
+    share_attendance_default when they sign up, so the user appears in
+    their own avatar stack without re-toggling."""
+    monkeypatch.setattr(auth_module, "get_admin_email", lambda: "admin@example.com")
+
+    device_id = "dev-merge-share"
+    # Anonymous "going" row — share_publicly defaults to False for anon.
+    session.add(
+        UserEventAttendance(
+            device_id=device_id,
+            event_id="evt-share-1",
+            user_id=None,
+            share_publicly=False,
+        )
+    )
+    session.commit()
+
+    resp = _login(client, email="dev-user@example.com", device_id=device_id)
+    assert resp.status_code == 200
+    user_id = UUID(resp.json()["user_id"])
+
+    rows = session.exec(
+        select(UserEventAttendance).where(
+            UserEventAttendance.event_id == "evt-share-1"
+        )
+    ).all()
+    assert len(rows) == 1
+    assert rows[0].user_id == user_id
+    # Default is True (see User.share_attendance_default in db/models.py).
+    assert rows[0].share_publicly is True
+
+
+@pytest.mark.unit
+def test_merge_uses_anon_id_cookie_in_addition_to_device_id(
+    client, session, monkeypatch
+):
+    """If the anonymous rows were keyed by the server-issued anon-id cookie
+    (different from the legacy localStorage device_id), the merge must
+    still claim them on sign-up."""
+    monkeypatch.setattr(auth_module, "get_admin_email", lambda: "admin@example.com")
+    from backend.api.anon_id import ANON_COOKIE_NAME
+
+    anon_cookie = "cookie-anon-xyz"
+    legacy_device = "dev-legacy"
+
+    # The cookie-keyed row is what /track/* writes today for an anon user.
+    session.add(
+        UserSavedEvent(device_id=anon_cookie, event_id="evt-cookie", user_id=None)
+    )
+    # And a legacy row keyed by the localStorage device_id (pre-cookie clients).
+    session.add(
+        UserSavedEvent(device_id=legacy_device, event_id="evt-legacy", user_id=None)
+    )
+    session.commit()
+
+    client.cookies.set(ANON_COOKIE_NAME, anon_cookie)
+    resp = _login(client, email="dev-user@example.com", device_id=legacy_device)
+    assert resp.status_code == 200
+    user_id = UUID(resp.json()["user_id"])
+
+    rows = session.exec(
+        select(UserSavedEvent).where(UserSavedEvent.user_id == user_id)
+    ).all()
+    assert {r.event_id for r in rows} == {"evt-cookie", "evt-legacy"}

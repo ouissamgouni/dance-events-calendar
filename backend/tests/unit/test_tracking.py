@@ -146,6 +146,10 @@ class TestEventSaveUserSavedEvent:
         app.dependency_overrides[get_session] = lambda: session
         try:
             c = TestClient(app)
+            # Pin the anon-id cookie so the materialized row's device_id is
+            # deterministic. Anonymous writes use the cookie, not the payload
+            # device_id, as the dedupe key.
+            c.cookies.set("movida_aid", "anon-cookie-fixed")
             resp = c.post(
                 "/api/track/event-save",
                 json={"event_id": "evt-1", "device_id": "dev-abc", "action": "save"},
@@ -157,13 +161,22 @@ class TestEventSaveUserSavedEvent:
             assert "EventSave" in types
             assert "UserSavedEvent" in types
 
+            # Analytics row still keyed by payload device_id.
+            event_save = next(
+                call.args[0]
+                for call in added
+                if isinstance(call.args[0], EventSave)
+            )
+            assert event_save.device_id == "dev-abc"
+
+            # Materialized state row keyed by the anon-id cookie value.
             user_saved = next(
                 call.args[0]
                 for call in added
                 if isinstance(call.args[0], UserSavedEvent)
             )
             assert user_saved.event_id == "evt-1"
-            assert user_saved.device_id == "dev-abc"
+            assert user_saved.device_id == "anon-cookie-fixed"
         finally:
             app.dependency_overrides.clear()
 
@@ -206,7 +219,12 @@ class TestEventSaveUserSavedEvent:
                 json={"event_id": "evt-1", "device_id": "dev-abc", "action": "unsave"},
             )
             assert resp.status_code == 201
-            session.delete.assert_called_once_with(existing)
+            # New behaviour: unsave looks up rows by both the anon-id cookie
+            # key and the payload device_id (back-compat). With this single
+            # mock returning the same row for both lookups, delete is called
+            # for each — in real DB the queries would target distinct rows.
+            session.delete.assert_called_with(existing)
+            assert session.delete.call_count >= 1
         finally:
             app.dependency_overrides.clear()
 
@@ -285,7 +303,10 @@ class TestEventAttendanceEndpoint:
                 },
             )
             assert resp.status_code == 201
-            session.delete.assert_called_once_with(existing)
+            # See note in test_unsave_action_deletes_user_saved_event — the
+            # endpoint now performs an extra lookup for the legacy device_id
+            # key, so the same mocked row may be deleted twice.
+            session.delete.assert_called_with(existing)
         finally:
             app.dependency_overrides.clear()
 

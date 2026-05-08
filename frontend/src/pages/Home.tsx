@@ -457,6 +457,7 @@ export default function Home() {
                                     onSortChange={setSortBy}
                                     hoveredEventId={hoveredEventId}
                                     onEventHover={handleEventHover}
+                                    onSuggestEvent={() => setShowSuggestModal(true)}
                                 />
                             </div>
                         </div>
@@ -484,6 +485,7 @@ export default function Home() {
                                 onSortChange={setSortBy}
                                 hoveredEventId={hoveredEventId}
                                 onEventHover={handleEventHover}
+                                onSuggestEvent={() => setShowSuggestModal(true)}
                             />
                         </div>
                     </div>

@@ -5,26 +5,92 @@ import { useAuth } from '../context/AuthContext';
 
 type Trigger = 'going' | 'save';
 
-// Per-trigger session-scoped tracking. Shown / dismissed = won't auto-show
-// again for that trigger until the page reloads.
-const shownThisSession = new Set<Trigger>();
+// Unified, persistent sign-in nudge gate.
+// - Shows at most once per browser session.
+// - After a dismissal, suppresses for COOLDOWN_MS.
+// - After SUPPRESS_AFTER_DISMISSALS consecutive dismissals, suppresses
+//   permanently until the user signs in (or clears storage).
+const STORAGE_KEY = 'movida_signin_nudge';
+const COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const SUPPRESS_AFTER_DISMISSALS = 2;
+
+interface NudgeState {
+    dismissedAt?: number;
+    dismissCount?: number;
+    suppressed?: boolean;
+}
+
+let sessionShown = false;
+
+function readState(): NudgeState {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? (JSON.parse(raw) as NudgeState) : {};
+    } catch {
+        return {};
+    }
+}
+
+function writeState(s: NudgeState) {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+    } catch {
+        // ignore
+    }
+}
+
+function clearState() {
+    try {
+        localStorage.removeItem(STORAGE_KEY);
+    } catch {
+        // ignore
+    }
+}
 
 /**
- * Hook gating whether a sign-in nudge should appear for a given trigger.
- * Returns no-op state when the user is signed in.
+ * Hook gating whether a sign-in nudge should appear. Returns no-op state
+ * when the user is signed in. Trigger drives copy only; gating is unified
+ * across all triggers (we don't want to nag once per action).
  */
-export function useSignInNudge(trigger: Trigger) {
+export function useSignInNudge(_trigger: Trigger) {
     const { user } = useAuth();
     const [, force] = useState(0);
-    const shouldShow = !user && !shownThisSession.has(trigger);
+
+    // Reset persisted state when user signs in so a future logout starts fresh.
+    useEffect(() => {
+        if (user) {
+            const s = readState();
+            if (s.dismissedAt || s.dismissCount || s.suppressed) {
+                clearState();
+            }
+        }
+    }, [user]);
+
+    let shouldShow = false;
+    if (!user && !sessionShown) {
+        const s = readState();
+        if (!s.suppressed && (!s.dismissedAt || Date.now() - s.dismissedAt >= COOLDOWN_MS)) {
+            shouldShow = true;
+        }
+    }
+
     const markShown = useCallback(() => {
-        shownThisSession.add(trigger);
+        sessionShown = true;
         force((n) => n + 1);
-    }, [trigger]);
+    }, []);
+
     const dismiss = useCallback(() => {
-        shownThisSession.add(trigger);
+        sessionShown = true;
+        const s = readState();
+        const count = (s.dismissCount ?? 0) + 1;
+        writeState({
+            dismissedAt: Date.now(),
+            dismissCount: count,
+            suppressed: count >= SUPPRESS_AFTER_DISMISSALS,
+        });
         force((n) => n + 1);
-    }, [trigger]);
+    }, []);
+
     return { shouldShow, markShown, dismiss };
 }
 

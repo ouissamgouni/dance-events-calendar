@@ -42,6 +42,15 @@ export default function MyCalendar() {
     const exportMenuRef = useRef<HTMLDivElement | null>(null);
     const [activeFilter, setActiveFilter] = useState<Filter>('all');
     const [showPastEvents, setShowPastEvents] = useState(false);
+    // Sign-in nudge banner: dismissable, persisted across sessions for anon users.
+    const [signInNudgeDismissed, setSignInNudgeDismissed] = useState<boolean>(() => {
+        if (typeof window === 'undefined') return false;
+        return window.localStorage.getItem('myCalendar.signInNudge.dismissed') === '1';
+    });
+    const dismissSignInNudge = useCallback(() => {
+        setSignInNudgeDismissed(true);
+        try { window.localStorage.setItem('myCalendar.signInNudge.dismissed', '1'); } catch { /* ignore quota */ }
+    }, []);
 
     // Union of saved + going — deduplicated
     const allEventIds = useMemo(
@@ -286,20 +295,27 @@ export default function MyCalendar() {
                     )}
                 </div>
 
-                {/* Anonymous users: invite to sign in to keep calendar across devices. */}
-                {!user && allEventIds.length > 0 && (
+                {/* Anonymous users: dismissable invite to sign in to keep calendar across devices. */}
+                {!user && allEventIds.length > 0 && !signInNudgeDismissed && (
                     <div className="mb-4 flex flex-wrap items-center gap-3 border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                        <span className="text-lg" aria-hidden>✨</span>
-                        <p className="flex-1 min-w-[14rem]">
-                            <span className="font-medium text-slate-800">Keep your calendar across devices.</span>{' '}
-                            Sign in to sync your saved events, “I’m going” list, and share link wherever you go.
-                        </p>
                         <Link
                             to={`/login?next=${encodeURIComponent('/my-calendar')}`}
                             className="shrink-0 bg-blue-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-blue-600 transition"
                         >
                             Sign in
                         </Link>
+                        <p className="flex-1 min-w-[14rem]">
+                            <span className="font-medium text-slate-800">Keep your calendar across devices.</span>{' '}
+                            Sign in to sync your saved events, “I’m going” list, and share link wherever you go.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={dismissSignInNudge}
+                            aria-label="Dismiss"
+                            className="shrink-0 text-slate-400 hover:text-slate-700 text-lg leading-none px-1"
+                        >
+                            ×
+                        </button>
                     </div>
                 )}
 
@@ -355,8 +371,11 @@ export default function MyCalendar() {
                         <p className="text-slate-400 text-sm mt-1">
                             Save events or mark "I'm going" to build your personal calendar.
                         </p>
-                        <Link to="/" className="mt-6 text-sm text-slate-600 hover:underline">
-                            ← Browse events
+                        <Link
+                            to="/"
+                            className="mt-6 inline-flex items-center gap-1.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold px-5 py-2 shadow-sm transition"
+                        >
+                            Browse events →
                         </Link>
                     </div>
                 )}

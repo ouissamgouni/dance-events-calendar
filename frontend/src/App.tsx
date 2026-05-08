@@ -139,10 +139,17 @@ function AppShell() {
               }
             />
           </Routes>
-          <footer className="py-3 text-center">
+          <footer className="py-3 text-center flex items-center justify-center gap-3">
             <Link to="/privacy" className="text-[11px] text-gray-400 hover:text-gray-600 transition">
               Privacy Policy
             </Link>
+            <span className="text-[11px] text-gray-300" aria-hidden="true">·</span>
+            <a
+              href="mailto:support@joinmovida.com?subject=Movida%20feedback"
+              className="text-[11px] text-gray-400 hover:text-gray-600 transition"
+            >
+              Send feedback
+            </a>
           </footer>
         </main>
         <StatusBar />

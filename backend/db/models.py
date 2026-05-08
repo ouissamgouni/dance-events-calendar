@@ -15,6 +15,19 @@ class User(SQLModel, table=True):
     email: str = Field(unique=True, index=True, max_length=255)
     display_name: Optional[str] = Field(default=None, max_length=120)
     avatar_url: Optional[str] = Field(default=None, max_length=512)
+    # Public, user-chosen identifier used for /u/{handle} URLs and future
+    # social features. Nullable so existing accounts can claim one later.
+    # Case-insensitive uniqueness is enforced by a functional unique index
+    # on ``lower(handle)`` (see migration g1a2b3c4d5e7).
+    handle: Optional[str] = Field(default=None, max_length=24)
+    # Short opaque base32 identifier appended to shared URLs as
+    # ``?ref=share&src={share_code}``. Distinct from ``handle`` so users
+    # can change their handle without breaking attribution on previously
+    # shared links. Nullable for legacy rows; populated lazily by the
+    # auth layer when the user next signs in.
+    share_code: Optional[str] = Field(
+        default=None, max_length=12, index=True, unique=True
+    )
     provider: str = Field(default="google", max_length=32)
     provider_subject: Optional[str] = Field(
         default=None, unique=True, index=True, max_length=255
@@ -437,4 +450,24 @@ class CalendarDefaultTag(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     calendar_id: str = Field(foreign_key="calendar_settings.calendar_id", index=True)
     tag_id: int = Field(foreign_key="tags.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ShareEvent(SQLModel, table=True):
+    """Append-only log of share funnel events.
+
+    One row per discrete action: a 'share' when the user activates the
+    share button, a 'click' when a referred visitor lands on the event
+    page (carries the originating ``share_code`` from the URL), and a
+    'conversion' when that referred visitor performs an attributable
+    action (currently RSVP "going").
+    """
+
+    __tablename__ = "share_events"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    event_id: str = Field(index=True)
+    action: str = Field(max_length=16)  # share | click | conversion
+    share_code: Optional[str] = Field(default=None, max_length=12, index=True)
+    device_id: Optional[str] = Field(default=None, max_length=64, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)

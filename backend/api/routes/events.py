@@ -16,7 +16,13 @@ from backend.api.schemas import (
 )
 from backend.api.routes.tags import get_event_tags
 from backend.db.database import get_session
-from backend.db.models import CachedEvent, CalendarSetting, EventTag, EventView
+from backend.db.models import (
+    CachedEvent,
+    CalendarSetting,
+    EventTag,
+    EventView,
+    UserEventAttendance,
+)
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 
@@ -106,6 +112,18 @@ def get_events(
         ).all()
         view_counts = {row[0]: row[1] for row in rows}
 
+    # Aggregate "going" count per event (one row per device in
+    # user_event_attendances = currently going). Public count includes
+    # both anonymous and signed-in attendees regardless of share toggle.
+    going_counts: dict[str, int] = {}
+    if event_ids:
+        rows = session.exec(
+            select(UserEventAttendance.event_id, func.count(UserEventAttendance.id))
+            .where(UserEventAttendance.event_id.in_(event_ids))
+            .group_by(UserEventAttendance.event_id)
+        ).all()
+        going_counts = {row[0]: row[1] for row in rows}
+
     # Batch-fetch tags
     tags_map = get_event_tags(session, event_ids)
 
@@ -123,6 +141,7 @@ def get_events(
             longitude=e.longitude,
             color=color_map.get(e.calendar_id),
             view_count=view_counts.get(e.event_id, 0),
+            going_count=going_counts.get(e.event_id, 0),
             price_min=e.price_min,
             price_max=e.price_max,
             price_currency=e.price_currency,
@@ -173,6 +192,15 @@ def get_events_by_ids(
         ).all()
         view_counts = {row[0]: row[1] for row in rows}
 
+    going_counts: dict[str, int] = {}
+    if event_ids:
+        rows = session.exec(
+            select(UserEventAttendance.event_id, func.count(UserEventAttendance.id))
+            .where(UserEventAttendance.event_id.in_(event_ids))
+            .group_by(UserEventAttendance.event_id)
+        ).all()
+        going_counts = {row[0]: row[1] for row in rows}
+
     tags_map = get_event_tags(session, event_ids)
 
     return [
@@ -189,6 +217,7 @@ def get_events_by_ids(
             longitude=e.longitude,
             color=color_map.get(e.calendar_id),
             view_count=view_counts.get(e.event_id, 0),
+            going_count=going_counts.get(e.event_id, 0),
             price_min=e.price_min,
             price_max=e.price_max,
             price_currency=e.price_currency,
@@ -231,6 +260,12 @@ def get_event(
         select(func.count(EventView.id)).where(EventView.event_id == event_id)
     ).one()
 
+    going_count = session.exec(
+        select(func.count(UserEventAttendance.id)).where(
+            UserEventAttendance.event_id == event_id
+        )
+    ).one()
+
     tags_map = get_event_tags(session, [event_id])
 
     data = EventResponse(
@@ -246,6 +281,7 @@ def get_event(
         longitude=event.longitude,
         color=calendar.color,
         view_count=view_count,
+        going_count=going_count,
         price_min=event.price_min,
         price_max=event.price_max,
         price_currency=event.price_currency,
@@ -256,6 +292,65 @@ def get_event(
     )
     response = JSONResponse(content=data.model_dump(mode="json"))
     response.headers["Cache-Control"] = "public, max-age=60"
+    return response
+
+
+@router.get("/{event_id}/og-meta")
+@limiter.limit("600/minute")
+def get_event_og_meta(
+    event_id: str,
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    """Lightweight metadata endpoint consumed by the Cloudflare Pages
+    Function that pre-renders Open Graph tags for crawlers.
+
+    Kept deliberately minimal (no view counts, no tags, no attendees) so
+    the edge function can be cached aggressively and respond within the
+    crawler's tight timeout budgets. Returned fields mirror the OG/SEO
+    surface only.
+    """
+    event = session.exec(
+        select(CachedEvent).where(
+            CachedEvent.event_id == event_id,
+            CachedEvent.deleted_at == None,  # noqa: E711 (SQLAlchemy comparison)
+        )
+    ).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    calendar = session.exec(
+        select(CalendarSetting).where(
+            CalendarSetting.calendar_id == event.calendar_id,
+            CalendarSetting.enabled == True,  # noqa: E712
+        )
+    ).first()
+    if not calendar:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    # Truncate description for the meta tag — most crawlers cap previews
+    # around 200 chars and trailing whitespace looks ugly in cards.
+    description = (event.description or "").strip()
+    if len(description) > 200:
+        description = description[:197].rstrip() + "…"
+
+    payload = {
+        "event_id": event.event_id,
+        "title": event.title,
+        "description": description or None,
+        "location": event.location,
+        "start": event.start.isoformat() if event.start else None,
+        "end": event.end.isoformat() if event.end else None,
+        "latitude": event.latitude,
+        "longitude": event.longitude,
+        "price_is_free": event.price_is_free,
+        "price_min": event.price_min,
+        "price_currency": event.price_currency,
+    }
+    response = JSONResponse(content=payload)
+    # Cache aggressively — bots re-fetch frequently and event metadata
+    # changes rarely. 5min browser, 1h shared cache (CDN).
+    response.headers["Cache-Control"] = "public, max-age=300, s-maxage=3600"
     return response
 
 

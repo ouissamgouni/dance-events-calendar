@@ -6,18 +6,24 @@ from pathlib import Path
 from typing import Optional
 
 import yaml
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from slowapi import Limiter
 from backend.api.rate_limit import client_ip
 from sqlmodel import Session, delete, select
+from sqlalchemy import func
 
 from backend.api.deps import (
     create_session_token,
     require_user,
 )
-from backend.api.schemas import UpdatePreferencesRequest
+from backend.api.anon_id import read_anon_id
+from backend.api.schemas import (
+    HandleAvailabilityResponse,
+    UpdatePreferencesRequest,
+    UpdateProfileRequest,
+)
 from backend.config.loader import (
     get_admin_email,
     get_dev_auth_enabled,
@@ -131,6 +137,9 @@ def _upsert_user_from_claims(
             last_login_at=now,
         )
         session.add(user)
+        # Allocate a share_code immediately for new users so their first
+        # shared link already carries attribution.
+        _ensure_share_code(session, user)
     else:
         # Reactivate a soft-deleted account on re-login.
         user.deleted_at = None
@@ -148,12 +157,31 @@ def _upsert_user_from_claims(
     return user, is_new_user
 
 
-def _merge_device_data(session: Session, user: User, device_id: Optional[str]) -> None:
-    """Attribute anonymous device-keyed rows to this user (idempotent, conflict-safe)."""
-    if not device_id:
+def _merge_device_data(
+    session: Session,
+    user: User,
+    device_id: Optional[str],
+    anon_id: Optional[str] = None,
+) -> None:
+    """Attribute anonymous device-keyed rows to this user (idempotent, conflict-safe).
+
+    ``device_id`` is the legacy localStorage value supplied by the client.
+    ``anon_id`` is the value of the server-issued ``movida_aid`` cookie
+    (see ``backend.api.anon_id``). Both are checked because writes after the
+    cookie was introduced are keyed on the cookie value, while pre-cookie
+    writes (and clients without the cookie) still use the device_id. We dedupe
+    so passing the same value for both does not double-process rows.
+
+    Newly-claimed ``UserEventAttendance`` rows inherit
+    ``user.share_attendance_default`` for ``share_publicly`` so the user
+    immediately appears in their own avatar stack on event cards / details
+    without having to re-toggle "going" after sign-up.
+    """
+    keys = [k for k in {device_id, anon_id} if k]
+    if not keys:
         return
 
-    # Saved events: claim rows for this device that have no user yet. On
+    # Saved events: claim rows for these keys that have no user yet. On
     # event-id conflict with rows already owned by this user, drop the
     # device-only row (keep the older user-owned one).
     existing_event_ids = set(
@@ -163,7 +191,7 @@ def _merge_device_data(session: Session, user: User, device_id: Optional[str]) -
     )
     saved_rows = session.exec(
         select(UserSavedEvent).where(
-            UserSavedEvent.device_id == device_id,
+            UserSavedEvent.device_id.in_(keys),
             UserSavedEvent.user_id.is_(None),
         )
     ).all()
@@ -184,7 +212,7 @@ def _merge_device_data(session: Session, user: User, device_id: Optional[str]) -
     )
     attending_rows = session.exec(
         select(UserEventAttendance).where(
-            UserEventAttendance.device_id == device_id,
+            UserEventAttendance.device_id.in_(keys),
             UserEventAttendance.user_id.is_(None),
         )
     ).all()
@@ -193,25 +221,34 @@ def _merge_device_data(session: Session, user: User, device_id: Optional[str]) -
             session.delete(row)
         else:
             row.user_id = user.id
+            # Anonymous rows are stored with share_publicly=False (anonymous
+            # callers can't choose visibility). Now that we know who the user
+            # is, apply their default so they appear in the public attendee
+            # list immediately — matching what would have happened if they
+            # had been logged in when they first clicked "going".
+            row.share_publicly = user.share_attendance_default
             session.add(row)
             existing_attending_ids.add(row.event_id)
 
     # Share token: if the user already owns one, keep it. Otherwise claim the
-    # device's token; on conflict drop the device-only token.
-    user_share = session.exec(
-        select(ShareToken).where(ShareToken.user_id == user.id)
-    ).first()
-    device_share = session.exec(
-        select(ShareToken).where(
-            ShareToken.device_id == device_id, ShareToken.user_id.is_(None)
-        )
-    ).first()
-    if device_share is not None:
-        if user_share is None:
-            device_share.user_id = user.id
-            session.add(device_share)
-        else:
-            session.delete(device_share)
+    # device's token; on conflict drop the device-only token. (Share tokens
+    # are still keyed by the legacy device_id only — the cookie is for
+    # write-side state dedupe, not link sharing.)
+    if device_id:
+        user_share = session.exec(
+            select(ShareToken).where(ShareToken.user_id == user.id)
+        ).first()
+        device_share = session.exec(
+            select(ShareToken).where(
+                ShareToken.device_id == device_id, ShareToken.user_id.is_(None)
+            )
+        ).first()
+        if device_share is not None:
+            if user_share is None:
+                device_share.user_id = user.id
+                session.add(device_share)
+            else:
+                session.delete(device_share)
 
     session.commit()
 
@@ -280,7 +317,9 @@ def login_with_google(
         picture=picture,
         provider_subject=provider_subject,
     )
-    _merge_device_data(session, user, body.device_id)
+    _merge_device_data(
+        session, user, body.device_id, anon_id=read_anon_id(request)
+    )
 
     is_admin = _is_admin_email(user.email)
     response = JSONResponse(
@@ -356,12 +395,22 @@ def dev_users():
 
 
 @router.get("/me")
-def get_me(user: User = Depends(require_user)):
+def get_me(
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+):
     """Return the current authenticated user."""
+    # Lazily mint a share_code for accounts that predate the column.
+    if not user.share_code:
+        _ensure_share_code(session, user)
+        session.commit()
+        session.refresh(user)
     return {
         "user_id": str(user.id),
         "email": user.email,
         "name": user.display_name or user.email,
+        "handle": user.handle,
+        "share_code": user.share_code,
         "avatar_url": user.avatar_url,
         "is_admin": _is_admin_email(user.email),
         "share_attendance_default": user.share_attendance_default,
@@ -384,6 +433,173 @@ def update_preferences(
     session.commit()
     session.refresh(user)
     return {"share_attendance_default": user.share_attendance_default}
+
+
+# --- Profile (display_name + handle) -----------------------------------------
+
+# Crockford-style base32 alphabet (no I/L/O/U) — short, unambiguous, URL-safe.
+# Used for ``users.share_code``, the opaque attribution identifier appended
+# to shared event URLs.
+_SHARE_CODE_ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz"
+_SHARE_CODE_LEN = 8
+_SHARE_CODE_MAX_TRIES = 6
+
+
+def _generate_share_code() -> str:
+    """Return an 8-char base32 token from a CSPRNG."""
+    import secrets
+
+    return "".join(secrets.choice(_SHARE_CODE_ALPHABET) for _ in range(_SHARE_CODE_LEN))
+
+
+def _ensure_share_code(session: Session, user: User) -> None:
+    """Lazily backfill ``share_code`` for users that predate the column.
+
+    Idempotent: no-op when the user already has one. Caller is responsible
+    for the surrounding commit.
+    """
+    if user.share_code:
+        return
+    for _ in range(_SHARE_CODE_MAX_TRIES):
+        candidate = _generate_share_code()
+        # Defensive uniqueness check; the unique index enforces the
+        # invariant but trying once at the application layer avoids the
+        # noisy IntegrityError path on the happy collisions-are-rare case.
+        clash = session.exec(
+            select(User.id).where(User.share_code == candidate)
+        ).first()
+        if clash is None:
+            user.share_code = candidate
+            session.add(user)
+            return
+    # Astronomically unlikely with 32^8 ≈ 1.1e12 keyspace; surface as 500
+    # rather than silently returning a None code.
+    raise HTTPException(status_code=500, detail="Failed to allocate share code")
+
+
+# Lowercase ASCII; must start with letter to avoid handles that look like
+# numeric IDs or that would clash with future numeric routes.
+_HANDLE_PATTERN = re.compile(r"^[a-z][a-z0-9_]{2,23}$")
+
+# Reserved handles that map to existing routes, generic terms, or names we
+# want to keep available for app-owned profiles. Lowercase comparisons.
+_RESERVED_HANDLES: frozenset[str] = frozenset(
+    {
+        "admin",
+        "admins",
+        "administrator",
+        "support",
+        "help",
+        "contact",
+        "about",
+        "privacy",
+        "terms",
+        "login",
+        "logout",
+        "signin",
+        "signup",
+        "register",
+        "account",
+        "settings",
+        "profile",
+        "user",
+        "users",
+        "u",
+        "me",
+        "home",
+        "events",
+        "event",
+        "calendar",
+        "share",
+        "shared",
+        "api",
+        "auth",
+        "static",
+        "assets",
+        "public",
+        "movida",
+        "joinmovida",
+        "official",
+        "system",
+        "root",
+        "moderator",
+        "mod",
+    }
+)
+
+
+def _normalize_handle(raw: str) -> str:
+    return raw.strip().lower()
+
+
+def _validate_handle(raw: str) -> tuple[Optional[str], Optional[str]]:
+    """Return (normalized_handle, error_reason). Reason is human-readable."""
+    h = _normalize_handle(raw)
+    if not h:
+        return None, "Handle is required"
+    if not _HANDLE_PATTERN.match(h):
+        return None, (
+            "3–24 chars, letters/numbers/underscore, must start with a letter"
+        )
+    if h in _RESERVED_HANDLES:
+        return None, "This handle is reserved"
+    return h, None
+
+
+def _handle_in_use(session: Session, handle: str, exclude_user_id) -> bool:
+    stmt = select(User.id).where(func.lower(User.handle) == handle)
+    if exclude_user_id is not None:
+        stmt = stmt.where(User.id != exclude_user_id)
+    return session.exec(stmt).first() is not None
+
+
+@router.get("/handle-available", response_model=HandleAvailabilityResponse)
+def handle_available(
+    handle: str = Query(..., min_length=1, max_length=32),
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+):
+    """Live availability check for the handle picker."""
+    normalized, reason = _validate_handle(handle)
+    if normalized is None:
+        return HandleAvailabilityResponse(handle=handle, available=False, reason=reason)
+    if _handle_in_use(session, normalized, exclude_user_id=user.id):
+        return HandleAvailabilityResponse(
+            handle=normalized, available=False, reason="Already taken"
+        )
+    return HandleAvailabilityResponse(handle=normalized, available=True)
+
+
+@router.patch("/profile")
+@limiter.limit("20/hour")
+def update_profile(
+    request: Request,
+    payload: UpdateProfileRequest,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+):
+    """Update editable identity fields (display_name and/or handle)."""
+    if payload.display_name is not None:
+        name = payload.display_name.strip()
+        if not name:
+            raise HTTPException(status_code=422, detail="Display name cannot be blank")
+        user.display_name = name
+
+    if payload.handle is not None:
+        normalized, reason = _validate_handle(payload.handle)
+        if normalized is None:
+            raise HTTPException(status_code=422, detail=reason or "Invalid handle")
+        if _handle_in_use(session, normalized, exclude_user_id=user.id):
+            raise HTTPException(status_code=409, detail="Handle already taken")
+        user.handle = normalized
+
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return {
+        "display_name": user.display_name,
+        "handle": user.handle,
+    }
 
 
 @router.post("/logout")

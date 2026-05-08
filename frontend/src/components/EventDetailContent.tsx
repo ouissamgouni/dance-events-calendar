@@ -5,6 +5,7 @@ import { parseLinks } from '../utils/parseLinks';
 import { deriveLinkLabel } from '../utils/deriveLinkLabel';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { trackLink } from '../utils/tracking';
+import { getDeviceId } from '../utils/deviceId';
 import { fetchTagGroups, retryGeocodingSingle } from '../api';
 import AddressAutocomplete from './AddressAutocomplete';
 import EventTagEditor from './EventTagEditor';
@@ -591,7 +592,7 @@ export default function EventDetailContent({
                         eventId={event.event_id}
                         tagGroups={tagGroups}
                         existingTagIds={new Set(event.tags?.map((t) => t.id) ?? [])}
-                        deviceId={localStorage.getItem('device_id') || 'anonymous'}
+                        deviceId={getDeviceId()}
                         onClose={() => setShowSuggestTags(false)}
                     />
                 </div>

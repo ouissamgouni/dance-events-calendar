@@ -36,4 +36,32 @@
 
 name = "movida"
 compatibility_date = "2026-04-30"
-pages_build_output_dir = "frontend/dist"
+pages_build_output_dir = "dist"
+
+# ─────────────────────────────────────────────────────────────────────────
+# Pages Functions runtime env vars (per environment).
+#
+# IMPORTANT: Once wrangler.toml is uploaded with a deploy, Cloudflare Pages
+# switches the project into "wrangler.toml-managed" mode. Dashboard env
+# vars become read-only and are wiped on each deploy. Only vars declared
+# here (plus secrets uploaded via `wrangler pages secret put`) are applied
+# at the edge.
+#
+# These vars are consumed by Pages Functions in `functions/` (e.g. the
+# OG/JSON-LD pre-render at functions/event/[eventId].ts). They are NOT
+# the same as the build-time VITE_* vars used by the Vite SPA — those
+# are injected into the bundle at `npm run build` and don't need to be
+# declared here.
+#
+# To add a secret (not committed):
+#   npx wrangler pages secret put NAME --project-name=movida --branch=develop
+#   npx wrangler pages secret put NAME --project-name=movida --branch=main
+# ─────────────────────────────────────────────────────────────────────────
+
+[env.production.vars]
+API_BASE = "https://api.joinmovida.com"
+PUBLIC_BASE = "https://joinmovida.com"
+
+[env.preview.vars]
+API_BASE = "https://api-develop.joinmovida.com"
+PUBLIC_BASE = "https://develop.joinmovida.com"

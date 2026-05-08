@@ -196,6 +196,11 @@ export interface AuthUser {
     user_id?: string;
     email: string;
     name: string;
+    handle?: string | null;
+    /** Opaque attribution token appended to shared URLs as `?ref=share&src=`.
+     *  Present once the user record is post-`h2b3c4d5e6f8` (auto-backfilled
+     *  on the first /me call). Null only in transient pre-backfill states. */
+    share_code?: string | null;
     avatar_url?: string | null;
     is_admin?: boolean;
     share_attendance_default?: boolean;
@@ -285,6 +290,41 @@ export async function updateUserPreferences(prefs: { share_attendance_default?: 
         body: JSON.stringify(prefs),
     });
     if (!res.ok) throw new Error('Failed to update preferences');
+    return res.json();
+}
+
+export async function updateUserProfile(
+    profile: { display_name?: string; handle?: string },
+): Promise<{ display_name: string | null; handle: string | null }> {
+    const res = await fetch(`${BASE}/auth/profile`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(profile),
+    });
+    if (!res.ok) {
+        let detail = 'Failed to update profile';
+        try {
+            const data = await res.json();
+            if (typeof data?.detail === 'string') detail = data.detail;
+        } catch { /* ignore */ }
+        throw new Error(detail);
+    }
+    return res.json();
+}
+
+export interface HandleAvailability {
+    handle: string;
+    available: boolean;
+    reason?: string | null;
+}
+
+export async function checkHandleAvailable(handle: string): Promise<HandleAvailability> {
+    const res = await fetch(
+        `${BASE}/auth/handle-available?handle=${encodeURIComponent(handle)}`,
+        { credentials: 'include' },
+    );
+    if (!res.ok) throw new Error('Handle check failed');
     return res.json();
 }
 
@@ -966,6 +1006,30 @@ export async function trackExport(format: string, eventCount: number, deviceId?:
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
+    });
+}
+
+// --- Share Funnel Tracking ---
+
+/** Server-side share funnel ping. ``share_code`` is sent only for click /
+ *  conversion (the originator on a `share` is read from the auth session). */
+export async function trackShare(args: {
+    eventId: string;
+    action: 'share' | 'click' | 'conversion';
+    shareCode?: string | null;
+    deviceId?: string;
+}): Promise<void> {
+    const body: Record<string, string> = {
+        event_id: args.eventId,
+        action: args.action,
+    };
+    if (args.shareCode) body.share_code = args.shareCode;
+    if (args.deviceId) body.device_id = args.deviceId;
+    await fetch(`${BASE}/track/share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        credentials: 'include',
     });
 }
 

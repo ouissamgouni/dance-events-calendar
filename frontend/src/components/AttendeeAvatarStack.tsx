@@ -36,58 +36,22 @@ function MiniAvatar({ attendee, z }: { attendee: Attendee; z: number }) {
 }
 
 /**
- * Compact attendee preview for event-card rows. Always rendered as a link to
- * the event detail page anchored at the attendees section, so users can tap
- * the avatar stack to jump straight to the full list. Renders nothing when
- * total_going = 0.
+ * Compact attendee avatar preview for event-card rows. Shows *who* is going
+ * (faces + overflow), not *how many* — the count lives next to the going CTA
+ * icon to avoid duplication. Anonymous viewers and events without preview
+ * attendees render nothing (the count chip on the CTA already conveys signal).
  */
 export default function AttendeeAvatarStack({ eventId, max = 3 }: Props) {
     const { user } = useAuth();
     const summary = useAttendanceSummary(eventId);
     if (!summary) return null;
-    const totalSaved = summary.total_saved ?? 0;
-    if (summary.total_going === 0 && totalSaved === 0) return null;
-
-    const savedNode = totalSaved > 0 ? (
-        <span className="text-slate-500" title={`${totalSaved} saved`}>
-            <span className="text-slate-300 mx-1">·</span>
-            <span className="font-medium text-slate-600">Saved</span>
-            <span className="ml-1">{totalSaved}</span>
-        </span>
-    ) : null;
-
-    // Logged-out viewers: count only, still tappable so they reach the
-    // sign-in CTA in the detail page.
-    if (!user) {
-        return (
-            <Link
-                to={`/event/${eventId}#attendees`}
-                onClick={(e) => e.stopPropagation()}
-                className="inline-flex items-center text-[11px] text-slate-500 hover:text-slate-700"
-                title="Sign in to see who"
-            >
-                {summary.total_going > 0 && (
-                    <>
-                        <span className="font-medium text-slate-600">Going</span>
-                        <span className="ml-1">{summary.total_going}</span>
-                    </>
-                )}
-                {summary.total_going > 0 && savedNode}
-                {summary.total_going === 0 && totalSaved > 0 && (
-                    <>
-                        <span className="font-medium text-slate-600">Saved</span>
-                        <span className="ml-1">{totalSaved}</span>
-                    </>
-                )}
-            </Link>
-        );
-    }
-
+    if (!user) return null;
+    if (summary.total_going === 0) return null;
     const shown = summary.preview_attendees.slice(0, max);
+    if (shown.length === 0) return null;
+
     const overflow = Math.max(0, summary.total_going - shown.length);
-    const namesTitle = shown.length
-        ? `${shown.map((a) => a.display_name ?? 'Attendee').join(', ')}${overflow > 0 ? ` and ${overflow} more` : ''}`
-        : `${summary.total_going} going`;
+    const namesTitle = `${shown.map((a) => a.display_name ?? 'Attendee').join(', ')}${overflow > 0 ? ` and ${overflow} more` : ''}`;
 
     return (
         <Link
@@ -96,32 +60,12 @@ export default function AttendeeAvatarStack({ eventId, max = 3 }: Props) {
             className="inline-flex items-center gap-1.5 text-[11px] text-slate-500 hover:text-slate-700"
             title={namesTitle}
         >
-            {summary.total_going > 0 && (
-                <>
-                    <span className="font-medium text-slate-600">Going</span>
-                    {shown.length > 0 && (
-                        <span className="flex -space-x-1.5">
-                            {shown.map((a, i) => (
-                                <MiniAvatar key={a.user_id} attendee={a} z={shown.length - i} />
-                            ))}
-                        </span>
-                    )}
-                    <span>
-                        {shown.length === 0
-                            ? `· ${summary.total_going}`
-                            : overflow > 0
-                                ? `+${overflow}`
-                                : `· ${summary.total_going}`}
-                    </span>
-                </>
-            )}
-            {summary.total_going === 0 && totalSaved > 0 && (
-                <>
-                    <span className="font-medium text-slate-600">Saved</span>
-                    <span>{totalSaved}</span>
-                </>
-            )}
-            {summary.total_going > 0 && savedNode}
+            <span className="flex -space-x-1.5">
+                {shown.map((a, i) => (
+                    <MiniAvatar key={a.user_id} attendee={a} z={shown.length - i} />
+                ))}
+            </span>
+            {overflow > 0 && <span>+{overflow}</span>}
         </Link>
     );
 }

@@ -111,11 +111,16 @@ tasks:
           exit 1
         fi
         echo "Building staging frontend (VITE_API_URL=$VITE_API_URL)..."
-        cd frontend && VITE_API_URL=$VITE_API_URL VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" VITE_UMAMI_WEBSITE_ID="${VITE_UMAMI_WEBSITE_ID:-}" npm run build
+        (cd frontend && VITE_API_URL=$VITE_API_URL VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" VITE_UMAMI_WEBSITE_ID="${VITE_UMAMI_WEBSITE_ID:-}" npm run build)
         echo "Deploying to Cloudflare Pages (branch: develop)..."
+        # Run wrangler from frontend/ so it discovers wrangler.toml,
+        # functions/ and dist/ as siblings — required for Pages Functions
+        # detection (Cloudflare expects functions/ adjacent to the build
+        # output dir).
+        cd frontend && \
         CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN \
         CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID \
-        npx --yes wrangler pages deploy dist \
+        npx --yes wrangler pages deploy \
           --project-name={{.PROJECT_NAME}} \
           --branch=develop
         echo "✅ Staging frontend deployed: https://develop.joinmovida.com (alias: https://develop.movida.pages.dev)"
@@ -255,11 +260,16 @@ tasks:
           exit 1
         fi
         echo "Building prod frontend (VITE_API_URL=$VITE_API_URL)..."
-        cd frontend && VITE_API_URL=$VITE_API_URL VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" VITE_UMAMI_WEBSITE_ID="${VITE_UMAMI_WEBSITE_ID:-}" npm run build
+        (cd frontend && VITE_API_URL=$VITE_API_URL VITE_UMAMI_URL="${VITE_UMAMI_URL:-}" VITE_UMAMI_WEBSITE_ID="${VITE_UMAMI_WEBSITE_ID:-}" npm run build)
         echo "Deploying to Cloudflare Pages (branch: main)..."
+        # Run wrangler from frontend/ so it discovers wrangler.toml,
+        # functions/ and dist/ as siblings — required for Pages Functions
+        # detection (Cloudflare expects functions/ adjacent to the build
+        # output dir).
+        cd frontend && \
         CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API_TOKEN \
         CLOUDFLARE_ACCOUNT_ID=$CLOUDFLARE_ACCOUNT_ID \
-        npx --yes wrangler pages deploy dist \
+        npx --yes wrangler pages deploy \
           --project-name={{.PROJECT_NAME}} \
           --branch=main
         echo "✅ Prod frontend deployed: https://joinmovida.com (alias: https://movida.pages.dev)"

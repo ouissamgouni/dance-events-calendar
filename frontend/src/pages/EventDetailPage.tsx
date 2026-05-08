@@ -4,6 +4,8 @@ import { Helmet } from 'react-helmet-async';
 import { fetchEvent, updateEvent, fetchTagGroups } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { trackView } from '../utils/tracking';
+import { getDeviceId } from '../utils/deviceId';
+import { useReferralAttribution } from '../hooks/useReferralAttribution';
 import EventDetailContent from '../components/EventDetailContent';
 import AdminEventDetailContent from '../components/AdminEventDetailContent';
 import EventMap from '../components/EventMap';
@@ -40,6 +42,10 @@ export default function EventDetailPage() {
     const [savingTitle, setSavingTitle] = useState(false);
     const [reviewCount, setReviewCount] = useState(0);
     const titleCancelledRef = useRef(false);
+
+    // Capture `?ref=share&src=` from the URL so any subsequent RSVP on
+    // this event can be attributed back to the originating share_code.
+    useReferralAttribution(eventId);
 
     useEffect(() => {
         if (!eventId) return;
@@ -232,30 +238,32 @@ export default function EventDetailPage() {
                                             eventId={event.event_id}
                                             tagGroups={tagGroups}
                                             existingTagIds={new Set(event.tags?.map((t) => t.id) ?? [])}
-                                            deviceId={localStorage.getItem('device_id') || 'anonymous'}
+                                            deviceId={getDeviceId()}
                                             onClose={() => setShowSuggestTags(false)}
                                         />
                                     </div>
                                 )}
 
-                                {/* Who's going */}
+                                {/* Interest — combined engagement section: going attendees + total saves. */}
                                 <div className="border-t border-slate-100 px-4 py-3">
                                     <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
-                                        Who's going
+                                        Interest
                                     </h3>
                                     <AttendeeList eventId={event.event_id} expanded />
                                 </div>
 
-                                {/* Actions bar */}
-                                <div className="border-t border-slate-100 px-4 py-2 flex items-center gap-1.5 flex-wrap">
-                                    <SaveEventButton eventId={event.event_id} appearance="pill" />
+                                {/* Actions bar — primary CTA (Going) is visually emphasised; the
+                                    rest are secondary. A sticky mobile bar mirrors the primary
+                                    action so users don't have to scroll back up to convert. */}
+                                <div className="border-t border-slate-100 px-4 py-3 flex items-center gap-2 flex-wrap">
                                     <GoingButton eventId={event.event_id} appearance="pill" />
-                                    {showRatings && <RateEventButton eventId={event.event_id} appearance="pill" eventHasReviews={reviewCount > 0} />}
+                                    <SaveEventButton eventId={event.event_id} appearance="pill" />
                                     <ShareButton
                                         eventId={event.event_id}
                                         title={event.title}
                                         url={shareUrl}
                                     />
+                                    {showRatings && <RateEventButton eventId={event.event_id} appearance="pill" eventHasReviews={reviewCount > 0} />}
                                     {!editMode && (
                                         <button
                                             onClick={() => {
@@ -312,6 +320,26 @@ export default function EventDetailPage() {
                         )}
                     </div>
                 </div>
+
+                {/* Sticky mobile CTA bar — mirrors the in-card actions bar so
+                    every primary affordance (Going, Save, Rate, Share) is
+                    reachable without scrolling. Hidden on lg+ where the
+                    in-card action bar is visible alongside the description. */}
+                <div className="lg:hidden fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur px-3 py-2 shadow-[0_-2px_8px_rgba(0,0,0,0.04)] flex items-center gap-2 overflow-x-auto">
+                    <GoingButton eventId={event.event_id} appearance="pill" />
+                    <SaveEventButton eventId={event.event_id} appearance="pill" />
+                    {showRatings && (
+                        <RateEventButton eventId={event.event_id} appearance="pill" eventHasReviews={reviewCount > 0} />
+                    )}
+                    <ShareButton
+                        eventId={event.event_id}
+                        title={event.title}
+                        url={shareUrl}
+                    />
+                </div>
+                {/* Spacer so the sticky bar never overlaps page content on
+                    mobile. Matches the bar's vertical footprint. */}
+                <div className="lg:hidden h-16" aria-hidden="true" />
             </div>
 
         </>

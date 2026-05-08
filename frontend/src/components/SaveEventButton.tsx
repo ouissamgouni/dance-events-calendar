@@ -48,7 +48,11 @@ export default function SaveEventButton({
     };
 
     const nudgeNode = showNudge && !user ? (
-        <SignInNudge anchorRef={buttonRef} trigger="save" onClose={() => setShowNudge(false)} />
+        <SignInNudge
+            anchorRef={buttonRef}
+            trigger="save"
+            onClose={() => { nudge.dismiss(); setShowNudge(false); }}
+        />
     ) : null;
 
     if (appearance === 'pill') {

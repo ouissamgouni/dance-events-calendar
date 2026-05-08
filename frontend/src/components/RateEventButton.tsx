@@ -136,15 +136,15 @@ export default function RateEventButton({
                     ? (
                         <span className="tabular-nums">
                             {scoreText} <span className="text-slate-400">({aggCount})</span>
-                            {hasRated && (
+                            {hasRated && (status === 'pending' || status === 'rejected') && (
                                 <span className="ml-1.5 pl-1.5 border-l border-amber-300 text-[11px] text-amber-700">
-                                    {status === 'pending' ? 'Your review pending' : status === 'rejected' ? 'Your review rejected' : 'Edit your review'}
+                                    {status === 'pending' ? 'Your review pending' : 'Your review rejected'}
                                 </span>
                             )}
                         </span>
                     )
                     : hasRated
-                        ? (status === 'pending' ? 'Pending review' : status === 'rejected' ? 'Rating rejected' : 'Edit rating')
+                        ? (status === 'pending' ? 'Pending review' : status === 'rejected' ? 'Rating rejected' : null)
                         : 'Rate'}
             </button>
         ) : (

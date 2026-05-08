@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useToast } from './Toast';
-import { trackLink } from '../utils/tracking';
+import { trackLink, trackShareAction } from '../utils/tracking';
+import { useAuth } from '../context/AuthContext';
 
 interface ShareButtonProps {
     eventId: string;
@@ -14,26 +15,43 @@ interface ShareButtonProps {
  * - When the Web Share API is available (most mobile browsers), opens the
  *   native share sheet (which already includes WhatsApp, Messages, Mail, etc.).
  * - Otherwise (most desktops), copies the link to the clipboard and shows a toast.
+ *
+ * When the user is signed in we append `?ref=share&src={share_code}` so
+ * recipient clicks can be attributed back to them in the share funnel.
  */
 export default function ShareButton({ eventId, title, url, className }: ShareButtonProps) {
     const toast = useToast();
+    const { user } = useAuth();
     const canNativeShare = useMemo(
         () => typeof navigator !== 'undefined' && typeof navigator.share === 'function',
         []
     );
 
+    const shareUrl = useMemo(() => {
+        if (!user?.share_code) return url;
+        try {
+            const u = new URL(url);
+            u.searchParams.set('ref', 'share');
+            u.searchParams.set('src', user.share_code);
+            return u.toString();
+        } catch {
+            return url;
+        }
+    }, [url, user?.share_code]);
+
     const handleClick = async () => {
-        trackLink(eventId, url);
+        trackLink(eventId, shareUrl);
+        trackShareAction(eventId);
         if (canNativeShare) {
             try {
-                await navigator.share({ title, text: title, url });
+                await navigator.share({ title, text: title, url: shareUrl });
             } catch {
                 // user cancelled or share failed; ignore
             }
             return;
         }
         try {
-            await navigator.clipboard.writeText(url);
+            await navigator.clipboard.writeText(shareUrl);
             toast.push({ title: 'Link copied', variant: 'success', duration: 2000 });
         } catch {
             toast.push({ title: 'Could not copy link', variant: 'error' });

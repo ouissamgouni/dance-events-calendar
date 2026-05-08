@@ -173,3 +173,31 @@ test_plan:
       expected: >
         Response JSON includes "event_attendances" and "user_event_attendances"
         keys with the count of deleted rows (>= 0). Attendance data is wiped.
+
+    # ── Anti-inflation (anonymous identity is server cookie) ─────
+    - id: 20
+      title: "Going count not inflated by clearing localStorage"
+      description: >
+        As an anonymous visitor, mark "Friday Salsa Social" as going. Note
+        the going count on the event card. Then clear localStorage in devtools
+        (Application → Local Storage → clear) WITHOUT clearing cookies, reload,
+        and click "going" again on the same event.
+      expected: >
+        The going count is unchanged (still +1). The server-issued httpOnly
+        cookie ``movida_aid`` keeps the same anonymous identity across the
+        localStorage wipe, so re-clicking does not insert a second
+        UserEventAttendance row.
+
+    - id: 21
+      title: "Anonymous going inherits share default after sign-up"
+      description: >
+        As a brand-new anonymous visitor, mark two events as going. Then sign
+        up via Google (mock auth in dev). With share_attendance_default=true on
+        the new account (default), check the avatar stack on each going event
+        card without re-clicking.
+      expected: >
+        Your avatar appears in the public attendee preview of both events
+        immediately after signup — no need to toggle "going" off and on. If
+        share_attendance_default is set to false in account preferences before
+        signup, the avatar does NOT appear and the user shows up as an
+        anonymous attendee in the count breakdown.

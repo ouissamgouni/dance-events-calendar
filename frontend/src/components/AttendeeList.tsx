@@ -91,16 +91,21 @@ export default function AttendeeList({ eventId, initialSummary, expanded = false
         return null;
     }
 
-    // Logged-out: show only total count + sign-in CTA.
+    // Logged-out: show only total counts + sign-in CTA.
     if (!user) {
-        if (summary.total_going === 0) {
-            return <div ref={containerRef} id="attendees" className="text-xs text-slate-500">No one is going yet.</div>;
+        if (summary.total_going === 0 && summary.total_saved === 0) {
+            return <div ref={containerRef} id="attendees" className="text-xs text-slate-500">No interest yet — be the first.</div>;
         }
         return (
-            <div ref={containerRef} id="attendees" className="text-xs text-slate-600">
-                <span className="font-medium">{summary.total_going}</span>{' '}
-                {summary.total_going === 1 ? 'person is' : 'people are'} going.{' '}
-                <span className="text-slate-500">Sign in to see who.</span>
+            <div ref={containerRef} id="attendees" className="text-xs text-slate-600 space-y-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <span><span className="font-medium">{summary.total_going}</span> going</span>
+                    <span className="text-slate-300">·</span>
+                    <span><span className="font-medium">{summary.total_saved}</span> saved</span>
+                </div>
+                {summary.total_going > 0 && (
+                    <div className="text-slate-500">Sign in to see who's going.</div>
+                )}
             </div>
         );
     }
@@ -114,8 +119,10 @@ export default function AttendeeList({ eventId, initialSummary, expanded = false
 
     return (
         <div ref={containerRef} id="attendees" className="space-y-2 scroll-mt-4">
-            <div className="text-xs text-slate-600">
-                <span className="font-medium">{summary.total_going}</span> going
+            <div className="text-xs text-slate-600 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <span><span className="font-medium">{summary.total_going}</span> going</span>
+                <span className="text-slate-300">·</span>
+                <span><span className="font-medium">{summary.total_saved}</span> saved</span>
             </div>
 
             {attendees.length === 0 ? (

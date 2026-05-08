@@ -3,13 +3,20 @@ import { createPortal } from 'react-dom';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useAuth } from '../context/AuthContext';
 import { updateUserPreferences } from '../api';
-import { useAnchoredToast, SIGN_IN_GOING_TOAST_MESSAGE } from './AnchoredToast';
-import SignInNudge, { useSignInNudge } from './SignInNudge';
+import { trackShareConversion } from '../utils/tracking';
+import { getActiveReferral } from '../hooks/useReferralAttribution';
+import PostRsvpPopover, { type PostRsvpVariant } from './PostRsvpPopover';
 
 interface Props {
     eventId: string;
     appearance?: 'icon' | 'pill';
     size?: 'sm' | 'md';
+    /**
+     * When true, the not-going pill renders as the page's primary CTA
+     * (larger, brand-colored). Already-going state keeps the existing
+     * "Going" segmented control to avoid noisy re-emphasis.
+     */
+    prominent?: boolean;
     stopPropagation?: boolean;
     className?: string;
 }
@@ -69,6 +76,7 @@ export default function GoingButton({
     eventId,
     appearance = 'icon',
     size = 'md',
+    prominent = false,
     stopPropagation = false,
     className = '',
 }: Props) {
@@ -79,14 +87,14 @@ export default function GoingButton({
 
     const triggerRef = useRef<HTMLButtonElement | null>(null);
     const popoverRef = useRef<HTMLDivElement | null>(null);
-    const toast = useAnchoredToast(triggerRef);
     // 'confirm' = off→going prompt, 'edit' = already going, edit visibility.
     const [popoverKind, setPopoverKind] = useState<'confirm' | 'edit' | null>(null);
     const [pendingShare, setPendingShare] = useState<boolean>(false);
     const [rememberDefault, setRememberDefault] = useState<boolean>(false);
     const [popoverPos, setPopoverPos] = useState<PopoverPos | null>(null);
-    const nudge = useSignInNudge('going');
-    const [showNudge, setShowNudge] = useState(false);
+    // Unified post-RSVP popover (replaces the old inline toast + separate
+    // share-nudge stack). Only one is ever visible at a time.
+    const [postRsvpVariant, setPostRsvpVariant] = useState<PostRsvpVariant | null>(null);
 
     // Position the popover under the trigger and keep it positioned on
     // scroll/resize while open.
@@ -126,23 +134,20 @@ export default function GoingButton({
     const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
         if (stopPropagation) e.stopPropagation();
         if (going) {
-            // Toggling off: dismiss any lingering toast so we never show
-            // an "I'm going!" message on a "not going" click.
-            toast.hide();
+            // Toggling off: dismiss any lingering popover so we never show
+            // a "You're going!" message on a "not going" click.
+            setPostRsvpVariant(null);
             toggleAttending(eventId);
             return;
         }
         if (user) {
             // If the user has already opted in to sharing by default, skip the
-            // confirmation popover and mark going publicly immediately. Show
-            // an inline advisory under the button so the user knows their
-            // name is public and where to change it.
+            // confirmation popover and mark going publicly immediately, then
+            // surface the unified post-RSVP popover with name/visibility info.
             if (user.share_attendance_default === true) {
                 toggleAttending(eventId, true);
-                toast.show(
-                    `You're going as ${user.name} \u2014 use the eye icon to hide your name.`,
-                    3500,
-                );
+                maybeFireShareConversion();
+                showPostRsvp('signed-in-default-share');
                 return;
             }
             setPendingShare(user.share_attendance_default ?? false);
@@ -150,14 +155,11 @@ export default function GoingButton({
             setPopoverKind('confirm');
         } else {
             toggleAttending(eventId);
-            if (nudge.shouldShow) {
-                // First anonymous "I'm going" in this session: show the rich
-                // sign-in popover. Subsequent clicks fall through to the toast.
-                nudge.markShown();
-                setShowNudge(true);
-            } else {
-                toast.show(SIGN_IN_GOING_TOAST_MESSAGE, 3200);
-            }
+            // Anonymous users always get the unified popover (Sign-in CTA +
+            // Share). Showing both options every time is consistent with the
+            // signed-in flow and ensures the share funnel is never skipped.
+            maybeFireShareConversion();
+            showPostRsvp('anon');
         }
     };
 
@@ -176,7 +178,8 @@ export default function GoingButton({
         toggleAttending(eventId, pendingShare);
         persistRememberIfNeeded(pendingShare);
         setPopoverKind(null);
-        toast.show("You're going!", 1800);
+        maybeFireShareConversion();
+        showPostRsvp(pendingShare ? 'signed-in-default-share' : 'signed-in');
     };
 
     const openEditShare = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -196,7 +199,71 @@ export default function GoingButton({
     const iconSizeClass = size === 'sm' ? 'w-4 h-4' : 'w-5 h-5';
     const tooltip = going ? 'Not going' : "I'm going";
 
-    const inlineToast = toast.node;
+    /**
+     * Surface the unified post-RSVP popover. Fires every time the user
+     * transitions off→going so they always have a chance to share.
+     */
+    const showPostRsvp = useCallback((variant: PostRsvpVariant) => {
+        setPostRsvpVariant(variant);
+    }, []);
+
+    /**
+     * If the visitor arrived via a `?ref=share&src=` link captured by
+     * useReferralAttribution and is now RSVPing for the same event,
+     * record the conversion against the originating share_code.
+     * Best-effort and analytics-only: failures and missing referrals
+     * are silent.
+     */
+    const maybeFireShareConversion = useCallback(() => {
+        const ref = getActiveReferral();
+        if (!ref) return;
+        if (ref.eventId !== eventId) return;
+        trackShareConversion(eventId, ref.src);
+    }, [eventId]);
+
+    const dismissPostRsvp = useCallback(() => {
+        setPostRsvpVariant(null);
+    }, []);
+
+    const shareEventNow = useCallback(async () => {
+        const url = `${window.location.origin}/event/${eventId}`;
+        const canNativeShare =
+            typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+        if (canNativeShare) {
+            try {
+                await navigator.share({ title: 'Join me!', text: 'Join me at this event', url });
+            } catch {
+                /* user cancelled */
+            }
+        } else {
+            try {
+                await navigator.clipboard.writeText(url);
+            } catch {
+                /* ignore */
+            }
+        }
+        setPostRsvpVariant(null);
+    }, [eventId]);
+
+    const openHideName = useCallback(() => {
+        // Reuse the existing visibility-edit popover so the user can flip
+        // off the public-attendance default for this event.
+        setPostRsvpVariant(null);
+        setPendingShare(false);
+        setRememberDefault(false);
+        setPopoverKind('edit');
+    }, []);
+
+    const postRsvpNode = postRsvpVariant ? (
+        <PostRsvpPopover
+            anchorRef={triggerRef}
+            variant={postRsvpVariant}
+            userName={user?.name ?? null}
+            onClose={dismissPostRsvp}
+            onShare={shareEventNow}
+            onHideName={openHideName}
+        />
+    ) : null;
 
     const popover = popoverKind && popoverPos && createPortal(
         <div
@@ -260,10 +327,6 @@ export default function GoingButton({
         document.body,
     );
 
-    const nudgeNode = showNudge && !user ? (
-        <SignInNudge anchorRef={triggerRef} trigger="going" onClose={() => setShowNudge(false)} />
-    ) : null;
-
     if (appearance === 'pill') {
         // When the user is going AND signed-in, render the pill as a unified
         // segmented control: left half = toggle going, right half = visibility
@@ -295,7 +358,7 @@ export default function GoingButton({
                         <VisibilityIcon shared={sharing} className="w-3.5 h-3.5" />
                     </button>
                     {popover}
-                    {nudgeNode}
+                    {postRsvpNode}
                 </div>
             );
         }
@@ -306,14 +369,20 @@ export default function GoingButton({
                     onClick={handleClick}
                     title={tooltip}
                     aria-label={tooltip}
-                    className={`text-xs rounded-full px-3 py-1 transition flex items-center gap-1.5 ${going ? 'text-emerald-800 bg-emerald-100 hover:bg-emerald-200' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'} ${className}`.trim()}
+                    className={
+                        prominent && !going
+                            ? `rounded-full px-5 py-2 text-sm font-semibold shadow-sm transition flex items-center gap-2 bg-rose-600 text-white hover:bg-rose-700 ${className}`.trim()
+                            : `text-xs rounded-full px-3 py-1 transition flex items-center gap-1.5 ${going ? 'text-emerald-800 bg-emerald-100 hover:bg-emerald-200' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'} ${className}`.trim()
+                    }
                 >
-                    <RaisedHandIcon solid={going} className="w-3.5 h-3.5" />
+                    <RaisedHandIcon
+                        solid={going}
+                        className={prominent && !going ? 'w-4 h-4' : 'w-3.5 h-3.5'}
+                    />
                     {going ? 'Going' : "I'm going"}
                 </button>
-                {inlineToast}
                 {popover}
-                {nudgeNode}
+                {postRsvpNode}
             </div>
         );
     }
@@ -330,10 +399,8 @@ export default function GoingButton({
                 <RaisedHandIcon solid={going} className={iconSizeClass} />
             </button>
 
-            {inlineToast}
-
             {popover}
-            {nudgeNode}
+            {postRsvpNode}
         </div>
     );
 }

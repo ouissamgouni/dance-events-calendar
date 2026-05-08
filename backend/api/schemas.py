@@ -38,6 +38,7 @@ class EventResponse(BaseModel):
     longitude: Optional[float] = None
     color: Optional[str] = None
     view_count: int = 0
+    going_count: int = 0
     price_min: Optional[float] = None
     price_max: Optional[float] = None
     price_currency: Optional[str] = None
@@ -122,6 +123,23 @@ class UpdatePreferencesRequest(BaseModel):
     share_attendance_default: Optional[bool] = None
 
 
+class UpdateProfileRequest(BaseModel):
+    """Editable identity fields surfaced on the Account page.
+
+    ``handle`` is validated against ``HANDLE_PATTERN`` server-side; clients
+    should pre-validate but the server is the source of truth.
+    """
+
+    display_name: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    handle: Optional[str] = Field(default=None, min_length=3, max_length=24)
+
+
+class HandleAvailabilityResponse(BaseModel):
+    handle: str
+    available: bool
+    reason: Optional[str] = None
+
+
 class EventLinkClickRequest(BaseModel):
     event_id: str
     url: str = Field(..., min_length=1, max_length=2048)
@@ -131,6 +149,22 @@ class EventLinkClickRequest(BaseModel):
 class EventExportRequest(BaseModel):
     format: str = Field(..., pattern="^(ics|xlsx)$")
     event_count: int = Field(..., ge=0, le=10000)
+    device_id: Optional[str] = Field(default=None, max_length=64)
+
+
+class ShareEventRequest(BaseModel):
+    """Payload for ``POST /api/track/share``.
+
+    ``action`` distinguishes the three funnel stages so a single endpoint
+    can serve all of them. ``share_code`` is required for click and
+    conversion (it identifies the originating sharer); for ``share`` the
+    code comes from the authenticated user's record so the field is
+    ignored.
+    """
+
+    event_id: str = Field(..., min_length=1, max_length=128)
+    action: str = Field(..., pattern="^(share|click|conversion)$")
+    share_code: Optional[str] = Field(default=None, min_length=4, max_length=12)
     device_id: Optional[str] = Field(default=None, max_length=64)
 
 
@@ -221,9 +255,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     event_color_bar_color: Optional[str] = Field(
         default=None, pattern="^#[0-9a-fA-F]{6}$"
     )
-    tag_sort_mode: Optional[str] = Field(
-        default=None, pattern="^(group|event_count)$"
-    )
+    tag_sort_mode: Optional[str] = Field(default=None, pattern="^(group|event_count)$")
 
 
 class EventUpdateRequest(BaseModel):

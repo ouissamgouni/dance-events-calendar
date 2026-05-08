@@ -1,11 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
-import { fetchMyRatings, updateUserPreferences } from '../api';
+import {
+    checkHandleAvailable,
+    fetchMyRatings,
+    updateUserPreferences,
+    updateUserProfile,
+} from '../api';
 import type { MyRating } from '../types';
+
+function slugifyHandle(name: string): string {
+    const base = name
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 24);
+    if (!base) return '';
+    // Must start with a letter per server validation.
+    return /^[a-z]/.test(base) ? base : `u_${base}`.slice(0, 24);
+}
 
 export default function Account() {
     const { user, loading, logout, deleteAccount, refreshUser } = useAuth();
@@ -19,6 +37,95 @@ export default function Account() {
     const [myRatings, setMyRatings] = useState<MyRating[] | null>(null);
     const [shareDefault, setShareDefault] = useState<boolean>(user?.share_attendance_default ?? true);
     const [shareSaving, setShareSaving] = useState(false);
+
+    // --- Profile editing (display_name + handle) ---
+    const [profileEditing, setProfileEditing] = useState(false);
+    const [nameDraft, setNameDraft] = useState<string>(user?.name ?? '');
+    const [handleDraft, setHandleDraft] = useState<string>(user?.handle ?? '');
+    const [profileSaving, setProfileSaving] = useState(false);
+    const [profileError, setProfileError] = useState<string | null>(null);
+    const [handleStatus, setHandleStatus] = useState<
+        | { state: 'idle' }
+        | { state: 'checking' }
+        | { state: 'ok'; handle: string }
+        | { state: 'error'; reason: string }
+    >({ state: 'idle' });
+    const handleCheckSeq = useRef(0);
+
+    const suggestedHandle = useMemo(
+        () => slugifyHandle(user?.name ?? ''),
+        [user?.name],
+    );
+
+    useEffect(() => {
+        setNameDraft(user?.name ?? '');
+        setHandleDraft(user?.handle ?? '');
+    }, [user?.name, user?.handle]);
+
+    // Debounced availability check on handle draft.
+    useEffect(() => {
+        if (!profileEditing) return;
+        const candidate = handleDraft.trim().toLowerCase();
+        if (!candidate || candidate === (user?.handle ?? '')) {
+            setHandleStatus({ state: 'idle' });
+            return;
+        }
+        if (!/^[a-z][a-z0-9_]{2,23}$/.test(candidate)) {
+            setHandleStatus({
+                state: 'error',
+                reason: '3–24 chars, letters/numbers/underscore, must start with a letter',
+            });
+            return;
+        }
+        setHandleStatus({ state: 'checking' });
+        const seq = ++handleCheckSeq.current;
+        const t = setTimeout(() => {
+            checkHandleAvailable(candidate)
+                .then((res) => {
+                    if (seq !== handleCheckSeq.current) return;
+                    if (res.available) {
+                        setHandleStatus({ state: 'ok', handle: res.handle });
+                    } else {
+                        setHandleStatus({
+                            state: 'error',
+                            reason: res.reason ?? 'Not available',
+                        });
+                    }
+                })
+                .catch(() => {
+                    if (seq !== handleCheckSeq.current) return;
+                    setHandleStatus({ state: 'error', reason: 'Check failed' });
+                });
+        }, 350);
+        return () => clearTimeout(t);
+    }, [handleDraft, profileEditing, user?.handle]);
+
+    const handleProfileSave = async () => {
+        setProfileSaving(true);
+        setProfileError(null);
+        try {
+            const trimmedName = nameDraft.trim();
+            const trimmedHandle = handleDraft.trim().toLowerCase();
+            const payload: { display_name?: string; handle?: string } = {};
+            if (trimmedName && trimmedName !== (user?.name ?? '')) {
+                payload.display_name = trimmedName;
+            }
+            if (trimmedHandle && trimmedHandle !== (user?.handle ?? '')) {
+                payload.handle = trimmedHandle;
+            }
+            if (Object.keys(payload).length === 0) {
+                setProfileEditing(false);
+                return;
+            }
+            await updateUserProfile(payload);
+            await refreshUser();
+            setProfileEditing(false);
+        } catch (e) {
+            setProfileError(e instanceof Error ? e.message : 'Failed to save');
+        } finally {
+            setProfileSaving(false);
+        }
+    };
 
     useEffect(() => {
         setShareDefault(user?.share_attendance_default ?? true);
@@ -90,6 +197,137 @@ export default function Account() {
                         )}
                     </div>
                 </div>
+            </section>
+
+            <section className="rounded-lg border border-slate-200 bg-white p-6 mb-6">
+                <div className="flex items-start justify-between gap-4">
+                    <h2 className="text-base font-semibold text-slate-900">Profile</h2>
+                    {!profileEditing && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setProfileEditing(true);
+                                if (!handleDraft && suggestedHandle) {
+                                    setHandleDraft(suggestedHandle);
+                                }
+                            }}
+                            className="text-sm text-rose-600 hover:text-rose-700 font-medium"
+                        >
+                            Edit
+                        </button>
+                    )}
+                </div>
+
+                {!profileEditing ? (
+                    <dl className="mt-3 space-y-2 text-sm">
+                        <div className="flex gap-2">
+                            <dt className="w-24 text-slate-500">Name</dt>
+                            <dd className="text-slate-900">{user.name}</dd>
+                        </div>
+                        <div className="flex gap-2 items-baseline">
+                            <dt className="w-24 text-slate-500">Handle</dt>
+                            <dd className="text-slate-900">
+                                {user.handle ? (
+                                    <span className="font-mono">@{user.handle}</span>
+                                ) : (
+                                    <span className="text-amber-700">
+                                        Not set —{' '}
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setProfileEditing(true);
+                                                if (suggestedHandle) setHandleDraft(suggestedHandle);
+                                            }}
+                                            className="underline"
+                                        >
+                                            pick one
+                                        </button>
+                                    </span>
+                                )}
+                            </dd>
+                        </div>
+                    </dl>
+                ) : (
+                    <div className="mt-3 space-y-3">
+                        <label className="block">
+                            <span className="block text-xs font-medium text-slate-600 mb-1">
+                                Display name
+                            </span>
+                            <input
+                                type="text"
+                                value={nameDraft}
+                                onChange={(e) => setNameDraft(e.target.value)}
+                                maxLength={120}
+                                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                            />
+                        </label>
+                        <label className="block">
+                            <span className="block text-xs font-medium text-slate-600 mb-1">
+                                Handle
+                            </span>
+                            <div className="flex items-stretch rounded-md border border-slate-300 overflow-hidden focus-within:border-slate-400">
+                                <span className="bg-slate-50 px-2 py-2 text-sm text-slate-500 border-r border-slate-300">
+                                    @
+                                </span>
+                                <input
+                                    type="text"
+                                    value={handleDraft}
+                                    onChange={(e) => setHandleDraft(e.target.value)}
+                                    maxLength={24}
+                                    autoCapitalize="none"
+                                    autoCorrect="off"
+                                    spellCheck={false}
+                                    placeholder={suggestedHandle || 'your_handle'}
+                                    className="flex-1 px-3 py-2 text-sm font-mono outline-none"
+                                />
+                            </div>
+                            <span className="block mt-1 text-xs min-h-[1rem]">
+                                {handleStatus.state === 'checking' && (
+                                    <span className="text-slate-500">Checking…</span>
+                                )}
+                                {handleStatus.state === 'ok' && (
+                                    <span className="text-emerald-700">
+                                        @{handleStatus.handle} is available
+                                    </span>
+                                )}
+                                {handleStatus.state === 'error' && (
+                                    <span className="text-red-700">{handleStatus.reason}</span>
+                                )}
+                                {handleStatus.state === 'idle' && (
+                                    <span className="text-slate-400">
+                                        Used for your public profile URL.
+                                    </span>
+                                )}
+                            </span>
+                        </label>
+                        {profileError && (
+                            <p className="text-sm text-red-700">{profileError}</p>
+                        )}
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={handleProfileSave}
+                                disabled={profileSaving || handleStatus.state === 'checking' || handleStatus.state === 'error'}
+                                className="rounded-md bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-50"
+                            >
+                                {profileSaving ? 'Saving…' : 'Save'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setProfileEditing(false);
+                                    setProfileError(null);
+                                    setNameDraft(user.name ?? '');
+                                    setHandleDraft(user.handle ?? '');
+                                }}
+                                disabled={profileSaving}
+                                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
             </section>
 
             <section className="rounded-lg border border-slate-200 bg-white p-6 mb-6">
@@ -181,6 +419,19 @@ export default function Account() {
                         </span>
                     </span>
                 </label>
+            </section>
+
+            <section className="rounded-lg border border-slate-200 bg-white p-6 mb-6">
+                <h2 className="text-base font-semibold text-slate-900 mb-2">Help &amp; feedback</h2>
+                <p className="text-sm text-slate-600 mb-2">
+                    Found a bug, have an idea, or want to say hi? We read every message.
+                </p>
+                <a
+                    href="mailto:support@joinmovida.com?subject=Movida%20feedback"
+                    className="inline-block rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                    Send feedback
+                </a>
             </section>
 
             <section className="rounded-lg border border-slate-200 bg-white p-6 mb-6">

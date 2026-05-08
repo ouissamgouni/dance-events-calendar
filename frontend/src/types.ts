@@ -89,6 +89,7 @@ export interface CalendarEvent {
     all_day: boolean;
     color: string | null;
     view_count: number;
+    going_count?: number;
     price_min: number | null;
     price_max: number | null;
     price_currency: string | null;
