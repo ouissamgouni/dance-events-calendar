@@ -3,10 +3,12 @@ test_plan:
   description: >
     Verify the privacy-respecting "Who's Going" feature. Logged-out users see
     only the total going count. Any signed-in user can see the attendee list,
-    but only attendees who explicitly opt in to share appear by name. Anonymous
-    device attendances (logged-out clicks) are counted but never named. Verifies
-    the per-event share toggle, the account-level default, and that GDPR
-    deletion wipes attendance data.
+    but only attendees who explicitly share at the Public or Friends tier appear
+    by name (Friends-tier reveals names only to mutual followers). Anonymous
+    device attendances (logged-out clicks) are counted but never named.
+    Verifies the per-event 3-tier audience picker (🌐 Public / 👥 Friends /
+    🔒 Private), the account-level default audience, and that GDPR deletion
+    wipes attendance data.
   preconditions:
     - "Run with: task start:scenario SCENARIO=share-im-going"
     - >
@@ -61,48 +63,53 @@ test_plan:
     - id: 4
       title: "Carol marks going PRIVATELY — counted but not named"
       description: >
-        Carol clicks the "I'm going" pill. The share-confirmation popover opens
-        with the checkbox UNCHECKED (Carol's account default is off). Carol
-        leaves it unchecked and clicks "I'm going".
+        Carol clicks the "I'm going" pill. The audience picker popover opens
+        showing three icon segments (🌐 Public / 👥 Friends / 🔒 Private)
+        with 🔒 Private pre-selected (Carol's account default). Carol leaves it
+        on Private and clicks "I'm going".
       expected: >
-        Pill becomes "Going ✓" with a small eye-slash icon next to it. The Who's
-        going section updates to "2 going". The attendee list still shows the
-        empty-state — Carol is counted but not named. Reloading the page
-        preserves all of the above.
+        Pill becomes "Going ✓" with a small lock (🔒) icon next to it,
+        matching the tier she just selected. The Who's going section
+        updates to "2 going". The attendee list still shows the empty-state
+        — Carol is counted but not named. Reloading the page preserves
+        all of the above.
 
     - id: 5
-      title: "Carol switches to PUBLIC via the per-event link"
+      title: "Carol switches to PUBLIC via the per-event audience picker"
       description: >
-        Carol clicks the small eye-slash icon next to the "Going ✓" pill. The
-        "Edit visibility" popover opens with the checkbox unchecked. She checks
-        it and clicks "Save".
+        Carol clicks the small lock icon next to the "Going ✓" pill. The
+        "Edit visibility" popover opens with the audience picker on 🔒 Private
+        and a "Not going" action in the bottom-left. She taps 🌐 Public
+        and clicks "Save".
       expected: >
-        The icon next to the pill changes to an eye icon. The Who's going
-        section becomes "2 going". Carol now appears in the attendee list with
-        her avatar/initial + display name "Carol".
+        The icon next to the pill changes to a globe (🌐) icon
+        reflecting the new tier. The Who's going section becomes "2 going".
+        Carol now appears in the attendee list with her avatar/initial +
+        display name "Carol".
 
     # ── Bob public-by-default path ──────────────────────────────
     - id: 6
-      title: "Bob enables share-by-default in account settings"
+      title: "Bob sets default audience to Public in account settings"
       description: >
         Open Browser C (fresh profile). Sign in as Bob via /login. Navigate to
-        /account → Privacy section. Tick "Share my name by default when I mark
-        myself going to an event."
+        /account → "Privacy & visibility" section. In the "When I RSVP" block,
+        change "Default audience for new RSVPs" from 🔒 Private to 🌐 Public.
       expected: >
-        Checkbox stays checked after the network call (no error toast).
-        Reloading /account shows the box still ticked — the preference is
-        persisted server-side via PATCH /api/auth/preferences.
+        The 🌐 Public segment becomes the active selection after the network
+        call (no error toast). Reloading /account shows it still selected — the
+        preference is persisted server-side via PATCH /api/social/me/visibility
+        as ``share_attendance_default_audience``.
 
     - id: 7
       title: "Bob marks going — auto-public, no popover"
       description: >
         Bob navigates to "Salsa Social Friday" and clicks "I'm going".
       expected: >
-        Because Bob's account default is share=true, NO confirmation popover
-        opens. The pill immediately becomes "Going ✓" with an eye icon (public).
-        The Who's going section becomes "3 going" and the attendee list shows
-        both "Carol" and "Bob" as horizontal chips (ordered by attending_since —
-        Carol first since she joined earlier).
+        Because Bob's account default is Public, NO confirmation popover
+        opens. The pill immediately becomes "Going ✓" with a globe (🌐)
+        icon. The Who's going section becomes "3 going" and the attendee list
+        shows both "Carol" and "Bob" as horizontal chips (ordered by
+        attending_since — Carol first since she joined earlier).
 
     # ── Cross-viewer verification ────────────────────────────────
     - id: 8
@@ -140,11 +147,11 @@ test_plan:
     - id: 11
       title: "Bob switches BACK to private from the action bar link"
       description: >
-        On Browser C, on "Salsa Social Friday", click the eye icon next to Bob's
-        "Going ✓" pill. The Edit visibility popover opens with the box checked.
-        Uncheck it and click "Save".
+        On Browser C, on "Salsa Social Friday", click the globe icon next to
+        Bob's "Going ✓" pill. The Edit visibility popover opens on 🌐 Public.
+        Tap 🔒 Private and click "Save".
       expected: >
-        The icon toggles to an eye-slash icon. The Who's going section becomes
+        The icon toggles to a lock (🔒) icon. The Who's going section becomes
         "3 going". Bob's name disappears from the attendee list (visible to
         other authed viewers — verify by reloading Browser B, where only "Carol"
         remains in the list).
@@ -153,14 +160,14 @@ test_plan:
     - id: 12
       title: "Toggling account default does not change existing attendances"
       description: >
-        On Browser C, go back to /account → Privacy and uncheck the
-        share-by-default box. Then navigate back to "Salsa Social Friday".
+        On Browser C, go back to /account → Privacy and switch the default
+        audience back to 🔒 Private. Then navigate back to "Salsa Social Friday".
       expected: >
-        Bob's pill is still "Going ✓" with "private" link — his existing
+        Bob's pill is still "Going ✓" with the lock icon — his existing
         per-event choice is unchanged. The default preference only affects the
-        prefilled value of the popover for FUTURE events. Verify by opening
-        "Bachata Workshop" and clicking "I'm going" — the popover opens with the
-        checkbox UNCHECKED now (reflects the new default).
+        prefilled value of the picker for FUTURE events. Verify by opening
+        "Bachata Workshop" and clicking "I'm going" — the audience picker now
+        opens with 🔒 Private pre-selected (reflects the new default).
 
     # ── Persistence across reload + sign-out/in ─────────────────
     - id: 13
@@ -169,7 +176,7 @@ test_plan:
         On Browser B (Carol), go to /account → "Sign out". Then sign back in as
         Carol. Navigate to "Salsa Social Friday".
       expected: >
-        Carol's pill is "Going ✓" with eye icon (her per-event
+        Carol's pill is "Going ✓" with a globe (🌐) icon (her per-event
         share_publicly=true was reloaded from the server via
         /api/auth/attending-events). She still appears in the attendee list
         shown to all signed-in viewers.
@@ -215,3 +222,21 @@ test_plan:
         event shows 3 avatars + "+9" overflow; clicking the stack navigates to
         the detail page anchored at #attendees and the section is scrolled into
         view.
+
+    # ── Friends-tier (mutual-follow) audience ───────────────────
+    - id: 17
+      title: "Friends-tier RSVP: Bob is named only to mutual followers"
+      description: >
+        Make Bob and Carol mutual followers (Bob follows Carol from /u/carol,
+        Carol follows Bob from /u/bob). On Browser C (Bob), open "Bachata
+        Workshop" and click "I'm going". In the audience picker, tap
+        👥 Friends and confirm. Then reload "Bachata Workshop" on Browser B
+        (Carol — mutual follower) and on Browser D (Dev Admin — NOT a mutual
+        follower).
+      expected: >
+        Browser B: Bob appears by name in the attendee list (Carol is a mutual
+        follower, so the friends-tier audience admits her). Browser D: the
+        attendee list shows "0 named" / empty-state for this event — Bob is
+        counted in the total going number but the admin (no mutual follow)
+        cannot see his name. Bob's pill on Browser C shows a users (👥)
+        icon next to "Going ✓" reflecting the friends tier.

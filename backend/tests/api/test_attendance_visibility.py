@@ -96,6 +96,7 @@ def _seed(
             device_id=device_id,
             user_id=user.id if user else None,
             share_publicly=share_publicly,
+            share_audience="public" if share_publicly else "private",
         )
     )
     session.commit()

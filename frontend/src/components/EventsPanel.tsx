@@ -63,6 +63,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
     const [tagGroups, setTagGroups] = useState<AdminTagGroup[]>([]);
     const [bulkTagPickerOpen, setBulkTagPickerOpen] = useState(false);
     const [bulkTagIds, setBulkTagIds] = useState<number[]>([]);
+    const [selectedVisibility, setSelectedVisibility] = useState<'hidden' | 'blocked' | ''>('');
     // Hide past events by default; toggle (here or in the admin header) to
     // include them. Mirrors the global admin pref so all panels stay in sync.
     const { includePast, setIncludePast } = useAdminPrefs();
@@ -86,9 +87,10 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 tag_ids: selectedTagIds || undefined,
                 ungeolocated: selectedGeoStatus === 'ungeolocated' || presetFilters.ungeolocated || undefined,
                 include_past: !hidePast || undefined,
+                visibility: selectedVisibility || undefined,
             };
         },
-        [preset, page, debouncedSearch, selectedReviewStatus, selectedCalendar, selectedTagIds, selectedGeoStatus, hidePast],
+        [preset, page, debouncedSearch, selectedReviewStatus, selectedCalendar, selectedTagIds, selectedGeoStatus, hidePast, selectedVisibility],
     );
 
     // Load events
@@ -423,6 +425,22 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                             >
                                 {hidePast ? 'Hide past' : 'Include past'}
                             </button>
+
+                            {/* Visibility pills */}
+                            {(['hidden', 'blocked'] as const).map((v) => (
+                                <button
+                                    key={v}
+                                    onClick={() => { setSelectedVisibility((prev) => (prev === v ? '' : v)); setPage(0); }}
+                                    className={`text-[10px] font-medium px-2 py-0.5 border transition ${selectedVisibility === v
+                                            ? v === 'hidden'
+                                                ? 'bg-amber-100 border-amber-400 text-amber-800'
+                                                : 'bg-slate-200 border-slate-400 text-slate-800'
+                                            : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                                        }`}
+                                >
+                                    {v.charAt(0).toUpperCase() + v.slice(1)}
+                                </button>
+                            ))}
                         </div>
                     )}
                 </div>
@@ -469,7 +487,14 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                 {events.map((event) => (
                                     <tr
                                         key={event.event_id}
-                                        className={`hover:bg-gray-50/50 transition cursor-pointer ${selectedIds.has(event.event_id) ? 'bg-blue-50/30' : ''}`}
+                                        className={`hover:bg-opacity-80 transition cursor-pointer ${event.is_blocked
+                                                ? 'bg-slate-100 hover:bg-slate-200/70'
+                                                : event.is_hidden
+                                                    ? 'bg-amber-50 hover:bg-amber-100/70'
+                                                    : selectedIds.has(event.event_id)
+                                                        ? 'bg-blue-50/30'
+                                                        : 'hover:bg-gray-50/50'
+                                            }`}
                                         onClick={() => setAdminDetailEventId(event.event_id)}
                                     >
                                         <td className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
@@ -502,14 +527,22 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                             {formatDate(event.start)}
                                         </td>
                                         <td className="px-2 py-1.5">
-                                            <span
-                                                className={`inline-block text-[10px] font-medium px-1.5 py-0.5 ${event.review_status === 'pending'
-                                                    ? 'bg-amber-50 text-amber-700'
-                                                    : 'bg-emerald-50 text-emerald-700'
-                                                    }`}
-                                            >
-                                                {event.review_status ?? 'reviewed'}
-                                            </span>
+                                            <div className="flex flex-wrap gap-1">
+                                                <span
+                                                    className={`inline-block text-[10px] font-medium px-1.5 py-0.5 ${event.review_status === 'pending'
+                                                        ? 'bg-amber-50 text-amber-700'
+                                                        : 'bg-emerald-50 text-emerald-700'
+                                                        }`}
+                                                >
+                                                    {event.review_status ?? 'reviewed'}
+                                                </span>
+                                                {event.is_blocked && (
+                                                    <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 bg-slate-200 text-slate-700">Blocked</span>
+                                                )}
+                                                {event.is_hidden && !event.is_blocked && (
+                                                    <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 bg-amber-100 text-amber-700">Hidden</span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="px-2 py-1.5 text-center">
                                             <LocationBadge

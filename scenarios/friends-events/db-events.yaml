@@ -1,0 +1,81 @@
+# Pre-seeded events for the friends-events scenario.
+#
+# Five events, each used by one specific assertion in the test plan so the
+# matrix stays unambiguous when toggling chips:
+#
+#   evt-fe-001 (Salsa Social Friday)        → Alice goes  → "Friends going" must surface
+#   evt-fe-002 (Bachata Workshop)           → Alice saves → "Friends saving" must surface
+#   evt-fe-003 (Cuban Night)                → Carol goes  → MUST NOT surface for Bob
+#                                             (Carol is one-way follower of Alice,
+#                                              not Bob's friend)
+#   evt-fe-004 (Bachata Beginners Bootcamp) → Dave goes   → MUST NOT surface for Bob
+#                                             (stranger, no follow either way)
+#   evt-fe-005 (Salsa Tuesday Night)        → Bob goes only (no friend) → MUST NOT
+#                                             surface under Bob's own chip — the
+#                                             filter is "events at least one of my
+#                                             friends is involved with", not "events
+#                                             I am involved with".
+base_week: 0
+events:
+  - id: evt-fe-001
+    calendar_id: salsa-cal-001
+    title: Salsa Social Friday
+    description: |
+      Weekly social with DJ Mambo. Beginners welcome.
+    location: Dance Studio, 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w0 Fri 21:00
+    end: w0 Sat 01:00
+    price_is_free: true
+  - id: evt-fe-002
+    calendar_id: bachata-cal-002
+    title: Bachata Workshop
+    description: |
+      Sensual workshop with Carlos & Maria. Intermediate level.
+    location: Tanzhaus, Friedrichstr. 100, Berlin, Germany
+    latitude: 52.52
+    longitude: 13.405
+    start: w0 Sat 14:00
+    end: w0 Sat 17:00
+    price_is_free: false
+    price_min: 25
+    price_max: 35
+    price_currency: EUR
+  - id: evt-fe-003
+    calendar_id: salsa-cal-001
+    title: Cuban Night
+    description: |
+      Live Cuban band + rueda for all levels.
+    location: Skybar, Av. de la Liberté, Brussels, Belgium
+    latitude: 50.8503
+    longitude: 4.3517
+    start: w1 Sat 20:00
+    end: w1 Sun 00:00
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+  - id: evt-fe-004
+    calendar_id: bachata-cal-002
+    title: Bachata Beginners Bootcamp
+    description: |
+      Half-day crash course for absolute beginners.
+    location: London Dance Academy, 12 Soho Square, London, UK
+    latitude: 51.5143
+    longitude: -0.1323
+    start: w1 Sun 15:00
+    end: w1 Sun 18:00
+    price_is_free: false
+    price_min: 30
+    price_currency: GBP
+  - id: evt-fe-005
+    calendar_id: salsa-cal-001
+    title: Salsa Tuesday Night
+    description: |
+      Weekly Tuesday social with resident DJ. Free entry all night.
+    location: Sala Rossa, Calle de Atocha 34, Madrid, Spain
+    latitude: 40.4168
+    longitude: -3.7038
+    start: w2 Tue 20:30
+    end: w2 Wed 00:00
+    price_is_free: true

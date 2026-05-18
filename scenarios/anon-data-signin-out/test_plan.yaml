@@ -1,0 +1,203 @@
+test_plan:
+  name: "Anonymous data on sign-in / sign-out — identity isolation"
+  description: >
+    Verify that "saved" and "going" state is correctly scoped to the current
+    identity (authenticated user_id, or anonymous movida_aid cookie) across
+    sign-in / sign-out / user-switch on the same browser. This scenario
+    covers the refactor that made the server the source of truth, with
+    localStorage as a per-identity write-through cache, optimistic toggles
+    with rollback, and server-side rotation of the anonymous identity
+    cookie on logout / account-delete.
+
+    The original bug this scenario guards against: after user A logged out
+    and user B logged in on the same browser, B saw A's saved/going events
+    in My Calendar (because local state was unioned with server state on
+    login and never wiped on logout, and the httpOnly anon cookie was not
+    rotated).
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=anon-data-signin-out"
+    - >
+      In every browser session you use, accept the cookie banner with the
+      "Personalization" category enabled. Without personalization consent
+      the frontend skips POST /api/track/event-save and /event-attendance,
+      so there is no server-side state to verify.
+    - >
+      Use ONE browser profile / window for the whole scenario unless a step
+      explicitly says otherwise. The point is to verify that two different
+      users on the SAME browser do not see each other's data.
+
+  steps:
+    # ── Anonymous baseline ──────────────────────────────────────
+    - id: 1
+      title: "Anonymous: save 2 events and mark 1 as going"
+      description: >
+        Open the home page in a fresh profile. Accept cookies with
+        Personalization enabled. From the event list:
+          - click the bookmark on evt-anon-001 and evt-anon-002
+          - click the raised-hand "I'm going" on evt-anon-003.
+      expected: >
+        Bookmark icons fill on evt-anon-001 / evt-anon-002 and the raised
+        hand turns green on evt-anon-003. DevTools → Application → Cookies
+        shows a `movida_aid` cookie (httpOnly). DevTools → Application →
+        Local Storage shows new keys
+        `movida_saved_events:anon:<device-id>` and
+        `movida_attending_events:anon:<device-id>`. The legacy
+        unnamespaced keys (`movida_saved_events`,
+        `movida_attending_events`, `movida_attending_share_publicly`) are
+        absent (one-shot legacy cleanup ran on app load).
+
+    # ── Sign in as user A: anonymous data merges into A ─────────
+    - id: 2
+      title: "Sign in as Alice — anonymous saves merge into her account"
+      description: >
+        Click "Sign in" → "Sign in as Alice". After sign-in navigate to
+        /my-calendar.
+      expected: >
+        evt-anon-001, evt-anon-002 (saved) and evt-anon-003 (going) are
+        all visible in Alice's My Calendar (server-side
+        `_merge_device_data` claimed them via the `movida_aid` cookie
+        identity during /api/auth/google). A new localStorage key
+        `movida_saved_events:user:<alice-uuid>` exists, populated by the
+        identity-change reconciliation effect.
+
+    - id: 3
+      title: "Alice saves one more event so she has a distinct footprint"
+      description: >
+        From the home page, save evt-anon-005.
+      expected: >
+        Bookmark icon fills. Alice now has 3 saved (001, 002, 005) and 1
+        going (003).
+
+    # ── Sign-out: anonymous identity is rotated ─────────────────
+    - id: 4
+      title: "Sign out — server clears the movida_aid cookie"
+      description: >
+        Open /account → click "Sign out". Then in DevTools → Application →
+        Cookies, look at the `movida_aid` row.
+      expected: >
+        The session cookie is gone (as before). The `movida_aid` cookie is
+        ALSO gone (the server cleared it on logout so the next anonymous
+        session can't inherit Alice's anonymous dedupe identity).
+        localStorage `movida_device_id` was rotated to a fresh UUID by the
+        client. The per-identity caches
+        `movida_saved_events:user:<alice-uuid>` /
+        `movida_saved_events:anon:<old-device-id>` may still be present on
+        disk (harmless — they will never be read by another identity).
+
+    # ── User-switch leak repro (the original bug) ───────────────
+    - id: 5
+      title: "Sign in as Bob — Alice's events MUST NOT appear"
+      description: >
+        Without closing the browser, click "Sign in" → "Sign in as Bob".
+        Navigate to /my-calendar.
+      expected: >
+        My Calendar is EMPTY for Bob — no evt-anon-001 / 002 / 003 / 005.
+        The header counter shows 0 events. This is the regression test
+        for the original bug: before the refactor Bob inherited Alice's
+        saved/going via the unioned-with-local startup behavior. A new
+        localStorage bucket `movida_saved_events:user:<bob-uuid>` exists
+        and is empty. The `movida_aid` cookie is absent (Bob has not made
+        any anonymous writes).
+
+    - id: 6
+      title: "Bob saves a different event — independent state"
+      description: >
+        From the home page, save evt-anon-004.
+      expected: >
+        Bob's My Calendar shows evt-anon-004 only. Alice's data is not
+        affected on the server (verifiable by signing back in as her in
+        the next steps).
+
+    # ── Sign back in as Alice: her events are restored from server ──
+    - id: 7
+      title: "Sign out from Bob, then sign back in as Alice"
+      description: >
+        On /account click "Sign out". On /login click "Sign in as Alice".
+        Navigate to /my-calendar.
+      expected: >
+        Alice's full pre-existing set is back (evt-anon-001, evt-anon-002,
+        evt-anon-005 saved; evt-anon-003 going). evt-anon-004 (Bob's save)
+        does NOT appear. The reconciliation effect REPLACED local state
+        with the server's truth keyed by Alice's user_id. Per-identity
+        cache `movida_saved_events:user:<alice-uuid>` is repopulated.
+
+    # ── Optimistic toggle + rollback under offline ───────────────
+    - id: 8
+      title: "Optimistic save reverts on network failure"
+      description: >
+        Open DevTools → Network tab. Set throttling to "Offline". Find an
+        unsaved event in the list (e.g. evt-anon-004 from the home page,
+        which Bob saved earlier but Alice has not). Click its bookmark.
+      expected: >
+        The bookmark icon fills INSTANTLY (optimistic update). Within ~1
+        second it reverts to the empty state (the POST
+        /api/track/event-save call failed). A toast appears:
+        "Couldn't save event — Please check your connection and try
+        again." Re-enable network and re-test: clicking save now persists
+        and the toast does not appear.
+
+    - id: 9
+      title: "Optimistic going toggle reverts on network failure"
+      description: >
+        Still in Alice's session. Toggle Network throttling to "Offline"
+        again. Click the raised-hand "I'm going" on evt-anon-002.
+      expected: >
+        The raised hand turns green INSTANTLY, then reverts to the empty
+        state within ~1 second. A toast appears: "Couldn't mark you as
+        going — Please check your connection and try again." Re-enable
+        network — Alice's actual server state for evt-anon-002 is still
+        "saved" (from step 2) and NOT "going".
+
+    # ── Cross-tab consistency on the same identity ──────────────
+    - id: 10
+      title: "Open a second tab as Alice — saves match exactly"
+      description: >
+        With Alice signed in, open a second tab in the same browser to
+        /my-calendar.
+      expected: >
+        The second tab shows the same set of saved/going events as the
+        first (the identity-change reconciliation effect runs on mount and
+        REPLACES local state with the server response). No phantom Bob /
+        anonymous entries appear.
+
+    # ── Account deletion clears the anon cookie too ─────────────
+    - id: 11
+      title: "Delete Alice's account — movida_aid cookie is also cleared"
+      description: >
+        On /account click "Delete my account" → confirm. Then look at
+        DevTools → Application → Cookies.
+      expected: >
+        Both the session cookie AND `movida_aid` are gone (DELETE
+        /api/auth/me clears both). The browser is signed out. /my-calendar
+        is empty. Per-identity localStorage caches for Alice
+        (`movida_saved_events:user:<alice-uuid>`,
+        `movida_attending_events:user:<alice-uuid>`) may remain on disk
+        but cannot leak — no other identity reads them.
+
+    # ── Anonymous resumes cleanly after delete ──────────────────
+    - id: 12
+      title: "Anonymous save after deletion uses a fresh identity"
+      description: >
+        Without signing in, save evt-anon-001 from the home page.
+      expected: >
+        A NEW `movida_aid` cookie is minted (different value from the one
+        Alice had). A new localStorage key
+        `movida_saved_events:anon:<new-device-id>` appears, containing
+        only evt-anon-001. Server-side this is a brand-new
+        UserSavedEvent row with `user_id=NULL` and the new
+        `device_id`/cookie value — fully isolated from any prior identity.
+
+    # ── Defensive: no unnamespaced legacy keys re-appear ────────
+    - id: 13
+      title: "Legacy unnamespaced localStorage keys never reappear"
+      description: >
+        At any point during the scenario, in DevTools → Application →
+        Local Storage, search for the exact keys `movida_saved_events`,
+        `movida_attending_events`, `movida_attending_share_publicly`
+        (without the `:` suffix).
+      expected: >
+        None of those three exact keys exists. Only namespaced variants
+        (with `:user:<uuid>` or `:anon:<device-id>` suffix) appear. The
+        one-shot legacy cleanup ran on app load and the contexts only
+        ever read/write the namespaced form.

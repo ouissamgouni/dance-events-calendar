@@ -1,0 +1,113 @@
+version: "3"
+
+# ════════════════════════════════════════════════════════════════
+# Analytics — wipe collected data per environment.
+# DESTRUCTIVE: every task here requires CONFIRM=WIPE-<ENV>.
+#
+# Two stores:
+#   - Backend tracking tables (event_views, event_saves, ...) in our DB
+#   - Umami Cloud website data (staging + prod use Umami Cloud)
+#
+# Toggling collection on/off is independent of these tasks: set the
+# backend env var ANALYTICS_ENABLED=false (Fly.io secret) and restart
+# the API. The frontend reads the flag from /api/config/info; no
+# rebuild needed.
+# ════════════════════════════════════════════════════════════════
+
+vars:
+  ENV: '{{.ENV | default ""}}'
+  CONFIRM: '{{.CONFIRM | default ""}}'
+
+tasks:
+  reset:db:dev:
+    desc: "Wipe analytics rows from local dev DB. Requires CONFIRM=WIPE-dev."
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/config/base.env",
+        "{{.ROOT_DIR}}/config/dev.env",
+        "{{.ROOT_DIR}}/config/secrets.env",
+        "{{.ROOT_DIR}}/config/secrets.dev.env",
+      ]
+    cmds:
+      - ENV_NAME=dev CONFIRM={{.CONFIRM}} PYTHONPATH={{.ROOT_DIR}}
+        {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.reset_analytics
+
+  reset:db:staging:remote:
+    desc: "Wipe analytics rows from REMOTE staging DB (Neon). Requires
+      CONFIRM=WIPE-staging."
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/config/secrets.env",
+        "{{.ROOT_DIR}}/config/secrets.staging.env",
+      ]
+    cmds:
+      - |
+        if [ -z "$DATABASE_URL" ]; then
+          echo "❌ DATABASE_URL not set — fill in config/secrets.staging.env"
+          exit 1
+        fi
+        ENV_NAME=staging CONFIRM={{.CONFIRM}} PYTHONPATH={{.ROOT_DIR}} \
+          {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.reset_analytics
+
+  reset:db:prod:remote:
+    desc: "Wipe analytics rows from PROD DB (Neon). Requires CONFIRM=WIPE-prod."
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/config/secrets.env",
+        "{{.ROOT_DIR}}/config/secrets.prod.env",
+      ]
+    prompt: "⚠️  This will TRUNCATE analytics tables in PRODUCTION (Neon main).
+      Continue?"
+    cmds:
+      - |
+        if [ -z "$DATABASE_URL" ]; then
+          echo "❌ DATABASE_URL not set — fill in config/secrets.prod.env"
+          exit 1
+        fi
+        ENV_NAME=prod CONFIRM={{.CONFIRM}} PYTHONPATH={{.ROOT_DIR}} \
+          {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.reset_analytics
+
+  reset:umami:staging:remote:
+    desc: "Reset Umami Cloud website data for staging. Requires
+      CONFIRM=WIPE-staging and UMAMI_API_KEY in secrets.staging.env."
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/config/staging.remote.env",
+        "{{.ROOT_DIR}}/config/secrets.env",
+        "{{.ROOT_DIR}}/config/secrets.staging.env",
+      ]
+    cmds:
+      - ENV_NAME=staging CONFIRM={{.CONFIRM}}
+        {{.ROOT_DIR}}/.venv/bin/python {{.ROOT_DIR}}/scripts/reset_umami_cloud.py
+
+  reset:umami:prod:remote:
+    desc: "Reset Umami Cloud website data for prod. Requires CONFIRM=WIPE-prod
+      and UMAMI_API_KEY in secrets.prod.env."
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/config/prod.remote.env",
+        "{{.ROOT_DIR}}/config/secrets.env",
+        "{{.ROOT_DIR}}/config/secrets.prod.env",
+      ]
+    prompt: "⚠️  This will wipe ALL Umami analytics for PRODUCTION. Continue?"
+    cmds:
+      - ENV_NAME=prod CONFIRM={{.CONFIRM}}
+        {{.ROOT_DIR}}/.venv/bin/python {{.ROOT_DIR}}/scripts/reset_umami_cloud.py
+
+  reset:staging:remote:
+    desc: "Wipe BOTH backend tables AND Umami Cloud for staging. Requires
+      CONFIRM=WIPE-staging."
+    cmds:
+      - task: reset:db:staging:remote
+        vars: { CONFIRM: "{{.CONFIRM}}" }
+      - task: reset:umami:staging:remote
+        vars: { CONFIRM: "{{.CONFIRM}}" }
+
+  reset:prod:remote:
+    desc: "Wipe BOTH backend tables AND Umami Cloud for prod. Requires
+      CONFIRM=WIPE-prod."
+    cmds:
+      - task: reset:db:prod:remote
+        vars: { CONFIRM: "{{.CONFIRM}}" }
+      - task: reset:umami:prod:remote
+        vars: { CONFIRM: "{{.CONFIRM}}" }

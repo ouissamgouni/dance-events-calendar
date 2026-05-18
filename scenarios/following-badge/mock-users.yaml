@@ -1,0 +1,18 @@
+# Mock users for the following-badge scenario. Same shape as
+# friends-events for consistency.
+users:
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+  - email: carol@example.com
+    name: Carol Nguyen
+    handle: carol
+  - email: dave@example.com
+    name: Dave Smith
+    handle: dave
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

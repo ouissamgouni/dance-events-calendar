@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
@@ -7,10 +7,13 @@ import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import {
     checkHandleAvailable,
     fetchMyRatings,
-    updateUserPreferences,
     updateUserProfile,
 } from '../api';
 import type { MyRating } from '../types';
+import PreferencesSection from '../components/PreferencesSection';
+import VisibilitySection from '../components/VisibilitySection';
+import BioEditor from '../components/BioEditor';
+import NetworkPanel from '../components/NetworkPanel';
 
 function slugifyHandle(name: string): string {
     const base = name
@@ -28,6 +31,7 @@ function slugifyHandle(name: string): string {
 export default function Account() {
     const { user, loading, logout, deleteAccount, refreshUser } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const { savedCount } = useSavedEvents();
     const { attendingCount } = useAttendingEvents();
     const { showRatings } = useFeatureFlags();
@@ -35,8 +39,6 @@ export default function Account() {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [myRatings, setMyRatings] = useState<MyRating[] | null>(null);
-    const [shareDefault, setShareDefault] = useState<boolean>(user?.share_attendance_default ?? true);
-    const [shareSaving, setShareSaving] = useState(false);
 
     // --- Profile editing (display_name + handle) ---
     const [profileEditing, setProfileEditing] = useState(false);
@@ -61,6 +63,21 @@ export default function Account() {
         setNameDraft(user?.name ?? '');
         setHandleDraft(user?.handle ?? '');
     }, [user?.name, user?.handle]);
+
+    // Honour ``/account#section-id`` URL hashes by scrolling the matching
+    // section into view once the page has rendered. React Router doesn't
+    // do this automatically. Re-runs on hash change so an in-app link to
+    // ``/account#network`` from a different page also lands correctly.
+    useEffect(() => {
+        if (!location.hash || loading) return;
+        const id = location.hash.slice(1);
+        // Defer to next paint so the target section is mounted.
+        const t = window.setTimeout(() => {
+            const el = document.getElementById(id);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 50);
+        return () => window.clearTimeout(t);
+    }, [location.hash, loading, user]);
 
     // Debounced availability check on handle draft.
     useEffect(() => {
@@ -128,10 +145,6 @@ export default function Account() {
     };
 
     useEffect(() => {
-        setShareDefault(user?.share_attendance_default ?? true);
-    }, [user?.share_attendance_default]);
-
-    useEffect(() => {
         if (showRatings && user) {
             fetchMyRatings().then(setMyRatings).catch(() => setMyRatings([]));
         }
@@ -146,7 +159,29 @@ export default function Account() {
     }
 
     if (!user) {
-        return <Navigate to="/login" replace />;
+        // Anonymous users still get the Settings page — the Preferences
+        // section is the canonical editor for everyone (see plan.md §
+        // Settings page). Profile / sign-out / activity sections are
+        // replaced by a single sign-in CTA.
+        return (
+            <div className="mx-auto max-w-xl px-6 py-10">
+                <h1 className="text-2xl font-bold text-slate-900 mb-6">Settings</h1>
+                <PreferencesSection />
+                <section className="rounded-lg border border-slate-200 bg-white p-6">
+                    <h2 className="text-base font-semibold text-slate-900 mb-2">Account</h2>
+                    <p className="text-sm text-slate-600 mb-3">
+                        Sign in with Google to sync your preferences across devices and
+                        unlock saved events, “I’m going”, and your shareable calendar.
+                    </p>
+                    <Link
+                        to="/login"
+                        className="inline-block rounded-md bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
+                    >
+                        Sign in
+                    </Link>
+                </section>
+            </div>
+        );
     }
 
     const handleSignOut = async () => {
@@ -173,10 +208,28 @@ export default function Account() {
 
     return (
         <div className="mx-auto max-w-xl px-6 py-10">
-            <h1 className="text-2xl font-bold text-slate-900 mb-6">Your account</h1>
+            <h1 className="text-2xl font-bold text-slate-900 mb-6">Settings</h1>
 
             <section className="rounded-lg border border-slate-200 bg-white p-6 mb-6">
-                <div className="flex items-center gap-4">
+                <div className="flex items-start justify-between gap-4 mb-4">
+                    <h2 className="text-base font-semibold text-slate-900">Profile</h2>
+                    {!profileEditing && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setProfileEditing(true);
+                                if (!handleDraft && suggestedHandle) {
+                                    setHandleDraft(suggestedHandle);
+                                }
+                            }}
+                            className="text-sm text-rose-600 hover:text-rose-700 font-medium"
+                        >
+                            Edit
+                        </button>
+                    )}
+                </div>
+
+                <div className="flex items-center gap-4 mb-4">
                     {user.avatar_url ? (
                         <img
                             src={user.avatar_url}
@@ -196,26 +249,6 @@ export default function Account() {
                             <div className="text-xs text-amber-700 mt-1">Administrator</div>
                         )}
                     </div>
-                </div>
-            </section>
-
-            <section className="rounded-lg border border-slate-200 bg-white p-6 mb-6">
-                <div className="flex items-start justify-between gap-4">
-                    <h2 className="text-base font-semibold text-slate-900">Profile</h2>
-                    {!profileEditing && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setProfileEditing(true);
-                                if (!handleDraft && suggestedHandle) {
-                                    setHandleDraft(suggestedHandle);
-                                }
-                            }}
-                            className="text-sm text-rose-600 hover:text-rose-700 font-medium"
-                        >
-                            Edit
-                        </button>
-                    )}
                 </div>
 
                 {!profileEditing ? (
@@ -328,25 +361,26 @@ export default function Account() {
                         </div>
                     </div>
                 )}
+
+                <BioEditor handle={user.handle ?? null} />
             </section>
 
             <section className="rounded-lg border border-slate-200 bg-white p-6 mb-6">
                 <h2 className="text-base font-semibold text-slate-900 mb-2">My Events</h2>
-                <p className="text-sm text-slate-600">
+                <p className="text-xs text-slate-600">
                     {savedCount} saved · {attendingCount} going
                 </p>
-                <Link to="/my-calendar" className="mt-2 inline-block text-sm text-rose-600 hover:text-rose-700 font-medium">
+                <Link to="/my-calendar" className="mt-2 inline-block text-xs text-rose-600 hover:text-rose-700 font-medium">
                     Show calendar →
                 </Link>
             </section>
 
-            <section className="rounded-lg border border-slate-200 bg-white p-6 mb-6">
-                <h2 className="text-base font-semibold text-slate-900 mb-2">Sync</h2>
-                <p className="text-sm text-slate-600">
-                    Your bookmarked events, “I’m going” events, and your share-my-calendar
-                    link are synced to this account and follow you across devices.
-                </p>
-            </section>
+            <NetworkPanel />
+
+            <PreferencesSection />
+
+            <VisibilitySection handle={user.handle ?? null} />
+
 
             {showRatings && (
                 <section className="rounded-lg border border-slate-200 bg-white p-6 mb-6">
@@ -384,42 +418,6 @@ export default function Account() {
                     )}
                 </section>
             )}
-
-            <section className="rounded-lg border border-slate-200 bg-white p-6 mb-6">
-                <h2 className="text-base font-semibold text-slate-900 mb-2">Privacy</h2>
-                <label className="flex items-start gap-3 text-sm text-slate-700 cursor-pointer">
-                    <input
-                        type="checkbox"
-                        checked={shareDefault}
-                        disabled={shareSaving}
-                        onChange={async (e) => {
-                            const next = e.target.checked;
-                            setShareDefault(next);
-                            setShareSaving(true);
-                            try {
-                                await updateUserPreferences({ share_attendance_default: next });
-                                // Refresh AuthContext so other consumers
-                                // (e.g. GoingButton on the same page) see
-                                // the new value without a full reload.
-                                await refreshUser();
-                            } catch {
-                                setShareDefault(!next);
-                            } finally {
-                                setShareSaving(false);
-                            }
-                        }}
-                        className="mt-0.5"
-                    />
-                    <span>
-                        Share my name by default when I mark myself going to an event.
-                        <span className="block text-xs text-slate-500 mt-0.5">
-                            When enabled, you will appear in the attendee list shown to other
-                            signed-in users. You can override this per-event from the “I’m going”
-                            button.
-                        </span>
-                    </span>
-                </label>
-            </section>
 
             <section className="rounded-lg border border-slate-200 bg-white p-6 mb-6">
                 <h2 className="text-base font-semibold text-slate-900 mb-2">Help &amp; feedback</h2>

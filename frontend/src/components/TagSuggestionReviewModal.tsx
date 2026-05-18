@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { TagSuggestionResponse, TagGroup } from '../types';
-import { approveTagSuggestion, rejectTagSuggestion, createTag, fetchAdminTagSuggestions } from '../api';
+import { approveTagSuggestion, rejectTagSuggestion, createTag } from '../api';
 
 interface FlatTag {
     id: number;
@@ -62,11 +62,6 @@ export default function TagSuggestionReviewModal({
     const isPending = suggestion.status === 'pending';
     const isFreeText = !suggestion.tag && !!suggestion.free_text;
 
-    const refreshSuggestion = async () => {
-        const all = await fetchAdminTagSuggestions();
-        return all.find((s) => s.id === suggestion.id) ?? suggestion;
-    };
-
     const handleApprove = async () => {
         setSaving(true);
         setError('');
@@ -88,8 +83,7 @@ export default function TagSuggestionReviewModal({
                 tagId = suggestion.tag?.id;
             }
 
-            await approveTagSuggestion(suggestion.id, tagId);
-            const updated = await refreshSuggestion();
+            const updated = await approveTagSuggestion(suggestion.id, tagId);
             onUpdated(updated);
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : 'Failed to approve.');
@@ -102,8 +96,7 @@ export default function TagSuggestionReviewModal({
         setSaving(true);
         setError('');
         try {
-            await rejectTagSuggestion(suggestion.id, adminNotes || undefined);
-            const updated = await refreshSuggestion();
+            const updated = await rejectTagSuggestion(suggestion.id, adminNotes || undefined);
             onUpdated(updated);
             setRejectMode(false);
         } catch {

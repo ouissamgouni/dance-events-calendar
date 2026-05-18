@@ -1,0 +1,204 @@
+test_plan:
+  name: "Phase E — Batch 1: Friendship adoption quick wins (E1, E2, E6, E9, E10)"
+  description: >
+    Verify the first batch of Phase E friendship-adoption nudges:
+      • E1  — "Follow back" button on new_follower notifications.
+      • E2  — Inline hint on AudiencePicker when the signed-in user
+              picks the "Friends" audience while having zero friends.
+      • E6  — Toast notification when an outbound follow becomes mutual
+              (i.e. a new_friend notification arrives during the 60s
+              poll cycle).
+      • E9  — "Most active" tab on the Network panel showing the
+              friends leaderboard with period filter (7d/30d/90d).
+      • E10 — "N of your friends follow this organizer" pill on a
+              verified-organizer profile page.
+
+    All five surface in the UI; no migrations are required. Every
+    assertion is observable in DevTools network/JSON or visually.
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=phase-e-batch-1"
+    - >
+      Pre-seeded users (one-click sign-in on /login):
+        viewer (the persona under test) — 0 mutuals at sign-in,
+        alpha, beta, gamma, delta, dave (all already follow viewer),
+        oscar (verified organizer; alpha and beta already follow him),
+        admin.
+    - >
+      Pre-seeded follow graph (none of these are mutual yet — viewer must
+      follow back during the test plan):
+        alpha→viewer, beta→viewer, gamma→viewer, delta→viewer, dave→viewer,
+        alpha→oscar, beta→oscar.
+    - >
+      Pre-seeded "going" attendances (used by E9):
+        alpha → 3 events (public),
+        beta  → 2 events (public),
+        delta → 1 event (friends audience — still counts on E9),
+        gamma → 1 event (private audience — must NOT count on E9).
+    - "Use a fresh browser profile or incognito window when switching users."
+    - >
+      Cookie banner: accept "Personalization" so /api/auth/* and /api/social/*
+      are not blocked by the consent gate.
+
+  steps:
+    # ── E2 — Zero-friends warning on AudiencePicker ────────────
+    - id: 1
+      title: "Viewer signs in with zero friends — picks Friends → hint appears"
+      description: >
+        On /login, click "Sign in as Viewer Persona". Open any flow that
+        renders <AudiencePicker /> (e.g. the Going / RSVP modal on a
+        public event, or the share-attendance setting on /account →
+        Privacy & visibility). Click the "Friends" radio.
+      expected: >
+        Below the radiogroup, an inline hint appears with
+        data-testid="audience-zero-friends-hint" — "You have no friends yet"
+        with a link to /account#network. The Public / Private radios do
+        NOT show the hint. Verify in DevTools:
+        GET /api/auth/me returns ``"friend_count": 0`` (E2 backend).
+
+    # ── E1 — Follow-back button on new_follower notifications ──
+    - id: 2
+      title: "Viewer's notifications panel shows Follow-back for dave"
+      description: >
+        IMPORTANT prep — the YAML seeder writes ``UserFollow`` rows
+        directly and bypasses the notification fan-out, so the
+        pre-seeded alpha/beta/gamma/delta/dave→viewer follows do NOT
+        produce ``new_follower`` rows by themselves. To exercise E1
+        you need at least one live follow:
+
+          a. Open a second browser profile (Browser B) and sign in as
+             ``dave@example.com`` (Dev Mock).
+          b. Navigate to ``/u/viewer`` and click "Follow".
+          c. Sign out of Browser B.
+          d. Switch back to Browser A (signed in as viewer) and open
+             the bell / notifications panel.
+
+        Locate the row "@dave started following you" (kind=new_follower).
+      expected: >
+        On the right side of the dave row, a primary blue square
+        "Follow back" button is rendered (E1). Any other live
+        ``new_follower`` rows from the same session also render the
+        button. Verify in DevTools:
+        GET /api/notifications returns the dave row with
+        ``actor.is_following: false``.
+
+    - id: 3
+      title: "Click Follow back on dave → optimistic flip; backend matches"
+      description: >
+        Click "Follow back" on the @dave new_follower row. If you
+        produced a second live follow during prep (e.g. signed in as
+        alpha in Browser B and followed viewer), click "Follow back"
+        on that row too — E6 needs at least two new_friend events
+        to assert plurality.
+      expected: >
+        Each button optimistically swaps to a non-clickable
+        "✓ Following" pill (square, secondary slate style). DevTools
+        shows POST /api/social/users/dave/follow → 201 with
+        ``is_friend: true`` in the response — the new edge completes
+        a mutual relationship. The notifications panel does not refetch
+        spontaneously; the pill stays put.
+
+    # ── E6 — Mutual-friend toast on the next poll ──────────────
+    - id: 4
+      title: "Within ~60s, a toast announces the new friendship"
+      description: >
+        Stay on the page; do not refresh. Wait for the 60-second
+        notifications poll to fire (or trigger any auth-touching navigation).
+        A new_friend notification arrived for each live Follow back in
+        step 3.
+      expected: >
+        A success toast appears with the text "@alpha is now your friend"
+        and an action button "Open @alpha" that navigates to /u/alpha.
+        Either two toasts stack (one per friend) or the second is queued
+        and surfaces on dismissal — both are acceptable. Verify the toast
+        DOES NOT appear again on a later poll for the same notification IDs
+        (de-duplication via localStorage seen-set).
+        Negative check: on a hard refresh, the toast must NOT re-fire
+        for the same already-seen notification IDs (priming guard).
+
+    - id: 5
+      title: "AudiencePicker hint disappears now that viewer has friends"
+      description: >
+        Re-open the AudiencePicker from step 1 (Going modal or
+        /account → Privacy). Click "Friends".
+      expected: >
+        The data-testid="audience-zero-friends-hint" element is GONE.
+        DevTools: GET /api/auth/me now returns ``friend_count: 2``.
+
+    # ── E10 — Mutual-friends pill on verified-organizer profile ─
+    - id: 6
+      title: "Visit @oscar's profile — pill shows '2 of your friends follow this organizer'"
+      description: >
+        Navigate to /u/oscar. Oscar is a verified organizer; alpha and
+        beta (now friends with viewer) follow him.
+      expected: >
+        Below the mutual-subscribers line, a slate-bordered square pill
+        with data-testid="mutual-friends-who-follow-pill" reads
+        "2 of your friends follow this organizer". The verified-organizer
+        badge is also visible. DevTools: GET /api/social/users/oscar
+        returns ``is_verified_organizer: true`` and
+        ``mutual_friends_who_follow: 2``.
+
+    - id: 7
+      title: "Pill is hidden on non-verified profiles even with mutual followers"
+      description: >
+        Navigate to /u/dave (not a verified organizer; dave still has
+        no return follow from viewer).
+      expected: >
+        The mutual-friends-who-follow pill is NOT rendered. DevTools:
+        the response omits or returns 0 for ``mutual_friends_who_follow``
+        and ``is_verified_organizer: false``.
+
+    # ── E9 — Friends leaderboard ───────────────────────────────
+    - id: 8
+      title: "Open Network panel → 'Most active' tab"
+      description: >
+        Go to /account#network (or the in-app Network panel entry).
+        Click the new "Most active" tab.
+      expected: >
+        The default period radio is "30 days". The list shows alpha
+        ranked #1 with going_count=3 and beta #2 with going_count=2.
+        delta and gamma do NOT appear yet — viewer is not friends with
+        them. DevTools: GET /api/social/me/friends/leaderboard?period=30d
+        returns rows ordered alpha → beta with ``rank`` 1, 2.
+
+    - id: 9
+      title: "Promote delta + gamma to friend, leaderboard updates correctly"
+      description: >
+        Open the Network panel "Following" tab (or directly visit
+        /u/delta and /u/gamma). For each, click Follow on viewer's behalf.
+        Both already follow viewer — these clicks complete the mutual
+        edge.
+        Then return to the "Most active" tab and click the period radios
+        to refetch.
+      expected: >
+        On the leaderboard, delta now appears with going_count=1 (the
+        single friends-audience attendance is COUNTED). gamma appears
+        with going_count=0 because her sole attendance has
+        share_audience=private — the E9 contract excludes private
+        RSVPs. Final rank: alpha (3) > beta (2) > delta (1) > gamma (0)
+        — note the handle ASC tiebreak between zero-count ties means
+        gamma is last in the alpha-sorted list of zeros (alone here).
+        Switch to period=7d and 90d radios — the same ordering holds
+        (all events are inside the next two weeks).
+      acceptance:
+        - "DevTools: GET /api/social/me/friends/leaderboard?period=30d "
+        - "  → items[0].handle == 'alpha' && items[0].going_count == 3"
+        - "  → items[1].handle == 'beta'  && items[1].going_count == 2"
+        - "  → items[2].handle == 'delta' && items[2].going_count == 1"
+        - "  → 'gamma' is in items with going_count == 0 (private excluded)"
+
+    - id: 10
+      title: "Negative: invalid period rejected"
+      description: >
+        In DevTools, fire ``fetch('/api/social/me/friends/leaderboard?period=1y')``.
+      expected: >
+        Response is 400 Bad Request — period must be one of 7d, 30d, 90d.
+
+    - id: 11
+      title: "Negative: anonymous viewer cannot reach the endpoint"
+      description: >
+        Sign out (or open an incognito window). Fire
+        ``fetch('/api/social/me/friends/leaderboard?period=30d')``.
+      expected: >
+        Response is 401 Unauthorized.

@@ -195,6 +195,54 @@ class TestSubmitTagSuggestion:
 
 @pytest.mark.unit
 class TestAdminEventTags:
+    def test_admin_count_tag_suggestions(self, admin_client):
+        c, session = admin_client
+        count_result = MagicMock()
+        count_result.one.return_value = 7
+        session.exec.return_value = count_result
+
+        resp = c.get("/api/admin/tags/suggestions/count?status=pending")
+
+        assert resp.status_code == 200
+        assert resp.json() == {"count": 7}
+
+    def test_admin_list_tag_suggestions_bulk_preloads_tags(self, admin_client):
+        c, session = admin_client
+        group = _make_tag_group()
+        first_tag = _make_tag(id=1)
+        first_tag.group = group
+        second_tag = _make_tag(id=2, slug="class", label="Class")
+        second_tag.group = group
+        first_event = _make_event("evt-001")
+        second_event = _make_event("evt-002")
+        second_event.title = "Second Event"
+        suggestions = [
+            TagSuggestion(id=1, event_id="evt-001", tag_id=1, status="pending"),
+            TagSuggestion(id=2, event_id="evt-002", tag_id=2, status="pending"),
+        ]
+
+        suggestion_result = MagicMock()
+        suggestion_result.all.return_value = suggestions
+        event_result = MagicMock()
+        event_result.all.return_value = [first_event, second_event]
+        tag_result = MagicMock()
+        tag_result.all.return_value = [first_tag, second_tag]
+        session.exec.side_effect = [suggestion_result, event_result, tag_result]
+
+        def mock_get(model, id):
+            if model is Tag:
+                raise AssertionError("list route should bulk preload tags")
+            return None
+
+        session.get.side_effect = mock_get
+
+        resp = c.get("/api/admin/tags/suggestions")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert [row["tag"]["id"] for row in data] == [1, 2]
+        assert [row["event_title"] for row in data] == ["Test Event", "Second Event"]
+
     def test_replace_event_tags(self, admin_client):
         c, session = admin_client
         event = _make_event()

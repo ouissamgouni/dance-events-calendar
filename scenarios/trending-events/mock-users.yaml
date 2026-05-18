@@ -1,0 +1,24 @@
+# Mock users for the trending-events scenario.
+#
+# Five active users + admin. Everyone is in everyone's friend graph (see
+# db-follows.yaml) so we don't need to worry about audience filtering for
+# the popularity score itself — popularity ignores the friend graph.
+users:
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+  - email: carol@example.com
+    name: Carol Nguyen
+    handle: carol
+  - email: dave@example.com
+    name: Dave Smith
+    handle: dave
+  - email: eve@example.com
+    name: Eve Johnson
+    handle: eve
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

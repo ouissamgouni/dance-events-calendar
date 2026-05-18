@@ -1,0 +1,71 @@
+# Pre-seeded events for the following-badge scenario.
+#
+#   evt-fb-001 — Alice (Bob's friend) is going  → badge MUST appear for Bob
+#   evt-fb-002 — Alice saved (not going)        → badge MUST appear for Bob
+#                                                 (uses saved_count signal)
+#   evt-fb-003 — Carol (one-way follower) going → badge MUST NOT appear for Bob
+#   evt-fb-004 — Stranger / nobody seeded       → badge MUST NOT appear for Bob
+base_week: 0
+events:
+  - id: evt-fb-001
+    calendar_id: salsa-cal-001
+    title: Salsa Social Friday
+    description: |
+      Weekly social. Alice (Bob's friend) is going.
+    location: Dance Studio, 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w0 Fri 21:00
+    end: w0 Sat 01:00
+    price_is_free: true
+  - id: evt-fb-002
+    calendar_id: bachata-cal-002
+    title: Bachata Workshop
+    description: |
+      Saved by Alice — badge should still appear via the saves signal.
+    location: Tanzhaus, Friedrichstr. 100, Berlin, Germany
+    latitude: 52.52
+    longitude: 13.405
+    start: w0 Sat 14:00
+    end: w0 Sat 17:00
+    price_is_free: false
+    price_min: 25
+    price_currency: EUR
+  - id: evt-fb-003
+    calendar_id: salsa-cal-001
+    title: Cuban Night (one-way follower control)
+    description: |
+      Carol (one-way follower of Alice, NOT Bob's friend) is going.
+      The badge MUST NOT appear for Bob.
+    location: Skybar, Av. de la Liberté, Brussels, Belgium
+    latitude: 50.8503
+    longitude: 4.3517
+    start: w1 Sat 20:00
+    end: w1 Sun 00:00
+    price_is_free: true
+  - id: evt-fb-004
+    calendar_id: bachata-cal-002
+    title: Stranger Bachata (no friends seeded)
+    description: |
+      Nobody Bob follows is going or saved this. Badge MUST NOT appear.
+    location: London Dance Academy, 12 Soho Square, London, UK
+    latitude: 51.5143
+    longitude: -0.1323
+    start: w1 Sun 15:00
+    end: w1 Sun 18:00
+    price_is_free: false
+    price_min: 30
+    price_currency: GBP
+
+attendances:
+  - event_id: evt-fb-001
+    email: alice@example.com
+    share_publicly: true
+  - event_id: evt-fb-003
+    email: carol@example.com
+    share_publicly: true
+
+saves:
+  - event_id: evt-fb-002
+    email: alice@example.com
+    audience: friends

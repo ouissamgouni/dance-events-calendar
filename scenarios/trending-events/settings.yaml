@@ -1,0 +1,17 @@
+# Site settings pre-seeded into the SiteSetting table.
+#
+# `trending_enabled: true` flips the popularity badge + sort to use the
+# new commitment-weighted score (popularity_score) instead of raw
+# view_count. `show_popularity: true` is required for the badge to
+# render at all (admin gate).
+#
+# `trending_floor_going: 1` is intentionally *lower* than the production
+# default (3) so this scenario can demonstrate the score with modest
+# seed data — every "trending" event in db-events.yaml has at least
+# 1 going.
+settings:
+  show_popularity: true
+  popularity_threshold: 1
+  trending_enabled: true
+  trending_window_days: 30
+  trending_floor_going: 1

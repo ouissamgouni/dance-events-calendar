@@ -19,6 +19,14 @@ interface Props {
      * Hero pills are always rendered first regardless of this setting.
      */
     sortMode?: 'group' | 'event_count';
+    /**
+     * Optional content rendered as the last item in the wrapping pill
+     * row, after the last tag pill. Used by the explorer to surface a
+     * "save as default" link without breaking the pill row's natural
+     * mobile wrap behaviour (placing the CTA in a sibling flex column
+     * forces the pills to compact horizontally).
+     */
+    trailingSlot?: React.ReactNode;
 }
 
 // Pill height (text-[11px] + py-px + 1px borders) ≈ 20px.
@@ -112,6 +120,7 @@ export default function TagFilterPills({
     onClear,
     countOverrides,
     sortMode = 'group',
+    trailingSlot,
 }: Props) {
     // Default state on every page/refresh: collapsed (2 rows).
     const [expanded, setExpanded] = useState(false);
@@ -210,6 +219,7 @@ export default function TagFilterPills({
                     </button>
                 )}
                 {allOrdered.map(renderPill)}
+                {trailingSlot}
             </div>
 
             {/* Collapsed overflow: floating "Show more" with gradient fade so

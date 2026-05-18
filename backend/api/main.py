@@ -17,9 +17,11 @@ from backend.api.routes.auth import router as auth_router
 from backend.api.routes.config import router as config_router
 from backend.api.routes.events import router as events_router
 from backend.api.routes.export import router as export_router
+from backend.api.routes.notifications import router as notifications_router
 from backend.api.routes.ratings import router as ratings_router
 from backend.api.routes.settings import router as settings_router
 from backend.api.routes.sharing import router as sharing_router
+from backend.api.routes.social import router as social_router
 from backend.api.routes.suggestions import router as suggestions_router
 from backend.api.routes.tags import router as tags_router
 from backend.api.routes.tracking import router as tracking_router
@@ -123,6 +125,7 @@ if _os.getenv("RATE_LIMIT_ENABLED", "true").lower() in ("false", "0", "no"):
         "export",
         "ratings",
         "sharing",
+        "social",
         "suggestions",
         "tags",
         "tracking",
@@ -161,6 +164,8 @@ app.include_router(config_router)
 app.include_router(suggestions_router)
 app.include_router(tags_router)
 app.include_router(ratings_router)
+app.include_router(social_router)
+app.include_router(notifications_router)
 
 
 @app.get("/health", response_model=HealthResponse)

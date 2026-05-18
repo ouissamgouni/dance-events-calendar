@@ -5,6 +5,15 @@ test_plan:
     Calendar explorer page (list + map), .ics and .xlsx exports, clear all,
     past-events toggle, and admin most-saved analytics. Uses mock calendar
     service with 5 future events and 2 past events across 2 calendars.
+
+    Audience note: every Save row gets a per-event audience picker
+    (Public / Friends / Private). The audience controls who else can see the
+    saved event on the user's public profile and Calendar tab; it does not
+    affect the user's own My Calendar view, which always shows everything
+    they saved. Signed-in users clicking the heart while it is already red
+    open an "Edit visibility" popover (audience picker + an "Unsave"
+    action) instead of toggling off blindly. Anonymous users have no
+    audience and keep the simple toggle behavior used in the steps below.
   steps:
     # ── Saving Events ───────────────────────────────────────────
     - id: 1

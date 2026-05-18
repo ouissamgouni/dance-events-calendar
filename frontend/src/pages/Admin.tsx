@@ -23,9 +23,10 @@ import TagSuggestionsPanel from '../components/TagSuggestionsPanel';
 import FeedbackPanel from '../components/FeedbackPanel';
 import AdminTagCategories from '../components/AdminTagCategories';
 import AdminAnalytics from '../components/AdminAnalytics';
+import AdminUsersTab from '../components/AdminUsersTab';
 import { useAdminCounters, notifyAdminDataChanged } from '../hooks/useAdminCounters';
 
-type AdminTab = 'data' | 'configuration' | 'analytics';
+type AdminTab = 'data' | 'configuration' | 'analytics' | 'users';
 type SyncMode = 'incremental' | 'reseed';
 
 export default function Admin() {
@@ -43,6 +44,12 @@ export default function Admin() {
     const [showPopularity, setShowPopularity] = useState(false);
     const [showRatings, setShowRatings] = useState(false);
     const [popularityThreshold, setPopularityThreshold] = useState(10);
+    // Adoption-boost feature toggles (Tracks 1-3).
+    const [followingBadgeEnabled, setFollowingBadgeEnabled] = useState(false);
+    const [unseenStateEnabled, setUnseenStateEnabled] = useState(false);
+    const [trendingEnabled, setTrendingEnabled] = useState(false);
+    const [trendingWindowDays, setTrendingWindowDays] = useState(30);
+    const [trendingFloorGoing, setTrendingFloorGoing] = useState(3);
     const [eventColorBarColor, setEventColorBarColor] = useState('#64748b');
     const [tagSortMode, setTagSortMode] = useState<'group' | 'event_count'>('group');
     const [editingCalId, setEditingCalId] = useState<string | null>(null);
@@ -76,7 +83,7 @@ export default function Admin() {
     const [calendarDefaultTagIds, setCalendarDefaultTagIds] = useState<Record<string, number[]>>({});
     const { tab: tabParam } = useParams<{ tab?: string }>();
     const isValidTab = (t: string | undefined): t is AdminTab =>
-        t === 'data' || t === 'configuration' || t === 'analytics';
+        t === 'data' || t === 'configuration' || t === 'analytics' || t === 'users';
     const [activeTab, setActiveTab] = useState<AdminTab>(isValidTab(tabParam) ? tabParam : 'data');
     const { user, logout } = useAuth();
     const navigate = useNavigate();
@@ -134,6 +141,11 @@ export default function Admin() {
             setShowPopularity(s.show_popularity);
             setShowRatings(s.show_ratings);
             setPopularityThreshold(s.popularity_threshold ?? 10);
+            setFollowingBadgeEnabled(s.following_badge_enabled ?? false);
+            setUnseenStateEnabled(s.unseen_state_enabled ?? false);
+            setTrendingEnabled(s.trending_enabled ?? false);
+            setTrendingWindowDays(s.trending_window_days ?? 30);
+            setTrendingFloorGoing(s.trending_floor_going ?? 3);
             setEventColorBarColor(s.event_color_bar_color || '#64748b');
             setTagSortMode(s.tag_sort_mode === 'event_count' ? 'event_count' : 'group');
         }).catch(() => { });
@@ -389,6 +401,62 @@ export default function Admin() {
         }
     };
 
+    const handleToggleFollowingBadge = async () => {
+        const newVal = !followingBadgeEnabled;
+        setFollowingBadgeEnabled(newVal);
+        try {
+            await updateSettings({ following_badge_enabled: newVal });
+            setMessage(`Following badge ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setFollowingBadgeEnabled(!newVal);
+            setMessage('Failed to update following badge.');
+        }
+    };
+
+    const handleToggleUnseenState = async () => {
+        const newVal = !unseenStateEnabled;
+        setUnseenStateEnabled(newVal);
+        try {
+            await updateSettings({ unseen_state_enabled: newVal });
+            setMessage(`Unseen state ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setUnseenStateEnabled(!newVal);
+            setMessage('Failed to update unseen state.');
+        }
+    };
+
+    const handleToggleTrending = async () => {
+        const newVal = !trendingEnabled;
+        setTrendingEnabled(newVal);
+        try {
+            await updateSettings({ trending_enabled: newVal });
+            setMessage(`Trending ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setTrendingEnabled(!newVal);
+            setMessage('Failed to update trending toggle.');
+        }
+    };
+
+    const handleTrendingWindowDaysChange = async (value: number) => {
+        if (isNaN(value) || value < 1 || value > 365) return;
+        setTrendingWindowDays(value);
+        try {
+            await updateSettings({ trending_window_days: value });
+        } catch {
+            setMessage('Failed to update trending window.');
+        }
+    };
+
+    const handleTrendingFloorGoingChange = async (value: number) => {
+        if (isNaN(value) || value < 0 || value > 100) return;
+        setTrendingFloorGoing(value);
+        try {
+            await updateSettings({ trending_floor_going: value });
+        } catch {
+            setMessage('Failed to update trending floor.');
+        }
+    };
+
     const handleTagSortModeChange = async (mode: 'group' | 'event_count') => {
         const prev = tagSortMode;
         setTagSortMode(mode);
@@ -436,6 +504,7 @@ export default function Admin() {
                         <button onClick={() => changeTab('data')} className={tabBtnClass('data')}>Data</button>
                         <button onClick={() => changeTab('configuration')} className={tabBtnClass('configuration')}>Configuration</button>
                         <button onClick={() => changeTab('analytics')} className={tabBtnClass('analytics')}>Analytics</button>
+                        <button onClick={() => changeTab('users')} className={tabBtnClass('users')}>Users</button>
                     </div>
                     <div className="ml-auto flex min-w-0 flex-col items-end gap-1">
                         <button
@@ -919,6 +988,93 @@ export default function Admin() {
                                     />
                                 </div>
                             )}
+
+                            {/* Adoption-boost: Trending sort (Track 3) ── replaces raw
+                                view_count with a commitment-weighted, time-decayed score.
+                                Requires Show popularity to be on (the badge is the
+                                surface that renders the score). */}
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <span className="text-[11px] font-medium text-gray-700">Trending</span>
+                                    <p className="text-[10px] text-gray-400">
+                                        Weighted score (5×going + 1×saved + 0.05×view) with time decay.
+                                        Replaces raw view-count for badge & sort.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={handleToggleTrending}
+                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${trendingEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                >
+                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${trendingEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                </button>
+                            </div>
+                            {trendingEnabled && (
+                                <>
+                                    <div className="flex items-center justify-between mt-1 pl-1">
+                                        <div>
+                                            <span className="text-[11px] font-medium text-gray-600">Trending window (days)</span>
+                                            <p className="text-[10px] text-gray-400">Only count signals from the last N days</p>
+                                        </div>
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={365}
+                                            value={trendingWindowDays}
+                                            onChange={(e) => setTrendingWindowDays(Number(e.target.value))}
+                                            onBlur={(e) => handleTrendingWindowDaysChange(Number(e.target.value))}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleTrendingWindowDaysChange(trendingWindowDays)}
+                                            className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                        />
+                                    </div>
+                                    <div className="flex items-center justify-between mt-1 pl-1">
+                                        <div>
+                                            <span className="text-[11px] font-medium text-gray-600">Trending floor (going)</span>
+                                            <p className="text-[10px] text-gray-400">
+                                                Min RSVPs required to be eligible. Anti-view-bait gate;
+                                                events below this floor get score 0.
+                                            </p>
+                                        </div>
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            max={100}
+                                            value={trendingFloorGoing}
+                                            onChange={(e) => setTrendingFloorGoing(Number(e.target.value))}
+                                            onBlur={(e) => handleTrendingFloorGoingChange(Number(e.target.value))}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleTrendingFloorGoingChange(trendingFloorGoing)}
+                                            className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                        />
+                                    </div>
+                                </>
+                            )}
+
+                            {/* Adoption-boost: Following badge (Track 1) */}
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <span className="text-[11px] font-medium text-gray-700">Following badge</span>
+                                    <p className="text-[10px] text-gray-400">Avatar/dot when a mutual friend is going or saved</p>
+                                </div>
+                                <button
+                                    onClick={handleToggleFollowingBadge}
+                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${followingBadgeEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                >
+                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${followingBadgeEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                </button>
+                            </div>
+
+                            {/* Adoption-boost: Unseen state (Track 2) */}
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <span className="text-[11px] font-medium text-gray-700">Unseen state</span>
+                                    <p className="text-[10px] text-gray-400">Dot + bold title for events the viewer has not opened yet</p>
+                                </div>
+                                <button
+                                    onClick={handleToggleUnseenState}
+                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${unseenStateEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                >
+                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${unseenStateEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -940,6 +1096,11 @@ export default function Admin() {
                     topLinks={topLinks}
                     exportStats={exportStats}
                 />
+            )}
+
+            {/* ── Users Tab ── */}
+            {activeTab === 'users' && (
+                <AdminUsersTab />
             )}
 
             {/* Slide-Out Panels */}

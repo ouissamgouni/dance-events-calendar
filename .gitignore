@@ -73,3 +73,6 @@ backend/db/alembic/versions/__pycache__/
 # ── Misc ──────────────────────────────────────────────
 *.log
 tmp/
+docs/PHASE_D_PROFILE_CONTENT.md
+docs/PHASE_F_GDPR_REMEDIATION.md
+docs/PHASE_E_FRIENDSHIP_ADOPTION.md

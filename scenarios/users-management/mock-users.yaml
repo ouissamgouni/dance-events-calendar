@@ -1,0 +1,26 @@
+# Mock users pre-seeded for the users-management scenario.
+#
+# - admin: matches ADMIN_EMAIL → has the Admin badge and access to /admin/users
+# - alice, bob, dave: regular users used to exercise list / search /
+#   verified-organizer toggle / admin-initiated delete with cascade
+# - carol: starts soft-deleted (see db-deletes.yaml is NOT used; the test
+#   plan deletes carol via the self-service flow as step 0 if needed). For
+#   simplicity we seed her as a regular user and the test plan triggers the
+#   purge through Carol's own /account → "Delete my account" before
+#   exercising the "Include deleted" toggle.
+users:
+  - email: admin@example.com # matches ADMIN_EMAIL → admin badge
+    name: Dev Admin
+    handle: admin
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+  - email: carol@example.com
+    name: Carol Nguyen
+    handle: carol
+  - email: dave@example.com
+    name: Dave Smith
+    handle: dave

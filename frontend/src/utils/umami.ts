@@ -30,6 +30,14 @@ let analyticsDisabled = false;
 
 export function setAnalyticsDisabled(disabled: boolean): void {
     analyticsDisabled = disabled;
+    if (disabled) {
+        // Defensive: if Umami already loaded before the disabled flag arrived
+        // (e.g. consent fired before /api/config/info resolved), drop the
+        // global so further track calls become no-ops even outside this module.
+        if (typeof window !== 'undefined') {
+            try { delete window.umami; } catch { /* non-configurable */ }
+        }
+    }
 }
 
 export function isAnalyticsDisabled(): boolean {

@@ -5,6 +5,7 @@ import {
     loginWithGoogle as apiLogin,
     logout as apiLogout,
     type AuthUser,
+    type PreferredAreaPayload,
 } from '../api';
 import { rotateDeviceId } from '../utils/deviceId';
 import { clearUmamiBaseContext, setAnalyticsDisabled, setUmamiBaseContext, umamiIdentify } from '../utils/umami';
@@ -16,6 +17,36 @@ import {
 } from '../utils/tracking';
 
 export type User = AuthUser;
+
+/**
+ * Mirrors the storage key in {@link ../context/PreferencesContext}. Duplicated
+ * here — rather than imported — to avoid an Auth↔Preferences provider
+ * cycle. Bump both call sites together if the key version changes.
+ */
+const PREFS_STORAGE_KEY = 'movida.preferences.v1';
+
+function readAnonPreferencesFromStorage():
+    | { preferred_area: PreferredAreaPayload | null; preferred_tag_ids: number[] }
+    | null {
+    try {
+        const raw = localStorage.getItem(PREFS_STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw) as {
+            preferred_area?: PreferredAreaPayload | null;
+            preferred_tag_ids?: unknown;
+        };
+        const area = parsed.preferred_area && typeof parsed.preferred_area === 'object'
+            ? parsed.preferred_area
+            : null;
+        const tagIds = Array.isArray(parsed.preferred_tag_ids)
+            ? parsed.preferred_tag_ids.filter((x): x is number => typeof x === 'number')
+            : [];
+        if (!area && tagIds.length === 0) return null;
+        return { preferred_area: area, preferred_tag_ids: tagIds };
+    } catch {
+        return null;
+    }
+}
 
 interface AuthContextType {
     user: User | null;
@@ -81,7 +112,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Bump the generation FIRST so any in-flight fetchMe can no longer
         // overwrite the user state we are about to set.
         generation.current++;
-        const u = await apiLogin(credential, deviceId, mockEmail, mockName);
+        // Surface anonymous preferences (preferred area + tags) saved by the
+        // user before signing in. Read straight from localStorage so we don't
+        // create an Auth↔Preferences context cycle. The backend silently
+        // ignores this payload when the user already has server-side prefs.
+        const anonPrefs = readAnonPreferencesFromStorage();
+        const u = await apiLogin(credential, deviceId, mockEmail, mockName, anonPrefs);
         setUser(u);
         setLoading(false);
         // Admin sessions are excluded from analytics — see fetchMe handler above.
@@ -134,6 +170,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // auto-load on next mount will reconcile.
         }
     }, []);
+
+    // Phase E (E2): when a follow/unfollow happens anywhere in the app
+    // (notifications "Follow back", profile follow button, network panel
+    // remove), the user's ``friend_count`` may have changed — re-fetch
+    // /auth/me so the AudiencePicker zero-friends hint and any other
+    // friend-count-driven UI immediately reflect the new graph.
+    useEffect(() => {
+        const onNetworkChanged = () => {
+            if (user) void refreshUser();
+        };
+        window.addEventListener('network:changed', onNetworkChanged);
+        return () =>
+            window.removeEventListener('network:changed', onNetworkChanged);
+    }, [user, refreshUser]);
 
     return (
         <AuthContext.Provider value={{ user, loading, login, logout, deleteAccount, refreshUser }}>

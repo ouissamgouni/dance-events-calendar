@@ -1,0 +1,75 @@
+test_plan:
+  name: "Unseen Events — new/unseen state UI (Track 2)"
+  description: >
+    Verify the new "Unseen" state — a small dot + bolder title on event
+    cards and pins for events the current viewer has not yet opened,
+    plus an "Unseen only" filter chip and a section counter. Per-viewer
+    state lives in localStorage keyed by event_id (no server-side state,
+    no DB writes — first-class anonymous-friendly behaviour).
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=unseen-events"
+    - "Use a fresh browser profile or hard-clear localStorage before step 1."
+    - "settings.yaml flips on `unseen_state_enabled`."
+
+  steps:
+    - id: 1
+      title: "All seeded events show the Unseen dot on first load"
+      description: >
+        Open / (Home, signed out is fine — the feature is anonymous).
+        Inspect the three event cards.
+      expected: >
+        Every card carries a small Unseen dot (left of the title) and
+        the title is rendered with a slightly bolder font weight. The
+        list-section header shows the counter "3 new since your last
+        visit".
+
+    - id: 2
+      title: "Opening an event clears its Unseen dot"
+      description: >
+        Click evt-unseen-001 (Friday Night Salsa Social) to open the
+        detail view. Click the back button.
+      expected: >
+        Back on / the evt-unseen-001 card no longer shows the Unseen
+        dot and its title reverts to the regular weight. The section
+        counter drops to "2 new since your last visit". `localStorage`
+        contains a `seen_events` (or similar) entry including
+        `evt-unseen-001`.
+
+    - id: 3
+      title: "Unseen-only filter chip narrows the list"
+      description: >
+        On / above the event list, locate the "Unseen only" chip and
+        click it.
+      expected: >
+        The list re-renders with only evt-unseen-002 and evt-unseen-003
+        (evt-unseen-001 was marked seen in step 2 and is filtered out).
+        The chip is purely a client-side filter — no extra network call
+        is made.
+
+    - id: 4
+      title: "Admin UI exposes the Unseen state toggle"
+      description: >
+        Sign in as admin (admin@example.com). Navigate to
+        /admin/configuration. In the right-hand feature-flag panel,
+        locate the "Unseen state" row.
+      expected: >
+        The toggle is currently ON (settings.yaml seeded
+        `unseen_state_enabled: true`) with the helper text
+        "Dot + bold title for events the viewer has not opened yet".
+        The Trending and Following badge toggles are OFF (independent —
+        proves the three flags don't bleed into each other).
+
+    - id: 5
+      title: "Toggling Unseen state OFF removes all Unseen UI"
+      description: >
+        Still on /admin/configuration, flip "Unseen state" off. Reload
+        / (signed-out viewer is fine).
+      expected: >
+        Network: PUT /api/settings → 200 with
+        `unseen_state_enabled: false`. Unseen dots and bold-title
+        styling disappear. The "Unseen only" chip is hidden. The
+        header counter is hidden. localStorage is not cleared (so
+        re-enabling restores the earlier seen state). Re-enable the
+        toggle and the badges/filter return on next reload. Proves the
+        feature is fully gated by the toggle.

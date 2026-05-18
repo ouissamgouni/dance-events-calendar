@@ -10,6 +10,25 @@
   display: none;
 }
 
+/* ── Panel slide animations ────────────────────────── */
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+@utility animate-slide-up {
+  animation: slide-up 0.25s ease-out;
+}
+
+@utility animate-slide-right {
+  animation: slide-in-right 0.25s ease-out;
+}
+
 :root {
   --color-primary: #475569;
   --color-accent: #4f46e5;

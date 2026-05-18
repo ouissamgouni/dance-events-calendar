@@ -78,11 +78,19 @@ export function trackView(eventId: string, source?: string): void {
  * cookie consent (legal basis: service the user explicitly requested). The
  * analytics log row (event_save) and umami ping are only written when
  * analytics consent is granted.
+ *
+ * Returns a Promise that REJECTS on functional-state write failure so
+ * SavedEventsContext can roll back its optimistic UI update. Analytics
+ * pings remain best-effort (umami failures are not surfaced).
  */
-export function trackSave(eventId: string, action: 'save' | 'unsave'): void {
+export function trackSave(
+    eventId: string,
+    action: 'save' | 'unsave',
+    audience?: 'public' | 'friends' | 'private',
+): Promise<void> {
     const analytics = readConsent().analytics;
-    trackEventSave(eventId, getDeviceId(), action, analytics).catch(() => { });
     if (analytics) umamiTrack('event_saved', { action });
+    return trackEventSave(eventId, getDeviceId(), action, analytics, audience);
 }
 
 /** Track a link click. */
@@ -139,18 +147,18 @@ export function trackAttendance(
     action: 'going' | 'not_going',
     sharePublicly?: boolean,
     isAuthenticated?: boolean,
+    shareAudience?: 'public' | 'friends' | 'private',
 ): Promise<void> {
     const analytics = readConsent().analytics;
     if (analytics) {
         umamiTrack('attendance_marked', {
             action,
             share_publicly: sharePublicly === undefined ? 'unset' : String(sharePublicly),
+            share_audience: shareAudience ?? 'unset',
             is_authenticated: isAuthenticated ?? false,
         });
     }
-    return trackEventAttendance(eventId, getDeviceId(), action, analytics, sharePublicly)
-        .then(() => { /* swallow result */ })
-        .catch(() => { /* fire-and-forget on error */ });
+    return trackEventAttendance(eventId, getDeviceId(), action, analytics, sharePublicly, shareAudience);
 }
 
 // ── Auth funnel (Umami only — backend already records sessions) ──────────

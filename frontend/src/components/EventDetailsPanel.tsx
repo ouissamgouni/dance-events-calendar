@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { CalendarEvent } from '../types';
 import EventDetailContent from './EventDetailContent';
@@ -13,6 +14,10 @@ interface Props {
     bodyClassName?: string;
     /** Source passed as ?src= on the "See full details" link for tracking attribution */
     source?: string;
+    /** Admin-only: hide this event (reversible) */
+    onHide?: () => void;
+    /** Admin-only: permanently remove this event (irreversible) */
+    onPermanentlyRemove?: () => void;
 }
 
 export default function EventDetailsPanel({
@@ -23,7 +28,10 @@ export default function EventDetailsPanel({
     className = '',
     bodyClassName = '',
     source,
+    onHide,
+    onPermanentlyRemove,
 }: Props) {
+    const [confirmRemove, setConfirmRemove] = useState(false);
     const surfaceClassName = surface === 'card'
         ? 'rounded-2xl bg-white shadow-2xl border border-slate-200'
         : '';
@@ -45,6 +53,41 @@ export default function EventDetailsPanel({
                 <div className="flex items-center gap-1 shrink-0">
                     <SaveEventButton eventId={event.event_id} appearance="icon" />
                     <GoingButton eventId={event.event_id} appearance="icon" />
+                    {onHide && (
+                        <button
+                            onClick={onHide}
+                            className="text-xs px-2 py-1 border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                            title="Hide event"
+                        >
+                            Hide
+                        </button>
+                    )}
+                    {onPermanentlyRemove && (
+                        confirmRemove ? (
+                            <>
+                                <span className="text-xs text-gray-600">Remove?</span>
+                                <button
+                                    onClick={() => { setConfirmRemove(false); onPermanentlyRemove(); }}
+                                    className="text-xs px-2 py-1 bg-red-600 hover:bg-red-700 text-white"
+                                >
+                                    Yes
+                                </button>
+                                <button
+                                    onClick={() => setConfirmRemove(false)}
+                                    className="text-xs px-2 py-1 text-gray-400 hover:text-gray-600"
+                                >
+                                    Cancel
+                                </button>
+                            </>
+                        ) : (
+                            <button
+                                onClick={() => setConfirmRemove(true)}
+                                className="text-xs px-2 py-1 bg-red-600 hover:bg-red-700 text-white"
+                            >
+                                Remove
+                            </button>
+                        )
+                    )}
                     {onClose && (
                         <button
                             onClick={onClose}

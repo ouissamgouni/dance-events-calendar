@@ -1,0 +1,178 @@
+base_week: 0
+# Events deliberately span four geographic clusters so the bbox filter is
+# observable end-to-end:
+#   • Inside DEFAULT_AREA_BBOX (20,-25,71,60) — Europe & Mediterranean basin:
+#       Paris, Madrid, Berlin, Rome, Athens, Istanbul, Casablanca
+#   • Outside on the west:  New York   (lng -74)
+#   • Outside on the east:  Tokyo      (lng 139)
+#   • Outside on the south: Buenos Aires (lat -34)
+# Tag mix covers salsa / bachata / kizomba / zouk so preferred-tag filtering
+# is observable without any single tag dominating the result list.
+events:
+  # ── Inside default bbox ────────────────────────────────────────
+  - id: evt-pref-001
+    calendar_id: salsa-cal-001
+    title: Friday Salsa Social Paris
+    description: |
+      Weekly Cuban salsa social with DJ Mambo. Beginners welcome.
+      All levels, no partner needed. Smooth-soled shoes recommended.
+    location: Dance Studio, 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w0 Fri 21:00
+    end: w0 Sat 01:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:salsa
+
+  - id: evt-pref-002
+    calendar_id: bachata-cal-002
+    title: Bachata Sensual Workshop Berlin
+    description: |
+      Intermediate sensual bachata workshop with rotation.
+      Comfortable dance shoes essential. Limited spaces.
+    location: Tanzhaus, Friedrichstr. 100, Berlin, Germany
+    latitude: 52.52
+    longitude: 13.405
+    start: w0 Sat 14:00
+    end: w0 Sat 17:00
+    price_is_free: false
+    price_min: 25
+    price_max: 35
+    price_currency: EUR
+    tags:
+      - format:workshop
+      - dance-style:bachata
+
+  - id: evt-pref-003
+    calendar_id: kizomba-cal-003
+    title: Kizomba Fundamentals Madrid
+    description: |
+      Learn the basics of kizomba in a relaxed setting. All levels welcome.
+    location: Sala Rossa, Calle de Atocha 34, Madrid, Spain
+    latitude: 40.4168
+    longitude: -3.7038
+    start: w0 Sun 18:00
+    end: w0 Sun 20:00
+    price_is_free: false
+    price_min: 15
+    price_currency: EUR
+    tags:
+      - format:workshop
+      - dance-style:kizomba
+
+  - id: evt-pref-004
+    calendar_id: salsa-cal-001
+    title: Salsa con Timba — Live Orchestra Rome
+    description: |
+      Full live Cuban timba orchestra plays while you dance.
+    location: Terrazza Trastevere, Piazza Trilussa, Rome, Italy
+    latitude: 41.8892
+    longitude: 12.4691
+    start: w1 Sat 21:00
+    end: w1 Sun 02:00
+    price_is_free: false
+    price_min: 15
+    price_currency: EUR
+    tags:
+      - format:social
+      - dance-style:salsa
+
+  - id: evt-pref-005
+    calendar_id: bachata-cal-002
+    title: Bachata Festival Athens
+    description: |
+      Three-day bachata festival with international artists.
+    location: Athens Convention Center, Athens, Greece
+    latitude: 37.9838
+    longitude: 23.7275
+    start: w1 Fri 18:00
+    end: w1 Sun 23:00
+    price_is_free: false
+    price_min: 80
+    price_max: 120
+    price_currency: EUR
+    tags:
+      - format:festival
+      - dance-style:bachata
+
+  - id: evt-pref-006
+    calendar_id: kizomba-cal-003
+    title: Kizomba Sunset Social Istanbul
+    description: |
+      Open-air kizomba social by the Bosphorus. All levels.
+    location: Bebek, Istanbul, Turkey
+    latitude: 41.0769
+    longitude: 29.0438
+    start: w1 Sun 20:00
+    end: w2 Mon 00:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:kizomba
+
+  - id: evt-pref-007
+    calendar_id: salsa-cal-001
+    title: Salsa Casablanca Beach Party
+    description: |
+      Beachfront salsa social. Free entry until 21:00.
+    location: Ain Diab, Casablanca, Morocco
+    latitude: 33.5731
+    longitude: -7.5898
+    start: w2 Sat 19:00
+    end: w2 Sat 23:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:salsa
+
+  # ── Outside default bbox (must NOT appear when bbox filter active) ─
+  - id: evt-pref-100
+    calendar_id: salsa-cal-001
+    title: New York Salsa Mondays
+    description: |
+      Weekly NYC on2 social. Mambo style. (Outside Europe & nearby.)
+    location: SOB's, 204 Varick St, New York, NY, USA
+    latitude: 40.7281
+    longitude: -74.006
+    start: w0 Mon 21:00
+    end: w1 Tue 01:00
+    price_is_free: false
+    price_min: 20
+    price_currency: USD
+    tags:
+      - format:social
+      - dance-style:salsa
+
+  - id: evt-pref-101
+    calendar_id: bachata-cal-002
+    title: Tokyo Bachata Sensual Night
+    description: |
+      Bachata sensual party in Shibuya. (Outside Europe & nearby.)
+    location: Roppongi, Tokyo, Japan
+    latitude: 35.6628
+    longitude: 139.7314
+    start: w0 Sat 20:00
+    end: w1 Sun 00:00
+    price_is_free: false
+    price_min: 3000
+    price_currency: JPY
+    tags:
+      - format:social
+      - dance-style:bachata
+
+  - id: evt-pref-102
+    calendar_id: kizomba-cal-003
+    title: Buenos Aires Kizomba Open-Air
+    description: |
+      Open-air kizomba in Palermo. (Outside Europe & nearby.)
+    location: Plaza Serrano, Buenos Aires, Argentina
+    latitude: -34.5879
+    longitude: -58.4321
+    start: w1 Sat 19:00
+    end: w1 Sat 23:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:kizomba

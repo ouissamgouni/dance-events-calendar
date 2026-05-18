@@ -1,0 +1,4 @@
+# No follow edges needed — the popularity score is global and does not
+# look at the friend graph. Keep the file present so the seeder doesn't
+# log a missing-file warning.
+follows: []

@@ -1,0 +1,103 @@
+# Pre-seeded events + attendances for the friends-graph scenario.
+#
+# The follow/profile/visibility flow doesn't strictly need events to assert
+# its own contracts, but in practice the test plan is much easier to walk
+# through when each signed-in user has something to look at on their
+# /my-calendar page (otherwise the empty-state CTA hides the
+# Subscribers panel and makes step 11/12 confusing). We seed five distinct
+# events and pre-mark a few "I'm going" attendances so each scenario user
+# already has a non-empty calendar at first sign-in.
+#
+# Distribution (intentionally asymmetric so the test plan can spot which
+# user it's looking at):
+#   - alice → going to evt-fg-001 + evt-fg-002 (2 events)
+#   - bob   → going to evt-fg-003                (1 event)
+#   - dave  → going to evt-fg-004 + evt-fg-005 (2 events; dave has the
+#            "public" calendar so any signed-in viewer can see his page)
+#   - carol → no pre-seeded attendance (she gets purged in step 14, so
+#            attendance rows would just need to cascade away — kept clean
+#            to keep that assertion focused on the social-edge cleanup).
+#
+# All attendances are seeded with share_publicly=true so Phase B's friend
+# filter (covered in friends-events) sees them through; the friends-graph
+# plan itself doesn't toggle this flag.
+base_week: 0
+events:
+  - id: evt-fg-001
+    calendar_id: salsa-cal-001
+    title: Salsa Social Friday
+    description: |
+      Weekly social with DJ Mambo. Beginners welcome.
+    location: Dance Studio, 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w0 Fri 21:00
+    end: w0 Sat 01:00
+    price_is_free: true
+  - id: evt-fg-002
+    calendar_id: bachata-cal-002
+    title: Bachata Workshop
+    description: |
+      Sensual workshop with Carlos & Maria. Intermediate level.
+    location: Tanzhaus, Friedrichstr. 100, Berlin, Germany
+    latitude: 52.52
+    longitude: 13.405
+    start: w0 Sat 14:00
+    end: w0 Sat 17:00
+    price_is_free: false
+    price_min: 25
+    price_max: 35
+    price_currency: EUR
+  - id: evt-fg-003
+    calendar_id: salsa-cal-001
+    title: Cuban Night
+    description: |
+      Live Cuban band + rueda for all levels.
+    location: Skybar, Av. de la Liberté, Brussels, Belgium
+    latitude: 50.8503
+    longitude: 4.3517
+    start: w1 Sat 20:00
+    end: w1 Sun 00:00
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+  - id: evt-fg-004
+    calendar_id: bachata-cal-002
+    title: Bachata Beginners Bootcamp
+    description: |
+      Half-day crash course for absolute beginners.
+    location: London Dance Academy, 12 Soho Square, London, UK
+    latitude: 51.5143
+    longitude: -0.1323
+    start: w1 Sun 15:00
+    end: w1 Sun 18:00
+    price_is_free: false
+    price_min: 30
+    price_currency: GBP
+  - id: evt-fg-005
+    calendar_id: salsa-cal-001
+    title: Salsa Tuesday Night
+    description: |
+      Weekly Tuesday social with resident DJ. Free entry all night.
+    location: Sala Rossa, Calle de Atocha 34, Madrid, Spain
+    latitude: 40.4168
+    longitude: -3.7038
+    start: w2 Tue 20:30
+    end: w2 Wed 00:00
+    price_is_free: true
+attendances:
+  - event_id: evt-fg-001
+    email: alice@example.com
+    share_publicly: true
+  - event_id: evt-fg-002
+    email: alice@example.com
+    share_publicly: true
+  - event_id: evt-fg-003
+    email: bob@example.com
+    share_publicly: true
+  - event_id: evt-fg-004
+    email: dave@example.com
+    share_publicly: true
+  - event_id: evt-fg-005
+    email: dave@example.com
+    share_publicly: true

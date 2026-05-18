@@ -10,6 +10,7 @@ import yaml
 from sqlmodel import Session, delete, select
 
 from backend.db.models import (
+    BlockedEvent,
     CachedEvent,
     CalendarDefaultTag,
     CalendarSetting,
@@ -25,6 +26,8 @@ from backend.db.models import (
     TagSynonym,
     User,
     UserEventAttendance,
+    UserFollow,
+    UserSavedEvent,
 )
 
 WEEKDAYS = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
@@ -94,8 +97,11 @@ class DatabaseSeeder:
         self._seed_tag_suggestions(scenario_dir / "db-events.yaml")
         self._seed_tracking(scenario_dir / "db-tracking.yaml")
         self._seed_users(scenario_dir / "mock-users.yaml")
+        # Follows must come AFTER users (FK on follower_id/followee_id).
+        self._seed_follows(scenario_dir / "db-follows.yaml")
         # Attendances must come AFTER users (FK on user_id) and after events.
         self._seed_attendances(scenario_dir / "db-events.yaml")
+        self._seed_user_saved_events(scenario_dir / "db-events.yaml")
         self._seed_ratings(scenario_dir / "db-events.yaml")
         self._seed_site_settings(scenario_dir / "settings.yaml")
         self._ingest_test_plans(scenario_dir)
@@ -196,7 +202,9 @@ class DatabaseSeeder:
 
                 with self.session.no_autoflush:
                     tag = self.session.exec(
-                        select(Tag).where(Tag.group_id == group.id, Tag.slug == tag_slug)
+                        select(Tag).where(
+                            Tag.group_id == group.id, Tag.slug == tag_slug
+                        )
                     ).first()
 
                 tag_ordinal = tag_data.get("ordinal", tag_idx)
@@ -418,6 +426,8 @@ class DatabaseSeeder:
                 existing.updated_at = datetime.utcnow()
                 existing.deleted_at = None
                 existing.review_status = "reviewed"
+                if "is_hidden" in evt_data:
+                    existing.is_hidden = evt_data["is_hidden"]
                 self.session.add(existing)
                 logger.info("Updated event: %s", evt_data["title"])
             else:
@@ -439,9 +449,17 @@ class DatabaseSeeder:
                         price_currency=evt_data.get("price_currency"),
                         price_is_free=evt_data.get("price_is_free", False),
                         review_status="reviewed",
+                        is_hidden=evt_data.get("is_hidden", False),
                     )
                 )
                 logger.info("Created event: %s", evt_data["title"])
+
+            # Insert a BlockedEvent row if the scenario marks this event blocked.
+            # This prevents sync from re-inserting it and seeds the is_blocked state.
+            if evt_data.get("is_blocked", False):
+                if not self.session.get(BlockedEvent, evt_id):
+                    self.session.add(BlockedEvent(event_id=evt_id))
+                    logger.info("Blocked event: %s", evt_id)
 
     def _seed_site_settings(self, path: Path) -> None:
         """Pre-seed SiteSetting key/value rows from scenario settings.yaml.
@@ -633,15 +651,79 @@ class DatabaseSeeder:
             ).first()
             if existing:
                 continue
-            self.session.add(
-                User(
-                    email=email,
-                    display_name=entry.get("name") or email.split("@", 1)[0],
-                    provider="google",
-                    provider_subject=provider_subject,
-                )
+            user_kwargs: dict = dict(
+                email=email,
+                display_name=entry.get("name") or email.split("@", 1)[0],
+                provider="google",
+                provider_subject=provider_subject,
             )
+            # Optional social-foundation fields. Scenarios use these to
+            # pre-seed handles, visibility, and the verified-organizer flag
+            # so multi-user social flows can be exercised without manual
+            # account setup.
+            for key in (
+                "handle",
+                "account_visibility",
+                "is_verified_organizer",
+                "instagram_url",
+                "facebook_url",
+            ):
+                if key in entry and entry[key] is not None:
+                    user_kwargs[key] = entry[key]
+            self.session.add(User(**user_kwargs))
             logger.info("Created mock user: %s", email)
+
+    def _seed_follows(self, path: Path) -> None:
+        """Seed UserFollow rows from scenarios/<name>/db-follows.yaml.
+
+        Lets a scenario pre-build the friends graph so social-foundation
+        flows (mutual = friend, follow-back, friends-only visibility) can
+        be exercised without manual click-through. Idempotent on the
+        (follower, followee) pair.
+
+        Expected structure:
+          follows:
+            - follower: alice@example.com   # email or handle
+              followee: bob@example.com
+            - follower: bob
+              followee: alice
+        """
+        if not path.exists():
+            return
+
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+
+        def _resolve(ref: str) -> User | None:
+            ref = (ref or "").strip()
+            if not ref:
+                return None
+            if "@" in ref:
+                return self.session.exec(
+                    select(User).where(User.email == ref.lower())
+                ).first()
+            return self.session.exec(select(User).where(User.handle == ref)).first()
+
+        for entry in data.get("follows", []) or []:
+            if not isinstance(entry, dict):
+                continue
+            follower = _resolve(entry.get("follower", ""))
+            followee = _resolve(entry.get("followee", ""))
+            if not follower or not followee or follower.id == followee.id:
+                logger.warning("Skipping follow row: %r", entry)
+                continue
+            existing = self.session.exec(
+                select(UserFollow).where(
+                    UserFollow.follower_id == follower.id,
+                    UserFollow.followee_id == followee.id,
+                )
+            ).first()
+            if existing:
+                continue
+            self.session.add(
+                UserFollow(follower_id=follower.id, followee_id=followee.id)
+            )
+            logger.info("Created mock follow: %s -> %s", follower.email, followee.email)
 
     def _seed_tracking(self, path: Path) -> None:
         """Seed EventView, EventLinkClick, and EventExport rows from db-tracking.yaml.
@@ -744,6 +826,12 @@ class DatabaseSeeder:
             email = (entry.get("email") or "").strip().lower() or None
             device_id = entry.get("device_id")
             share_publicly = bool(entry.get("share_publicly", False))
+            # Optional ``share_audience`` (one of public|friends|private).
+            # When omitted, fall back to legacy ``share_publicly`` semantics so
+            # existing scenarios behave identically.
+            share_audience = entry.get("share_audience")
+            if share_audience not in ("public", "friends", "private"):
+                share_audience = "public" if share_publicly else "private"
 
             user_id = None
             if email:
@@ -785,11 +873,99 @@ class DatabaseSeeder:
                     user_id=user_id,
                     device_id=device_id or f"seed-attend-{event_id}-{email or 'anon'}",
                     share_publicly=share_publicly,
+                    share_audience=share_audience,
                 )
             )
             seeded += 1
         if seeded:
             logger.info("Seeded %d UserEventAttendance rows", seeded)
+
+    def _seed_user_saved_events(self, path: Path) -> None:
+        """Pre-seed ``UserSavedEvent`` rows from db-events.yaml ``saves:`` list.
+
+        Lets scenarios test the trending / popularity score and the
+        Following-badge "soft saved" fallback without driving the UI.
+        Idempotent on ``(device_id, event_id)`` (the table's unique
+        constraint).
+
+        Expected structure (under db-events.yaml)::
+
+            saves:
+              - event_id: evt-trend-001
+                email: alice@example.com   # required if no device_id
+                audience: public           # public | friends | private (default friends)
+              - event_id: evt-trend-001
+                device_id: seed-anon-1     # anonymous, device-only save
+        """
+        if not path.exists():
+            return
+
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+
+        rows = data.get("saves") or []
+        if not rows:
+            return
+
+        seeded = 0
+        for entry in rows:
+            if not isinstance(entry, dict):
+                continue
+            event_id = entry.get("event_id")
+            if not event_id:
+                continue
+            email = (entry.get("email") or "").strip().lower() or None
+            device_id = entry.get("device_id")
+            audience = entry.get("audience") or "friends"
+            if audience not in ("public", "friends", "private"):
+                logger.warning(
+                    "Skipping save for %s: invalid audience %r", event_id, audience
+                )
+                continue
+
+            user_id = None
+            if email:
+                user = self.session.exec(
+                    select(User).where(User.email == email)
+                ).first()
+                if not user:
+                    logger.warning(
+                        "Skipping save: user %s not found (seed users first)",
+                        email,
+                    )
+                    continue
+                user_id = user.id
+
+            if user_id is None and not device_id:
+                logger.warning(
+                    "Skipping save for %s: needs email or device_id",
+                    event_id,
+                )
+                continue
+
+            effective_device_id = device_id or f"seed-save-{event_id}-{email or 'anon'}"
+
+            # Idempotency check on the unique (device_id, event_id) constraint.
+            existing = self.session.exec(
+                select(UserSavedEvent).where(
+                    UserSavedEvent.event_id == event_id,
+                    UserSavedEvent.device_id == effective_device_id,
+                )
+            ).first()
+            if existing:
+                continue
+
+            self.session.add(
+                UserSavedEvent(
+                    event_id=event_id,
+                    user_id=user_id,
+                    device_id=effective_device_id,
+                    audience=audience,
+                )
+            )
+            seeded += 1
+        if seeded:
+            logger.info("Seeded %d UserSavedEvent rows", seeded)
 
     def _seed_ratings(self, path: Path) -> None:
         """Pre-seed EventRating rows from db-events.yaml `ratings:` list.

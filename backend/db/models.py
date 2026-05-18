@@ -43,6 +43,51 @@ class User(SQLModel, table=True):
     # backfills can avoid overriding deliberate choices.
     share_attendance_default: bool = Field(default=True, nullable=False)
     share_attendance_default_set_by_user: bool = Field(default=False, nullable=False)
+    # 3-tier audience replacement for ``share_attendance_default``. Used as the
+    # pre-selected option in the GoingButton audience picker (public / friends
+    # / private). Backfilled from ``share_attendance_default`` in migration
+    # ``ee50f6a7b8c9``. The boolean field is kept for one release for
+    # backwards compatibility; new code should read this field instead.
+    # Default is ``friends`` (privacy-by-default per GDPR Art. 25): only
+    # mutual followers see RSVPs/saves unless the user opts up to ``public``
+    # via the per-event AudiencePicker. New users with no friends yet see
+    # the same effective behaviour as ``private``, failing closed.
+    share_attendance_default_audience: str = Field(
+        default="friends", max_length=16, nullable=False
+    )
+    # Backed-up default for new RSVP/save audience values is computed
+    # client-side from a localStorage "last used" hint; this column is
+    # kept for backwards compatibility (read paths still consult it as a
+    # fallback) but is no longer surfaced in Settings UI.
+    # User preferences (preferred map area + preferred tags) used as default
+    # filters in the explorer. Area is stored as a bounding box; tags live in
+    # the user_preferred_tag join table. ``preferences_set_at`` is the gate
+    # that distinguishes "never set" from "explicitly empty" — also used by
+    # the anon→authed merge path to decide whether to apply localStorage prefs.
+    preferred_area_min_lat: Optional[float] = Field(default=None)
+    preferred_area_min_lng: Optional[float] = Field(default=None)
+    preferred_area_max_lat: Optional[float] = Field(default=None)
+    preferred_area_max_lng: Optional[float] = Field(default=None)
+    preferred_area_label: Optional[str] = Field(default=None, max_length=120)
+    preferences_set_at: Optional[datetime] = Field(default=None)
+    # --- Social foundation ---
+    # Single account-level visibility gate (Instagram-style). Values:
+    # ``public`` (anyone can view profile + lists) or ``friends`` (only
+    # mutual followers, plus the user themselves). Per-event audience
+    # is independent and lives on the per-event rows
+    # (``UserEventAttendance.share_audience`` / ``UserSavedEvent.audience``).
+    account_visibility: str = Field(default="public", max_length=16, nullable=False)
+    # Admin-granted credibility badge surfaced on the public profile.
+    is_verified_organizer: bool = Field(default=False, nullable=False)
+    # Optional, unverified social profile links shown on the public profile
+    # for self-published credibility. Display-only; never used for auth.
+    instagram_url: Optional[str] = Field(default=None, max_length=255)
+    facebook_url: Optional[str] = Field(default=None, max_length=255)
+    # --- Phase D: profile content ---
+    # Free-form short bio rendered on /u/{handle} About tab. Plain text
+    # only (no markdown), trimmed and stripped of control chars at write
+    # time. Capped at 280 chars to keep profile cards skimmable.
+    bio: Optional[str] = Field(default=None, max_length=280)
 
 
 class CalendarSetting(SQLModel, table=True):
@@ -81,6 +126,20 @@ class CachedEvent(SQLModel, table=True):
     content_hash: Optional[str] = Field(default=None, index=True)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     deleted_at: Optional[datetime] = Field(default=None, index=True)
+    is_hidden: bool = Field(default=False, index=True)
+
+
+class BlockedEvent(SQLModel, table=True):
+    """Records event IDs that have been permanently suppressed by an admin.
+
+    Sync workers skip any incoming event whose event_id exists in this table,
+    preventing a re-blocked event from reappearing after a Google Calendar sync.
+    """
+
+    __tablename__ = "blocked_events"
+
+    event_id: str = Field(primary_key=True)
+    blocked_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class EventCalendarSource(SQLModel, table=True):
@@ -128,6 +187,12 @@ class UserSavedEvent(SQLModel, table=True):
     event_id: str = Field(index=True)
     user_id: Optional[UUID] = Field(default=None, foreign_key="users.id", index=True)
     saved_at: datetime = Field(default_factory=datetime.utcnow)
+    # Per-saved-event audience (public / friends / private). Treated as
+    # the equivalent of "interested" tier on Facebook events. Defaults
+    # to ``friends`` (privacy-by-default per GDPR Art. 25) — the
+    # frontend may pre-fill with the user's last-used choice from
+    # localStorage or with ``share_attendance_default_audience``.
+    audience: str = Field(default="friends", max_length=16, nullable=False)
 
 
 class ShareToken(SQLModel, table=True):
@@ -211,6 +276,12 @@ class EventSuggestion(SQLModel, table=True):
     # Submitter info
     submitter_name: Optional[str] = Field(default=None)
     submitter_email: Optional[str] = Field(default=None)
+    # Authenticated submitter (Phase C: enables fan-out of subscription_suggested
+    # notifications to the submitter's subscribers on approval). Null for
+    # anonymous submissions.
+    submitter_user_id: Optional[UUID] = Field(
+        default=None, foreign_key="users.id", index=True
+    )
 
     # Browser metadata
     submitter_ip: Optional[str] = Field(default=None)
@@ -234,6 +305,11 @@ class EventSuggestion(SQLModel, table=True):
     synced_to_google: bool = Field(default=False)
     google_event_id: Optional[str] = Field(default=None)
     suggested_tag_ids: Optional[list] = Field(default=None, sa_column=Column(JSON))
+    # When True, the approval flow auto-creates a UserSavedEvent for
+    # ``submitter_user_id`` so the suggested event lands on the submitter's
+    # Calendar tab without a separate save action. Defaults to True;
+    # the suggest form exposes an opt-out checkbox.
+    auto_save: bool = Field(default=True, nullable=False)
     # User-entered new-tag suggestions submitted with the event. Each item:
     #   {"free_text": str, "group_slug": str | None}
     # On approval these become regular TagSuggestion rows tied to the new event.
@@ -342,6 +418,21 @@ class EventTag(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class UserPreferredTag(SQLModel, table=True):
+    """User's preferred dance-style tags, applied as default explorer filter.
+
+    Mirrors the ``EventTag`` shape: composite primary key, no relationship
+    navigation. ``ON DELETE CASCADE`` is enforced via the migration so removing
+    a user or a tag automatically tidies up the join rows.
+    """
+
+    __tablename__ = "user_preferred_tags"
+
+    user_id: UUID = Field(foreign_key="users.id", primary_key=True)
+    tag_id: int = Field(foreign_key="tags.id", primary_key=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class TagSuggestion(SQLModel, table=True):
     __tablename__ = "tag_suggestions"
 
@@ -436,7 +527,14 @@ class UserEventAttendance(SQLModel, table=True):
     # public attendee list for the event. When False, the attendance is
     # counted but the user is not named ("private going"). Anonymous device
     # rows (user_id IS NULL) are always private regardless of this flag.
+    # Legacy boolean kept dual-written for one release so older clients
+    # continue to work; new code should read ``share_audience``.
     share_publicly: bool = Field(default=False, nullable=False)
+    # 3-tier audience: ``public`` | ``friends`` | ``private``. Source of
+    # truth for who can see this user in the attendee list. Combined
+    # with the viewer's relationship for the ``friends`` tier
+    # (mutual-follow gate enforced in the read paths).
+    share_audience: str = Field(default="public", max_length=16, nullable=False)
 
 
 class CalendarDefaultTag(SQLModel, table=True):
@@ -471,3 +569,89 @@ class ShareEvent(SQLModel, table=True):
     share_code: Optional[str] = Field(default=None, max_length=12, index=True)
     device_id: Optional[str] = Field(default=None, max_length=64, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class UserFollow(SQLModel, table=True):
+    """Asymmetric follow edge from ``follower_id`` to ``followee_id``.
+
+    A "friend" is a mutual follow (both directions exist). This single edge
+    table is the source of truth for the follow graph; mutuality is derived
+    by self-joining the table at query time.
+    """
+
+    __tablename__ = "user_follows"
+    __table_args__ = (
+        UniqueConstraint("follower_id", "followee_id", name="uq_user_follow_pair"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    follower_id: UUID = Field(foreign_key="users.id", index=True)
+    followee_id: UUID = Field(foreign_key="users.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class CalendarSubscription(SQLModel, table=True):
+    """A subscriber's interest in another user's shared calendar.
+
+    Distinct from ``UserFollow`` (the follow graph): subscribing means the
+    subscriber wants the target's saved/going events surfaced in their own
+    "My Calendar" feed and (when ``notify_new_events`` is true) wants a
+    notification when the target publishes new activity.
+
+    Subscribing requires that the subscriber currently passes
+    ``can_view(viewer, target, 'calendar')``; the row is preserved if
+    visibility is later tightened, but the feed/notification producers
+    re-check ``can_view`` at read/emit time so a target can effectively
+    revoke access without an explicit unsubscribe.
+    """
+
+    __tablename__ = "calendar_subscriptions"
+    __table_args__ = (
+        UniqueConstraint(
+            "subscriber_id",
+            "target_user_id",
+            name="uq_calendar_subscription_pair",
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    subscriber_id: UUID = Field(foreign_key="users.id", index=True)
+    target_user_id: UUID = Field(foreign_key="users.id", index=True)
+    notify_new_events: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class Notification(SQLModel, table=True):
+    """In-app notification fanned out to a subscriber.
+
+    ``kind`` distinguishes the trigger:
+      - ``subscription_going``: ``actor_user_id`` marked themselves Going to
+        ``event_id`` with ``share_publicly=true``.
+      - ``subscription_suggested``: ``actor_user_id`` submitted an event
+        suggestion that was approved (the resulting cached event id is
+        recorded in ``event_id``).
+
+    A unique index on (recipient_user_id, kind, actor_user_id, event_id)
+    keeps re-triggers (e.g. flipping share_publicly off then on) idempotent.
+    """
+
+    __tablename__ = "notifications"
+    __table_args__ = (
+        UniqueConstraint(
+            "recipient_user_id",
+            "kind",
+            "actor_user_id",
+            "event_id",
+            name="uq_notification_dedupe",
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    recipient_user_id: UUID = Field(foreign_key="users.id", index=True)
+    actor_user_id: UUID = Field(foreign_key="users.id", index=True)
+    kind: str = Field(
+        index=True
+    )  # subscription_going | subscription_suggested | new_follower | new_friend
+    event_id: Optional[str] = Field(default=None, index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    read_at: Optional[datetime] = Field(default=None, index=True)

@@ -10,7 +10,7 @@ tasks:
 
   dev:
     desc: Stop all dev services (DB + backend + frontend)
-    deps: [dev:db, dev:backend, dev:frontend]
+    deps: [ dev:db, dev:backend, dev:frontend ]
     cmds:
       - echo "✅ All dev services stopped"
 
@@ -48,7 +48,7 @@ tasks:
   dev:volumes:
     desc: "Stop dev and remove volumes (⚠️ destroys data). DRY_RUN=1 to preview."
     vars:
-      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+      DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
     cmds:
       - |
         if [ "{{.DRY_RUN}}" = "1" ]; then
@@ -63,10 +63,11 @@ tasks:
   _dev:volumes:exec:
     internal: true
     status:
-      - '[ "{{.DRY_RUN}}" = "1" ]'
+      - "[ \"{{.DRY_RUN}}\" = \"1\" ]"
     prompt: "This will destroy all dev database data. Continue?"
     cmds:
-      - docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.dev.yml down -v
+      - docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.dev.yml down
+        -v
       - echo "✅ Dev containers and volumes removed"
 
   # ════════════════════════════════════════════════════════════════
@@ -76,13 +77,16 @@ tasks:
   staging:local:
     desc: Stop local staging stack (docker-compose)
     cmds:
-      - ENV_NAME=staging docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p movida-staging down
+      - ENV_NAME=staging docker compose -f
+        {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p movida-staging
+        down
       - echo "✅ Local staging stopped"
 
   staging:local:volumes:
-    desc: "Stop local staging and remove volumes (⚠️ destroys data). DRY_RUN=1 to preview."
+    desc: "Stop local staging and remove volumes (⚠️ destroys data). DRY_RUN=1 to
+      preview."
     vars:
-      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+      DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
     prompt: "This will destroy all local staging data. Continue?"
     cmds:
       - |
@@ -90,7 +94,9 @@ tasks:
           echo "🔍 DRY RUN — would remove local staging containers + volumes"
           exit 0
         fi
-      - ENV_NAME=staging docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p movida-staging down -v
+      - ENV_NAME=staging docker compose -f
+        {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p movida-staging
+        down -v
       - echo "✅ Local staging containers and volumes removed"
 
   # ════════════════════════════════════════════════════════════════
@@ -100,13 +106,15 @@ tasks:
   prod:
     desc: Stop prod stack
     cmds:
-      - ENV_NAME=prod docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p movida-prod down
+      - ENV_NAME=prod docker compose -f
+        {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p movida-prod
+        down
       - echo "✅ Prod stopped"
 
   prod:volumes:
     desc: "Stop prod and remove volumes (🚨 destroys data). DRY_RUN=1 to preview."
     vars:
-      DRY_RUN: '{{.DRY_RUN | default "0"}}'
+      DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
     prompt: "🚨 This will destroy all PRODUCTION data. Are you sure?"
     cmds:
       - |
@@ -114,7 +122,9 @@ tasks:
           echo "🔍 DRY RUN — would remove prod containers + volumes"
           exit 0
         fi
-      - ENV_NAME=prod docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p movida-prod down -v
+      - ENV_NAME=prod docker compose -f
+        {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p movida-prod
+        down -v
       - echo "✅ Prod containers and volumes removed"
 
   # ════════════════════════════════════════════════════════════════
@@ -122,9 +132,11 @@ tasks:
   # ════════════════════════════════════════════════════════════════
 
   scenario:
-    desc: "Stop a scenario instance (SCENARIO=name)"
+    desc: "Stop a scenario instance (SCENARIO=name). Also closes its isolated Chrome
+      sessions (KEEP_BROWSER=1 to opt out)."
     vars:
-      SCENARIO: '{{.SCENARIO | default "default"}}'
+      SCENARIO: "{{.SCENARIO | default \"default\"}}"
+      KEEP_BROWSER: "{{.KEEP_BROWSER | default \"0\"}}"
     prompt: "Stop scenario '{{.SCENARIO}}'?"
     cmds:
       - |
@@ -151,11 +163,19 @@ tasks:
         lsof -ti:$SC_API_PORT | xargs kill -9 2>/dev/null || true
         lsof -ti:$SC_WEB_PORT | xargs kill -9 2>/dev/null || true
 
+        # Browser cleanup (close + remove isolated profile dirs)
+        if [ "{{.KEEP_BROWSER}}" != "1" ]; then
+          {{.ROOT_DIR}}/.taskfiles/_browser_cleanup.sh "scenario-{{.SCENARIO}}"
+        fi
+
         rm -f "{{.ROOT_DIR}}/.taskfiles/.scenario-state/{{.SCENARIO}}.env"
         echo "✅ Scenario '$SCENARIO_NAME' stopped"
 
   scenario:all:
-    desc: Stop ALL running scenario instances
+    desc: "Stop ALL running scenario instances. Also closes their isolated Chrome
+      sessions (KEEP_BROWSER=1 to opt out)."
+    vars:
+      KEEP_BROWSER: "{{.KEEP_BROWSER | default \"0\"}}"
     prompt: "Stop ALL scenario instances?"
     cmds:
       - |
@@ -198,6 +218,11 @@ tasks:
             [ "$NAME" = "default" ] && continue
             _stop_scenario "$NAME"
           done
+        fi
+
+        # Browser cleanup: close all scenario-* isolated Chrome sessions
+        if [ "{{.KEEP_BROWSER}}" != "1" ]; then
+          {{.ROOT_DIR}}/.taskfiles/_browser_cleanup.sh "scenario-"
         fi
 
         echo "✅ All scenario instances stopped"

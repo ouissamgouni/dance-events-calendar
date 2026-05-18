@@ -1,0 +1,173 @@
+# Pre-seeded events for the trending-events scenario.
+#
+# The popularity score is:
+#   raw   = 5*going_30d + 1*saved_30d + 0.05*view_30d
+#   score = raw / (hours_age + 24) ** 0.4   (and 0 if going < trending_floor_going)
+#
+# All "trending" candidate events are scheduled in the future (so they
+# aren't suppressed by the past-event guard), and use updated_at = now()
+# (set automatically by the seeder via SQLModel default), so the time-decay
+# denominator is roughly 24^0.4 ≈ 3.5 for everyone — meaning the ranking
+# is dominated by the (going, saved, view) commitment mix, which is
+# exactly what we want to demonstrate.
+#
+# Seeded ordering (highest → lowest expected score):
+#
+#   evt-trend-001  — Headliner Salsa Saturday
+#       4 going + 3 saved + 5 views  → raw = 23.25 → top score
+#       Demonstrates the "going is king" weighting.
+#
+#   evt-trend-002  — Bachata Workshop (saved-heavy)
+#       2 going + 5 saved + 3 views  → raw = 15.15
+#       Demonstrates that saves contribute meaningfully but going dominates.
+#
+#   evt-trend-003  — Cuban Night (view-heavy decoy)
+#       1 going + 0 saved + 80 views → raw = 9.0  but going<floor=1 ⇒ trending
+#       (with floor=1) — i.e. proves the floor gate works at the boundary.
+#       In production (floor=3) this would be hidden.
+#
+#   evt-trend-004  — View-bait No-Commitment
+#       0 going + 0 saved + 200 views → raw = 10 BUT going<floor ⇒ score=0
+#       Proves that high view counts alone can NOT trend (anti-bait gate).
+#
+#   evt-trend-005  — Last Week's Past Event
+#       3 going + 2 saved + 10 views, but already ended → score=0
+#       Proves past-event suppression.
+base_week: 0
+events:
+  - id: evt-trend-001
+    calendar_id: salsa-cal-001
+    title: Headliner Salsa Saturday
+    description: |
+      DJ Mambo headliner night. Massive turnout expected.
+    location: Dance Studio, 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w0 Sat 21:00
+    end: w0 Sun 02:00
+    price_is_free: false
+    price_min: 15
+    price_currency: EUR
+  - id: evt-trend-002
+    calendar_id: bachata-cal-002
+    title: Bachata Workshop with Carlos & Maria
+    description: |
+      Sensual bachata workshop. Most-saved event of the month.
+    location: Tanzhaus, Friedrichstr. 100, Berlin, Germany
+    latitude: 52.52
+    longitude: 13.405
+    start: w1 Sat 14:00
+    end: w1 Sat 17:00
+    price_is_free: false
+    price_min: 30
+    price_currency: EUR
+  - id: evt-trend-003
+    calendar_id: salsa-cal-001
+    title: Cuban Night (boundary case)
+    description: |
+      Live Cuban band. Lots of curiosity (views) but only one confirmed RSVP.
+    location: Skybar, Av. de la Liberté, Brussels, Belgium
+    latitude: 50.8503
+    longitude: 4.3517
+    start: w1 Fri 20:00
+    end: w1 Sat 00:00
+    price_is_free: true
+  - id: evt-trend-004
+    calendar_id: bachata-cal-002
+    title: View-Bait — Free Bachata Crash Course
+    description: |
+      Lots of views (clickbait title). Zero RSVPs, zero saves. The
+      anti-bait floor on `trending_floor_going` MUST keep this from
+      trending despite the view spam.
+    location: London Dance Academy, 12 Soho Square, London, UK
+    latitude: 51.5143
+    longitude: -0.1323
+    start: w1 Sun 15:00
+    end: w1 Sun 18:00
+    price_is_free: true
+  - id: evt-trend-005
+    calendar_id: salsa-cal-001
+    title: Last Week's Salsa Tuesday (past)
+    description: |
+      Already happened. Even with healthy going+saved+view it must NOT
+      appear in trending — past-event suppression is unconditional.
+    location: Sala Rossa, Calle de Atocha 34, Madrid, Spain
+    latitude: 40.4168
+    longitude: -3.7038
+    start: w-1 Tue 20:30
+    end: w-1 Wed 00:00
+    price_is_free: true
+
+# Going RSVPs — primary signal for the trending score.
+attendances:
+  # evt-trend-001 (4 going)
+  - event_id: evt-trend-001
+    email: alice@example.com
+    share_publicly: true
+  - event_id: evt-trend-001
+    email: bob@example.com
+    share_publicly: true
+  - event_id: evt-trend-001
+    email: carol@example.com
+    share_publicly: true
+  - event_id: evt-trend-001
+    email: dave@example.com
+    share_publicly: true
+  # evt-trend-002 (2 going)
+  - event_id: evt-trend-002
+    email: alice@example.com
+    share_publicly: true
+  - event_id: evt-trend-002
+    email: bob@example.com
+    share_publicly: true
+  # evt-trend-003 (1 going — exactly at floor=1)
+  - event_id: evt-trend-003
+    email: eve@example.com
+    share_publicly: true
+  # evt-trend-004 — intentionally NO going (proves view-bait gate)
+  # evt-trend-005 (3 going on a past event — proves past gate)
+  - event_id: evt-trend-005
+    email: alice@example.com
+    share_publicly: true
+  - event_id: evt-trend-005
+    email: bob@example.com
+    share_publicly: true
+  - event_id: evt-trend-005
+    email: carol@example.com
+    share_publicly: true
+
+# Saved-event signal — secondary contributor to the score.
+saves:
+  # evt-trend-001 (3 saves)
+  - event_id: evt-trend-001
+    email: eve@example.com
+    audience: friends
+  - event_id: evt-trend-001
+    device_id: seed-trend-anon-1
+    audience: friends
+  - event_id: evt-trend-001
+    device_id: seed-trend-anon-2
+    audience: friends
+  # evt-trend-002 (5 saves — the "saved-heavy" event)
+  - event_id: evt-trend-002
+    email: carol@example.com
+    audience: friends
+  - event_id: evt-trend-002
+    email: dave@example.com
+    audience: friends
+  - event_id: evt-trend-002
+    email: eve@example.com
+    audience: friends
+  - event_id: evt-trend-002
+    device_id: seed-trend-anon-3
+    audience: friends
+  - event_id: evt-trend-002
+    device_id: seed-trend-anon-4
+    audience: friends
+  # evt-trend-005 (2 saves on past event)
+  - event_id: evt-trend-005
+    email: dave@example.com
+    audience: friends
+  - event_id: evt-trend-005
+    email: eve@example.com
+    audience: friends

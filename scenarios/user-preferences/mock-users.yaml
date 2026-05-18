@@ -1,0 +1,10 @@
+# Two mock users so the cross-device merge gate can be exercised:
+#   - alice has NO server-side preferences yet → first sign-in merges anon prefs.
+#   - bob is used in a separate browser-profile sub-flow to demonstrate that
+#     anon prefs from a NEW device are silently discarded once the user has
+#     server-side prefs (set during an earlier step of the plan).
+users:
+  - email: alice@example.com
+    name: Alice
+  - email: bob@example.com
+    name: Bob

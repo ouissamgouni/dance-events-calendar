@@ -13,16 +13,21 @@ from slowapi import Limiter
 from backend.api.rate_limit import client_ip
 from sqlmodel import Session, delete, select
 from sqlalchemy import func
+from sqlalchemy.orm import aliased
 
 from backend.api.deps import (
     create_session_token,
+    get_current_user_optional,
     require_user,
 )
-from backend.api.anon_id import read_anon_id
+from backend.api.anon_id import clear_anon_id, read_anon_id
 from backend.api.schemas import (
+    AnonPreferencesPayload,
     HandleAvailabilityResponse,
+    PreferredAreaResponse,
     UpdatePreferencesRequest,
     UpdateProfileRequest,
+    UserPreferencesResponse,
 )
 from backend.config.loader import (
     get_admin_email,
@@ -32,10 +37,14 @@ from backend.config.loader import (
 )
 from backend.db.database import get_session
 from backend.db.models import (
+    CalendarSubscription,
     EventRating,
     ShareToken,
+    Tag,
     User,
     UserEventAttendance,
+    UserFollow,
+    UserPreferredTag,
     UserSavedEvent,
 )
 
@@ -59,6 +68,10 @@ class GoogleLoginRequest(BaseModel):
     # hole in production.
     mock_email: Optional[str] = None
     mock_name: Optional[str] = None
+    # Anonymous preferences from localStorage. Applied only when the user
+    # has no server-side prefs yet (see ``_apply_anon_preferences``); a
+    # returning user signing in on a second device keeps their saved prefs.
+    anon_preferences: Optional[AnonPreferencesPayload] = None
 
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -253,6 +266,99 @@ def _merge_device_data(
     session.commit()
 
 
+def _validate_tag_ids(session: Session, tag_ids: list[int]) -> list[int]:
+    """Return a deduped list of tag IDs that exist and are enabled.
+
+    Raises ``HTTPException(400)`` if any of the supplied IDs do not match an
+    enabled tag — better to fail loudly than silently drop preferences.
+    """
+    if not tag_ids:
+        return []
+    deduped = list(dict.fromkeys(int(t) for t in tag_ids))
+    rows = session.exec(
+        select(Tag.id).where(Tag.id.in_(deduped), Tag.enabled == True)  # noqa: E712
+    ).all()
+    found = {row for row in rows}
+    missing = [t for t in deduped if t not in found]
+    if missing:
+        raise HTTPException(
+            status_code=400, detail=f"Unknown or disabled tag IDs: {missing}"
+        )
+    return deduped
+
+
+def _replace_preferred_tags(session: Session, user: User, tag_ids: list[int]) -> None:
+    """Replace the user's preferred tag rows in one shot."""
+    session.exec(delete(UserPreferredTag).where(UserPreferredTag.user_id == user.id))
+    for tid in tag_ids:
+        session.add(UserPreferredTag(user_id=user.id, tag_id=tid))
+
+
+def _load_preferred_tag_ids(session: Session, user: User) -> list[int]:
+    rows = session.exec(
+        select(UserPreferredTag.tag_id).where(UserPreferredTag.user_id == user.id)
+    ).all()
+    return sorted(int(r) for r in rows)
+
+
+def _serialize_preferences(session: Session, user: User) -> UserPreferencesResponse:
+    area: Optional[PreferredAreaResponse] = None
+    if (
+        user.preferred_area_min_lat is not None
+        and user.preferred_area_min_lng is not None
+        and user.preferred_area_max_lat is not None
+        and user.preferred_area_max_lng is not None
+        and user.preferred_area_label
+    ):
+        area = PreferredAreaResponse(
+            min_lat=user.preferred_area_min_lat,
+            min_lng=user.preferred_area_min_lng,
+            max_lat=user.preferred_area_max_lat,
+            max_lng=user.preferred_area_max_lng,
+            label=user.preferred_area_label,
+        )
+    return UserPreferencesResponse(
+        share_attendance_default=user.share_attendance_default,
+        preferred_area=area,
+        preferred_tag_ids=_load_preferred_tag_ids(session, user),
+        set_at=user.preferences_set_at,
+    )
+
+
+def _apply_anon_preferences(
+    session: Session,
+    user: User,
+    anon_prefs: Optional[AnonPreferencesPayload],
+) -> None:
+    """Merge ``localStorage`` prefs into a fresh user row.
+
+    Applied only when ``user.preferences_set_at IS NULL``. A returning user
+    signing in on a second device keeps their saved prefs untouched (the
+    frontend surfaces a non-blocking toast in that case).
+    """
+    if anon_prefs is None or user.preferences_set_at is not None:
+        return
+    if anon_prefs.preferred_area is not None:
+        area = anon_prefs.preferred_area
+        if area.min_lat >= area.max_lat or area.min_lng >= area.max_lng:
+            # Bad bbox — silently skip rather than failing sign-in.
+            return
+        user.preferred_area_min_lat = area.min_lat
+        user.preferred_area_min_lng = area.min_lng
+        user.preferred_area_max_lat = area.max_lat
+        user.preferred_area_max_lng = area.max_lng
+        user.preferred_area_label = area.label
+    try:
+        tag_ids = _validate_tag_ids(session, anon_prefs.preferred_tag_ids)
+    except HTTPException:
+        # Stale tag IDs from localStorage — drop them, don't fail sign-in.
+        tag_ids = []
+    _replace_preferred_tags(session, user, tag_ids)
+    user.preferences_set_at = datetime.utcnow()
+    session.add(user)
+    session.commit()
+
+
 @router.post("/google")
 @limiter.limit("10/minute")
 def login_with_google(
@@ -317,9 +423,9 @@ def login_with_google(
         picture=picture,
         provider_subject=provider_subject,
     )
-    _merge_device_data(
-        session, user, body.device_id, anon_id=read_anon_id(request)
-    )
+    _merge_device_data(session, user, body.device_id, anon_id=read_anon_id(request))
+    _apply_anon_preferences(session, user, body.anon_preferences)
+    session.refresh(user)
 
     is_admin = _is_admin_email(user.email)
     response = JSONResponse(
@@ -327,10 +433,22 @@ def login_with_google(
             "user_id": str(user.id),
             "email": user.email,
             "name": user.display_name or user.email,
+            "handle": user.handle,
             "avatar_url": user.avatar_url,
             "is_admin": is_admin,
             "is_new_user": is_new_user,
             "share_attendance_default": user.share_attendance_default,
+            "share_attendance_default_audience": (
+                user.share_attendance_default_audience
+                or ("public" if user.share_attendance_default else "private")
+            ),
+            "preferences": _serialize_preferences(session, user).model_dump(
+                mode="json"
+            ),
+            # Phase E (E2): include friend_count on the login response so
+            # the AudiencePicker zero-friends hint can render immediately
+            # after sign-in without waiting for the next /auth/me cycle.
+            "friend_count": _friend_count(session, user.id),
         }
     )
     return _set_session_cookie(response, user, is_admin)
@@ -344,6 +462,29 @@ def auth_mode():
         "dev_auth": dev,
         "google_client_id": "" if dev else get_google_client_id(),
     }
+
+
+def _friend_count(session: Session, user_id) -> int:
+    """Count mutual follows (``friends``) for ``user_id``.
+
+    Used by ``/auth/me`` and ``/auth/google`` so the frontend
+    AudiencePicker can render the Phase E zero-friends hint right
+    after sign-in. Kept here (not in deps/social) to preserve the
+    one-way auth → social import direction.
+    """
+    f1 = aliased(UserFollow)
+    f2 = aliased(UserFollow)
+    return int(
+        session.exec(
+            select(func.count())
+            .select_from(f1)
+            .join(
+                f2,
+                (f2.follower_id == f1.followee_id) & (f2.followee_id == f1.follower_id),
+            )
+            .where(f1.follower_id == user_id)
+        ).one()
+    )
 
 
 def _load_mock_users_from_scenario() -> list[dict]:
@@ -405,6 +546,7 @@ def get_me(
         _ensure_share_code(session, user)
         session.commit()
         session.refresh(user)
+    friend_count = _friend_count(session, user.id)
     return {
         "user_id": str(user.id),
         "email": user.email,
@@ -414,25 +556,78 @@ def get_me(
         "avatar_url": user.avatar_url,
         "is_admin": _is_admin_email(user.email),
         "share_attendance_default": user.share_attendance_default,
+        "share_attendance_default_audience": (
+            user.share_attendance_default_audience
+            or ("public" if user.share_attendance_default else "private")
+        ),
+        "preferences": _serialize_preferences(session, user).model_dump(mode="json"),
+        "friend_count": friend_count,
     }
 
 
-@router.patch("/preferences")
+@router.patch("/preferences", response_model=UserPreferencesResponse)
 def update_preferences(
     payload: UpdatePreferencesRequest,
     user: User = Depends(require_user),
     session: Session = Depends(get_session),
 ):
-    """Partial update of the authenticated user's preferences."""
+    """Partial update of the authenticated user's preferences.
+
+    ``share_attendance_default`` keeps its existing partial-update semantics
+    (omit → untouched). For the new fields:
+
+    * ``preferred_area`` — omit (``None``-by-default) leaves the area
+      untouched. To clear it, pass an explicit ``{"preferred_area": null}``
+      with ``__clear__`` semantics via ``preferred_tag_ids: []`` and the
+      separate ``DELETE`` endpoint pattern is intentionally avoided here
+      — callers send a fresh full payload.
+    * ``preferred_tag_ids`` — omit leaves untouched; ``[]`` clears.
+
+    ``preferences_set_at`` is bumped on any successful save (including
+    explicit empty) so the anon→authed merge knows the user has opted in.
+    """
+    touched_prefs = False
     if payload.share_attendance_default is not None:
         user.share_attendance_default = payload.share_attendance_default
         # Mark the preference as explicitly chosen so future default-flip
         # migrations skip this user.
         user.share_attendance_default_set_by_user = True
+
+    # Use ``model_fields_set`` to distinguish "omitted" from "explicit null".
+    fields_set = payload.model_fields_set
+    if "preferred_area" in fields_set:
+        touched_prefs = True
+        if payload.preferred_area is None:
+            user.preferred_area_min_lat = None
+            user.preferred_area_min_lng = None
+            user.preferred_area_max_lat = None
+            user.preferred_area_max_lng = None
+            user.preferred_area_label = None
+        else:
+            area = payload.preferred_area
+            if area.min_lat >= area.max_lat or area.min_lng >= area.max_lng:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid preferred_area: min must be < max",
+                )
+            user.preferred_area_min_lat = area.min_lat
+            user.preferred_area_min_lng = area.min_lng
+            user.preferred_area_max_lat = area.max_lat
+            user.preferred_area_max_lng = area.max_lng
+            user.preferred_area_label = area.label
+
+    if "preferred_tag_ids" in fields_set:
+        touched_prefs = True
+        validated = _validate_tag_ids(session, payload.preferred_tag_ids or [])
+        _replace_preferred_tags(session, user, validated)
+
+    if touched_prefs:
+        user.preferences_set_at = datetime.utcnow()
+
     session.add(user)
     session.commit()
     session.refresh(user)
-    return {"share_attendance_default": user.share_attendance_default}
+    return _serialize_preferences(session, user)
 
 
 # --- Profile (display_name + handle) -----------------------------------------
@@ -604,32 +799,50 @@ def update_profile(
 
 @router.post("/logout")
 def logout():
-    """Clear the session cookie."""
+    """Clear the session cookie and rotate the anonymous-id cookie.
+
+    Rotating ``movida_aid`` on logout prevents the next anonymous session
+    on the same browser from inheriting the previous user's anonymous
+    dedupe identity (otherwise saves/going made anonymously after logout
+    would attach to the same server-side row group as the previous user).
+    """
     response = JSONResponse(content={"status": "logged out"})
     response.delete_cookie(key=_COOKIE_NAME)
+    clear_anon_id(response)
     return response
 
 
-@router.delete("/me")
-@limiter.limit("5/hour")
-def delete_me(
-    request: Request,
-    user: User = Depends(require_user),
-    session: Session = Depends(get_session),
-):
-    """GDPR: hard-delete the user's personal rows + soft-delete the account."""
-    user_id = user.id
+def purge_user_account(session: Session, user_id) -> None:
+    """Hard-delete personal rows and soft-anonymise the user row.
 
+    Shared by the self-service ``DELETE /api/auth/me`` flow and the admin
+    ``DELETE /api/social/admin/users/{handle}`` flow so the cleanup logic
+    (especially the social-edge cascade fixed for the friends-graph
+    regression) lives in one place. Caller commits.
+    """
     session.exec(delete(UserSavedEvent).where(UserSavedEvent.user_id == user_id))
     session.exec(
         delete(UserEventAttendance).where(UserEventAttendance.user_id == user_id)
     )
     session.exec(delete(ShareToken).where(ShareToken.user_id == user_id))
+    # Drop social edges in both directions so deleted users no longer
+    # inflate other users' follower / friend counts and disappear from
+    # subscription lists. (Hard-delete: these rows carry no standalone
+    # meaning once the account is gone.)
+    session.exec(
+        delete(UserFollow).where(
+            (UserFollow.follower_id == user_id) | (UserFollow.followee_id == user_id)
+        )
+    )
+    session.exec(
+        delete(CalendarSubscription).where(
+            (CalendarSubscription.subscriber_id == user_id)
+            | (CalendarSubscription.target_user_id == user_id)
+        )
+    )
 
     # Soft-anonymise ratings rather than hard-delete so aggregate scores
-    # (count + average) shown to other users remain stable. The FK uses
-    # ON DELETE SET NULL but we also explicitly flip is_anonymous so the
-    # public reviewer label switches to "Anonymous".
+    # (count + average) shown to other users remain stable.
     user_ratings = session.exec(
         select(EventRating).where(EventRating.user_id == user_id)
     ).all()
@@ -640,54 +853,154 @@ def delete_me(
 
     db_user = session.get(User, user_id)
     if db_user is not None:
-        # Anonymize and soft-delete; the row stays so FK history is preserved.
         db_user.email = f"deleted-{db_user.id}@example.invalid"
         db_user.display_name = None
         db_user.avatar_url = None
         db_user.provider_subject = None
         db_user.deleted_at = datetime.utcnow()
         session.add(db_user)
-    session.commit()
 
+
+@router.delete("/me")
+@limiter.limit("5/hour")
+def delete_me(
+    request: Request,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+):
+    """GDPR: hard-delete the user's personal rows + soft-delete the account."""
+    purge_user_account(session, user.id)
+    session.commit()
     response = JSONResponse(content={"status": "deleted"})
     response.delete_cookie(key=_COOKIE_NAME)
+    clear_anon_id(response)
     return response
 
 
 @router.get("/saved-events")
 def get_my_saved_events(
-    user: User = Depends(require_user),
+    request: Request,
+    user: User | None = Depends(get_current_user_optional),
     session: Session = Depends(get_session),
 ):
-    """Return event_ids the current user has saved across all their devices."""
+    """Return event_ids saved by the current identity.
+
+    Authed: returns rows owned by ``user_id`` across all devices.
+    Anonymous: returns rows owned by the ``movida_aid`` cookie identity
+    (so the frontend can replace its local cache from server truth even
+    before sign-in). Returns an empty list when neither identity is
+    available (cookie blocked, first-ever visit).
+
+    Also returns ``events: [{event_id, audience}]`` so callers can render
+    a per-saved-event audience picker without an extra round trip.
+    Anonymous rows always report ``audience='private'``.
+    """
+    if user is not None:
+        rows = session.exec(
+            select(UserSavedEvent.event_id, UserSavedEvent.audience).where(
+                UserSavedEvent.user_id == user.id
+            )
+        ).all()
+        # Collapse cross-device rows to one entry per event_id; most-permissive
+        # audience wins on collapse (public > friends > private).
+        order = {"private": 0, "friends": 1, "public": 2}
+        by_event: dict[str, str] = {}
+        for event_id, audience in rows:
+            current = by_event.get(event_id, "private")
+            incoming = audience or "private"
+            if order.get(incoming, 0) > order.get(current, 0):
+                by_event[event_id] = incoming
+            else:
+                by_event.setdefault(event_id, current)
+        events = [
+            {"event_id": eid, "audience": aud} for eid, aud in sorted(by_event.items())
+        ]
+        return {
+            "event_ids": [e["event_id"] for e in events],
+            "events": events,
+        }
+    anon_id = read_anon_id(request)
+    if not anon_id:
+        return {"event_ids": [], "events": []}
     rows = session.exec(
-        select(UserSavedEvent.event_id).where(UserSavedEvent.user_id == user.id)
+        select(UserSavedEvent.event_id).where(
+            UserSavedEvent.device_id == anon_id,
+            UserSavedEvent.user_id.is_(None),
+        )
     ).all()
-    return {"event_ids": sorted({r for r in rows})}
+    event_ids = sorted({r for r in rows})
+    events = [{"event_id": eid, "audience": "private"} for eid in event_ids]
+    return {"event_ids": event_ids, "events": events}
 
 
 @router.get("/attending-events")
 def get_my_attending_events(
-    user: User = Depends(require_user),
+    request: Request,
+    user: User | None = Depends(get_current_user_optional),
     session: Session = Depends(get_session),
 ):
-    """Return events the current user is attending across all their devices,
-    along with the per-event share_publicly flag so the UI can render the
-    correct toggle state without re-querying."""
+    """Return events the current identity is attending, with the per-event
+    ``share_publicly`` flag so the UI can render the correct toggle state
+    without re-querying.
+
+    Authed: collapses cross-device rows for ``user_id``; ``share_publicly``
+    is True if any device has it set. Anonymous: returns rows owned by the
+    ``movida_aid`` cookie identity (always ``share_publicly=False`` because
+    anonymous rows can never opt in to public sharing). Returns an empty
+    list when neither identity is available.
+    """
+    if user is not None:
+        rows = session.exec(
+            select(
+                UserEventAttendance.event_id,
+                UserEventAttendance.share_publicly,
+                UserEventAttendance.share_audience,
+            ).where(UserEventAttendance.user_id == user.id)
+        ).all()
+        # A user may have rows on multiple devices for the same event; collapse
+        # to one entry per event_id, treating share_publicly=True on any device
+        # as the canonical state (since one row gating visibility is enough).
+        by_event: dict[str, dict] = {}
+        for event_id, share_publicly, share_audience in rows:
+            entry = by_event.setdefault(
+                event_id, {"share_publicly": False, "share_audience": "private"}
+            )
+            entry["share_publicly"] = entry["share_publicly"] or bool(share_publicly)
+            # Most-permissive wins on collapse (public > friends > private).
+            order = {"private": 0, "friends": 1, "public": 2}
+            if order.get(share_audience or "private", 0) > order.get(
+                entry["share_audience"], 0
+            ):
+                entry["share_audience"] = share_audience or "private"
+        events = [
+            {
+                "event_id": eid,
+                "share_publicly": v["share_publicly"],
+                "share_audience": v["share_audience"],
+            }
+            for eid, v in sorted(by_event.items())
+        ]
+        return {
+            "event_ids": [e["event_id"] for e in events],
+            "events": events,
+        }
+    anon_id = read_anon_id(request)
+    if not anon_id:
+        return {"event_ids": [], "events": []}
     rows = session.exec(
         select(
             UserEventAttendance.event_id,
             UserEventAttendance.share_publicly,
-        ).where(UserEventAttendance.user_id == user.id)
+        ).where(
+            UserEventAttendance.device_id == anon_id,
+            UserEventAttendance.user_id.is_(None),
+        )
     ).all()
-    # A user may have rows on multiple devices for the same event; collapse
-    # to one entry per event_id, treating share_publicly=True on any device
-    # as the canonical state (since one row gating visibility is enough).
     by_event: dict[str, bool] = {}
     for event_id, share_publicly in rows:
         by_event[event_id] = by_event.get(event_id, False) or bool(share_publicly)
     events = [
-        {"event_id": eid, "share_publicly": share}
+        {"event_id": eid, "share_publicly": share, "share_audience": "private"}
         for eid, share in sorted(by_event.items())
     ]
     return {

@@ -8,6 +8,7 @@ import GoingButton from './GoingButton';
 import AttendeeAvatarStack from './AttendeeAvatarStack';
 import RateEventButton from './RateEventButton';
 import TagBadges from './TagBadges';
+import { useAuth } from '../context/AuthContext';
 import { getTagColors } from '../utils/eventColor';
 
 interface MapBounds {
@@ -54,20 +55,35 @@ function PriceBadge({ event }: { event: CalendarEvent }) {
     return null;
 }
 
-function PopularityBadge({ viewCount, allViewCounts, threshold }: { viewCount: number; allViewCounts: number[]; threshold: number }) {
-    if (viewCount === 0) return null;
+function PopularityBadge({
+    signal,
+    allSignals,
+    threshold,
+    trending,
+}: {
+    /** Either ``view_count`` or ``popularity_score`` depending on mode. */
+    signal: number;
+    allSignals: number[];
+    threshold: number;
+    /** When true, render "Trending" semantics (no raw view-count chip). */
+    trending: boolean;
+}) {
+    if (signal <= 0) return null;
 
-    // Check if this is in top 3 of current visible events
-    const sorted = [...allViewCounts].sort((a, b) => b - a);
-    const isTop3 = viewCount > 0 && sorted.indexOf(viewCount) < 3 && sorted[0] > 0;
+    // Top 3 of currently visible events.
+    const sorted = [...allSignals].sort((a, b) => b - a);
+    const isTop3 = signal > 0 && sorted.indexOf(signal) < 3 && sorted[0] > 0;
 
-    const countBadge = (
+    // In trending mode, do NOT show a numeric chip — popularity_score is
+    // an internal score, not a user-facing count. In legacy view-count
+    // mode, keep the existing 👁 N chip for backward compatibility.
+    const countBadge = trending ? null : (
         <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-            👁 {viewCount}
+            👁 {signal}
         </span>
     );
 
-    if (isTop3 && viewCount >= threshold) {
+    if (isTop3 && signal >= threshold) {
         return (
             <>
                 <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700">
@@ -77,7 +93,7 @@ function PopularityBadge({ viewCount, allViewCounts, threshold }: { viewCount: n
             </>
         );
     }
-    if (viewCount >= threshold) {
+    if (signal >= threshold) {
         return (
             <>
                 <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700">
@@ -121,7 +137,7 @@ export default function EventListPanel({
     onSuggestEvent,
 }: EventListPanelProps) {
     const { isSaved } = useSavedEvents();
-    const { showRatings } = useFeatureFlags();
+    const { showRatings, trendingEnabled } = useFeatureFlags();
     const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const scrollRef = useRef<HTMLDivElement>(null);
     const [showBottomFade, setShowBottomFade] = useState(false);
@@ -165,7 +181,13 @@ export default function EventListPanel({
         const aOnMap = isOnMap(a, mapBounds);
         const bOnMap = isOnMap(b, mapBounds);
         if (aOnMap !== bOnMap) return aOnMap ? -1 : 1;
-        if (sortBy === 'popularity') return b.view_count - a.view_count;
+        if (sortBy === 'popularity') {
+            // Use the trending score when enabled, otherwise fall back to
+            // the legacy view-count signal.
+            const sa = trendingEnabled ? (a.popularity_score ?? 0) : a.view_count;
+            const sb = trendingEnabled ? (b.popularity_score ?? 0) : b.view_count;
+            return sb - sa;
+        }
         return new Date(a.start).getTime() - new Date(b.start).getTime();
     });
 
@@ -175,7 +197,9 @@ export default function EventListPanel({
 
     const onMapCount = mapBounds ? events.filter((e) => isOnMap(e, mapBounds)).length : events.length;
 
-    const allViewCounts = sortedEvents.map((e) => e.view_count);
+    const allViewCounts = sortedEvents.map((e) =>
+        trendingEnabled ? (e.popularity_score ?? 0) : e.view_count,
+    );
 
     const formatDate = (d: Date) =>
         d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -274,11 +298,16 @@ export default function EventListPanel({
                                                 <span className="event-card-offmap-badge">Off map</span>
                                             )}
                                             {((showPrices && (event.price_is_free || (event.price_min != null && event.price_currency))) ||
-                                                (showPopularity && event.view_count > 0)) && (
+                                                (showPopularity && (trendingEnabled ? (event.popularity_score ?? 0) > 0 : event.view_count > 0))) && (
                                                     <div className="event-card-badges">
                                                         {showPrices && <PriceBadge event={event} />}
                                                         {showPopularity && (
-                                                            <PopularityBadge viewCount={event.view_count} allViewCounts={allViewCounts} threshold={popularityThreshold} />
+                                                            <PopularityBadge
+                                                                signal={trendingEnabled ? (event.popularity_score ?? 0) : event.view_count}
+                                                                allSignals={allViewCounts}
+                                                                threshold={popularityThreshold}
+                                                                trending={trendingEnabled}
+                                                            />
                                                         )}
                                                     </div>
                                                 )}
@@ -315,6 +344,7 @@ export default function EventListPanel({
  */
 function ActionCountCluster({ eventId, showRatings, isSavedFlag }: { eventId: string; showRatings: boolean; isSavedFlag: boolean }) {
     const summary = useAttendanceSummary(eventId);
+    const { user } = useAuth();
     const savedCount = summary?.total_saved ?? 0;
     const goingCount = summary?.total_going ?? 0;
     return (

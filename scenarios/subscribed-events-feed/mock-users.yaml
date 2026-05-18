@@ -1,0 +1,31 @@
+# Mock users pre-seeded for the subscribed-events-feed scenario (Phase C).
+#
+# Roles:
+# - bob is the SUBSCRIBER. He subscribes to alice + carol during the test
+#   plan. His notification feed and "From subscriptions" MyCalendar section
+#   are the SUT.
+# - alice and carol are TARGETS with public calendar visibility so bob can
+#   subscribe without a friendship edge.
+# - dave is an UNRELATED user (no subscription). His Going attendance must
+#   NOT surface in bob's feed — the negative control.
+# - admin is required so ADMIN_EMAIL resolves to an existing user; admin
+#   approves the suggestion in the suggested fan-out test.
+users:
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    account_visibility: public
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+  - email: carol@example.com
+    name: Carol Nguyen
+    handle: carol
+    account_visibility: public
+  - email: dave@example.com
+    name: Dave Smith
+    handle: dave
+    account_visibility: public
+  - email: admin@example.com # matches ADMIN_EMAIL → admin badge
+    name: Dev Admin
+    handle: admin

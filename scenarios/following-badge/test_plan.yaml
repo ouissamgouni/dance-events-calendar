@@ -1,0 +1,81 @@
+test_plan:
+  name: "Following Badge — at-a-glance friends signal (Track 1)"
+  description: >
+    Verify the new "Following" badge — a small avatar/dot on event cards
+    and map pins indicating that at least one user you follow (mutually)
+    is going or saved this event. The badge is the at-a-glance
+    complement to the existing `friends_going` filter chip: the chip is
+    "show me ONLY those events", the badge is "I can still see all
+    events, but the ones with friend signal are visually marked".
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=following-badge"
+    - >
+      Pre-seeded follow graph mirrors friends-events: alice<->bob mutual,
+      carol→alice one-way. Four events are seeded with deterministic
+      attendance/save edges so each badge assertion has exactly one
+      target row.
+    - "settings.yaml flips on `following_badge_enabled`."
+
+  steps:
+    - id: 1
+      title: "Bob sees the badge on Alice's going event"
+      description: >
+        /login → "Sign in as Bob Martin". Open / (Home).
+      expected: >
+        evt-fb-001 (Salsa Social Friday) renders with a small "Following"
+        avatar/dot decoration showing Alice's avatar (or initials).
+        Hovering the badge surfaces a tooltip "Alice is going".
+
+    - id: 2
+      title: "Badge also fires on saves (not just going)"
+      description: >
+        Still as Bob, locate evt-fb-002 (Bachata Workshop) in the list.
+      expected: >
+        The badge appears with Alice's avatar and tooltip "Alice saved
+        this". Proves both signals contribute equally to the badge.
+
+    - id: 3
+      title: "One-way follower attendance does NOT trigger the badge"
+      description: >
+        Locate evt-fb-003 (Cuban Night). Carol is going, but Carol is
+        only a one-way follower of Alice — she is not Bob's mutual
+        friend.
+      expected: >
+        No badge on the card. Proves the badge respects the same
+        mutual-follow rule as `friends_going`.
+
+    - id: 4
+      title: "Stranger event has no badge"
+      description: >
+        Locate evt-fb-004 (Stranger Bachata).
+      expected: >
+        No badge. Proves the badge is OFF by default — no false positives.
+
+    - id: 5
+      title: "Admin UI exposes the Following badge toggle"
+      description: >
+        Sign in as admin (admin@example.com). Navigate to
+        /admin/configuration. In the right-hand feature-flag panel,
+        locate the "Following badge" row (sits below the Trending
+        block).
+      expected: >
+        The toggle is currently ON (settings.yaml seeded
+        `following_badge_enabled: true`) with the helper text
+        "Avatar/dot when a mutual friend is going or saved". The
+        Trending and Unseen toggles are OFF (independent — proves the
+        three flags don't bleed into each other).
+
+    - id: 6
+      title: "Toggling Following badge OFF removes all badges"
+      description: >
+        Still on /admin/configuration, flip "Following badge" off.
+        Reload / in Bob's browser.
+      expected: >
+        Network: PUT /api/settings → 200 with
+        `following_badge_enabled: false`. All "Following" badges
+        disappear from cards and pins, including evt-fb-001 and
+        evt-fb-002. The legacy "Friends → Interested" filter chip still
+        works (it is a separate feature, not covered by this toggle).
+        Re-enable the toggle and the badges return on next reload.
+        Proves the feature is fully gated by the toggle.

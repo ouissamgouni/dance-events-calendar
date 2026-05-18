@@ -25,9 +25,11 @@ from backend.api.main import app  # noqa: E402
 from backend.api.routes import auth as auth_module  # noqa: E402
 from backend.db.database import get_session  # noqa: E402
 from backend.db.models import (  # noqa: E402
+    CalendarSubscription,
     ShareToken,
     User,
     UserEventAttendance,
+    UserFollow,
     UserSavedEvent,
 )
 
@@ -266,6 +268,35 @@ def test_delete_me_removes_user_and_personal_rows(client, session, monkeypatch):
 
 
 @pytest.mark.unit
+def test_delete_me_drops_follows_and_subscriptions(client, session, monkeypatch):
+    """Regression: account deletion must clear social edges in BOTH directions
+    so other users' follower / friend / subscription counts shrink instead of
+    counting a ghost row pointing at a soft-deleted user."""
+    monkeypatch.setattr(auth_module, "get_admin_email", lambda: "admin@example.com")
+
+    alice = _login(client, email="alice@example.com", device_id="dev-a")
+    assert alice.status_code == 200
+    alice_id = UUID(alice.json()["user_id"])
+
+    carol = _login(client, email="carol@example.com", device_id="dev-c")
+    assert carol.status_code == 200
+    carol_id = UUID(carol.json()["user_id"])
+
+    # Carol follows Alice and subscribes to her calendar.
+    session.add(UserFollow(follower_id=carol_id, followee_id=alice_id))
+    session.add(CalendarSubscription(subscriber_id=carol_id, target_user_id=alice_id))
+    session.commit()
+
+    # Carol deletes her account (current cookie is Carol's from last _login).
+    resp = client.delete("/api/auth/me")
+    assert resp.status_code == 200
+
+    # Edges in both directions are gone — Alice's follower count drops to 0.
+    assert session.exec(select(UserFollow)).all() == []
+    assert session.exec(select(CalendarSubscription)).all() == []
+
+
+@pytest.mark.unit
 def test_auth_google_rate_limit_returns_429_after_threshold(client, monkeypatch):
     """The route is decorated @limiter.limit("10/minute"); the 11th call from
     the same IP within the window must return 429."""
@@ -293,15 +324,32 @@ def test_saved_events_route_uses_user_when_authed(client, session, monkeypatch):
     user_id = UUID(login_resp.json()["user_id"])
 
     # Saves from two different devices, both linked to the same user.
-    session.add(UserSavedEvent(device_id=device_a, event_id="evt-1", user_id=user_id))
-    session.add(UserSavedEvent(device_id="dev-B", event_id="evt-2", user_id=user_id))
+    # Force ``audience='public'`` so the existing assertion remains the
+    # contract under test (the model default flipped to ``friends`` for
+    # privacy-by-default; this test checks cross-device aggregation, not
+    # the audience default).
+    session.add(
+        UserSavedEvent(
+            device_id=device_a, event_id="evt-1", user_id=user_id, audience="public"
+        )
+    )
+    session.add(
+        UserSavedEvent(
+            device_id="dev-B", event_id="evt-2", user_id=user_id, audience="public"
+        )
+    )
     # And one anonymous row that must NOT show up.
     session.add(UserSavedEvent(device_id="dev-X", event_id="evt-other", user_id=None))
     session.commit()
 
     resp = client.get("/api/auth/saved-events")
     assert resp.status_code == 200
-    assert resp.json() == {"event_ids": ["evt-1", "evt-2"]}
+    body = resp.json()
+    assert body["event_ids"] == ["evt-1", "evt-2"]
+    assert body["events"] == [
+        {"event_id": "evt-1", "audience": "public"},
+        {"event_id": "evt-2", "audience": "public"},
+    ]
 
 
 @pytest.mark.unit
@@ -449,9 +497,7 @@ def test_anonymous_attendance_inherits_share_default_on_signup(
     user_id = UUID(resp.json()["user_id"])
 
     rows = session.exec(
-        select(UserEventAttendance).where(
-            UserEventAttendance.event_id == "evt-share-1"
-        )
+        select(UserEventAttendance).where(UserEventAttendance.event_id == "evt-share-1")
     ).all()
     assert len(rows) == 1
     assert rows[0].user_id == user_id
@@ -491,3 +537,138 @@ def test_merge_uses_anon_id_cookie_in_addition_to_device_id(
         select(UserSavedEvent).where(UserSavedEvent.user_id == user_id)
     ).all()
     assert {r.event_id for r in rows} == {"evt-cookie", "evt-legacy"}
+
+
+@pytest.mark.unit
+def test_logout_clears_anon_id_cookie(client, session, monkeypatch):
+    """Logout must clear the httpOnly ``movida_aid`` cookie so the next
+    anonymous session on this browser is a fresh server-side identity.
+    Without this, anonymous saves/going made after logout would attach to
+    the previous user's anonymous dedupe identity."""
+    monkeypatch.setattr(auth_module, "get_admin_email", lambda: "admin@example.com")
+    from backend.api.anon_id import ANON_COOKIE_NAME
+
+    # Mint the cookie via an anonymous save first.
+    r = client.post(
+        "/api/track/event-save",
+        json={
+            "event_id": "evt-cookie-clear",
+            "device_id": "dev-cookie-clear",
+            "action": "save",
+            "record_analytics": False,
+        },
+    )
+    assert r.status_code == 201
+    assert client.cookies.get(ANON_COOKIE_NAME)
+
+    # Sign in then sign out.
+    login = _login(client, email="dev-user@example.com", device_id="dev-cookie-clear")
+    assert login.status_code == 200
+    logout = client.post("/api/auth/logout")
+    assert logout.status_code == 200
+    # The Set-Cookie header on the logout response must clear movida_aid.
+    set_cookie_headers = (
+        logout.headers.get_list("set-cookie")
+        if hasattr(logout.headers, "get_list")
+        else [v for k, v in logout.headers.items() if k.lower() == "set-cookie"]
+    )
+    assert any(
+        ANON_COOKIE_NAME in h and ("Max-Age=0" in h or "expires=" in h.lower())
+        for h in set_cookie_headers
+    ), set_cookie_headers
+
+
+@pytest.mark.unit
+def test_delete_me_clears_anon_id_cookie(client, session, monkeypatch):
+    """Same expectation as logout, for the GDPR account-delete path."""
+    monkeypatch.setattr(auth_module, "get_admin_email", lambda: "admin@example.com")
+    from backend.api.anon_id import ANON_COOKIE_NAME
+
+    login = _login(client, email="dev-user@example.com", device_id="dev-delete-me")
+    assert login.status_code == 200
+    # Trigger cookie mint via any tracked write.
+    client.post(
+        "/api/track/event-save",
+        json={
+            "event_id": "evt-delete-me",
+            "device_id": "dev-delete-me",
+            "action": "save",
+            "record_analytics": False,
+        },
+    )
+    delete = client.delete("/api/auth/me")
+    assert delete.status_code == 200
+    set_cookie_headers = (
+        delete.headers.get_list("set-cookie")
+        if hasattr(delete.headers, "get_list")
+        else [v for k, v in delete.headers.items() if k.lower() == "set-cookie"]
+    )
+    assert any(
+        ANON_COOKIE_NAME in h and ("Max-Age=0" in h or "expires=" in h.lower())
+        for h in set_cookie_headers
+    ), set_cookie_headers
+
+
+@pytest.mark.unit
+def test_anonymous_get_saved_events_returns_cookie_identity(client, session):
+    """``GET /api/auth/saved-events`` must work for anonymous callers and
+    return rows owned by the ``movida_aid`` cookie identity, so the
+    frontend can replace its local cache from server truth without
+    requiring a sign-in first."""
+    from backend.api.anon_id import ANON_COOKIE_NAME
+
+    # Anonymous save mints the cookie.
+    r = client.post(
+        "/api/track/event-save",
+        json={
+            "event_id": "evt-anon-read",
+            "device_id": "dev-anon-read",
+            "action": "save",
+            "record_analytics": False,
+        },
+    )
+    assert r.status_code == 201
+    assert client.cookies.get(ANON_COOKIE_NAME)
+
+    saved = client.get("/api/auth/saved-events")
+    assert saved.status_code == 200
+    assert saved.json()["event_ids"] == ["evt-anon-read"]
+
+
+@pytest.mark.unit
+def test_anonymous_get_saved_events_empty_without_cookie(client, session):
+    """No cookie, no authed user -> empty list (not 401)."""
+    saved = client.get("/api/auth/saved-events")
+    assert saved.status_code == 200
+    assert saved.json()["event_ids"] == []
+
+
+@pytest.mark.unit
+def test_anonymous_get_attending_events_returns_cookie_identity(client, session):
+    """Same anon-read contract for attending events."""
+    from backend.api.anon_id import ANON_COOKIE_NAME
+
+    r = client.post(
+        "/api/track/event-attendance",
+        json={
+            "event_id": "evt-anon-attending",
+            "device_id": "dev-anon-attending",
+            "action": "going",
+            "record_analytics": False,
+        },
+    )
+    assert r.status_code == 201
+    assert client.cookies.get(ANON_COOKIE_NAME)
+
+    attending = client.get("/api/auth/attending-events")
+    assert attending.status_code == 200
+    body = attending.json()
+    assert body["event_ids"] == ["evt-anon-attending"]
+    # Anonymous rows can never opt in to public sharing.
+    assert body["events"] == [
+        {
+            "event_id": "evt-anon-attending",
+            "share_publicly": False,
+            "share_audience": "private",
+        }
+    ]

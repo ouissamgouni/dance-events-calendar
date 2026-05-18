@@ -1,0 +1,77 @@
+base_week: 0
+events:
+  # Visible — used to test Hide action
+  - id: evt-hide-001
+    calendar_id: salsa-cal-001
+    title: Friday Salsa Social
+    description: |
+      Weekly social dance night with DJ Mambo. Beginners welcome!
+      The dance floor is open from the first beat to the last.
+      All skill levels are welcome — no partner or prior experience needed.
+      Expect a warm, inclusive crowd of local and visiting dancers.
+      The venue features a full bar, cloakroom, and water stations throughout.
+      Dress smart-casual; smooth-soled dance shoes strongly recommended.
+    location: Dance Studio, 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w0 Fri 21:00
+    end: w0 Sat 01:00
+    price_is_free: true
+
+  # Visible — used to test Permanently Remove (block) action
+  - id: evt-hide-002
+    calendar_id: bachata-cal-002
+    title: Bachata Sensual Night
+    description: |
+      Sensual bachata social with classes beforehand.
+      The dance floor is open from the first beat to the last.
+      All skill levels are welcome — no partner or prior experience needed.
+      Expect a warm, inclusive crowd of local and visiting dancers.
+      The venue features a full bar, cloakroom, and water stations throughout.
+    location: Tanzhaus, Friedrichstr. 100, Berlin, Germany
+    latitude: 52.52
+    longitude: 13.405
+    start: w0 Sat 21:00
+    end: w0 Sun 02:00
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+
+  # Already hidden — used to test Unhide action
+  - id: evt-hide-003
+    calendar_id: salsa-cal-001
+    title: Salsa On2 Workshop (hidden)
+    description: |
+      Intermediate on2 technique workshop with Carlos & Maria.
+      Each session is broken into clear, manageable steps with individual feedback.
+      The instructor will address both leading and following roles equally.
+      Comfortable dance shoes with a smooth, non-rubber sole are essential.
+    location: Studio Danzante, 5 Calle Mayor, Madrid, Spain
+    latitude: 40.4168
+    longitude: -3.7038
+    start: w0 Sun 15:00
+    end: w0 Sun 18:00
+    price_is_free: false
+    price_min: 20
+    price_currency: EUR
+    is_hidden: true
+
+  # Already blocked (permanently removed) — used to test Restore action
+  - id: evt-hide-004
+    calendar_id: bachata-cal-002
+    title: Kizomba Urban Night (blocked)
+    description: |
+      Kizomba and urban kiz social with a live DJ set.
+      The dance floor is open from the first beat to the last.
+      All skill levels are welcome — no partner or prior experience needed.
+      Expect a warm, inclusive crowd of local and visiting dancers.
+    location: Sala Rossa, Via Roma 12, Rome, Italy
+    latitude: 41.9028
+    longitude: 12.4964
+    start: w1 Fri 22:00
+    end: w1 Sat 02:00
+    price_is_free: false
+    price_min: 15
+    price_currency: EUR
+    is_hidden: true
+    is_blocked: true

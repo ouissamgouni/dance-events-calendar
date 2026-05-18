@@ -1,6 +1,6 @@
 version: "3"
 
-dotenv: [ "config/base.env" ]
+dotenv: ["config/base.env"]
 
 vars:
   ROOT_DIR:
@@ -63,6 +63,11 @@ includes:
     dir: "{{.ROOT_DIR}}"
     vars:
       ROOT_DIR: "{{.ROOT_DIR}}"
+  analytics:
+    taskfile: .taskfiles/analytics.yml
+    vars:
+      ROOT_DIR: "{{.ROOT_DIR}}"
+      BACKEND_DIR: "{{.BACKEND_DIR}}"
 
 tasks:
   default:
@@ -206,10 +211,19 @@ tasks:
         echo "  task start:scenario         Local code + Docker DB"
         echo "  task stop:scenario          Stop scenario instance"
         echo "  task scenarios              List all scenario ports"
-        echo "  task open:session:<env> [BROWSERS=N]  Fresh isolated Chrome session(s)"
+        echo "  ── Browser ──────────────────────────────────────────────"
+        echo "  Add to start:* tasks:  BROWSER=none|shared|isolated   COUNT=N   RESET_BROWSER=1"
+        echo "    none      (default for start:*)  servers only, no browser opened"
+        echo "    shared    focus existing tab in your default Chrome (shared cookies)"
+        echo "    isolated  open COUNT sessions, each with own --user-data-dir;"
+        echo "              idempotent (focuses existing). RESET_BROWSER=1 wipes first."
+        echo "  task open:shared:<env>               Focus/open one tab in default Chrome"
+        echo "  task open:isolated:<env> [COUNT=N]   Open N isolated sessions"
         echo "    <env> = dev | scenario | staging:local | staging:remote | prod"
-        echo "    e.g. task open:session:scenario SCENARIO=share-im-going BROWSERS=2"
-        echo "  task open:clean             Remove temp Chrome session dirs"
+        echo "    e.g. task open:isolated:scenario SCENARIO=share-im-going COUNT=2"
+        echo "    e.g. task open:isolated:scenario SCENARIO=foo RESET_BROWSER=1"
+        echo "  task open:clean             Remove all isolated Chrome profile dirs"
+        echo "  task open:clean:dev         Remove only dev-* isolated profile dirs"
         echo ""
         echo "  ── Production (per-component releases) ─────────────────"
         echo "  task release:prod:backend  -- v1.2.0   Tag backend-v1.2.0 + deploy"

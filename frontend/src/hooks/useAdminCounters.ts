@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { fetchAdminRatings, fetchAdminTagSuggestions, fetchEventFilterOptions } from '../api';
+import { fetchAdminRatings, fetchAdminTagSuggestionCount, fetchEventFilterOptions } from '../api';
 import { useAdminPrefs } from '../context/AdminPrefsContext';
 
 export interface AdminCounters {
@@ -64,12 +64,12 @@ export function useAdminCounters(): { counters: AdminCounters; refresh: () => vo
             })
             .catch(() => undefined);
 
-        fetchAdminTagSuggestions({
+        fetchAdminTagSuggestionCount({
             status: 'pending',
             includePast: includePast || undefined,
         })
-            .then((rows) =>
-                setCounters((prev) => ({ ...prev, tagSuggestions: rows.length })),
+            .then((count) =>
+                setCounters((prev) => ({ ...prev, tagSuggestions: count })),
             )
             .catch(() => undefined);
 

@@ -1,0 +1,11 @@
+# Same follow graph as friends-events:
+#   alice <-> bob   (mutual = friends — badge MUST appear for Bob's view)
+#   carol -> alice  (one-way; carol is NOT bob's friend, attendance
+#                    must NOT trigger the badge for Bob)
+follows:
+  - follower: alice
+    followee: bob
+  - follower: bob
+    followee: alice
+  - follower: carol
+    followee: alice

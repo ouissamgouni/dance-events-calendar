@@ -1,0 +1,9 @@
+# Two pre-seeded mock users so the /login page renders one button per user.
+# Verifying the bug requires two distinct identities on the same browser.
+users:
+  - email: alice@example.com
+    name: Alice
+  - email: bob@example.com
+    name: Bob
+  - email: admin@example.com # matches ADMIN_EMAIL → admin badge on /account
+    name: Dev Admin

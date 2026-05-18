@@ -90,11 +90,21 @@ export interface CalendarEvent {
     color: string | null;
     view_count: number;
     going_count?: number;
+    /** Distinct savers (UserSavedEvent rows). 0 when not surfaced by the endpoint. */
+    saved_count?: number;
+    /**
+     * Commitment-weighted, time-decayed popularity score. Set by the server
+     * when ``trending_enabled`` is on; otherwise 0. Use this (not
+     * ``view_count``) to drive the "Trending" badge and sort.
+     */
+    popularity_score?: number;
     price_min: number | null;
     price_max: number | null;
     price_currency: string | null;
     price_is_free: boolean;
     review_status?: string;
+    is_hidden?: boolean;
+    is_blocked?: boolean;
     links: LinkItem[] | null;
     tags: Tag[];
 }
@@ -110,6 +120,7 @@ export interface Attendee {
     user_id: string;
     display_name: string | null;
     avatar_url: string | null;
+    handle: string | null;
 }
 
 export interface AttendanceSummary {
@@ -126,6 +137,12 @@ export interface AttendanceSummary {
 export interface AttendingEventEntry {
     event_id: string;
     share_publicly: boolean;
+    share_audience?: 'public' | 'friends' | 'private';
+}
+
+export interface SavedEventEntry {
+    event_id: string;
+    audience: 'public' | 'friends' | 'private';
 }
 
 export interface AppInfo {
@@ -134,6 +151,7 @@ export interface AppInfo {
     frontend_version?: string | null;
     db_schema_version?: string | null;
     qa_scenarios?: string[];
+    analytics_enabled?: boolean;
 }
 
 export interface TestStep {
@@ -169,6 +187,10 @@ export interface EventSuggestionCreate {
     price_max?: number | null;
     price_currency?: string | null;
     price_is_free?: boolean;
+    /** When True (default), an approved suggestion is auto-saved to the
+     * authenticated submitter's Calendar. Has no effect for anonymous
+     * submissions. */
+    auto_save?: boolean;
     website?: string; // honeypot
     screen_size?: string;
     timezone?: string;

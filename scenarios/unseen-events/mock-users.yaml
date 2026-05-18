@@ -1,0 +1,4 @@
+users:
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

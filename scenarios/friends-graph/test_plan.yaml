@@ -1,0 +1,315 @@
+test_plan:
+  name: "Friends Graph — Follow, Profiles, Visibility & Subscriptions (Phase A + B)"
+  description: >
+    Verify the v1 social foundation (Phase A: follow graph, public profiles,
+    visibility scopes, profile links, verified-organizer toggle, account
+    deletion cascade) plus the Phase B subscription layer built on top:
+    opt-in calendar subscriptions (POST/DELETE
+    /api/social/users/{handle}/subscribe, GET /api/social/me/subscriptions,
+    GET /api/social/me/subscribers). Privacy chokepoint still holds
+    end-to-end: subscribing to a calendar you cannot view returns 404
+    (never 403). The explorer friend filter is covered separately in the
+    ``friends-events`` scenario (which seeds the necessary event data) and
+    the Admin Users tab is covered in ``users-management``.
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=friends-graph"
+    - >
+      The scenario pre-seeds five users: alice, bob, carol, dave (handles match
+      email local part) plus admin@example.com (Dev Admin). It also pre-seeds
+      the follow graph: alice<->bob (mutual = friends), carol->alice (one-way),
+      dave & admin are isolated. No follows are created via UI before step 1 —
+      every step verifies state on top of this baseline.
+    - "Use a fresh browser profile or incognito window per signed-in user."
+    - >
+      Cookie banner: accept "Personalization" so /api/auth/* and /api/social/*
+      are not blocked by the consent gate.
+
+  steps:
+    # ── Public profile & follow button states (anonymous) ────────
+    - id: 1
+      title: "Anonymous viewer sees a public-shape profile shell"
+      description: >
+        In Browser A (signed out), open /u/alice directly via the URL bar.
+      expected: >
+        Header shows display name "Alice Rivera", handle @alice, avatar
+        placeholder, member-since date, and follower/following counts
+        (followers=2: bob & carol; following=1: bob; mutual_friends=0 since
+        viewer is anonymous). The follow button reads "Sign in to follow" and
+        is a primary blue square button. NO email is shown anywhere on the page
+        or in the /api/social/users/alice JSON response (verify via DevTools).
+        The "Going / Saved / Calendar" tabs each render the
+        "Only friends can see this" placeholder because alice's defaults are
+        friends-only and the viewer has no session.
+
+    # ── Sign in as carol — one-way follow already in place ──────
+    - id: 2
+      title: "Carol sees Following state and can unfollow"
+      description: >
+        Open Browser B, go to /login → "Sign in as Carol Nguyen". Navigate to
+        /u/alice.
+      expected: >
+        The follow button reads "Following" (secondary style: white background,
+        slate border). Below the header, mutual_friends_count is 0 (carol and
+        alice are not mutual). Tabs are still gated with the friends-only
+        placeholder because carol is not yet a friend (alice has not followed
+        back). Click "Following" once — button becomes "Follow" (primary blue),
+        followers count for alice drops from 2 to 1. Click "Follow" again to
+        restore the one-way edge for the rest of the run.
+
+    # ── Sign in as bob — mutual relationship ────────────────────
+    - id: 3
+      title: "Bob & Alice are mutual — gated tabs unlock"
+      description: >
+        Open Browser C, /login → "Sign in as Bob Martin". Navigate to /u/alice.
+      expected: >
+        Follow button reads "Friends ✓" (secondary style). Header shows
+        mutual_friends_count > 0 only if there are common follows (will be 0 in
+        this baseline). All three tabs (Going / Saved / Calendar) render their
+        normal "Coming soon" content placeholder — the friends-only placeholder
+        is GONE. /api/social/users/alice/followers returns 200 with both bob
+        and carol in items.
+
+    # ── Profile-link discoverability ────────────────────────────
+    - id: 4
+      title: "Carol adds Instagram & Facebook links from /account"
+      description: >
+        On Browser B (Carol), go to /account. Scroll to the "Privacy &
+        visibility" section. In "Profile links (optional)" enter
+        https://instagram.com/carol.dances and https://facebook.com/carol.fb,
+        then click "Save links".
+      expected: >
+        Both URLs persist after a page reload (re-render reads back the
+        normalized values from /api/social/users/carol). Try entering
+        https://example.com/carol — saving fails with a clear error toast
+        ("URL must be on one of: instagram.com, facebook.com, fb.com"); the
+        previous saved values remain unchanged.
+
+    - id: 5
+      title: "Profile links appear on Carol's public profile"
+      description: >
+        On Browser C (Bob), open /u/carol.
+      expected: >
+        Below the header, two small icon links to Instagram and Facebook are
+        rendered (open in a new tab). Hovering shows the full URL. The links
+        are NOT marked verified — they are plain user-supplied links. On
+        Browser A (signed out), /u/carol shows the same links (links are
+        public regardless of visibility scopes — they are profile metadata).
+
+    # ── Visibility — friends only is the default ────────────────
+    - id: 6
+      title: "Carol switches account visibility to public"
+      description: >
+        On Browser B (Carol), /account → "Account visibility" section →
+        click the "Anyone" option.
+      expected: >
+        The "Anyone" card becomes selected (blue border). Network request:
+        PATCH /api/social/me/visibility with {"account_visibility":"public"}
+        returns 200 and the response includes account_visibility="public".
+        Reload the page — "Anyone" is still selected (state survived).
+
+    - id: 7
+      title: "Dave (stranger) can now see Carol's calendar tab"
+      description: >
+        Open Browser D, /login → "Sign in as Dave Smith". Navigate to /u/carol.
+        Click the "Calendar" tab.
+      expected: >
+        The follow button reads "Follow" (Dave is not following Carol). The
+        Calendar tab renders normally rather than the friends-only gate,
+        because carol's account_visibility is now public. All tabs are
+        viewable; per-event audience still gates which specific rows show.
+
+    - id: 8
+      title: "Carol locks account back down to friends — strangers see gate"
+      description: >
+        Back in Browser B (Carol), /account → "Account visibility" → click
+        "Friends only". Then on Browser D (Dave — not Carol's friend), open
+        /u/carol and click the Going tab.
+      expected: >
+        Dave sees the friends-only placeholder on every private tab.
+        Switch back to Browser B and open /u/carol → Going tab — Carol sees
+        her own tab content (self always wins).
+
+    # ── Privacy chokepoint never leaks via 403 ──────────────────
+    - id: 9
+      title: "API uses 404 (not 403) for follow-listing on private profile"
+      description: >
+        On Browser D (Dave), open DevTools network tab. Hit
+        GET /api/social/users/carol/followers (Carol's account visibility
+        defaults to "friends" — only friends can list her followers).
+      expected: >
+        The HTTP response is either 200 (if carol has loosened calendar
+        visibility) or 404 (if she has not). Crucially, no 403 is ever
+        returned — the absence of permission is indistinguishable from a
+        non-existent handle. The /api/social/users/carol GET still returns
+        200 with the public profile shell (handle is the public identifier).
+
+    # ── Verified organizer admin toggle (backend-only in Phase A) ─
+    - id: 10
+      title: "Admin marks Alice as a verified organizer via API"
+      description: >
+        On Browser C, open a terminal alongside it. With the dev session
+        cookie for admin@example.com active (sign in via /login → Dev Admin in
+        a separate browser if needed), run:
+          curl -X PATCH http://localhost:8001/api/social/admin/users/alice/verified \
+               -H "Content-Type: application/json" \
+               -b "session=<copy from DevTools>" \
+               -d '{"is_verified_organizer": true}'
+      expected: >
+        Response is 200 with is_verified_organizer=true in the JSON. Refresh
+        /u/alice in any browser — a small "Verified organizer" badge now
+        appears next to the display name. Calling the same endpoint as a
+        non-admin user returns 403 ("Admin access required").
+
+    # ── Account deletion is the LAST step — see step 14 ────────────
+    # (Steps 11–13 below all rely on Carol still existing; deletion is
+    # deliberately deferred to the end so we can also verify that the
+    # cascade clears her Phase B subscriptions, not just the follow edges.)
+
+    # ──────────────────────────────────────────────────────────────
+    # Phase B — Calendar subscriptions
+    # ──────────────────────────────────────────────────────────────
+    # Subscribing is gated by ``can_view(viewer, owner)`` — i.e. the
+    # OWNER's account_visibility setting decides who may subscribe:
+    #   - "public"  → anyone signed in
+    #   - "friends" → mutual followers only
+    # The two paths below are exercised on different users so each is
+    # covered independently:
+    #   - Step 11: Bob subscribes to Alice  → "friends" path (mutual follow,
+    #     Alice keeps default account_visibility="friends").
+    #   - Step 12: Carol subscribes to Dave → "public" path (no follow at
+    #     all; Dave is seeded with account_visibility="public" via
+    #     mock-users.yaml).
+    # Step 13 then verifies the chokepoint (friends-only owner + non-
+    # friend viewer → 404, never 403).
+
+    - id: 11
+      title: "Bob (friend) subscribes to Alice's calendar from /u/alice"
+      description: >
+        On Browser C (Bob), open /u/alice. Bob is mutually following Alice
+        (alice<->bob is the seeded friendship), and Alice keeps the default
+        account_visibility="friends". Locate the "Subscribe" button in the
+        profile header and click it.
+      expected: >
+        Button label flips to "Subscribed" (secondary style, matches the
+        Following pill aesthetic). Network:
+        POST /api/social/users/alice/subscribe → 200 with
+        {is_subscribed: true}. A subsequent GET /api/social/users/alice
+        returns can_view_calendar=true and is_subscribed=true. Critically,
+        the same flow attempted by Carol (who only has a one-way follow of
+        Alice) would 404 — the friends rule means a one-way follower is
+        NOT enough; this is the intended product behaviour. (The Subscribe
+        button is hidden in Carol's UI because the profile response shows
+        can_view_calendar=false for her.) On Browser A (Alice) reload
+        /account: the "My calendar" row in the Privacy & visibility section
+        now shows a "1 subscriber" pill next to the visibility selector, and
+        the new half/half row shows the "My Subscriptions" panel on the
+        right of "My Events" (still empty for Alice). Clicking the
+        subscribers pill opens a modal listing exactly one row — Bob — with
+        avatar/handle, and the row links to /u/bob. Then on Browser A open
+        /my-calendar: the page header (next to the "My Calendar" title)
+        also shows the "1 subscriber" pill driven by the same
+        GET /api/social/me/subscribers endpoint.
+
+    - id: 12
+      title: "Carol subscribes to Dave's PUBLIC calendar (no follow needed)"
+      description: >
+        On Browser B (Carol), open /u/dave. Dave is seeded with
+        account_visibility="public" and Carol does NOT follow him (and
+        vice versa). The Subscribe button must still be visible because the
+        profile response carries can_view_calendar=true for any signed-in
+        viewer when the owner's account is public. Click Subscribe.
+      expected: >
+        POST /api/social/users/dave/subscribe → 200 with
+        {is_subscribed: true}. This proves the rule is "owner's
+        account_visibility gates subscribing", not "must be friends" — a
+        public-calendar organiser can be followed by anyone without
+        requiring a reciprocal follow. Then on Browser B navigate to
+        /calendar (MyCalendar) — the "Subscriptions" panel lists exactly
+        one row: Dave. Bob's panel (Browser C) lists exactly one row: Alice.
+        Additionally, on Browser B open /account: the new "My
+        Subscriptions" section (right half of the My Events / My
+        Subscriptions row) lists exactly one row: Dave. On Browser D
+        (Dave), reload /account and verify the "My calendar" row shows
+        "1 subscriber" with a modal listing Carol; /my-calendar header
+        shows the same pill.
+        Clicking the unsubscribe icon on either side removes the row
+        optimistically (DELETE /api/social/users/{handle}/subscribe → 200);
+        re-clicking Subscribe on the profile restores it for step 14.
+
+    - id: 13
+      title: "Subscribing to a calendar you cannot view returns 404"
+      description: >
+        Privacy chokepoint. On Browser B (Carol), open /u/alice. Alice's
+        calendar visibility is "friends" and Carol's follow of Alice is
+        one-way (not mutual) — so Carol is NOT a friend of Alice. The
+        Subscribe button must be hidden in the UI. Bypass the guard by
+        running in DevTools console:
+          fetch('/api/social/users/alice/subscribe', {method: 'POST'})
+            .then(r => console.log(r.status))
+      expected: >
+        Status logged is 404 (never 403). The GET on /api/social/users/alice
+        as Carol returned can_view_calendar=false, which is why the frontend
+        hid the button. No row was inserted in calendar_subscriptions. The
+        same call by Bob (mutual friend) — already done in step 11 — would
+        return 200, confirming the gate.
+
+    # ── /account → My network panel (followers / following / friends) ──
+    - id: 14
+      title: "Bob discovers his friends list on /account → My network"
+      description: >
+        On Browser C (Bob), open /account. Below the My Events / My
+        Subscriptions row, locate the new "My network" panel. It exposes
+        three tabs: "Friends", "Followers", "Following". The Friends tab
+        is selected by default and answers the user-facing question
+        "who are my friends?" (friendship = mutual follow).
+
+        Click each tab in turn and observe the network calls.
+      expected: >
+        Friends tab: GET /api/social/me/friends?limit=50 → 200 with at
+        least Alice (Bob and Alice are mutual followers per the seeded
+        graph). Followers tab: GET /api/social/me/followers?limit=50 →
+        200 listing everyone who follows Bob. Following tab: GET
+        /api/social/me/following?limit=50 → 200 listing everyone Bob
+        follows (includes Alice and any users from steps 11–12).
+
+        Each row renders an avatar/initial, display name + @handle, and
+        links to /u/<handle>. Rows on the Followers/Following tabs that
+        are also mutual show a small "· friend" hint next to the
+        handle. Empty tabs render a friendly placeholder (e.g. "You
+        don't have any friends yet. Friends are users who follow you
+        back."). Each tab is fetched lazily on first activation; the
+        per-tab counts (rendered next to the tab labels after fetch)
+        match the followers_count / following_count surfaced on Bob's
+        public /u/bob profile.
+
+    # ─────────────────────────────────────────────────────────────
+    # Account deletion — must be the last step (cascades follows AND subs)
+    # ─────────────────────────────────────────────────────────────
+
+    - id: 15
+      title: "Carol deletes account — follows AND subscriptions cascade away"
+      description: >
+        Pre-state from prior steps: Carol still follows Alice (baseline
+        one-way) AND is subscribed to Dave's public calendar (from step 12;
+        re-clicked Subscribe at the end of that step). Bob is also
+        subscribed to Alice from step 11 — that subscription must SURVIVE
+        the cascade because Bob is not the one being deleted. On Browser B
+        (Carol), open /account → "Delete my account" → confirm. Then on
+        Browser C (Bob), open /u/alice and on Browser D (Dave) check
+        GET /api/social/me/subscriptions in DevTools.
+      expected: >
+        Browser B is signed out and redirected to "/". On Browser C, Alice's
+        followers count drops by 1 (Carol's edge is gone) but Bob's
+        subscription to Alice is unaffected — visible in Alice's
+        /api/social/me/subscriptions, and Bob's MyCalendar Subscriptions
+        panel still lists Alice. On Browser D, Dave's
+        /api/social/me/subscriptions no longer lists Carol as a subscriber
+        (the public-calendar subscription cascaded too). Hitting /u/carol
+        returns the SPA, but GET /api/social/users/carol responds 404 — the
+        user is fully gone. No orphan rows remain in user_follows OR
+        calendar_subscriptions referencing carol (regression: pre-fix the
+        delete_me handler skipped both tables, so Alice's follower count
+        stayed inflated by 1 forever and Dave's calendar showed a ghost
+        subscriber). To re-run earlier steps after this one, restart the
+        scenario with `task start:scenario SCENARIO=friends-graph` so Carol
+        is re-seeded.

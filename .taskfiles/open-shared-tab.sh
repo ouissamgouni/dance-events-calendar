@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# Open a URL in Google Chrome:
-#   - If a tab with this URL (prefix match) already exists → focus + reload it
+# Open a URL in your default Chrome profile (cookies + localStorage shared
+# with your normal browsing). Used by BROWSER=shared.
+#
+#   - If a tab with this URL (exact, or a path/query/fragment of it) already
+#     exists → focus + reload it
 #   - Otherwise → open a new Chrome window
 #
-# Usage: open-browser.sh <url>
+# Usage: open-shared-tab.sh <url>
 
 URL="$1"
 if [ -z "$URL" ]; then
-  echo "Usage: open-browser.sh <url>"
+  echo "Usage: open-shared-tab.sh <url>"
   exit 1
 fi
 
@@ -21,7 +24,8 @@ if application \"Google Chrome\" is running then
       set tabIndex to 0
       repeat with t in tabs of w
         set tabIndex to tabIndex + 1
-        if URL of t starts with targetURL then
+        set tu to URL of t
+        if tu is targetURL or tu starts with (targetURL & \"/\") or tu starts with (targetURL & \"?\") or tu starts with (targetURL & \"#\") then
           set found to true
           set active tab index of w to tabIndex
           set index of w to 1

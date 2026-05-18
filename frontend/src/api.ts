@@ -1,4 +1,4 @@
-import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry } from './types';
+import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry } from './types';
 
 declare const __VITE_API_URL__: string;
 
@@ -33,15 +33,29 @@ const parseJsonResponse = async <T>(res: Response, fallbackMessage: string): Pro
     const bodyText = await res.text();
 
     if (!res.ok) {
+        let detail: string | null = null;
         if (contentType.includes('application/json') && bodyText) {
             try {
-                const errorBody = JSON.parse(bodyText) as { detail?: string; message?: string };
-                throw new Error(errorBody.detail || errorBody.message || fallbackMessage);
+                const errorBody = JSON.parse(bodyText) as { detail?: unknown; message?: unknown };
+                // FastAPI wraps validation errors as ``detail: [{loc, msg, ...}]``;
+                // surface the first ``msg`` so the toast is human-readable
+                // instead of "[object Object]".
+                if (Array.isArray(errorBody.detail) && errorBody.detail.length > 0) {
+                    const first = errorBody.detail[0] as { msg?: unknown };
+                    if (typeof first?.msg === 'string') detail = first.msg;
+                } else if (typeof errorBody.detail === 'string') {
+                    detail = errorBody.detail;
+                } else if (typeof errorBody.message === 'string') {
+                    detail = errorBody.message;
+                }
             } catch {
-                throw new Error(`${fallbackMessage} (HTTP ${res.status})`);
+                // body wasn't valid JSON despite the header — fall through.
             }
         }
-        throw new Error(`${fallbackMessage} (HTTP ${res.status})`);
+        // Throw OUTSIDE the parse try/catch so the detail isn't swallowed by
+        // the fallback. Previous shape buried the real message because the
+        // ``throw new Error(detail)`` lived inside the same try block.
+        throw new Error(detail ? detail : `${fallbackMessage} (HTTP ${res.status})`);
     }
 
     if (!bodyText) return {} as T;
@@ -61,13 +75,38 @@ const parseJsonResponse = async <T>(res: Response, fallbackMessage: string): Pro
     }
 };
 
-export async function fetchEvents(params?: { startDate?: string; endDate?: string; tagIds?: number[] }): Promise<CalendarEvent[]> {
+export async function fetchEvents(
+    params?: {
+        startDate?: string;
+        endDate?: string;
+        tagIds?: number[];
+        area?: { min_lat: number; min_lng: number; max_lat: number; max_lng: number } | null;
+        friendsGoing?: boolean;
+        friendsSaved?: boolean;
+        friendHandle?: string;
+    },
+): Promise<CalendarEvent[]> {
     const searchParams = new URLSearchParams();
     if (params?.startDate) searchParams.set('start_date', params.startDate);
     if (params?.endDate) searchParams.set('end_date', params.endDate);
     if (params?.tagIds?.length) searchParams.set('tag_ids', params.tagIds.join(','));
+    if (params?.area) {
+        searchParams.set('min_lat', String(params.area.min_lat));
+        searchParams.set('min_lng', String(params.area.min_lng));
+        searchParams.set('max_lat', String(params.area.max_lat));
+        searchParams.set('max_lng', String(params.area.max_lng));
+    }
+    if (params?.friendsGoing) searchParams.set('friends_going', 'true');
+    if (params?.friendsSaved) searchParams.set('friends_saved', 'true');
+    if (params?.friendHandle) searchParams.set('friend_handle', params.friendHandle);
     const qs = searchParams.toString();
-    const res = await fetch(`${BASE}/events${qs ? `?${qs}` : ''}`, { cache: 'no-cache' });
+    // Friend-filter params require the session cookie to identify the viewer
+    // and apply mutual-follower checks; sending credentials is harmless for
+    // anonymous reads (the backend treats them as no viewer).
+    const res = await fetch(`${BASE}/events${qs ? `?${qs}` : ''}`, {
+        cache: 'no-cache',
+        credentials: 'include',
+    });
     return parseJsonResponse<CalendarEvent[]>(res, 'Failed to fetch events');
 }
 
@@ -92,6 +131,14 @@ export interface SiteSettings {
     show_popularity: boolean;
     show_ratings: boolean;
     popularity_threshold: number;
+    // Adoption-boost feature toggles. Optional so older API responses
+    // (e.g. cached or pre-deploy) still parse — defaults are applied in
+    // FeatureFlagsContext.
+    following_badge_enabled?: boolean;
+    unseen_state_enabled?: boolean;
+    trending_enabled?: boolean;
+    trending_window_days?: number;
+    trending_floor_going?: number;
     event_color_bar_color: string;
     tag_sort_mode: 'group' | 'event_count';
 }
@@ -192,6 +239,23 @@ export async function fetchAuthMode(): Promise<AuthMode> {
     return res.json();
 }
 
+export interface PreferredAreaPayload {
+    min_lat: number;
+    min_lng: number;
+    max_lat: number;
+    max_lng: number;
+    label: string;
+}
+
+export interface UserPreferences {
+    share_attendance_default: boolean;
+    preferred_area: PreferredAreaPayload | null;
+    preferred_tag_ids: number[];
+    /** ISO timestamp; null until the user (or anon→authed merge) has
+     * explicitly saved preferences. */
+    set_at: string | null;
+}
+
 export interface AuthUser {
     user_id?: string;
     email: string;
@@ -204,9 +268,19 @@ export interface AuthUser {
     avatar_url?: string | null;
     is_admin?: boolean;
     share_attendance_default?: boolean;
+    /** New 3-tier replacement for ``share_attendance_default``. May be
+     * absent on older payloads — fall back to the boolean. */
+    share_attendance_default_audience?: 'public' | 'friends' | 'private';
+    /** Full preferences blob. Always present on /auth/me and /auth/google
+     * after the preferences feature shipped. */
+    preferences?: UserPreferences;
     /** Only present on the /auth/google response — lets the client emit
      * `signup_completed` vs `login_completed`. Absent on /auth/me. */
     is_new_user?: boolean;
+    /** Phase E (E2): viewer's own friend count (mutual follows). Used by
+     *  AudiencePicker to surface a "no friends yet" hint when the user
+     *  picks the ``friends`` audience. Null/undefined for anon. */
+    friend_count?: number;
 }
 
 export async function loginWithGoogle(
@@ -214,10 +288,12 @@ export async function loginWithGoogle(
     deviceId?: string,
     mockEmail?: string,
     mockName?: string,
+    anonPreferences?: { preferred_area: PreferredAreaPayload | null; preferred_tag_ids: number[] } | null,
 ): Promise<AuthUser> {
     const body: Record<string, unknown> = { credential, device_id: deviceId };
     if (mockEmail) body.mock_email = mockEmail;
     if (mockName) body.mock_name = mockName;
+    if (anonPreferences) body.anon_preferences = anonPreferences;
     const res = await fetch(`${BASE}/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -268,6 +344,13 @@ export async function fetchMySavedEventIds(): Promise<string[]> {
     return data.event_ids ?? [];
 }
 
+export async function fetchMySavedEvents(): Promise<SavedEventEntry[]> {
+    const res = await fetch(`${BASE}/auth/saved-events`, { credentials: 'include' });
+    if (!res.ok) return [];
+    const data = await res.json() as { events?: SavedEventEntry[] };
+    return data.events ?? [];
+}
+
 export async function fetchMyAttendingEventIds(): Promise<string[]> {
     const res = await fetch(`${BASE}/auth/attending-events`, { credentials: 'include' });
     if (!res.ok) return [];
@@ -282,7 +365,17 @@ export async function fetchMyAttendingEvents(): Promise<AttendingEventEntry[]> {
     return data.events ?? [];
 }
 
-export async function updateUserPreferences(prefs: { share_attendance_default?: boolean }): Promise<{ share_attendance_default: boolean }> {
+export interface UpdatePreferencesPayload {
+    share_attendance_default?: boolean;
+    /** Omit to leave area untouched; pass `null` to clear. */
+    preferred_area?: PreferredAreaPayload | null;
+    /** Omit to leave tags untouched; pass `[]` to clear. */
+    preferred_tag_ids?: number[];
+}
+
+export async function updateUserPreferences(
+    prefs: UpdatePreferencesPayload,
+): Promise<UserPreferences> {
     const res = await fetch(`${BASE}/auth/preferences`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -326,6 +419,691 @@ export async function checkHandleAvailable(handle: string): Promise<HandleAvaila
     );
     if (!res.ok) throw new Error('Handle check failed');
     return res.json();
+}
+
+// --- Social / friends graph (Phase A) ---
+//
+// Asymmetric follow model: a "friend" is a mutual follow, derived server-side.
+// All read endpoints honour the per-scope visibility chokepoint (`can_view`)
+// and respond 404 for denied access (never 403) to avoid leaking existence.
+
+export type Visibility = 'public' | 'friends' | 'private';
+export type ShareAudience = Visibility;
+/** Single account-level visibility gate (Instagram-style). Only two
+ * values now: ``public`` (anyone) or ``friends`` (mutual followers).
+ * The legacy three-scope (visibility_attendance / visibility_saved /
+ * visibility_calendar) model has been collapsed; per-event audience
+ * (``share_audience`` / ``audience``) remains independent. */
+export type AccountVisibility = 'public' | 'friends';
+
+export interface ProfileCalendarItem {
+    event: CalendarEvent;
+    intent: 'going' | 'saved' | 'both';
+}
+
+export interface ProfileCalendarList {
+    items: ProfileCalendarItem[];
+    total: number;
+    limit: number;
+    offset: number;
+}
+
+export interface MutualSubscriberPreview {
+    handle: string;
+    display_name: string | null;
+    avatar_url: string | null;
+}
+
+export interface PublicProfile {
+    handle: string;
+    display_name: string | null;
+    avatar_url: string | null;
+    is_verified_organizer: boolean;
+    instagram_url: string | null;
+    facebook_url: string | null;
+    bio: string | null;
+    member_since: string;
+    followers_count: number;
+    following_count: number;
+    subscribers_count: number;
+    going_count_30d: number;
+    is_self: boolean;
+    is_following: boolean;
+    follows_you: boolean;
+    is_friend: boolean;
+    account_visibility: AccountVisibility;
+    friend_count: number;
+    mutual_friend_count: number;
+    // Default audience pre-selected in the GoingButton audience picker
+    // for new RSVPs (replacement for the legacy boolean
+    // ``share_attendance_default``).
+    share_attendance_default_audience: ShareAudience;
+    can_view_calendar: boolean;
+    is_subscribed: boolean;
+    notify_new_events: boolean;
+    mutual_subscribers: MutualSubscriberPreview[];
+    mutual_subscribers_count: number;
+    // Phase E (E10): viewer's friends who follow this verified organizer.
+    // 0 for non-organizers, anonymous viewers, and self-views.
+    mutual_friends_who_follow?: number;
+}
+
+export interface FollowUser {
+    handle: string;
+    display_name: string | null;
+    avatar_url: string | null;
+    is_verified_organizer: boolean;
+    is_friend: boolean;
+}
+
+export interface FollowList {
+    items: FollowUser[];
+    total: number;
+}
+
+export interface FollowAction {
+    handle: string;
+    is_following: boolean;
+    is_friend: boolean;
+    followers_count: number;
+    // Phase B: follow now implies subscribe-to-calendar.
+    is_subscribed: boolean;
+    notify_new_events: boolean;
+}
+
+export async function fetchPublicProfile(handle: string): Promise<PublicProfile> {
+    const res = await fetch(
+        `${BASE}/social/users/${encodeURIComponent(handle)}`,
+        { credentials: 'include' },
+    );
+    if (res.status === 404) throw new Error('User not found');
+    return parseJsonResponse<PublicProfile>(res, 'Failed to fetch profile');
+}
+
+export async function followUser(handle: string): Promise<FollowAction> {
+    const res = await fetch(
+        `${BASE}/social/users/${encodeURIComponent(handle)}/follow`,
+        { method: 'POST', credentials: 'include' },
+    );
+    return parseJsonResponse<FollowAction>(res, 'Failed to follow user');
+}
+
+export async function unfollowUser(handle: string): Promise<FollowAction> {
+    const res = await fetch(
+        `${BASE}/social/users/${encodeURIComponent(handle)}/follow`,
+        { method: 'DELETE', credentials: 'include' },
+    );
+    return parseJsonResponse<FollowAction>(res, 'Failed to unfollow user');
+}
+
+export async function fetchFollowers(
+    handle: string,
+    opts?: { limit?: number; offset?: number },
+): Promise<FollowList> {
+    const sp = new URLSearchParams();
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    if (opts?.offset) sp.set('offset', String(opts.offset));
+    const qs = sp.toString();
+    const res = await fetch(
+        `${BASE}/social/users/${encodeURIComponent(handle)}/followers${qs ? `?${qs}` : ''}`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<FollowList>(res, 'Failed to fetch followers');
+}
+
+export async function fetchFollowing(
+    handle: string,
+    opts?: { limit?: number; offset?: number },
+): Promise<FollowList> {
+    const sp = new URLSearchParams();
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    if (opts?.offset) sp.set('offset', String(opts.offset));
+    const qs = sp.toString();
+    const res = await fetch(
+        `${BASE}/social/users/${encodeURIComponent(handle)}/following${qs ? `?${qs}` : ''}`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<FollowList>(res, 'Failed to fetch following');
+}
+
+export async function fetchMyFriends(opts?: { q?: string; limit?: number }): Promise<FollowList> {
+    const sp = new URLSearchParams();
+    if (opts?.q) sp.set('q', opts.q);
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    const qs = sp.toString();
+    const res = await fetch(
+        `${BASE}/social/me/friends${qs ? `?${qs}` : ''}`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<FollowList>(res, 'Failed to fetch friends');
+}
+
+// Phase E (E9): friends leaderboard.
+export type LeaderboardPeriod = '7d' | '30d' | '90d';
+
+export interface FriendsLeaderboardEntry {
+    rank: number;
+    handle: string;
+    display_name: string | null;
+    avatar_url: string | null;
+    is_verified_organizer: boolean;
+    going_count: number;
+}
+
+export interface FriendsLeaderboardResponse {
+    period: LeaderboardPeriod;
+    items: FriendsLeaderboardEntry[];
+}
+
+export async function fetchFriendsLeaderboard(
+    opts?: { period?: LeaderboardPeriod; limit?: number },
+): Promise<FriendsLeaderboardResponse> {
+    const sp = new URLSearchParams();
+    if (opts?.period) sp.set('period', opts.period);
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    const qs = sp.toString();
+    const res = await fetch(
+        `${BASE}/social/me/friends/leaderboard${qs ? `?${qs}` : ''}`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<FriendsLeaderboardResponse>(
+        res, 'Failed to fetch leaderboard',
+    );
+}
+
+export async function fetchMyFollowers(
+    opts?: { limit?: number; offset?: number },
+): Promise<FollowList> {
+    const sp = new URLSearchParams();
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    if (opts?.offset) sp.set('offset', String(opts.offset));
+    const qs = sp.toString();
+    const res = await fetch(
+        `${BASE}/social/me/followers${qs ? `?${qs}` : ''}`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<FollowList>(res, 'Failed to fetch my followers');
+}
+
+export async function fetchMyFollowing(
+    opts?: { limit?: number; offset?: number },
+): Promise<FollowList> {
+    const sp = new URLSearchParams();
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    if (opts?.offset) sp.set('offset', String(opts.offset));
+    const qs = sp.toString();
+    const res = await fetch(
+        `${BASE}/social/me/following${qs ? `?${qs}` : ''}`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<FollowList>(res, 'Failed to fetch my following');
+}
+
+export async function fetchMutualFriends(
+    handle: string,
+    opts?: { limit?: number; offset?: number },
+): Promise<FollowList> {
+    const sp = new URLSearchParams();
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    if (opts?.offset) sp.set('offset', String(opts.offset));
+    const qs = sp.toString();
+    const res = await fetch(
+        `${BASE}/social/users/${encodeURIComponent(handle)}/mutual-friends${qs ? `?${qs}` : ''}`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<FollowList>(res, 'Failed to fetch mutual friends');
+}
+
+export async function removeMyFollower(handle: string): Promise<void> {
+    const res = await fetch(
+        `${BASE}/social/me/followers/${encodeURIComponent(handle)}`,
+        { method: 'DELETE', credentials: 'include' },
+    );
+    if (!res.ok && res.status !== 204) {
+        throw new Error('Failed to remove follower');
+    }
+}
+
+// --- Calendar subscriptions (Phase B) ---
+
+export interface SubscribedUser {
+    handle: string;
+    display_name: string | null;
+    avatar_url: string | null;
+    is_verified_organizer: boolean;
+    notify_new_events: boolean;
+    can_view_calendar: boolean;
+    subscribed_at: string;
+}
+
+export interface SubscriptionList {
+    items: SubscribedUser[];
+    total: number;
+}
+
+export interface SubscriptionAction {
+    handle: string;
+    is_subscribed: boolean;
+    notify_new_events: boolean;
+}
+
+export async function subscribeToCalendar(
+    handle: string,
+    notify_new_events = true,
+): Promise<SubscriptionAction> {
+    const res = await fetch(
+        `${BASE}/social/users/${encodeURIComponent(handle)}/subscribe`,
+        {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notify_new_events }),
+        },
+    );
+    if (res.status === 404) throw new Error("This calendar isn't available");
+    return parseJsonResponse<SubscriptionAction>(res, 'Failed to subscribe');
+}
+
+export async function unsubscribeFromCalendar(handle: string): Promise<SubscriptionAction> {
+    const res = await fetch(
+        `${BASE}/social/users/${encodeURIComponent(handle)}/subscribe`,
+        { method: 'DELETE', credentials: 'include' },
+    );
+    return parseJsonResponse<SubscriptionAction>(res, 'Failed to unsubscribe');
+}
+
+export async function fetchMySubscriptions(
+    opts?: { limit?: number; offset?: number },
+): Promise<SubscriptionList> {
+    const sp = new URLSearchParams();
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    if (opts?.offset) sp.set('offset', String(opts.offset));
+    const qs = sp.toString();
+    const res = await fetch(
+        `${BASE}/social/me/subscriptions${qs ? `?${qs}` : ''}`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<SubscriptionList>(res, 'Failed to fetch subscriptions');
+}
+
+export interface SubscriberUser {
+    handle: string;
+    display_name: string | null;
+    avatar_url: string | null;
+    is_verified_organizer: boolean;
+    subscribed_at: string;
+}
+
+export interface SubscriberList {
+    items: SubscriberUser[];
+    total: number;
+}
+
+export async function fetchMySubscribers(
+    opts?: { limit?: number; offset?: number },
+): Promise<SubscriberList> {
+    const sp = new URLSearchParams();
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    if (opts?.offset) sp.set('offset', String(opts.offset));
+    const qs = sp.toString();
+    const res = await fetch(
+        `${BASE}/social/me/subscribers${qs ? `?${qs}` : ''}`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<SubscriberList>(res, 'Failed to fetch subscribers');
+}
+
+export async function removeMySubscriber(handle: string): Promise<void> {
+    const res = await fetch(
+        `${BASE}/social/me/subscribers/${encodeURIComponent(handle)}`,
+        { method: 'DELETE', credentials: 'include' },
+    );
+    if (!res.ok && res.status !== 204) {
+        throw new Error('Failed to remove subscriber');
+    }
+}
+
+// --- Phase C: in-app notifications ---
+
+export type NotificationKind = 'subscription_going' | 'subscription_suggested' | 'new_follower' | 'new_friend';
+
+export interface NotificationActor {
+    handle: string;
+    display_name: string;
+    avatar_url: string | null;
+    is_verified_organizer: boolean;
+    // Phase E (E1): True iff the current viewer already follows this actor.
+    // Used to decide whether to show a "Follow back" CTA on new_follower rows.
+    is_following?: boolean;
+}
+
+export interface NotificationItem {
+    id: number;
+    kind: NotificationKind;
+    event_id: string | null;
+    event_title: string | null;
+    event_start: string | null;
+    actor: NotificationActor;
+    created_at: string;
+    read_at: string | null;
+}
+
+export interface NotificationListResponse {
+    items: NotificationItem[];
+    total: number;
+    unread_count: number;
+    limit: number;
+    offset: number;
+}
+
+export async function fetchNotifications(
+    opts?: { kind?: NotificationKind; unreadOnly?: boolean; limit?: number; offset?: number },
+): Promise<NotificationListResponse> {
+    const sp = new URLSearchParams();
+    if (opts?.kind) sp.set('kind', opts.kind);
+    if (opts?.unreadOnly) sp.set('unread_only', 'true');
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    if (opts?.offset) sp.set('offset', String(opts.offset));
+    const qs = sp.toString();
+    const res = await fetch(
+        `${BASE}/notifications${qs ? `?${qs}` : ''}`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<NotificationListResponse>(res, 'Failed to fetch notifications');
+}
+
+export async function fetchNotificationsUnreadCount(): Promise<{ count: number }> {
+    const res = await fetch(`${BASE}/notifications/unread-count`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<{ count: number }>(res, 'Failed to fetch unread count');
+}
+
+export async function markNotificationRead(id: number): Promise<NotificationItem> {
+    const res = await fetch(`${BASE}/notifications/${id}/read`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return parseJsonResponse<NotificationItem>(res, 'Failed to mark notification read');
+}
+
+export async function markAllNotificationsRead(): Promise<{ count: number }> {
+    const res = await fetch(`${BASE}/notifications/read-all`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return parseJsonResponse<{ count: number }>(res, 'Failed to mark all read');
+}
+
+export interface SubscribedEventVia {
+    actor: NotificationActor;
+    kind: NotificationKind;
+}
+
+export interface SubscribedEventItem {
+    event_id: string;
+    calendar_id: string;
+    title: string;
+    description: string | null;
+    location: string | null;
+    start: string;
+    end: string;
+    all_day: boolean;
+    latitude: number | null;
+    longitude: number | null;
+    color: string | null;
+    via: SubscribedEventVia[];
+}
+
+export interface SubscribedEventListResponse {
+    items: SubscribedEventItem[];
+    total: number;
+    limit: number;
+    offset: number;
+}
+
+export async function fetchSubscribedEvents(
+    opts?: { fromHandle?: string; limit?: number; offset?: number },
+): Promise<SubscribedEventListResponse> {
+    const sp = new URLSearchParams();
+    if (opts?.fromHandle) sp.set('from_handle', opts.fromHandle);
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    if (opts?.offset) sp.set('offset', String(opts.offset));
+    const qs = sp.toString();
+    const res = await fetch(
+        `${BASE}/social/me/subscribed-events${qs ? `?${qs}` : ''}`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<SubscribedEventListResponse>(res, 'Failed to fetch subscribed events');
+}
+
+// --- Admin: users management ---
+
+export interface AdminUserRow {
+    user_id: string;
+    email: string;
+    handle: string | null;
+    display_name: string | null;
+    avatar_url: string | null;
+    is_admin: boolean;
+    is_verified_organizer: boolean;
+    deleted_at: string | null;
+    created_at: string;
+    followers_count: number;
+    following_count: number;
+}
+
+export interface AdminUserList {
+    items: AdminUserRow[];
+    total: number;
+}
+
+export async function fetchAdminUsers(
+    opts?: { q?: string; includeDeleted?: boolean; verifiedOnly?: boolean; limit?: number; offset?: number },
+): Promise<AdminUserList> {
+    const sp = new URLSearchParams();
+    if (opts?.q) sp.set('q', opts.q);
+    if (opts?.includeDeleted) sp.set('include_deleted', 'true');
+    if (opts?.verifiedOnly) sp.set('verified_only', 'true');
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    if (opts?.offset) sp.set('offset', String(opts.offset));
+    const qs = sp.toString();
+    const res = await fetch(
+        `${BASE}/social/admin/users${qs ? `?${qs}` : ''}`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<AdminUserList>(res, 'Failed to fetch users');
+}
+
+export async function adminDeleteUser(handle: string): Promise<{ status: string; user_id: string }> {
+    const res = await fetch(
+        `${BASE}/social/admin/users/${encodeURIComponent(handle)}`,
+        { method: 'DELETE', credentials: 'include' },
+    );
+    return parseJsonResponse<{ status: string; user_id: string }>(res, 'Failed to delete user');
+}
+
+export async function adminSetVerifiedOrganizer(
+    handle: string,
+    isVerified: boolean,
+): Promise<PublicProfile> {
+    const res = await fetch(
+        `${BASE}/social/admin/users/${encodeURIComponent(handle)}/verified`,
+        {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_verified_organizer: isVerified }),
+        },
+    );
+    return parseJsonResponse<PublicProfile>(res, 'Failed to update verified flag');
+}
+
+export async function updateMyVisibility(
+    visibility: Partial<{
+        account_visibility: AccountVisibility;
+        share_attendance_default_audience: ShareAudience;
+    }>,
+): Promise<PublicProfile> {
+    const res = await fetch(`${BASE}/social/me/visibility`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(visibility),
+    });
+    return parseJsonResponse<PublicProfile>(res, 'Failed to update visibility');
+}
+
+export async function updateMySocialLinks(
+    links: Partial<{ instagram_url: string; facebook_url: string }>,
+): Promise<PublicProfile> {
+    const res = await fetch(`${BASE}/social/me/social-links`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(links),
+    });
+    return parseJsonResponse<PublicProfile>(res, 'Failed to update social links');
+}
+
+// --- Phase D: profile bio + content tabs + discovery ---
+
+export async function updateMyBio(bio: string | null): Promise<PublicProfile> {
+    const res = await fetch(`${BASE}/social/me/bio`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bio }),
+    });
+    return parseJsonResponse<PublicProfile>(res, 'Failed to update bio');
+}
+
+export interface ProfileEventListResponse {
+    items: CalendarEvent[];
+    total: number;
+    limit: number;
+    offset: number;
+}
+
+async function fetchProfileEventList(
+    handle: string,
+    tab: 'going' | 'saved' | 'suggested',
+    opts?: { limit?: number; offset?: number; includePast?: boolean },
+): Promise<ProfileEventListResponse> {
+    const sp = new URLSearchParams();
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    if (opts?.offset) sp.set('offset', String(opts.offset));
+    if (tab === 'going' && opts?.includePast) sp.set('include_past', '1');
+    const qs = sp.toString();
+    const res = await fetch(
+        `${BASE}/social/users/${encodeURIComponent(handle)}/${tab}${qs ? `?${qs}` : ''}`,
+        { credentials: 'include' },
+    );
+    if (res.status === 404) throw new Error('Not found');
+    return parseJsonResponse<ProfileEventListResponse>(
+        res,
+        `Failed to fetch ${tab} list`,
+    );
+}
+
+export function fetchUserGoing(
+    handle: string,
+    opts?: { limit?: number; offset?: number; includePast?: boolean },
+) {
+    return fetchProfileEventList(handle, 'going', opts);
+}
+
+export function fetchUserSaved(
+    handle: string,
+    opts?: { limit?: number; offset?: number },
+) {
+    return fetchProfileEventList(handle, 'saved', opts);
+}
+
+export function fetchUserSuggested(
+    handle: string,
+    opts?: { limit?: number; offset?: number },
+) {
+    return fetchProfileEventList(handle, 'suggested', opts);
+}
+
+// Phase D: merged Calendar tab — returns the union of going + saved
+// (deduplicated, with intent metadata so the UI can render a chip
+// such as "Going" or "Saved" or "Going + Saved" per row).
+export async function fetchUserCalendar(
+    handle: string,
+    opts?: { limit?: number; offset?: number; includePast?: boolean },
+): Promise<ProfileCalendarList> {
+    const sp = new URLSearchParams();
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    if (opts?.offset) sp.set('offset', String(opts.offset));
+    if (opts?.includePast) sp.set('include_past', '1');
+    const qs = sp.toString();
+    const res = await fetch(
+        `${BASE}/social/users/${encodeURIComponent(handle)}/calendar${qs ? `?${qs}` : ''}`,
+        { credentials: 'include' },
+    );
+    if (res.status === 404) throw new Error('Calendar not visible');
+    return parseJsonResponse<ProfileCalendarList>(res, 'Failed to fetch calendar');
+}
+
+// Phase B: toggle the bell on a Following relationship without
+// unfollowing the user.
+export async function setFollowNotify(
+    handle: string,
+    notify: boolean,
+): Promise<FollowAction> {
+    const res = await fetch(
+        `${BASE}/social/users/${encodeURIComponent(handle)}/follow/notify`,
+        {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notify_new_events: notify }),
+        },
+    );
+    return parseJsonResponse<FollowAction>(res, 'Failed to update notifications');
+}
+
+export interface UserSearchResult {
+    handle: string;
+    display_name: string | null;
+    avatar_url: string | null;
+    is_verified_organizer: boolean;
+    subscribers_count: number;
+    is_subscribed: boolean;
+}
+
+export interface UserSearchResponse {
+    items: UserSearchResult[];
+}
+
+export async function searchUsers(
+    q: string,
+    opts?: { limit?: number },
+): Promise<UserSearchResponse> {
+    const sp = new URLSearchParams({ q });
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    const res = await fetch(`${BASE}/social/search/users?${sp.toString()}`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<UserSearchResponse>(res, 'Failed to search users');
+}
+
+export async function fetchSuggestedUsers(
+    opts?: { limit?: number },
+): Promise<UserSearchResponse> {
+    const sp = new URLSearchParams();
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    const qs = sp.toString();
+    const res = await fetch(
+        `${BASE}/social/discover/suggested${qs ? `?${qs}` : ''}`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<UserSearchResponse>(
+        res,
+        'Failed to fetch suggested users',
+    );
 }
 
 // --- Who's Going (attendee visibility) ---
@@ -569,6 +1347,8 @@ export interface EventFilterParams {
      * widen the scope (audits, archives, etc.).
      */
     include_past?: boolean;
+    /** Filter by visibility state: 'hidden' (is_hidden and not blocked) or 'blocked'. */
+    visibility?: 'hidden' | 'blocked';
 }
 
 export interface FilterOption {
@@ -596,6 +1376,7 @@ export async function fetchAdminEvents(params: EventFilterParams = {}): Promise<
     if (params.ungeolocated) qs.set('ungeolocated', 'true');
     if (params.future_only) qs.set('future_only', 'true');
     if (params.include_past) qs.set('include_past', 'true');
+    if (params.visibility) qs.set('visibility', params.visibility);
     const res = await fetch(`${BASE}/admin/events?${qs}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch events');
     return res.json();
@@ -610,6 +1391,7 @@ export async function fetchEventFilterOptions(params: EventFilterParams = {}): P
     if (params.ungeolocated) qs.set('ungeolocated', 'true');
     if (params.future_only) qs.set('future_only', 'true');
     if (params.include_past) qs.set('include_past', 'true');
+    if (params.visibility) qs.set('visibility', params.visibility);
     const res = await fetch(`${BASE}/admin/events/filter-options?${qs}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch filter options');
     return res.json();
@@ -645,6 +1427,15 @@ export async function bulkAssignTags(eventIds: string[], tagIds: number[]): Prom
         credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to bulk assign tags');
+    return res.json();
+}
+
+export async function fetchAdminEvent(eventId: string): Promise<CalendarEvent> {
+    const res = await fetch(`${BASE}/admin/events/${encodeURIComponent(eventId)}`, {
+        cache: 'no-store',
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to fetch event');
     return res.json();
 }
 
@@ -790,6 +1581,7 @@ export async function trackEventAttendance(
     action: 'going' | 'not_going',
     recordAnalytics: boolean = true,
     sharePublicly?: boolean,
+    shareAudience?: ShareAudience,
 ): Promise<void> {
     const body: Record<string, unknown> = {
         event_id: eventId,
@@ -798,12 +1590,18 @@ export async function trackEventAttendance(
         record_analytics: recordAnalytics,
     };
     if (sharePublicly !== undefined) body.share_publicly = sharePublicly;
-    await fetch(`${BASE}/track/event-attendance`, {
+    if (shareAudience !== undefined) body.share_audience = shareAudience;
+    const res = await fetch(`${BASE}/track/event-attendance`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(body),
     });
+    if (!res.ok) {
+        // Surface failure so the SavedEvents/AttendingEvents contexts can
+        // roll back the optimistic UI update instead of silently lying.
+        throw new Error(`Attendance write failed (${res.status})`);
+    }
 }
 
 // --- Event Save Tracking ---
@@ -813,13 +1611,26 @@ export async function trackEventSave(
     deviceId: string,
     action: 'save' | 'unsave',
     recordAnalytics: boolean = true,
+    audience?: ShareAudience,
 ): Promise<void> {
-    await fetch(`${BASE}/track/event-save`, {
+    const body: Record<string, unknown> = {
+        event_id: eventId,
+        device_id: deviceId,
+        action,
+        record_analytics: recordAnalytics,
+    };
+    if (audience !== undefined) body.audience = audience;
+    const res = await fetch(`${BASE}/track/event-save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ event_id: eventId, device_id: deviceId, action, record_analytics: recordAnalytics }),
+        body: JSON.stringify(body),
     });
+    if (!res.ok) {
+        // Surface failure so the SavedEvents context can roll back the
+        // optimistic UI update instead of silently lying.
+        throw new Error(`Save write failed (${res.status})`);
+    }
 }
 
 // --- Batch Fetch Events ---
@@ -1064,21 +1875,31 @@ export async function submitTagSuggestion(body: TagSuggestionCreate): Promise<vo
     if (!res.ok) throw new Error('Failed to submit tag suggestion');
 }
 
+function buildAdminTagSuggestionParams(
+    opts?:
+        | { status?: string; source?: 'user' | 'heuristic'; eventId?: string; includePast?: boolean }
+        | string,
+): URLSearchParams {
+    const params = new URLSearchParams();
+    if (typeof opts === 'string') {
+        if (opts) params.set('status', opts);
+        return params;
+    }
+    if (!opts) return params;
+    if (opts.status) params.set('status', opts.status);
+    if (opts.source) params.set('source', opts.source);
+    if (opts.eventId) params.set('event_id', opts.eventId);
+    if (opts.includePast) params.set('include_past', 'true');
+    return params;
+}
+
 export async function fetchAdminTagSuggestions(
     opts?:
         | { status?: string; source?: 'user' | 'heuristic'; eventId?: string; includePast?: boolean }
         | string,
 ): Promise<TagSuggestionResponse[]> {
     // Backwards-compat: accept a bare status string from existing callers.
-    const params = new URLSearchParams();
-    if (typeof opts === 'string') {
-        if (opts) params.set('status', opts);
-    } else if (opts) {
-        if (opts.status) params.set('status', opts.status);
-        if (opts.source) params.set('source', opts.source);
-        if (opts.eventId) params.set('event_id', opts.eventId);
-        if (opts.includePast) params.set('include_past', 'true');
-    }
+    const params = buildAdminTagSuggestionParams(opts);
     const qs = params.toString() ? `?${params.toString()}` : '';
     const res = await fetch(`${BASE}/admin/tags/suggestions${qs}`, {
         credentials: 'include',
@@ -1087,24 +1908,36 @@ export async function fetchAdminTagSuggestions(
     return res.json();
 }
 
-export async function approveTagSuggestion(id: number, tagId?: number): Promise<void> {
+export async function fetchAdminTagSuggestionCount(
+    opts?: { status?: string; source?: 'user' | 'heuristic'; eventId?: string; includePast?: boolean } | string,
+): Promise<number> {
+    const params = buildAdminTagSuggestionParams(opts);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`${BASE}/admin/tags/suggestions/count${qs}`, {
+        credentials: 'include',
+    });
+    const data = await parseJsonResponse<{ count: number }>(res, 'Failed to fetch tag suggestion count');
+    return data.count;
+}
+
+export async function approveTagSuggestion(id: number, tagId?: number): Promise<TagSuggestionResponse> {
     const res = await fetch(`${BASE}/admin/tags/suggestions/${id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(tagId ? { tag_id: tagId } : {}),
         credentials: 'include',
     });
-    if (!res.ok) throw new Error('Failed to approve tag suggestion');
+    return parseJsonResponse<TagSuggestionResponse>(res, 'Failed to approve tag suggestion');
 }
 
-export async function rejectTagSuggestion(id: number, adminNotes?: string): Promise<void> {
+export async function rejectTagSuggestion(id: number, adminNotes?: string): Promise<TagSuggestionResponse> {
     const res = await fetch(`${BASE}/admin/tags/suggestions/${id}/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(adminNotes ? { admin_notes: adminNotes } : {}),
         credentials: 'include',
     });
-    if (!res.ok) throw new Error('Failed to reject tag suggestion');
+    return parseJsonResponse<TagSuggestionResponse>(res, 'Failed to reject tag suggestion');
 }
 
 export async function bulkReviewTagSuggestions(
@@ -1307,6 +2140,7 @@ export async function fetchAdminEventIds(params: EventFilterParams = {}): Promis
     if (params.ungeolocated) qs.set('ungeolocated', 'true');
     if (params.future_only) qs.set('future_only', 'true');
     if (params.include_past) qs.set('include_past', 'true');
+    if (params.visibility) qs.set('visibility', params.visibility);
     const res = await fetch(`${BASE}/admin/events/ids?${qs}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch event IDs');
     return res.json();
@@ -1431,4 +2265,22 @@ export async function rejectRating(ratingId: string, adminNotes?: string): Promi
         credentials: 'include',
     });
     return parseJsonResponse<AdminRating>(res, 'Failed to reject rating');
+}
+
+export async function blockEvent(eventId: string): Promise<CalendarEvent> {
+    const res = await fetch(`${BASE}/admin/events/${eventId}/block`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to block event');
+    return res.json();
+}
+
+export async function unblockEvent(eventId: string): Promise<CalendarEvent> {
+    const res = await fetch(`${BASE}/admin/events/${eventId}/block`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to unblock event');
+    return res.json();
 }

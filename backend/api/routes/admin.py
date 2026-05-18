@@ -33,6 +33,7 @@ from backend.api.schemas import (
 from backend.api.routes.tags import _suggestion_to_response, get_event_tags
 from backend.db.database import get_engine, get_session
 from backend.db.models import (
+    BlockedEvent,
     CalendarDefaultTag,
     CachedEvent,
     CalendarSetting,
@@ -52,6 +53,11 @@ from backend.services.sync_job_service import SyncJobStatus, get_sync_job_servic
 from backend.services.sync_service import SyncService
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+
+def _is_event_blocked(session: Session, event_id: str) -> bool:
+    """Return True if event_id has an entry in blocked_events."""
+    return session.get(BlockedEvent, event_id) is not None
 
 
 def _apply_upcoming_filter(
@@ -921,6 +927,7 @@ def list_admin_events(
     ungeolocated: Optional[bool] = Query(default=None),
     future_only: Optional[bool] = Query(default=None),
     include_past: bool = Query(default=False),
+    visibility: Optional[str] = Query(default=None, pattern="^(hidden|blocked)$"),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
@@ -967,6 +974,15 @@ def list_admin_events(
             ).all()
             base = base.where(CachedEvent.event_id.in_(matching_event_ids))
 
+    if visibility == "blocked":
+        blocked_subq = select(BlockedEvent.event_id)
+        base = base.where(CachedEvent.event_id.in_(blocked_subq))
+    elif visibility == "hidden":
+        blocked_subq = select(BlockedEvent.event_id)
+        base = base.where(CachedEvent.is_hidden == True).where(
+            ~CachedEvent.event_id.in_(blocked_subq)
+        )
+
     # Count total matching
     count_stmt = select(func.count()).select_from(base.subquery())
     total = session.exec(count_stmt).one()
@@ -999,6 +1015,8 @@ def list_admin_events(
             review_status=e.review_status,
             links=e.links,
             tags=tags_map.get(e.event_id, []),
+            is_hidden=e.is_hidden,
+            is_blocked=_is_event_blocked(session, e.event_id),
         )
         for e in events
     ]
@@ -1084,6 +1102,8 @@ def update_event(
         review_status=event.review_status,
         links=event.links,
         tags=event_tags.get(event_id, []),
+        is_hidden=event.is_hidden,
+        is_blocked=_is_event_blocked(session, event_id),
     )
 
 
@@ -1113,6 +1133,7 @@ def event_filter_options(
     ungeolocated: Optional[bool] = Query(default=None),
     future_only: Optional[bool] = Query(default=None),
     include_past: bool = Query(default=False),
+    visibility: Optional[str] = Query(default=None, pattern="^(hidden|blocked)$"),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
@@ -1151,6 +1172,15 @@ def event_filter_options(
                 .distinct()
             ).all()
             base = base.where(CachedEvent.event_id.in_(matching))
+
+    if visibility == "blocked":
+        blocked_subq = select(BlockedEvent.event_id)
+        base = base.where(CachedEvent.event_id.in_(blocked_subq))
+    elif visibility == "hidden":
+        blocked_subq = select(BlockedEvent.event_id)
+        base = base.where(CachedEvent.is_hidden == True).where(
+            ~CachedEvent.event_id.in_(blocked_subq)
+        )
 
     filtered_cte = base.subquery()
     fe = filtered_cte.c
@@ -1261,6 +1291,8 @@ def review_event(
         review_status=event.review_status,
         links=event.links,
         tags=event_tags.get(event_id, []),
+        is_hidden=event.is_hidden,
+        is_blocked=_is_event_blocked(session, event_id),
     )
 
 
@@ -1529,6 +1561,7 @@ def list_admin_event_ids(
     ungeolocated: Optional[bool] = Query(default=None),
     future_only: Optional[bool] = Query(default=None),
     include_past: bool = Query(default=False),
+    visibility: Optional[str] = Query(default=None, pattern="^(hidden|blocked)$"),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
@@ -1569,6 +1602,15 @@ def list_admin_event_ids(
                 .distinct()
             ).all()
             base = base.where(CachedEvent.event_id.in_(matching_event_ids))
+
+    if visibility == "blocked":
+        blocked_subq = select(BlockedEvent.event_id)
+        base = base.where(CachedEvent.event_id.in_(blocked_subq))
+    elif visibility == "hidden":
+        blocked_subq = select(BlockedEvent.event_id)
+        base = base.where(CachedEvent.is_hidden == True).where(
+            ~CachedEvent.event_id.in_(blocked_subq)
+        )
 
     ids = session.exec(base).all()
     return EventIdsResponse(ids=list(ids))
@@ -1644,3 +1686,147 @@ def get_sync_log_progress(
         "enrichment_status": log.enrichment_status,
         "enrichment_progress": log.enrichment_progress,
     }
+
+
+@router.get("/events/{event_id}", response_model=EventResponse)
+def get_admin_event(
+    event_id: str,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Fetch a single event for the admin panel, including hidden/blocked events."""
+    event = session.get(CachedEvent, event_id)
+    if not event or event.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    cal = session.get(CalendarSetting, event.calendar_id)
+    event_tags = get_event_tags(session, [event_id])
+    return EventResponse(
+        event_id=event.event_id,
+        calendar_id=event.calendar_id,
+        title=event.title,
+        description=event.description,
+        location=event.location,
+        start=event.start,
+        end=event.end,
+        all_day=event.all_day,
+        latitude=event.latitude,
+        longitude=event.longitude,
+        color=cal.color if cal else None,
+        price_min=event.price_min,
+        price_max=event.price_max,
+        price_currency=event.price_currency,
+        price_is_free=event.price_is_free,
+        review_status=event.review_status,
+        links=event.links,
+        tags=event_tags.get(event_id, []),
+        is_hidden=event.is_hidden,
+        is_blocked=_is_event_blocked(session, event_id),
+    )
+
+
+@router.post("/events/{event_id}/block", response_model=EventResponse)
+def block_event(
+    event_id: str,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Permanently suppress an event.
+
+    Sets ``is_hidden=True`` on the event and inserts a row into
+    ``blocked_events`` so subsequent sync runs skip this event_id.
+    """
+    event = session.get(CachedEvent, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    event.is_hidden = True
+    from datetime import datetime as _dt
+
+    event.updated_at = _dt.utcnow()
+    session.add(event)
+
+    if not session.get(BlockedEvent, event_id):
+        session.add(BlockedEvent(event_id=event_id))
+
+    session.commit()
+    session.refresh(event)
+
+    cal = session.get(CalendarSetting, event.calendar_id)
+    event_tags = get_event_tags(session, [event_id])
+    return EventResponse(
+        event_id=event.event_id,
+        calendar_id=event.calendar_id,
+        title=event.title,
+        description=event.description,
+        location=event.location,
+        start=event.start,
+        end=event.end,
+        all_day=event.all_day,
+        latitude=event.latitude,
+        longitude=event.longitude,
+        color=cal.color if cal else None,
+        price_min=event.price_min,
+        price_max=event.price_max,
+        price_currency=event.price_currency,
+        price_is_free=event.price_is_free,
+        review_status=event.review_status,
+        links=event.links,
+        tags=event_tags.get(event_id, []),
+        is_hidden=event.is_hidden,
+        is_blocked=True,
+    )
+
+
+@router.delete("/events/{event_id}/block", response_model=EventResponse)
+def unblock_event(
+    event_id: str,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Restore a permanently suppressed event.
+
+    Removes the ``blocked_events`` row and sets ``is_hidden=False``.
+    The event will reappear on the next Google Calendar sync if it still
+    exists in the source calendar.
+    """
+    event = session.get(CachedEvent, event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    blocked = session.get(BlockedEvent, event_id)
+    if blocked:
+        session.delete(blocked)
+
+    event.is_hidden = False
+    from datetime import datetime as _dt
+
+    event.updated_at = _dt.utcnow()
+    session.add(event)
+    session.commit()
+    session.refresh(event)
+
+    cal = session.get(CalendarSetting, event.calendar_id)
+    event_tags = get_event_tags(session, [event_id])
+    return EventResponse(
+        event_id=event.event_id,
+        calendar_id=event.calendar_id,
+        title=event.title,
+        description=event.description,
+        location=event.location,
+        start=event.start,
+        end=event.end,
+        all_day=event.all_day,
+        latitude=event.latitude,
+        longitude=event.longitude,
+        color=cal.color if cal else None,
+        price_min=event.price_min,
+        price_max=event.price_max,
+        price_currency=event.price_currency,
+        price_is_free=event.price_is_free,
+        review_status=event.review_status,
+        links=event.links,
+        tags=event_tags.get(event_id, []),
+        is_hidden=event.is_hidden,
+        is_blocked=False,
+    )

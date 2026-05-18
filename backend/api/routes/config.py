@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 
 from backend.api.schemas import AppInfoResponse
-from backend.config.loader import get_app_version, get_env_name
+from backend.config.loader import get_analytics_enabled, get_app_version, get_env_name
 from backend.db.database import get_session
 from backend.db.models import SiteSetting
 
@@ -34,6 +34,7 @@ def get_app_info(session: Session = Depends(get_session)):
         environment=get_env_name(),
         backend_version=get_app_version(),
         qa_scenarios=qa_scenarios,
+        analytics_enabled=get_analytics_enabled(),
     )
 
 

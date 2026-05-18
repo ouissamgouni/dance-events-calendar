@@ -7,6 +7,11 @@ from slowapi import Limiter
 from sqlalchemy import func
 from sqlmodel import Session, select
 
+from backend.api.deps import (
+    _audience_passes,
+    can_view,
+    get_current_user_optional,
+)
 from backend.api.rate_limit import client_ip
 from backend.api.routes.settings import _get_since_date
 from backend.api.schemas import (
@@ -21,12 +26,177 @@ from backend.db.models import (
     CalendarSetting,
     EventTag,
     EventView,
+    User,
     UserEventAttendance,
+    UserFollow,
+    UserSavedEvent,
 )
+from backend.services.popularity import compute_popularity_scores, get_saved_counts
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 
 limiter = Limiter(key_func=client_ip)
+
+
+def _trending_settings(session: Session) -> tuple[bool, int, int]:
+    """Read the ``trending_*`` site settings.
+
+    Mirrors the helper in ``event_serializer.py`` but kept local to avoid
+    importing from a sibling that itself depends on this module's
+    ``get_event_tags``. Returns ``(enabled, window_days, floor_going)``.
+    """
+    from backend.db.models import SiteSetting  # local import to avoid cycle
+
+    enabled = False
+    window_days = 30
+    floor_going = 3
+    try:
+        row = session.get(SiteSetting, "trending_enabled")
+        if row and row.value.lower() == "true":
+            enabled = True
+        row = session.get(SiteSetting, "trending_window_days")
+        if row and row.value.isdigit():
+            window_days = int(row.value)
+        row = session.get(SiteSetting, "trending_floor_going")
+        if row and row.value.lstrip("-").isdigit():
+            floor_going = int(row.value)
+    except Exception:
+        pass
+    return enabled, window_days, floor_going
+
+
+def _viewer_friend_ids(session: Session, viewer: Optional[User]) -> list:
+    """Return the user_ids of the viewer's friends (mutual followers).
+
+    Returns an empty list for anonymous viewers (no follow graph anchor).
+    Used by the explorer friend filter on ``GET /api/events``.
+    """
+    if viewer is None or viewer.id is None:
+        return []
+    # Self-join: x is a friend of viewer iff viewer follows x AND x follows
+    # viewer. Single SELECT with a sub-query avoids two round-trips.
+    out = (
+        select(UserFollow.followee_id)
+        .where(UserFollow.follower_id == viewer.id)
+        .where(
+            UserFollow.followee_id.in_(
+                select(UserFollow.follower_id).where(
+                    UserFollow.followee_id == viewer.id
+                )
+            )
+        )
+    )
+    return [row for row in session.exec(out).all()]
+
+
+def _friend_filtered_event_ids(
+    *,
+    session: Session,
+    viewer: Optional[User],
+    friends_going: bool,
+    friends_saved: bool,
+    friend_handle: Optional[str],
+) -> list[str]:
+    """Compute the set of event_ids visible to the viewer via the friend filter.
+
+    Resolution order:
+
+    1. If ``friend_handle`` is supplied, narrow the friend set to that single
+       user. The handle's owner must currently pass ``can_view`` for each
+       requested scope; failures silently drop that scope so a private
+       attendance list cannot be probed via this endpoint.
+    2. Otherwise, the friend set is the viewer's mutual followers.
+    3. For each enabled scope, collect event_ids from
+       ``user_event_attendance`` (going) and ``user_saved_event`` (saved)
+       restricted to friends whose own visibility allows the viewer to see
+       that scope.
+
+    The returned list is the UNION across enabled scopes (empty list means
+    "no matches" — caller short-circuits the parent query).
+    """
+    # Resolve the candidate friend set up front so each scope check operates
+    # on a stable list of (User, id) pairs.
+    candidates: list[User] = []
+    if friend_handle is not None:
+        h = (friend_handle or "").strip().lower()
+        if not h:
+            return []
+        target = session.exec(select(User).where(func.lower(User.handle) == h)).first()
+        if target is None or target.deleted_at is not None:
+            return []
+        candidates = [target]
+        # If the viewer asked for the friend filter via handle, we don't
+        # require the target to actually be a mutual follower — discovery by
+        # handle is intentional and the visibility of each scope is still
+        # enforced below.
+    else:
+        if viewer is None:
+            return []
+        friend_ids = _viewer_friend_ids(session, viewer)
+        if not friend_ids:
+            return []
+        candidates = list(
+            session.exec(select(User).where(User.id.in_(friend_ids))).all()
+        )
+
+    # Default: at least one of the two scopes must be enabled. If a caller
+    # passes friend_handle alone, treat it as "any activity from this friend"
+    # (going OR saved) so the explorer chip "Show what alice is up to" works.
+    if not friends_going and not friends_saved:
+        friends_going = True
+        friends_saved = True
+
+    going_owner_ids: list = []
+    saved_owner_ids: list = []
+    owner_by_id: dict = {}
+    for friend in candidates:
+        # Single account-level gate: per-row audience further narrows
+        # which events of each owner show up.
+        if not can_view(session, viewer, friend):
+            continue
+        owner_by_id[friend.id] = friend
+        if friends_going:
+            going_owner_ids.append(friend.id)
+        if friends_saved:
+            saved_owner_ids.append(friend.id)
+
+    if not going_owner_ids and not saved_owner_ids:
+        return []
+
+    event_ids: set[str] = set()
+    if going_owner_ids:
+        rows = session.exec(
+            select(
+                UserEventAttendance.event_id,
+                UserEventAttendance.user_id,
+                UserEventAttendance.share_audience,
+            ).where(UserEventAttendance.user_id.in_(going_owner_ids))
+        ).all()
+        for event_id, owner_id, share_audience in rows:
+            if not event_id:
+                continue
+            owner = owner_by_id.get(owner_id)
+            if owner is None:
+                continue
+            if _audience_passes(session, viewer, owner, share_audience or "private"):
+                event_ids.add(event_id)
+    if saved_owner_ids:
+        rows = session.exec(
+            select(
+                UserSavedEvent.event_id,
+                UserSavedEvent.user_id,
+                UserSavedEvent.audience,
+            ).where(UserSavedEvent.user_id.in_(saved_owner_ids))
+        ).all()
+        for event_id, owner_id, audience in rows:
+            if not event_id:
+                continue
+            owner = owner_by_id.get(owner_id)
+            if owner is None:
+                continue
+            if _audience_passes(session, viewer, owner, audience or "private"):
+                event_ids.add(event_id)
+    return list(event_ids)
 
 
 @router.get("/calendars", response_model=list[CalendarSettingResponse])
@@ -56,6 +226,57 @@ def get_events(
     tag_ids: Optional[str] = Query(
         None, description="Comma-separated tag IDs to filter by (AND logic)"
     ),
+    min_lat: Optional[float] = Query(
+        None,
+        ge=-90,
+        le=90,
+        description="Bounding-box south edge (decimal degrees)",
+    ),
+    min_lng: Optional[float] = Query(
+        None,
+        ge=-180,
+        le=180,
+        description="Bounding-box west edge (decimal degrees)",
+    ),
+    max_lat: Optional[float] = Query(
+        None,
+        ge=-90,
+        le=90,
+        description="Bounding-box north edge (decimal degrees)",
+    ),
+    max_lng: Optional[float] = Query(
+        None,
+        ge=-180,
+        le=180,
+        description="Bounding-box east edge (decimal degrees)",
+    ),
+    friends_going: bool = Query(
+        False,
+        description=(
+            "Restrict to events at least one of the viewer's friends "
+            "(mutual followers) is going to. Requires auth; returns an "
+            "empty list for anonymous viewers."
+        ),
+    ),
+    friends_saved: bool = Query(
+        False,
+        description=(
+            "Restrict to events at least one of the viewer's friends has "
+            "saved. Requires auth; returns an empty list for anonymous "
+            "viewers. Combines with friends_going as a UNION when both are "
+            "true."
+        ),
+    ),
+    friend_handle: Optional[str] = Query(
+        None,
+        description=(
+            "Narrow the friend filter to a specific @handle. The handle's "
+            "owner must currently pass can_view for the relevant scope; "
+            "otherwise an empty list is returned (privacy chokepoint — "
+            "never 403 / 404)."
+        ),
+    ),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     since_date = _get_since_date(session)
     since_dt = datetime.fromisoformat(since_date)
@@ -78,6 +299,7 @@ def get_events(
     query = select(CachedEvent).where(
         CachedEvent.calendar_id.in_(calendar_ids),
         CachedEvent.deleted_at == None,
+        CachedEvent.is_hidden == False,
         CachedEvent.start >= effective_start,
     )
     if end_date:
@@ -98,6 +320,54 @@ def get_events(
                     select(EventTag.event_id).where(EventTag.tag_id == tid)
                 )
             )
+
+    # Bounding-box filter (preferred-area in user prefs, or any explicit
+    # bbox passed by the explorer). All four params must be supplied
+    # together; otherwise the bbox filter is skipped. Events without
+    # geocoded coordinates (latitude/longitude IS NULL) are excluded when
+    # any bbox is active.
+    bbox_parts = [min_lat, min_lng, max_lat, max_lng]
+    if any(p is not None for p in bbox_parts):
+        if any(p is None for p in bbox_parts):
+            raise HTTPException(
+                status_code=400,
+                detail="min_lat, min_lng, max_lat, max_lng must be supplied together",
+            )
+        if min_lat >= max_lat or min_lng >= max_lng:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid bounding box: min must be < max",
+            )
+        query = query.where(
+            CachedEvent.latitude.is_not(None),
+            CachedEvent.longitude.is_not(None),
+            CachedEvent.latitude >= min_lat,
+            CachedEvent.latitude <= max_lat,
+            CachedEvent.longitude >= min_lng,
+            CachedEvent.longitude <= max_lng,
+        )
+
+    # Friend filter (Phase B): restrict to events that one or more friends
+    # have marked going / saved. The viewer's "friends" are mutual followers
+    # (or just the single user named by ``friend_handle``). Each filtered
+    # source is gated by ``can_view`` on the owner so we never leak activity
+    # the owner has chosen to hide.
+    if friends_going or friends_saved or friend_handle is not None:
+        friend_event_ids = _friend_filtered_event_ids(
+            session=session,
+            viewer=current_user,
+            friends_going=friends_going,
+            friends_saved=friends_saved,
+            friend_handle=friend_handle,
+        )
+        if not friend_event_ids:
+            # Empty match — short-circuit so we don't pay for any of the
+            # downstream batch queries (and so anonymous viewers get a
+            # consistently empty list).
+            response = JSONResponse(content=[])
+            response.headers["Cache-Control"] = "private, max-age=0"
+            return response
+        query = query.where(CachedEvent.event_id.in_(friend_event_ids))
 
     events = session.exec(query).all()
 
@@ -124,6 +394,20 @@ def get_events(
         ).all()
         going_counts = {row[0]: row[1] for row in rows}
 
+    # Lifetime saved count per event + (when trending is on) the
+    # commitment-weighted, time-decayed popularity score.
+    saved_counts = get_saved_counts(session, event_ids) if event_ids else {}
+    trending_on, window_days, floor_going = _trending_settings(session)
+    if trending_on and events:
+        scores = compute_popularity_scores(
+            session,
+            events,
+            window_days=window_days,
+            floor_going=floor_going,
+        )
+    else:
+        scores = {}
+
     # Batch-fetch tags
     tags_map = get_event_tags(session, event_ids)
 
@@ -142,6 +426,8 @@ def get_events(
             color=color_map.get(e.calendar_id),
             view_count=view_counts.get(e.event_id, 0),
             going_count=going_counts.get(e.event_id, 0),
+            saved_count=saved_counts.get(e.event_id, 0),
+            popularity_score=scores.get(e.event_id, 0.0),
             price_min=e.price_min,
             price_max=e.price_max,
             price_currency=e.price_currency,
@@ -179,6 +465,7 @@ def get_events_by_ids(
             CachedEvent.event_id.in_(payload.event_ids),
             CachedEvent.calendar_id.in_(calendar_ids),
             CachedEvent.deleted_at == None,
+            CachedEvent.is_hidden == False,
         )
     ).all()
 
@@ -201,6 +488,18 @@ def get_events_by_ids(
         ).all()
         going_counts = {row[0]: row[1] for row in rows}
 
+    saved_counts = get_saved_counts(session, event_ids) if event_ids else {}
+    trending_on, window_days, floor_going = _trending_settings(session)
+    if trending_on and events:
+        scores = compute_popularity_scores(
+            session,
+            events,
+            window_days=window_days,
+            floor_going=floor_going,
+        )
+    else:
+        scores = {}
+
     tags_map = get_event_tags(session, event_ids)
 
     return [
@@ -218,6 +517,8 @@ def get_events_by_ids(
             color=color_map.get(e.calendar_id),
             view_count=view_counts.get(e.event_id, 0),
             going_count=going_counts.get(e.event_id, 0),
+            saved_count=saved_counts.get(e.event_id, 0),
+            popularity_score=scores.get(e.event_id, 0.0),
             price_min=e.price_min,
             price_max=e.price_max,
             price_currency=e.price_currency,
@@ -241,6 +542,7 @@ def get_event(
         select(CachedEvent).where(
             CachedEvent.event_id == event_id,
             CachedEvent.deleted_at == None,
+            CachedEvent.is_hidden == False,
         )
     ).first()
     if not event:
@@ -314,6 +616,7 @@ def get_event_og_meta(
         select(CachedEvent).where(
             CachedEvent.event_id == event_id,
             CachedEvent.deleted_at == None,  # noqa: E711 (SQLAlchemy comparison)
+            CachedEvent.is_hidden == False,  # noqa: E712
         )
     ).first()
     if not event:
@@ -377,6 +680,7 @@ def get_sitemap(
             select(CachedEvent).where(
                 CachedEvent.calendar_id.in_(calendar_ids),
                 CachedEvent.deleted_at == None,
+                CachedEvent.is_hidden == False,
             )
         ).all()
 

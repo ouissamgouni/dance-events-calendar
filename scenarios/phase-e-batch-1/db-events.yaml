@@ -1,0 +1,99 @@
+# Pre-seeded events + attendances for phase-e-batch-1.
+#
+# E9 (friends leaderboard) needs each prospective friend to have a
+# distinct "going" footprint inside the 7d/30d windows once they become
+# mutual with viewer. We seed:
+#   - alpha → 3 events going (public)        → leaderboard top
+#   - beta  → 2 events going (public)
+#   - delta → 1 event going (friends)        → still counts (audience !=private)
+#   - gamma → 1 event going (private)        → must NOT count (E9 contract)
+#   - oscar → 2 events (Verified Organizer events for E10 profile context)
+#   - dave  → none
+#
+# All event start times stay inside the next 7 days so both period=7d
+# and period=30d return the same ranking; the period radio (E9 UI)
+# can still be clicked without empty states.
+base_week: 0
+calendars:
+  - id: salsa-cal-001
+  - id: bachata-cal-002
+events:
+  - id: evt-pe-001
+    calendar_id: salsa-cal-001
+    title: Salsa Social Friday
+    location: Dance Studio, 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w0 Fri 21:00
+    end: w0 Sat 01:00
+    price_is_free: true
+  - id: evt-pe-002
+    calendar_id: bachata-cal-002
+    title: Bachata Workshop
+    location: Tanzhaus, Friedrichstr. 100, Berlin, Germany
+    latitude: 52.52
+    longitude: 13.405
+    start: w0 Sat 14:00
+    end: w0 Sat 17:00
+    price_is_free: false
+    price_min: 25
+    price_currency: EUR
+  - id: evt-pe-003
+    calendar_id: salsa-cal-001
+    title: Cuban Night
+    location: Skybar, Av. de la Liberté, Brussels, Belgium
+    latitude: 50.8503
+    longitude: 4.3517
+    start: w0 Sun 20:00
+    end: w0 Mon 00:00
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+  - id: evt-pe-004
+    calendar_id: salsa-cal-001
+    title: Salsa Tuesday Night
+    location: Sala Rossa, Calle de Atocha 34, Madrid, Spain
+    latitude: 40.4168
+    longitude: -3.7038
+    start: w1 Tue 20:30
+    end: w1 Wed 00:00
+    price_is_free: true
+  - id: evt-pe-005
+    calendar_id: bachata-cal-002
+    title: Bachata Beginners Bootcamp
+    location: London Dance Academy, 12 Soho Square, London, UK
+    latitude: 51.5143
+    longitude: -0.1323
+    start: w1 Sun 15:00
+    end: w1 Sun 18:00
+    price_is_free: false
+    price_min: 30
+    price_currency: GBP
+attendances:
+  # alpha — 3 going (top of leaderboard)
+  - event_id: evt-pe-001
+    email: alpha@example.com
+    share_publicly: true
+  - event_id: evt-pe-002
+    email: alpha@example.com
+    share_publicly: true
+  - event_id: evt-pe-003
+    email: alpha@example.com
+    share_publicly: true
+  # beta — 2 going
+  - event_id: evt-pe-001
+    email: beta@example.com
+    share_publicly: true
+  - event_id: evt-pe-004
+    email: beta@example.com
+    share_publicly: true
+  # delta — 1 going (friends audience: still counted)
+  - event_id: evt-pe-005
+    email: delta@example.com
+    share_publicly: false
+    share_audience: friends
+  # gamma — 1 going PRIVATE → must not surface on E9
+  - event_id: evt-pe-002
+    email: gamma@example.com
+    share_publicly: false
+    share_audience: private

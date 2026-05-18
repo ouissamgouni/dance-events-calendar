@@ -1,0 +1,112 @@
+test_plan:
+  name: "Users Management — Admin /admin/users tab"
+  description: >
+    Verify the Admin UI Users tab end-to-end: list/search with the
+    "Include deleted" toggle, the verified-organizer toggle, the
+    admin-initiated delete cascade (parity with the self-service GDPR
+    flow), and the admin self-delete guard. The admin path must reuse the
+    same purge_user_account helper as the self-service flow so the
+    follow-graph regression fixed for friends-graph cannot recur here.
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=users-management"
+    - >
+      The scenario pre-seeds five users: admin (matches ADMIN_EMAIL), alice,
+      bob, carol, dave. A single follow edge (alice -> dave) is seeded so the
+      admin-delete cascade has something measurable to clean up.
+    - "Use a fresh browser profile or incognito window per signed-in user."
+    - >
+      Cookie banner: accept "Personalization" so /api/auth/* and /api/social/*
+      are not blocked by the consent gate.
+
+  steps:
+    # ── Setup: produce one soft-deleted user so the include-deleted toggle has signal
+    - id: 1
+      title: "Carol deletes her own account so the table has a soft-deleted row"
+      description: >
+        Open Browser B, /login → "Sign in as Carol Nguyen". Go to /account →
+        scroll to the bottom → click "Delete my account" and confirm.
+      expected: >
+        DELETE /api/auth/me returns 200; Browser B is signed out and
+        redirected to "/". A subsequent GET /api/social/users/carol returns
+        404. This puts the database in the state needed for step 3
+        (default list omits Carol; "Include deleted" surfaces her with an
+        anonymised email).
+
+    # ── Admin lands on the Users tab ─────────────────────────────
+    - id: 2
+      title: "Admin lands on /admin/users and sees the seeded users"
+      description: >
+        Open Browser X (admin browser), /login → "Sign in as Dev Admin".
+        Navigate to /admin. A "Users" tab is visible alongside Data /
+        Configuration / Analytics. Click it (URL becomes /admin/users).
+      expected: >
+        The tab loads a paginated table with one row per non-deleted user:
+        admin, alice, bob, dave (Carol is absent because she was purged in
+        step 1). Each row shows avatar, handle, email, created-at, follower
+        count, following count, status badges (Admin / Verified / Deleted),
+        and per-row actions. The admin row has the "Admin" badge and its
+        Delete button is disabled (tooltip explains admins cannot be
+        deleted via this UI). Network: GET /api/social/admin/users returns
+        200 with items+total; calling the same endpoint while signed in as
+        Alice (a non-admin) in another browser returns 403.
+
+    - id: 3
+      title: "Search filters the table by handle / display name / email; include-deleted surfaces Carol"
+      description: >
+        Type "ali" into the search box and submit (or press Enter). Then
+        clear and search "@example.com" to verify email-substring matching.
+        Toggle the "Include deleted" checkbox.
+      expected: >
+        First search returns only Alice. The query is sent as
+        ?q=ali&limit=50&offset=0; the result count and pagination footer
+        update. The "@example.com" search returns all four current users
+        (admin, alice, bob, dave). Toggling "Include deleted" ON re-issues
+        the request with include_deleted=1 and now also surfaces Carol's
+        soft-deleted row with the "Deleted" badge, an anonymised email
+        (deleted-<uuid>@example.invalid), and Verify/Delete actions
+        disabled.
+
+    - id: 4
+      title: "Admin verifies + unverifies an organizer from the table"
+      description: >
+        With "Include deleted" off, find Bob's row and click "Verify". Then
+        click "Unverify" on the same row. Cross-check by opening /u/bob in
+        another browser tab.
+      expected: >
+        Verify call: PATCH /api/social/admin/users/bob/verified-organizer
+        with {is_verified_organizer: true} → 200; the row's "Verified" badge
+        appears immediately (optimistic update reconciled by the response).
+        /u/bob shows the "Verified organizer" pill next to the display name.
+        Unverify reverses both the badge and the pill. No other row is
+        mutated.
+
+    - id: 5
+      title: "Admin deletes Dave from the table — same cascade as self-service"
+      description: >
+        Pre-state: Dave has zero followers and follows nobody, but Alice
+        follows Dave (seeded in db-follows.yaml). Refresh /admin/users.
+        Click "Delete" on Dave's row, confirm the browser confirm dialog.
+      expected: >
+        DELETE /api/social/admin/users/dave returns 200 with
+        {status: "deleted", user_id: "..."}. The row disappears from the
+        default view. Toggle "Include deleted" ON — Dave reappears with the
+        Deleted badge and anonymised email. In Browser A (Alice — sign in
+        if not already), refresh /u/alice: following count drops by 1
+        (Alice's edge to Dave was purged via the shared purge_user_account
+        helper, identical to the self-service GDPR cascade). GET
+        /api/social/users/dave now returns 404. Re-clicking Delete on the
+        now-deleted row is impossible (button disabled).
+
+    - id: 6
+      title: "Admin cannot delete themselves through the Users tab"
+      description: >
+        Locate the admin@example.com row. Inspect the disabled Delete
+        button. Bypass the UI guard by hitting the API directly in DevTools:
+          fetch('/api/social/admin/users/admin', {method: 'DELETE'})
+            .then(r => r.json().then(b => console.log(r.status, b)))
+      expected: >
+        Console logs `400` with detail "Refusing to delete the admin account
+        via this endpoint". The admin row is unchanged; admin remains
+        signed in. This protects against self-lockout — the only path to
+        remove the admin user is the GDPR self-service flow
+        (DELETE /api/auth/me), which clears the session cookie atomically.

@@ -10,7 +10,7 @@ from sqlmodel import Session
 from backend.api.main import app
 from backend.api.deps import require_admin
 from backend.db.database import get_session
-from backend.db.models import CachedEvent, CalendarSetting, EventView
+from backend.db.models import BlockedEvent, CachedEvent, CalendarSetting, EventView
 
 
 def _fake_admin():
@@ -423,3 +423,107 @@ class TestPendingReviewEndpoints:
         client = TestClient(app)
         resp = client.get("/api/admin/events")
         assert resp.status_code in (401, 403)
+
+
+@pytest.mark.unit
+class TestHideBlockEndpoints:
+    def _make_event(self, is_hidden=False):
+        return CachedEvent(
+            event_id="evt-1",
+            calendar_id="cal-1",
+            title="Test",
+            start=datetime(2099, 6, 1, 20, 0),
+            end=datetime(2099, 6, 1, 23, 0),
+            is_hidden=is_hidden,
+        )
+
+    def _make_cal(self):
+        return CalendarSetting(
+            calendar_id="cal-1", name="C", enabled=True, color="#ff0000"
+        )
+
+    def test_patch_is_hidden_true_returns_is_hidden(self):
+        event = self._make_event()
+        cal = self._make_cal()
+        mock_session = MagicMock(spec=Session)
+        mock_session.get.side_effect = lambda model, key: (
+            event if model == CachedEvent else cal
+        )
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[require_admin] = _fake_admin
+        try:
+            client = TestClient(app)
+            resp = client.patch("/api/admin/events/evt-1", json={"is_hidden": True})
+            assert resp.status_code == 200
+            assert resp.json()["is_hidden"] is True
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_block_event_sets_is_hidden_and_is_blocked(self):
+        event = self._make_event()
+        cal = self._make_cal()
+        mock_session = MagicMock(spec=Session)
+        mock_session.get.side_effect = lambda model, key: (
+            event if model == CachedEvent else (None if model == BlockedEvent else cal)
+        )
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[require_admin] = _fake_admin
+        try:
+            client = TestClient(app)
+            resp = client.post("/api/admin/events/evt-1/block")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["is_hidden"] is True
+            assert data["is_blocked"] is True
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_block_event_not_found(self):
+        mock_session = MagicMock(spec=Session)
+        mock_session.get.return_value = None
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[require_admin] = _fake_admin
+        try:
+            client = TestClient(app)
+            resp = client.post("/api/admin/events/nonexistent/block")
+            assert resp.status_code == 404
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_unblock_event_clears_is_hidden_and_is_blocked(self):
+        event = self._make_event(is_hidden=True)
+        cal = self._make_cal()
+        blocked = BlockedEvent(event_id="evt-1")
+        mock_session = MagicMock(spec=Session)
+
+        def _get(model, key):
+            if model == CachedEvent:
+                return event
+            if model == BlockedEvent:
+                return blocked
+            return cal
+
+        mock_session.get.side_effect = _get
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[require_admin] = _fake_admin
+        try:
+            client = TestClient(app)
+            resp = client.delete("/api/admin/events/evt-1/block")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["is_hidden"] is False
+            assert data["is_blocked"] is False
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_unblock_event_not_found(self):
+        mock_session = MagicMock(spec=Session)
+        mock_session.get.return_value = None
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[require_admin] = _fake_admin
+        try:
+            client = TestClient(app)
+            resp = client.delete("/api/admin/events/nonexistent/block")
+            assert resp.status_code == 404
+        finally:
+            app.dependency_overrides.clear()

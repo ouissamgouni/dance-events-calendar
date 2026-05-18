@@ -1,0 +1,8 @@
+# Site settings pre-seeded into the SiteSetting table.
+#
+# `following_badge_enabled: true` is the new feature toggle for the
+# Following badge — a small avatar/dot decoration on event cards & map
+# pins indicating "at least one user you follow is going or saved this".
+# Independent of the legacy ?friends_going filter chip.
+settings:
+  following_badge_enabled: true

@@ -1,0 +1,16 @@
+# Pre-seeded follow graph for the friends-events scenario.
+#
+# Resulting graph:
+#   alice <-> bob          (mutual = "friends" — primary filter pair)
+#   carol -> alice         (one-way; alice does NOT follow back, so carol is
+#                          NOT a friend of alice and her attendance must NOT
+#                          appear under Bob's "Friends going" chip)
+#   dave   isolated        (no follows; stranger control)
+#   admin  isolated
+follows:
+  - follower: alice
+    followee: bob
+  - follower: bob
+    followee: alice
+  - follower: carol
+    followee: alice

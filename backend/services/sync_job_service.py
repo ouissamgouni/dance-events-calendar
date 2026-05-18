@@ -8,6 +8,15 @@ from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
+# Postgres advisory-lock key used to gate sync job starts across multiple
+# backend instances (e.g. two Fly Machines). Without this, the in-process
+# threading.Lock in SyncJobService only prevents duplicate jobs within a
+# single process — two machines can each pass the local check and start
+# parallel workers, doubling Google API calls and corrupting per-job
+# bookkeeping. The constant value is arbitrary; only its uniqueness within
+# the application matters.
+_SYNC_JOB_ADVISORY_LOCK_KEY = 0x6D6F7669736E6373  # "movisncs"
+
 
 def _utcnow_naive() -> datetime:
     """Return UTC now as naive datetime for compatibility with existing DB models."""
@@ -69,6 +78,70 @@ class SyncJobService:
         self._jobs: dict[str, SyncJobRecord] = {}
         self._history: list[str] = []
         self._active_job_id: str | None = None
+        # Holds the dedicated DB connection that owns the cross-instance
+        # advisory lock for the currently-running job, so the lock survives
+        # for the worker's full lifetime and is released when the worker
+        # finishes (regardless of which thread does the cleanup).
+        self._lock_conn = None
+
+    @staticmethod
+    def _try_acquire_cross_instance_lock():
+        """Acquire a Postgres session-level advisory lock on a dedicated
+        connection. Returns the connection on success, None when the dialect
+        does not support advisory locks (e.g. SQLite) or when the DB is
+        temporarily unreachable (best-effort, matching ``_persist_record``),
+        and raises ``RuntimeError`` when another instance already holds it.
+        """
+        from backend.db.database import get_engine
+
+        engine = get_engine()
+        if engine.dialect.name != "postgresql":
+            return None
+        try:
+            conn = engine.connect()
+        except Exception:
+            # DB unreachable: fall back to in-process locking only. Logged
+            # so multi-instance deployments can spot it in ops dashboards.
+            logger.warning(
+                "advisory lock acquisition skipped: DB unreachable", exc_info=True
+            )
+            return None
+        try:
+            acquired = conn.exec_driver_sql(
+                f"SELECT pg_try_advisory_lock({_SYNC_JOB_ADVISORY_LOCK_KEY})"
+            ).scalar()
+        except Exception:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            logger.warning("advisory lock query failed", exc_info=True)
+            return None
+        if not acquired:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            raise RuntimeError(
+                "Another backend instance is already running a sync job"
+            )
+        return conn
+
+    @staticmethod
+    def _release_cross_instance_lock(conn) -> None:
+        if conn is None:
+            return
+        try:
+            conn.exec_driver_sql(
+                f"SELECT pg_advisory_unlock({_SYNC_JOB_ADVISORY_LOCK_KEY})"
+            )
+        except Exception:
+            logger.warning("advisory unlock failed", exc_info=True)
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
     def start_job(
         self,
@@ -82,6 +155,11 @@ class SyncJobService:
             if active is not None:
                 raise RuntimeError("A sync job is already running")
 
+            # Acquire the cross-instance lock before recording any state so
+            # a "lock held elsewhere" error doesn't leave a phantom active
+            # job in our local map.
+            lock_conn = self._try_acquire_cross_instance_lock()
+
             job_id = str(uuid.uuid4())
             record = SyncJobRecord(
                 job_id=job_id,
@@ -92,6 +170,7 @@ class SyncJobService:
             self._jobs[job_id] = record
             self._history.insert(0, job_id)
             self._active_job_id = job_id
+            self._lock_conn = lock_conn
 
         # Persist initial record (best-effort, outside the lock).
         self._persist_record(record, force=True)
@@ -148,6 +227,9 @@ class SyncJobService:
                 record.finished_at = _utcnow_naive()
                 if self._active_job_id == job_id:
                     self._active_job_id = None
+                lock_conn = self._lock_conn
+                self._lock_conn = None
+            self._release_cross_instance_lock(lock_conn)
         except Exception as exc:
             with self._lock:
                 record = self._jobs.get(job_id)
@@ -159,6 +241,9 @@ class SyncJobService:
                 record.finished_at = _utcnow_naive()
                 if self._active_job_id == job_id:
                     self._active_job_id = None
+                lock_conn = self._lock_conn
+                self._lock_conn = None
+            self._release_cross_instance_lock(lock_conn)
 
         # Persist final state outside the lock (best-effort).
         final = self._jobs.get(job_id)

@@ -160,9 +160,14 @@ export default function TagsPicker({
                     const c = group.color ?? '#6b7280';
                     const fullGroupTags = (tagGroups.find((g) => g.slug === group.slug)?.tags ?? [])
                         .filter((t) => t.enabled !== false);
-                    const noResults = group.tags.length === 0 && search.trim() && fullGroupTags.length > 0;
+                    const searching = !!search.trim();
+                    const noResults = group.tags.length === 0 && searching && fullGroupTags.length > 0;
                     const allFiltered = fullGroupTags.length === 0
                         || (excludeTagIds && fullGroupTags.every((t) => excludeTagIds.has(t.id)));
+
+                    // While searching, hide groups that have no matching
+                    // tags so the user only sees relevant rows.
+                    if (searching && noResults) return null;
 
                     return (
                         <div key={group.slug}>
@@ -171,8 +176,6 @@ export default function TagsPicker({
                             </p>
                             {allFiltered ? (
                                 <p className="text-[11px] text-slate-400 italic">No tags available.</p>
-                            ) : noResults ? (
-                                <p className="text-[11px] text-slate-400 italic">No matches.</p>
                             ) : (
                                 <div className="flex flex-wrap gap-1">
                                     {group.tags.map((tag) => {

@@ -1,0 +1,14 @@
+# Site settings pre-seeded into the SiteSetting table.
+#
+# `unseen_state_enabled: true` flips on the New/Unseen state UI:
+#   - small dot decoration + bolder title on cards/pins for events the
+#     viewer hasn't visited yet
+#   - "Unseen only" filter chip in the explorer
+#   - a header counter ("3 new since your last visit")
+#
+# Per-viewer state (which events have been seen) is tracked client-side
+# in localStorage keyed by event_id, so the scenario does not need to
+# seed any per-user state — every event is "unseen" until the user
+# clicks it once.
+settings:
+  unseen_state_enabled: true
