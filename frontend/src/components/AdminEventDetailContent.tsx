@@ -262,8 +262,12 @@ export default function AdminEventDetailContent({
                                     </span>
                                 )}
                                 {event.view_count > 0 && (
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-                                        {event.view_count >= 10 ? '\uD83D\uDD25' : '\uD83D\uDC41'} {event.view_count}
+                                    <span className="inline-flex items-center gap-1 bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                                        <svg viewBox="0 0 20 20" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                                            <path d="M2 10s2.5-5 8-5 8 5 8 5-2.5 5-8 5-8-5-8-5Z" strokeLinejoin="round" />
+                                            <circle cx="10" cy="10" r="2.25" />
+                                        </svg>
+                                        {event.view_count}
                                     </span>
                                 )}
                                 <EditHint />

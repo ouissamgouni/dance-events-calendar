@@ -1,0 +1,36 @@
+test_plan:
+  name: "Phase E (E9) — Friends leaderboard (Most active tab)"
+  description: >
+    Verify the leaderboard ordering, the 7d/30d/90d period radio, and
+    the contract that private-audience Going rows are EXCLUDED.
+
+  preconditions:
+    - "task start:scenario SCENARIO=friends-leaderboard"
+    - "viewer is mutual with alpha/beta/delta/gamma at sign-in."
+    - "Going footprint: alpha=3 public, beta=2 public, delta=1 friends, gamma=1 PRIVATE."
+
+  steps:
+    - id: 1
+      title: "Open Network panel → Most active tab"
+      description: "Sign in as viewer. Open /account#network and click ``Most active``."
+      expected: >
+        Default period radio is ``30 days``. Rows render in order:
+        alpha (3) → beta (2) → delta (1). gamma also renders with
+        ``going_count == 0`` (private excluded). DevTools:
+        GET /api/social/me/friends/leaderboard?period=30d returns the
+        same ordering with rank 1..4.
+
+    - id: 2
+      title: "Switch period radio → ordering preserved"
+      description: "Click 7d, then 90d. All events live in week 0 so the ranking is stable."
+      expected: "Ordering unchanged: alpha (3) > beta (2) > delta (1) > gamma (0)."
+
+    - id: 3
+      title: "Negative: invalid period rejected"
+      description: "DevTools: ``fetch('/api/social/me/friends/leaderboard?period=1y')``."
+      expected: "400 Bad Request — period must be one of 7d / 30d / 90d."
+
+    - id: 4
+      title: "Negative: anonymous viewer cannot reach the endpoint"
+      description: "Sign out (or use incognito). Re-fire the same fetch."
+      expected: "401 Unauthorized."

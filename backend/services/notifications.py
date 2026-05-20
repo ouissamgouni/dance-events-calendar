@@ -35,6 +35,15 @@ SUBSCRIPTION_GOING = "subscription_going"
 SUBSCRIPTION_SUGGESTED = "subscription_suggested"
 NEW_FOLLOWER = "new_follower"
 NEW_FRIEND = "new_friend"
+# Phase E (E8): pending follow request awaiting approval. The recipient
+# is the *target* of the follow (the account whose visibility is
+# ``friends``); the actor is the requester.
+FOLLOW_REQUEST = "follow_request"
+# Phase E (E8): the requester is notified when the target approves their
+# pending follow-request. The recipient is the *requester* (bob); the
+# actor is the approver (alice). Replaces the wrong new_follower that
+# previously went to the approver instead.
+FOLLOW_REQUEST_APPROVED = "follow_request_approved"
 
 
 def _fan_out(
@@ -242,3 +251,76 @@ def notify_new_friend(session: Session, user_a: User, user_b: User) -> None:
             )
         )
     session.flush()
+
+
+def notify_follow_request(session: Session, target: User, requester: User) -> None:
+    """Phase E (E8): notify ``target`` that ``requester`` wants to follow.
+
+    Idempotent against the partial unique index on
+    ``(recipient, actor, kind)`` for event-less notifications: a repeat
+    request from the same user (e.g. unfollow→re-request) reuses the
+    existing row.
+    """
+    if _notification_exists(
+        session,
+        recipient_id=target.id,
+        actor_id=requester.id,
+        kind=FOLLOW_REQUEST,
+    ):
+        return
+    session.add(
+        Notification(
+            recipient_user_id=target.id,
+            actor_user_id=requester.id,
+            kind=FOLLOW_REQUEST,
+            event_id=None,
+        )
+    )
+    session.flush()
+
+
+def notify_follow_request_approved(
+    session: Session, requester: User, approver: User
+) -> None:
+    """Phase E (E8): notify ``requester`` that ``approver`` has approved their
+    pending follow-request.
+
+    The recipient is the requester (bob); the actor is the approver (alice).
+    Idempotent against the partial unique index.
+    """
+    if _notification_exists(
+        session,
+        recipient_id=requester.id,
+        actor_id=approver.id,
+        kind=FOLLOW_REQUEST_APPROVED,
+    ):
+        return
+    session.add(
+        Notification(
+            recipient_user_id=requester.id,
+            actor_user_id=approver.id,
+            kind=FOLLOW_REQUEST_APPROVED,
+            event_id=None,
+        )
+    )
+    session.flush()
+
+
+def discard_follow_request_notification(
+    session: Session, target_id, requester_id
+) -> None:
+    """Phase E (E8): remove the pending ``follow_request`` row, if any.
+
+    Called when a request is approved or declined so the recipient's
+    inbox stays in sync. Uses a direct ``delete()`` to avoid loading
+    the row; commits are owned by the caller.
+    """
+    from backend.db.models import Notification as _N  # local import
+
+    session.exec(
+        _N.__table__.delete().where(
+            (_N.recipient_user_id == target_id)
+            & (_N.actor_user_id == requester_id)
+            & (_N.kind == FOLLOW_REQUEST)
+        )
+    )

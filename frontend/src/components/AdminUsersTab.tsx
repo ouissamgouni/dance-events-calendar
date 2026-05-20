@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { fetchAdminUsers, adminDeleteUser, adminSetVerifiedOrganizer } from '../api';
+import {
+    fetchAdminUsers,
+    adminDeleteUser,
+    adminSetVerifiedOrganizer,
+    adminSetAdminManaged,
+} from '../api';
 import type { AdminUserRow } from '../api';
 
 const PAGE_SIZE = 50;
@@ -66,6 +71,49 @@ export default function AdminUsersTab() {
         setBusyHandle(row.handle);
         try {
             await adminSetVerifiedOrganizer(row.handle, !row.is_verified_organizer);
+            await load();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Failed to update');
+        } finally {
+            setBusyHandle(null);
+        }
+    };
+
+    const onToggleManaged = async (row: AdminUserRow) => {
+        if (!row.handle) return;
+        // When flipping ON we also ask for an optional label so the
+        // admin can disambiguate curator personas in the list.
+        let nextLabel: string | null = row.managed_label;
+        if (!row.is_admin_managed) {
+            const input = window.prompt(
+                `Mark @${row.handle} as admin-managed.\n\nOptional internal label (e.g. "Salsa Nights Paris"). Leave blank to skip.`,
+                row.managed_label ?? '',
+            );
+            if (input === null) return; // cancelled
+            nextLabel = input.trim() || null;
+        }
+        setBusyHandle(row.handle);
+        try {
+            await adminSetAdminManaged(row.handle, !row.is_admin_managed, nextLabel);
+            await load();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Failed to update');
+        } finally {
+            setBusyHandle(null);
+        }
+    };
+
+    const onEditManagedLabel = async (row: AdminUserRow) => {
+        if (!row.handle || !row.is_admin_managed) return;
+        const input = window.prompt(
+            `Internal label for @${row.handle} (max 120 chars). Leave blank to clear.`,
+            row.managed_label ?? '',
+        );
+        if (input === null) return;
+        const next = input.trim() || null;
+        setBusyHandle(row.handle);
+        try {
+            await adminSetAdminManaged(row.handle, true, next);
             await load();
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to update');
@@ -213,6 +261,14 @@ export default function AdminUsersTab() {
                                                     verified
                                                 </span>
                                             )}
+                                            {row.is_admin_managed && (
+                                                <span
+                                                    className="px-1.5 py-px text-xs bg-indigo-100 text-indigo-800 rounded"
+                                                    title={row.managed_label || 'Admin-managed curator account'}
+                                                >
+                                                    managed{row.managed_label ? `: ${row.managed_label}` : ''}
+                                                </span>
+                                            )}
                                             {isDeleted && (
                                                 <span className="px-1.5 py-px text-xs bg-slate-200 text-slate-700 rounded">
                                                     deleted
@@ -231,6 +287,26 @@ export default function AdminUsersTab() {
                                             >
                                                 {row.is_verified_organizer ? 'Unverify' : 'Verify'}
                                             </button>
+                                            <button
+                                                type="button"
+                                                disabled={!row.handle || isDeleted || row.is_admin || busyHandle === row.handle}
+                                                onClick={() => onToggleManaged(row)}
+                                                className="px-2 py-1 text-xs border border-slate-300 bg-white rounded hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                title={row.is_admin_managed ? 'Unmark as admin-managed account' : 'Mark as admin-managed curator account'}
+                                            >
+                                                {row.is_admin_managed ? 'Unmanage' : 'Manage'}
+                                            </button>
+                                            {row.is_admin_managed && (
+                                                <button
+                                                    type="button"
+                                                    disabled={!row.handle || isDeleted || busyHandle === row.handle}
+                                                    onClick={() => onEditManagedLabel(row)}
+                                                    className="px-2 py-1 text-xs border border-slate-300 bg-white rounded hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    title="Edit internal managed label"
+                                                >
+                                                    Label
+                                                </button>
+                                            )}
                                             <button
                                                 type="button"
                                                 disabled={!row.handle || isDeleted || row.is_admin || busyHandle === row.handle}

@@ -8,6 +8,7 @@ import SaveEventButton from './SaveEventButton';
 import GoingButton from './GoingButton';
 import RateEventButton from './RateEventButton';
 import TagBadges from './TagBadges';
+import AttendeeAvatarStack from './AttendeeAvatarStack';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 
 export interface MapBounds {
@@ -38,32 +39,90 @@ function adaptiveMarkerPadding(map: L.Map): [number, number] {
     return [p, p];
 }
 
-function makeColoredIcon(color: string | null): L.DivIcon {
+/** Per-event signal overlays composed onto the colored disc. All optional. */
+interface PinDecorations {
+    /** True when popularity_score is top-3 + above threshold; draws an orange ring. */
+    trending?: boolean;
+    /** Count of mutual friends with going/saved; draws a rose chip at bottom-right. */
+    followingCount?: number;
+    /** True when the viewer hasn't opened this event; draws a rose dot at top-right. */
+    unseen?: boolean;
+    /** Total going count for the event; rendered as a small slate chip at
+     * top-left so the pin conveys "how many attendees" even when there are
+     * no mutual friends. */
+    totalGoing?: number;
+}
+
+/** Build the SVG fragment for the trending ring (drawn just inside the box). */
+function trendingRing(size: number): string {
+    const cx = size / 2;
+    const r = size / 2 - 1;
+    return `<circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="#f97316" stroke-width="2" />`;
+}
+
+/** Build the HTML for the following-friend chip (bottom-right). Blue
+ * (social signal, not warning) + an inline "people" silhouette so the
+ * count reads as "N people you follow" even at pin size. */
+function followingChip(count: number): string {
+    const label = count >= 10 ? '9+' : String(count);
+    // Inline SVG: 8x8 two-head people glyph in white. Tight against the
+    // count for a "icon · N" composition that fits in ~26px width.
+    const icon =
+        '<svg viewBox="0 0 20 20" width="8" height="8" fill="currentColor" aria-hidden="true" style="vertical-align:middle;margin-right:1px;">' +
+        '<path d="M7 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm6 0a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM1.5 16.25c0-2.69 2.46-4.5 5.5-4.5s5.5 1.81 5.5 4.5v.5h-11v-.5Zm12.25.5v-.5c0-1.18-.42-2.2-1.14-3.01.36-.05.74-.07 1.14-.07 2.62 0 4.5 1.45 4.5 3.58Z"/></svg>';
+    return `<span style="position:absolute;right:-6px;bottom:-6px;display:inline-flex;align-items:center;min-width:18px;height:14px;padding:0 4px;background:#3b82f6;color:white;font-size:9px;font-weight:700;line-height:14px;border:1.5px solid white;box-sizing:content-box;font-family:system-ui,sans-serif;">${icon}${label}</span>`;
+}
+
+/** Build the HTML for the unseen dot (top-right). Blue dot matches the
+ * unseen affordance on the cards (`bg-blue-500`). */
+function unseenDot(): string {
+    return `<span style="position:absolute;right:-2px;top:-2px;width:8px;height:8px;border-radius:9999px;background:#3b82f6;border:1.5px solid white;box-sizing:content-box;"></span>`;
+}
+
+/** Build the HTML for the total-going chip (top-left). Slate (neutral)
+ * so it reads as "how many" without competing with the friends-going
+ * (blue) or unseen (blue) social signals. */
+function totalGoingChip(count: number): string {
+    const label = count >= 100 ? '99+' : String(count);
+    return `<span style="position:absolute;left:-6px;top:-6px;display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;padding:0 3px;background:#475569;color:white;font-size:9px;font-weight:700;line-height:14px;border:1.5px solid white;box-sizing:content-box;font-family:system-ui,sans-serif;">${label}</span>`;
+}
+
+function makeColoredIcon(color: string | null, dec?: PinDecorations): L.DivIcon {
     const fill = color || '#3b82f6';
+    const ring = dec?.trending ? trendingRing(28) : '';
+    const followBadge = dec?.followingCount && dec.followingCount > 0 ? followingChip(dec.followingCount) : '';
+    const unseenBadge = dec?.unseen ? unseenDot() : '';
+    const totalBadge = dec?.totalGoing && dec.totalGoing > 0 ? totalGoingChip(dec.totalGoing) : '';
     return L.divIcon({
         className: '',
         iconSize: [28, 28],
         iconAnchor: [14, 14],
         popupAnchor: [0, -14],
-        html: `<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+        html: `<div style="position:relative;width:28px;height:28px;"><svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
             <circle cx="14" cy="14" r="11" fill="${fill}" stroke="white" stroke-width="2.5" />
             <circle cx="14" cy="14" r="4" fill="white" opacity="0.9" />
-        </svg>`,
+            ${ring}
+        </svg>${totalBadge}${unseenBadge}${followBadge}</div>`,
     });
 }
 
-function makeHighlightedIcon(color: string | null): L.DivIcon {
+function makeHighlightedIcon(color: string | null, dec?: PinDecorations): L.DivIcon {
     const fill = color || '#3b82f6';
+    const ring = dec?.trending ? trendingRing(36) : '';
+    const followBadge = dec?.followingCount && dec.followingCount > 0 ? followingChip(dec.followingCount) : '';
+    const unseenBadge = dec?.unseen ? unseenDot() : '';
+    const totalBadge = dec?.totalGoing && dec.totalGoing > 0 ? totalGoingChip(dec.totalGoing) : '';
     return L.divIcon({
         className: '',
         iconSize: [36, 36],
         iconAnchor: [18, 18],
         popupAnchor: [0, -18],
-        html: `<svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
+        html: `<div style="position:relative;width:36px;height:36px;"><svg width="36" height="36" viewBox="0 0 36 36" xmlns="http://www.w3.org/2000/svg">
             <circle cx="18" cy="18" r="16" fill="${fill}" opacity="0.25" />
             <circle cx="18" cy="18" r="12" fill="${fill}" stroke="white" stroke-width="3" />
             <circle cx="18" cy="18" r="4.5" fill="white" opacity="0.9" />
-        </svg>`,
+            ${ring}
+        </svg>${totalBadge}${unseenBadge}${followBadge}</div>`,
     });
 }
 
@@ -101,6 +160,22 @@ interface Props {
      * imperative flyToArea re-fit. When provided, the marker auto-fit is
      * also suppressed for the first render. */
     initialArea?: { min_lat: number; min_lng: number; max_lat: number; max_lng: number } | null;
+    /** Set of event_ids the viewer has already opened. Drives the Unseen
+     * dot overlay when ``unseenStateEnabled`` is on. Optional — when
+     * omitted no events are treated as seen. */
+    seenEventIds?: Set<string>;
+    /** Threshold for the trending pin ring. Defaults to 10 to match the
+     * list panel's ``PopularityBadge``. */
+    popularityThreshold?: number;
+    /** Called when a pin (or its popup title) is clicked; the parent uses
+     * this to mark the event as seen. */
+    onMarkSeen?: (eventId: string) => void;
+    /** Per-render override for the following-badge overlay on map pins.
+     * When the site-wide ``followingBadgeEnabled`` flag is on, this lets
+     * the user temporarily hide the friends-going chip on the map without
+     * disabling the badge elsewhere (cards, modal). Defaults to ``true``.
+     * Has no effect when the site-wide flag is off. */
+    showFollowingBadgeOverlay?: boolean;
 }
 
 function BoundsReporter({ onBoundsChange }: { onBoundsChange?: (bounds: MapBounds, userDriven: boolean) => void }) {
@@ -383,13 +458,29 @@ function FlyToAreaController({
     return null;
 }
 
-export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea }: Props) {
-    const { showRatings, eventColorBarColor } = useFeatureFlags();
+export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, seenEventIds, popularityThreshold = 10, onMarkSeen, showFollowingBadgeOverlay = true }: Props) {
+    const { showRatings, eventColorBarColor, followingBadgeEnabled, unseenStateEnabled, trendingEnabled, trendingTopN, trendingTopPercent } = useFeatureFlags();
     const markerRefs = useRef(new Map<string, L.Marker>());
     const geoEvents = useMemo(
         () => events.filter((e) => e.latitude != null && e.longitude != null),
         [events],
     );
+
+    // Top-K popularity_score in the currently-rendered set, used (with
+    // the threshold) to gate the trending pin ring — mirrors
+    // PopularityBadge. Effective cap is
+    //   min(trendingTopN, ceil(positiveVisible * trendingTopPercent / 100))
+    const topScores = useMemo<number[]>(() => {
+        const scores = geoEvents
+            .map((e) => e.popularity_score ?? 0)
+            .filter((s) => s > 0)
+            .sort((a, b) => b - a);
+        const cap = Math.max(
+            1,
+            Math.min(trendingTopN, Math.ceil((scores.length * trendingTopPercent) / 100)),
+        );
+        return scores.slice(0, cap);
+    }, [geoEvents, trendingTopN, trendingTopPercent]);
 
     const positions = useMemo<[number, number][]>(
         () => geoEvents.map((e) => [e.latitude!, e.longitude!]),
@@ -497,49 +588,68 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
             />
             <FlyToAreaController flyToArea={flyToArea} flyToAreaToken={flyToAreaToken} />
             <BoundsReporter onBoundsChange={onBoundsChange} />
-            {geoEvents.map((e) => (
-                <Marker
-                    key={e.event_id}
-                    ref={(marker) => registerMarker(e.event_id, marker)}
-                    position={[e.latitude!, e.longitude!]}
-                    icon={hoveredEventId === e.event_id ? makeHighlightedIcon(eventColorBarColor) : makeColoredIcon(eventColorBarColor)}
-                    eventHandlers={{
-                        mouseover: () => onEventHover?.(e.event_id),
-                        mouseout: () => onEventHover?.(null),
-                    }}
-                >
-                    <Popup>
-                        <div className="space-y-1.5 text-xs min-w-[180px]">
-                            <p
-                                className="font-semibold text-sm cursor-pointer hover:text-slate-600"
-                                onClick={() => onEventClick?.(e)}
-                            >
-                                {e.title}
-                            </p>
-                            <p className="text-slate-500">{formatDate(e)}</p>
-                            {e.location && (
-                                <p className="text-slate-600">📍 {e.location}</p>
-                            )}
-                            {e.tags?.length > 0 && (
-                                <TagBadges tags={e.tags} maxVisible={3} />
-                            )}
-                            <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-                                <div className="flex items-center gap-1">
-                                    <SaveEventButton eventId={e.event_id} appearance="icon" size="sm" stopPropagation />
-                                    <GoingButton eventId={e.event_id} appearance="icon" size="sm" stopPropagation />
-                                    {showRatings && <RateEventButton eventId={e.event_id} appearance="icon" size="sm" stopPropagation />}
-                                </div>
-                                <Link
-                                    to={`/event/${e.event_id}${detailLinkSource ? `?src=${detailLinkSource}` : ''}`}
-                                    className="text-[10px] font-medium text-rose-500 hover:text-rose-700"
+            {geoEvents.map((e) => {
+                const showFollowingOverlay = followingBadgeEnabled && showFollowingBadgeOverlay;
+                const followingCount = showFollowingOverlay ? (e.following_friend_count ?? 0) : 0;
+                const unseen = unseenStateEnabled && !!seenEventIds && !seenEventIds.has(e.event_id);
+                const score = e.popularity_score ?? 0;
+                const trending = trendingEnabled
+                    && score >= popularityThreshold
+                    && topScores.includes(score);
+                const totalGoing = e.going_count ?? 0;
+                const dec: PinDecorations = { trending, followingCount, unseen, totalGoing };
+                const isHovered = hoveredEventId === e.event_id;
+                return (
+                    <Marker
+                        key={e.event_id}
+                        ref={(marker) => registerMarker(e.event_id, marker)}
+                        position={[e.latitude!, e.longitude!]}
+                        icon={isHovered ? makeHighlightedIcon(eventColorBarColor, dec) : makeColoredIcon(eventColorBarColor, dec)}
+                        eventHandlers={{
+                            mouseover: () => onEventHover?.(e.event_id),
+                            mouseout: () => onEventHover?.(null),
+                            click: () => onMarkSeen?.(e.event_id),
+                        }}
+                    >
+                        <Popup>
+                            <div className="space-y-1.5 text-xs min-w-[180px]">
+                                <p
+                                    className="font-semibold text-sm cursor-pointer hover:text-slate-600"
+                                    onClick={() => { onMarkSeen?.(e.event_id); onEventClick?.(e); }}
                                 >
-                                    Details →
-                                </Link>
+                                    {e.title}
+                                </p>
+                                <p className="text-slate-500">{formatDate(e)}</p>
+                                {e.location && (
+                                    <p className="text-slate-600">📍 {e.location}</p>
+                                )}
+                                {followingCount > 0 && (
+                                    <AttendeeAvatarStack
+                                        eventId={e.event_id}
+                                        friendsPreview={showFollowingOverlay ? e.following_friends_preview : undefined}
+                                    />
+                                )}
+                                {e.tags?.length > 0 && (
+                                    <TagBadges tags={e.tags} maxVisible={3} />
+                                )}
+                                <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                                    <div className="flex items-center gap-1">
+                                        <SaveEventButton eventId={e.event_id} appearance="icon" size="sm" stopPropagation />
+                                        <GoingButton eventId={e.event_id} appearance="icon" size="sm" stopPropagation />
+                                        {showRatings && <RateEventButton eventId={e.event_id} appearance="icon" size="sm" stopPropagation />}
+                                    </div>
+                                    <Link
+                                        to={`/event/${e.event_id}${detailLinkSource ? `?src=${detailLinkSource}` : ''}`}
+                                        className="text-[10px] font-medium text-rose-500 hover:text-rose-700"
+                                    >
+                                        Details →
+                                    </Link>
+                                </div>
                             </div>
-                        </div>
-                    </Popup>
-                </Marker>
-            ))}
+                        </Popup>
+                    </Marker>
+                );
+            })}
         </MapContainer>
     );
 }

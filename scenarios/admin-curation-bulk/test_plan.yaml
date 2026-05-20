@@ -1,0 +1,72 @@
+test_plan:
+  name: "Admin-curated lists (Phase 2) — bulk on-demand curation"
+  description: >
+    Verify the admin can flag a regular account as admin-managed and then
+    bulk-curate events from the Events panel into that account's Saved /
+    Going lists. Curated rows must show the "Curated" pill on the public
+    profile (Phase 4) and be isolated by ``device_id="admin:<admin.id>"``
+    so a real user signing in as the puppet would not see them as own.
+
+  preconditions:
+    - "task start:scenario SCENARIO=admin-curation-bulk"
+    - "task db:up && task db:migrate (heads: fb71a8c9d0e1, 8c2f3d4e5a01)"
+    - "Pre-seeded users: admin, curator-paris, alice."
+    - "Mock calendar service yields at least 3 upcoming events after a sync."
+
+  steps:
+    - id: 1
+      title: "Sync events"
+      description: "Sign in as admin (Dev Mock). Trigger a manual sync from the admin Calendars panel."
+      expected: "At least 3 events appear in the Events panel."
+
+    - id: 2
+      title: "Flag curator-paris as admin-managed"
+      description: >
+        Open the Users tab in /admin. Click "Manage" on the curator-paris
+        row, then set a label "Paris Salsa Curator".
+      expected: >
+        Row shows a "managed" pill and "Unmanage" button.
+        PATCH /api/social/admin/users/{id}/admin-managed → 200
+        with ``is_admin_managed: true``.
+
+    - id: 3
+      title: "Bulk curate to Saved"
+      description: >
+        In the Events panel, multi-select 2 events. Click "Curate to Lists".
+        Choose target = curator-paris, intent = saved, audience = public.
+        Confirm.
+      expected: >
+        POST /api/admin/engagement/bulk → 200 with ``written=2, skipped=0``.
+        Toast: "Curated 2 events to curator-paris (Saved)".
+
+    - id: 4
+      title: "Bulk curate to Going"
+      description: >
+        Multi-select 1 additional event. Repeat the dialog with intent = going.
+      expected: "``written=1`` in response; toast confirms Going."
+
+    - id: 5
+      title: "Public profile shows Curated pill (Phase 4)"
+      description: >
+        Sign out. In a fresh incognito window, visit /u/curator-paris and
+        open the Calendar tab.
+      expected: >
+        All 3 events render with an indigo "Curated" badge (tooltip:
+        "Curated by the editorial team") alongside the Going / Saved pill.
+        GET /api/social/users/curator-paris/calendar response: every item
+        has ``curated: true``.
+
+    - id: 6
+      title: "Re-curation is idempotent"
+      description: "Sign back in as admin. Re-run step 3 with the same events."
+      expected: "``written=0, skipped=2`` (already curated; audit cols unchanged)."
+
+    - id: 7
+      title: "Curator isolation"
+      description: >
+        Sign in as curator-paris (Dev Mock). Visit /calendar (own view).
+      expected: >
+        The Saved / Going lists rendered for the *signed-in self* do NOT
+        include the admin-curated rows — those live under
+        ``device_id="admin:<admin.id>"`` and are scoped to the admin
+        device, not the curator's own device.

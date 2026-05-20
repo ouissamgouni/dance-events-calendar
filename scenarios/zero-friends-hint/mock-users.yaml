@@ -1,0 +1,20 @@
+# Phase E (E2) — Zero-friends warning in AudiencePicker.
+#
+# Cast:
+#   - viewer — persona under test; 0 friends → exercises hint.
+#   - alpha  — friend candidate (already follows viewer, one-way) used
+#              in step 3 to verify the hint disappears once a mutual
+#              edge is created.
+#   - admin
+users:
+  - email: viewer@example.com
+    name: Viewer Persona
+    handle: viewer
+    account_visibility: public
+  - email: alpha@example.com
+    name: Alpha Garcia
+    handle: alpha
+    account_visibility: public
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

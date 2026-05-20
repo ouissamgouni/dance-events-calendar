@@ -1,0 +1,17 @@
+# Phase E (D2) — share-link doubles as referral.
+#
+# Cast:
+#   - sharer  — the user whose ?ref=share&src=<share_code> URL the
+#               visitor lands on. We surface the banner for them.
+#   - viewer  — persona under test (signs in to redeem).
+#   - admin
+users:
+  - email: sharer@example.com
+    name: Sharer Persona
+    handle: sharer
+  - email: viewer@example.com
+    name: Viewer Persona
+    handle: viewer
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

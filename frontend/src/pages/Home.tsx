@@ -1,7 +1,8 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { CalendarEvent, TagGroup } from '../types';
-import { fetchEvents, fetchMyFriends, fetchSettings, fetchTagGroups } from '../api';
+import { fetchEvents, fetchSettings, fetchTagGroups } from '../api';
+import UserInterestPicker from '../components/UserInterestPicker';
 import { trackView } from '../utils/tracking';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
@@ -17,11 +18,14 @@ import EventListPanel from '../components/EventListPanel';
 import TagFilterPills from '../components/TagFilterPills';
 import AreaFilterChip from '../components/AreaFilterChip';
 import { usePreferences } from '../context/PreferencesContext';
+import { useInvalidateAttendanceSummaries } from '../context/AttendanceSummariesContext';
 import { DEFAULT_AREA_BBOX, DEFAULT_AREA_LABEL, clampArea, isDefaultArea } from '../constants/area';
 import type { PreferredAreaPayload } from '../api';
 import MineButton from '../components/MineButton';
+import FollowsButton from '../components/FollowsButton';
 import SuggestEventModal from '../components/SuggestEventModal';
 import EventAnchoredDetailPanel from '../components/EventAnchoredDetailPanel';
+import { useSeenEvents } from '../hooks/useSeenEvents';
 
 type ViewMode = 'explorer' | 'calendar';
 
@@ -34,8 +38,13 @@ function formatDate(date: Date): string {
 
 export default function Home() {
     const { user } = useAuth();
-    const { showPrices, showPopularity, popularityThreshold, tagSortMode } = useFeatureFlags();
+    const { showPrices, showPopularity, popularityThreshold, tagSortMode, unseenStateEnabled, followingBadgeEnabled } = useFeatureFlags();
+    const { seen: seenEventIds, markSeen } = useSeenEvents();
     const [showSuggestModal, setShowSuggestModal] = useState(false);
+    // Session-only toggle for the friends-going overlay on map pins.
+    // Enabled by default; lets users temporarily hide the friends chip
+    // without disabling the site-wide ``followingBadgeEnabled`` flag.
+    const [mapFollowingBadgeOverlay, setMapFollowingBadgeOverlay] = useState(true);
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
 
@@ -50,6 +59,7 @@ export default function Home() {
     }, [searchParams, setSearchParams]);
 
     const viewMode: ViewMode = location.pathname === '/calendar' ? 'calendar' : 'explorer';
+    const invalidateAttendanceSummaries = useInvalidateAttendanceSummaries();
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [sinceDate, setSinceDate] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -339,18 +349,23 @@ export default function Home() {
     const [startDate, setStartDate] = useState(today);
     const [endDate, setEndDate] = useState(formatDate(defaultEndDate));
 
-    // Friend filter (Phase B). Anonymous users can toggle the chip but the
-    // backend returns an empty list — the UI surfaces a sign-in nudge in that
-    // case so the empty state isn't confusing.
-    //
-    // "Interested" is the union of going + saved (Facebook Events semantics):
-    // a single toggle sends both ``friends_going`` and ``friends_saved`` to
-    // the backend, which OR-merges them.
-    const [friendsInterested, setFriendsInterested] = useState(false);
-    // Optional: scope the Interested filter to one specific friend. When set,
-    // implies ``friendsInterested = true`` (a friend is selected because the
-    // viewer wants to see their picks).
-    const [friendHandle, setFriendHandle] = useState<string | null>(null);
+    // Interest filter (Phase: following-interest). Restricts the explorer
+    // feed to events at least one user in the chosen graph has marked
+    // going / saved.
+    //   • `interestSource` = which graph: `follows` (anyone the viewer
+    //     follows, one-way OK) or `friends` (mutual followers only).
+    //     `null` = filter off.
+    //   • `interestKind` = which signal: `any` (going OR saved), `going`,
+    //     `saved`. Defaults to `any` so the chip works as a one-click
+    //     "what are people I follow up to" toggle.
+    //   • `interestUserHandle` = optional narrow to a single user (any
+    //     user, not necessarily followed). When set, implies the filter
+    //     is on.
+    // Backend enforces per-row audience visibility; non-mutual followers
+    // never see `friends`-audience rows.
+    const [interestSource, setInterestSource] = useState<'follows' | 'friends' | null>(null);
+    const [interestKind, setInterestKind] = useState<'any' | 'going' | 'saved'>('any');
+    const [interestUserHandle, setInterestUserHandle] = useState<string | null>(null);
 
     // Calendar mode map bounds (for off-map styling in the calendar grid)
     const [calMapBounds, setCalMapBounds] = useState<MapBounds | null>(null);
@@ -373,19 +388,19 @@ export default function Home() {
     const [visibleRange, setVisibleRange] = useState<{ start: Date; end: Date } | null>(null);
     useEffect(() => {
         if (!initialLoadDone.current) setLoading(true);
-        let params: { startDate?: string; endDate?: string; area?: PreferredAreaPayload | null; friendsGoing?: boolean; friendsSaved?: boolean; friendHandle?: string } | undefined;
+        let params: { startDate?: string; endDate?: string; area?: PreferredAreaPayload | null; interestSource?: 'follows' | 'friends'; interestKind?: 'any' | 'going' | 'saved'; interestUserHandle?: string } | undefined;
         if (viewMode === 'explorer') {
             // No ``area`` here on purpose — we always pull the full set
             // and filter by the current map viewport on the client (see
             // ``filteredEvents``). Keeps panning instantaneous regardless
             // of which preset is selected.
-            const interestedActive = friendsInterested || !!friendHandle;
+            const interestActive = interestSource !== null || !!interestUserHandle;
             params = {
                 startDate,
                 endDate,
-                friendsGoing: interestedActive || undefined,
-                friendsSaved: interestedActive || undefined,
-                friendHandle: friendHandle ?? undefined,
+                interestSource: interestActive ? (interestSource ?? 'follows') : undefined,
+                interestKind: interestActive ? interestKind : undefined,
+                interestUserHandle: interestUserHandle ?? undefined,
             };
         } else if (visibleRange) {
             params = {
@@ -399,6 +414,11 @@ export default function Home() {
         const tagParams = params?.startDate || params?.endDate ? params : undefined;
         Promise.all([fetchEvents(params), fetchSettings(), fetchTagGroups(tagParams)])
             .then(([evts, settings, groups]) => {
+                // Invalidate cached attendance summaries for the events we just
+                // (re)fetched so visible cards re-pull fresh avatars + counts
+                // when filters change — mirrors page-refresh behavior without
+                // dropping cache for events not in the new result.
+                invalidateAttendanceSummaries(evts.map((e) => e.event_id));
                 setEvents(evts);
                 setSinceDate(settings.since_date);
                 setTagGroups(groups);
@@ -408,7 +428,7 @@ export default function Home() {
                 setLoading(false);
                 initialLoadDone.current = true;
             });
-    }, [viewMode, startDate, endDate, visibleRange, friendsInterested, friendHandle]);
+    }, [viewMode, startDate, endDate, visibleRange, interestSource, interestKind, interestUserHandle]);
 
     const handleDateRangeChange = useCallback((start: string, end: string) => {
         setStartDate(start);
@@ -610,13 +630,15 @@ export default function Home() {
 
     // Explorer list panel click — carries source through URL query param
     const handleExplorerListEventClick = useCallback((evt: CalendarEvent) => {
+        markSeen(evt.event_id);
         navigate(`/event/${evt.event_id}?src=explorer-list`);
-    }, [navigate]);
+    }, [navigate, markSeen]);
 
     // Explorer map marker click — carries source through URL query param
     const handleExplorerMapEventClick = useCallback((evt: CalendarEvent) => {
+        markSeen(evt.event_id);
         navigate(`/event/${evt.event_id}?src=explorer-map`);
-    }, [navigate]);
+    }, [navigate, markSeen]);
 
     const handleCloseModal = useCallback(() => {
         setSelectedEventRect(null);
@@ -757,6 +779,7 @@ export default function Home() {
                             </div>
                             <div className="flex gap-1 bg-slate-200 p-1 shrink-0 w-fit">
                                 <MineButton />
+                                <FollowsButton />
                                 <button
                                     onClick={() => setShowSuggestModal(true)}
                                     className="hidden sm:inline-flex px-3 py-1 text-sm transition bg-white text-slate-900 font-medium shadow-sm hover:bg-slate-50"
@@ -805,30 +828,41 @@ export default function Home() {
                                         ) : undefined}
                                     />
                                 )}
-                                {/* Friend filter chips (Phase B). Only useful for
-                                signed-in users with mutual followers; the
-                                backend returns an empty list for anonymous
-                                viewers, which we surface explicitly below. */}
-                                <FriendFilterChips
+                                {/* Interest filter chips (Phase:
+                                following-interest). Restricts the feed to
+                                activity from people the viewer follows
+                                (one-way OK) or just mutual friends, with
+                                going/saved/any sub-filter and an optional
+                                single-user narrow. Per-row audience is
+                                still enforced server-side. */}
+                                <InterestFilterChips
                                     signedIn={!!user}
-                                    friendsInterested={friendsInterested}
-                                    onToggleInterested={() => {
+                                    interestSource={interestSource}
+                                    interestKind={interestKind}
+                                    interestUserHandle={interestUserHandle}
+                                    onChange={(next) => {
                                         bumpAutoFit();
-                                        setFriendsInterested((v) => {
-                                            // Turning the chip off also clears
-                                            // any selected friend — otherwise
-                                            // the dropdown would show a stale
-                                            // selection while the filter is
-                                            // visually inactive.
-                                            if (v) setFriendHandle(null);
-                                            return !v;
-                                        });
-                                    }}
-                                    friendHandle={friendHandle}
-                                    onFriendHandleChange={(h) => {
-                                        bumpAutoFit();
-                                        setFriendHandle(h);
-                                        if (h) setFriendsInterested(true);
+                                        if (Object.prototype.hasOwnProperty.call(next, 'source')) {
+                                            setInterestSource(next.source ?? null);
+                                            // Clearing the source also clears the
+                                            // single-user narrow so we never show
+                                            // a "filter is on" pill while the user
+                                            // picker is hidden.
+                                            if (next.source === null) setInterestUserHandle(null);
+                                        }
+                                        if (Object.prototype.hasOwnProperty.call(next, 'kind')) {
+                                            setInterestKind(next.kind!);
+                                        }
+                                        if (Object.prototype.hasOwnProperty.call(next, 'userHandle')) {
+                                            setInterestUserHandle(next.userHandle ?? null);
+                                            // Selecting a user implicitly turns
+                                            // the filter on (source defaults to
+                                            // follows so the picker scope matches
+                                            // what's just been picked).
+                                            if (next.userHandle && interestSource === null) {
+                                                setInterestSource('follows');
+                                            }
+                                        }
                                     }}
                                 />
                                 {/* Event list: hidden on mobile until after map, fills remaining height on desktop */}
@@ -845,6 +879,8 @@ export default function Home() {
                                         hoveredEventId={hoveredEventId}
                                         onEventHover={handleEventHover}
                                         onSuggestEvent={() => setShowSuggestModal(true)}
+                                        unseenEnabled={unseenStateEnabled}
+                                        seenEventIds={seenEventIds}
                                     />
                                 </div>
                             </div>
@@ -866,6 +902,10 @@ export default function Home() {
                                         flyToArea={flyToAreaBbox}
                                         flyToAreaToken={flyToAreaToken}
                                         initialArea={initialAreaRef.current}
+                                        seenEventIds={seenEventIds}
+                                        popularityThreshold={popularityThreshold}
+                                        onMarkSeen={markSeen}
+                                        showFollowingBadgeOverlay={mapFollowingBadgeOverlay}
                                     />
                                 </div>
                                 {/* Default-area bar: ONE bordered pill that
@@ -959,6 +999,21 @@ export default function Home() {
                                                 Saved.
                                             </span>
                                         )}
+                                        {followingBadgeEnabled && (
+                                            <label
+                                                className="shrink-0 inline-flex items-center gap-1.5 ml-auto cursor-pointer select-none whitespace-nowrap"
+                                                title="Show the friends-going overlay on map pins"
+                                                data-testid="map-following-badge-toggle"
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    className="h-3 w-3 accent-blue-500"
+                                                    checked={mapFollowingBadgeOverlay}
+                                                    onChange={(e) => setMapFollowingBadgeOverlay(e.target.checked)}
+                                                />
+                                                <span className="opacity-80">friends overlay</span>
+                                            </label>
+                                        )}
                                     </div>
                                     {/* Inline name-this-area form. Submitting
                                     persists prefs.area with the typed label;
@@ -1017,6 +1072,8 @@ export default function Home() {
                                     hoveredEventId={hoveredEventId}
                                     onEventHover={handleEventHover}
                                     onSuggestEvent={() => setShowSuggestModal(true)}
+                                    unseenEnabled={unseenStateEnabled}
+                                    seenEventIds={seenEventIds}
                                 />
                             </div>
                         </div>
@@ -1108,6 +1165,9 @@ export default function Home() {
                                         hoveredEventId={hoveredEventId}
                                         onEventHover={handleEventHover}
                                         detailLinkSource="calendar-map"
+                                        seenEventIds={seenEventIds}
+                                        popularityThreshold={popularityThreshold}
+                                        onMarkSeen={markSeen}
                                     />
                                 </div>
                             )}
@@ -1150,80 +1210,189 @@ export default function Home() {
     );
 }
 
-function FriendFilterChips({
+interface InterestFilterChange {
+    source?: 'follows' | 'friends' | null;
+    kind?: 'any' | 'going' | 'saved';
+    userHandle?: string | null;
+}
+
+function InterestFilterChips({
     signedIn,
-    friendsInterested,
-    onToggleInterested,
-    friendHandle,
-    onFriendHandleChange,
+    interestSource,
+    interestKind,
+    interestUserHandle,
+    onChange,
 }: {
     signedIn: boolean;
-    friendsInterested: boolean;
-    onToggleInterested: () => void;
-    friendHandle: string | null;
-    onFriendHandleChange: (h: string | null) => void;
+    interestSource: 'follows' | 'friends' | null;
+    interestKind: 'any' | 'going' | 'saved';
+    interestUserHandle: string | null;
+    onChange: (next: InterestFilterChange) => void;
 }) {
-    // Pill styling matches TagFilterPills (square corners per UI conventions).
+    // Square corners, blue-500 for selected (matches TagFilterPills + UI
+    // conventions). The component is purely presentational + a small
+    // amount of local UI state for the picker popover.
     const chip = (active: boolean) =>
         'px-2 py-1 text-xs border transition ' +
         (active
             ? 'bg-blue-500 border-blue-500 text-white'
             : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500');
-    // Lazily fetch the viewer's friends only when the picker is needed,
-    // i.e. once Interested is toggled on. Anonymous users never trigger this.
-    const [friends, setFriends] = useState<{ handle: string; display_name: string | null }[]>([]);
-    const [friendsLoaded, setFriendsLoaded] = useState(false);
-    useEffect(() => {
-        if (!signedIn || !friendsInterested || friendsLoaded) return;
-        let cancelled = false;
-        fetchMyFriends({ limit: 100 })
-            .then((res) => {
-                if (cancelled) return;
-                setFriends(res.items.map((f) => ({ handle: f.handle, display_name: f.display_name })));
-                setFriendsLoaded(true);
-            })
-            .catch(() => {
-                if (!cancelled) setFriendsLoaded(true);
-            });
-        return () => { cancelled = true; };
-    }, [signedIn, friendsInterested, friendsLoaded]);
+    // Anonymous users see the inline "Sign in to…" hint when they click
+    // the Following pill (rather than the pill being disabled and the
+    // hint only showing in the post-logout edge case where
+    // interestSource had been left non-null).
+    const [showAnonHint, setShowAnonHint] = useState(false);
+    const pickerActive = signedIn
+        ? interestSource !== null || !!interestUserHandle
+        : showAnonHint;
+    const [pickerOpen, setPickerOpen] = useState(false);
     return (
         <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs uppercase tracking-wide text-slate-500">
-                Friends
-            </span>
+
             <button
                 type="button"
-                onClick={onToggleInterested}
-                className={chip(friendsInterested)}
-                aria-pressed={friendsInterested}
-                disabled={!signedIn}
-                title={signedIn ? "Show events your friends are going to or have saved" : 'Sign in to filter by friends'}
+                onClick={() => {
+                    if (signedIn) {
+                        onChange({ source: interestSource === null ? 'follows' : null });
+                    } else {
+                        setShowAnonHint((v) => !v);
+                    }
+                }}
+                className={chip(pickerActive)}
+                aria-pressed={pickerActive}
+                title={signedIn ? 'Show events from people you follow' : 'Sign in to filter by people you follow'}
             >
-                Interested
-            </button>
-            {signedIn && friendsInterested && (
-                <select
-                    value={friendHandle ?? ''}
-                    onChange={(e) => onFriendHandleChange(e.target.value || null)}
-                    className="text-xs border border-slate-200 bg-white px-2 py-1 text-slate-700"
-                    aria-label="Filter by a specific friend"
+                <svg
+                    aria-hidden="true"
+                    viewBox="0 0 20 20"
+                    className="mr-1 -mt-0.5 inline h-3.5 w-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                 >
-                    <option value="">All friends</option>
-                    {friends.map((f) => (
-                        <option key={f.handle} value={f.handle}>
-                            {f.display_name ? `${f.display_name} (@${f.handle})` : `@${f.handle}`}
-                        </option>
-                    ))}
-                </select>
+                    <circle cx="7" cy="7" r="3" />
+                    <path d="M2 17c0-2.8 2.2-5 5-5s5 2.2 5 5" />
+                    <circle cx="14" cy="6" r="2.4" />
+                    <path d="M13 12c2.8 0 5 2 5 5" />
+                </svg>
+                Following
+            </button>
+            {/* Quick shortcut to the dedicated "From people I follow" calendar
+            view. Revealed only when the Following filter is active so it
+            stays out of the way until users opt into the follows context. */}
+            {pickerActive && (
+                <Link
+                    to={signedIn ? '/my-calendar/subscriptions' : `/login?next=${encodeURIComponent('/my-calendar/subscriptions')}`}
+                    data-testid="follows-shortcut"
+                    aria-label="Open the calendar from people I follow"
+                    title="Open the calendar from people I follow"
+                    className="inline-flex items-center px-2 py-1 text-xs border border-slate-200 bg-white text-slate-600 hover:border-blue-500 hover:text-blue-500 transition"
+                >
+                    {/* Heroicons calendar outline */}
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="w-3.5 h-3.5" aria-hidden="true">
+                        <rect x="2.75" y="4.25" width="14.5" height="13" rx="0" />
+                        <path d="M2.75 8.25h14.5M6.5 2.75v3M13.5 2.75v3" strokeLinecap="round" />
+                    </svg>
+                </Link>
             )}
-            {!signedIn && friendsInterested && (
+            {signedIn && pickerActive && (
+                <>
+                    {/* Scope pills: which graph to draw from. */}
+                    <div className="flex gap-1 border border-slate-200 bg-white">
+                        <button
+                            type="button"
+                            onClick={() => onChange({ source: 'follows' })}
+                            className={
+                                'px-2 py-1 text-xs transition ' +
+                                (interestSource === 'follows'
+                                    ? 'bg-blue-500 text-white'
+                                    : 'text-slate-600 hover:text-blue-500')
+                            }
+                            aria-pressed={interestSource === 'follows'}
+                            title="Everyone you follow (one-way OK)"
+                        >
+                            All
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onChange({ source: 'friends' })}
+                            className={
+                                'px-2 py-1 text-xs transition ' +
+                                (interestSource === 'friends'
+                                    ? 'bg-blue-500 text-white'
+                                    : 'text-slate-600 hover:text-blue-500')
+                            }
+                            aria-pressed={interestSource === 'friends'}
+                            title="Mutual followers only"
+                        >
+                            Friends only
+                        </button>
+                    </div>
+                    {/* Kind pills: which signal. */}
+                    <div className="flex gap-1 border border-slate-200 bg-white">
+                        {(['any', 'going', 'saved'] as const).map((k) => (
+                            <button
+                                key={k}
+                                type="button"
+                                onClick={() => onChange({ kind: k })}
+                                className={
+                                    'px-2 py-1 text-xs transition ' +
+                                    (interestKind === k
+                                        ? 'bg-blue-500 text-white'
+                                        : 'text-slate-600 hover:text-blue-500')
+                                }
+                                aria-pressed={interestKind === k}
+                            >
+                                {k === 'any' ? 'Any' : k === 'going' ? 'Going' : 'Saved'}
+                            </button>
+                        ))}
+                    </div>
+                    {/* Single-user narrow: show the selection as a pill +
+                    open the picker popover on click. The picker reuses the
+                    shared UserResultList primitive (same shape as the
+                    header search), composed with rich rows. */}
+                    {interestUserHandle ? (
+                        <button
+                            type="button"
+                            onClick={() => onChange({ userHandle: null })}
+                            className={chip(true)}
+                            title="Clear the person filter"
+                        >
+                            @{interestUserHandle} ✕
+                        </button>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setPickerOpen((v) => !v)}
+                            className={chip(false)}
+                            aria-expanded={pickerOpen}
+                            title="Filter to a single person you follow"
+                        >
+                            + Pick a person
+                        </button>
+                    )}
+                </>
+            )}
+            {!signedIn && showAnonHint && (
                 <span className="text-xs text-slate-500">
                     <Link to="/login" className="text-blue-600 hover:underline">
                         Sign in
                     </Link>{' '}
-                    to see your friends' picks.
+                    to see picks from people you follow.
                 </span>
+            )}
+            {pickerOpen && signedIn && (
+                <div className="relative w-full">
+                    <UserInterestPicker
+                        onPick={(handle) => {
+                            onChange({ userHandle: handle });
+                            setPickerOpen(false);
+                        }}
+                        onClose={() => setPickerOpen(false)}
+                    />
+                </div>
             )}
         </div>
     );

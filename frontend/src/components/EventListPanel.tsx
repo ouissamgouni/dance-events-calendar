@@ -8,7 +8,6 @@ import GoingButton from './GoingButton';
 import AttendeeAvatarStack from './AttendeeAvatarStack';
 import RateEventButton from './RateEventButton';
 import TagBadges from './TagBadges';
-import { useAuth } from '../context/AuthContext';
 import { getTagColors } from '../utils/eventColor';
 
 interface MapBounds {
@@ -32,6 +31,10 @@ interface EventListPanelProps {
     pastEventIds?: Set<string>;
     /** Optional callback to open the "Suggest an event" flow from the empty state. */
     onSuggestEvent?: () => void;
+    /** When true, render the Unseen state UI (dot + bold title + chip + counter). */
+    unseenEnabled?: boolean;
+    /** Set of event ids the current viewer has already opened. */
+    seenEventIds?: Set<string>;
 }
 
 function PriceBadge({ event }: { event: CalendarEvent }) {
@@ -56,54 +59,39 @@ function PriceBadge({ event }: { event: CalendarEvent }) {
 }
 
 function PopularityBadge({
-    signal,
-    allSignals,
+    score,
+    allScores,
     threshold,
-    trending,
+    topN,
+    topPercent,
 }: {
-    /** Either ``view_count`` or ``popularity_score`` depending on mode. */
-    signal: number;
-    allSignals: number[];
+    score: number;
+    allScores: number[];
     threshold: number;
-    /** When true, render "Trending" semantics (no raw view-count chip). */
-    trending: boolean;
+    topN: number;
+    topPercent: number;
 }) {
-    if (signal <= 0) return null;
-
-    // Top 3 of currently visible events.
-    const sorted = [...allSignals].sort((a, b) => b - a);
-    const isTop3 = signal > 0 && sorted.indexOf(signal) < 3 && sorted[0] > 0;
-
-    // In trending mode, do NOT show a numeric chip — popularity_score is
-    // an internal score, not a user-facing count. In legacy view-count
-    // mode, keep the existing 👁 N chip for backward compatibility.
-    const countBadge = trending ? null : (
-        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-            👁 {signal}
+    if (score <= 0 || score < threshold) return null;
+    // Top-K of currently visible events where K is the effective cap
+    //   min(topN, ceil(positiveVisible * topPercent / 100))
+    // The score itself stays hidden — it's an internal blend (going +
+    // saved + tiny view term, decayed by age), not a user-facing count.
+    const sorted = [...allScores].sort((a, b) => b - a);
+    const positiveCount = sorted.filter((s) => s > 0).length;
+    const effectiveCap = Math.max(
+        1,
+        Math.min(topN, Math.ceil((positiveCount * topPercent) / 100)),
+    );
+    const isTopK = sorted.indexOf(score) < effectiveCap && sorted[0] > 0;
+    if (!isTopK) return null;
+    return (
+        <span
+            className="inline-flex items-center gap-0.5 bg-orange-50 px-1.5 py-0.5 text-[10px] font-medium text-orange-700"
+            data-testid="trending-badge"
+        >
+            🔥 Trending
         </span>
     );
-
-    if (isTop3 && signal >= threshold) {
-        return (
-            <>
-                <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700">
-                    🔥 Trending
-                </span>
-                {countBadge}
-            </>
-        );
-    }
-    if (signal >= threshold) {
-        return (
-            <>
-                <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700">
-                    🔥 Popular
-                </span>
-                {countBadge}
-            </>
-        );
-    }
-    return countBadge;
 }
 
 function isInBounds(event: CalendarEvent, bounds: MapBounds): boolean {
@@ -135,12 +123,17 @@ export default function EventListPanel({
     onEventHover,
     pastEventIds,
     onSuggestEvent,
+    unseenEnabled = false,
+    seenEventIds,
 }: EventListPanelProps) {
     const { isSaved } = useSavedEvents();
-    const { showRatings, trendingEnabled } = useFeatureFlags();
+    const { showRatings, trendingEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled } = useFeatureFlags();
     const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const scrollRef = useRef<HTMLDivElement>(null);
     const [showBottomFade, setShowBottomFade] = useState(false);
+    // Client-side only filter: hide events the viewer has already opened.
+    // Per the scenario, no network call is made when toggled.
+    const [unseenOnly, setUnseenOnly] = useState(false);
 
     const updateFade = useCallback(() => {
         const el = scrollRef.current;
@@ -165,7 +158,10 @@ export default function EventListPanel({
 
     // Show all events — on-map first, off-map / ungeolocated pushed to the bottom.
     // When pastEventIds is provided, keep upcoming events before past events.
-    const sortedEvents = [...events].sort((a, b) => {
+    const visibleEvents = unseenEnabled && unseenOnly && seenEventIds
+        ? events.filter((e) => !seenEventIds.has(e.event_id))
+        : events;
+    const sortedEvents = [...visibleEvents].sort((a, b) => {
         if (pastEventIds) {
             const aPast = pastEventIds.has(a.event_id);
             const bPast = pastEventIds.has(b.event_id);
@@ -182,11 +178,13 @@ export default function EventListPanel({
         const bOnMap = isOnMap(b, mapBounds);
         if (aOnMap !== bOnMap) return aOnMap ? -1 : 1;
         if (sortBy === 'popularity') {
-            // Use the trending score when enabled, otherwise fall back to
-            // the legacy view-count signal.
-            const sa = trendingEnabled ? (a.popularity_score ?? 0) : a.view_count;
-            const sb = trendingEnabled ? (b.popularity_score ?? 0) : b.view_count;
-            return sb - sa;
+            // popularity_score is the weighted, time-decayed score
+            // computed server-side when ``trending_enabled`` is on. When
+            // the flag is off, all scores are 0 and this becomes a no-op
+            // tiebreaker (the secondary date sort below takes over).
+            const sa = a.popularity_score ?? 0;
+            const sb = b.popularity_score ?? 0;
+            if (sa !== sb) return sb - sa;
         }
         return new Date(a.start).getTime() - new Date(b.start).getTime();
     });
@@ -197,9 +195,14 @@ export default function EventListPanel({
 
     const onMapCount = mapBounds ? events.filter((e) => isOnMap(e, mapBounds)).length : events.length;
 
-    const allViewCounts = sortedEvents.map((e) =>
-        trendingEnabled ? (e.popularity_score ?? 0) : e.view_count,
-    );
+    // Counter for the section header: number of events in this list that
+    // the viewer hasn't opened yet. Computed over the *unfiltered* list so
+    // toggling the chip doesn't make the counter jump to zero.
+    const unseenCount = unseenEnabled && seenEventIds
+        ? events.reduce((n, e) => (seenEventIds.has(e.event_id) ? n : n + 1), 0)
+        : 0;
+
+    const allViewCounts = sortedEvents.map((e) => e.popularity_score ?? 0);
 
     const formatDate = (d: Date) =>
         d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -232,6 +235,28 @@ export default function EventListPanel({
                     )}
                 </div>
             </div>
+            {unseenEnabled && (
+                <div className="flex items-center justify-between gap-2 px-3 py-1.5 text-[11px]" data-testid="unseen-bar">
+                    {unseenCount > 0 ? (
+                        <span className="text-slate-600" data-testid="unseen-counter">
+                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500 mr-1.5 align-middle" aria-hidden="true" />
+                            {unseenCount} new since your last visit
+                        </span>
+                    ) : <span />}
+                    <button
+                        type="button"
+                        onClick={() => setUnseenOnly((v) => !v)}
+                        aria-pressed={unseenOnly}
+                        data-testid="unseen-only-chip"
+                        className={`shrink-0 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium transition ${unseenOnly
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'}`}
+                    >
+                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" aria-hidden="true" />
+                        Unseen only
+                    </button>
+                </div>
+            )}
 
             <div className="event-list-scroll-wrapper">
                 <div className="event-list-scroll" ref={scrollRef} onScroll={updateFade}>
@@ -287,7 +312,19 @@ export default function EventListPanel({
                                             })()}
                                         </div>
                                         <div className="event-card-content relative">
-                                            <h4 className="event-card-title">{event.title}</h4>
+                                            <h4
+                                                className={`event-card-title${unseenEnabled && seenEventIds && !seenEventIds.has(event.event_id) ? ' font-semibold' : ''}`}
+                                                data-unseen={unseenEnabled && seenEventIds && !seenEventIds.has(event.event_id) ? 'true' : undefined}
+                                            >
+                                                {unseenEnabled && seenEventIds && !seenEventIds.has(event.event_id) && (
+                                                    <span
+                                                        className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500 mr-1.5 align-middle"
+                                                        aria-label="Unseen"
+                                                        data-testid="unseen-dot"
+                                                    />
+                                                )}
+                                                {event.title}
+                                            </h4>
                                             <p className="event-card-date">
                                                 {event.all_day ? formatDate(start) : `${formatDate(start)} · ${formatTime(start)}`}
                                             </p>
@@ -297,27 +334,40 @@ export default function EventListPanel({
                                             {!onMap && (
                                                 <span className="event-card-offmap-badge">Off map</span>
                                             )}
-                                            {((showPrices && (event.price_is_free || (event.price_min != null && event.price_currency))) ||
-                                                (showPopularity && (trendingEnabled ? (event.popularity_score ?? 0) > 0 : event.view_count > 0))) && (
-                                                    <div className="event-card-badges">
-                                                        {showPrices && <PriceBadge event={event} />}
-                                                        {showPopularity && (
-                                                            <PopularityBadge
-                                                                signal={trendingEnabled ? (event.popularity_score ?? 0) : event.view_count}
-                                                                allSignals={allViewCounts}
-                                                                threshold={popularityThreshold}
-                                                                trending={trendingEnabled}
-                                                            />
-                                                        )}
-                                                    </div>
-                                                )}
+                                            {((showPrices && (event.price_is_free || (event.price_min != null && event.price_currency)))) && (
+                                                <div className="event-card-badges">
+                                                    {showPrices && <PriceBadge event={event} />}
+                                                </div>
+                                            )}
                                             {event.tags?.length > 0 && (
                                                 <div className="mt-1">
                                                     <TagBadges tags={event.tags} maxVisible={3} />
                                                 </div>
                                             )}
-                                            <div className="mt-1">
-                                                <AttendeeAvatarStack eventId={event.event_id} />
+                                            <div className="mt-1 flex items-center gap-2">
+                                                <AttendeeAvatarStack
+                                                    eventId={event.event_id}
+                                                    friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
+                                                />
+                                                {event.has_active_promo_codes && (
+                                                    <img
+                                                        src="/promo-code.png"
+                                                        alt=""
+                                                        aria-hidden="true"
+                                                        title="Has promo codes"
+                                                        className="w-4 h-4 object-contain"
+                                                        data-testid="event-card-promo-icon"
+                                                    />
+                                                )}
+                                                {showPopularity && trendingEnabled && (
+                                                    <PopularityBadge
+                                                        score={event.popularity_score ?? 0}
+                                                        allScores={allViewCounts}
+                                                        threshold={popularityThreshold}
+                                                        topN={trendingTopN}
+                                                        topPercent={trendingTopPercent}
+                                                    />
+                                                )}
                                             </div>
                                             <div className="absolute top-0 right-0 flex items-center gap-1.5">
                                                 <ActionCountCluster eventId={event.event_id} showRatings={!!showRatings} isSavedFlag={isSaved(event.event_id)} />
@@ -344,7 +394,6 @@ export default function EventListPanel({
  */
 function ActionCountCluster({ eventId, showRatings, isSavedFlag }: { eventId: string; showRatings: boolean; isSavedFlag: boolean }) {
     const summary = useAttendanceSummary(eventId);
-    const { user } = useAuth();
     const savedCount = summary?.total_saved ?? 0;
     const goingCount = summary?.total_going ?? 0;
     return (

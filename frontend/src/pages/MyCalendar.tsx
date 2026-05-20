@@ -40,7 +40,7 @@ export default function MyCalendar() {
     const navigate = useNavigate();
     const { savedEventIds, savedCount, isSaved, clearAll } = useSavedEvents();
     const { attendingEventIds, attendingCount, isAttending } = useAttendingEvents();
-    const { showPrices, showPopularity } = useFeatureFlags();
+    const { showPrices, showPopularity, popularityThreshold } = useFeatureFlags();
     const { user, loading: authLoading } = useAuth();
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [loading, setLoading] = useState(true);
@@ -532,6 +532,7 @@ export default function MyCalendar() {
                                     focusedEvent={selectedEvent}
                                     onEventClick={handleEventClick}
                                     onBoundsChange={handleBoundsChange}
+                                    popularityThreshold={popularityThreshold}
                                 />
                             </div>
                             <div className="order-3 lg:hidden">

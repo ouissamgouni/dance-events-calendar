@@ -1,0 +1,31 @@
+# Phase E (E3) — onboarding follow scenario.
+#
+# Cast is intentionally minimal: one fresh-account viewer with no prior
+# onboarding stamp plus two verified organizers and three ordinary
+# accounts pre-followed by an `admin` filler — so the GET
+# /api/social/onboarding/suggestions response is deterministic
+# (organizers first, then the popular tail).
+users:
+  - email: newbie@example.com
+    name: Nora Newbie
+    handle: newbie
+  - email: verifiedorg1@example.com
+    name: Salsa Hub
+    handle: salsahub
+    is_verified_organizer: true
+  - email: verifiedorg2@example.com
+    name: Bachata Co
+    handle: bachataco
+    is_verified_organizer: true
+  - email: popular1@example.com
+    name: Popular One
+    handle: pop1
+  - email: popular2@example.com
+    name: Popular Two
+    handle: pop2
+  - email: popular3@example.com
+    name: Popular Three
+    handle: pop3
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

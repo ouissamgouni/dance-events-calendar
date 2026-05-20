@@ -79,6 +79,12 @@ export function useReferralAttribution(eventId: string | null | undefined): void
         }
 
         persist(src, eventId);
+        // Notify in-app listeners (e.g. ShareReferralBanner mounted at the
+        // App level, whose own effect already ran with an empty store
+        // before this route child's effect persisted the attribution).
+        try {
+            window.dispatchEvent(new CustomEvent('referral:changed'));
+        } catch { /* ignore */ }
         // Best-effort; failures are silent (analytics, not functional state).
         trackShare({
             eventId,

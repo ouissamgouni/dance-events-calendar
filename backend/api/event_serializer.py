@@ -14,12 +14,14 @@ from sqlalchemy import func
 from sqlmodel import Session, select
 
 from backend.api.routes.tags import get_event_tags
-from backend.api.schemas import EventResponse
+from backend.api.schemas import EventOrganizerMini, EventResponse
 from backend.db.models import (
     CachedEvent,
     CalendarSetting,
+    EventPromoCode,
     EventView,
     SiteSetting,
+    User,
     UserEventAttendance,
 )
 from backend.services.popularity import compute_popularity_scores, get_saved_counts
@@ -101,6 +103,60 @@ def serialize_events(
 
     tags_map = get_event_tags(session, event_ids)
 
+    promo_codes_enabled = False
+    try:
+        row = session.get(SiteSetting, "promo_codes_enabled")
+        if row and row.value.lower() == "true":
+            promo_codes_enabled = True
+    except Exception:
+        pass
+
+    events_with_promos: set[str] = set()
+    if promo_codes_enabled:
+        from datetime import datetime
+
+        now = datetime.utcnow()
+        promo_rows = session.exec(
+            select(EventPromoCode.event_id)
+            .where(EventPromoCode.event_id.in_(event_ids))
+            .where(EventPromoCode.status == "approved")
+            .where(
+                (EventPromoCode.expires_at.is_(None))
+                | (EventPromoCode.expires_at > now)
+            )
+            .group_by(EventPromoCode.event_id)
+        ).all()
+        events_with_promos = {row for row in promo_rows}
+
+    organizer_claims_enabled = False
+    try:
+        row = session.get(SiteSetting, "organizer_claims_enabled")
+        if row and row.value.lower() == "true":
+            organizer_claims_enabled = True
+    except Exception:
+        pass
+
+    organizer_by_event: dict[str, EventOrganizerMini] = {}
+    if organizer_claims_enabled:
+        organizer_user_ids = {
+            e.organizer_user_id for e in events_list if e.organizer_user_id
+        }
+        if organizer_user_ids:
+            users = session.exec(
+                select(User).where(User.id.in_(organizer_user_ids))
+            ).all()
+            user_by_id = {u.id: u for u in users}
+            for ev in events_list:
+                if ev.organizer_user_id and ev.organizer_user_id in user_by_id:
+                    u = user_by_id[ev.organizer_user_id]
+                    organizer_by_event[ev.event_id] = EventOrganizerMini(
+                        user_id=u.id,
+                        handle=u.handle,
+                        display_name=u.display_name,
+                        avatar_url=u.avatar_url,
+                        is_verified_organizer=u.is_verified_organizer,
+                    )
+
     return [
         EventResponse(
             event_id=e.event_id,
@@ -124,6 +180,8 @@ def serialize_events(
             price_is_free=e.price_is_free,
             links=e.links,
             tags=tags_map.get(e.event_id, []),
+            has_active_promo_codes=e.event_id in events_with_promos,
+            organizer=organizer_by_event.get(e.event_id),
         )
         for e in events_list
     ]

@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -25,6 +26,10 @@ from backend.api.schemas import (
     AnonPreferencesPayload,
     HandleAvailabilityResponse,
     PreferredAreaResponse,
+    RedeemReferralRequest,
+    RedeemReferralResponse,
+    RedeemShareFollowRequest,
+    RedeemShareFollowResponse,
     UpdatePreferencesRequest,
     UpdateProfileRequest,
     UserPreferencesResponse,
@@ -45,6 +50,7 @@ from backend.db.models import (
     UserEventAttendance,
     UserFollow,
     UserPreferredTag,
+    UserReferral,
     UserSavedEvent,
 )
 
@@ -163,6 +169,15 @@ def _upsert_user_from_claims(
         if picture:
             user.avatar_url = picture
         user.last_login_at = now
+        session.add(user)
+
+    if not user.handle:
+        user.handle = _generate_default_handle(
+            session,
+            name=user.display_name or name,
+            email=user.email,
+            exclude_user_id=user.id,
+        )
         session.add(user)
 
     session.commit()
@@ -449,6 +464,12 @@ def login_with_google(
             # the AudiencePicker zero-friends hint can render immediately
             # after sign-in without waiting for the next /auth/me cycle.
             "friend_count": _friend_count(session, user.id),
+            # Phase E (E3): ISO-8601 timestamp of onboarding completion
+            # (or skip). ``None`` means the frontend should redirect to
+            # ``/onboarding/follow`` after first-load.
+            "onboarded_at": (
+                user.onboarded_at.isoformat() if user.onboarded_at else None
+            ),
         }
     )
     return _set_session_cookie(response, user, is_admin)
@@ -562,6 +583,9 @@ def get_me(
         ),
         "preferences": _serialize_preferences(session, user).model_dump(mode="json"),
         "friend_count": friend_count,
+        # Phase E (E3): see /auth/google for shape; ``None`` triggers the
+        # onboarding redirect on first signed-in navigation.
+        "onboarded_at": (user.onboarded_at.isoformat() if user.onboarded_at else None),
     }
 
 
@@ -746,6 +770,45 @@ def _handle_in_use(session: Session, handle: str, exclude_user_id) -> bool:
     if exclude_user_id is not None:
         stmt = stmt.where(User.id != exclude_user_id)
     return session.exec(stmt).first() is not None
+
+
+def _default_handle_base(raw: str) -> str:
+    text = unicodedata.normalize("NFKD", raw or "")
+    text = text.encode("ascii", "ignore").decode("ascii").lower()
+    base = re.sub(r"[^a-z0-9]+", "_", text).strip("_")
+    if not base:
+        base = "member"
+    if not base[0].isalpha():
+        base = f"u_{base}"
+    if len(base) < 3:
+        base = (base + "xxx")[:3]
+    return base[:24].strip("_")
+
+
+def _generate_default_handle(
+    session: Session,
+    *,
+    name: str,
+    email: str,
+    exclude_user_id,
+) -> str:
+    sources = [name, email.split("@", 1)[0], "member"]
+    bases: list[str] = []
+    for source in sources:
+        base = _default_handle_base(source)
+        if base not in bases:
+            bases.append(base)
+
+    for base in bases:
+        for suffix in [""] + [f"_{i}" for i in range(2, 100)]:
+            candidate = f"{base[: 24 - len(suffix)]}{suffix}"
+            normalized, reason = _validate_handle(candidate)
+            if normalized is None or reason is not None:
+                continue
+            if not _handle_in_use(session, normalized, exclude_user_id=exclude_user_id):
+                return normalized
+
+    raise HTTPException(status_code=500, detail="Failed to allocate handle")
 
 
 @router.get("/handle-available", response_model=HandleAvailabilityResponse)
@@ -1007,3 +1070,183 @@ def get_my_attending_events(
         "event_ids": [e["event_id"] for e in events],
         "events": events,
     }
+
+
+# ---------------------------------------------------------------------------
+# Phase E (E7) — referral redemption
+# ---------------------------------------------------------------------------
+
+
+@router.post("/redeem-referral", response_model=RedeemReferralResponse)
+@limiter.limit("60/hour")
+def redeem_referral(
+    request: Request,
+    body: RedeemReferralRequest,
+    session: Session = Depends(get_session),
+    viewer: User = Depends(require_user),
+):
+    """Phase E (E7): redeem an invite code after sign-up.
+
+    Side effects when ``consent=True`` and the code resolves to an
+    inviter who is NOT the viewer:
+
+      1. Insert ``UserFollow(follower=viewer, target=inviter)``.
+      2. Insert ``UserFollow(follower=inviter, target=viewer)``.
+         The pair makes them friends immediately so the per-event
+         ``friends`` audience starts working for both.
+      3. Increment ``user_referrals.used_count`` (best-effort).
+      4. Fire ``notify_new_follower`` for the inviter (so they see
+         "@viewer joined via your link") AND ``notify_new_friend``
+         on both sides via the same notification side-effect path
+         used by the regular follow flow.
+
+    To avoid leaking information about who owns which code, the
+    endpoint returns 200 with an empty ``inviter_handle`` if the
+    code is unknown, the inviter is the viewer themselves, or the
+    inviter account is soft-deleted. Only ``consent=False`` returns
+    400 — that's a deliberate client error.
+    """
+    if not body.consent:
+        raise HTTPException(status_code=400, detail="Consent required")
+
+    code = (body.code or "").strip().upper()
+    if not code:
+        return RedeemReferralResponse(inviter_handle=None, mutual_follow_created=False)
+
+    referral = session.exec(
+        select(UserReferral).where(func.upper(UserReferral.code) == code)
+    ).first()
+    if referral is None:
+        return RedeemReferralResponse(inviter_handle=None, mutual_follow_created=False)
+
+    inviter = session.exec(
+        select(User)
+        .where(User.id == referral.inviter_user_id)
+        .where(User.deleted_at.is_(None))
+    ).first()
+    if inviter is None or inviter.id == viewer.id:
+        return RedeemReferralResponse(inviter_handle=None, mutual_follow_created=False)
+
+    # Insert both follow edges, idempotently. We're intentionally
+    # importing the notification helper at call time to avoid a
+    # circular import with backend.services.notifications which
+    # imports from this module's parent package.
+    from backend.services.notifications import (
+        notify_new_follower as _notify_new_follower,
+        notify_new_friend as _notify_new_friend,
+    )
+
+    created_edges = 0
+    for follower_id, target_id in (
+        (viewer.id, inviter.id),
+        (inviter.id, viewer.id),
+    ):
+        existing = session.exec(
+            select(UserFollow)
+            .where(UserFollow.follower_id == follower_id)
+            .where(UserFollow.followee_id == target_id)
+        ).first()
+        if existing is None:
+            session.add(UserFollow(follower_id=follower_id, followee_id=target_id))
+            created_edges += 1
+
+    # Bump the counter even for re-redemptions so the inviter can see
+    # repeat clicks if we ever surface link analytics.
+    referral.used_count = int(referral.used_count or 0) + 1
+    session.add(referral)
+    session.commit()
+
+    if created_edges > 0:
+        # Notify the inviter that someone joined via their link AND
+        # both sides that they're now friends (E6 toast surfaces on
+        # the next poll). These rows live on the same session so we
+        # commit them together below; without that commit the rows
+        # were silently dropped on request teardown (get_session has
+        # no auto-commit).
+        _notify_new_follower(session, followee=inviter, follower=viewer)
+        _notify_new_friend(session, viewer, inviter)
+        session.commit()
+
+    return RedeemReferralResponse(
+        inviter_handle=inviter.handle,
+        mutual_follow_created=created_edges > 0,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Phase E (D2) — share-link doubles as referral
+# ---------------------------------------------------------------------------
+
+
+@router.post("/redeem-share-follow", response_model=RedeemShareFollowResponse)
+@limiter.limit("30/hour")
+def redeem_share_follow(
+    request: Request,
+    body: RedeemShareFollowRequest,
+    session: Session = Depends(get_session),
+    viewer: User = Depends(require_user),
+):
+    """Phase 3 (D2): one-way follow on share-link redemption.
+
+    Mirrors ``redeem_referral`` but:
+
+    * looks up the sharer by ``User.share_code`` (the opaque token
+      already in every ``?ref=share&src=`` URL) rather than by an
+      invite code from ``user_referrals``;
+    * does NOT bump ``user_referrals.used_count`` — share-link
+      conversions are tracked on their own surface and stay out of
+      the invite leaderboard (D2 decision);
+    * creates ONLY the viewer→sharer follow edge (one-way). Sharing
+      a link is not strong enough consent for the sharer to befriend
+      a stranger who clicked it; the sharer gets a regular
+      new-follower notification and can follow back manually via the
+      existing UI (GDPR-safer than auto-mutual).
+    * runs on its own ``30/hour`` per-IP rate-limit bucket, separate
+      from the ``60/hour`` cap on ``redeem-referral``.
+
+    Idempotent on the follow edge (re-redemption is a no-op). To
+    avoid leaking information about who owns which share_code the
+    endpoint returns 200 with an empty ``sharer_handle`` when the
+    code is unknown, points at the viewer themselves, or to a
+    soft-deleted account. ``consent=false`` is the only client error.
+    """
+    if not body.consent:
+        raise HTTPException(status_code=400, detail="Consent required")
+
+    code = (body.share_code or "").strip().lower()
+    if not code:
+        return RedeemShareFollowResponse(sharer_handle=None, follow_created=False)
+
+    sharer = session.exec(
+        select(User).where(User.share_code == code).where(User.deleted_at.is_(None))
+    ).first()
+    if sharer is None or sharer.id == viewer.id:
+        return RedeemShareFollowResponse(sharer_handle=None, follow_created=False)
+
+    from backend.services.notifications import (
+        notify_new_follower as _notify_new_follower,
+    )
+
+    existing = session.exec(
+        select(UserFollow)
+        .where(UserFollow.follower_id == viewer.id)
+        .where(UserFollow.followee_id == sharer.id)
+    ).first()
+    follow_created = False
+    if existing is None:
+        session.add(UserFollow(follower_id=viewer.id, followee_id=sharer.id))
+        follow_created = True
+
+    session.commit()
+
+    if follow_created:
+        # Same commit-ordering caveat as redeem_referral: get_session
+        # has no auto-commit, so we must explicitly commit AFTER the
+        # notification helper or its row is dropped on teardown.
+        _notify_new_follower(session, followee=sharer, follower=viewer)
+        session.commit()
+
+    return RedeemShareFollowResponse(
+        sharer_handle=sharer.handle,
+        follow_created=follow_created,
+    )

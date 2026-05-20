@@ -4,6 +4,7 @@ import {
     fetchMe,
     loginWithGoogle as apiLogin,
     logout as apiLogout,
+    redeemReferral,
     type AuthUser,
     type PreferredAreaPayload,
 } from '../api';
@@ -24,6 +25,17 @@ export type User = AuthUser;
  * cycle. Bump both call sites together if the key version changes.
  */
 const PREFS_STORAGE_KEY = 'movida.preferences.v1';
+
+function readCookie(name: string): string | null {
+    const m = document.cookie.match(
+        new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()[\]\\/+^])/g, '\\$1') + '=([^;]*)'),
+    );
+    return m ? decodeURIComponent(m[1]) : null;
+}
+
+function clearCookie(name: string): void {
+    document.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax`;
+}
 
 function readAnonPreferencesFromStorage():
     | { preferred_area: PreferredAreaPayload | null; preferred_tag_ids: number[] }
@@ -136,6 +148,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         if (u.user_id) umamiIdentify(u.user_id);
         setUmamiBaseContext({ is_authenticated: true, auth_method: method });
+        // Phase E (E7): if the visitor arrived via /r/:code and the
+        // referral landing page stashed the inviter's code in a
+        // cookie, redeem it now (best-effort; never block sign-in on
+        // failure). Clearing the cookie after the call guarantees a
+        // single redemption attempt per click — duplicate runs are
+        // backend-idempotent anyway.
+        const refCode = readCookie('ref_code');
+        if (refCode) {
+            clearCookie('ref_code');
+            try {
+                await redeemReferral(refCode, true);
+                window.dispatchEvent(new CustomEvent('network:changed'));
+            } catch {
+                // Non-fatal — user is already signed in; surface a
+                // toast in a future iteration.
+            }
+        }
     }, []);
 
     const logout = useCallback(async () => {

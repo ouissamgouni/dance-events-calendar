@@ -71,8 +71,10 @@ export default function NotificationsPanel({
             await markRead(item.id);
         }
         onClose();
-        if (item.kind === 'new_follower' || item.kind === 'new_friend') {
+        if (item.kind === 'new_follower' || item.kind === 'new_friend' || item.kind === 'follow_request') {
             navigate(`/u/${item.actor.handle}`);
+        } else if (item.kind === 'organizer_claim_decided') {
+            navigate('/account');
         } else {
             navigate(`/event/${item.event_id}`);
         }
@@ -206,7 +208,7 @@ function NotificationRow({
     onFollowedBack?: (handle: string) => void;
 }) {
     const isUnread = !item.read_at;
-    const isFollowKind = item.kind === 'new_follower' || item.kind === 'new_friend';
+    const isFollowKind = item.kind === 'new_follower' || item.kind === 'new_friend' || item.kind === 'follow_request';
     // Phase E (E1): inline Follow-back CTA on new_follower rows when the
     // viewer does not already follow the actor. ``new_friend`` rows mean
     // the relationship is already mutual, so no CTA is needed.
@@ -241,7 +243,15 @@ function NotificationRow({
                     ? 'started following you'
                     : item.kind === 'new_friend'
                         ? 'and you are now friends!'
-                        : 'updated';
+                        : item.kind === 'follow_request'
+                            ? 'wants to follow you'
+                            : item.kind === 'promo_code_approved'
+                                ? 'approved your promo code for'
+                                : item.kind === 'promo_code_rejected'
+                                    ? 'rejected your promo code for'
+                                    : item.kind === 'organizer_claim_decided'
+                                        ? 'reviewed your organizer claim'
+                                        : 'updated';
     const actorName = item.actor.display_name || `@${item.actor.handle}`;
     const initial = (actorName || '?').trim().charAt(0).toUpperCase();
     return (

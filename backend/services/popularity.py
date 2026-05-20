@@ -101,7 +101,10 @@ def compute_popularity_scores(
         select(UserEventAttendance.event_id, func.count(UserEventAttendance.id))
         .where(
             UserEventAttendance.event_id.in_(event_ids),
-            UserEventAttendance.created_at >= since,
+            # ``UserEventAttendance`` records the timestamp under
+            # ``attending_since`` (the moment the row was materialized
+            # as "currently going"); there is no ``created_at`` field.
+            UserEventAttendance.attending_since >= since,
         )
         .group_by(UserEventAttendance.event_id)
     ).all()

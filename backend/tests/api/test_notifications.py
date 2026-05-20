@@ -704,3 +704,153 @@ def test_refollow_does_not_duplicate_notifications(client, session):
     assert len(follower_notifs) == 1, (
         "idempotent re-follow must not duplicate notification"
     )
+
+
+# --- E8: friend-request notification correctness ----------------------------
+
+
+def _make_friends_user(session: Session, email: str, handle: str) -> User:
+    """Create a friends-visibility account."""
+    u = User(
+        email=email,
+        display_name=handle.title(),
+        handle=handle,
+        provider="google",
+        provider_subject=f"mock|{email}",
+        account_visibility="friends",
+    )
+    session.add(u)
+    session.commit()
+    session.refresh(u)
+    return u
+
+
+def test_e8_approve_request_notifies_requester_not_approver(client, session):
+    """Approving a follow-request must send follow_request_approved to the
+    requester (bob), NOT new_follower to the approver (alice).
+
+    Bug: the old code called notify_new_follower(followee=alice, follower=bob)
+    which incorrectly sent Alice a "Bob started following you – Follow back?"
+    notification. Post-fix, Alice should get NO notification (she just
+    approved), and Bob should get follow_request_approved.
+    """
+    import os
+
+    os.environ["FEATURE_FRIEND_REQUESTS"] = "true"
+
+    _make_friends_user(session, "alice@example.com", "alice")
+    _make_user(session, "bob@example.com", "bob")
+
+    # Bob sends follow-request to alice (friends-only account).
+    _login(client, "bob@example.com")
+    r = client.post("/api/social/users/alice/follow")
+    assert r.status_code == 201, r.text
+    assert r.json()["follow_status"] == "pending"
+    _logout(client)
+
+    # Alice approves the request.
+    _login(client, "alice@example.com")
+    r = client.post("/api/social/me/follow-requests/bob/approve")
+    assert r.status_code == 200, r.text
+
+    # Alice must NOT have a new_follower notification.
+    r = client.get("/api/notifications")
+    alice_kinds = [n["kind"] for n in r.json()["items"]]
+    assert "new_follower" not in alice_kinds, (
+        "alice (approver) must not receive new_follower"
+    )
+    # Alice's inbox: follow_request row must be gone.
+    assert "follow_request" not in alice_kinds
+    _logout(client)
+
+    # Bob must receive follow_request_approved with alice as actor.
+    _login(client, "bob@example.com")
+    r = client.get("/api/notifications")
+    assert r.status_code == 200
+    items = r.json()["items"]
+    kinds = [n["kind"] for n in items]
+    assert "follow_request_approved" in kinds, (
+        "requester (bob) must receive follow_request_approved"
+    )
+    approved_notif = next(n for n in items if n["kind"] == "follow_request_approved")
+    assert approved_notif["actor"]["handle"] == "alice"
+
+
+def test_e8_pending_follow_public_event_appears_in_subscribed_feed(client, session):
+    """A pending-follow target's public-audience going-event should appear
+    in the viewer's subscribed-events feed even before approval."""
+    import os
+
+    os.environ["FEATURE_FRIEND_REQUESTS"] = "true"
+
+    _make_calendar(session)
+    _make_event(session, "ev-pending-public")
+
+    alice = _make_friends_user(session, "alice@example.com", "alice")
+    _make_user(session, "bob@example.com", "bob")
+
+    # Alice marks going with public audience.
+    session.add(
+        UserEventAttendance(
+            device_id="dev-alice",
+            event_id="ev-pending-public",
+            user_id=alice.id,
+            share_audience="public",
+            share_publicly=True,
+        )
+    )
+    session.commit()
+
+    # Bob requests to follow alice (pending).
+    _login(client, "bob@example.com")
+    r = client.post("/api/social/users/alice/follow")
+    assert r.json()["follow_status"] == "pending"
+
+    # Bob's subscribed-events feed should include alice's event.
+    r = client.get("/api/social/me/subscribed-events")
+    assert r.status_code == 200, r.text
+    event_ids = [item["event_id"] for item in r.json()["items"]]
+    assert "ev-pending-public" in event_ids, (
+        "pending-follow target's public event must appear in subscribed feed"
+    )
+
+
+def test_e8_pending_follow_friends_event_does_not_appear_in_subscribed_feed(
+    client, session
+):
+    """A pending-follow target's friends-audience event must NOT appear
+    in the viewer's subscribed-events feed."""
+    import os
+
+    os.environ["FEATURE_FRIEND_REQUESTS"] = "true"
+
+    _make_calendar(session)
+    _make_event(session, "ev-pending-friends")
+
+    alice = _make_friends_user(session, "alice@example.com", "alice")
+    _make_user(session, "bob@example.com", "bob")
+
+    # Alice marks going with friends-only audience.
+    session.add(
+        UserEventAttendance(
+            device_id="dev-alice-f",
+            event_id="ev-pending-friends",
+            user_id=alice.id,
+            share_audience="friends",
+            share_publicly=False,
+        )
+    )
+    session.commit()
+
+    # Bob requests to follow alice (pending).
+    _login(client, "bob@example.com")
+    r = client.post("/api/social/users/alice/follow")
+    assert r.json()["follow_status"] == "pending"
+
+    # Bob's subscribed-events feed must NOT include alice's friends-only event.
+    r = client.get("/api/social/me/subscribed-events")
+    assert r.status_code == 200
+    event_ids = [item["event_id"] for item in r.json()["items"]]
+    assert "ev-pending-friends" not in event_ids, (
+        "pending-follow target's friends-audience event must NOT appear in feed"
+    )

@@ -1,0 +1,18 @@
+users:
+  - email: dev-user@example.com
+    name: Dev User
+  - email: organizer@example.com
+    name: Olive Organizer
+    handle: olive
+    bio: Festival organiser & DJ. Running socials across EU since 2018.
+    instagram_url: https://instagram.com/olive
+    facebook_url: https://facebook.com/olive
+  - email: claimant@example.com
+    name: Carl Claimant
+    handle: carl
+    bio: Local DJ. Hoping to claim my upcoming socials.
+    instagram_url: https://instagram.com/carl
+  - email: noprofile@example.com # missing bio + social → blocked from claim form
+    name: Nora NoProfile
+  - email: admin@example.com # matches ADMIN_EMAIL → admin
+    name: Dev Admin

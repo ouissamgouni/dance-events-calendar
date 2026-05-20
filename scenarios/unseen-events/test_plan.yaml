@@ -73,3 +73,20 @@ test_plan:
         re-enabling restores the earlier seen state). Re-enable the
         toggle and the badges/filter return on next reload. Proves the
         feature is fully gated by the toggle.
+
+    - id: 6
+      title: "Map pins also show the Unseen dot"
+      description: >
+        Re-enable the Unseen state and clear `seen_events` from
+        localStorage. Reload / and confirm the explorer map is visible.
+        Locate the pins for the three seeded events.
+      expected: >
+        Each pin renders a small blue (#3b82f6) dot at the top-right
+        of the colored disc — matching the card's `bg-blue-500`
+        unseen affordance (positive "new content" signal stays blue,
+        per the frontend color rule that reserves red for
+        destructive/error states). Clicking a pin opens its popup
+        AND marks the event as seen (the dot disappears from both
+        the pin and its list card on next render). Proves the pin's
+        dot is driven by the same `seen_events` localStorage set as
+        the card's dot.

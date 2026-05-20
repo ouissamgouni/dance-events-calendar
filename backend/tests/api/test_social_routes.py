@@ -71,6 +71,58 @@ def _logout(client: TestClient) -> None:
     client.cookies.clear()
 
 
+def test_login_assigns_default_handle_for_new_user(client, session):
+    r = client.post(
+        "/api/auth/google",
+        json={
+            "credential": "ignored",
+            "mock_email": "maria@example.com",
+            "mock_name": "María López",
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["handle"] == "maria_lopez"
+
+    user = session.exec(select(User).where(User.email == "maria@example.com")).one()
+    assert user.handle == "maria_lopez"
+
+
+def test_login_default_handle_avoids_collisions(client, session):
+    _make_user(session, "existing@example.com", "maria_lopez")
+
+    r = client.post(
+        "/api/auth/google",
+        json={
+            "credential": "ignored",
+            "mock_email": "maria2@example.com",
+            "mock_name": "Maria Lopez",
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["handle"] == "maria_lopez_2"
+
+
+def test_login_backfills_missing_handle_for_existing_user(client, session):
+    user = User(
+        email="legacy@example.com",
+        display_name="Legacy Person",
+        provider="google",
+        provider_subject="mock|legacy@example.com",
+    )
+    session.add(user)
+    session.commit()
+
+    r = client.post(
+        "/api/auth/google",
+        json={"credential": "ignored", "mock_email": "legacy@example.com"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["handle"] == "legacy_person"
+
+    session.refresh(user)
+    assert user.handle == "legacy_person"
+
+
 def _make_user(
     session: Session,
     email: str,
@@ -145,8 +197,11 @@ def test_public_profile_handle_lookup_is_case_insensitive(client, session):
 
 
 def test_follow_then_mutual_becomes_friend(client, session):
-    _make_user(session, "alice@example.com", "alice")
-    _make_user(session, "bob@example.com", "bob")
+    # Phase E (E8): use public accounts so this test exercises the
+    # legacy approved-immediately path. The pending/approve flow has
+    # dedicated coverage in test_phase_e_batch_2.py.
+    _make_user(session, "alice@example.com", "alice", account_visibility="public")
+    _make_user(session, "bob@example.com", "bob", account_visibility="public")
 
     _login(client, "alice@example.com")
     r = client.post("/api/social/users/bob/follow")

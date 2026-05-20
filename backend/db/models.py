@@ -79,6 +79,22 @@ class User(SQLModel, table=True):
     account_visibility: str = Field(default="public", max_length=16, nullable=False)
     # Admin-granted credibility badge surfaced on the public profile.
     is_verified_organizer: bool = Field(default=False, nullable=False)
+    # Phase: admin-curated lists. When True the account is operated by
+    # site admins ("dedicated curator profile") and is a valid target
+    # for the bulk-curation routes. Default False — civilian accounts
+    # are never written to by admin tooling.
+    is_admin_managed: bool = Field(default=False, nullable=False, index=True)
+    # Optional admin-only label shown in the Admin Users tab
+    # (e.g. "Salsa Nights Paris curator"). Not exposed publicly.
+    managed_label: Optional[str] = Field(default=None, max_length=120)
+    # Phase: admin-curated lists. When True the account is operated by
+    # site admins ("dedicated curator profile") and is a valid target
+    # for the bulk-curation routes. Default False — civilian accounts
+    # are never written to by admin tooling.
+    is_admin_managed: bool = Field(default=False, nullable=False, index=True)
+    # Optional admin-only label shown in the Admin Users tab
+    # (e.g. "Salsa Nights Paris curator"). Not exposed publicly.
+    managed_label: Optional[str] = Field(default=None, max_length=120)
     # Optional, unverified social profile links shown on the public profile
     # for self-published credibility. Display-only; never used for auth.
     instagram_url: Optional[str] = Field(default=None, max_length=255)
@@ -88,6 +104,14 @@ class User(SQLModel, table=True):
     # only (no markdown), trimmed and stripped of control chars at write
     # time. Capped at 280 chars to keep profile cards skimmable.
     bio: Optional[str] = Field(default=None, max_length=280)
+    # --- Phase E2: onboarding ---
+    # Stamped the first time the user either completes the
+    # ``/onboarding/follow`` flow (E3) or explicitly skips it. NULL means
+    # the user has never seen the onboarding screen, so frontend route
+    # guards should redirect them there on their next signed-in
+    # navigation. Existing pre-E3 accounts also start as NULL and pass
+    # through the redirect once on their next sign-in.
+    onboarded_at: Optional[datetime] = Field(default=None)
 
 
 class CalendarSetting(SQLModel, table=True):
@@ -100,6 +124,46 @@ class CalendarSetting(SQLModel, table=True):
     sync_token: Optional[str] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class CalendarCurationRule(SQLModel, table=True):
+    """Per-calendar rule that auto-curates synced events onto an
+    admin-managed target's Saved/Going list.
+
+    The post-sync hook
+    (``SyncService.run_enrichment`` → ``apply_curation_rules``) reads
+    all ``enabled`` rules for the touched calendars and calls
+    ``set_event_engagement(add)`` per (event, rule) pair. The primitive
+    is idempotent so re-running a sync is a safe no-op.
+
+    The ``(calendar_id, target_user_id, kind)`` unique constraint means
+    there is at most one rule per pair per kind — toggling
+    ``audience`` later mutates the existing row rather than spawning
+    duplicates.
+    """
+
+    __tablename__ = "calendar_curation_rules"
+    __table_args__ = (
+        UniqueConstraint(
+            "calendar_id",
+            "target_user_id",
+            "kind",
+            name="uq_curation_rule_cal_target_kind",
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    calendar_id: str = Field(
+        foreign_key="calendar_settings.calendar_id", index=True, nullable=False
+    )
+    target_user_id: UUID = Field(foreign_key="users.id", index=True, nullable=False)
+    # ``save`` | ``going``.
+    kind: str = Field(max_length=16, nullable=False)
+    # Per-row audience override. None = use the target user's profile
+    # default at engagement time (mirrors the bulk route default).
+    audience: Optional[str] = Field(default=None, max_length=16)
+    enabled: bool = Field(default=True, nullable=False)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class CachedEvent(SQLModel, table=True):
@@ -127,6 +191,12 @@ class CachedEvent(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     deleted_at: Optional[datetime] = Field(default=None, index=True)
     is_hidden: bool = Field(default=False, index=True)
+    # Per-event organizer attribution. Set when an admin approves an
+    # ``OrganizerClaimEvent`` row tying a user to this event. Independent
+    # from ``User.is_verified_organizer`` (the account-level badge).
+    organizer_user_id: Optional[UUID] = Field(
+        default=None, foreign_key="users.id", index=True
+    )
 
 
 class BlockedEvent(SQLModel, table=True):
@@ -185,6 +255,12 @@ class UserSavedEvent(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     device_id: str = Field(index=True, max_length=64)
     event_id: str = Field(index=True)
+    # Non-NULL when the row was written by the site admin acting on
+    # behalf of the target user (admin-curated lists feature). Used by
+    # the public read paths to surface a "Curated" pill on the row.
+    created_by_admin_user_id: Optional[UUID] = Field(
+        default=None, foreign_key="users.id", index=True
+    )
     user_id: Optional[UUID] = Field(default=None, foreign_key="users.id", index=True)
     saved_at: datetime = Field(default_factory=datetime.utcnow)
     # Per-saved-event audience (public / friends / private). Treated as
@@ -193,6 +269,12 @@ class UserSavedEvent(SQLModel, table=True):
     # frontend may pre-fill with the user's last-used choice from
     # localStorage or with ``share_attendance_default_audience``.
     audience: str = Field(default="friends", max_length=16, nullable=False)
+    # Non-NULL when the row was written by the site admin acting on
+    # behalf of the target user (admin-curated lists feature). Used by
+    # the public read paths to surface a "Curated" pill on the row.
+    created_by_admin_user_id: Optional[UUID] = Field(
+        default=None, foreign_key="users.id", index=True
+    )
 
 
 class ShareToken(SQLModel, table=True):
@@ -324,6 +406,95 @@ class EventSuggestion(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     reviewed_at: Optional[datetime] = Field(default=None)
     reviewed_by: Optional[str] = Field(default=None)
+
+
+class EventPromoCode(SQLModel, table=True):
+    """User-submitted promo code attached to an event.
+
+    Sign-in required (``submitter_user_id`` is NOT NULL). Admin-moderated:
+    ``status`` flows ``pending`` → ``approved`` | ``rejected``. Author
+    edits to a previously approved row revert ``status`` to ``pending``
+    so the change is re-reviewed.
+
+    Uniqueness on ``(event_id, lower(code))`` is enforced via a partial
+    unique index (``WHERE status != 'rejected'``) in the migration —
+    SQLModel cannot express the partiality declaratively.
+    """
+
+    __tablename__ = "event_promo_codes"
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    event_id: str = Field(foreign_key="cached_events.event_id", index=True)
+    code: str = Field(max_length=64)
+    description: Optional[str] = Field(default=None, max_length=200)
+    source_url: Optional[str] = Field(default=None, max_length=500)
+    expires_at: Optional[datetime] = Field(default=None)
+    submitter_user_id: UUID = Field(foreign_key="users.id", index=True)
+    status: str = Field(default="pending", max_length=16)
+    admin_notes: Optional[str] = Field(default=None, sa_column=Column(Text))
+    reviewed_at: Optional[datetime] = Field(default=None)
+    reviewed_by: Optional[str] = Field(default=None, max_length=255)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class OrganizerClaim(SQLModel, table=True):
+    """User-submitted request related to organizer attribution.
+
+    Two kinds, decided independently:
+
+    - ``kind="badge"``: account-level verified-organizer badge request.
+      Approving flips ``users.is_verified_organizer``. Allowed only
+      while the user is NOT already verified and has no pending badge
+      claim. Carries no event line items.
+    - ``kind="events"``: per-event organizer attribution. Allowed only
+      for already-verified users. Carries 1..20 event line items
+      (rows in ``organizer_claim_events``). Approving an event sets
+      ``cached_events.organizer_user_id`` AND inserts a public
+      ``UserEventAttendance`` row (organizer auto-going).
+
+    Admin-moderated: status flows ``pending`` → ``approved`` |
+    ``rejected``.
+    """
+
+    __tablename__ = "organizer_claims"
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    user_id: UUID = Field(foreign_key="users.id", index=True)
+    # ``badge`` | ``events`` — see class docstring. Legacy rows
+    # (created before the split) default to ``badge``.
+    kind: str = Field(default="badge", max_length=16, index=True)
+    # Legacy column kept for historical rows; new code ignores it and
+    # routes badge-vs-events behaviour off ``kind``. Always True for
+    # backfilled rows.
+    grant_badge: bool = Field(default=True, nullable=False)
+    status: str = Field(default="pending", max_length=16, index=True)
+    admin_notes: Optional[str] = Field(default=None, sa_column=Column(Text))
+    reviewed_at: Optional[datetime] = Field(default=None)
+    reviewed_by: Optional[str] = Field(default=None, max_length=255)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class OrganizerClaimEvent(SQLModel, table=True):
+    """Per-event line item attached to an :class:`OrganizerClaim`.
+
+    Admins decide each event independently: ``decision`` is
+    ``pending`` | ``approved`` | ``rejected``. On approval, the
+    corresponding ``cached_events.organizer_user_id`` is set to the
+    claim's submitter.
+    """
+
+    __tablename__ = "organizer_claim_events"
+    __table_args__ = (
+        UniqueConstraint("claim_id", "event_id", name="uq_organizer_claim_event"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    claim_id: UUID = Field(foreign_key="organizer_claims.id", index=True)
+    event_id: str = Field(foreign_key="cached_events.event_id", index=True)
+    decision: str = Field(default="pending", max_length=16)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class EventLinkClick(SQLModel, table=True):
@@ -521,6 +692,10 @@ class UserEventAttendance(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     device_id: str = Field(index=True, max_length=64)
     event_id: str = Field(index=True)
+    # See ``UserSavedEvent.created_by_admin_user_id``.
+    created_by_admin_user_id: Optional[UUID] = Field(
+        default=None, foreign_key="users.id", index=True
+    )
     user_id: Optional[UUID] = Field(default=None, foreign_key="users.id", index=True)
     attending_since: datetime = Field(default_factory=datetime.utcnow)
     # When True AND user_id IS NOT NULL the row is eligible to appear in the
@@ -535,6 +710,10 @@ class UserEventAttendance(SQLModel, table=True):
     # with the viewer's relationship for the ``friends`` tier
     # (mutual-follow gate enforced in the read paths).
     share_audience: str = Field(default="public", max_length=16, nullable=False)
+    # See ``UserSavedEvent.created_by_admin_user_id``.
+    created_by_admin_user_id: Optional[UUID] = Field(
+        default=None, foreign_key="users.id", index=True
+    )
 
 
 class CalendarDefaultTag(SQLModel, table=True):
@@ -588,6 +767,40 @@ class UserFollow(SQLModel, table=True):
     follower_id: UUID = Field(foreign_key="users.id", index=True)
     followee_id: UUID = Field(foreign_key="users.id", index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    # Phase E (E8). For ``friends``-visibility targets the follow is
+    # created with ``status='pending'`` and grants NO visibility until
+    # the target approves; for ``public`` targets it is created with
+    # ``status='approved'`` (the historical behaviour). Read paths
+    # (``is_following``, follower lists, ``can_view``, mutual-follow
+    # gates) MUST filter on ``status='approved'``. Pending rows live
+    # in the table only to drive the approve/decline inbox surface.
+    status: str = Field(default="approved", max_length=16, nullable=False)
+
+
+class UserReferral(SQLModel, table=True):
+    """Invite code an existing user shares with friends (Phase E7).
+
+    One row per inviter (the ``inviter_user_id`` column is uniquely
+    constrained), so calls to ``GET /api/social/me/referral`` are
+    idempotent — the same code is returned each time. Redeeming a code
+    at signup auto-creates a mutual ``UserFollow`` pair between
+    inviter and new user (gated on explicit consent surfaced at the
+    signup screen per GDPR Art. 7) and increments ``used_count``.
+    """
+
+    __tablename__ = "user_referrals"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_user_referrals_code"),
+        UniqueConstraint("inviter_user_id", name="uq_user_referrals_inviter"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    inviter_user_id: UUID = Field(foreign_key="users.id", index=True)
+    # Short opaque case-insensitive identifier (base32, no padding).
+    # Surfaced in URLs like ``https://app.example.com/r/{code}``.
+    code: str = Field(max_length=24)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    used_count: int = Field(default=0, nullable=False)
 
 
 class CalendarSubscription(SQLModel, table=True):
@@ -651,7 +864,7 @@ class Notification(SQLModel, table=True):
     actor_user_id: UUID = Field(foreign_key="users.id", index=True)
     kind: str = Field(
         index=True
-    )  # subscription_going | subscription_suggested | new_follower | new_friend
+    )  # subscription_going | subscription_suggested | new_follower | new_friend | follow_request
     event_id: Optional[str] = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     read_at: Optional[datetime] = Field(default=None, index=True)

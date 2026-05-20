@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useAnchoredToast, SIGN_IN_TOAST_MESSAGE } from './AnchoredToast';
 import SignInNudge, { useSignInNudge } from './SignInNudge';
 import AudiencePicker from './AudiencePicker';
+import { trackSave } from '../utils/tracking';
 import type { ShareAudience } from '../api';
 
 interface Props {
@@ -19,13 +20,30 @@ interface PopoverPos { top: number; left: number; }
 
 const POPOVER_WIDTH = 272;
 
-function computePopoverPos(trigger: HTMLElement, popoverWidth: number): PopoverPos {
+/**
+ * Compute fixed-position coordinates for the audience popover. Clamps
+ * horizontally and — when there isn't enough room below the trigger
+ * for ``popoverHeight`` — flips ABOVE the trigger so the popover isn't
+ * clipped at the bottom of the viewport (a recurring problem on event
+ * cards near the page footer).
+ */
+function computePopoverPos(
+    trigger: HTMLElement,
+    popoverWidth: number,
+    popoverHeight: number = 220,
+): PopoverPos {
     const r = trigger.getBoundingClientRect();
     const margin = 8;
     const desiredLeft = r.left + r.width / 2 - popoverWidth / 2;
     const maxLeft = window.innerWidth - popoverWidth - margin;
     const left = Math.max(margin, Math.min(desiredLeft, maxLeft));
-    return { top: r.bottom + 6, left };
+    const spaceBelow = window.innerHeight - r.bottom - margin;
+    const spaceAbove = r.top - margin;
+    const top =
+        spaceBelow >= popoverHeight || spaceBelow >= spaceAbove
+            ? r.bottom + 6
+            : Math.max(margin, r.top - popoverHeight - 6);
+    return { top, left };
 }
 
 export default function SaveEventButton({
@@ -97,6 +115,30 @@ export default function SaveEventButton({
             setShowNudge(true);
             nudgeShown = true;
         }
+        if (!wasSaved && user) {
+            // Signed-in first-time save: emit the save with the user's
+            // account-level default audience (privacy-by-default: friends),
+            // optimistically flip local state, then open the visibility
+            // popover so the user can adjust on the fly — parity with the
+            // post-RSVP popover that GoingButton shows.
+            const defaultAudience: ShareAudience =
+                user.share_attendance_default_audience
+                ?? (user.share_attendance_default === false ? 'private' : 'friends');
+            toggleSave(eventId).then((ok) => {
+                if (!ok) {
+                    toast.show("Couldn't save \u2014 try again", 3200);
+                    return;
+                }
+                // Persist the chosen default on the row so the local
+                // audience map and the subscribers' fan-out tier agree.
+                trackSave(eventId, 'save', defaultAudience)
+                    .then(() => setSavedAudience(eventId, defaultAudience))
+                    .catch(() => { /* row exists with default; non-fatal */ });
+                setPendingAudience(defaultAudience);
+                setPopoverOpen(true);
+            });
+            return;
+        }
         toggleSave(eventId).then((ok) => {
             if (ok) {
                 if (wasSaved) return;
@@ -108,11 +150,10 @@ export default function SaveEventButton({
         });
     };
 
-    const applyAudience = (e: React.MouseEvent<HTMLButtonElement>) => {
-        e.stopPropagation();
-        toast.hide();
-        const next = pendingAudience;
-        setPopoverOpen(false);
+    // Live-apply: audience clicks in the popover write through to the
+    // server immediately, no explicit Save button needed.
+    const handlePopoverAudienceChange = (next: ShareAudience) => {
+        setPendingAudience(next);
         setSavedAudience(eventId, next).then((ok) => {
             if (!ok) toast.show("Couldn't update visibility \u2014 try again", 3200);
         });
@@ -142,7 +183,7 @@ export default function SaveEventButton({
             </p>
             <AudiencePicker
                 value={pendingAudience}
-                onChange={setPendingAudience}
+                onChange={handlePopoverAudienceChange}
                 size="full"
                 ariaLabel="Saved event visibility"
             />
@@ -161,22 +202,13 @@ export default function SaveEventButton({
                 >
                     Unsave
                 </button>
-                <div className="flex gap-2">
-                    <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setPopoverOpen(false); }}
-                        className="text-xs px-2 py-1 text-slate-600 hover:bg-slate-100"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        onClick={applyAudience}
-                        className="text-xs px-3 py-1 bg-emerald-600 text-white hover:bg-emerald-700"
-                    >
-                        Save
-                    </button>
-                </div>
+                <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setPopoverOpen(false); }}
+                    className="text-xs px-2 py-1 text-slate-600 hover:bg-slate-100"
+                >
+                    Close
+                </button>
             </div>
         </div>,
         document.body,

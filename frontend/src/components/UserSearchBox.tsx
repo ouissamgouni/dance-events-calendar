@@ -220,12 +220,13 @@ export default function UserSearchBox() {
                                             {u.display_name || `@${u.handle}`}
                                         </span>
                                         {u.is_verified_organizer && (
-                                            <span
-                                                className="text-[10px] text-blue-600"
+                                            <img
+                                                src="/orga.png"
+                                                alt=""
                                                 title="Verified organizer"
-                                            >
-                                                ✓
-                                            </span>
+                                                aria-label="Verified organizer"
+                                                className="w-3.5 h-3.5 object-contain"
+                                            />
                                         )}
                                     </div>
                                     <div className="text-[11px] text-slate-500 truncate">

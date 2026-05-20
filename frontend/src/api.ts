@@ -1,4 +1,4 @@
-import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry } from './types';
+import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide } from './types';
 
 declare const __VITE_API_URL__: string;
 
@@ -84,6 +84,9 @@ export async function fetchEvents(
         friendsGoing?: boolean;
         friendsSaved?: boolean;
         friendHandle?: string;
+        interestSource?: 'follows' | 'friends';
+        interestKind?: 'any' | 'going' | 'saved';
+        interestUserHandle?: string;
     },
 ): Promise<CalendarEvent[]> {
     const searchParams = new URLSearchParams();
@@ -99,6 +102,9 @@ export async function fetchEvents(
     if (params?.friendsGoing) searchParams.set('friends_going', 'true');
     if (params?.friendsSaved) searchParams.set('friends_saved', 'true');
     if (params?.friendHandle) searchParams.set('friend_handle', params.friendHandle);
+    if (params?.interestSource) searchParams.set('interest_source', params.interestSource);
+    if (params?.interestKind) searchParams.set('interest_kind', params.interestKind);
+    if (params?.interestUserHandle) searchParams.set('interest_user_handle', params.interestUserHandle);
     const qs = searchParams.toString();
     // Friend-filter params require the session cookie to identify the viewer
     // and apply mutual-follower checks; sending credentials is harmless for
@@ -139,8 +145,12 @@ export interface SiteSettings {
     trending_enabled?: boolean;
     trending_window_days?: number;
     trending_floor_going?: number;
+    trending_top_n?: number;
+    trending_top_percent?: number;
     event_color_bar_color: string;
     tag_sort_mode: 'group' | 'event_count';
+    promo_codes_enabled?: boolean;
+    organizer_claims_enabled?: boolean;
 }
 
 export async function fetchSettings(): Promise<SiteSettings> {
@@ -281,6 +291,10 @@ export interface AuthUser {
      *  AudiencePicker to surface a "no friends yet" hint when the user
      *  picks the ``friends`` audience. Null/undefined for anon. */
     friend_count?: number;
+    /** Phase E (E3): ISO-8601 timestamp of onboarding completion (or
+     *  skip). When ``null`` the frontend route guard redirects to
+     *  ``/onboarding/follow`` after first-load. Absent for anon. */
+    onboarded_at?: string | null;
 }
 
 export async function loginWithGoogle(
@@ -439,6 +453,7 @@ export type AccountVisibility = 'public' | 'friends';
 export interface ProfileCalendarItem {
     event: CalendarEvent;
     intent: 'going' | 'saved' | 'both';
+    curated?: boolean;
 }
 
 export interface ProfileCalendarList {
@@ -458,11 +473,14 @@ export interface PublicProfile {
     handle: string;
     display_name: string | null;
     avatar_url: string | null;
-    is_verified_organizer: boolean;
-    instagram_url: string | null;
-    facebook_url: string | null;
     bio: string | null;
     member_since: string;
+    is_verified_organizer: boolean;
+    // True when this profile is an admin-curated puppet account
+    // (admin-managed lists feature). Drives transparency badge.
+    is_admin_managed?: boolean;
+    instagram_url: string | null;
+    facebook_url: string | null;
     followers_count: number;
     following_count: number;
     subscribers_count: number;
@@ -471,6 +489,9 @@ export interface PublicProfile {
     is_following: boolean;
     follows_you: boolean;
     is_friend: boolean;
+    // Phase E (E8): "approved" once active; "pending" when an
+    // outstanding follow-request awaits the target's approval.
+    follow_status?: 'approved' | 'pending';
     account_visibility: AccountVisibility;
     friend_count: number;
     mutual_friend_count: number;
@@ -509,6 +530,21 @@ export interface FollowAction {
     // Phase B: follow now implies subscribe-to-calendar.
     is_subscribed: boolean;
     notify_new_events: boolean;
+    // Phase E (E8): "approved" once active, "pending" when the target
+    // has friends-visibility and the request awaits their approval.
+    follow_status?: 'approved' | 'pending';
+}
+
+// Phase E (E8): inbound follow-request inbox item.
+export interface FollowRequestItem {
+    handle: string;
+    display_name: string | null;
+    avatar_url: string | null;
+    requested_at: string;
+}
+
+export interface FollowRequestList {
+    items: FollowRequestItem[];
 }
 
 export async function fetchPublicProfile(handle: string): Promise<PublicProfile> {
@@ -534,6 +570,38 @@ export async function unfollowUser(handle: string): Promise<FollowAction> {
         { method: 'DELETE', credentials: 'include' },
     );
     return parseJsonResponse<FollowAction>(res, 'Failed to unfollow user');
+}
+
+// Phase E (E8): friend-request inbox.
+export async function fetchFollowRequests(): Promise<FollowRequestList> {
+    const res = await fetch(`${BASE}/social/me/follow-requests`, {
+        credentials: 'include',
+    });
+    if (res.status === 401) return { items: [] };
+    return parseJsonResponse<FollowRequestList>(
+        res,
+        'Failed to fetch follow requests',
+    );
+}
+
+export async function approveFollowRequest(
+    handle: string,
+): Promise<FollowAction> {
+    const res = await fetch(
+        `${BASE}/social/me/follow-requests/${encodeURIComponent(handle)}/approve`,
+        { method: 'POST', credentials: 'include' },
+    );
+    return parseJsonResponse<FollowAction>(res, 'Failed to approve request');
+}
+
+export async function declineFollowRequest(handle: string): Promise<void> {
+    const res = await fetch(
+        `${BASE}/social/me/follow-requests/${encodeURIComponent(handle)}/decline`,
+        { method: 'POST', credentials: 'include' },
+    );
+    if (!res.ok && res.status !== 204) {
+        throw new Error('Failed to decline request');
+    }
 }
 
 export async function fetchFollowers(
@@ -609,6 +677,196 @@ export async function fetchFriendsLeaderboard(
     return parseJsonResponse<FriendsLeaderboardResponse>(
         res, 'Failed to fetch leaderboard',
     );
+}
+
+// --- Phase E (E3) — onboarding -----------------------------------------
+
+export interface OnboardingSuggestionsResponse {
+    items: UserSearchResult[];
+}
+
+export async function fetchOnboardingSuggestions(
+    limit = 10,
+): Promise<OnboardingSuggestionsResponse> {
+    const res = await fetch(
+        `${BASE}/social/onboarding/suggestions?limit=${limit}`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<OnboardingSuggestionsResponse>(
+        res, 'Failed to load onboarding suggestions',
+    );
+}
+
+export interface CompleteOnboardingResponse {
+    onboarded_at: string;
+    followed: string[];
+}
+
+export async function completeOnboarding(
+    handles: string[],
+): Promise<CompleteOnboardingResponse> {
+    const res = await fetch(`${BASE}/social/onboarding/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ handles }),
+        credentials: 'include',
+    });
+    return parseJsonResponse<CompleteOnboardingResponse>(
+        res, 'Failed to complete onboarding',
+    );
+}
+
+// --- Phase E (E4) — friend-of-friend suggestions -----------------------
+
+export interface FoFSuggestionItem {
+    handle: string;
+    display_name: string | null;
+    avatar_url: string | null;
+    is_verified_organizer: boolean;
+    mutual_friend_count: number;
+    mutual_friends_preview: string[];
+}
+
+export interface FoFSuggestionsResponse {
+    items: FoFSuggestionItem[];
+    total: number;
+}
+
+export async function fetchMySuggestions(
+    opts?: { limit?: number; offset?: number },
+): Promise<FoFSuggestionsResponse> {
+    const sp = new URLSearchParams();
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    if (opts?.offset) sp.set('offset', String(opts.offset));
+    const qs = sp.toString();
+    const res = await fetch(
+        `${BASE}/social/me/suggestions${qs ? `?${qs}` : ''}`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<FoFSuggestionsResponse>(
+        res, 'Failed to load suggestions',
+    );
+}
+
+// --- Phase E (E7) — referrals ------------------------------------------
+
+export interface ReferralResponse {
+    code: string;
+    url: string;
+    used_count: number;
+}
+
+export async function fetchMyReferral(): Promise<ReferralResponse> {
+    const res = await fetch(`${BASE}/social/me/referral`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<ReferralResponse>(
+        res, 'Failed to load referral link',
+    );
+}
+
+export interface RedeemReferralResponse {
+    inviter_handle: string | null;
+    mutual_follow_created: boolean;
+}
+
+export async function redeemReferral(
+    code: string,
+    consent: boolean,
+): Promise<RedeemReferralResponse> {
+    const res = await fetch(`${BASE}/auth/redeem-referral`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, consent }),
+        credentials: 'include',
+    });
+    return parseJsonResponse<RedeemReferralResponse>(
+        res, 'Failed to redeem referral',
+    );
+}
+
+// --- Phase 3 (D2) — share-link doubles as referral --------------------------
+
+export interface ShareSourceResponse {
+    handle: string | null;
+    display_name: string | null;
+    avatar_url: string | null;
+}
+
+/** Resolve a `?ref=share&src=` token to the sharer preview shown by the
+ *  share-referral banner. Returns null on 404 (unknown / deleted code).
+ *  Anonymous-safe — the share_code is already in the visitor's URL. */
+export async function fetchShareSource(
+    shareCode: string,
+): Promise<ShareSourceResponse | null> {
+    const res = await fetch(
+        `${BASE}/social/share-source/${encodeURIComponent(shareCode)}`,
+        { credentials: 'include' },
+    );
+    if (res.status === 404) return null;
+    return parseJsonResponse<ShareSourceResponse>(
+        res, 'Failed to load share source',
+    );
+}
+
+export interface RedeemShareFollowResponse {
+    sharer_handle: string | null;
+    mutual_follow_created: boolean;
+}
+
+/** Trigger the mutual-follow on a share-link redemption. Mirrors
+ *  `redeemReferral` but on its own backend bucket; does NOT count
+ *  toward the E7 invite leaderboard. */
+export async function redeemShareFollow(
+    shareCode: string,
+    consent: boolean,
+): Promise<RedeemShareFollowResponse> {
+    const res = await fetch(`${BASE}/auth/redeem-share-follow`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ share_code: shareCode, consent }),
+        credentials: 'include',
+    });
+    return parseJsonResponse<RedeemShareFollowResponse>(
+        res, 'Failed to redeem share follow',
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Phase E (E5) — friends / FoF "going" wedge for the event modal.
+// ---------------------------------------------------------------------------
+
+export interface WedgeAttendee {
+    user_id: string;
+    handle: string | null;
+    display_name: string | null;
+    avatar_url: string | null;
+    viewer_follow_status?: 'pending' | 'approved';
+}
+
+export interface FofGoingAttendee extends WedgeAttendee {
+    via_friend_handle: string | null;
+    via_friend_display_name: string | null;
+}
+
+export interface GoingWedgeResponse {
+    event_id: string;
+    friends_going: WedgeAttendee[];
+    fof_going: FofGoingAttendee[];
+    public_going_count: number;
+}
+
+/** Fetch the per-event social-proof wedge (friends/FoF/public count).
+ *  Anonymous callers get 401 — caller should hide the wedge in that
+ *  case and rely on the existing public ``going_count`` instead. */
+export async function fetchGoingWedge(
+    eventId: string,
+): Promise<GoingWedgeResponse | null> {
+    const res = await fetch(`${BASE}/events/${eventId}/going-wedge`, {
+        credentials: 'include',
+    });
+    if (res.status === 401) return null;
+    return parseJsonResponse<GoingWedgeResponse>(res, 'Failed to load wedge');
 }
 
 export async function fetchMyFollowers(
@@ -765,7 +1023,16 @@ export async function removeMySubscriber(handle: string): Promise<void> {
 
 // --- Phase C: in-app notifications ---
 
-export type NotificationKind = 'subscription_going' | 'subscription_suggested' | 'new_follower' | 'new_friend';
+export type NotificationKind =
+    | 'subscription_going'
+    | 'subscription_suggested'
+    | 'new_follower'
+    | 'new_friend'
+    | 'follow_request'
+    | 'follow_request_approved'
+    | 'promo_code_approved'
+    | 'promo_code_rejected'
+    | 'organizer_claim_decided';
 
 export interface NotificationActor {
     handle: string;
@@ -887,6 +1154,8 @@ export interface AdminUserRow {
     avatar_url: string | null;
     is_admin: boolean;
     is_verified_organizer: boolean;
+    is_admin_managed: boolean;
+    managed_label: string | null;
     deleted_at: string | null;
     created_at: string;
     followers_count: number;
@@ -939,6 +1208,26 @@ export async function adminSetVerifiedOrganizer(
     return parseJsonResponse<PublicProfile>(res, 'Failed to update verified flag');
 }
 
+export async function adminSetAdminManaged(
+    handle: string,
+    isAdminManaged: boolean,
+    managedLabel?: string | null,
+): Promise<PublicProfile> {
+    const res = await fetch(
+        `${BASE}/social/admin/users/${encodeURIComponent(handle)}/managed`,
+        {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                is_admin_managed: isAdminManaged,
+                managed_label: managedLabel ?? null,
+            }),
+        },
+    );
+    return parseJsonResponse<PublicProfile>(res, 'Failed to update managed flag');
+}
+
 export async function updateMyVisibility(
     visibility: Partial<{
         account_visibility: AccountVisibility;
@@ -983,6 +1272,7 @@ export interface ProfileEventListResponse {
     total: number;
     limit: number;
     offset: number;
+    curated_event_ids?: string[];
 }
 
 async function fetchProfileEventList(
@@ -1072,6 +1362,8 @@ export interface UserSearchResult {
     is_verified_organizer: boolean;
     subscribers_count: number;
     is_subscribed: boolean;
+    is_friend?: boolean;
+    is_followed_by_viewer?: boolean;
 }
 
 export interface UserSearchResponse {
@@ -1126,6 +1418,35 @@ export async function fetchAttendanceSummaryBatch(eventIds: string[]): Promise<A
     });
     if (!res.ok) return [];
     return res.json();
+}
+
+// --- Interest filter picker (Phase: following-interest) ---
+
+export interface InterestSummaryItem {
+    handle: string;
+    upcoming_going_visible: number;
+    upcoming_saved_visible: number;
+}
+
+/**
+ * Batched per-handle upcoming counts used by the explorer's interest
+ * picker. Mirrors `GET /api/social/users/interest-summary?handles=…`
+ * (the param is repeated per handle). Returns `[]` on non-OK so the
+ * picker degrades to row-only rendering.
+ */
+export async function fetchInterestSummary(handles: string[]): Promise<InterestSummaryItem[]> {
+    const clean = handles
+        .map((h) => (h || '').trim().replace(/^@/, '').toLowerCase())
+        .filter((h) => h.length > 0);
+    if (clean.length === 0) return [];
+    const sp = new URLSearchParams();
+    for (const h of clean) sp.append('handles', h);
+    const res = await fetch(`${BASE}/social/users/interest-summary?${sp.toString()}`, {
+        credentials: 'include',
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data?.items) ? data.items : [];
 }
 
 export async function fetchEventAttendees(eventId: string): Promise<Attendee[] | { unauthorized: true }> {
@@ -1429,6 +1750,128 @@ export async function bulkAssignTags(eventIds: string[], tagIds: number[]): Prom
     if (!res.ok) throw new Error('Failed to bulk assign tags');
     return res.json();
 }
+
+// --- Admin bulk engagement curation -----------------------------------------
+
+export type AdminBulkEngagementKind = 'save' | 'going';
+export type AdminBulkEngagementAction = 'add' | 'remove';
+export type AdminBulkEngagementAudience = 'public' | 'friends' | 'private';
+
+export interface AdminBulkEngagementItem {
+    handle: string;
+    event_id: string;
+    status:
+    | 'changed'
+    | 'noop'
+    | 'skipped_not_managed'
+    | 'skipped_no_user'
+    | 'skipped_no_event';
+    detail: string | null;
+}
+
+export interface AdminBulkEngagementResponse {
+    items: AdminBulkEngagementItem[];
+    changed_count: number;
+    skipped_count: number;
+}
+
+/**
+ * Bulk-curate Saved/Going entries on admin-managed accounts.
+ * Backend skips non-managed targets per-row (never errors).
+ */
+export async function adminBulkEngagement(
+    handles: string[],
+    eventIds: string[],
+    kind: AdminBulkEngagementKind,
+    action: AdminBulkEngagementAction,
+    opts?: { audience?: AdminBulkEngagementAudience; fanOut?: boolean },
+): Promise<AdminBulkEngagementResponse> {
+    const res = await fetch(`${BASE}/admin/engagement/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+            handles,
+            event_ids: eventIds,
+            kind,
+            action,
+            audience: opts?.audience ?? null,
+            fan_out: opts?.fanOut ?? false,
+        }),
+    });
+    return parseJsonResponse<AdminBulkEngagementResponse>(res, 'Failed to apply bulk curation');
+}
+
+
+// --- Phase 3: per-calendar curation rules ---
+
+export interface CalendarCurationRule {
+    id: number;
+    calendar_id: string;
+    target_user_id: string;
+    target_handle: string | null;
+    kind: AdminBulkEngagementKind;
+    audience: AdminBulkEngagementAudience | null;
+    enabled: boolean;
+}
+
+export async function listCalendarCurationRules(calendarId: string): Promise<CalendarCurationRule[]> {
+    const res = await fetch(
+        `${BASE}/admin/calendars/${encodeURIComponent(calendarId)}/curation-rules`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<CalendarCurationRule[]>(res, 'Failed to load curation rules');
+}
+
+export async function createCalendarCurationRule(
+    calendarId: string,
+    body: {
+        target_handle: string;
+        kind: AdminBulkEngagementKind;
+        audience?: AdminBulkEngagementAudience | null;
+        enabled?: boolean;
+    },
+): Promise<CalendarCurationRule> {
+    const res = await fetch(
+        `${BASE}/admin/calendars/${encodeURIComponent(calendarId)}/curation-rules`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(body),
+        },
+    );
+    return parseJsonResponse<CalendarCurationRule>(res, 'Failed to create curation rule');
+}
+
+export async function updateCalendarCurationRule(
+    calendarId: string,
+    ruleId: number,
+    body: { audience?: AdminBulkEngagementAudience | null; enabled?: boolean },
+): Promise<CalendarCurationRule> {
+    const res = await fetch(
+        `${BASE}/admin/calendars/${encodeURIComponent(calendarId)}/curation-rules/${ruleId}`,
+        {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(body),
+        },
+    );
+    return parseJsonResponse<CalendarCurationRule>(res, 'Failed to update curation rule');
+}
+
+export async function deleteCalendarCurationRule(calendarId: string, ruleId: number): Promise<void> {
+    const res = await fetch(
+        `${BASE}/admin/calendars/${encodeURIComponent(calendarId)}/curation-rules/${ruleId}`,
+        { method: 'DELETE', credentials: 'include' },
+    );
+    if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || 'Failed to delete curation rule');
+    }
+}
+
 
 export async function fetchAdminEvent(eventId: string): Promise<CalendarEvent> {
     const res = await fetch(`${BASE}/admin/events/${encodeURIComponent(eventId)}`, {
@@ -2283,4 +2726,176 @@ export async function unblockEvent(eventId: string): Promise<CalendarEvent> {
     });
     if (!res.ok) throw new Error('Failed to unblock event');
     return res.json();
+}
+
+// --- Promo codes -----------------------------------------------------------
+
+export async function fetchEventPromoCodes(eventId: string): Promise<PromoCode[]> {
+    const res = await fetch(`${BASE}/events/${eventId}/promo-codes`, {
+        credentials: 'include',
+    });
+    if (res.status === 404) return [];
+    return parseJsonResponse<PromoCode[]>(res, 'Failed to load promo codes');
+}
+
+export async function submitEventPromoCode(
+    eventId: string,
+    body: PromoCodeCreate,
+): Promise<PromoCode> {
+    const res = await fetch(`${BASE}/events/${eventId}/promo-codes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+    });
+    return parseJsonResponse<PromoCode>(res, 'Failed to submit promo code');
+}
+
+export async function updateEventPromoCode(
+    eventId: string,
+    promoId: string,
+    body: PromoCodeUpdate,
+): Promise<PromoCode> {
+    const res = await fetch(`${BASE}/events/${eventId}/promo-codes/${promoId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+    });
+    return parseJsonResponse<PromoCode>(res, 'Failed to update promo code');
+}
+
+export async function deleteEventPromoCode(
+    eventId: string,
+    promoId: string,
+): Promise<void> {
+    const res = await fetch(`${BASE}/events/${eventId}/promo-codes/${promoId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to delete promo code');
+    }
+}
+
+export async function fetchAdminPromoCodes(status?: string): Promise<PromoCodeAdmin[]> {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+    const res = await fetch(`${BASE}/admin/promo-codes${qs}`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<PromoCodeAdmin[]>(res, 'Failed to fetch promo codes');
+}
+
+export async function approveAdminPromoCode(promoId: string): Promise<PromoCodeAdmin> {
+    const res = await fetch(`${BASE}/admin/promo-codes/${promoId}/approve`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return parseJsonResponse<PromoCodeAdmin>(res, 'Failed to approve promo code');
+}
+
+export async function rejectAdminPromoCode(
+    promoId: string,
+    adminNotes?: string,
+): Promise<PromoCodeAdmin> {
+    const res = await fetch(`${BASE}/admin/promo-codes/${promoId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ admin_notes: adminNotes ?? null }),
+    });
+    return parseJsonResponse<PromoCodeAdmin>(res, 'Failed to reject promo code');
+}
+
+export async function updateAdminPromoCode(
+    promoId: string,
+    body: PromoCodeUpdate,
+): Promise<PromoCodeAdmin> {
+    const res = await fetch(`${BASE}/admin/promo-codes/${promoId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+    });
+    return parseJsonResponse<PromoCodeAdmin>(res, 'Failed to update promo code');
+}
+
+// --- Organizer claims ------------------------------------------------------
+
+export interface EventSearchResult {
+    event_id: string;
+    title: string;
+    start: string | null;
+}
+
+export async function searchEvents(
+    q: string,
+    limit = 10,
+): Promise<EventSearchResult[]> {
+    const qs = `?q=${encodeURIComponent(q)}&limit=${limit}`;
+    const res = await fetch(`${BASE}/events/search${qs}`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<EventSearchResult[]>(res, 'Failed to search events');
+}
+
+export async function fetchMyOrganizerClaims(
+    kind?: 'badge' | 'events',
+): Promise<OrganizerClaim[]> {
+    const qs = kind ? `?kind=${kind}` : '';
+    const res = await fetch(`${BASE}/me/organizer-claims${qs}`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<OrganizerClaim[]>(res, 'Failed to fetch claims');
+}
+
+export async function submitOrganizerClaim(
+    body: OrganizerClaimCreate,
+): Promise<OrganizerClaim> {
+    const res = await fetch(`${BASE}/me/organizer-claims`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+    });
+    return parseJsonResponse<OrganizerClaim>(res, 'Failed to submit claim');
+}
+
+export async function cancelOrganizerClaim(claimId: string): Promise<void> {
+    const res = await fetch(`${BASE}/me/organizer-claims/${claimId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to cancel claim');
+    }
+}
+
+export async function fetchAdminOrganizerClaims(
+    status?: string,
+    kind?: 'badge' | 'events',
+): Promise<OrganizerClaimAdmin[]> {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (kind) params.set('kind', kind);
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`${BASE}/admin/organizer-claims${qs}`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<OrganizerClaimAdmin[]>(res, 'Failed to fetch claims');
+}
+
+export async function decideOrganizerClaim(
+    claimId: string,
+    body: OrganizerClaimDecide,
+): Promise<OrganizerClaimAdmin> {
+    const res = await fetch(`${BASE}/admin/organizer-claims/${claimId}/decide`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+    });
+    return parseJsonResponse<OrganizerClaimAdmin>(res, 'Failed to decide claim');
 }

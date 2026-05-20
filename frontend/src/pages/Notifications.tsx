@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     fetchNotifications,
+    approveFollowRequest,
+    declineFollowRequest,
     type NotificationItem,
     type NotificationKind,
 } from '../api';
@@ -131,6 +133,11 @@ export default function NotificationsPage() {
                     active={filterKind === 'new_friend'}
                     onClick={() => setFilterKind('new_friend')}
                 />
+                <KindChip
+                    label="Requests"
+                    active={filterKind === 'follow_request'}
+                    onClick={() => setFilterKind('follow_request')}
+                />
             </div>
 
             {error && (
@@ -197,7 +204,33 @@ function NotificationRow({
 }) {
     const navigate = useNavigate();
     const isUnread = !item.read_at;
-    const isFollowKind = item.kind === 'new_follower' || item.kind === 'new_friend';
+    const isFollowKind = item.kind === 'new_follower' || item.kind === 'new_friend' || item.kind === 'follow_request' || item.kind === 'follow_request_approved';
+    const [requestHandled, setRequestHandled] = useState<'approved' | 'declined' | null>(null);
+    const [requestBusy, setRequestBusy] = useState(false);
+    const handleApprove = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (requestBusy) return;
+        setRequestBusy(true);
+        try {
+            await approveFollowRequest(item.actor.handle);
+            setRequestHandled('approved');
+            window.dispatchEvent(new Event('network:changed'));
+        } finally {
+            setRequestBusy(false);
+        }
+    };
+    const handleDecline = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (requestBusy) return;
+        setRequestBusy(true);
+        try {
+            await declineFollowRequest(item.actor.handle);
+            setRequestHandled('declined');
+            window.dispatchEvent(new Event('network:changed'));
+        } finally {
+            setRequestBusy(false);
+        }
+    };
     const verb =
         item.kind === 'subscription_going'
             ? 'is going to'
@@ -207,7 +240,11 @@ function NotificationRow({
                     ? 'started following you'
                     : item.kind === 'new_friend'
                         ? 'and you are now friends!'
-                        : 'updated';
+                        : item.kind === 'follow_request'
+                            ? 'wants to follow you'
+                            : item.kind === 'follow_request_approved'
+                                ? 'approved your follow request'
+                                : 'updated';
     const actorName = item.actor.display_name || `@${item.actor.handle}`;
     const initial = (actorName || '?').trim().charAt(0).toUpperCase();
     const destination = isFollowKind ? `/u/${item.actor.handle}` : `/event/${item.event_id}`;
@@ -239,9 +276,13 @@ function NotificationRow({
                         {actorName}
                     </span>
                     {item.actor.is_verified_organizer && (
-                        <span className="ml-1 text-blue-600" title="Verified organizer">
-                            ✓
-                        </span>
+                        <img
+                            src="/orga.png"
+                            alt=""
+                            title="Verified organizer"
+                            aria-label="Verified organizer"
+                            className="inline-block w-3.5 h-3.5 ml-1 align-middle object-contain"
+                        />
                     )}{' '}
                     <span className="text-slate-500">{verb}</span>
                     {!isFollowKind && (
@@ -256,6 +297,38 @@ function NotificationRow({
                 <p className="text-xs text-slate-400 mt-0.5">
                     {formatRelative(item.created_at)}
                 </p>
+                {item.kind === 'follow_request' && (
+                    <div className="mt-2 flex gap-2">
+                        {requestHandled === 'approved' ? (
+                            <span className="inline-block px-2 py-1 text-[11px] border border-slate-200 bg-white text-slate-600">
+                                ✓ Approved
+                            </span>
+                        ) : requestHandled === 'declined' ? (
+                            <span className="inline-block px-2 py-1 text-[11px] border border-slate-200 bg-white text-slate-600">
+                                Declined
+                            </span>
+                        ) : (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={handleApprove}
+                                    disabled={requestBusy}
+                                    className="px-2 py-1 text-[11px] bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-60"
+                                >
+                                    {requestBusy ? '…' : 'Approve'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleDecline}
+                                    disabled={requestBusy}
+                                    className="px-2 py-1 text-[11px] border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                                >
+                                    Decline
+                                </button>
+                            </>
+                        )}
+                    </div>
+                )}
             </button>
             {isUnread ? (
                 <button

@@ -66,7 +66,11 @@ export default function ProfilePage() {
         }
         setFollowBusy(true);
         try {
-            const result = profile.is_following
+            // Phase E (E8): treat pending follow-requests the same as an
+            // active follow for the purposes of the toggle — DELETE
+            // rescinds the request.
+            const isPending = profile.follow_status === 'pending';
+            const result = profile.is_following || isPending
                 ? await unfollowUser(profile.handle)
                 : await followUser(profile.handle);
             // Phase B: follow auto-creates a calendar subscription (with
@@ -82,6 +86,10 @@ export default function ProfilePage() {
                 followers_count: result.followers_count,
                 is_subscribed: result.is_subscribed,
                 notify_new_events: result.notify_new_events,
+                // Phase E (E8): persist the pending state so the button
+                // renders "Requested" until the target approves or the
+                // viewer rescinds.
+                follow_status: result.follow_status ?? 'approved',
                 subscribers_count: Math.max(0, profile.subscribers_count + subDelta),
             });
             // Phase E: notify Auth + Network panels that the graph changed
@@ -170,23 +178,48 @@ function ProfileHeader({
         month: 'long',
     });
     return (
-        <div className="border border-slate-200 bg-white p-5">
-            <div className="flex items-start gap-4">
+        <div className="border border-slate-200 bg-white px-4 py-4 sm:px-5">
+            <div className="flex min-w-0 items-start gap-3 sm:gap-4">
                 <Avatar
                     url={profile.avatar_url}
                     name={profile.display_name || profile.handle}
                 />
-                <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <h1 className="text-xl font-semibold text-slate-900 truncate">
-                            {profile.display_name || `@${profile.handle}`}
-                        </h1>
-                        {profile.is_verified_organizer && (
-                            <VerifiedBadge />
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <h1 className="truncate text-lg font-semibold leading-tight text-slate-900 sm:text-xl">
+                                    {profile.display_name || `@${profile.handle}`}
+                                </h1>
+                                {profile.is_verified_organizer && (
+                                    <VerifiedBadge />
+                                )}
+                            </div>
+                            <div className="mt-0.5 text-sm leading-tight text-slate-500">@{profile.handle}</div>
+                        </div>
+                        {!profile.is_self && (
+                            <div className="flex shrink-0 items-stretch gap-1">
+                                <FollowButton
+                                    profile={profile}
+                                    onClick={onFollow}
+                                    busy={followBusy}
+                                    isAuthenticated={isAuthenticated}
+                                />
+                                {/* Phase B: Follow implies calendar subscription.
+                                    The bell toggle controls notify_new_events on
+                                    that implied subscription — only meaningful
+                                    while following. */}
+                                {isAuthenticated && profile.is_following && profile.is_subscribed && (
+                                    <NotifyBellToggle
+                                        enabled={profile.notify_new_events}
+                                        onChange={onNotifyToggle}
+                                        busy={notifyBusy}
+                                    />
+                                )}
+                            </div>
                         )}
                     </div>
-                    <div className="mt-0.5 text-sm text-slate-500">@{profile.handle}</div>
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
                         <span>
                             <strong className="text-slate-900">{profile.followers_count}</strong>{' '}
                             followers
@@ -203,11 +236,10 @@ function ProfileHeader({
                                 mutual friend{profile.mutual_friend_count === 1 ? '' : 's'}
                             </span>
                         )}
-
-                        <span className="text-slate-400">Member since {memberSince}</span>
+                        <span className="whitespace-nowrap text-slate-400">Joined {memberSince}</span>
                     </div>
                     {profile.bio && (
-                        <p className="mt-3 text-sm text-slate-700 whitespace-pre-line break-words">
+                        <p className="mt-2 text-sm text-slate-700 whitespace-pre-line break-words">
                             {profile.bio}
                         </p>
                     )}
@@ -223,7 +255,7 @@ function ProfileHeader({
                         !profile.is_self &&
                         (profile.mutual_friends_who_follow ?? 0) > 0 && (
                             <p
-                                className="mt-2 inline-block px-2 py-1 text-[11px] border border-slate-200 bg-slate-50 text-slate-700"
+                                className="mt-1.5 inline-block border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-700"
                                 data-testid="mutual-friends-who-follow-pill"
                             >
                                 Followed by{' '}
@@ -233,31 +265,8 @@ function ProfileHeader({
                                 of your friend{profile.mutual_friends_who_follow === 1 ? '' : 's'}
                             </p>
                         )}
+                    <FollowHintBanner profile={profile} isAuthenticated={isAuthenticated} />
                 </div>
-                {!profile.is_self && (
-                    <div className="shrink-0 flex flex-col items-stretch gap-2">
-                        <div className="flex items-stretch gap-1">
-                            <FollowButton
-                                profile={profile}
-                                onClick={onFollow}
-                                busy={followBusy}
-                                isAuthenticated={isAuthenticated}
-                            />
-                            {/* Phase B: Follow implies calendar subscription.
-                                The bell toggle controls notify_new_events on
-                                that implied subscription — only meaningful
-                                while following. */}
-                            {isAuthenticated && profile.is_following && profile.is_subscribed && (
-                                <NotifyBellToggle
-                                    enabled={profile.notify_new_events}
-                                    onChange={onNotifyToggle}
-                                    busy={notifyBusy}
-                                />
-                            )}
-                        </div>
-                        <FollowHintBanner profile={profile} isAuthenticated={isAuthenticated} />
-                    </div>
-                )}
             </div>
         </div>
     );
@@ -317,14 +326,24 @@ function FollowButton({
     } else if (profile.is_following) {
         label = 'Following';
         primary = false;
+    } else if (profile.follow_status === 'pending') {
+        // Phase E (E8): outstanding follow-request awaiting approval.
+        // Clicking again rescinds the request (DELETE /follow).
+        label = 'Requested';
+        primary = false;
     } else if (profile.follows_you) {
         label = 'Follow back';
+        primary = true;
+    } else if (profile.account_visibility === 'friends') {
+        // Phase E (E8): clarify that this action sends a request, not
+        // an instant follow.
+        label = 'Request to follow';
         primary = true;
     } else {
         label = 'Follow';
         primary = true;
     }
-    const baseCls = 'shrink-0 px-4 py-2 text-sm font-medium transition disabled:opacity-50';
+    const baseCls = 'shrink-0 px-3.5 py-1.5 text-sm font-medium transition disabled:opacity-50';
     const cls = primary
         ? `${baseCls} bg-blue-500 text-white hover:bg-blue-600`
         : `${baseCls} border border-slate-200 bg-white text-slate-700 hover:bg-slate-50`;
@@ -348,8 +367,8 @@ function NotifyBellToggle({
         ? 'Notifications on — click to mute'
         : 'Notifications muted — click to enable';
     const cls = enabled
-        ? 'shrink-0 px-2.5 border border-slate-200 bg-white text-blue-500 hover:bg-slate-50 transition disabled:opacity-50 flex items-center justify-center'
-        : 'shrink-0 px-2.5 border border-slate-200 bg-white text-slate-400 hover:bg-slate-50 transition disabled:opacity-50 flex items-center justify-center';
+        ? 'shrink-0 px-2 border border-slate-200 bg-white text-blue-500 hover:bg-slate-50 transition disabled:opacity-50 flex items-center justify-center'
+        : 'shrink-0 px-2 border border-slate-200 bg-white text-slate-400 hover:bg-slate-50 transition disabled:opacity-50 flex items-center justify-center';
     return (
         <button
             type="button"
@@ -380,13 +399,12 @@ function VerifiedBadge() {
             className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs text-blue-700"
             title="Admin-verified organizer"
         >
-            <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm3.707-10.293a1 1 0 0 0-1.414-1.414L9 9.586 7.707 8.293a1 1 0 0 0-1.414 1.414l2 2a1 1 0 0 0 1.414 0l4-4Z"
-                    clipRule="evenodd"
-                />
-            </svg>
+            <img
+                src="/orga.png"
+                alt=""
+                aria-hidden="true"
+                className="w-3.5 h-3.5 object-contain"
+            />
             Verified organizer
         </span>
     );
@@ -398,13 +416,13 @@ function Avatar({ url, name }: { url: string | null; name: string }) {
             <img
                 src={url}
                 alt={name}
-                className="w-16 h-16 rounded-full object-cover bg-slate-100"
+                className="h-14 w-14 rounded-full bg-slate-100 object-cover"
             />
         );
     }
     const initial = (name || '?').trim().charAt(0).toUpperCase();
     return (
-        <div className="w-16 h-16 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xl font-semibold">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-200 text-lg font-semibold text-slate-600">
             {initial}
         </div>
     );
@@ -635,9 +653,19 @@ function ProfileCalendarRow({ item }: { item: ProfileCalendarItem }) {
                 >
                     {item.event.title}
                 </Link>
-                <span className={`shrink-0 px-2 py-0.5 text-[10px] font-medium ${badge.cls}`}>
-                    {badge.label}
-                </span>
+                <div className="flex items-center gap-1 shrink-0">
+                    {item.curated && (
+                        <span
+                            className="px-2 py-0.5 text-[10px] font-medium bg-indigo-50 text-indigo-700"
+                            title="Curated by the editorial team"
+                        >
+                            Curated
+                        </span>
+                    )}
+                    <span className={`px-2 py-0.5 text-[10px] font-medium ${badge.cls}`}>
+                        {badge.label}
+                    </span>
+                </div>
             </div>
             <p className="text-xs text-slate-500">
                 {dateLabel}

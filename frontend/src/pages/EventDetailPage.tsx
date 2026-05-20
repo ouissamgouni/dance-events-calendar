@@ -14,7 +14,7 @@ import GoingButton from '../components/GoingButton';
 import SaveEventButton from '../components/SaveEventButton';
 import RateEventButton from '../components/RateEventButton';
 import EventReviewsSection from '../components/EventReviewsSection';
-import AttendeeList from '../components/AttendeeList';
+import InterestSection from '../components/InterestSection';
 import ShareButton from '../components/ShareButton';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import type { CalendarEvent, TagGroup } from '../types';
@@ -244,12 +244,12 @@ export default function EventDetailPage() {
                                     </div>
                                 )}
 
-                                {/* Interest — combined engagement section: going attendees + total saves. */}
-                                <div className="border-t border-slate-100 px-4 py-3">
-                                    <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
-                                        Interest
-                                    </h3>
-                                    <AttendeeList eventId={event.event_id} expanded />
+                                {/* Interest — combined engagement section: going attendees + total saves.
+                                    InterestSection provides its own top border + padding; only horizontal padding here.
+                                    px-6 matches EventDetailContent's wrapper so this section visually aligns
+                                    with the promo-codes section rendered just above (inside EventDetailContent). */}
+                                <div className="px-6 pb-3">
+                                    <InterestSection eventId={event.event_id} eventTitle={event.title} />
                                 </div>
 
                                 {/* Actions bar — primary CTA (Going) is visually emphasised; the

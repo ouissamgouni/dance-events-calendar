@@ -1,0 +1,62 @@
+# Phase E (E5) — Friends/FoF wedge in the event modal.
+#
+# Cast (5 dancers + 1 admin):
+#   • viewer — the protagonist. Sees the wedge from her POV.
+#   • alice  — mutual friend of viewer            → "Friends going" bucket
+#   • bob    — friend of alice but NOT of viewer  → "Friends-of-friends" bucket
+#                                                   (via @alice)
+#   • carol  — strict-private going row           → MUST be invisible to viewer
+#                                                   even via FoF (GDPR guardrail)
+#   • dave   — public-going stranger              → counted in the
+#                                                   "+N more public" tail
+#   • admin  — admin user for /admin/configuration
+users:
+  - email: viewer@example.com
+    name: Viewer Wedge
+    handle: viewer
+    account_visibility: public
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    account_visibility: public
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+    account_visibility: public
+  - email: carol@example.com
+    name: Carol Nguyen
+    handle: carol
+    account_visibility: friends
+  - email: dave@example.com
+    name: Dave Public
+    handle: dave
+    account_visibility: public
+  # Extra public-going strangers so the "Also going" bucket overflows
+  # the inline cap (6) and the "Show all N" CTA opens the sectioned modal.
+  - email: eve@example.com
+    name: Eve Park
+    handle: eve
+    account_visibility: public
+  - email: frank@example.com
+    name: Frank Wu
+    handle: frank
+    account_visibility: public
+  - email: gina@example.com
+    name: Gina Ortiz
+    handle: gina
+    account_visibility: public
+  - email: hugo@example.com
+    name: Hugo Tan
+    handle: hugo
+    account_visibility: public
+  - email: ivy@example.com
+    name: Ivy Nakamura
+    handle: ivy
+    account_visibility: public
+  - email: jack@example.com
+    name: Jack Reed
+    handle: jack
+    account_visibility: public
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

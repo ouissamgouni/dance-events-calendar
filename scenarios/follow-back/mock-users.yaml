@@ -1,0 +1,19 @@
+# Phase E (E1) — Follow-back button on new_follower notifications.
+#
+# Cast:
+#   - viewer  — persona under test; receives a new_follower notification
+#               from dave with is_following=false → exercises E1 button.
+#   - dave    — incoming follower with no return follow.
+#   - admin
+users:
+  - email: viewer@example.com
+    name: Viewer Persona
+    handle: viewer
+    account_visibility: public
+  - email: dave@example.com
+    name: Dave Pending
+    handle: dave
+    account_visibility: public
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

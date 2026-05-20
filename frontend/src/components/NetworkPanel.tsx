@@ -13,7 +13,8 @@ import {
     type FriendsLeaderboardResponse,
     type LeaderboardPeriod,
 } from '../api';
-
+import PeopleYouMayKnowCard from './PeopleYouMayKnowCard';
+import FollowRequestsPanel from './FollowRequestsPanel';
 /**
  * Network panel for the /account page. Lets the signed-in user browse
  * who follows them, who they follow, and the intersection (mutual = friends).
@@ -24,18 +25,19 @@ import {
  * audience tiers across the app.
  */
 
-type Tab = 'friends' | 'followers' | 'following' | 'leaderboard';
+type Tab = 'suggestions' | 'followers' | 'following' | 'friends' | 'leaderboard';
 
 const TAB_LABELS: Record<Tab, string> = {
-    friends: 'Friends',
+    suggestions: 'Suggestions',
     followers: 'Followers',
     following: 'Following',
+    friends: 'Friends',
     leaderboard: 'Most active',
 };
 
 export default function NetworkPanel() {
-    const [tab, setTab] = useState<Tab>('friends');
-    const [data, setData] = useState<Record<Exclude<Tab, 'leaderboard'>, FollowList | null>>({
+    const [tab, setTab] = useState<Tab>('suggestions');
+    const [data, setData] = useState<Record<Exclude<Tab, 'leaderboard' | 'suggestions'>, FollowList | null>>({
         friends: null,
         followers: null,
         following: null,
@@ -44,6 +46,7 @@ export default function NetworkPanel() {
         friends: null,
         followers: null,
         following: null,
+        suggestions: null,
         leaderboard: null,
     });
     // Phase E (E9): leaderboard state lives separately because its row
@@ -82,6 +85,7 @@ export default function NetworkPanel() {
                 cancelled = true;
             };
         }
+        if (tab === 'suggestions') return; // PYM card owns its own fetch
         if (data[tab] !== null) return;
         let cancelled = false;
         const fetcher =
@@ -106,7 +110,7 @@ export default function NetworkPanel() {
         };
     }, [tab, data, leaderboard, leaderboardPeriod]);
 
-    const current = tab === 'leaderboard' ? null : data[tab];
+    const current = tab === 'leaderboard' || tab === 'suggestions' ? null : data[tab];
     const error = errors[tab];
     const [pending, setPending] = useState<string | null>(null);
 
@@ -164,20 +168,21 @@ export default function NetworkPanel() {
     return (
         <section
             id="network"
-            className="rounded-lg border border-slate-200 bg-white p-6 scroll-mt-6"
+            className="rounded-lg border border-slate-200 bg-white p-4 mb-3 scroll-mt-4"
         >
-            <h2 className="text-base font-semibold text-slate-900 mb-3">
+            <h2 className="text-sm font-semibold text-slate-900 mb-2">
                 My network
             </h2>
+            <FollowRequestsPanel />
             <div
                 role="tablist"
                 aria-label="My network"
-                className="flex gap-1 mb-3 border-b border-slate-200"
+                className="flex gap-0.5 mb-3 border-b border-slate-200 overflow-x-auto scrollbar-none"
             >
                 {(Object.keys(TAB_LABELS) as Tab[]).map((t) => {
                     const active = t === tab;
                     const count =
-                        t === 'leaderboard' ? undefined : data[t]?.total;
+                        t === 'leaderboard' || t === 'suggestions' ? undefined : data[t]?.total;
                     return (
                         <button
                             key={t}
@@ -185,8 +190,8 @@ export default function NetworkPanel() {
                             role="tab"
                             aria-selected={active}
                             onClick={() => setTab(t)}
-                            className={`px-3 py-1.5 text-sm font-medium border-b-2 -mb-px ${active
-                                ? 'border-rose-600 text-rose-700'
+                            className={`shrink-0 px-2.5 py-1.5 text-xs font-medium border-b-2 -mb-px whitespace-nowrap ${active
+                                ? 'border-blue-500 text-blue-600'
                                 : 'border-transparent text-slate-600 hover:text-slate-900'
                                 }`}
                         >
@@ -202,7 +207,12 @@ export default function NetworkPanel() {
             </div>
 
             {error ? (
-                <p className="text-sm text-rose-600">{error}</p>
+                <p className="text-xs text-red-600">{error}</p>
+            ) : tab === 'suggestions' ? (
+                // Phase E (E4): friend-of-friend / popular accounts the
+                // viewer might want to follow. The PYM card owns its
+                // own data fetch + Follow buttons so we just drop it in.
+                <PeopleYouMayKnowCard />
             ) : tab === 'leaderboard' ? (
                 <LeaderboardView
                     period={leaderboardPeriod}
@@ -213,9 +223,9 @@ export default function NetworkPanel() {
                     data={leaderboard}
                 />
             ) : current === null ? (
-                <p className="text-sm text-slate-400">Loading…</p>
+                <p className="text-xs text-slate-400">Loading…</p>
             ) : current.items.length === 0 ? (
-                <p className="text-sm text-slate-500">
+                <p className="text-xs text-slate-500">
                     {tab === 'friends'
                         ? "You don't have any friends yet. Friends are users who follow you back."
                         : tab === 'followers'
@@ -239,24 +249,24 @@ export default function NetworkPanel() {
                                         className="w-8 h-8 rounded-full object-cover bg-slate-100"
                                     />
                                 ) : (
-                                    <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-sm font-semibold">
+                                    <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-semibold">
                                         {initial}
                                     </div>
                                 )}
                                 <div className="min-w-0 flex-1">
                                     <Link
                                         to={`/u/${u.handle}`}
-                                        className="block truncate text-sm font-medium text-slate-900 hover:text-rose-600"
+                                        className="block truncate text-xs font-medium text-slate-900 hover:text-blue-500"
                                     >
                                         {name}
                                         {u.is_verified_organizer && (
-                                            <span
-                                                className="ml-1 text-blue-600"
+                                            <img
+                                                src="/orga.png"
+                                                alt=""
                                                 title="Verified organizer"
                                                 aria-label="Verified organizer"
-                                            >
-                                                ✓
-                                            </span>
+                                                className="inline-block w-3.5 h-3.5 ml-1 align-middle object-contain"
+                                            />
                                         )}
                                     </Link>
                                     <div className="text-xs text-slate-500 truncate">
@@ -372,23 +382,23 @@ function LeaderboardView({
                                         className="w-8 h-8 rounded-full object-cover bg-slate-100"
                                     />
                                 ) : (
-                                    <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-sm font-semibold">
+                                    <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-semibold">
                                         {initial}
                                     </div>
                                 )}
                                 <Link
                                     to={`/u/${row.handle}`}
-                                    className="flex-1 truncate text-sm font-medium text-slate-900 hover:text-blue-600"
+                                    className="flex-1 truncate text-xs font-medium text-slate-900 hover:text-blue-600"
                                 >
                                     {name}
                                     {row.is_verified_organizer && (
-                                        <span
-                                            className="ml-1 text-blue-600"
+                                        <img
+                                            src="/orga.png"
+                                            alt=""
                                             title="Verified organizer"
                                             aria-label="Verified organizer"
-                                        >
-                                            ✓
-                                        </span>
+                                            className="inline-block w-3.5 h-3.5 ml-1 align-middle object-contain"
+                                        />
                                     )}
                                 </Link>
                                 <span className="shrink-0 text-xs text-slate-500">

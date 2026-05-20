@@ -1,0 +1,65 @@
+test_plan:
+  name: "Phase E (E3) — onboarding follow screen"
+  description: >
+    First-sign-in flow that surfaces a one-screen list of seed
+    suggestions (verified organizers first, then most-followed users),
+    a batch follow CTA, and a Skip path. Either action stamps
+    `users.onboarded_at` so the App-level guard never bounces the
+    user back here on subsequent loads.
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=phase-e-onboarding"
+    - >
+      Cast: `newbie` (fresh, no onboarded_at), two verified organizers
+      (`salsahub`, `bachataco`), three popular accounts (`pop1`, `pop2`,
+      `pop3`) seeded with a handful of pre-existing follower edges so
+      the most-followed tail is deterministic.
+
+  steps:
+    - id: 1
+      title: "Fresh sign-in lands on /onboarding/follow"
+      description: >
+        Open / in a brand-new browser session. /login → "Sign in as
+        Nora Newbie".
+      expected: >
+        URL becomes /onboarding/follow?next=%2F. The list shows
+        `salsahub` and `bachataco` in the first two rows with a small
+        blue verified pip, then `pop1`/`pop2`/`pop3` in descending
+        follower order. Each row's "Follow" pill is pre-selected (blue
+        background, label "Following").
+
+    - id: 2
+      title: "Deselect a couple and complete"
+      description: >
+        Tap the row for `bachataco` and the row for `pop3` to deselect
+        them. The bottom-right CTA updates live to read "Follow 3 and
+        continue".
+      expected: >
+        Click the CTA. Network: POST
+        /api/social/onboarding/complete → 200, body contains
+        `onboarded_at` (ISO timestamp) and `followed`:
+        ["salsahub","pop1","pop2"]. App navigates to /. Refreshing
+        the page stays on / — the guard no longer redirects.
+
+    - id: 3
+      title: "Skip path still stamps onboarded_at"
+      description: >
+        Reset DB (re-run `task start:scenario SCENARIO=phase-e-onboarding`),
+        sign in as Nora Newbie again, and tap "Skip" in the top-right.
+      expected: >
+        POST /api/social/onboarding/complete with `handles: []` → 200
+        with `onboarded_at` set and `followed: []`. App navigates to
+        /. No new UserFollow rows created (check NetworkPanel
+        "Following" tab is empty).
+
+    - id: 4
+      title: "Pre-onboarded user never sees the screen"
+      description: >
+        While still signed in as Nora (already onboarded), navigate
+        directly to /onboarding/follow.
+      expected: >
+        The route still renders the suggestions list (the page itself
+        is reachable by URL — only the *guard* is suppressed). Tapping
+        Skip or Follow updates onboarded_at again with a fresh
+        timestamp and bounces back to /. This proves the gate is the
+        only redirector — the page itself stays usable for testing.

@@ -36,6 +36,8 @@ VALID_KINDS = {
     "subscription_suggested",
     "new_follower",
     "new_friend",
+    "follow_request",
+    "follow_request_approved",
 }
 
 
@@ -62,6 +64,7 @@ def _hydrate(
             session.exec(
                 select(UserFollow.followee_id)
                 .where(UserFollow.follower_id == viewer_id)
+                .where(UserFollow.status == "approved")
                 .where(col(UserFollow.followee_id).in_(actor_ids))
             ).all()
         )

@@ -1,0 +1,4 @@
+# Site settings — turn on the promo_codes flag so the user-facing
+# submit form and admin slide-over both appear from first boot.
+settings:
+  promo_codes_enabled: true

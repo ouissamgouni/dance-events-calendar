@@ -146,13 +146,13 @@ function SubscriptionRow({
                 >
                     {name}
                     {sub.is_verified_organizer && (
-                        <span
-                            className="ml-1 text-blue-600"
+                        <img
+                            src="/orga.png"
+                            alt=""
                             title="Verified organizer"
                             aria-label="Verified organizer"
-                        >
-                            ✓
-                        </span>
+                            className="inline-block w-3.5 h-3.5 ml-1 align-middle object-contain"
+                        />
                     )}
                 </Link>
                 {!sub.can_view_calendar && (

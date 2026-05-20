@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import MineButton from './MineButton';
+import FollowsButton from './FollowsButton';
 
 /**
  * Always-visible floating Mine CTA at the bottom-right of the viewport.
@@ -36,6 +37,9 @@ export default function FloatingMineButton() {
     return (
         <div className="fixed bottom-4 right-4 z-[8000] flex items-center shadow-lg">
             <MineButton />
+            <div className="border-l border-slate-100">
+                <FollowsButton />
+            </div>
             <button
                 type="button"
                 onClick={handleDismiss}

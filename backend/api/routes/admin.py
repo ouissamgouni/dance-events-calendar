@@ -8,11 +8,17 @@ logger = logging.getLogger(__name__)
 
 from backend.api.deps import require_admin
 from backend.api.schemas import (
+    AdminBulkEngagementItem,
+    AdminBulkEngagementRequest,
+    AdminBulkEngagementResponse,
     BulkEventIdsRequest,
     BulkTagAssignRequest,
     BulkTagSuggestionRunRequest,
     BulkTagSuggestionRunResponse,
     CalendarAddRequest,
+    CalendarCurationRuleCreateRequest,
+    CalendarCurationRuleResponse,
+    CalendarCurationRuleUpdateRequest,
     CalendarDefaultTagsResponse,
     CalendarDefaultTagsUpdate,
     CalendarSettingResponse,
@@ -36,6 +42,7 @@ from backend.db.models import (
     BlockedEvent,
     CalendarDefaultTag,
     CachedEvent,
+    CalendarCurationRule,
     CalendarSetting,
     EventAttendance,
     EventLinkClick,
@@ -46,6 +53,7 @@ from backend.db.models import (
     SyncLog,
     Tag,
     TagSuggestion,
+    User,
     UserEventAttendance,
 )
 from backend.services.geocoding import geocode_location, search_locations
@@ -1830,3 +1838,195 @@ def unblock_event(
         is_hidden=event.is_hidden,
         is_blocked=False,
     )
+
+
+# --- Admin: bulk engagement curation ----------------------------------------
+
+
+@router.post("/engagement/bulk", response_model=AdminBulkEngagementResponse)
+def admin_bulk_engagement(
+    payload: AdminBulkEngagementRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+) -> AdminBulkEngagementResponse:
+    """Bulk add/remove Saved or Going entries for admin-managed accounts.
+
+    Applies ``(kind, action)`` to the cross-product of ``handles`` x
+    ``event_ids``. Targets that are not flagged ``is_admin_managed`` are
+    skipped per-row (never raised) so the admin can correct data and
+    re-run. ``audience`` is per-row and defaults to each target's own
+    ``share_attendance_default_audience`` when omitted. ``fan_out`` is
+    opt-in — curated Going entries are silent by default.
+    """
+    from backend.api.deps import get_admin_user_id
+    from backend.services.admin_curation import bulk_set_engagement
+
+    admin_user_id = get_admin_user_id(session)
+    result = bulk_set_engagement(
+        session,
+        handles=payload.handles,
+        event_ids=payload.event_ids,
+        kind=payload.kind,
+        action=payload.action,
+        audience=payload.audience,
+        fan_out=payload.fan_out,
+        admin_user_id=admin_user_id,
+    )
+    session.commit()
+    return AdminBulkEngagementResponse(
+        items=[
+            AdminBulkEngagementItem(
+                handle=i.handle,
+                event_id=i.event_id,
+                status=i.status,
+                detail=i.detail,
+            )
+            for i in result.items
+        ],
+        changed_count=result.changed_count,
+        skipped_count=result.skipped_count,
+    )
+
+
+# --- Admin: per-calendar curation rules -------------------------------------
+
+
+def _serialize_rule(
+    rule: CalendarCurationRule, handle: Optional[str]
+) -> CalendarCurationRuleResponse:
+    return CalendarCurationRuleResponse(
+        id=rule.id,  # type: ignore[arg-type]
+        calendar_id=rule.calendar_id,
+        target_user_id=str(rule.target_user_id),
+        target_handle=handle,
+        kind=rule.kind,  # type: ignore[arg-type]
+        audience=rule.audience,  # type: ignore[arg-type]
+        enabled=rule.enabled,
+    )
+
+
+def _require_calendar(session: Session, calendar_id: str) -> CalendarSetting:
+    cal = session.get(CalendarSetting, calendar_id)
+    if cal is None:
+        raise HTTPException(status_code=404, detail="calendar_not_found")
+    return cal
+
+
+def _resolve_target_or_404(session: Session, handle: str) -> User:
+    handle_norm = handle.lstrip("@").strip()
+    if not handle_norm:
+        raise HTTPException(status_code=400, detail="invalid_handle")
+    target = session.exec(
+        select(User).where(func.lower(User.handle) == handle_norm.lower())
+    ).first()
+    if target is None or target.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="target_user_not_found")
+    if not bool(getattr(target, "is_admin_managed", False)):
+        raise HTTPException(status_code=409, detail="target_not_admin_managed")
+    return target
+
+
+@router.get(
+    "/calendars/{calendar_id}/curation-rules",
+    response_model=list[CalendarCurationRuleResponse],
+)
+def list_calendar_curation_rules(
+    calendar_id: str,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+) -> list[CalendarCurationRuleResponse]:
+    _require_calendar(session, calendar_id)
+    rules = session.exec(
+        select(CalendarCurationRule)
+        .where(CalendarCurationRule.calendar_id == calendar_id)
+        .order_by(CalendarCurationRule.id)
+    ).all()
+    if not rules:
+        return []
+    target_ids = {r.target_user_id for r in rules}
+    users = session.exec(select(User).where(User.id.in_(target_ids))).all()
+    handles = {u.id: u.handle for u in users}
+    return [_serialize_rule(r, handles.get(r.target_user_id)) for r in rules]
+
+
+@router.post(
+    "/calendars/{calendar_id}/curation-rules",
+    response_model=CalendarCurationRuleResponse,
+)
+def create_calendar_curation_rule(
+    calendar_id: str,
+    payload: CalendarCurationRuleCreateRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+) -> CalendarCurationRuleResponse:
+    _require_calendar(session, calendar_id)
+    target = _resolve_target_or_404(session, payload.target_handle)
+    # Unique on (calendar_id, target, kind) — upsert-friendly: if a rule
+    # exists, mutate it (lets admin re-create after disabling).
+    existing = session.exec(
+        select(CalendarCurationRule).where(
+            CalendarCurationRule.calendar_id == calendar_id,
+            CalendarCurationRule.target_user_id == target.id,
+            CalendarCurationRule.kind == payload.kind,
+        )
+    ).first()
+    if existing is not None:
+        existing.audience = payload.audience
+        existing.enabled = payload.enabled
+        session.add(existing)
+        session.commit()
+        session.refresh(existing)
+        return _serialize_rule(existing, target.handle)
+    rule = CalendarCurationRule(
+        calendar_id=calendar_id,
+        target_user_id=target.id,
+        kind=payload.kind,
+        audience=payload.audience,
+        enabled=payload.enabled,
+    )
+    session.add(rule)
+    session.commit()
+    session.refresh(rule)
+    return _serialize_rule(rule, target.handle)
+
+
+@router.patch(
+    "/calendars/{calendar_id}/curation-rules/{rule_id}",
+    response_model=CalendarCurationRuleResponse,
+)
+def update_calendar_curation_rule(
+    calendar_id: str,
+    rule_id: int,
+    payload: CalendarCurationRuleUpdateRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+) -> CalendarCurationRuleResponse:
+    rule = session.get(CalendarCurationRule, rule_id)
+    if rule is None or rule.calendar_id != calendar_id:
+        raise HTTPException(status_code=404, detail="rule_not_found")
+    if "audience" in payload.model_fields_set:
+        rule.audience = payload.audience
+    if payload.enabled is not None:
+        rule.enabled = payload.enabled
+    session.add(rule)
+    session.commit()
+    session.refresh(rule)
+    target = session.get(User, rule.target_user_id)
+    return _serialize_rule(rule, target.handle if target else None)
+
+
+@router.delete(
+    "/calendars/{calendar_id}/curation-rules/{rule_id}",
+    status_code=204,
+)
+def delete_calendar_curation_rule(
+    calendar_id: str,
+    rule_id: int,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+) -> None:
+    rule = session.get(CalendarCurationRule, rule_id)
+    if rule is None or rule.calendar_id != calendar_id:
+        raise HTTPException(status_code=404, detail="rule_not_found")
+    session.delete(rule)
+    session.commit()

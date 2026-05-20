@@ -1,0 +1,57 @@
+# E9 needs a distinct Going footprint per friend so the leaderboard
+# ranking is deterministic. All events live in week 0 → period=7d, 30d
+# and 90d return the same ordering.
+base_week: 0
+calendars:
+  - id: salsa-cal-001
+  - id: bachata-cal-002
+events:
+  - id: evt-e9-001
+    calendar_id: salsa-cal-001
+    title: Salsa Social Friday
+    location: Dance Studio, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w0 Fri 21:00
+    end: w0 Sat 01:00
+    price_is_free: true
+  - id: evt-e9-002
+    calendar_id: bachata-cal-002
+    title: Bachata Workshop
+    location: Tanzhaus, Berlin, Germany
+    latitude: 52.52
+    longitude: 13.405
+    start: w0 Sat 14:00
+    end: w0 Sat 17:00
+    price_is_free: true
+  - id: evt-e9-003
+    calendar_id: salsa-cal-001
+    title: Cuban Night
+    location: Skybar, Brussels, Belgium
+    latitude: 50.8503
+    longitude: 4.3517
+    start: w0 Sun 20:00
+    end: w0 Mon 00:00
+    price_is_free: true
+attendances:
+  # alpha — 3 public
+  - { event_id: evt-e9-001, email: alpha@example.com, share_publicly: true }
+  - { event_id: evt-e9-002, email: alpha@example.com, share_publicly: true }
+  - { event_id: evt-e9-003, email: alpha@example.com, share_publicly: true }
+  # beta — 2 public
+  - { event_id: evt-e9-001, email: beta@example.com, share_publicly: true }
+  - { event_id: evt-e9-002, email: beta@example.com, share_publicly: true }
+  # delta — 1 friends-audience (still counts)
+  - {
+      event_id: evt-e9-003,
+      email: delta@example.com,
+      share_publicly: false,
+      share_audience: friends,
+    }
+  # gamma — 1 private (must NOT count on E9)
+  - {
+      event_id: evt-e9-001,
+      email: gamma@example.com,
+      share_publicly: false,
+      share_audience: private,
+    }

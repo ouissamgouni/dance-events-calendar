@@ -1,0 +1,5 @@
+# alpha follows viewer one-way so the Follow-back from viewer creates a
+# mutual edge during step 3 (hint must disappear after that).
+follows:
+  - follower: alpha
+    followee: viewer

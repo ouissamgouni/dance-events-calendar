@@ -74,15 +74,28 @@ interface PopoverPos { top: number; left: number; }
 /**
  * Compute fixed-position coordinates for a popover anchored under a trigger
  * element. Clamps horizontally to the viewport so cards near the right edge
- * don't push the popover off-screen.
+ * don't push the popover off-screen. When there isn't enough room below the
+ * trigger for ``popoverHeight``, flip ABOVE the trigger so the popover
+ * (which contains primary actions) is never clipped at the bottom of the
+ * viewport — a recurring problem on event cards near the page footer.
  */
-function computePopoverPos(trigger: HTMLElement, popoverWidth: number): PopoverPos {
+function computePopoverPos(
+    trigger: HTMLElement,
+    popoverWidth: number,
+    popoverHeight: number = 260,
+): PopoverPos {
     const r = trigger.getBoundingClientRect();
     const margin = 8;
     const desiredLeft = r.left + r.width / 2 - popoverWidth / 2;
     const maxLeft = window.innerWidth - popoverWidth - margin;
     const left = Math.max(margin, Math.min(desiredLeft, maxLeft));
-    return { top: r.bottom + 6, left };
+    const spaceBelow = window.innerHeight - r.bottom - margin;
+    const spaceAbove = r.top - margin;
+    const top =
+        spaceBelow >= popoverHeight || spaceBelow >= spaceAbove
+            ? r.bottom + 6
+            : Math.max(margin, r.top - popoverHeight - 6);
+    return { top, left };
 }
 
 const POPOVER_WIDTH = 272; // Tailwind w-68 equiv (matches className below).
@@ -169,18 +182,19 @@ export default function GoingButton({
         }
         if (user) {
             // Resolve default audience for this RSVP. Priority order:
-            //   1. ``audience.lastUsed.<user_id>`` localStorage hint
-            //      (Phase C — most recent explicit choice).
-            //   2. ``user.share_attendance_default_audience`` (the
+            //   1. ``user.share_attendance_default_audience`` (the
             //      account-level default; defaults to ``friends`` per
-            //      privacy-by-default — see User model).
+            //      privacy-by-default — see User model). When the user
+            //      explicitly set this in /account it MUST win over any
+            //      stale ``audience.lastUsed`` localStorage hint from
+            //      a previous one-off choice.
+            //   2. ``audience.lastUsed.<user_id>`` localStorage hint
+            //      (Phase C — last explicit per-event choice; only used
+            //      when the account-level default is unset).
             //   3. Legacy boolean fallback for very old payloads.
-            // Note: we use ``getLastUsedAudience`` (returns null when
-            // unset) rather than ``defaultAudienceFor`` so the account
-            // default actually wins when the user has no localStorage
-            // hint yet.
-            const defaultAudience: ShareAudience = getLastUsedAudience(user.user_id)
-                ?? user.share_attendance_default_audience
+            const defaultAudience: ShareAudience =
+                user.share_attendance_default_audience
+                ?? getLastUsedAudience(user.user_id)
                 ?? (user.share_attendance_default === false ? 'private' : 'friends');
             // Always RSVP immediately with the default audience — no extra
             // confirmation click. The post-RSVP popover surfaces an inline
@@ -246,21 +260,6 @@ export default function GoingButton({
         setPendingAudience(getAudience(eventId));
         setRememberDefault(false);
         setPopoverKind('edit');
-    };
-
-    const applyEditShare = (e: React.MouseEvent<HTMLButtonElement>) => {
-        e.stopPropagation();
-        errorToast.hide();
-        const audience = pendingAudience;
-        setPopoverKind(null);
-        setAudience(eventId, audience).then((ok) => {
-            if (ok) {
-                if (user?.user_id) setLastUsedAudience(user.user_id, audience);
-                persistRememberIfNeeded(audience);
-            } else {
-                errorToast.show("Couldn't update visibility \u2014 try again", 3200);
-            }
-        });
     };
 
     const iconSizeClass = size === 'sm' ? 'w-4 h-4' : 'w-5 h-5';
@@ -332,6 +331,29 @@ export default function GoingButton({
         />
     ) : null;
 
+    // Live-apply handler: in the ``edit`` flow every audience click writes
+    // through to the server immediately (no explicit Save button). The
+    // ``confirm`` flow still requires an explicit "I'm going" click since
+    // the RSVP itself hasn't happened yet.
+    const handlePopoverAudienceChange = (next: ShareAudience) => {
+        setPendingAudience(next);
+        if (popoverKind !== 'edit') return;
+        setAudience(eventId, next).then((ok) => {
+            if (!ok) {
+                errorToast.show("Couldn't update visibility \u2014 try again", 3200);
+                return;
+            }
+            if (user?.user_id) setLastUsedAudience(user.user_id, next);
+            // When the user has opted in to "make default", persist the new
+            // value as the account-level default too.
+            if (rememberDefault) {
+                updateMyVisibility({ share_attendance_default_audience: next })
+                    .then(() => refreshUser())
+                    .catch(() => { /* ignore */ });
+            }
+        });
+    };
+
     const popover = popoverKind && popoverPos && createPortal(
         <div
             ref={popoverRef}
@@ -349,7 +371,7 @@ export default function GoingButton({
             </p>
             <AudiencePicker
                 value={pendingAudience}
-                onChange={setPendingAudience}
+                onChange={handlePopoverAudienceChange}
                 size="full"
                 ariaLabel="Attendance visibility"
             />
@@ -362,13 +384,26 @@ export default function GoingButton({
             </p>
             {/* Only offer to save a new default when the user is editing
                  visibility on an existing attendance; in the initial confirm
-                 flow the preference is managed from /account. */}
+                 flow the preference is managed from /account. Toggling this
+                 ON also persists the current selection as the new default
+                 immediately, so the user doesn't have to re-pick. */}
             {popoverKind === 'edit' && (
                 <label className="mt-2 flex items-start gap-2 text-[11px] text-slate-600 cursor-pointer">
                     <input
                         type="checkbox"
                         checked={rememberDefault}
-                        onChange={(e) => setRememberDefault(e.target.checked)}
+                        onChange={(e) => {
+                            const checked = e.target.checked;
+                            setRememberDefault(checked);
+                            if (checked) {
+                                // Persist the currently-selected audience as
+                                // the account-level default right away so the
+                                // checkbox doesn't require an additional click.
+                                updateMyVisibility({ share_attendance_default_audience: pendingAudience })
+                                    .then(() => refreshUser())
+                                    .catch(() => { /* ignore */ });
+                            }
+                        }}
                         className="mt-0.5"
                     />
                     <span>Make this my default for future events</span>
@@ -395,20 +430,32 @@ export default function GoingButton({
                     <span />
                 )}
                 <div className="flex gap-2">
-                    <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); setPopoverKind(null); }}
-                        className="text-xs px-2 py-1 text-slate-600 hover:bg-slate-100"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        type="button"
-                        onClick={popoverKind === 'confirm' ? confirmGoing : applyEditShare}
-                        className="text-xs px-3 py-1 bg-emerald-600 text-white hover:bg-emerald-700"
-                    >
-                        {popoverKind === 'confirm' ? "I'm going" : 'Save'}
-                    </button>
+                    {popoverKind === 'confirm' ? (
+                        <>
+                            <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setPopoverKind(null); }}
+                                className="text-xs px-2 py-1 text-slate-600 hover:bg-slate-100"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={confirmGoing}
+                                className="text-xs px-3 py-1 bg-blue-500 text-white hover:bg-blue-600"
+                            >
+                                I'm going
+                            </button>
+                        </>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setPopoverKind(null); }}
+                            className="text-xs px-2 py-1 text-slate-600 hover:bg-slate-100"
+                        >
+                            Close
+                        </button>
+                    )}
                 </div>
             </div>
         </div>,

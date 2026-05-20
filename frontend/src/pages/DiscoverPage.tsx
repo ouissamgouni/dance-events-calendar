@@ -171,12 +171,13 @@ function UserGrid({ users }: { users: UserSearchResult[] }) {
                         >
                             {u.display_name || `@${u.handle}`}
                             {u.is_verified_organizer && (
-                                <span
-                                    className="ml-1 text-[10px] text-blue-600"
+                                <img
+                                    src="/orga.png"
+                                    alt=""
                                     title="Verified organizer"
-                                >
-                                    ✓
-                                </span>
+                                    aria-label="Verified organizer"
+                                    className="inline-block w-3.5 h-3.5 ml-1 align-middle object-contain"
+                                />
                             )}
                         </Link>
                         <div className="text-xs text-slate-500 truncate">

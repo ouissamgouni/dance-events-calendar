@@ -12,13 +12,23 @@
 
 /* ── Panel slide animations ────────────────────────── */
 @keyframes slide-up {
-  from { transform: translateY(100%); }
-  to   { transform: translateY(0); }
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
 }
 
 @keyframes slide-in-right {
-  from { transform: translateX(100%); }
-  to   { transform: translateX(0); }
+  from {
+    transform: translateX(100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
 }
 
 @utility animate-slide-up {
@@ -530,6 +540,15 @@ body {
   white-space: nowrap;
   align-self: center;
   padding-left: 2px;
+}
+
+.fc-event-promo-icon {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  align-self: center;
+  margin-right: 2px;
+  object-fit: contain;
 }
 
 .event-card-content {

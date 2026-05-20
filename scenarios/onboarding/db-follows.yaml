@@ -1,0 +1,10 @@
+# Pre-seed a couple of followers on the popular* accounts so they
+# qualify for the "most-followed" tail of the onboarding screen with
+# deterministic order (verified organizers always come first).
+follows:
+  - follower: admin
+    followee: pop1
+  - follower: admin
+    followee: pop2
+  - follower: pop3
+    followee: pop1

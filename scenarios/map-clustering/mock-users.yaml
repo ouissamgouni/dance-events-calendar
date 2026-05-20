@@ -1,0 +1,52 @@
+# Mock users for the map-clustering scenario.
+#
+# Cast mirrors the following-badge scenario so the cluster fixture
+# also exercises the friend / followed-not-friends pin overlays at
+# realistic densities. See db-follows.yaml for the relationships and
+# db-events.yaml `attendances:` / `saves:` for the per-event mix.
+users:
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin
+  # Mutual friends of bob — going at the hero event.
+  - { email: emma@example.com, name: Emma Larsen, handle: emma }
+  - { email: frank@example.com, name: Frank Dubois, handle: frank }
+  - { email: gina@example.com, name: Gina Costa, handle: gina }
+  - { email: hugo@example.com, name: Hugo Schmidt, handle: hugo }
+  # Mutual friends of bob — saving (not going) at the hero event.
+  - { email: nia@example.com, name: Nia Okafor, handle: nia }
+  - { email: omar@example.com, name: Omar Haddad, handle: omar }
+  # One-way followees: bob follows them, no follow-back.
+  - { email: pablo@example.com, name: Pablo Ortega, handle: pablo }
+  - { email: quinn@example.com, name: Quinn Walsh, handle: quinn }
+  - { email: rita@example.com, name: Rita Falk, handle: rita }
+  - { email: samir@example.com, name: Samir Patel, handle: samir }
+  - { email: tara@example.com, name: Tara Lindqvist, handle: tara }
+  - { email: ulysses@example.com, name: Ulysses Moreau, handle: ulysses }
+  # Strangers — bob does not follow them, they do not follow him.
+  - { email: s01@example.com, name: Stranger 01, handle: s01 }
+  - { email: s02@example.com, name: Stranger 02, handle: s02 }
+  - { email: s03@example.com, name: Stranger 03, handle: s03 }
+  - { email: s04@example.com, name: Stranger 04, handle: s04 }
+  - { email: s05@example.com, name: Stranger 05, handle: s05 }
+  - { email: s06@example.com, name: Stranger 06, handle: s06 }
+  - { email: s07@example.com, name: Stranger 07, handle: s07 }
+  - { email: s08@example.com, name: Stranger 08, handle: s08 }
+  - { email: s09@example.com, name: Stranger 09, handle: s09 }
+  - { email: s10@example.com, name: Stranger 10, handle: s10 }
+  - { email: t01@example.com, name: Saver 01, handle: t01 }
+  - { email: t02@example.com, name: Saver 02, handle: t02 }
+  - { email: t03@example.com, name: Saver 03, handle: t03 }
+  - { email: t04@example.com, name: Saver 04, handle: t04 }
+  - { email: t05@example.com, name: Saver 05, handle: t05 }
+  - { email: t06@example.com, name: Saver 06, handle: t06 }
+  - { email: t07@example.com, name: Saver 07, handle: t07 }
+  - { email: t08@example.com, name: Saver 08, handle: t08 }
+  - { email: t09@example.com, name: Saver 09, handle: t09 }
+  - { email: t10@example.com, name: Saver 10, handle: t10 }

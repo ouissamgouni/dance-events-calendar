@@ -16,9 +16,12 @@ from backend.db.models import (
     CalendarSetting,
     EventExport,
     EventLinkClick,
+    EventPromoCode,
     EventRating,
     EventTag,
     EventView,
+    OrganizerClaim,
+    OrganizerClaimEvent,
     SiteSetting,
     Tag,
     TagGroup,
@@ -103,6 +106,8 @@ class DatabaseSeeder:
         self._seed_attendances(scenario_dir / "db-events.yaml")
         self._seed_user_saved_events(scenario_dir / "db-events.yaml")
         self._seed_ratings(scenario_dir / "db-events.yaml")
+        self._seed_promo_codes(scenario_dir / "db-promo-codes.yaml")
+        self._seed_organizer_claims(scenario_dir / "db-organizer-claims.yaml")
         self._seed_site_settings(scenario_dir / "settings.yaml")
         self._ingest_test_plans(scenario_dir)
         self.session.commit()
@@ -667,6 +672,7 @@ class DatabaseSeeder:
                 "is_verified_organizer",
                 "instagram_url",
                 "facebook_url",
+                "bio",
             ):
                 if key in entry and entry[key] is not None:
                     user_kwargs[key] = entry[key]
@@ -712,6 +718,13 @@ class DatabaseSeeder:
             if not follower or not followee or follower.id == followee.id:
                 logger.warning("Skipping follow row: %r", entry)
                 continue
+            # Phase E (E8): optional ``status`` (approved|pending). Defaults
+            # to ``approved`` to preserve legacy seed behaviour. Pending rows
+            # are used by the friend-requests scenario to pre-seed an
+            # inbound request without hand-clicking.
+            status = entry.get("status", "approved")
+            if status not in ("approved", "pending"):
+                status = "approved"
             existing = self.session.exec(
                 select(UserFollow).where(
                     UserFollow.follower_id == follower.id,
@@ -721,9 +734,18 @@ class DatabaseSeeder:
             if existing:
                 continue
             self.session.add(
-                UserFollow(follower_id=follower.id, followee_id=followee.id)
+                UserFollow(
+                    follower_id=follower.id,
+                    followee_id=followee.id,
+                    status=status,
+                )
             )
-            logger.info("Created mock follow: %s -> %s", follower.email, followee.email)
+            logger.info(
+                "Created mock follow: %s -> %s (%s)",
+                follower.email,
+                followee.email,
+                status,
+            )
 
     def _seed_tracking(self, path: Path) -> None:
         """Seed EventView, EventLinkClick, and EventExport rows from db-tracking.yaml.
@@ -1052,3 +1074,205 @@ class DatabaseSeeder:
             seeded += 1
         if seeded:
             logger.info("Seeded %d EventRating rows", seeded)
+
+    def _seed_promo_codes(self, path: Path) -> None:
+        """Pre-seed EventPromoCode rows from db-promo-codes.yaml.
+
+        Each entry can specify:
+          - event_id (required)
+          - submitter_email (required — must exist in mock-users.yaml)
+          - code (required)
+          - description (optional)
+          - source_url (optional)
+          - expires_at (optional, ISO datetime)
+          - status: pending | approved | rejected (default pending)
+          - admin_notes (optional)
+        Idempotent: skips when a row with the same
+        ``(event_id, lower(code))`` already exists.
+        """
+        if not path.exists():
+            return
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+        rows = data.get("promo_codes") or []
+        if not rows:
+            return
+
+        seeded = 0
+        for entry in rows:
+            if not isinstance(entry, dict):
+                continue
+            event_id = entry.get("event_id")
+            code = entry.get("code")
+            email = (entry.get("submitter_email") or "").strip().lower() or None
+            if not event_id or not code or not email:
+                continue
+            user = self.session.exec(select(User).where(User.email == email)).first()
+            if not user:
+                logger.warning("Skipping promo code: submitter %s not found", email)
+                continue
+            existing = self.session.exec(
+                select(EventPromoCode).where(
+                    EventPromoCode.event_id == event_id,
+                    EventPromoCode.code == code,
+                )
+            ).first()
+            if existing:
+                continue
+            status = entry.get("status") or "pending"
+            now = datetime.utcnow()
+            expires_at_raw = entry.get("expires_at")
+            expires_at = None
+            if expires_at_raw:
+                if isinstance(expires_at_raw, datetime):
+                    expires_at = expires_at_raw
+                else:
+                    try:
+                        expires_at = datetime.fromisoformat(str(expires_at_raw))
+                    except ValueError:
+                        logger.warning(
+                            "Bad expires_at %r on promo code %s", expires_at_raw, code
+                        )
+            self.session.add(
+                EventPromoCode(
+                    event_id=event_id,
+                    code=code,
+                    description=entry.get("description"),
+                    source_url=entry.get("source_url"),
+                    expires_at=expires_at,
+                    submitter_user_id=user.id,
+                    status=status,
+                    admin_notes=entry.get("admin_notes"),
+                    reviewed_at=now if status != "pending" else None,
+                    reviewed_by=("seed" if status != "pending" else None),
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+            seeded += 1
+        if seeded:
+            logger.info("Seeded %d EventPromoCode rows", seeded)
+
+    def _seed_organizer_claims(self, path: Path) -> None:
+        """Pre-seed OrganizerClaim + OrganizerClaimEvent rows from
+        db-organizer-claims.yaml.
+
+        Each entry:
+          - submitter_email (required)
+          - kind: ``"badge"`` (default) or ``"events"``
+          - grant_badge (badge claims: default true; events: ignored)
+          - status (default pending)
+          - admin_notes (optional)
+          - events: list of {event_id, decision} (required for kind=events;
+            ignored for kind=badge)
+        On approved decisions, the corresponding
+        ``cached_events.organizer_user_id`` is set + the user's
+        ``is_verified_organizer`` flag is flipped on (badge claims with
+        status=approved + grant_badge=true).
+        Idempotent: skips a claim if one already exists for that user
+        of the same kind whose set of event_ids matches exactly.
+        """
+        if not path.exists():
+            return
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+        rows = data.get("organizer_claims") or []
+        if not rows:
+            return
+
+        seeded = 0
+        for entry in rows:
+            if not isinstance(entry, dict):
+                continue
+            email = (entry.get("submitter_email") or "").strip().lower() or None
+            if not email:
+                continue
+            kind = (entry.get("kind") or "badge").lower()
+            if kind not in ("badge", "events"):
+                logger.warning("Skipping organizer claim: unknown kind %s", kind)
+                continue
+            event_entries = entry.get("events") or [] if kind == "events" else []
+            user = self.session.exec(select(User).where(User.email == email)).first()
+            if not user:
+                logger.warning("Skipping organizer claim: user %s not found", email)
+                continue
+            event_ids = sorted(
+                str(ev.get("event_id"))
+                for ev in event_entries
+                if isinstance(ev, dict) and ev.get("event_id")
+            )
+            if kind == "events" and not event_ids:
+                continue
+            existing_claims = self.session.exec(
+                select(OrganizerClaim)
+                .where(OrganizerClaim.user_id == user.id)
+                .where(OrganizerClaim.kind == kind)
+            ).all()
+            duplicate = False
+            for c in existing_claims:
+                rows_existing = self.session.exec(
+                    select(OrganizerClaimEvent).where(
+                        OrganizerClaimEvent.claim_id == c.id
+                    )
+                ).all()
+                if sorted(r.event_id for r in rows_existing) == event_ids:
+                    duplicate = True
+                    break
+            if duplicate:
+                continue
+
+            status = entry.get("status") or "pending"
+            grant_badge = bool(
+                entry.get("grant_badge", True if kind == "badge" else False)
+            )
+            now = datetime.utcnow()
+            claim = OrganizerClaim(
+                user_id=user.id,
+                kind=kind,
+                grant_badge=grant_badge,
+                status=status,
+                admin_notes=entry.get("admin_notes"),
+                reviewed_at=now if status != "pending" else None,
+                reviewed_by=("seed" if status != "pending" else None),
+                created_at=now,
+                updated_at=now,
+            )
+            self.session.add(claim)
+            self.session.flush()
+
+            granted_event_ids: list[str] = []
+            for ev in event_entries:
+                if not isinstance(ev, dict):
+                    continue
+                event_id = ev.get("event_id")
+                if not event_id:
+                    continue
+                decision = ev.get("decision") or "pending"
+                self.session.add(
+                    OrganizerClaimEvent(
+                        claim_id=claim.id,
+                        event_id=event_id,
+                        decision=decision,
+                        created_at=now,
+                    )
+                )
+                if decision == "approved":
+                    granted_event_ids.append(event_id)
+
+            if granted_event_ids:
+                cached_rows = self.session.exec(
+                    select(CachedEvent).where(
+                        CachedEvent.event_id.in_(granted_event_ids)
+                    )
+                ).all()
+                for cev in cached_rows:
+                    cev.organizer_user_id = user.id
+                    self.session.add(cev)
+
+            if kind == "badge" and grant_badge and status == "approved":
+                user.is_verified_organizer = True
+                self.session.add(user)
+
+            seeded += 1
+        if seeded:
+            logger.info("Seeded %d OrganizerClaim rows", seeded)

@@ -1,0 +1,21 @@
+# Pre-seeded promo codes for the Promo Codes scenario.
+# Each entry references an event from db-events.yaml and a submitter
+# from mock-users.yaml. Statuses cover the three admin tabs.
+promo_codes:
+  - event_id: evt-promo-001
+    submitter_email: submitter@example.com
+    code: EARLYBIRD
+    description: 10% off until door close
+    source_url: https://example.com/early-bird
+    status: approved
+  - event_id: evt-promo-001
+    submitter_email: dev-user@example.com
+    code: NEEDREVIEW
+    description: Pending admin review
+    status: pending
+  - event_id: evt-promo-002
+    submitter_email: submitter@example.com
+    code: SPAMCODE
+    description: spammy text buy crypto now
+    status: rejected
+    admin_notes: Spam content.

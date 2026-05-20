@@ -1,0 +1,5 @@
+# viewer follows alpha one-way at start. alpha follows viewer back in
+# step 2 → the mutual-edge completes → new_friend notification fires.
+follows:
+  - follower: viewer
+    followee: alpha

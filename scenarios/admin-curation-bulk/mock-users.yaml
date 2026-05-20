@@ -1,0 +1,19 @@
+# Admin-curated lists (Phase 2) — bulk on-demand curation.
+#
+# Cast:
+#   - admin           — the site admin (ADMIN_EMAIL) who performs curation.
+#   - curator-paris   — admin-managed puppet account; receives curated rows.
+#   - alice           — regular viewer who sees the curated profile.
+users:
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin
+    account_visibility: public
+  - email: curator-paris@example.com
+    name: Paris Salsa Curator
+    handle: curator-paris
+    account_visibility: public
+  - email: alice@example.com
+    name: Alice Viewer
+    handle: alice
+    account_visibility: public

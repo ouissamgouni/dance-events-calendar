@@ -1,0 +1,11 @@
+# Mutual follow edges between viewer and each of alpha/beta/delta/gamma
+# so the leaderboard renders on first load (no pre-test setup steps).
+follows:
+  - { follower: viewer, followee: alpha }
+  - { follower: alpha, followee: viewer }
+  - { follower: viewer, followee: beta }
+  - { follower: beta, followee: viewer }
+  - { follower: viewer, followee: delta }
+  - { follower: delta, followee: viewer }
+  - { follower: viewer, followee: gamma }
+  - { follower: gamma, followee: viewer }

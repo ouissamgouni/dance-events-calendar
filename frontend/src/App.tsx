@@ -18,6 +18,7 @@ import NotificationBell from './components/NotificationBell';
 import HeaderUserMenu from './components/HeaderUserMenu';
 import ProtectedRoute from './components/ProtectedRoute';
 import SignUpBanner from './components/SignUpBanner';
+import ShareReferralBanner from './components/ShareReferralBanner';
 import FloatingMineButton from './components/FloatingMineButton';
 import Home from './pages/Home';
 import Admin from './pages/Admin';
@@ -30,6 +31,9 @@ import ProfilePage from './pages/ProfilePage';
 import DiscoverPage from './pages/DiscoverPage';
 import SharedCalendarPage from './pages/SharedCalendarPage';
 import Privacy from './pages/Privacy';
+import OnboardingFollow from './pages/OnboardingFollow';
+import ReferralLanding from './pages/ReferralLanding';
+import OnboardingGate from './components/OnboardingGate';
 import UserSearchBox from './components/UserSearchBox';
 import { useConsent } from './context/ConsentContext';
 import { umamiPageView } from './utils/umami';
@@ -99,9 +103,13 @@ function AppShell() {
             </div>
           </div>
           <SignUpBanner />
+          <ShareReferralBanner />
+          <OnboardingGate />
           <main className="flex-1 overflow-auto">
             <Routes>
               <Route path="/" element={<Home />} />
+              <Route path="/onboarding/follow" element={<OnboardingFollow />} />
+              <Route path="/r/:code" element={<ReferralLanding />} />
               <Route path="/calendar" element={<Home />} />
               <Route path="/event/:eventId" element={<EventDetailPage />} />
               <Route path="/my-calendar" element={<MyCalendar />} />

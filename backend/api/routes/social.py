@@ -13,6 +13,7 @@ Privacy notes:
 """
 
 from datetime import datetime, timedelta
+import os
 from typing import Optional
 from uuid import UUID
 
@@ -39,18 +40,29 @@ from backend.api.schemas import (
     AdminUser,
     AdminUserListResponse,
     CalendarSubscriptionRequest,
+    CompleteOnboardingRequest,
+    CompleteOnboardingResponse,
+    FoFSuggestionItem,
+    FoFSuggestionsResponse,
     FollowActionResponse,
     FollowListResponse,
     FollowNotifyRequest,
+    FollowRequestItem,
+    FollowRequestListResponse,
     FollowUserResponse,
     FriendsLeaderboardEntry,
     FriendsLeaderboardResponse,
+    InterestSummaryItem,
+    InterestSummaryResponse,
     MutualSubscriberPreview,
     NotificationActor,
+    OnboardingSuggestionsResponse,
     ProfileCalendarItem,
     ProfileCalendarResponse,
     ProfileEventListResponse,
     PublicProfileResponse,
+    ReferralResponse,
+    ShareSourceResponse,
     SubscribedEventItem,
     SubscribedEventListResponse,
     SubscribedEventVia,
@@ -75,16 +87,35 @@ from backend.db.models import (
     User,
     UserEventAttendance,
     UserFollow,
+    UserReferral,
     UserSavedEvent,
 )
-from backend.services.notifications import notify_new_follower, notify_new_friend
-from backend.config.loader import get_admin_email
+from backend.services.notifications import (
+    discard_follow_request_notification,
+    notify_follow_request,
+    notify_follow_request_approved,
+    notify_new_follower,
+    notify_new_friend,
+)
+from backend.api.deps import get_admin_user_id, is_admin_user
 
 router = APIRouter(prefix="/api/social", tags=["social"])
 limiter = Limiter(key_func=client_ip)
 
 
 # --- Helpers ----------------------------------------------------------------
+
+
+def _friend_requests_enabled() -> bool:
+    """Phase E (E8): is the friend-request flow active?
+
+    Controlled by the ``FEATURE_FRIEND_REQUESTS`` env var. Defaults to
+    "true" so dev/test environments exercise the flow without
+    additional config; production opts in by leaving the variable
+    unset-or-"true" and out by setting it to "false"/"0".
+    """
+    raw = os.environ.get("FEATURE_FRIEND_REQUESTS", "true").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
 
 
 def _resolve_handle(session: Session, handle: str) -> User:
@@ -101,9 +132,12 @@ def _resolve_handle(session: Session, handle: str) -> User:
 
 
 def _followers_count(session: Session, user_id: UUID) -> int:
+    # Phase E (E8): pending follow-requests don't count as followers.
     return int(
         session.exec(
-            select(func.count(UserFollow.id)).where(UserFollow.followee_id == user_id)
+            select(func.count(UserFollow.id))
+            .where(UserFollow.followee_id == user_id)
+            .where(UserFollow.status == "approved")
         ).one()
     )
 
@@ -120,9 +154,12 @@ def _subscribers_count(session: Session, user_id: UUID) -> int:
 
 
 def _following_count(session: Session, user_id: UUID) -> int:
+    # Phase E (E8): pending follow-requests don't count as following.
     return int(
         session.exec(
-            select(func.count(UserFollow.id)).where(UserFollow.follower_id == user_id)
+            select(func.count(UserFollow.id))
+            .where(UserFollow.follower_id == user_id)
+            .where(UserFollow.status == "approved")
         ).one()
     )
 
@@ -139,6 +176,8 @@ def _friend_count(session: Session, user_id: UUID) -> int:
             (f2.follower_id == f1.followee_id) & (f2.followee_id == f1.follower_id),
         )
         .where(f1.follower_id == user_id)
+        .where(f1.status == "approved")
+        .where(f2.status == "approved")
     )
     return int(session.exec(sub).one())
 
@@ -243,6 +282,8 @@ def _mutual_friends_count(session: Session, viewer_id: UUID, owner_id: UUID) -> 
             (fv2.follower_id == fv1.followee_id) & (fv2.followee_id == fv1.follower_id),
         )
         .where(fv1.follower_id == viewer_id)
+        .where(fv1.status == "approved")
+        .where(fv2.status == "approved")
     )
     fo1 = aliased(UserFollow)
     fo2 = aliased(UserFollow)
@@ -253,6 +294,8 @@ def _mutual_friends_count(session: Session, viewer_id: UUID, owner_id: UUID) -> 
             (fo2.follower_id == fo1.followee_id) & (fo2.followee_id == fo1.follower_id),
         )
         .where(fo1.follower_id == owner_id)
+        .where(fo1.status == "approved")
+        .where(fo2.status == "approved")
     )
     vsub = viewer_friends.subquery()
     osub = owner_friends.subquery()
@@ -286,10 +329,14 @@ def _mutual_friends_who_follow(
             (fv2.follower_id == fv1.followee_id) & (fv2.followee_id == fv1.follower_id),
         )
         .where(fv1.follower_id == viewer_id)
+        .where(fv1.status == "approved")
+        .where(fv2.status == "approved")
     ).subquery()
-    # Followers of organizer.
+    # Followers of organizer (approved only; pending requests don't count).
     organizer_followers = (
-        select(UserFollow.follower_id).where(UserFollow.followee_id == organizer_id)
+        select(UserFollow.follower_id)
+        .where(UserFollow.followee_id == organizer_id)
+        .where(UserFollow.status == "approved")
     ).subquery()
     rows = session.exec(
         select(func.count()).select_from(
@@ -349,6 +396,103 @@ def _list_users(
 # --- Public profile ----------------------------------------------------------
 
 
+@router.get(
+    "/users/interest-summary",
+    response_model=InterestSummaryResponse,
+)
+@limiter.limit("60/minute")
+def users_interest_summary(
+    request: Request,
+    handles: list[str] = Query(
+        ...,
+        description=(
+            "Up to 50 @handles to summarise. Unknown / deleted handles "
+            "silently return zeros — never 404 — to avoid leaking "
+            "account existence."
+        ),
+    ),
+    session: Session = Depends(get_session),
+    viewer: User | None = Depends(get_current_user_optional),
+):
+    """Per-handle upcoming visible-activity counts for the picker.
+
+    Counts only rows that ``viewer`` is allowed to see (per-row audience
+    check via ``_audience_passes``; account-level ``can_view`` gates the
+    owner up front). Anonymous viewers see only public-audience rows on
+    public profiles. Handles past the 50-cap are silently dropped to
+    keep the response bounded.
+
+    IMPORTANT: Must be declared BEFORE ``/users/{handle}`` so FastAPI's
+    route matcher does not greedily capture "interest-summary" as a
+    handle path-param (which would 404 the request).
+    """
+    # Normalise + dedupe + cap. Empty / whitespace handles are skipped.
+    seen: list[str] = []
+    seen_set: set[str] = set()
+    for raw in handles:
+        h = (raw or "").strip().lstrip("@").lower()
+        if not h or h in seen_set:
+            continue
+        seen_set.add(h)
+        seen.append(h)
+        if len(seen) >= 50:
+            break
+    if not seen:
+        return InterestSummaryResponse(items=[])
+
+    users = session.exec(
+        select(User)
+        .where(func.lower(User.handle).in_(seen))
+        .where(User.deleted_at.is_(None))
+    ).all()
+    user_by_handle: dict[str, User] = {(u.handle or "").lower(): u for u in users}
+
+    now = datetime.utcnow()
+    items: list[InterestSummaryItem] = []
+    for h in seen:
+        owner = user_by_handle.get(h)
+        if owner is None or not can_view(session, viewer, owner):
+            items.append(InterestSummaryItem(handle=h))
+            continue
+
+        going_rows = session.exec(
+            select(
+                UserEventAttendance.event_id,
+                UserEventAttendance.share_audience,
+            )
+            .join(CachedEvent, CachedEvent.event_id == UserEventAttendance.event_id)
+            .where(UserEventAttendance.user_id == owner.id)
+            .where(CachedEvent.start >= now)
+            .where(CachedEvent.deleted_at.is_(None))
+        ).all()
+        saved_rows = session.exec(
+            select(UserSavedEvent.event_id, UserSavedEvent.audience)
+            .join(CachedEvent, CachedEvent.event_id == UserSavedEvent.event_id)
+            .where(UserSavedEvent.user_id == owner.id)
+            .where(CachedEvent.start >= now)
+            .where(CachedEvent.deleted_at.is_(None))
+        ).all()
+
+        going_visible = sum(
+            1
+            for _eid, audience in going_rows
+            if _audience_passes(session, viewer, owner, audience or "private")
+        )
+        saved_visible = sum(
+            1
+            for _eid, audience in saved_rows
+            if _audience_passes(session, viewer, owner, audience or "private")
+        )
+        items.append(
+            InterestSummaryItem(
+                handle=h,
+                upcoming_going_visible=going_visible,
+                upcoming_saved_visible=saved_visible,
+            )
+        )
+    return InterestSummaryResponse(items=items)
+
+
 @router.get("/users/{handle}", response_model=PublicProfileResponse)
 def get_public_profile(
     handle: str,
@@ -366,22 +510,29 @@ def get_public_profile(
     is_following = False
     follows_you = False
     is_friend = False
+    follow_status = "approved"
     if viewer is not None and not is_self:
-        is_following = (
-            session.exec(
-                select(UserFollow.id).where(
-                    (UserFollow.follower_id == viewer.id)
-                    & (UserFollow.followee_id == target.id)
-                )
-            ).first()
-            is not None
-        )
+        # Phase E (E8): the visible "Following" state requires an
+        # approved edge; a pending follow-request shows as
+        # ``follow_status='pending'`` with ``is_following=False`` so the
+        # UI renders the "Requested" button.
+        forward = session.exec(
+            select(UserFollow).where(
+                (UserFollow.follower_id == viewer.id)
+                & (UserFollow.followee_id == target.id)
+            )
+        ).first()
+        if forward is not None:
+            if forward.status == "approved":
+                is_following = True
+            else:
+                follow_status = "pending"
         follows_you = (
             session.exec(
-                select(UserFollow.id).where(
-                    (UserFollow.follower_id == target.id)
-                    & (UserFollow.followee_id == viewer.id)
-                )
+                select(UserFollow.id)
+                .where(UserFollow.follower_id == target.id)
+                .where(UserFollow.followee_id == viewer.id)
+                .where(UserFollow.status == "approved")
             ).first()
             is not None
         )
@@ -416,6 +567,7 @@ def get_public_profile(
         display_name=target.display_name,
         avatar_url=target.avatar_url,
         is_verified_organizer=target.is_verified_organizer,
+        is_admin_managed=bool(target.is_admin_managed),
         instagram_url=target.instagram_url,
         facebook_url=target.facebook_url,
         bio=target.bio,
@@ -428,6 +580,7 @@ def get_public_profile(
         is_following=is_following,
         follows_you=follows_you,
         is_friend=is_friend,
+        follow_status=follow_status,
         account_visibility=target.account_visibility,
         friend_count=_friend_count(session, target.id),
         mutual_friend_count=(
@@ -477,9 +630,66 @@ def follow_user(
         )
     ).first()
     is_new_follow = existing is None
+
+    # Phase E (E8): friend-request gate. When the target's account is
+    # ``friends``-only AND the viewer is not already an approved
+    # follower in the reverse direction (which would auto-approve via
+    # follow-back semantics), create a *pending* edge that grants no
+    # visibility until the target approves it.
+    reverse_already = (
+        session.exec(
+            select(UserFollow.id)
+            .where(UserFollow.follower_id == target.id)
+            .where(UserFollow.followee_id == viewer.id)
+            .where(UserFollow.status == "approved")
+        ).first()
+        is not None
+    )
+    requires_approval = (
+        _friend_requests_enabled()
+        and getattr(target, "account_visibility", "public") == "friends"
+        and not reverse_already
+    )
+    if existing is not None and existing.status == "pending" and not requires_approval:
+        # Visibility relaxed between request and now: auto-approve.
+        existing.status = "approved"
+        session.add(existing)
+        is_new_follow = True  # treat as a fresh approved follow for side effects
     if is_new_follow:
-        session.add(UserFollow(follower_id=viewer.id, followee_id=target.id))
+        new_status = "pending" if requires_approval else "approved"
+        if existing is None:
+            session.add(
+                UserFollow(
+                    follower_id=viewer.id,
+                    followee_id=target.id,
+                    status=new_status,
+                )
+            )
+        if new_status == "pending":
+            notify_follow_request(session, target=target, requester=viewer)
+            session.commit()
+            return FollowActionResponse(
+                handle=target.handle or "",
+                is_following=False,
+                is_friend=False,
+                followers_count=_followers_count(session, target.id),
+                is_subscribed=False,
+                notify_new_events=False,
+                follow_status="pending",
+            )
         notify_new_follower(session, followee=target, follower=viewer)
+    elif existing is not None and existing.status == "pending":
+        # Still pending (target still friends-only, no reverse follow).
+        # Idempotent re-request: just return the pending status.
+        return FollowActionResponse(
+            handle=target.handle or "",
+            is_following=False,
+            is_friend=False,
+            followers_count=_followers_count(session, target.id),
+            is_subscribed=False,
+            notify_new_events=False,
+            follow_status="pending",
+        )
     # Phase B: Follow now implies Subscribe-to-calendar so the social graph
     # produces actual user-facing value (notifications + feed inclusion).
     # Idempotent: if a subscription already exists we leave its
@@ -528,6 +738,7 @@ def follow_user(
         followers_count=_followers_count(session, target.id),
         is_subscribed=sub_after is not None,
         notify_new_events=bool(sub_after.notify_new_events) if sub_after else False,
+        follow_status="approved",
     )
 
 
@@ -552,7 +763,15 @@ def unfollow_user(
         )
     ).first()
     if existing is not None:
+        was_pending = existing.status == "pending"
         session.delete(existing)
+        if was_pending:
+            # Phase E (E8): also clear the pending request notification
+            # so the target's inbox doesn't keep a dangling "wants to
+            # follow you" entry after the requester rescinds.
+            discard_follow_request_notification(
+                session, target_id=target.id, requester_id=viewer.id
+            )
     # Phase B: unfollow also drops the implied calendar subscription so
     # the user stops receiving notifications and feed entries.
     sub = _get_subscription(session, viewer.id, target.id)
@@ -566,6 +785,7 @@ def unfollow_user(
         followers_count=_followers_count(session, target.id),
         is_subscribed=False,
         notify_new_events=False,
+        follow_status="approved",
     )
 
 
@@ -597,6 +817,10 @@ def set_follow_notify(
     ).first()
     if follow is None:
         raise HTTPException(status_code=404, detail="Not following")
+    # Phase E (E8): the implied calendar subscription only exists for
+    # approved follows; pending requests cannot toggle the bell.
+    if follow.status != "approved":
+        raise HTTPException(status_code=404, detail="Not following")
     sub = _get_subscription(session, viewer.id, target.id)
     if sub is None:
         # Re-create the implied subscription if it was somehow lost (e.g.
@@ -621,6 +845,147 @@ def set_follow_notify(
         is_subscribed=True,
         notify_new_events=bool(sub.notify_new_events),
     )
+
+
+# --- Phase E (E8): Follow requests -----------------------------------------
+
+
+@router.get(
+    "/me/follow-requests",
+    response_model=FollowRequestListResponse,
+)
+@limiter.limit("60/hour")
+def list_follow_requests(
+    request: Request,
+    session: Session = Depends(get_session),
+    viewer: User = Depends(require_user),
+):
+    """Return the viewer's inbound pending follow-requests, newest first.
+
+    Empty list (not 404) when the feature flag is off or there are no
+    pending rows — the inbox UI just hides the section.
+    """
+    rows = session.exec(
+        select(UserFollow, User)
+        .join(User, User.id == UserFollow.follower_id)
+        .where(UserFollow.followee_id == viewer.id)
+        .where(UserFollow.status == "pending")
+        .where(User.deleted_at.is_(None))
+        .order_by(UserFollow.created_at.desc())
+    ).all()
+    items = [
+        FollowRequestItem(
+            handle=u.handle or "",
+            display_name=u.display_name,
+            avatar_url=u.avatar_url,
+            requested_at=f.created_at,
+        )
+        for (f, u) in rows
+    ]
+    return FollowRequestListResponse(items=items)
+
+
+@router.post(
+    "/me/follow-requests/{handle}/approve",
+    response_model=FollowActionResponse,
+)
+@limiter.limit("60/hour")
+def approve_follow_request(
+    request: Request,
+    handle: str,
+    session: Session = Depends(get_session),
+    viewer: User = Depends(require_user),
+):
+    """Approve a pending follow-request targeting the viewer.
+
+    Promotes the row to ``status='approved'``, runs the full set of
+    side-effects an immediate follow would have produced (implied
+    calendar subscription, new_follower notification, reverse
+    subscription + new_friend if the approval creates mutuality), and
+    deletes the pending ``follow_request`` inbox row.
+    """
+    requester = _resolve_handle(session, handle)
+    follow = session.exec(
+        select(UserFollow)
+        .where(UserFollow.follower_id == requester.id)
+        .where(UserFollow.followee_id == viewer.id)
+        .where(UserFollow.status == "pending")
+    ).first()
+    if follow is None:
+        raise HTTPException(status_code=404, detail="No pending request")
+    follow.status = "approved"
+    session.add(follow)
+    session.flush()  # make status visible to is_mutual_follow
+    # Implied calendar subscription for the requester (mirrors the
+    # follow_user flow which creates this on the approved path).
+    sub = _get_subscription(session, requester.id, viewer.id)
+    if sub is None:
+        session.add(
+            CalendarSubscription(
+                subscriber_id=requester.id,
+                target_user_id=viewer.id,
+                notify_new_events=True,
+            )
+        )
+    is_friend = is_mutual_follow(session, requester.id, viewer.id)
+    if is_friend:
+        reverse_sub = _get_subscription(session, viewer.id, requester.id)
+        if reverse_sub is None:
+            session.add(
+                CalendarSubscription(
+                    subscriber_id=viewer.id,
+                    target_user_id=requester.id,
+                    notify_new_events=True,
+                )
+            )
+        notify_new_friend(session, user_a=viewer, user_b=requester)
+    # Notify the requester that their request was approved (not the approver).
+    notify_follow_request_approved(session, requester=requester, approver=viewer)
+    discard_follow_request_notification(
+        session, target_id=viewer.id, requester_id=requester.id
+    )
+    session.commit()
+    return FollowActionResponse(
+        handle=requester.handle or "",
+        is_following=False,  # the viewer doesn't auto-follow back
+        is_friend=is_friend,
+        followers_count=_followers_count(session, viewer.id),
+        is_subscribed=False,
+        notify_new_events=False,
+        follow_status="approved",
+    )
+
+
+@router.post(
+    "/me/follow-requests/{handle}/decline",
+    status_code=204,
+)
+@limiter.limit("60/hour")
+def decline_follow_request(
+    request: Request,
+    handle: str,
+    session: Session = Depends(get_session),
+    viewer: User = Depends(require_user),
+):
+    """Decline a pending follow-request. Deletes the UserFollow row and
+    the inbox notification. Per the product spec we do NOT tell the
+    requester they were declined.
+    """
+    requester = _resolve_handle(session, handle)
+    follow = session.exec(
+        select(UserFollow)
+        .where(UserFollow.follower_id == requester.id)
+        .where(UserFollow.followee_id == viewer.id)
+        .where(UserFollow.status == "pending")
+    ).first()
+    if follow is None:
+        raise HTTPException(status_code=404, detail="No pending request")
+    session.delete(follow)
+    discard_follow_request_notification(
+        session, target_id=viewer.id, requester_id=requester.id
+    )
+    session.commit()
+    return None
 
 
 # --- Followers / Following / Friends listings --------------------------------
@@ -691,12 +1056,62 @@ def list_my_followers(
 def list_my_following(
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    q: Optional[str] = Query(
+        default=None,
+        description=(
+            "Optional case-insensitive substring filter on handle and "
+            "display_name. Friends (mutual followers) are returned first; "
+            "remaining matches follow in display-name order."
+        ),
+    ),
     session: Session = Depends(get_session),
     viewer: User = Depends(require_user),
 ):
-    """Authenticated viewer's own following list."""
+    """Authenticated viewer's own following list.
+
+    When ``q`` is supplied, results are restricted to followees whose
+    handle or display_name contains the substring (case-insensitive).
+    Friends (mutual followers) are sorted ahead of one-way followees
+    regardless of the search filter — this powers the interest picker's
+    "friends first" ordering.
+    """
     sub = select(UserFollow.followee_id).where(UserFollow.follower_id == viewer.id)
-    return _list_users(session, sub, viewer, limit, offset)
+    # Friend ids = followees who also follow back (approved). Used to
+    # rank friends ahead of one-way follows in the picker.
+    fv1 = aliased(UserFollow)
+    fv2 = aliased(UserFollow)
+    friend_ids_sub = (
+        select(fv1.followee_id)
+        .join(
+            fv2,
+            (fv2.follower_id == fv1.followee_id) & (fv2.followee_id == fv1.follower_id),
+        )
+        .where(fv1.follower_id == viewer.id)
+    )
+    base_query = select(User).where(User.id.in_(sub)).where(User.deleted_at.is_(None))
+    if q:
+        needle = f"%{q.strip().lower()}%"
+        base_query = base_query.where(
+            func.lower(User.handle).like(needle)
+            | func.lower(User.display_name).like(needle)
+        )
+    total = int(
+        session.exec(select(func.count()).select_from(base_query.subquery())).one()
+    )
+    # Sort: friends first (in_ → bool desc), then display name / handle.
+    rows = session.exec(
+        base_query.order_by(
+            User.id.in_(friend_ids_sub).desc(),
+            User.display_name.asc(),
+            User.handle.asc(),
+        )
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    return FollowListResponse(
+        items=[_to_follow_user(session, viewer.id, u) for u in rows],
+        total=total,
+    )
 
 
 @router.delete("/me/followers/{handle}", status_code=204)
@@ -1149,11 +1564,22 @@ def list_user_going(
     page, total = _hydrate_profile_events(
         session, event_ids, include_past=include_past, limit=limit, offset=offset
     )
+    page_ids = [ev.event_id for ev in page]
+    curated_ids: list[str] = []
+    if page_ids:
+        curated_rows = session.exec(
+            select(UserEventAttendance.event_id)
+            .where(UserEventAttendance.user_id == target.id)
+            .where(UserEventAttendance.event_id.in_(page_ids))
+            .where(UserEventAttendance.created_by_admin_user_id.is_not(None))
+        ).all()
+        curated_ids = [eid for eid in curated_rows if eid]
     return ProfileEventListResponse(
         items=serialize_events(session, page),
         total=total,
         limit=limit,
         offset=offset,
+        curated_event_ids=curated_ids,
     )
 
 
@@ -1196,11 +1622,22 @@ def list_user_saved(
     page, total = _hydrate_profile_events(
         session, event_ids, include_past=False, limit=limit, offset=offset
     )
+    page_ids = [ev.event_id for ev in page]
+    curated_ids: list[str] = []
+    if page_ids:
+        curated_rows = session.exec(
+            select(UserSavedEvent.event_id)
+            .where(UserSavedEvent.user_id == target.id)
+            .where(UserSavedEvent.event_id.in_(page_ids))
+            .where(UserSavedEvent.created_by_admin_user_id.is_not(None))
+        ).all()
+        curated_ids = [eid for eid in curated_rows if eid]
     return ProfileEventListResponse(
         items=serialize_events(session, page),
         total=total,
         limit=limit,
         offset=offset,
+        curated_event_ids=curated_ids,
     )
 
 
@@ -1273,10 +1710,27 @@ def list_user_calendar(
         session, event_ids, include_past=include_past, limit=limit, offset=offset
     )
     serialized = serialize_events(session, page)
+    page_ids = [ev.event_id for ev in serialized]
+    curated_set: set[str] = set()
+    if page_ids:
+        curated_going = session.exec(
+            select(UserEventAttendance.event_id)
+            .where(UserEventAttendance.user_id == target.id)
+            .where(UserEventAttendance.event_id.in_(page_ids))
+            .where(UserEventAttendance.created_by_admin_user_id.is_not(None))
+        ).all()
+        curated_saved = session.exec(
+            select(UserSavedEvent.event_id)
+            .where(UserSavedEvent.user_id == target.id)
+            .where(UserSavedEvent.event_id.in_(page_ids))
+            .where(UserSavedEvent.created_by_admin_user_id.is_not(None))
+        ).all()
+        curated_set = {eid for eid in (*curated_going, *curated_saved) if eid}
     items = [
         ProfileCalendarItem(
             event=ev,
             intent=intent_by_event.get(ev.event_id, "saved"),
+            curated=ev.event_id in curated_set,
         )
         for ev in serialized
     ]
@@ -1338,18 +1792,39 @@ def _user_to_search_result(
     user: User,
     *,
     subscriber_ids: Optional[set[UUID]] = None,
+    followed_ids: Optional[set[UUID]] = None,
+    friend_ids: Optional[set[UUID]] = None,
 ) -> UserSearchResult:
     """Project a ``User`` row into the discovery card shape.
 
-    ``subscriber_ids`` lets the caller batch-precompute the viewer's
-    current subscriptions to avoid an N+1 over the result page.
+    ``subscriber_ids``, ``followed_ids`` and ``friend_ids`` let the
+    caller batch-precompute the viewer's current edges to avoid N+1.
+    When not supplied we fall back to per-row queries.
     """
     is_subscribed = False
+    is_followed_by_viewer = False
+    is_friend = False
     if viewer is not None and viewer.id != user.id:
         if subscriber_ids is not None:
             is_subscribed = user.id in subscriber_ids
         else:
             is_subscribed = _get_subscription(session, viewer.id, user.id) is not None
+        if followed_ids is not None:
+            is_followed_by_viewer = user.id in followed_ids
+        else:
+            is_followed_by_viewer = (
+                session.exec(
+                    select(UserFollow.id)
+                    .where(UserFollow.follower_id == viewer.id)
+                    .where(UserFollow.followee_id == user.id)
+                    .where(UserFollow.status == "approved")
+                ).first()
+                is not None
+            )
+        if friend_ids is not None:
+            is_friend = user.id in friend_ids
+        else:
+            is_friend = is_mutual_follow(session, viewer.id, user.id)
     return UserSearchResult(
         handle=user.handle or "",
         display_name=user.display_name,
@@ -1357,6 +1832,8 @@ def _user_to_search_result(
         is_verified_organizer=bool(user.is_verified_organizer),
         subscribers_count=_subscribers_count(session, user.id),
         is_subscribed=is_subscribed,
+        is_followed_by_viewer=is_followed_by_viewer,
+        is_friend=is_friend,
     )
 
 
@@ -1405,6 +1882,9 @@ def search_users(
             )
         )
     )
+    admin_id = get_admin_user_id(session)
+    if admin_id is not None:
+        stmt = stmt.where(User.id != admin_id)
     stmt = stmt.order_by(
         User.is_verified_organizer.desc(),
         User.handle.asc(),
@@ -1462,9 +1942,13 @@ def discover_suggested(
         return SuggestedUsersResponse(items=[])
 
     # People that the viewer's network is subscribed to. Exclude users
-    # the viewer already follows or subscribes to, and self.
+    # the viewer already follows or subscribes to, self, and the site
+    # admin (hidden from public discovery).
     excluded: set[UUID] = set(network_ids)
     excluded.add(viewer.id)
+    admin_id = get_admin_user_id(session)
+    if admin_id is not None:
+        excluded.add(admin_id)
     rows = session.exec(
         select(
             CalendarSubscription.target_user_id,
@@ -1539,6 +2023,40 @@ def admin_set_verified_organizer(
     return get_public_profile(user.handle or "", session=session, viewer=None)
 
 
+# --- Admin: admin-managed account toggle ------------------------------------
+
+
+class _AdminManagedToggleRequest(BaseModel):
+    is_admin_managed: bool
+    # Optional internal label (max 120 chars). Empty string clears.
+    managed_label: Optional[str] = None
+
+
+@router.patch("/admin/users/{handle}/managed", response_model=PublicProfileResponse)
+def admin_set_admin_managed(
+    handle: str,
+    payload: _AdminManagedToggleRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Admin-only: mark/unmark a user as an admin-managed curator account.
+
+    Admin-managed accounts are the only legal write target for the
+    bulk-curation routes (Phase 2) and pipeline rules (Phase 3). The
+    optional ``managed_label`` is an internal note shown in the Admin
+    Users tab to disambiguate curator personas (e.g. "Salsa Nights
+    Paris"). The label is **not** exposed on the public profile.
+    """
+    user = _resolve_handle(session, handle)
+    user.is_admin_managed = bool(payload.is_admin_managed)
+    raw_label = (payload.managed_label or "").strip()
+    user.managed_label = raw_label[:120] if raw_label else None
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return get_public_profile(user.handle or "", session=session, viewer=None)
+
+
 # --- Admin: users management (list + hard-delete) ---------------------------
 
 
@@ -1579,7 +2097,6 @@ def admin_list_users(
         stmt.order_by(User.created_at.desc()).limit(limit).offset(offset)
     ).all()
 
-    admin_email = (get_admin_email() or "").lower()
     items: list[AdminUser] = []
     for u in rows:
         items.append(
@@ -1589,8 +2106,10 @@ def admin_list_users(
                 handle=u.handle,
                 display_name=u.display_name,
                 avatar_url=u.avatar_url,
-                is_admin=bool(admin_email and u.email.lower() == admin_email),
+                is_admin=is_admin_user(u),
                 is_verified_organizer=bool(u.is_verified_organizer),
+                is_admin_managed=bool(u.is_admin_managed),
+                managed_label=u.managed_label,
                 deleted_at=u.deleted_at,
                 created_at=u.created_at,
                 followers_count=_followers_count(session, u.id),
@@ -1615,8 +2134,7 @@ def admin_delete_user(
     that, which also clears their session cookie.
     """
     user = _resolve_handle(session, handle)
-    admin_email = (get_admin_email() or "").lower()
-    if admin_email and user.email.lower() == admin_email:
+    if is_admin_user(user):
         raise HTTPException(
             status_code=400,
             detail="Refusing to delete the admin account via this endpoint",
@@ -1940,7 +2458,56 @@ def list_subscribed_events(
 
     # Re-apply account-visibility at read time.
     visible_ids = [t.id for t in target_by_id.values() if can_view(session, viewer, t)]
-    if not visible_ids:
+
+    # Phase E (E8): pending-follow targets are not in CalendarSubscription, so
+    # they never appear via the subscription path. Include their public-audience
+    # going-events directly so the feed reflects activity from people the viewer
+    # has expressed interest in following (but hasn't been approved yet).
+    # Only "subscription_going" with share_audience=public is allowed — saved
+    # events and suggested events require an approved relationship.
+    pending_going_rows: list[tuple] = []
+    if from_handle is None:
+        pending_followee_rows = session.exec(
+            select(UserFollow.followee_id)
+            .where(UserFollow.follower_id == viewer.id)
+            .where(UserFollow.status == "pending")
+        ).all()
+        pending_ids = [
+            r
+            for r in pending_followee_rows
+            if r not in target_by_id  # skip if already subscribed (approved follow)
+        ]
+        if pending_ids:
+            pending_users: list[User] = list(
+                session.exec(
+                    select(User).where(
+                        User.id.in_(pending_ids),
+                        User.deleted_at.is_(None),
+                    )
+                ).all()
+            )
+            pending_target_by_id: dict = {u.id: u for u in pending_users}
+            pending_attendances = session.exec(
+                select(
+                    UserEventAttendance.event_id,
+                    UserEventAttendance.user_id,
+                    UserEventAttendance.share_audience,
+                )
+                .where(UserEventAttendance.user_id.in_(pending_ids))
+                .where(UserEventAttendance.share_audience == "public")
+            ).all()
+            for ev_id, uid, audience in pending_attendances:
+                if not ev_id:
+                    continue
+                owner = pending_target_by_id.get(uid)
+                if owner is None:
+                    continue
+                pending_going_rows.append((ev_id, uid))
+                # Merge this user into target_by_id so via_map hydration
+                # can resolve their display info later.
+                target_by_id.setdefault(uid, owner)
+
+    if not visible_ids and not pending_going_rows:
         return SubscribedEventListResponse(
             items=[], total=0, limit=limit, offset=offset
         )
@@ -2007,6 +2574,13 @@ def list_subscribed_events(
         if not ev_id:
             continue
         via_map.setdefault(ev_id, []).append((uid, "subscription_suggested"))
+    # Phase E (E8): pending-follow targets' public-going events.
+    for ev_id, uid in pending_going_rows:
+        if not ev_id:
+            continue
+        existing_uids = {actor_id for actor_id, _ in via_map.get(ev_id, [])}
+        if uid not in existing_uids:
+            via_map.setdefault(ev_id, []).append((uid, "subscription_going"))
 
     if not via_map:
         return SubscribedEventListResponse(
@@ -2065,4 +2639,417 @@ def list_subscribed_events(
 
     return SubscribedEventListResponse(
         items=items, total=total, limit=limit, offset=offset
+    )
+
+
+# ---------------------------------------------------------------------------
+# Phase E (E3) — onboarding "find your crew" step
+# ---------------------------------------------------------------------------
+
+
+def _friend_ids(session: Session, user_id: UUID) -> set[UUID]:
+    """Return the set of viewer's friends (mutual follows).
+
+    Phase E (E8): only ``status='approved'`` edges count.
+    """
+    f1 = aliased(UserFollow)
+    f2 = aliased(UserFollow)
+    rows = session.exec(
+        select(f1.followee_id)
+        .join(
+            f2,
+            (f2.follower_id == f1.followee_id) & (f2.followee_id == f1.follower_id),
+        )
+        .where(f1.follower_id == user_id)
+        .where(f1.status == "approved")
+        .where(f2.status == "approved")
+    ).all()
+    return {UUID(str(r)) if not isinstance(r, UUID) else r for r in rows}
+
+
+def _already_followed_ids(session: Session, viewer_id: UUID) -> set[UUID]:
+    # Phase E (E8): include pending requests so we don't suggest a target
+    # the viewer has already asked to follow.
+    rows = session.exec(
+        select(UserFollow.followee_id).where(UserFollow.follower_id == viewer_id)
+    ).all()
+    return {UUID(str(r)) if not isinstance(r, UUID) else r for r in rows}
+
+
+@router.get(
+    "/onboarding/suggestions",
+    response_model=OnboardingSuggestionsResponse,
+)
+@limiter.limit("30/hour")
+def onboarding_suggestions(
+    request: Request,
+    limit: int = Query(default=10, ge=1, le=25),
+    session: Session = Depends(get_session),
+    viewer: User = Depends(require_user),
+):
+    """Phase E (E3): initial follow candidates for the post-signup screen.
+
+    Ranking (in order, dedup by user id, never include self / already-
+    followed / soft-deleted):
+
+      1. Verified organizers — high-trust seed signal.
+      2. Most-followed accounts overall — fills remaining slots.
+
+    Future iterations can layer area-locality once we add a geo column
+    to ``users``; today the user model has no city, so we keep the
+    ranking simple and explicit (see PHASE_E_FRIENDSHIP_ADOPTION.md).
+    """
+    excluded: set[UUID] = _already_followed_ids(session, viewer.id)
+    excluded.add(viewer.id)
+
+    picked: list[User] = []
+    seen: set[UUID] = set()
+
+    # 1. Verified organizers.
+    organizers = list(
+        session.exec(
+            select(User)
+            .where(User.is_verified_organizer == True)  # noqa: E712
+            .where(User.deleted_at.is_(None))
+            .where(User.handle.is_not(None))
+            .where(~col(User.id).in_(excluded))
+            .limit(limit)
+        ).all()
+    )
+    for u in organizers:
+        if u.id in seen:
+            continue
+        picked.append(u)
+        seen.add(u.id)
+        if len(picked) >= limit:
+            break
+
+    # 2. Most-followed accounts (by absolute followers count).
+    if len(picked) < limit:
+        remaining = limit - len(picked)
+        skip_ids = excluded | seen
+        rows = session.exec(
+            select(
+                UserFollow.followee_id,
+                func.count(UserFollow.id).label("followers"),
+            )
+            .where(~col(UserFollow.followee_id).in_(skip_ids))
+            .group_by(UserFollow.followee_id)
+            .order_by(func.count(UserFollow.id).desc())
+            .limit(remaining * 3)
+        ).all()
+        candidate_ids = [r[0] for r in rows]
+        if candidate_ids:
+            extra = list(
+                session.exec(
+                    select(User)
+                    .where(col(User.id).in_(candidate_ids))
+                    .where(User.deleted_at.is_(None))
+                    .where(User.handle.is_not(None))
+                ).all()
+            )
+            rank = {r[0]: int(r[1]) for r in rows}
+            extra.sort(key=lambda u: (-rank.get(u.id, 0), u.handle or ""))
+            for u in extra:
+                if u.id in seen or len(picked) >= limit:
+                    continue
+                picked.append(u)
+                seen.add(u.id)
+
+    sub_ids = _viewer_subscription_ids(session, viewer)
+    return OnboardingSuggestionsResponse(
+        items=[
+            _user_to_search_result(session, viewer, u, subscriber_ids=sub_ids)
+            for u in picked
+        ]
+    )
+
+
+@router.post(
+    "/onboarding/complete",
+    response_model=CompleteOnboardingResponse,
+)
+@limiter.limit("10/hour")
+def onboarding_complete(
+    request: Request,
+    payload: CompleteOnboardingRequest,
+    session: Session = Depends(get_session),
+    viewer: User = Depends(require_user),
+):
+    """Phase E (E3): batch-follow + stamp ``onboarded_at``.
+
+    Idempotent in two senses:
+      - Calling with the same handles twice does NOT create duplicate
+        ``UserFollow`` rows (the unique constraint on
+        ``(follower_id, followee_id)`` no-ops the second insert).
+      - Calling after ``onboarded_at`` is already set silently re-stamps
+        it but doesn't error — the frontend route guard already redirects
+        away, so this only matters for replay safety.
+
+    Unknown handles, self-follows, and soft-deleted targets are dropped
+    silently to avoid leaking existence and to keep the UX forgiving.
+    """
+    handles = [h.strip().lower() for h in (payload.handles or []) if h and h.strip()]
+    handles = list(dict.fromkeys(handles))  # de-dup, preserve order
+
+    followed: list[str] = []
+    if handles:
+        already = _already_followed_ids(session, viewer.id)
+        # Resolve all in one query.
+        targets = list(
+            session.exec(
+                select(User)
+                .where(func.lower(User.handle).in_(handles))
+                .where(User.deleted_at.is_(None))
+            ).all()
+        )
+        for target in targets:
+            if target.id == viewer.id or target.id in already:
+                continue
+            session.add(UserFollow(follower_id=viewer.id, followee_id=target.id))
+            try:
+                notify_new_follower(session, followee=target, follower=viewer)
+            except Exception:
+                # Best-effort — never block onboarding on notification
+                # delivery (e.g. transient email/queue errors).
+                pass
+            # Detect mutual completion (the inviter may already follow
+            # the new user back via an earlier referral redemption).
+            if is_mutual_follow(session, viewer.id, target.id):
+                try:
+                    notify_new_friend(session, viewer, target)
+                except Exception:
+                    pass
+            followed.append(target.handle or "")
+
+    viewer.onboarded_at = datetime.utcnow()
+    session.add(viewer)
+    session.commit()
+    session.refresh(viewer)
+
+    return CompleteOnboardingResponse(
+        onboarded_at=viewer.onboarded_at.isoformat(),
+        followed=[h for h in followed if h],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Phase E (E4) — friend-of-friend suggestions
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/me/suggestions",
+    response_model=FoFSuggestionsResponse,
+)
+@limiter.limit("60/hour")
+def friend_of_friend_suggestions(
+    request: Request,
+    limit: int = Query(default=12, ge=1, le=50),
+    offset: int = Query(default=0, ge=0),
+    session: Session = Depends(get_session),
+    viewer: User = Depends(require_user),
+):
+    """Phase E (E4): "People you may know" — ranked by mutual friends.
+
+    For each candidate ``c`` we compute ``mutual_friend_count`` =
+    number of viewer-friends who also follow ``c``. Tiebreakers (in
+    order): verified-organizer flag desc, then handle asc.
+
+    Excludes: self, viewer's existing follows, soft-deleted accounts,
+    and accounts with no public handle. Anonymous viewers never hit
+    this route (``require_user``).
+    """
+    viewer_friends = _friend_ids(session, viewer.id)
+    if not viewer_friends:
+        return FoFSuggestionsResponse(items=[], total=0)
+
+    excluded: set[UUID] = _already_followed_ids(session, viewer.id)
+    excluded.add(viewer.id)
+    admin_id = get_admin_user_id(session)
+    if admin_id is not None:
+        excluded.add(admin_id)
+
+    # Candidates = followees of viewer's friends (i.e. FoF), minus
+    # excluded set. ``mutual_friend_count`` per candidate = count of
+    # distinct viewer-friends in the join.
+    rows = session.exec(
+        select(
+            UserFollow.followee_id,
+            func.count(UserFollow.follower_id).label("mutuals"),
+        )
+        .where(col(UserFollow.follower_id).in_(viewer_friends))
+        .where(~col(UserFollow.followee_id).in_(excluded))
+        .group_by(UserFollow.followee_id)
+        .order_by(func.count(UserFollow.follower_id).desc())
+    ).all()
+    if not rows:
+        return FoFSuggestionsResponse(items=[], total=0)
+
+    total = len(rows)
+    page = rows[offset : offset + limit]
+    candidate_ids = [r[0] for r in page]
+
+    candidates = list(
+        session.exec(
+            select(User)
+            .where(col(User.id).in_(candidate_ids))
+            .where(User.deleted_at.is_(None))
+            .where(User.handle.is_not(None))
+        ).all()
+    )
+    rank = {r[0]: int(r[1]) for r in page}
+    candidates.sort(
+        key=lambda u: (
+            -rank.get(u.id, 0),
+            0 if u.is_verified_organizer else 1,
+            (u.handle or "").lower(),
+        )
+    )
+
+    # Preview: up to 3 viewer-friends who follow each candidate.
+    items: list[FoFSuggestionItem] = []
+    for u in candidates:
+        preview_rows = session.exec(
+            select(User.handle)
+            .join(UserFollow, UserFollow.follower_id == User.id)
+            .where(UserFollow.followee_id == u.id)
+            .where(col(UserFollow.follower_id).in_(viewer_friends))
+            .where(User.handle.is_not(None))
+            .order_by(User.handle.asc())
+            .limit(3)
+        ).all()
+        items.append(
+            FoFSuggestionItem(
+                handle=u.handle or "",
+                display_name=u.display_name,
+                avatar_url=u.avatar_url,
+                is_verified_organizer=bool(u.is_verified_organizer),
+                mutual_friend_count=rank.get(u.id, 0),
+                mutual_friends_preview=[h for h in preview_rows if h],
+            )
+        )
+
+    return FoFSuggestionsResponse(items=items, total=total)
+
+
+# ---------------------------------------------------------------------------
+# Phase E (E7) — referrals
+# ---------------------------------------------------------------------------
+
+
+def _generate_referral_code() -> str:
+    """Generate a short opaque case-insensitive referral code.
+
+    Base32-without-padding over 6 random bytes → 10 chars (e.g.
+    ``A7K2QZNM3X``). ~3e14 codespace; collisions are vanishingly rare
+    and re-tried by the caller if they ever happen.
+    """
+    import base64
+    import secrets
+
+    return base64.b32encode(secrets.token_bytes(6)).decode("ascii").rstrip("=")
+
+
+def _public_app_url() -> str:
+    """Return the public app base URL for referral links.
+
+    Reads ``PUBLIC_APP_URL`` env var (set in fly.toml / .env). Falls
+    back to ``http://localhost:5173`` for local dev so the link is
+    still copy-pasteable.
+    """
+    import os
+
+    return (os.getenv("PUBLIC_APP_URL") or "http://localhost:5173").rstrip("/")
+
+
+def _referral_url(code: str) -> str:
+    return f"{_public_app_url()}/r/{code}"
+
+
+@router.get(
+    "/me/referral",
+    response_model=ReferralResponse,
+)
+def get_or_create_my_referral(
+    session: Session = Depends(get_session),
+    viewer: User = Depends(require_user),
+):
+    """Phase E (E7): return the viewer's referral code, creating one lazily.
+
+    Idempotent — repeated calls return the same code. Enforced at the
+    DB level by ``uq_user_referrals_inviter``.
+    """
+    row = session.exec(
+        select(UserReferral).where(UserReferral.inviter_user_id == viewer.id)
+    ).first()
+    if row is None:
+        # Retry on the (extremely unlikely) code collision.
+        for _ in range(5):
+            code = _generate_referral_code()
+            exists = session.exec(
+                select(UserReferral).where(UserReferral.code == code)
+            ).first()
+            if exists is None:
+                row = UserReferral(inviter_user_id=viewer.id, code=code)
+                session.add(row)
+                session.commit()
+                session.refresh(row)
+                break
+        if row is None:
+            raise HTTPException(
+                status_code=500, detail="Could not allocate referral code"
+            )
+    return ReferralResponse(
+        code=row.code,
+        url=_referral_url(row.code),
+        used_count=int(row.used_count or 0),
+    )
+
+
+@router.post(
+    "/me/referral",
+    response_model=ReferralResponse,
+)
+def create_my_referral(
+    session: Session = Depends(get_session),
+    viewer: User = Depends(require_user),
+):
+    """Alias for ``GET /me/referral`` — kept POST-shaped for clients
+    that prefer side-effecting verbs for the lazy-create case."""
+    return get_or_create_my_referral(session=session, viewer=viewer)
+
+
+# ---------------------------------------------------------------------------
+# Phase E (D2) — share-source lookup for the share-referral banner
+# ---------------------------------------------------------------------------
+
+
+@router.get("/share-source/{share_code}", response_model=ShareSourceResponse)
+def get_share_source(
+    share_code: str,
+    session: Session = Depends(get_session),
+):
+    """Resolve a ``?ref=share&src=`` token to the originating user.
+
+    Public on purpose — the ``share_code`` is already present in the
+    URL the caller arrived from, so revealing the matching handle +
+    avatar does not leak new information. Returns the minimal preview
+    the share-referral banner needs ("You arrived via @alpha — follow
+    them?"). 404 when the code is unknown or the owner is
+    soft-deleted (matches the silent-redemption contract — we don't
+    leak existence of expired or anonymized accounts).
+    """
+    code = (share_code or "").strip().lower()
+    if not code:
+        raise HTTPException(status_code=404, detail="Unknown share source")
+    sharer = session.exec(
+        select(User).where(User.share_code == code).where(User.deleted_at.is_(None))
+    ).first()
+    if sharer is None:
+        raise HTTPException(status_code=404, detail="Unknown share source")
+    return ShareSourceResponse(
+        handle=sharer.handle,
+        display_name=sharer.display_name,
+        avatar_url=sharer.avatar_url,
     )

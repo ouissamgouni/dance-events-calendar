@@ -1,0 +1,36 @@
+test_plan:
+  name: "Phase E (E10) — 'N of your friends follow this organizer' pill"
+  description: >
+    Verify the pill renders on verified-organizer profiles with the
+    correct count, and is hidden on non-organizer profiles.
+
+  preconditions:
+    - "task start:scenario SCENARIO=organizer-pill"
+    - "viewer mutual with alpha+beta; alpha+beta follow oscar (verified)."
+    - "dave is a non-organizer; no pill should ever render on /u/dave."
+
+  steps:
+    - id: 1
+      title: "Visit /u/oscar — pill shows '2 of your friends follow this organizer'"
+      description: "Sign in as viewer; navigate to /u/oscar."
+      expected: >
+        Below the mutual-subscribers line, a slate-bordered square pill
+        with ``data-testid="mutual-friends-who-follow-pill"`` reads
+        "2 of your friends follow this organizer". The verified-organizer
+        badge is also visible. DevTools: GET /api/social/users/oscar
+        returns ``is_verified_organizer: true`` and
+        ``mutual_friends_who_follow: 2``.
+
+    - id: 2
+      title: "Pill is hidden on non-verified profile (dave)"
+      description: "Navigate to /u/dave."
+      expected: >
+        The pill is NOT rendered. Response omits or returns 0 for
+        ``mutual_friends_who_follow``; ``is_verified_organizer: false``.
+
+    - id: 3
+      title: "Negative: anonymous viewer sees no count"
+      description: "Sign out and refresh /u/oscar."
+      expected: >
+        The pill is NOT rendered (no friend graph for anonymous).
+        ``mutual_friends_who_follow`` is omitted or 0 in the API response.

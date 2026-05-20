@@ -1,0 +1,32 @@
+# Pre-seeded events for the zero-friends-hint scenario.
+#
+# The test plan opens the Going modal on "any public event" to surface
+# the AudiencePicker. A single public event is sufficient; we add a
+# second free salsa social so the explorer renders more than one card
+# and the picker can be opened from either row.
+base_week: 0
+events:
+  - id: evt-zfh-001
+    calendar_id: salsa-cal-001
+    title: Salsa Social Friday (audience-picker host)
+    description: |
+      Headline event. Open this card → "I'm Going" → the
+      AudiencePicker is the surface under test.
+    location: Dance Studio, 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w0 Fri 21:00
+    end: w0 Sat 01:00
+    price_is_free: true
+  - id: evt-zfh-002
+    calendar_id: salsa-cal-001
+    title: Cuban Night (secondary picker host)
+    description: |
+      Alternative public event so the explorer never renders
+      empty and the picker is reachable from any row.
+    location: Skybar, Av. de la Liberté, Brussels, Belgium
+    latitude: 50.8503
+    longitude: 4.3517
+    start: w0 Sat 20:00
+    end: w0 Sun 00:00
+    price_is_free: true

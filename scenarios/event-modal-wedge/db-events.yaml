@@ -1,0 +1,91 @@
+# Pre-seeded event + attendances for the wedge scenario.
+#
+# evt-wedge-001 (Salsa Social Friday) is the headline event. The wedge
+# under it must render the following buckets for `viewer`:
+#
+#   1. Friends going:
+#        - alice  (mutual friend, share_audience=friends OR public)
+#   2. Friends-of-friends going (capped at 5):
+#        - bob (via @alice) — share_audience MUST be `public` so
+#          viewer (who is NOT bob's friend) can see his attendance
+#   3. "+N more public" tail count:
+#        - dave (stranger, share_audience=public)  → counted (+1)
+#
+# carol's attendance uses share_audience=private and MUST NOT appear
+# in any bucket — not even as an opaque "+1 going" count delta. This
+# is the GDPR guardrail asserted in step 4 of the test plan.
+base_week: 0
+events:
+  - id: evt-wedge-001
+    calendar_id: salsa-cal-001
+    title: Salsa Social Friday (wedge demo)
+    description: |
+      Headline event for E5. Open the modal and inspect the
+      "Going" wedge under the details.
+    location: Dance Studio, 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w0 Fri 21:00
+    end: w0 Sat 01:00
+    price_is_free: true
+  - id: evt-wedge-002
+    calendar_id: bachata-cal-002
+    title: Bachata Brunch (empty wedge control)
+    description: |
+      Control event with zero attendances. The wedge MUST render
+      with the "No friends going yet" placeholder for the logged-in
+      viewer, not crash and not show the FoF/public buckets.
+    location: Tanzhaus, Friedrichstr. 100, Berlin, Germany
+    latitude: 52.52
+    longitude: 13.405
+    start: w0 Sun 12:00
+    end: w0 Sun 14:00
+    price_is_free: true
+
+attendances:
+  # Bucket 1: friends-going row.
+  - event_id: evt-wedge-001
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+  # Bucket 2: friend-of-friend row (via alice).
+  - event_id: evt-wedge-001
+    email: bob@example.com
+    share_publicly: true
+    share_audience: public
+  # GDPR control: must NEVER surface to viewer.
+  - event_id: evt-wedge-001
+    email: carol@example.com
+    share_publicly: false
+    share_audience: private
+  # Bucket 3: "Also going" — public-audience strangers. Seven rows so
+  # the inline cap (6) is exceeded and the "Show all N" CTA appears,
+  # opening the sectioned modal.
+  - event_id: evt-wedge-001
+    email: dave@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-wedge-001
+    email: eve@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-wedge-001
+    email: frank@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-wedge-001
+    email: gina@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-wedge-001
+    email: hugo@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-wedge-001
+    email: ivy@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-wedge-001
+    email: jack@example.com
+    share_publicly: true
+    share_audience: public

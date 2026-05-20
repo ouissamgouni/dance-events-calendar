@@ -1,0 +1,34 @@
+# Phase E (E10) — "N of your friends follow this organizer" pill.
+#
+# Cast:
+#   - viewer — persona under test; mutual with alpha+beta at sign-in.
+#   - alpha  — mutual friend of viewer; follows oscar.
+#   - beta   — mutual friend of viewer; follows oscar.
+#   - oscar  — verified organizer (where the pill renders).
+#   - dave   — non-organizer profile (pill must be hidden).
+#   - admin
+users:
+  - email: viewer@example.com
+    name: Viewer Persona
+    handle: viewer
+    account_visibility: public
+  - email: alpha@example.com
+    name: Alpha Garcia
+    handle: alpha
+    account_visibility: public
+  - email: beta@example.com
+    name: Beta Lopez
+    handle: beta
+    account_visibility: public
+  - email: oscar@example.com
+    name: Oscar Promoter
+    handle: oscar
+    account_visibility: public
+    is_verified_organizer: true
+  - email: dave@example.com
+    name: Dave Civilian
+    handle: dave
+    account_visibility: public
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

@@ -14,8 +14,9 @@ import {
     bulkRetryGeocoding,
     bulkAssignTags,
     runTagSuggestionsBulk,
+    adminBulkEngagement,
 } from '../api';
-import type { AdminTagGroup } from '../api';
+import type { AdminTagGroup, AdminBulkEngagementKind, AdminBulkEngagementAudience } from '../api';
 import LocationBadge from './LocationBadge';
 import AdminEventDetailPanel from './AdminEventDetailPanel';
 import { useAdminPrefs } from '../context/AdminPrefsContext';
@@ -63,6 +64,13 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
     const [tagGroups, setTagGroups] = useState<AdminTagGroup[]>([]);
     const [bulkTagPickerOpen, setBulkTagPickerOpen] = useState(false);
     const [bulkTagIds, setBulkTagIds] = useState<number[]>([]);
+    // Curate-to-lists dialog state. Targets are admin-managed handles
+    // entered as comma/space-separated text; backend skips any handle
+    // that isn't flagged ``is_admin_managed`` (per-row).
+    const [curatePickerOpen, setCuratePickerOpen] = useState(false);
+    const [curateHandlesText, setCurateHandlesText] = useState('');
+    const [curateKind, setCurateKind] = useState<AdminBulkEngagementKind>('save');
+    const [curateAudience, setCurateAudience] = useState<AdminBulkEngagementAudience | ''>('');
     const [selectedVisibility, setSelectedVisibility] = useState<'hidden' | 'blocked' | ''>('');
     // Hide past events by default; toggle (here or in the admin header) to
     // include them. Mirrors the global admin pref so all panels stay in sync.
@@ -212,6 +220,38 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             loadEvents();
         } catch {
             setMessage('Failed to assign tags.');
+        } finally {
+            setBusy('');
+        }
+    };
+
+    const handleBulkCurate = async () => {
+        if (selectedIds.size === 0) return;
+        const handles = curateHandlesText
+            .split(/[\s,]+/)
+            .map((h) => h.trim().replace(/^@/, ''))
+            .filter(Boolean);
+        if (handles.length === 0) {
+            setMessage('Enter one or more admin-managed handles.');
+            return;
+        }
+        setBusy('bulk-curate');
+        try {
+            const res = await adminBulkEngagement(
+                handles,
+                [...selectedIds],
+                curateKind,
+                'add',
+                { audience: curateAudience || undefined },
+            );
+            const skipped = res.skipped_count > 0 ? ` (${res.skipped_count} skipped)` : '';
+            setMessage(
+                `Curated ${res.changed_count} ${curateKind} entry(ies) across ${handles.length} account(s)${skipped}.`,
+            );
+            setCuratePickerOpen(false);
+            setCurateHandlesText('');
+        } catch (e) {
+            setMessage(e instanceof Error ? e.message : 'Failed to curate.');
         } finally {
             setBusy('');
         }
@@ -674,6 +714,67 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                     </div>
                 )}
 
+                {/* Curate-to-Lists Picker */}
+                {curatePickerOpen && (
+                    <div className="px-4 py-2.5 border-t border-indigo-200 bg-white shrink-0 space-y-2">
+                        <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">
+                            Curate {selectedIds.size} event(s) to admin-managed lists
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <label className="text-[10px] text-gray-600 flex items-center gap-1">
+                                List:
+                                <select
+                                    value={curateKind}
+                                    onChange={(e) => setCurateKind(e.target.value as AdminBulkEngagementKind)}
+                                    className="text-[10px] border border-gray-300 px-1 py-0.5"
+                                >
+                                    <option value="save">Saved</option>
+                                    <option value="going">Going</option>
+                                </select>
+                            </label>
+                            <label className="text-[10px] text-gray-600 flex items-center gap-1">
+                                Audience:
+                                <select
+                                    value={curateAudience}
+                                    onChange={(e) => setCurateAudience(e.target.value as AdminBulkEngagementAudience | '')}
+                                    className="text-[10px] border border-gray-300 px-1 py-0.5"
+                                    title="Per-row audience. Defaults to each target's profile setting when blank."
+                                >
+                                    <option value="">target default</option>
+                                    <option value="public">public</option>
+                                    <option value="friends">friends</option>
+                                    <option value="private">private</option>
+                                </select>
+                            </label>
+                        </div>
+                        <input
+                            type="text"
+                            value={curateHandlesText}
+                            onChange={(e) => setCurateHandlesText(e.target.value)}
+                            placeholder="Handles: @curator-paris, @curator-bachata (comma/space separated)"
+                            className="w-full text-[11px] border border-gray-300 px-2 py-1"
+                        />
+                        <p className="text-[10px] text-gray-500">
+                            Non-admin-managed handles are skipped per-row. No notifications are fanned out.
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleBulkCurate}
+                                disabled={!!busy || !curateHandlesText.trim()}
+                                className="text-[10px] font-medium px-2.5 py-1 bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition"
+                            >
+                                {busy === 'bulk-curate' ? 'Curating…' : 'Apply'}
+                            </button>
+                            <button
+                                onClick={() => { setCuratePickerOpen(false); setCurateHandlesText(''); }}
+                                className="text-[10px] text-gray-500 hover:text-gray-700"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Bulk Action Bar */}
                 {selectedIds.size > 0 && (
                     <div className="flex items-center gap-2 px-4 py-2 border-t border-blue-200 bg-blue-50 shrink-0">
@@ -687,6 +788,14 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                             className="text-[10px] font-medium px-2 py-1 bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition"
                         >
                             Assign Tags
+                        </button>
+                        <button
+                            onClick={() => { setCuratePickerOpen((o) => !o); }}
+                            disabled={!!busy}
+                            className="text-[10px] font-medium px-2 py-1 bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition"
+                            title="Add to Saved/Going on admin-managed curator accounts"
+                        >
+                            Curate to Lists
                         </button>
                         <button
                             onClick={handleBulkReview}

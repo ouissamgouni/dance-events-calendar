@@ -1,0 +1,25 @@
+# Follow graph for the following-interest scenario.
+#
+# Resulting graph (one-way unless noted):
+#   viewer -> alice          (one-way: alice does NOT follow back)
+#   viewer -> bob            (one-way)
+#   viewer -> carol          (one-way; carol has friends-only audience —
+#                             see settings/profile setup in test plan;
+#                             her friends-audience rows must NOT leak)
+#   eve    -> viewer         (one-way in the reverse direction —
+#                             control to prove the filter reads
+#                             viewer's followees, not followers)
+#   dave   isolated          (stranger control)
+#
+# Note: NO mutual edges. This is intentional — the whole point of the
+# follows-scope filter is to surface activity from people the viewer
+# follows even when they do not follow back.
+follows:
+  - follower: viewer
+    followee: alice
+  - follower: viewer
+    followee: bob
+  - follower: viewer
+    followee: carol
+  - follower: eve
+    followee: viewer

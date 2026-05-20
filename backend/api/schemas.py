@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -48,6 +48,17 @@ class EventResponse(BaseModel):
     # ``trending_enabled`` site setting is on; otherwise left at 0 and the
     # frontend falls back to the legacy view-count badge.
     popularity_score: float = 0.0
+    # Total count of the viewer's mutual friends who are going to or have
+    # saved this event (audience-gated). Drives the pin's "people" badge.
+    # Only populated when ``following_badge_enabled`` is on AND the viewer
+    # is signed in; defaults to 0 otherwise so back-compat serializers
+    # keep working.
+    following_friend_count: int = 0
+    # Up to 5 friend mini-profiles (subset of the count above), used by
+    # the card's inline avatar track to show *who* — friends first, then
+    # the rest of the going set. Empty when the feature flag is off or
+    # the viewer is anonymous.
+    following_friends_preview: list["FriendMini"] = []
     price_min: Optional[float] = None
     price_max: Optional[float] = None
     price_currency: Optional[str] = None
@@ -57,6 +68,28 @@ class EventResponse(BaseModel):
     tags: list[TagResponse] = []
     is_hidden: bool = False
     is_blocked: bool = False
+    # True when the event has at least one approved, non-expired promo
+    # code. Powers the small "%" badge on event cards; gated by the
+    # ``promo_codes_enabled`` site setting (always False when off).
+    has_active_promo_codes: bool = False
+    # Verified organizer mini-profile when an admin-approved
+    # OrganizerClaimEvent maps this event to a user. Gated by the
+    # ``organizer_claims_enabled`` site setting (always None when off).
+    organizer: Optional["EventOrganizerMini"] = None
+
+
+class EventOrganizerMini(BaseModel):
+    user_id: UUID
+    handle: Optional[str] = None
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    is_verified_organizer: bool = False
+
+
+class FriendMini(BaseModel):
+    user_id: UUID
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 
 class CalendarSettingResponse(BaseModel):
@@ -123,6 +156,10 @@ class AttendeeResponse(BaseModel):
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
     handle: Optional[str] = None
+    # Phase E (E8): viewer's follow status toward this user, so chips/buttons
+    # can render the correct "Follow" / "Following" / "Requested" state on
+    # first paint (no per-attendee status fetch needed).
+    viewer_follow_status: Optional[str] = None
 
 
 class AttendanceSummaryResponse(BaseModel):
@@ -142,6 +179,73 @@ class AttendanceSummaryResponse(BaseModel):
 
 class AttendanceSummaryBatchRequest(BaseModel):
     event_ids: list[str] = Field(..., min_length=1, max_length=200)
+
+
+# ---------------------------------------------------------------------------
+# Phase: following-interest — per-user upcoming counts used by the
+# explorer's interest filter picker.
+# ---------------------------------------------------------------------------
+
+
+class InterestSummaryItem(BaseModel):
+    """Visibility-filtered upcoming counts for a single handle.
+
+    Counts reflect what the viewer is permitted to see (per audience
+    rules); unknown handles return zeros rather than 404 so the picker
+    can render a row regardless.
+    """
+
+    handle: str
+    upcoming_going_visible: int = 0
+    upcoming_saved_visible: int = 0
+
+
+class InterestSummaryResponse(BaseModel):
+    items: list[InterestSummaryItem] = []
+
+
+# ---------------------------------------------------------------------------
+# Phase E (E5) — friends / FoF "going" wedge for the event modal.
+# ---------------------------------------------------------------------------
+
+
+class FofGoingAttendee(BaseModel):
+    """A friend-of-friend attendee shown in the event modal wedge.
+
+    ``via_friend_handle`` is one of the viewer's friends who also follows
+    this attendee — surfaced as the "Followed by @alice" attribution
+    line. We pick a deterministic single witness (lowest handle) so
+    re-renders are stable.
+    """
+
+    user_id: UUID
+    handle: Optional[str] = None
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    via_friend_handle: Optional[str] = None
+    via_friend_display_name: Optional[str] = None
+    # Phase E (E8): viewer's follow status toward this FoF attendee.
+    viewer_follow_status: Optional[str] = None
+
+
+class GoingWedgeResponse(BaseModel):
+    """Per-event "who's going" wedge for signed-in viewers.
+
+    - ``friends_going`` — mutual friends of the viewer, regardless of
+      audience (mutual-follow grants ``friends`` visibility).
+    - ``fof_going`` — attendees whose ``share_audience == 'public'``
+      AND who share at least one mutual friend with the viewer.
+    - ``public_going_count`` — count of public-audience attendees who
+      are neither friends nor FoF (so the wedge sums consistently).
+
+    Private-audience rows and non-public strangers are NEVER counted or
+    surfaced — see PHASE_E_FRIENDSHIP_ADOPTION.md "GDPR guardrail".
+    """
+
+    event_id: str
+    friends_going: list[AttendeeResponse] = []
+    fof_going: list[FofGoingAttendee] = []
+    public_going_count: int = 0
 
 
 class UpdatePreferencesRequest(BaseModel):
@@ -256,6 +360,125 @@ class HealthResponse(BaseModel):
     status: str
 
 
+# --- Promo codes ---
+
+
+class PromoCodeSubmitter(BaseModel):
+    user_id: UUID
+    handle: Optional[str] = None
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+
+class PromoCodeOut(BaseModel):
+    id: UUID
+    event_id: str
+    code: str
+    description: Optional[str] = None
+    source_url: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    status: str
+    submitter: PromoCodeSubmitter
+    created_at: datetime
+    updated_at: datetime
+
+
+class PromoCodeAdminOut(PromoCodeOut):
+    admin_notes: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
+    reviewed_by: Optional[str] = None
+    event_title: Optional[str] = None
+
+
+def _validate_source_url(value: Optional[str]) -> Optional[str]:
+    if value is None:
+        return value
+    v = value.strip()
+    if not v:
+        return None
+    low = v.lower()
+    if not (low.startswith("http://") or low.startswith("https://")):
+        raise ValueError("source_url must start with http:// or https://")
+    return v
+
+
+class PromoCodeCreate(BaseModel):
+    code: str = Field(..., min_length=1, max_length=64)
+    description: Optional[str] = Field(default=None, max_length=200)
+    source_url: Optional[str] = Field(default=None, max_length=500)
+    expires_at: Optional[datetime] = None
+
+    def model_post_init(self, __context) -> None:
+        _validate_source_url(self.source_url)
+
+
+class PromoCodeUpdate(BaseModel):
+    code: Optional[str] = Field(default=None, min_length=1, max_length=64)
+    description: Optional[str] = Field(default=None, max_length=200)
+    source_url: Optional[str] = Field(default=None, max_length=500)
+    expires_at: Optional[datetime] = None
+
+    def model_post_init(self, __context) -> None:
+        _validate_source_url(self.source_url)
+
+
+class PromoCodeReject(BaseModel):
+    admin_notes: Optional[str] = Field(default=None, max_length=500)
+
+
+# --- Organizer claims ---
+
+
+class OrganizerClaimEventOut(BaseModel):
+    event_id: str
+    event_title: Optional[str] = None
+    event_start: Optional[datetime] = None
+    decision: str
+
+
+class OrganizerClaimOut(BaseModel):
+    id: UUID
+    user_id: UUID
+    # ``badge`` (account-level verified-organizer request) or ``events``
+    # (per-event organizer attribution). See ``OrganizerClaim`` model.
+    kind: str
+    status: str
+    admin_notes: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
+    reviewed_by: Optional[str] = None
+    created_at: datetime
+    events: list[OrganizerClaimEventOut] = []
+
+
+class OrganizerClaimAdminOut(OrganizerClaimOut):
+    user_handle: Optional[str] = None
+    user_display_name: Optional[str] = None
+    user_email: Optional[str] = None
+    user_avatar_url: Optional[str] = None
+    user_bio: Optional[str] = None
+    user_instagram_url: Optional[str] = None
+    user_facebook_url: Optional[str] = None
+
+
+class OrganizerClaimCreate(BaseModel):
+    # ``badge``: request the account-level verified-organizer badge.
+    # Must not include ``event_ids``. Allowed only when the user is
+    # not already verified and has no pending badge claim.
+    #
+    # ``events``: claim organizership of specific events. Requires
+    # 1..20 ``event_ids``. Allowed only for already-verified users.
+    kind: str = Field(default="badge", max_length=16)
+    event_ids: list[str] = Field(default_factory=list, max_length=20)
+
+
+class OrganizerClaimDecideRequest(BaseModel):
+    grant_badge: bool = True
+    approved_event_ids: list[str] = Field(default_factory=list)
+    rejected_event_ids: list[str] = Field(default_factory=list)
+    admin_notes: Optional[str] = Field(default=None, max_length=500)
+    overwrite: bool = False
+
+
 class CreateShareTokenRequest(BaseModel):
     device_id: str = Field(..., min_length=1, max_length=64)
 
@@ -329,8 +552,24 @@ class SiteSettingsResponse(BaseModel):
     # qualify for any tier (prevents view-bait from being crowned hot).
     trending_window_days: int = 30
     trending_floor_going: int = 3
+    # Effective trending cap for the visible list/map:
+    #   cap = min(trending_top_n, ceil(visible_count * trending_top_percent / 100))
+    # ``trending_top_n`` is an absolute upper bound ("never decorate
+    # more than N events as Trending"). ``trending_top_percent`` is a
+    # relative ceiling so small lists don't get a Trending chip on every
+    # other card (e.g. 5 visible events @ 20% → effective cap of 1).
+    trending_top_n: int = 3
+    trending_top_percent: int = 100
     event_color_bar_color: str = "#64748b"
     tag_sort_mode: str = "group"  # "group" | "event_count"
+    # User-submitted promo codes per event (admin-moderated). When False,
+    # public + user-facing promo endpoints return 404 and the event
+    # section / card badge are hidden.
+    promo_codes_enabled: bool = False
+    # User-initiated organizer claims (badge + per-event ownership;
+    # admin-moderated). When False, the Account application section
+    # and event "Organized by" pill are hidden.
+    organizer_claims_enabled: bool = False
 
 
 class SiteSettingsUpdateRequest(BaseModel):
@@ -350,10 +589,14 @@ class SiteSettingsUpdateRequest(BaseModel):
     trending_enabled: Optional[bool] = None
     trending_window_days: Optional[int] = Field(default=None, ge=1, le=365)
     trending_floor_going: Optional[int] = Field(default=None, ge=0, le=1000)
+    trending_top_n: Optional[int] = Field(default=None, ge=1, le=50)
+    trending_top_percent: Optional[int] = Field(default=None, ge=1, le=100)
     event_color_bar_color: Optional[str] = Field(
         default=None, pattern="^#[0-9a-fA-F]{6}$"
     )
     tag_sort_mode: Optional[str] = Field(default=None, pattern="^(group|event_count)$")
+    promo_codes_enabled: Optional[bool] = None
+    organizer_claims_enabled: Optional[bool] = None
 
 
 class EventUpdateRequest(BaseModel):
@@ -858,6 +1101,11 @@ class PublicProfileResponse(BaseModel):
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
     is_verified_organizer: bool = False
+    # True when this profile is an admin-curated puppet account
+    # (Phase: admin-managed lists). Renders a transparency badge so
+    # viewers know its Saved/Going entries are editorially curated
+    # rather than personal engagement.
+    is_admin_managed: bool = False
     instagram_url: Optional[str] = None
     facebook_url: Optional[str] = None
     # Phase D: free-form short bio (max 280 chars). Always public when set;
@@ -879,6 +1127,11 @@ class PublicProfileResponse(BaseModel):
     is_following: bool = False
     follows_you: bool = False
     is_friend: bool = False
+    # Phase E (E8): "approved" when ``is_following`` is True; "pending"
+    # when the viewer has an outstanding follow-request awaiting
+    # approval (target is friends-visibility). Defaults to "approved"
+    # so legacy clients don't have to handle a third state.
+    follow_status: str = "approved"
     # Single account-level visibility gate ("public" | "friends"). Echoed
     # so the client can render "Friends-only" hint banners.
     account_visibility: str = "public"
@@ -964,6 +1217,23 @@ class FollowActionResponse(BaseModel):
     # at follow time and is independently toggleable via the notify PATCH.
     is_subscribed: bool = False
     notify_new_events: bool = False
+    # Phase E (E8): "approved" for an active follow; "pending" when the
+    # target has friends-visibility and the request awaits their
+    # approval. UI uses this to show "Requested" instead of "Following".
+    follow_status: str = "approved"
+
+
+class FollowRequestItem(BaseModel):
+    """Phase E (E8): a pending inbound follow-request row."""
+
+    handle: str
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    requested_at: datetime
+
+
+class FollowRequestListResponse(BaseModel):
+    items: list[FollowRequestItem]
 
 
 class FollowNotifyRequest(BaseModel):
@@ -1157,6 +1427,11 @@ class AdminUser(BaseModel):
     avatar_url: Optional[str] = None
     is_admin: bool = False
     is_verified_organizer: bool = False
+    # Phase: admin-managed accounts. Flag + optional internal label
+    # the admin uses to identify the curator persona
+    # (e.g. "Salsa Nights Paris").
+    is_admin_managed: bool = False
+    managed_label: Optional[str] = None
     deleted_at: Optional[datetime] = None
     created_at: datetime
     followers_count: int = 0
@@ -1166,6 +1441,83 @@ class AdminUser(BaseModel):
 class AdminUserListResponse(BaseModel):
     items: list[AdminUser]
     total: int
+
+
+# --- Admin: bulk engagement curation ----------------------------------------
+
+
+class AdminBulkEngagementRequest(BaseModel):
+    """Body for ``POST /api/admin/engagement/bulk``.
+
+    The admin selects one or more admin-managed target users (by handle)
+    and one or more events, and applies ``(kind, action)`` to the
+    cross-product. Audience defaults to each target's profile default
+    when omitted. ``fan_out`` is opt-in and defaults to False so curated
+    Going entries don't notify the target's followers by default.
+    """
+
+    handles: list[str]
+    event_ids: list[str]
+    kind: Literal["save", "going"]
+    action: Literal["add", "remove"]
+    audience: Optional[Literal["public", "friends", "private"]] = None
+    fan_out: bool = False
+
+
+class AdminBulkEngagementItem(BaseModel):
+    handle: str
+    event_id: str
+    status: Literal[
+        "changed",
+        "noop",
+        "skipped_not_managed",
+        "skipped_no_user",
+        "skipped_no_event",
+    ]
+    detail: Optional[str] = None
+
+
+class AdminBulkEngagementResponse(BaseModel):
+    items: list[AdminBulkEngagementItem]
+    changed_count: int
+    skipped_count: int
+
+
+# --- Phase 3: per-calendar curation rules ----------------------------------
+
+
+class CalendarCurationRuleResponse(BaseModel):
+    """A single per-calendar curation rule.
+
+    ``audience`` is ``None`` when the rule defers to the target user's
+    profile default at engagement time (mirrors the bulk route).
+    """
+
+    id: int
+    calendar_id: str
+    target_user_id: str
+    target_handle: Optional[str] = None
+    kind: Literal["save", "going"]
+    audience: Optional[Literal["public", "friends", "private"]] = None
+    enabled: bool
+
+
+class CalendarCurationRuleCreateRequest(BaseModel):
+    """Body for ``POST /api/admin/calendars/{calendar_id}/curation-rules``.
+
+    Target is specified by handle (admin UI's canonical identifier);
+    server resolves to ``users.id`` and validates ``is_admin_managed``.
+    """
+
+    target_handle: str
+    kind: Literal["save", "going"]
+    audience: Optional[Literal["public", "friends", "private"]] = None
+    enabled: bool = True
+
+
+class CalendarCurationRuleUpdateRequest(BaseModel):
+    audience: Optional[Literal["public", "friends", "private"]] = None
+    enabled: Optional[bool] = None
 
 
 # --- Phase D: profile content & user discovery ------------------------------
@@ -1186,12 +1538,19 @@ class ProfileEventListResponse(BaseModel):
 
     Reuses ``EventResponse`` so the frontend can drop the items straight
     into the same card components used on /.
+
+    ``curated_event_ids`` is the subset of ``items`` whose engagement
+    row was created by the admin curator (Phase 2 bulk or Phase 3
+    pipeline rule). The client uses it to render a "Curated" pill for
+    transparency. Always present (possibly empty) — never null — so
+    clients don't need to coalesce.
     """
 
     items: list[EventResponse]
     total: int
     limit: int
     offset: int
+    curated_event_ids: list[str] = []
 
 
 class ProfileCalendarItem(BaseModel):
@@ -1201,10 +1560,14 @@ class ProfileCalendarItem(BaseModel):
     so the client can render filter chips (All / Going / Saved) without
     a second round-trip. ``both`` is set when the owner has both saved
     and RSVP'd-going to the same event.
+
+    ``curated`` is True iff any of the contributing engagement rows
+    (saved and/or going) was created by the admin curator.
     """
 
     event: EventResponse
     intent: str = Field(pattern="^(going|saved|both)$")
+    curated: bool = False
 
 
 class ProfileCalendarResponse(BaseModel):
@@ -1239,3 +1602,164 @@ class SuggestedUsersResponse(BaseModel):
     """
 
     items: list[UserSearchResult]
+
+
+# ---------------------------------------------------------------------------
+# Phase E (E3) — onboarding suggestions
+# ---------------------------------------------------------------------------
+
+
+class OnboardingSuggestionsResponse(BaseModel):
+    """Initial follow candidates surfaced on the ``/onboarding/follow`` page.
+
+    Ranking is computed server-side (verified organizers first, then
+    most-followed accounts in the new user's preferred area, then a
+    global fallback). Frontend should render the items in the order
+    returned and not re-sort.
+    """
+
+    items: list[UserSearchResult]
+
+
+class CompleteOnboardingRequest(BaseModel):
+    """Body for ``POST /api/social/onboarding/complete``.
+
+    Empty ``handles`` is valid and means the user pressed Skip — we
+    still stamp ``users.onboarded_at`` so they aren't redirected again.
+    Duplicates and unknown handles are silently dropped; the follows
+    are idempotent (POST /follow no-ops on the second call).
+    """
+
+    handles: list[str] = []
+
+
+class CompleteOnboardingResponse(BaseModel):
+    """Result of the onboarding batch follow.
+
+    ``followed`` lists the handles that resulted in a NEW follow edge
+    (excludes already-followed and unknown handles) so the UI can show
+    an accurate "Followed N people" toast.
+    """
+
+    onboarded_at: str
+    followed: list[str]
+
+
+# ---------------------------------------------------------------------------
+# Phase E (E4) — friend-of-friend suggestions
+# ---------------------------------------------------------------------------
+
+
+class FoFSuggestionItem(BaseModel):
+    """One row in the "People you may know" panel.
+
+    ``mutual_friend_count`` is the count of viewer-friends who follow
+    this candidate. ``mutual_friends_preview`` is up to 3 handles from
+    that set, used to render "Followed by @alice, @bob and N others".
+    """
+
+    handle: str
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    is_verified_organizer: bool = False
+    mutual_friend_count: int = 0
+    mutual_friends_preview: list[str] = []
+
+
+class FoFSuggestionsResponse(BaseModel):
+    items: list[FoFSuggestionItem]
+    total: int
+
+
+# ---------------------------------------------------------------------------
+# Phase E (E7) — referrals
+# ---------------------------------------------------------------------------
+
+
+class ReferralResponse(BaseModel):
+    """Idempotent payload for ``GET/POST /api/social/me/referral``.
+
+    The same ``code`` and ``url`` are returned across calls for a given
+    user (a UNIQUE constraint on ``user_referrals.inviter_user_id``
+    enforces this). ``used_count`` lets the frontend surface viral
+    stats (e.g. "3 friends joined via your link").
+    """
+
+    code: str
+    url: str
+    used_count: int
+
+
+class RedeemReferralRequest(BaseModel):
+    """Body for ``POST /api/auth/redeem-referral``.
+
+    ``consent`` MUST be ``true`` — surfaced as an explicit checkbox on
+    the signup page (GDPR Art. 7 — informed, specific, unambiguous).
+    Without consent the endpoint returns 400 and no follow is created.
+    The redemption attempt itself is silent and reveals nothing about
+    the inviter to a logged-out actor.
+    """
+
+    code: str
+    consent: bool = False
+
+
+class RedeemReferralResponse(BaseModel):
+    """Result of a successful redemption.
+
+    ``inviter_handle`` is included so the post-signup toast can render
+    "@alice is now your friend" without an extra round trip.
+    """
+
+    inviter_handle: Optional[str] = None
+    mutual_follow_created: bool = False
+
+
+# ---------------------------------------------------------------------------
+# Phase E (D2) — share-link doubles as referral
+# ---------------------------------------------------------------------------
+
+
+class ShareSourceResponse(BaseModel):
+    """Public lookup for ``GET /api/social/share-source/{share_code}``.
+
+    Used by the share-referral banner to render "You arrived via
+    @alpha — follow them?" before the viewer consents. Public on
+    purpose (the share_code is already in the URL the visitor
+    arrived on) but kept minimal — no email, no friend count.
+    Returns 404 when the code does not resolve to an active user.
+    """
+
+    handle: Optional[str] = None
+    display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+
+class RedeemShareFollowRequest(BaseModel):
+    """Body for ``POST /api/auth/redeem-share-follow``.
+
+    Phase 3 share-link-as-referral surface. Distinct from
+    ``RedeemReferralRequest`` because share-link conversions do NOT
+    count toward the E7 invite leaderboard (see D2 decision matrix
+    in PHASE_E_FRIENDSHIP_ADOPTION.md).
+
+    ``consent`` MUST be ``true`` — the share-referral banner exposes
+    an opt-out checkbox (defaults checked); unchecking it skips the
+    network call entirely, so the endpoint should never see
+    ``consent=false`` from the normal flow. Mirrors the E7 contract
+    so callers can't be tricked into silent follows.
+    """
+
+    share_code: str
+    consent: bool = False
+
+
+class RedeemShareFollowResponse(BaseModel):
+    """Result of a successful share-follow redemption.
+
+    ``sharer_handle`` lets the post-redemption toast render
+    "@alice is now your friend" without an extra round trip.
+    """
+
+    sharer_handle: Optional[str] = None
+    mutual_follow_created: bool = False

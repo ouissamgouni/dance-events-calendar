@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import Cookie, Depends, HTTPException, Request
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from sqlmodel import Session, select
+from sqlalchemy import func
 
 from backend.config.loader import (
     get_admin_email,
@@ -81,6 +82,57 @@ def require_admin(user: dict = Depends(get_current_user)) -> dict:
     return user
 
 
+def is_admin_user(user: User | None) -> bool:
+    """True when ``user`` is the configured site admin.
+
+    Single source of truth for admin identification — wraps the
+    env-var-based ``ADMIN_EMAIL`` comparison so callers don't inline
+    case-folded email checks.
+    """
+    if user is None or not user.email:
+        return False
+    admin_email = (get_admin_email() or "").lower()
+    if not admin_email:
+        return False
+    return user.email.lower() == admin_email
+
+
+def get_admin_user_id(session: Session) -> UUID | None:
+    """Return the admin User's id, or None if no admin email configured
+    or no matching user row exists yet.
+
+    Used by public discovery surfaces to exclude the human admin
+    account from search / FoF results. Returns None defensively so
+    callers can no-op the exclusion in setups without an admin.
+    """
+    admin_email = (get_admin_email() or "").lower()
+    if not admin_email:
+        return None
+    row = session.exec(
+        select(User.id).where(func.lower(User.email) == admin_email)
+    ).first()
+    return row
+
+
+def require_flag(name: str):
+    """Dependency factory: 404 when the given site-setting boolean flag is off.
+
+    Used to gate user-facing endpoints behind admin-controlled feature
+    flags (``promo_codes_enabled``, ``organizer_claims_enabled``).
+    Admin endpoints should not use this — admins must always be able to
+    triage backlog after disabling a feature.
+    """
+
+    def _dep(session: Session = Depends(get_session)) -> None:
+        from backend.db.models import SiteSetting
+
+        row = session.get(SiteSetting, name)
+        if not row or row.value.lower() != "true":
+            raise HTTPException(status_code=404, detail="Not found")
+
+    return _dep
+
+
 def create_session_token(
     email: str, name: str, user_id: str | None = None, is_admin: bool = False
 ) -> str:
@@ -137,11 +189,16 @@ def _account_visibility(owner: User) -> str:
 
 
 def is_mutual_follow(session: Session, viewer_id: UUID, owner_id: UUID) -> bool:
-    """True iff both ``viewer_id`` and ``owner_id`` follow each other."""
+    """True iff both ``viewer_id`` and ``owner_id`` follow each other.
+
+    Phase E (E8): only ``status='approved'`` edges count toward
+    mutuality. Pending follow-requests grant zero visibility.
+    """
     if viewer_id == owner_id:
         return True
     rows = session.exec(
-        select(UserFollow.follower_id, UserFollow.followee_id).where(
+        select(UserFollow.follower_id, UserFollow.followee_id)
+        .where(
             (
                 (UserFollow.follower_id == viewer_id)
                 & (UserFollow.followee_id == owner_id)
@@ -151,6 +208,7 @@ def is_mutual_follow(session: Session, viewer_id: UUID, owner_id: UUID) -> bool:
                 & (UserFollow.followee_id == viewer_id)
             )
         )
+        .where(UserFollow.status == "approved")
     ).all()
     return len(rows) >= 2
 

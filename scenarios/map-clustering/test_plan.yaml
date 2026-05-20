@@ -1,0 +1,220 @@
+test_plan:
+  name: "Map clustering — pin-density exploration & future-work fixture"
+  description: >
+    The product currently renders one Leaflet marker per event with no
+    clustering layer. At country-level zoom on the explorer map, dense
+    cities like Paris and Berlin become an illegible stack of
+    overlapping discs. This scenario seeds 30 events distributed as:
+
+      * 16 events in central Paris (within ~700m of the Louvre)
+      * 8 events in Berlin Mitte (~500m radius)
+      * 6 outliers across Madrid / Rome / Lisbon / Amsterdam /
+        Vienna / Prague
+
+    so we have a reproducible fixture for the current (degraded) UX
+    AND the acceptance baseline for the future clustering layer.
+
+    NOTE: `leaflet.markercluster` is NOT installed in
+    `frontend/package.json` at the time of writing — the "expected"
+    blocks below distinguish current behavior from the desired
+    behavior so this file doubles as a spec.
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=map-clustering"
+    - >
+      Same broader cast as the following-badge scenario is seeded
+      (7 mutual friends of bob, 6 one-way followees, 20 strangers)
+      plus the same follow graph. settings.yaml flips on
+      `following_badge_enabled` so the Paris hero event surfaces the
+      blue Following chip on its pin and the avatar stack in the
+      popup — proving the cluster fixture also exercises the friend
+      signals the future cluster layer must preserve when expanding.
+    - >
+      Hero event evt-cluster-par-08 (Madeleine Salsa Saturday) seeds
+      the full rich mix: 5 friends going + 2 friends saved + 6
+      followed-not-friends going publicly + 10 strangers going + 10
+      strangers saving. Lighter mixes are sprinkled on par-01, par-12,
+      par-16, ber-01, ber-08, mad-01, rom-01, lis-01.
+    - >
+      Trending is also wired on (`trending_enabled: true`,
+      `trending_floor_going: 1`, `trending_top_n: 5`,
+      `trending_top_percent: 15`) and `db-tracking.yaml` seeds
+      EventView rows mirroring the trending-events scenario:
+      par-08 (20 views), par-16 (14), ber-08 (12), par-01 (10),
+      par-12 / ber-01 (8 each), mad-01 (6), rom-01 (4), lis-01 (3),
+      plus a view-bait control par-04 (15 views, 0 RSVPs, 0 saves).
+    - "Unseen overlay flag remains at its default (off)."
+
+  steps:
+    - id: 1
+      title: "Continent-level zoom shows three visually distinct clumps"
+      description: >
+        Open / signed out. Wait for the map to settle, then zoom out
+        until France, Germany and Spain are all visible (roughly
+        zoom level 4-5).
+      expected:
+        current: >
+          A dense overlapping cluster of pins is visible over Paris
+          (16 pins compressed into a single illegible disc), another
+          smaller stack over Berlin (8 pins), and six isolated pins
+          for the outliers. Pin colors blur together because they
+          overlap.
+        future_clustering: >
+          The Paris stack collapses into a single circular cluster
+          badge displaying "16"; Berlin shows "8"; outliers remain
+          single pins. Cluster badge color reflects the dominant
+          calendar in the cluster (e.g. salsa-cal-001 red if salsa
+          events dominate).
+
+    - id: 2
+      title: "City-level zoom (Paris) still has overlapping pins"
+      description: >
+        Double-click on the Paris cluster (or zoom in until the map
+        scale shows ~500m). Pin positions span roughly 700m around
+        the Louvre.
+      expected:
+        current: >
+          Most of the 16 Paris pins are now individually visible but
+          several pairs (e.g. evt-cluster-par-05 Palais-Royal and
+          evt-cluster-par-15 Pyramides — ~50m apart) still visually
+          overlap. Hovering reveals only the topmost pin's tooltip;
+          the underlying one is unreachable without zooming further.
+        future_clustering: >
+          Sub-clusters appear inside the Paris area at this zoom
+          (e.g. one badge over Louvre/Palais-Royal grouping 4-5
+          events, one over Les Halles grouping 3-4). Zooming one
+          more step expands each sub-cluster.
+
+    - id: 3
+      title: "Street-level zoom resolves every pin individually"
+      description: >
+        Zoom to ~100m scale and pan across the cluster.
+      expected:
+        current: >
+          All 16 Paris pins are clickable individually. Pin colors
+          (red salsa / purple bachata / blue kizomba) are legible.
+          This is the only zoom level at which the current UX is
+          actually usable for a dense city.
+        future_clustering: >
+          All cluster badges have expanded into individual pins; the
+          page behaves identically to the current implementation at
+          this zoom level (clustering is purely a far-zoom helper).
+
+    - id: 4
+      title: "Outliers always render as single pins"
+      description: >
+        Pan to Madrid, Rome, Lisbon, Amsterdam, Vienna, Prague — one
+        event each.
+      expected: >
+        Each outlier renders as a single pin at every zoom level.
+        Behavior is identical between current and future-clustering
+        implementations.
+
+    - id: 5
+      title: "List panel and map stay in sync as you pan"
+      description: >
+        With the list panel open on the left, pan the map to center
+        only Berlin. The list should filter to the 8 Berlin events.
+      expected: >
+        `onBoundsChange` fires, the list panel re-queries with the
+        new bounds, and only the 8 evt-cluster-ber-* events remain
+        visible in the list. Confirms map-list coupling still works
+        regardless of pin density (this contract MUST be preserved
+        when clustering is added).
+
+    - id: 6
+      title: "Following decorations are visible on the seeded pins"
+      description: >
+        Sign in as Bob. Trending and Following are both flipped on by
+        settings.yaml (Unseen remains off). This step focuses on the
+        blue Following chip — trending is asserted separately in
+        step 8. Locate each pin with at least one friend or
+        followed-not-friends RSVP and read its chip.
+      expected: >
+        Pins with following signal:
+          * evt-cluster-par-08 (Madrid hero) — chip reads "11"
+            (5 friends going + 6 followed-not-friends going public).
+          * evt-cluster-par-01 — chip reads "3" (3 friends going).
+          * evt-cluster-par-12 — chip reads "1" (1 friend going).
+          * evt-cluster-par-16 — chip reads "4" (4 friends going).
+          * evt-cluster-ber-01 — chip reads "5" (2 friends + 3
+            followed-not-friends).
+          * evt-cluster-mad-01 — chip reads "2".
+          * evt-cluster-rom-01 — chip reads "3" (only followed-not-
+            friends).
+        Pins without following signal: evt-cluster-ber-08,
+        evt-cluster-lis-01, all other par-* / ber-* with no seeded
+        edges. Proves the cluster fixture isolates the *density*
+        problem from the *signal-overlay* shape while still
+        exercising both — the future cluster layer MUST preserve
+        these chips when individual pins expand from a cluster.
+
+    - id: 7
+      title: "Hero popup renders the unified AttendeeAvatarStack"
+      description: >
+        Click the pin for evt-cluster-par-08 (Paris hero).
+      expected: >
+        The popup body shows an `AttendeeAvatarStack` (avatars + "+N
+        more" overflow) instead of any "<N> friend interested" text
+        line — the same component used on event cards and in the
+        following-badge scenario. The first 5 avatars carry blue
+        rings (alice, emma, frank, gina, hugo); a small inline
+        PeopleIcon prefixes the track. Followed-not-friends and
+        strangers fill the overflow count but DO NOT add blue rings.
+
+    - id: 8
+      title: "Trending ring is drawn on the top-N pins"
+      description: >
+        Still as Bob, with `trending_enabled: true` and the seeded
+        `db-tracking.yaml` views, identify which pins carry the
+        orange trending ring overlay. Compute the effective cap:
+        `min(trending_top_n=5, ceil(visible*trending_top_percent/100))`
+        — with 30 visible events and percent=15, ceil(30*0.15)=5, so
+        both knobs land at 5.
+      expected: >
+        The 5 crowned pins are exactly:
+          1. evt-cluster-par-08 (20 views + 21 going + 12 saves)
+          2. evt-cluster-par-16 (14 views + 4 going)
+          3. evt-cluster-ber-08 (12 views + 6 going + 1 friend save)
+          4. evt-cluster-par-01 (10 views + 5 going)
+          5. evt-cluster-ber-01 (8 views + 5 going)
+        Each carries the orange ring around the colored disc. All
+        other pins render without the ring. Confirms tracking +
+        attendance signals compose the same way they do in
+        scenarios/trending-events.
+
+    - id: 9
+      title: "View-bait control is suppressed by trending_floor_going"
+      description: >
+        Locate evt-cluster-par-04 (Opéra Tuesday) on the map. It has
+        15 seeded views — the SECOND-highest view count in the seed —
+        but ZERO RSVPs and ZERO saves.
+      expected: >
+        Pin shows NO orange trending ring even though its raw view
+        count is higher than several crowned pins. Proves
+        `trending_floor_going: 1` correctly suppresses view-bait —
+        same behavior as evt-trend-004 in trending-events. Flipping
+        the floor to 0 in /admin/configuration and reloading should
+        crown par-04 (regression check that the knob is wired).
+
+    - id: 10
+      title: "Following + Trending overlays co-exist on the hero pin"
+      description: >
+        Re-locate evt-cluster-par-08 (Paris hero) on the map.
+      expected: >
+        Hero pin renders BOTH overlays simultaneously: orange
+        trending ring around the disc AND the blue Following chip
+        with count "11" at the bottom-right. Validates the two
+        decoration layers stack independently and that future
+        cluster work must preserve both on cluster expansion.
+
+  future_work:
+    summary: >
+      Acceptance criteria for the clustering layer when it ships.
+    items:
+      - "Add `leaflet.markercluster` (or a custom equivalent) to frontend/package.json."
+      - "Cluster badge size scales with N; color reflects dominant calendar in the cluster."
+      - "`onBoundsChange` still fires correctly so the list panel filtering keeps working."
+      - "Trending ring / following chip / unseen dot decorations still apply to individual pins after they expand from a cluster."
+      - "Cluster badges themselves should surface an aggregate following count when at least one underlying pin has a Following chip (e.g. small blue ring around the badge with the summed `following_friend_count`)."
+      - "This test_plan's 'future_clustering' branches become the acceptance gates."

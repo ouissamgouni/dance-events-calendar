@@ -1,0 +1,6 @@
+# Pre-seeded follow graph for E1.
+# dave already follows viewer; viewer does NOT follow back, so the
+# Follow-back button (E1) is the next click required.
+follows:
+  - follower: dave
+    followee: viewer

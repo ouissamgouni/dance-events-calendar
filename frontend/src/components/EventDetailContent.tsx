@@ -13,11 +13,13 @@ import LocationBadge from './LocationBadge';
 import SaveEventButton from './SaveEventButton';
 import GoingButton from './GoingButton';
 import AttendeeList from './AttendeeList';
+import GoingWedge from './GoingWedge';
 import RateEventButton from './RateEventButton';
 import TagBadges from './TagBadges';
 import SuggestTagsButton from './SuggestTagsButton';
 import ExpandableDescription from './ExpandableDescription';
 import ShareButton from './ShareButton';
+import { EventPromoCodes } from './EventPromoCodes';
 
 interface Props {
     event: CalendarEvent;
@@ -236,30 +238,74 @@ export default function EventDetailContent({
                     </div>
                 )}
 
+                {/* Organizer pill — surfaces an admin-approved organizer
+                    attribution. ``event.organizer`` is server-gated on the
+                    ``organizer_claims_enabled`` flag. */}
+                {event.organizer && (
+                    <div className="mt-1">
+                        <a
+                            href={event.organizer.handle ? `/u/${event.organizer.handle}` : '#'}
+                            className="inline-flex items-center gap-1.5 bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-200 transition"
+                            onClick={(e) => {
+                                if (!event.organizer?.handle) e.preventDefault();
+                            }}
+                        >
+                            {event.organizer.avatar_url && (
+                                <img
+                                    src={event.organizer.avatar_url}
+                                    alt=""
+                                    className="h-4 w-4 rounded-full object-cover"
+                                />
+                            )}
+                            <span>
+                                Organized by{' '}
+                                {event.organizer.handle
+                                    ? `@${event.organizer.handle}`
+                                    : event.organizer.display_name ?? 'organizer'}
+                            </span>
+                            {event.organizer.is_verified_organizer && (
+                                <img
+                                    src="/orga.png"
+                                    alt=""
+                                    title="Verified organizer"
+                                    aria-label="Verified organizer"
+                                    className="w-3.5 h-3.5 object-contain"
+                                />
+                            )}
+                        </a>
+                    </div>
+                )}
+
                 {/* Price badges — shown below the date */}
                 {hasVisibleBadge && editingField !== 'price' && (
-                    <div
-                        className={`flex items-center gap-2 mt-2 flex-wrap ${editable ? 'group relative cursor-pointer hover:bg-slate-50 -mx-2 px-2 py-1 rounded transition' : ''}`}
-                        onClick={editable ? startPriceEdit : undefined}
-                    >
-                        {showPrices && event.price_is_free && (
-                            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                                Free
-                            </span>
-                        )}
-                        {showPrices && !event.price_is_free && event.price_min != null && event.price_currency && (
-                            <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-                                {event.price_max != null && event.price_max !== event.price_min
-                                    ? `${event.price_currency} ${event.price_min}\u2013${event.price_max}`
-                                    : `${event.price_currency} ${event.price_min}`}
-                            </span>
-                        )}
-                        {showPopularity && event.view_count > 0 && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-                                {event.view_count >= 10 ? '\uD83D\uDD25' : '\uD83D\uDC41'} {event.view_count} view{event.view_count !== 1 ? 's' : ''}
-                            </span>
-                        )}
-                        {editable && <EditHint />}
+                    <div className="flex items-start gap-3 mt-2 flex-wrap">
+                        <div
+                            className={`flex items-center gap-2 flex-wrap ${editable ? 'group relative cursor-pointer hover:bg-slate-50 -mx-2 px-2 py-1 rounded transition' : ''}`}
+                            onClick={editable ? startPriceEdit : undefined}
+                        >
+                            {showPrices && event.price_is_free && (
+                                <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                                    Free
+                                </span>
+                            )}
+                            {showPrices && !event.price_is_free && event.price_min != null && event.price_currency && (
+                                <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                                    {event.price_max != null && event.price_max !== event.price_min
+                                        ? `${event.price_currency} ${event.price_min}\u2013${event.price_max}`
+                                        : `${event.price_currency} ${event.price_min}`}
+                                </span>
+                            )}
+                            {showPopularity && event.view_count > 0 && (
+                                <span className="inline-flex items-center gap-1 bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                                    <svg viewBox="0 0 20 20" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                                        <path d="M2 10s2.5-5 8-5 8 5 8 5-2.5 5-8 5-8-5-8-5Z" strokeLinejoin="round" />
+                                        <circle cx="10" cy="10" r="2.25" />
+                                    </svg>
+                                    {event.view_count} view{event.view_count !== 1 ? 's' : ''}
+                                </span>
+                            )}
+                            {editable && <EditHint />}
+                        </div>
                     </div>
                 )}
 
@@ -491,6 +537,9 @@ export default function EventDetailContent({
                 </div>
             ) : null}
 
+            {/* Promo codes — collapsible section under the description. */}
+            <EventPromoCodes eventId={event.event_id} />
+
             {/* Links */}
             {editable && editingField === 'links' ? (
                 <div className="space-y-2 border-t border-slate-100 pt-3">
@@ -607,6 +656,12 @@ export default function EventDetailContent({
                     <AttendeeList eventId={event.event_id} expanded />
                 </div>
             )}
+
+            {/* Phase E (E5) — friends / FoF social-proof wedge.
+                Renders nothing for anon viewers and nothing when all
+                three buckets are empty, so it's safe to mount
+                unconditionally alongside AttendeeList. */}
+            {showActions && <GoingWedge eventId={event.event_id} />}
 
             {/* Action bar */}
             {showActions && (

@@ -1,0 +1,146 @@
+# Pre-seeded EventView rows for the map-clustering scenario — gives the
+# trending / popularity overlay something to chew on so the cluster
+# fixture exercises BOTH the friend signal AND the orange ring at
+# realistic densities. Same shape as scenarios/trending-events/
+# db-tracking.yaml.
+#
+# Distribution (paired with the attendance/saves mix in db-events.yaml):
+#   * evt-cluster-par-08 (Madrid Paris hero) — 20 views: combined with
+#     5 friends going + 6 followed-not-friends going + 10 strangers
+#     going + 10 strangers saving, its popularity_score easily wins
+#     the top crown.
+#   * evt-cluster-par-16 (Halles festival)   — 14 views
+#   * evt-cluster-par-01 (Louvre sunset)     — 10 views
+#   * evt-cluster-par-12 (Les Halles Friday) —  8 views
+#   * evt-cluster-ber-01 (Alexanderplatz)    —  8 views
+#   * evt-cluster-ber-08 (Holzmarkt fest)    — 12 views
+#   * evt-cluster-mad-01 (Madrid headliner)  —  6 views
+#   * evt-cluster-rom-01 (Rome Trastevere)   —  4 views
+#   * evt-cluster-lis-01 (Lisbon Cais)       —  3 views
+#   * evt-cluster-par-04 (Opéra Tuesday)     — 15 views with NO RSVPs
+#     and no saves — the view-bait control. Validates that
+#     `trending_floor_going: 1` suppresses it from the trending top-N
+#     even though it has the second-highest view count, exactly like
+#     evt-trend-004 in the trending-events scenario.
+views:
+  # --- evt-cluster-par-08 (hero) ---
+  - { event_id: evt-cluster-par-08, device_id: seed-mc-view-01, source: explorer-list, country: France, city: Paris }
+  - { event_id: evt-cluster-par-08, device_id: seed-mc-view-02, source: explorer-list, country: France, city: Paris }
+  - { event_id: evt-cluster-par-08, device_id: seed-mc-view-03, source: explorer-list, country: France, city: Paris }
+  - { event_id: evt-cluster-par-08, device_id: seed-mc-view-04, source: explorer-map,  country: France, city: Paris }
+  - { event_id: evt-cluster-par-08, device_id: seed-mc-view-05, source: explorer-map,  country: France, city: Paris }
+  - { event_id: evt-cluster-par-08, device_id: seed-mc-view-06, source: explorer-map,  country: Germany, city: Berlin }
+  - { event_id: evt-cluster-par-08, device_id: seed-mc-view-07, source: explorer-map,  country: Germany, city: Berlin }
+  - { event_id: evt-cluster-par-08, device_id: seed-mc-view-08, source: shared-link,   country: Spain,   city: Madrid }
+  - { event_id: evt-cluster-par-08, device_id: seed-mc-view-09, source: shared-link,   country: Spain,   city: Barcelona }
+  - { event_id: evt-cluster-par-08, device_id: seed-mc-view-10, source: shared-link,   country: Italy,   city: Rome }
+  - { event_id: evt-cluster-par-08, device_id: seed-mc-view-11, source: explorer-list, country: Belgium }
+  - { event_id: evt-cluster-par-08, device_id: seed-mc-view-12, source: explorer-list, country: Netherlands }
+  - { event_id: evt-cluster-par-08, device_id: seed-mc-view-13, source: explorer-map,  country: Portugal }
+  - { event_id: evt-cluster-par-08, device_id: seed-mc-view-14, source: explorer-map,  country: Czechia }
+  - { event_id: evt-cluster-par-08, device_id: seed-mc-view-15, source: shared-link,   country: Austria }
+  - { event_id: evt-cluster-par-08, device_id: seed-mc-view-16, source: shared-link,   country: UK }
+  - { event_id: evt-cluster-par-08, device_id: seed-mc-view-17, source: shared-link,   country: UK }
+  - { event_id: evt-cluster-par-08, device_id: seed-mc-view-18, source: shared-link,   country: Ireland }
+  - { event_id: evt-cluster-par-08, device_id: seed-mc-view-19, source: explorer-list, country: Sweden }
+  - { event_id: evt-cluster-par-08, device_id: seed-mc-view-20, source: explorer-list, country: Denmark }
+
+  # --- evt-cluster-par-16 (Halles festival) — 14 views ---
+  - { event_id: evt-cluster-par-16, device_id: seed-mc-view-21, source: explorer-list, country: France, city: Paris }
+  - { event_id: evt-cluster-par-16, device_id: seed-mc-view-22, source: explorer-list, country: France, city: Paris }
+  - { event_id: evt-cluster-par-16, device_id: seed-mc-view-23, source: explorer-map,  country: France, city: Paris }
+  - { event_id: evt-cluster-par-16, device_id: seed-mc-view-24, source: explorer-map,  country: France, city: Lyon }
+  - { event_id: evt-cluster-par-16, device_id: seed-mc-view-25, source: shared-link,   country: Germany, city: Berlin }
+  - { event_id: evt-cluster-par-16, device_id: seed-mc-view-26, source: shared-link,   country: Germany, city: Munich }
+  - { event_id: evt-cluster-par-16, device_id: seed-mc-view-27, source: shared-link,   country: Spain, city: Madrid }
+  - { event_id: evt-cluster-par-16, device_id: seed-mc-view-28, source: explorer-list, country: Italy, city: Rome }
+  - { event_id: evt-cluster-par-16, device_id: seed-mc-view-29, source: explorer-list, country: Belgium }
+  - { event_id: evt-cluster-par-16, device_id: seed-mc-view-30, source: explorer-map,  country: Netherlands }
+  - { event_id: evt-cluster-par-16, device_id: seed-mc-view-31, source: explorer-map,  country: Portugal }
+  - { event_id: evt-cluster-par-16, device_id: seed-mc-view-32, source: shared-link,   country: Austria }
+  - { event_id: evt-cluster-par-16, device_id: seed-mc-view-33, source: shared-link,   country: UK }
+  - { event_id: evt-cluster-par-16, device_id: seed-mc-view-34, source: shared-link,   country: Sweden }
+
+  # --- evt-cluster-par-01 (Louvre) — 10 views ---
+  - { event_id: evt-cluster-par-01, device_id: seed-mc-view-35, source: explorer-list, country: France, city: Paris }
+  - { event_id: evt-cluster-par-01, device_id: seed-mc-view-36, source: explorer-list, country: France, city: Paris }
+  - { event_id: evt-cluster-par-01, device_id: seed-mc-view-37, source: explorer-map,  country: France, city: Paris }
+  - { event_id: evt-cluster-par-01, device_id: seed-mc-view-38, source: explorer-map,  country: Germany }
+  - { event_id: evt-cluster-par-01, device_id: seed-mc-view-39, source: explorer-map,  country: Spain }
+  - { event_id: evt-cluster-par-01, device_id: seed-mc-view-40, source: shared-link,   country: Italy }
+  - { event_id: evt-cluster-par-01, device_id: seed-mc-view-41, source: shared-link,   country: Belgium }
+  - { event_id: evt-cluster-par-01, device_id: seed-mc-view-42, source: explorer-list, country: Netherlands }
+  - { event_id: evt-cluster-par-01, device_id: seed-mc-view-43, source: explorer-list, country: Portugal }
+  - { event_id: evt-cluster-par-01, device_id: seed-mc-view-44, source: explorer-list, country: UK }
+
+  # --- evt-cluster-par-12 (Les Halles) — 8 views ---
+  - { event_id: evt-cluster-par-12, device_id: seed-mc-view-45, source: explorer-list, country: France }
+  - { event_id: evt-cluster-par-12, device_id: seed-mc-view-46, source: explorer-list, country: France }
+  - { event_id: evt-cluster-par-12, device_id: seed-mc-view-47, source: explorer-map,  country: France }
+  - { event_id: evt-cluster-par-12, device_id: seed-mc-view-48, source: explorer-map,  country: Germany }
+  - { event_id: evt-cluster-par-12, device_id: seed-mc-view-49, source: shared-link,   country: Spain }
+  - { event_id: evt-cluster-par-12, device_id: seed-mc-view-50, source: shared-link,   country: Italy }
+  - { event_id: evt-cluster-par-12, device_id: seed-mc-view-51, source: explorer-list, country: Belgium }
+  - { event_id: evt-cluster-par-12, device_id: seed-mc-view-52, source: explorer-list, country: Netherlands }
+
+  # --- evt-cluster-ber-01 (Alexanderplatz) — 8 views ---
+  - { event_id: evt-cluster-ber-01, device_id: seed-mc-view-53, source: explorer-list, country: Germany, city: Berlin }
+  - { event_id: evt-cluster-ber-01, device_id: seed-mc-view-54, source: explorer-list, country: Germany, city: Berlin }
+  - { event_id: evt-cluster-ber-01, device_id: seed-mc-view-55, source: explorer-map,  country: Germany, city: Berlin }
+  - { event_id: evt-cluster-ber-01, device_id: seed-mc-view-56, source: explorer-map,  country: Germany, city: Munich }
+  - { event_id: evt-cluster-ber-01, device_id: seed-mc-view-57, source: shared-link,   country: France }
+  - { event_id: evt-cluster-ber-01, device_id: seed-mc-view-58, source: shared-link,   country: Austria }
+  - { event_id: evt-cluster-ber-01, device_id: seed-mc-view-59, source: explorer-list, country: Czechia }
+  - { event_id: evt-cluster-ber-01, device_id: seed-mc-view-60, source: explorer-list, country: Netherlands }
+
+  # --- evt-cluster-ber-08 (Holzmarkt festival) — 12 views ---
+  - { event_id: evt-cluster-ber-08, device_id: seed-mc-view-61, source: explorer-list, country: Germany, city: Berlin }
+  - { event_id: evt-cluster-ber-08, device_id: seed-mc-view-62, source: explorer-list, country: Germany, city: Berlin }
+  - { event_id: evt-cluster-ber-08, device_id: seed-mc-view-63, source: explorer-list, country: Germany, city: Hamburg }
+  - { event_id: evt-cluster-ber-08, device_id: seed-mc-view-64, source: explorer-map,  country: Germany, city: Berlin }
+  - { event_id: evt-cluster-ber-08, device_id: seed-mc-view-65, source: explorer-map,  country: France }
+  - { event_id: evt-cluster-ber-08, device_id: seed-mc-view-66, source: explorer-map,  country: Austria }
+  - { event_id: evt-cluster-ber-08, device_id: seed-mc-view-67, source: shared-link,   country: Czechia }
+  - { event_id: evt-cluster-ber-08, device_id: seed-mc-view-68, source: shared-link,   country: Poland }
+  - { event_id: evt-cluster-ber-08, device_id: seed-mc-view-69, source: shared-link,   country: Denmark }
+  - { event_id: evt-cluster-ber-08, device_id: seed-mc-view-70, source: explorer-list, country: Sweden }
+  - { event_id: evt-cluster-ber-08, device_id: seed-mc-view-71, source: explorer-list, country: Netherlands }
+  - { event_id: evt-cluster-ber-08, device_id: seed-mc-view-72, source: explorer-list, country: UK }
+
+  # --- evt-cluster-mad-01 (Madrid) — 6 views ---
+  - { event_id: evt-cluster-mad-01, device_id: seed-mc-view-73, source: explorer-list, country: Spain, city: Madrid }
+  - { event_id: evt-cluster-mad-01, device_id: seed-mc-view-74, source: explorer-list, country: Spain, city: Madrid }
+  - { event_id: evt-cluster-mad-01, device_id: seed-mc-view-75, source: explorer-map,  country: Spain, city: Barcelona }
+  - { event_id: evt-cluster-mad-01, device_id: seed-mc-view-76, source: explorer-map,  country: Portugal }
+  - { event_id: evt-cluster-mad-01, device_id: seed-mc-view-77, source: shared-link,   country: France }
+  - { event_id: evt-cluster-mad-01, device_id: seed-mc-view-78, source: shared-link,   country: Italy }
+
+  # --- evt-cluster-rom-01 (Rome) — 4 views ---
+  - { event_id: evt-cluster-rom-01, device_id: seed-mc-view-79, source: explorer-list, country: Italy, city: Rome }
+  - { event_id: evt-cluster-rom-01, device_id: seed-mc-view-80, source: explorer-list, country: Italy, city: Milan }
+  - { event_id: evt-cluster-rom-01, device_id: seed-mc-view-81, source: explorer-map,  country: France }
+  - { event_id: evt-cluster-rom-01, device_id: seed-mc-view-82, source: shared-link,   country: Spain }
+
+  # --- evt-cluster-lis-01 (Lisbon) — 3 views ---
+  - { event_id: evt-cluster-lis-01, device_id: seed-mc-view-83, source: explorer-list, country: Portugal, city: Lisbon }
+  - { event_id: evt-cluster-lis-01, device_id: seed-mc-view-84, source: explorer-map,  country: Portugal, city: Porto }
+  - { event_id: evt-cluster-lis-01, device_id: seed-mc-view-85, source: shared-link,   country: Spain }
+
+  # --- evt-cluster-par-04 (Opéra Tuesday) — VIEW-BAIT CONTROL: 15 views,
+  #     ZERO RSVPs, ZERO saves. Must NOT enter the trending top-N because
+  #     `trending_floor_going: 1` is applied. Mirrors evt-trend-004.
+  - { event_id: evt-cluster-par-04, device_id: seed-mc-view-86, source: explorer-list, country: France, city: Paris }
+  - { event_id: evt-cluster-par-04, device_id: seed-mc-view-87, source: explorer-list, country: France, city: Paris }
+  - { event_id: evt-cluster-par-04, device_id: seed-mc-view-88, source: explorer-list, country: France, city: Paris }
+  - { event_id: evt-cluster-par-04, device_id: seed-mc-view-89, source: explorer-map,  country: France, city: Paris }
+  - { event_id: evt-cluster-par-04, device_id: seed-mc-view-90, source: explorer-map,  country: Germany, city: Berlin }
+  - { event_id: evt-cluster-par-04, device_id: seed-mc-view-91, source: explorer-map,  country: Germany, city: Munich }
+  - { event_id: evt-cluster-par-04, device_id: seed-mc-view-92, source: shared-link,   country: Spain }
+  - { event_id: evt-cluster-par-04, device_id: seed-mc-view-93, source: shared-link,   country: Italy }
+  - { event_id: evt-cluster-par-04, device_id: seed-mc-view-94, source: shared-link,   country: Belgium }
+  - { event_id: evt-cluster-par-04, device_id: seed-mc-view-95, source: shared-link,   country: Netherlands }
+  - { event_id: evt-cluster-par-04, device_id: seed-mc-view-96, source: explorer-list, country: Portugal }
+  - { event_id: evt-cluster-par-04, device_id: seed-mc-view-97, source: explorer-list, country: Austria }
+  - { event_id: evt-cluster-par-04, device_id: seed-mc-view-98, source: explorer-list, country: Czechia }
+  - { event_id: evt-cluster-par-04, device_id: seed-mc-view-99, source: explorer-map,  country: UK }
+  - { event_id: evt-cluster-par-04, device_id: seed-mc-view-100, source: explorer-map, country: Sweden }

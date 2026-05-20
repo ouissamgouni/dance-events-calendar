@@ -1,0 +1,28 @@
+# Map-clustering exploration scenario.
+#
+# Stresses the explorer map with a high density of pins in Paris /
+# Berlin (and a sparse long tail) so we can:
+#
+#   1. Document the *current* behavior (pins overlap and become
+#      unreadable in dense clusters).
+#   2. Have a reproducible seed for the future
+#      `leaflet.markercluster` (or custom cluster layer) work.
+#   3. Mirror the following-badge scenario's friend / followed-not-
+#      friends signal mix so cluster pins also exercise the blue
+#      Following chip — proving the future cluster layer must not
+#      drop those decorations when pins collapse into a cluster.
+#
+# When clustering ships, this scenario's `test_plan.yaml` becomes the
+# acceptance fixture for the new layer.
+settings:
+  following_badge_enabled: true
+  # Trending wired on so the cluster fixture also surfaces the orange
+  # popularity ring on its hottest pins (par-08 hero + a handful of
+  # secondary Paris/Berlin events). Same knob shape as trending-events.
+  show_popularity: true
+  popularity_threshold: 1
+  trending_enabled: true
+  trending_window_days: 30
+  trending_floor_going: 1
+  trending_top_n: 5
+  trending_top_percent: 15

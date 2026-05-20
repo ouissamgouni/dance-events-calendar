@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { fetchAdminRatings, fetchAdminTagSuggestionCount, fetchEventFilterOptions } from '../api';
+import { fetchAdminOrganizerClaims, fetchAdminPromoCodes, fetchAdminRatings, fetchAdminTagSuggestionCount, fetchEventFilterOptions } from '../api';
 import { useAdminPrefs } from '../context/AdminPrefsContext';
 
 export interface AdminCounters {
@@ -23,6 +23,8 @@ export interface AdminCounters {
     ungeolocated: number;
     tagSuggestions: number;
     feedbackPending: number;
+    organizerClaimsPending: number;
+    promoCodesPending: number;
 }
 
 const ZERO: AdminCounters = {
@@ -30,6 +32,8 @@ const ZERO: AdminCounters = {
     ungeolocated: 0,
     tagSuggestions: 0,
     feedbackPending: 0,
+    organizerClaimsPending: 0,
+    promoCodesPending: 0,
 };
 
 /**
@@ -76,6 +80,24 @@ export function useAdminCounters(): { counters: AdminCounters; refresh: () => vo
         fetchAdminRatings({ status: 'pending', page: 1, pageSize: 1 })
             .then((res) =>
                 setCounters((prev) => ({ ...prev, feedbackPending: res.total })),
+            )
+            .catch(() => undefined);
+
+        fetchAdminOrganizerClaims('pending')
+            .then((rows) =>
+                setCounters((prev) => ({
+                    ...prev,
+                    organizerClaimsPending: rows.length,
+                })),
+            )
+            .catch(() => undefined);
+
+        fetchAdminPromoCodes('pending')
+            .then((rows) =>
+                setCounters((prev) => ({
+                    ...prev,
+                    promoCodesPending: rows.length,
+                })),
             )
             .catch(() => undefined);
     }, [includePast]);

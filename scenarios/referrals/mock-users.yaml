@@ -1,0 +1,22 @@
+# Phase E (E7) — referral scenario cast.
+#
+#   • `inviter`    — already onboarded; will generate a referral link
+#                    and watch used_count tick up.
+#   • `newbie`     — fresh visitor who will redeem via the cookie flow
+#                    (anonymous click on /r/:code → sign-in).
+#   • `signedin`   — already onboarded; demonstrates the
+#                    "open /r/:code while signed in" direct path.
+#   • `admin`      — required for /admin pages by convention.
+users:
+  - email: inviter@example.com
+    name: Iris Inviter
+    handle: inviter
+  - email: newbie@example.com
+    name: Nora Newbie
+    handle: newbie
+  - email: signedin@example.com
+    name: Sam Signedin
+    handle: signedin
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

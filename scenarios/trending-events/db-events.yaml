@@ -98,6 +98,172 @@ events:
     end: w-1 Wed 00:00
     price_is_free: true
 
+  # --- Geographic + temporal spread (proves top-3 cap with many
+  # candidates, and incidentally feeds the explorer map with a healthy
+  # multi-city dataset). Engineered going/saved counts keep these BELOW
+  # the top-3 of evt-trend-001/002/003 so the trending chip distribution
+  # stays predictable, while still exercising the threshold gate. ---
+  - id: evt-trend-010
+    calendar_id: salsa-cal-001
+    title: Amsterdam Salsa Sunday
+    description: Weekly social by the canal.
+    location: Paradiso, Weteringschans 6, Amsterdam, Netherlands
+    latitude: 52.3625
+    longitude: 4.8836
+    start: w2 Sun 19:00
+    end: w2 Sun 23:00
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+  - id: evt-trend-011
+    calendar_id: bachata-cal-002
+    title: Rome Bachata Rooftop
+    description: Sunset bachata with city views.
+    location: Terrazza Borromini, Piazza Navona, Rome, Italy
+    latitude: 41.8989
+    longitude: 12.4731
+    start: w2 Sat 18:30
+    end: w2 Sat 23:30
+    price_is_free: false
+    price_min: 12
+    price_currency: EUR
+  - id: evt-trend-012
+    calendar_id: salsa-cal-001
+    title: Barcelona Salsa Open Air
+    description: Beachfront salsa social.
+    location: Platja de la Barceloneta, Barcelona, Spain
+    latitude: 41.3784
+    longitude: 2.1925
+    start: w3 Fri 20:00
+    end: w3 Sat 01:00
+    price_is_free: true
+  - id: evt-trend-013
+    calendar_id: bachata-cal-002
+    title: Lisbon Kizomba & Bachata Night
+    description: Hosted by Casa do Kizomba.
+    location: B.Leza, Cais da Ribeira Nova, Lisbon, Portugal
+    latitude: 38.7077
+    longitude: -9.1493
+    start: w3 Sat 22:00
+    end: w4 Sun 03:00
+    price_is_free: false
+    price_min: 8
+    price_currency: EUR
+  - id: evt-trend-014
+    calendar_id: salsa-cal-001
+    title: Prague Salsa Tuesday
+    description: Weekday social in the old town.
+    location: Roxy, Dlouhá 33, Prague, Czechia
+    latitude: 50.0894
+    longitude: 14.4256
+    start: w3 Tue 20:30
+    end: w4 Wed 00:30
+    price_is_free: true
+  - id: evt-trend-015
+    calendar_id: bachata-cal-002
+    title: Vienna Bachata Brunch
+    description: Sunday morning bachata + brunch combo.
+    location: Volksgarten, Burgring, Vienna, Austria
+    latitude: 48.2082
+    longitude: 16.3669
+    start: w4 Sun 11:00
+    end: w4 Sun 15:00
+    price_is_free: false
+    price_min: 18
+    price_currency: EUR
+  - id: evt-trend-016
+    calendar_id: salsa-cal-001
+    title: Copenhagen Latin Friday
+    description: Multi-room (salsa / bachata / kizomba).
+    location: Vega, Enghavevej 40, Copenhagen, Denmark
+    latitude: 55.6700
+    longitude: 12.5450
+    start: w4 Fri 21:30
+    end: w5 Sat 02:00
+    price_is_free: false
+    price_min: 14
+    price_currency: EUR
+  - id: evt-trend-017
+    calendar_id: bachata-cal-002
+    title: Dublin Salsa Tuesday
+    description: Beginner-friendly bachata + salsa social.
+    location: Workman's Club, 10 Wellington Quay, Dublin, Ireland
+    latitude: 53.3441
+    longitude: -6.2674
+    start: w4 Tue 20:00
+    end: w4 Tue 23:30
+    price_is_free: true
+  - id: evt-trend-018
+    calendar_id: salsa-cal-001
+    title: Stockholm Salsa Open Stage
+    description: DJs and live percussion.
+    location: Debaser Strand, Hornstulls Strand 4, Stockholm, Sweden
+    latitude: 59.3147
+    longitude: 18.0288
+    start: w5 Sat 22:00
+    end: w6 Sun 03:00
+    price_is_free: false
+    price_min: 16
+    price_currency: SEK
+  - id: evt-trend-019
+    calendar_id: bachata-cal-002
+    title: Warsaw Bachata Sensual Festival (kickoff night)
+    description: Festival opening with international artists.
+    location: Hala Koszyki, Koszykowa 63, Warsaw, Poland
+    latitude: 52.2208
+    longitude: 21.0167
+    start: w5 Fri 20:00
+    end: w6 Sat 02:00
+    price_is_free: false
+    price_min: 35
+    price_currency: EUR
+  - id: evt-trend-020
+    calendar_id: salsa-cal-001
+    title: Zurich Salsa Lake Cruise
+    description: Boat social on the lake.
+    location: Bürkliplatz, Zurich, Switzerland
+    latitude: 47.3667
+    longitude: 8.5410
+    start: w5 Sat 18:00
+    end: w5 Sat 23:00
+    price_is_free: false
+    price_min: 40
+    price_currency: CHF
+  - id: evt-trend-021
+    calendar_id: salsa-cal-001
+    title: Paris Salsa Riverside Picnic
+    description: Daytime social on the Seine.
+    location: Quai de Seine, Paris, France
+    latitude: 48.8410
+    longitude: 2.3650
+    start: w2 Sat 14:00
+    end: w2 Sat 18:00
+    price_is_free: true
+  - id: evt-trend-022
+    calendar_id: bachata-cal-002
+    title: Berlin Sensual Bachata Pop-up
+    description: Surprise pop-up at a new studio.
+    location: Holzmarkt 25, Berlin, Germany
+    latitude: 52.5125
+    longitude: 13.4259
+    start: w2 Wed 20:00
+    end: w2 Wed 23:30
+    price_is_free: false
+    price_min: 15
+    price_currency: EUR
+  - id: evt-trend-023
+    calendar_id: salsa-cal-001
+    title: Brussels Mojito Salsa Night
+    description: Free welcome drink and group class.
+    location: Sounds Jazz Club, Rue de la Tulipe 28, Brussels, Belgium
+    latitude: 50.8392
+    longitude: 4.3680
+    start: w3 Thu 21:00
+    end: w4 Fri 01:00
+    price_is_free: false
+    price_min: 8
+    price_currency: EUR
+
 # Going RSVPs — primary signal for the trending score.
 attendances:
   # evt-trend-001 (4 going)
@@ -136,6 +302,41 @@ attendances:
     email: carol@example.com
     share_publicly: true
 
+  # --- Spread events: 1-2 going apiece so they're above the
+  # `trending_floor_going=1` gate but well below evt-trend-001/002.
+  # Their job is to populate the top-3 cap: only the 3 highest scoring
+  # candidates ever get a trending chip, even when many events qualify.
+  - event_id: evt-trend-010
+    email: alice@example.com
+    share_publicly: true
+  - event_id: evt-trend-011
+    email: bob@example.com
+    share_publicly: true
+  - event_id: evt-trend-011
+    email: carol@example.com
+    share_publicly: true
+  - event_id: evt-trend-012
+    email: dave@example.com
+    share_publicly: true
+  - event_id: evt-trend-013
+    email: eve@example.com
+    share_publicly: true
+  - event_id: evt-trend-016
+    email: alice@example.com
+    share_publicly: true
+  - event_id: evt-trend-016
+    email: bob@example.com
+    share_publicly: true
+  - event_id: evt-trend-019
+    email: carol@example.com
+    share_publicly: true
+  - event_id: evt-trend-019
+    email: dave@example.com
+    share_publicly: true
+  - event_id: evt-trend-022
+    email: eve@example.com
+    share_publicly: true
+
 # Saved-event signal — secondary contributor to the score.
 saves:
   # evt-trend-001 (3 saves)
@@ -170,4 +371,30 @@ saves:
     audience: friends
   - event_id: evt-trend-005
     email: eve@example.com
+    audience: friends
+
+  # --- Spread events: one save each, secondary signal only. ---
+  - event_id: evt-trend-010
+    email: alice@example.com
+    audience: friends
+  - event_id: evt-trend-011
+    email: bob@example.com
+    audience: friends
+  - event_id: evt-trend-012
+    email: carol@example.com
+    audience: friends
+  - event_id: evt-trend-013
+    email: dave@example.com
+    audience: friends
+  - event_id: evt-trend-016
+    email: eve@example.com
+    audience: friends
+  - event_id: evt-trend-019
+    email: alice@example.com
+    audience: friends
+  - event_id: evt-trend-020
+    email: bob@example.com
+    audience: friends
+  - event_id: evt-trend-022
+    email: carol@example.com
     audience: friends
