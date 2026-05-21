@@ -21,6 +21,7 @@ export interface TagGroup {
     ordinal: number;
     allow_multiple: boolean;
     enabled: boolean;
+    onboarding_eligible: boolean;
     scope?: 'event' | 'review';
     tags: Tag[];
 }
@@ -90,13 +91,130 @@ export interface CalendarEvent {
     color: string | null;
     view_count: number;
     going_count?: number;
+    /** Distinct savers (UserSavedEvent rows). 0 when not surfaced by the endpoint. */
+    saved_count?: number;
+    /**
+     * Commitment-weighted, time-decayed popularity score. Set by the server
+     * when ``trending_enabled`` is on; otherwise 0. Use this (not
+     * ``view_count``) to drive the "Trending" badge and sort.
+     */
+    popularity_score?: number;
+    /**
+     * Count of the viewer's mutual friends with an audience-passing "going"
+     * or "saved" row on this event. Populated only when the
+     * ``following_badge_enabled`` site setting is on AND the viewer is
+     * signed in; otherwise 0.
+     */
+    following_friend_count?: number;
+    /**
+     * Up to 5 mutual friends (subset of ``following_friend_count``) used by
+     * the card's combined avatar track to render *who* — friends first.
+     */
+    following_friends_preview?: FriendMini[];
     price_min: number | null;
     price_max: number | null;
     price_currency: string | null;
     price_is_free: boolean;
     review_status?: string;
+    is_hidden?: boolean;
+    is_blocked?: boolean;
     links: LinkItem[] | null;
     tags: Tag[];
+    /** Server-computed: at least one approved, non-expired promo code exists.
+     * Drives the badge/count next to the price block. */
+    has_active_promo_codes?: boolean;
+    /** Approved organizer claim for this event (or null). */
+    organizer?: EventOrganizerMini | null;
+}
+
+export interface EventOrganizerMini {
+    user_id: string;
+    handle: string | null;
+    display_name: string | null;
+    avatar_url: string | null;
+    is_verified_organizer: boolean;
+}
+
+// --- User-submitted promo codes --------------------------------------------
+
+export interface PromoCodeSubmitter {
+    user_id: string;
+    handle: string | null;
+    display_name: string | null;
+    avatar_url: string | null;
+}
+
+export interface PromoCode {
+    id: string;
+    event_id: string;
+    code: string;
+    description: string | null;
+    source_url: string | null;
+    expires_at: string | null;
+    status: 'pending' | 'approved' | 'rejected';
+    submitter: PromoCodeSubmitter;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface PromoCodeAdmin extends PromoCode {
+    admin_notes: string | null;
+    reviewed_at: string | null;
+    reviewed_by: string | null;
+    event_title: string | null;
+}
+
+export interface PromoCodeCreate {
+    code: string;
+    description?: string | null;
+    source_url?: string | null;
+    expires_at?: string | null;
+}
+
+export type PromoCodeUpdate = Partial<PromoCodeCreate>;
+
+// --- Organizer claims ------------------------------------------------------
+
+export interface OrganizerClaimEvent {
+    event_id: string;
+    event_title: string | null;
+    event_start: string | null;
+    decision: 'pending' | 'approved' | 'rejected';
+}
+
+export interface OrganizerClaim {
+    id: string;
+    user_id: string;
+    kind: 'badge' | 'events';
+    status: 'pending' | 'approved' | 'rejected';
+    admin_notes: string | null;
+    reviewed_at: string | null;
+    reviewed_by: string | null;
+    created_at: string;
+    events: OrganizerClaimEvent[];
+}
+
+export interface OrganizerClaimAdmin extends OrganizerClaim {
+    user_handle: string | null;
+    user_display_name: string | null;
+    user_email: string | null;
+    user_avatar_url: string | null;
+    user_bio: string | null;
+    user_instagram_url: string | null;
+    user_facebook_url: string | null;
+}
+
+export interface OrganizerClaimCreate {
+    kind: 'badge' | 'events';
+    event_ids?: string[];
+}
+
+export interface OrganizerClaimDecide {
+    grant_badge: boolean;
+    approved_event_ids: string[];
+    rejected_event_ids: string[];
+    admin_notes?: string | null;
+    overwrite?: boolean;
 }
 
 export interface CalendarSetting {
@@ -107,6 +225,14 @@ export interface CalendarSetting {
 }
 
 export interface Attendee {
+    user_id: string;
+    display_name: string | null;
+    avatar_url: string | null;
+    handle: string | null;
+    viewer_follow_status?: 'pending' | 'approved';
+}
+
+export interface FriendMini {
     user_id: string;
     display_name: string | null;
     avatar_url: string | null;
@@ -126,6 +252,12 @@ export interface AttendanceSummary {
 export interface AttendingEventEntry {
     event_id: string;
     share_publicly: boolean;
+    share_audience?: 'public' | 'friends' | 'private';
+}
+
+export interface SavedEventEntry {
+    event_id: string;
+    audience: 'public' | 'friends' | 'private';
 }
 
 export interface AppInfo {
@@ -134,13 +266,20 @@ export interface AppInfo {
     frontend_version?: string | null;
     db_schema_version?: string | null;
     qa_scenarios?: string[];
+    analytics_enabled?: boolean;
 }
 
 export interface TestStep {
     id: number;
     title: string;
     description: string;
-    expected: string;
+    /**
+     * Either a plain string, or a labeled-variants object used by the
+     * map-clustering scenario to contrast current vs. future-work
+     * acceptance (keys are free-form, e.g. ``current`` /
+     * ``future_clustering``).
+     */
+    expected: string | Record<string, string>;
     verification: string;
 }
 
@@ -169,6 +308,10 @@ export interface EventSuggestionCreate {
     price_max?: number | null;
     price_currency?: string | null;
     price_is_free?: boolean;
+    /** When True (default), an approved suggestion is auto-saved to the
+     * authenticated submitter's Calendar. Has no effect for anonymous
+     * submissions. */
+    auto_save?: boolean;
     website?: string; // honeypot
     screen_size?: string;
     timezone?: string;

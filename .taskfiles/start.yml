@@ -1,16 +1,16 @@
 version: "3"
 
 vars:
-  RELOAD_FLAG: "{{if eq (env \"DONT_RELOAD\") \"true\"}}{{else}}--reload{{end}}"
-  LOG_LEVEL: "{{.LOG_LEVEL | default \"info\"}}"
-  UVICORN_ACCESS_LOG_EXCLUDE_PATHS: "{{.UVICORN_ACCESS_LOG_EXCLUDE_PATHS | default \"\"}}"
+  RELOAD_FLAG: '{{if eq (env "DONT_RELOAD") "true"}}{{else}}--reload{{end}}'
+  LOG_LEVEL: '{{.LOG_LEVEL | default "info"}}'
+  UVICORN_ACCESS_LOG_EXCLUDE_PATHS: '{{.UVICORN_ACCESS_LOG_EXCLUDE_PATHS | default ""}}'
   SCENARIO_PORTS_SH: .taskfiles/scenario_ports.sh
 
 tasks:
   dev:db:
     desc: Start dev database + Umami analytics (RESET=1 to teardown first)
     vars:
-      RESET: "{{.RESET | default \"0\"}}"
+      RESET: '{{.RESET | default "0"}}'
     cmds:
       - |
         if [ "{{.RESET}}" = "1" ]; then
@@ -25,25 +25,30 @@ tasks:
         echo "   Umami:    http://localhost:${UMAMI_PORT:-3100}"
 
   open:umami:
-    desc: Open Umami analytics dashboard in browser
+    desc: "Open Umami analytics dashboard. BROWSER=none|shared|isolated (default
+      shared), COUNT=N for isolated, RESET_BROWSER=1 to wipe profile."
     vars:
-      BROWSERS: "{{.BROWSERS | default \"0\"}}"
+      BROWSER: '{{.BROWSER | default "shared"}}'
+      COUNT: '{{.COUNT | default "1"}}'
+      RESET_BROWSER: '{{.RESET_BROWSER | default "0"}}'
     cmds:
       - |
-        {{.ROOT_DIR}}/.taskfiles/open-browsers.sh "http://localhost:${UMAMI_PORT:-3100}" {{.BROWSERS}}
+        {{.ROOT_DIR}}/.taskfiles/open-browsers.sh "http://localhost:${UMAMI_PORT:-3100}" "{{.BROWSER}}" "{{.COUNT}}" "umami" "{{.RESET_BROWSER}}"
 
   dev:db:check:
     internal: true
     desc: Check if dev database is running
     preconditions:
-      - sh: docker ps --filter "name=calendar_db_dev" --filter "status=running" --format
+      - sh:
+          docker ps --filter "name=calendar_db_dev" --filter "status=running" --format
           '{{`{{.Names}}`}}' | grep -q calendar_db_dev
         msg: |
           ❌ Dev database not running. Start it first:
              task start:dev:db
 
   dev:
-    desc: "Start all: DB + backend (reload) + frontend (vite)"
+    desc: "Start all: DB + backend (reload) + frontend (vite).
+      BROWSER=none|shared|isolated, COUNT=N, RESET_BROWSER=1."
     dotenv:
       [
         "{{.ROOT_DIR}}/config/base.env",
@@ -51,9 +56,11 @@ tasks:
         "{{.ROOT_DIR}}/config/secrets.env",
         "{{.ROOT_DIR}}/config/secrets.dev.env",
       ]
-    deps: [ dev:db ]
+    deps: [dev:db]
     vars:
-      BROWSERS: "{{.BROWSERS | default \"0\"}}"
+      BROWSER: '{{.BROWSER | default "none"}}'
+      COUNT: '{{.COUNT | default "1"}}'
+      RESET_BROWSER: '{{.RESET_BROWSER | default "0"}}'
     cmds:
       - task: dev:db:check
       - |
@@ -63,7 +70,7 @@ tasks:
           --kill-others-on-fail \
           "cd {{.BACKEND_DIR}} && PYTHONPATH={{.ROOT_DIR}} LOG_LEVEL={{.LOG_LEVEL}} UVICORN_ACCESS_LOG_EXCLUDE_PATHS={{.UVICORN_ACCESS_LOG_EXCLUDE_PATHS}} {{.ROOT_DIR}}/.venv/bin/uvicorn backend.api.main:app {{.RELOAD_FLAG}} --host 0.0.0.0 --port $BACKEND_PORT" \
           "cd {{.FRONTEND_DIR}} && npm run dev -- --port $FRONTEND_PORT --strictPort" \
-          "until curl -sf http://localhost:$FRONTEND_PORT >/dev/null 2>&1; do sleep 1; done && {{.ROOT_DIR}}/.taskfiles/open-browsers.sh http://localhost:$FRONTEND_PORT {{.BROWSERS}}"
+          "until curl -sf http://localhost:$FRONTEND_PORT >/dev/null 2>&1; do sleep 1; done && {{.ROOT_DIR}}/.taskfiles/open-browsers.sh http://localhost:$FRONTEND_PORT {{.BROWSER}} {{.COUNT}} dev {{.RESET_BROWSER}}"
 
   dev:debug:
     desc: "Start all with debugger on port 5678 (attach from VSCode)"
@@ -74,9 +81,11 @@ tasks:
         "{{.ROOT_DIR}}/config/secrets.env",
         "{{.ROOT_DIR}}/config/secrets.dev.env",
       ]
-    deps: [ dev:db ]
+    deps: [dev:db]
     vars:
-      BROWSERS: "{{.BROWSERS | default \"0\"}}"
+      BROWSER: '{{.BROWSER | default "none"}}'
+      COUNT: '{{.COUNT | default "1"}}'
+      RESET_BROWSER: '{{.RESET_BROWSER | default "0"}}'
     cmds:
       - task: dev:db:check
       - |
@@ -86,7 +95,7 @@ tasks:
           --kill-others-on-fail \
           "cd {{.BACKEND_DIR}} && PYTHONPATH={{.ROOT_DIR}} LOG_LEVEL={{.LOG_LEVEL}} UVICORN_ACCESS_LOG_EXCLUDE_PATHS={{.UVICORN_ACCESS_LOG_EXCLUDE_PATHS}} {{.ROOT_DIR}}/.venv/bin/python -m debugpy --listen 127.0.0.1:5678 -m uvicorn backend.api.main:app {{.RELOAD_FLAG}} --host 0.0.0.0 --port $BACKEND_PORT" \
           "cd {{.FRONTEND_DIR}} && npm run dev -- --port $FRONTEND_PORT --strictPort" \
-          "until curl -sf http://localhost:$FRONTEND_PORT >/dev/null 2>&1; do sleep 1; done && {{.ROOT_DIR}}/.taskfiles/open-browsers.sh http://localhost:$FRONTEND_PORT {{.BROWSERS}}"
+          "until curl -sf http://localhost:$FRONTEND_PORT >/dev/null 2>&1; do sleep 1; done && {{.ROOT_DIR}}/.taskfiles/open-browsers.sh http://localhost:$FRONTEND_PORT {{.BROWSER}} {{.COUNT}} dev {{.RESET_BROWSER}}"
 
   dev:backend:
     desc: Start backend only (no frontend)
@@ -97,7 +106,7 @@ tasks:
         "{{.ROOT_DIR}}/config/secrets.env",
         "{{.ROOT_DIR}}/config/secrets.dev.env",
       ]
-    deps: [ dev:db ]
+    deps: [dev:db]
     cmds:
       - task: dev:db:check
       - cd {{.BACKEND_DIR}} && PYTHONPATH={{.ROOT_DIR}} LOG_LEVEL={{.LOG_LEVEL}}
@@ -114,7 +123,7 @@ tasks:
         "{{.ROOT_DIR}}/config/secrets.env",
         "{{.ROOT_DIR}}/config/secrets.dev.env",
       ]
-    deps: [ dev:db ]
+    deps: [dev:db]
     cmds:
       - task: dev:db:check
       - cd {{.BACKEND_DIR}} && PYTHONPATH={{.ROOT_DIR}} LOG_LEVEL={{.LOG_LEVEL}}
@@ -124,7 +133,9 @@ tasks:
         $BACKEND_PORT
 
   dev:frontend:
-    desc: Start frontend only (no backend)
+    desc:
+      "Start frontend only (no backend). BROWSER=none|shared|isolated, COUNT=N,
+      RESET_BROWSER=1."
     dotenv:
       [
         "{{.ROOT_DIR}}/config/base.env",
@@ -133,10 +144,12 @@ tasks:
         "{{.ROOT_DIR}}/config/secrets.dev.env",
       ]
     vars:
-      BROWSERS: "{{.BROWSERS | default \"0\"}}"
+      BROWSER: '{{.BROWSER | default "none"}}'
+      COUNT: '{{.COUNT | default "1"}}'
+      RESET_BROWSER: '{{.RESET_BROWSER | default "0"}}'
     cmds:
       - |
-        (until curl -sf http://localhost:$FRONTEND_PORT >/dev/null 2>&1; do sleep 1; done && {{.ROOT_DIR}}/.taskfiles/open-browsers.sh http://localhost:$FRONTEND_PORT {{.BROWSERS}}) &
+        (until curl -sf http://localhost:$FRONTEND_PORT >/dev/null 2>&1; do sleep 1; done && {{.ROOT_DIR}}/.taskfiles/open-browsers.sh http://localhost:$FRONTEND_PORT {{.BROWSER}} {{.COUNT}} dev {{.RESET_BROWSER}}) &
         cd {{.FRONTEND_DIR}} && npm run dev -- --port $FRONTEND_PORT --strictPort
 
   dev:mock:
@@ -159,8 +172,10 @@ tasks:
         "{{.ROOT_DIR}}/config/secrets.staging.local.env",
       ]
     vars:
-      RESET: "{{.RESET | default \"0\"}}"
-      BROWSERS: "{{.BROWSERS | default \"0\"}}"
+      RESET: '{{.RESET | default "0"}}'
+      BROWSER: '{{.BROWSER | default "none"}}'
+      COUNT: '{{.COUNT | default "1"}}'
+      RESET_BROWSER: '{{.RESET_BROWSER | default "0"}}'
     cmds:
       - |
         if [ "{{.RESET}}" = "1" ]; then
@@ -174,10 +189,10 @@ tasks:
         echo "   Frontend: http://localhost:${FRONTEND_PORT:-3001}"
         echo "   Backend:  http://localhost:${BACKEND_PORT:-8002}"
         echo ""
-        echo "Open in a fresh isolated browser:"
-        echo "   task open:session:staging:local              → 1 session"
-        echo "   task open:session:staging:local BROWSERS=2   → multi-user QA"
-        {{.ROOT_DIR}}/.taskfiles/open-browsers.sh "http://localhost:${FRONTEND_PORT:-3001}" {{.BROWSERS}}
+        echo "Open in an isolated browser:"
+        echo "   task open:isolated:staging:local            → 1 isolated session"
+        echo "   task open:isolated:staging:local COUNT=2    → multi-user QA"
+        {{.ROOT_DIR}}/.taskfiles/open-browsers.sh "http://localhost:${FRONTEND_PORT:-3001}" "{{.BROWSER}}" "{{.COUNT}}" "staging-local" "{{.RESET_BROWSER}}"
 
   # ════════════════════════════════════════════════════════════════
   # Scenario (isolated manual testing)
@@ -194,12 +209,14 @@ tasks:
         "{{.ROOT_DIR}}/config/secrets.scenario.env",
       ]
     vars:
-      SCENARIO: "{{.SCENARIO | default \"default\"}}"
-      SEED_DIR: "{{.SEED_DIR | default \"\"}}"
-      RESET: "{{.RESET | default \"0\"}}"
-      WEB_PORT: "{{.WEB_PORT | default \"\"}}"
-      API_PORT: "{{.API_PORT | default \"\"}}"
-      BROWSERS: "{{.BROWSERS | default \"0\"}}"
+      SCENARIO: '{{.SCENARIO | default "default"}}'
+      SEED_DIR: '{{.SEED_DIR | default ""}}'
+      RESET: '{{.RESET | default "0"}}'
+      WEB_PORT: '{{.WEB_PORT | default ""}}'
+      API_PORT: '{{.API_PORT | default ""}}'
+      BROWSER: '{{.BROWSER | default "none"}}'
+      COUNT: '{{.COUNT | default "1"}}'
+      RESET_BROWSER: '{{.RESET_BROWSER | default "0"}}'
     cmds:
       - |
         source {{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
@@ -255,7 +272,18 @@ tasks:
         docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.scenario-db.yml -p $SC_PROJECT_NAME up -d
 
         echo "Waiting for database..."
-        sleep 3
+        for i in $(seq 1 30); do
+          if {{.ROOT_DIR}}/.venv/bin/python -c \
+            "import psycopg2,sys; psycopg2.connect(host='localhost',port=${SC_DB_PORT},user='${POSTGRES_USER}',password='${POSTGRES_PASSWORD}',dbname='postgres',connect_timeout=1).close()" \
+            2>/dev/null; then
+            break
+          fi
+          if [ "$i" = "30" ]; then
+            echo "❌ Database did not become ready after 30 seconds"
+            exit 1
+          fi
+          sleep 1
+        done
 
         # Run migrations
         DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${SC_DB_PORT}/${SC_DB_NAME}" \
@@ -364,16 +392,20 @@ tasks:
           --prefix-colors "blue,green,yellow" \
           "cd {{.BACKEND_DIR}} && PYTHONPATH={{.ROOT_DIR}} ENV_NAME=$ENV_NAME DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${SC_DB_PORT}/${SC_DB_NAME} CALENDAR_SERVICE=$CALENDAR_SVC SCENARIO_DIR=$SCENARIO_DIR GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-} GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-} ADMIN_EMAIL=${ADMIN_EMAIL:-} SESSION_SECRET=${SESSION_SECRET:-scenario-secret} GOOGLE_SERVICE_ACCOUNT_FILE=${GOOGLE_SERVICE_ACCOUNT_FILE:-} SMTP_HOST=${SMTP_HOST:-} SMTP_PORT=${SMTP_PORT:-} SMTP_USER=${SMTP_USER:-} SMTP_PASSWORD=${SMTP_PASSWORD:-} SMTP_FROM=${SMTP_FROM:-} {{.ROOT_DIR}}/.venv/bin/uvicorn backend.api.main:app --reload --host 0.0.0.0 --port $SC_API_PORT" \
           "cd {{.FRONTEND_DIR}} && VITE_API_URL=http://localhost:$SC_API_PORT VITE_UMAMI_URL=http://localhost:${SC_UMAMI_PORT} VITE_UMAMI_WEBSITE_ID=${SC_UMAMI_WEBSITE_ID} npm run dev -- --port $SC_WEB_PORT --strictPort" \
-          "until curl -sf http://localhost:$SC_WEB_PORT >/dev/null 2>&1; do sleep 1; done && {{.ROOT_DIR}}/.taskfiles/open-browsers.sh http://localhost:$SC_WEB_PORT {{.BROWSERS}}"
+          "until curl -sf http://localhost:$SC_WEB_PORT >/dev/null 2>&1; do sleep 1; done && {{.ROOT_DIR}}/.taskfiles/open-browsers.sh http://localhost:$SC_WEB_PORT {{.BROWSER}} {{.COUNT}} scenario-{{.SCENARIO}} {{.RESET_BROWSER}}"
 
   scenario:ref:
-    desc: "Start scenario from git ref (all Docker). Usage: task start:scenario:ref
+    desc:
+      "Start scenario from git ref (all Docker). Usage: task start:scenario:ref
       -- <ref> SCENARIO=name"
-    dotenv: [ "{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/scenario.env" ]
+    dotenv:
+      ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/scenario.env"]
     vars:
       REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
-      SCENARIO: "{{.SCENARIO | default \"default\"}}"
-      BROWSERS: "{{.BROWSERS | default \"0\"}}"
+      SCENARIO: '{{.SCENARIO | default "default"}}'
+      BROWSER: '{{.BROWSER | default "none"}}'
+      COUNT: '{{.COUNT | default "1"}}'
+      RESET_BROWSER: '{{.RESET_BROWSER | default "0"}}'
     cmds:
       - |
         REF="{{.REF}}"
@@ -424,7 +456,7 @@ tasks:
         echo "   Frontend: http://localhost:$SC_WEB_PORT"
         echo "   Backend:  http://localhost:$SC_API_PORT"
         echo ""
-        echo "Open in a fresh isolated browser:"
-        echo "   task open:session:scenario SCENARIO={{.SCENARIO}}              → 1 session"
-        echo "   task open:session:scenario SCENARIO={{.SCENARIO}} BROWSERS=2  → multi-user QA"
-        {{.ROOT_DIR}}/.taskfiles/open-browsers.sh "http://localhost:$SC_WEB_PORT" {{.BROWSERS}}
+        echo "Open in an isolated browser:"
+        echo "   task open:isolated:scenario SCENARIO={{.SCENARIO}}            → 1 isolated session"
+        echo "   task open:isolated:scenario SCENARIO={{.SCENARIO}} COUNT=2    → multi-user QA"
+        {{.ROOT_DIR}}/.taskfiles/open-browsers.sh "http://localhost:$SC_WEB_PORT" "{{.BROWSER}}" "{{.COUNT}}" "scenario-{{.SCENARIO}}" "{{.RESET_BROWSER}}"

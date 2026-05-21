@@ -1,0 +1,71 @@
+test_plan:
+  name: "Admin-curated lists (Phase 2) — bulk on-demand curation"
+  description: >
+    Verify the admin can use an admin-managed curator account and then
+    bulk-curate events from the Events panel into that account's Saved /
+    Going lists. Curated rows must default to public visibility, show the
+    "Curated" pill on the public profile (Phase 4), and remain idempotent
+    when the curator later changes per-event visibility.
+
+  preconditions:
+    - "task start:scenario SCENARIO=admin-curation-bulk"
+    - "task db:up && task db:migrate (heads: fb71a8c9d0e1, 8c2f3d4e5a01)"
+    - "Pre-seeded users: admin, curator-paris (admin-managed, default audience public), alice."
+    - "Mock calendar service yields at least 3 upcoming events after a sync."
+
+  steps:
+    - id: 1
+      title: "Sync events"
+      description: "Sign in as admin (Dev Mock). Trigger a manual sync from the admin Calendars panel."
+      expected: "At least 3 events appear in the Events panel."
+
+    - id: 2
+      title: "Confirm curator-paris is admin-managed"
+      description: >
+        Open the Users tab in /admin and find the curator-paris row.
+      expected: >
+        Row shows a "managed: Paris Salsa Curator" pill and "Unmanage" button.
+        The curator's default RSVP/save audience is public.
+
+    - id: 3
+      title: "Bulk curate to Saved"
+      description: >
+        In the Events panel, multi-select 2 events. Click "Curate to Lists".
+        Choose target = curator-paris, intent = saved, audience = public.
+        Confirm.
+      expected: >
+        POST /api/admin/engagement/bulk → 200 with ``written=2, skipped=0``.
+        Toast: "Curated 2 events to curator-paris (Saved)".
+
+    - id: 4
+      title: "Bulk curate to Going"
+      description: >
+        Multi-select 1 additional event. Repeat the dialog with intent = going.
+      expected: "``written=1`` in response; toast confirms Going."
+
+    - id: 5
+      title: "Public profile shows Curated pill (Phase 4)"
+      description: >
+        Sign out. In a fresh incognito window, visit /u/curator-paris and
+        open the Calendar tab.
+      expected: >
+        All 3 events render with an indigo "Curated" badge (tooltip:
+        "Curated by the editorial team") alongside the Going / Saved pill.
+        GET /api/social/users/curator-paris/calendar response: every item
+        has ``curated: true`` and a public audience.
+
+    - id: 6
+      title: "Re-curation is idempotent"
+      description: "Sign back in as admin. Re-run step 3 with the same events."
+      expected: "``written=0, skipped=2`` (already curated; audit cols unchanged)."
+
+    - id: 7
+      title: "Curator can change visibility without duplicating Going"
+      description: >
+        Sign in as curator-paris (Dev Mock). On the curated Going event,
+        change the audience from public to private.
+      expected: >
+        The event remains in the curator's own Going list, the event's
+        total Going count stays unchanged, and the database still has a
+        single ``UserEventAttendance`` row for curator-paris on that event
+        with ``device_id="admin:<curator.id>"``.

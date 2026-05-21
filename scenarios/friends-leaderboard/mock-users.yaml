@@ -1,0 +1,34 @@
+# Phase E (E9) — Friends leaderboard ("Most active" tab).
+#
+# Cast:
+#   - viewer — persona under test; mutual with alpha/beta/delta/gamma
+#              at sign-in so the leaderboard surfaces immediately.
+#   - alpha  — 3 public Going rows → top of leaderboard.
+#   - beta   — 2 public Going rows.
+#   - delta  — 1 friends-audience Going row (counted).
+#   - gamma  — 1 PRIVATE Going row (must NOT count — E9 contract).
+#   - admin
+users:
+  - email: viewer@example.com
+    name: Viewer Persona
+    handle: viewer
+    account_visibility: public
+  - email: alpha@example.com
+    name: Alpha Garcia
+    handle: alpha
+    account_visibility: public
+  - email: beta@example.com
+    name: Beta Lopez
+    handle: beta
+    account_visibility: public
+  - email: gamma@example.com
+    name: Gamma Wong
+    handle: gamma
+    account_visibility: public
+  - email: delta@example.com
+    name: Delta Khan
+    handle: delta
+    account_visibility: public
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

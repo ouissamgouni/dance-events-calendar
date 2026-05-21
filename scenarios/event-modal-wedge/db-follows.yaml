@@ -1,0 +1,16 @@
+# Follow graph for the event-modal wedge scenario.
+#
+#   viewer <-> alice      (mutual → alice is viewer's friend)
+#   alice  <-> bob        (mutual → bob is alice's friend,
+#                           so bob is a friend-of-friend for viewer)
+#
+# viewer does NOT follow bob, carol, or dave.
+follows:
+  - follower: viewer
+    followee: alice
+  - follower: alice
+    followee: viewer
+  - follower: alice
+    followee: bob
+  - follower: bob
+    followee: alice

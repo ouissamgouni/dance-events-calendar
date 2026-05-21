@@ -1,0 +1,4 @@
+# No pre-seeded follow edges — every UserFollow row created during
+# this scenario is the direct result of a referral redemption (E7),
+# which makes assertions on the network panel unambiguous.
+follows: []

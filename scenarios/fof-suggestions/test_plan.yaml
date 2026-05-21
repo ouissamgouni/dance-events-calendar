@@ -1,0 +1,61 @@
+test_plan:
+  name: "Phase E (E4) — People you may know (friend-of-friend)"
+  description: >
+    Adds a "People you may know" card to /account, ABOVE the
+    NetworkPanel. Ranks suggestions by mutual-friend count and shows
+    up to 3 mutual-friend preview handles per row. The card is hidden
+    when there are no suggestions (e.g. viewer has no friends).
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=phase-e-fof-suggestions"
+    - >
+      Pre-seeded graph: `viewer` is mutual friends with alice, bob,
+      carol. alice follows pop1+pop2+pop3, bob follows pop1+pop2,
+      carol follows pop1. `loner` has no friends.
+    - "Both viewers have already gone through onboarding (no gate)."
+
+  steps:
+    - id: 1
+      title: "Viewer sees the card with ranked suggestions"
+      description: >
+        /login → "Sign in as View Erfof". Navigate to /account and
+        scroll to "People you may know" (sits ABOVE the My network
+        section).
+      expected: >
+        Network: GET /api/social/me/suggestions → 200 with three
+        items in this order: pop1, pop2, pop3.
+        Row text:
+          • pop1 — "Followed by @alice + 2 more"
+          • pop2 — "Followed by @alice + 1 more"
+          • pop3 — "Followed by @alice"
+        Each row has a blue "Follow" button.
+
+    - id: 2
+      title: "Follow from card removes it and updates the network panel"
+      description: >
+        Click "Follow" on the pop1 row.
+      expected: >
+        Network: POST /api/social/follow/pop1 → 200. The pop1 row is
+        immediately removed from the card. A "network:changed" event
+        re-fetches /auth/me and the FoF list. Scroll down — "My
+        network" → "Following" tab now contains pop1.
+
+    - id: 3
+      title: "Viewer with no friends does not see the card"
+      description: >
+        Sign out, sign in as Lonnie Loner. Open /account.
+      expected: >
+        GET /api/social/me/suggestions → 200 with `items: []`. The
+        "People you may know" card is NOT rendered (the component
+        returns null on empty). The rest of the account page renders
+        normally.
+
+    - id: 4
+      title: "Already-followed candidates never appear"
+      description: >
+        While signed in as Viewer, manually follow pop3 via the search
+        bar. Reload /account.
+      expected: >
+        The card now lists only pop2 (since pop1 was followed in
+        step 2 and pop3 was just followed). Proves the
+        `_already_followed_ids` exclusion path works end-to-end.

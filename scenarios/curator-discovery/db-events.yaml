@@ -1,0 +1,107 @@
+# Pre-seeded events for the curator-discovery scenario.
+#
+# curator-paris exposes two public signals (one Going, one Saved). Once
+# viewer follows curator-paris from a Suggestions row, the Home Following
+# filter should surface exactly these two events. curator-bachata exposes
+# one public saved event used by Discover/header no-result suggestion cards.
+base_week: 0
+events:
+  - id: evt-cd-001
+    calendar_id: salsa-cal-001
+    title: Curated Paris Salsa Friday
+    description: |
+      A curator-picked salsa social in Paris. curator-paris is going.
+    location: Dance Studio, 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w0 Fri 21:00
+    end: w0 Sat 01:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:salsa
+      - level:all-levels
+      - venue:indoor
+      - scale:medium
+      - scope:local
+      - vibe:social-atmosphere
+  - id: evt-cd-002
+    calendar_id: bachata-cal-002
+    title: Curated Bachata Workshop
+    description: |
+      A curator-picked bachata workshop saved by curator-paris.
+    location: Studio Azul, 20 Rue Oberkampf, Paris, France
+    latitude: 48.8645
+    longitude: 2.3804
+    start: w1 Sat 14:00
+    end: w1 Sat 17:00
+    price_is_free: false
+    price_min: 25
+    price_max: 35
+    price_currency: EUR
+    tags:
+      - format:workshop
+      - dance-style:bachata
+      - level:intermediate
+      - venue:indoor
+      - scale:small
+      - scope:local
+  - id: evt-cd-003
+    calendar_id: bachata-cal-002
+    title: Bachata Curator Sunday Pick
+    description: |
+      A bachata curator saved event. It should not appear in viewer's
+      Following filter until viewer follows curator-bachata too.
+    location: London Dance Academy, 12 Soho Square, London, UK
+    latitude: 51.5143
+    longitude: -0.1323
+    start: w1 Sun 16:00
+    end: w1 Sun 19:00
+    price_is_free: false
+    price_min: 30
+    price_currency: GBP
+    tags:
+      - format:workshop
+      - dance-style:bachata
+      - level:beginner-friendly
+      - venue:indoor
+      - scale:medium
+      - scope:international
+  - id: evt-cd-004
+    calendar_id: salsa-cal-001
+    title: Ordinary Organizer Control Event
+    description: |
+      Saved by an ordinary verified organizer. This event proves curator
+      suggestions do not silently include every searchable user.
+    location: Sala Rossa, Calle de Atocha 34, Madrid, Spain
+    latitude: 40.4168
+    longitude: -3.7038
+    start: w2 Tue 20:30
+    end: w2 Wed 00:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:salsa
+      - level:all-levels
+      - venue:indoor
+      - scale:medium
+      - scope:local
+      - vibe:good-music
+      - vibe:social-atmosphere
+
+attendances:
+  - event_id: evt-cd-001
+    email: curator-paris@example.com
+    share_publicly: true
+    share_audience: public
+
+saves:
+  - event_id: evt-cd-002
+    email: curator-paris@example.com
+    audience: public
+  - event_id: evt-cd-003
+    email: curator-bachata@example.com
+    audience: public
+  - event_id: evt-cd-004
+    email: ordinary@example.com
+    audience: public

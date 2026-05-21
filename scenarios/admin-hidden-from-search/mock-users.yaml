@@ -1,0 +1,19 @@
+# Admin hidden from social discovery (Phase -1).
+#
+# Cast:
+#   - admin   — the site admin (ADMIN_EMAIL); must be invisible to social discovery.
+#   - alice   — regular user attempting to discover @admin.
+#   - bob     — regular user; alice follows bob (so bob is a FoF candidate).
+users:
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin
+    account_visibility: public
+  - email: alice@example.com
+    name: Alice Viewer
+    handle: alice
+    account_visibility: public
+  - email: bob@example.com
+    name: Bob Bystander
+    handle: bob
+    account_visibility: public

@@ -1,0 +1,9 @@
+# viewer mutual with alpha+beta; both alpha+beta follow oscar so the
+# pill reads "2 of your friends follow this organizer" on /u/oscar.
+follows:
+  - { follower: viewer, followee: alpha }
+  - { follower: alpha, followee: viewer }
+  - { follower: viewer, followee: beta }
+  - { follower: beta, followee: viewer }
+  - { follower: alpha, followee: oscar }
+  - { follower: beta, followee: oscar }

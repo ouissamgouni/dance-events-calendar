@@ -1,0 +1,42 @@
+test_plan:
+  name: "Phase E (E6) — Mutual-follow celebration toast"
+  description: >
+    Verify a one-shot toast appears within the 60s poll cycle when an
+    outbound follow becomes mutual. The toast must NOT re-fire on a
+    hard refresh (priming guard against already-seen notification IDs).
+
+  preconditions:
+    - "task start:scenario SCENARIO=friend-toast"
+    - "Pre-seeded users: viewer, alpha, admin."
+    - "viewer→alpha one-way (alpha must follow back live in step 2)."
+
+  steps:
+    - id: 1
+      title: "Sign in as viewer; stay on the app (do not refresh)"
+      description: "Sign in as viewer in Browser A and navigate anywhere within the app."
+      expected: "No friend-toast yet (alpha hasn't followed back)."
+
+    - id: 2
+      title: "From a second browser, alpha follows viewer back"
+      description: >
+        In Browser B (fresh profile / incognito), sign in as alpha
+        (Dev Mock), visit /u/viewer and click Follow. Sign out.
+      expected: >
+        DevTools on Browser B → POST /api/social/users/viewer/follow → 201
+        with ``is_friend: true`` (mutual edge completed).
+
+    - id: 3
+      title: "Within ~60s a toast announces the new friendship"
+      description: >
+        Stay on Browser A. Wait for the next poll cycle (or trigger any
+        navigation that hits /api/auth/me).
+      expected: >
+        A success toast appears with the text "@alpha is now your friend"
+        and a primary "Open @alpha" action that navigates to /u/alpha.
+
+    - id: 4
+      title: "Negative: toast does NOT re-fire on hard refresh"
+      description: "Reload Browser A."
+      expected: >
+        No new toast appears for the same notification ID — the
+        localStorage seen-set primes on load and suppresses replays.

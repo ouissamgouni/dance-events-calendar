@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from backend.api.main import app
-from backend.api.routes.tags import _group_to_response
+from backend.api.routes.tags import _group_to_response, get_event_tags
 from backend.db.database import get_session
 from backend.db.models import Tag, TagGroup, EventTag, TagSuggestion, CachedEvent
 
@@ -33,10 +33,20 @@ def _mock_session():
 
 
 def _make_tag_group(
-    id=1, slug="format", label="Format", ordinal=0, allow_multiple=True
+    id=1,
+    slug="format",
+    label="Format",
+    ordinal=0,
+    allow_multiple=True,
+    onboarding_eligible=False,
 ):
     g = TagGroup(
-        id=id, slug=slug, label=label, ordinal=ordinal, allow_multiple=allow_multiple
+        id=id,
+        slug=slug,
+        label=label,
+        ordinal=ordinal,
+        allow_multiple=allow_multiple,
+        onboarding_eligible=onboarding_eligible,
     )
     g.tags = []
     return g
@@ -103,8 +113,23 @@ class TestListTags:
         data = resp.json()
         assert len(data) == 1
         assert data[0]["slug"] == "format"
+        assert data[0]["onboarding_eligible"] is False
         assert len(data[0]["tags"]) == 1
         assert data[0]["tags"][0]["slug"] == "social"
+
+    def test_list_tags_onboarding_filters_eligible_groups(self, client):
+        c, session = client
+        group = _make_tag_group(onboarding_eligible=True)
+        tag = _make_tag()
+        tag.group = group
+        group.tags = [tag]
+
+        session.exec.return_value.all.side_effect = [[group], []]
+        resp = c.get("/api/tags?onboarding=true")
+        assert resp.status_code == 200
+        query = session.exec.call_args_list[0].args[0]
+        assert "onboarding_eligible" in str(query)
+        assert resp.json()[0]["onboarding_eligible"] is True
 
     def test_group_response_sorts_tags_by_ordinal(self):
         group = _make_tag_group()
@@ -114,6 +139,16 @@ class TestListTags:
 
         data = _group_to_response(group)
         assert [t.slug for t in data.tags] == ["alpha", "zeta"]
+
+    def test_get_event_tags_filters_disabled_tags_and_groups(self):
+        session = MagicMock(spec=Session)
+        session.exec.return_value.all.return_value = []
+
+        get_event_tags(session, ["evt-001"])
+
+        query_text = str(session.exec.call_args.args[0]).lower()
+        assert "tags.enabled = true" in query_text
+        assert "tag_groups.enabled = true" in query_text
 
 
 @pytest.mark.unit
@@ -195,6 +230,54 @@ class TestSubmitTagSuggestion:
 
 @pytest.mark.unit
 class TestAdminEventTags:
+    def test_admin_count_tag_suggestions(self, admin_client):
+        c, session = admin_client
+        count_result = MagicMock()
+        count_result.one.return_value = 7
+        session.exec.return_value = count_result
+
+        resp = c.get("/api/admin/tags/suggestions/count?status=pending")
+
+        assert resp.status_code == 200
+        assert resp.json() == {"count": 7}
+
+    def test_admin_list_tag_suggestions_bulk_preloads_tags(self, admin_client):
+        c, session = admin_client
+        group = _make_tag_group()
+        first_tag = _make_tag(id=1)
+        first_tag.group = group
+        second_tag = _make_tag(id=2, slug="class", label="Class")
+        second_tag.group = group
+        first_event = _make_event("evt-001")
+        second_event = _make_event("evt-002")
+        second_event.title = "Second Event"
+        suggestions = [
+            TagSuggestion(id=1, event_id="evt-001", tag_id=1, status="pending"),
+            TagSuggestion(id=2, event_id="evt-002", tag_id=2, status="pending"),
+        ]
+
+        suggestion_result = MagicMock()
+        suggestion_result.all.return_value = suggestions
+        event_result = MagicMock()
+        event_result.all.return_value = [first_event, second_event]
+        tag_result = MagicMock()
+        tag_result.all.return_value = [first_tag, second_tag]
+        session.exec.side_effect = [suggestion_result, event_result, tag_result]
+
+        def mock_get(model, id):
+            if model is Tag:
+                raise AssertionError("list route should bulk preload tags")
+            return None
+
+        session.get.side_effect = mock_get
+
+        resp = c.get("/api/admin/tags/suggestions")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert [row["tag"]["id"] for row in data] == [1, 2]
+        assert [row["event_title"] for row in data] == ["Test Event", "Second Event"]
+
     def test_replace_event_tags(self, admin_client):
         c, session = admin_client
         event = _make_event()
@@ -224,6 +307,21 @@ class TestAdminEventTags:
         resp = c.patch("/api/admin/tags/groups/1", json={"ordinal": 2})
         assert resp.status_code == 200
         assert group.ordinal == 2
+
+    def test_admin_updates_tag_group_onboarding_eligibility(self, admin_client):
+        c, session = admin_client
+        group = _make_tag_group(id=1, onboarding_eligible=False)
+        session.get.side_effect = lambda model, id: {
+            (TagGroup, 1): group,
+        }.get((model, id))
+
+        resp = c.patch(
+            "/api/admin/tags/groups/1",
+            json={"onboarding_eligible": True},
+        )
+        assert resp.status_code == 200
+        assert group.onboarding_eligible is True
+        assert resp.json()["onboarding_eligible"] is True
 
     def test_admin_approve_tag_suggestion(self, admin_client):
         c, session = admin_client

@@ -1,0 +1,354 @@
+# Pre-seeded events for the following-badge scenario.
+#
+#   evt-fb-001 — Alice (Bob's friend) is going  → badge MUST appear for Bob
+#   evt-fb-002 — Alice saved (not going)        → badge MUST appear for Bob
+#                                                 (uses saved_count signal)
+#   evt-fb-003 — Carol (one-way follower) going → badge MUST NOT appear for Bob
+#   evt-fb-004 — Stranger / nobody seeded       → badge MUST NOT appear for Bob
+base_week: 0
+events:
+  - id: evt-fb-001
+    calendar_id: salsa-cal-001
+    title: Salsa Social Friday
+    description: |
+      Weekly social. Alice (Bob's friend) is going.
+    location: Dance Studio, 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w0 Fri 21:00
+    end: w0 Sat 01:00
+    price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-fb-002
+    calendar_id: bachata-cal-002
+    title: Bachata Workshop
+    description: |
+      Saved by Alice — badge should still appear via the saves signal.
+    location: Tanzhaus, Friedrichstr. 100, Berlin, Germany
+    latitude: 52.52
+    longitude: 13.405
+    start: w0 Sat 14:00
+    end: w0 Sat 17:00
+    price_is_free: false
+    price_min: 25
+    price_currency: EUR
+    tags:
+    - format:workshop
+    - dance-style:bachata
+    - level:all-levels
+    - venue:indoor
+    - scale:small
+    - scope:local
+  - id: evt-fb-003
+    calendar_id: salsa-cal-001
+    title: Cuban Night (one-way follower control)
+    description: |
+      Carol (one-way follower of Alice, NOT Bob's friend) is going.
+      The badge MUST NOT appear for Bob.
+    location: Skybar, Av. de la Liberté, Brussels, Belgium
+    latitude: 50.8503
+    longitude: 4.3517
+    start: w1 Sat 20:00
+    end: w1 Sun 00:00
+    price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-fb-004
+    calendar_id: bachata-cal-002
+    title: Stranger Bachata (no friends seeded)
+    description: |
+      Nobody Bob follows is going or saved this. Badge MUST NOT appear.
+    location: London Dance Academy, 12 Soho Square, London, UK
+    latitude: 51.5143
+    longitude: -0.1323
+    start: w1 Sun 15:00
+    end: w1 Sun 18:00
+    price_is_free: false
+    price_min: 30
+    price_currency: GBP
+
+  # --------------------------------------------------------------
+  # European spread + hero "rich attendance" event.
+  #
+  # evt-fb-100 (Madrid hero) — designed to exercise every input that
+  # feeds the badge / avatar stack in one place:
+  #     5 friends going        (alice, emma, frank, gina, hugo)
+  #     2 friends saved        (nia, omar — saved with audience=friends)
+  #     6 followed-not-friends going, visibility public
+  #        (pablo, quinn, rita, samir, tara, ulysses)
+  #    10 strangers going      (s01..s10, share_audience: public)
+  #    10 strangers saving     (t01..t10, audience: public)
+  # Expected aggregate for Bob's view:
+  #   following_friend_count = 5 (friends going) + 6 (public RSVPs from
+  #     followed-not-friends) = 11
+  #   following_friends_preview includes up to 5 distinct friends
+  #     (the friends-going set; saved-only friends fill remaining slots).
+  #
+  # The other evt-fb-1xx events scatter lighter compositions across
+  # Europe so the map view shows realistic pin density.
+  # --------------------------------------------------------------
+    tags:
+    - format:social
+    - dance-style:bachata
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+  - id: evt-fb-100
+    calendar_id: salsa-cal-001
+    title: European Salsa Congress (Madrid)
+    description: |
+      Hero attendance mix: 5 friends going, 2 friends saving, 6
+      followed-not-friends going publicly, 10 strangers going,
+      10 strangers saving.
+    location: Palacio de Vistalegre, Calle de Utebo 1, Madrid, Spain
+    latitude: 40.3947
+    longitude: -3.7361
+    start: w0 Sat 19:00
+    end: w0 Sun 03:00
+    price_is_free: false
+    price_min: 45
+    price_currency: EUR
+    tags:
+    - format:congress
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:large
+    - scope:international
+    - vibe:crowded
+  - id: evt-fb-101
+    calendar_id: salsa-cal-001
+    title: Canal Salsa Social (Amsterdam)
+    description: |
+      3 mutual friends of Bob going publicly, plus a handful of
+      strangers. No followed-not-friends.
+    location: Pakhuis de Zwijger, Piet Heinkade 179, Amsterdam, Netherlands
+    latitude: 52.3756
+    longitude: 4.9105
+    start: w0 Fri 20:00
+    end: w0 Sat 00:30
+    price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-fb-102
+    calendar_id: bachata-cal-002
+    title: Trastevere Bachata Night (Rome)
+    description: |
+      2 friends going + 1 friend saving (audience=friends). Surfaces
+      the saved-friends branch on a non-hero event.
+    location: Casa del Jazz, Viale di Porta Ardeatina 55, Rome, Italy
+    latitude: 41.8732
+    longitude: 12.4892
+    start: w0 Sat 21:00
+    end: w0 Sun 01:00
+    price_is_free: false
+    price_min: 15
+    price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:bachata
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-fb-103
+    calendar_id: salsa-cal-001
+    title: Old Town Salsa (Prague)
+    description: |
+      1 friend going + 4 strangers. Minimal friend presence — checks
+      the "+N more" overflow in the avatar stack.
+    location: Lucerna Music Bar, Vodičkova 36, Prague, Czechia
+    latitude: 50.0814
+    longitude: 14.4242
+    start: w1 Fri 21:00
+    end: w1 Sat 01:00
+    price_is_free: false
+    price_min: 12
+    price_currency: CZK
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:good-music
+  - id: evt-fb-104
+    calendar_id: salsa-cal-001
+    title: Donau Salsa Open Air (Vienna)
+    description: |
+      ONLY followed-not-friends going (3 of them, public). Validates
+      that public RSVPs from non-friends Bob follows still contribute
+      to following_friend_count but DO NOT add blue-ringed avatars
+      to the stack (they appear as regular white-ringed attendees).
+    location: Donauinsel, Steinspornbrücke, Vienna, Austria
+    latitude: 48.2331
+    longitude: 16.4145
+    start: w1 Sat 18:00
+    end: w1 Sat 23:00
+    price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:outdoor
+    - scale:medium
+    - scope:local
+  - id: evt-fb-105
+    calendar_id: bachata-cal-002
+    title: Alfama Bachata Rooftop (Lisbon)
+    description: |
+      ONLY strangers (5 going). Control: pin shows no following chip,
+      popup shows the standard avatar stack with no friend prefix.
+    location: Memmo Alfama, Travessa das Merceeiras 27, Lisbon, Portugal
+    latitude: 38.7117
+    longitude: -9.1296
+    start: w1 Sun 19:00
+    end: w1 Sun 23:00
+    price_is_free: false
+    price_min: 20
+    price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:bachata
+    - level:all-levels
+    - venue:rooftop
+    - scale:medium
+    - scope:local
+  - id: evt-fb-106
+    calendar_id: salsa-cal-001
+    title: Gothic Quarter Salsa (Barcelona)
+    description: |
+      4 mutual friends going publicly + 2 strangers. Good "balanced"
+      card that shows mostly friend avatars in the stack.
+    location: Antilla BCN Latin Club, Carrer d'Aragó 141, Barcelona, Spain
+    latitude: 41.3870
+    longitude: 2.1538
+    start: w1 Sat 22:00
+    end: w1 Sun 03:00
+    price_is_free: false
+    price_min: 18
+    price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+
+attendances:
+  # --- original minimal events ---
+  - event_id: evt-fb-001
+    email: alice@example.com
+    share_publicly: true
+  - event_id: evt-fb-003
+    email: carol@example.com
+    share_publicly: true
+
+  # --- evt-fb-100 (Madrid hero): 5 friends going, 6 followed-not-
+  #     friends going (public), 10 strangers going (public) ---
+  - { event_id: evt-fb-100, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-fb-100, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-fb-100, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-fb-100, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-fb-100, email: hugo@example.com, share_publicly: true }
+  - { event_id: evt-fb-100, email: pablo@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: quinn@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: rita@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: samir@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: tara@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: ulysses@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: s01@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: s02@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: s03@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: s04@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: s05@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: s06@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: s07@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: s08@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: s09@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: s10@example.com, share_audience: public }
+
+  # --- evt-fb-101 (Amsterdam): 3 friends going public + 2 strangers ---
+  - { event_id: evt-fb-101, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-fb-101, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-fb-101, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-fb-101, email: s01@example.com, share_audience: public }
+  - { event_id: evt-fb-101, email: s02@example.com, share_audience: public }
+
+  # --- evt-fb-102 (Rome): 2 friends going public ---
+  - { event_id: evt-fb-102, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-fb-102, email: hugo@example.com, share_publicly: true }
+
+  # --- evt-fb-103 (Prague): 1 friend going + 4 strangers ---
+  - { event_id: evt-fb-103, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-fb-103, email: s03@example.com, share_audience: public }
+  - { event_id: evt-fb-103, email: s04@example.com, share_audience: public }
+  - { event_id: evt-fb-103, email: s05@example.com, share_audience: public }
+  - { event_id: evt-fb-103, email: s06@example.com, share_audience: public }
+
+  # --- evt-fb-104 (Vienna): only followed-not-friends (3, public) ---
+  - { event_id: evt-fb-104, email: pablo@example.com, share_audience: public }
+  - { event_id: evt-fb-104, email: quinn@example.com, share_audience: public }
+  - { event_id: evt-fb-104, email: rita@example.com, share_audience: public }
+
+  # --- evt-fb-105 (Lisbon): only strangers (5 going, public) ---
+  - { event_id: evt-fb-105, email: s06@example.com, share_audience: public }
+  - { event_id: evt-fb-105, email: s07@example.com, share_audience: public }
+  - { event_id: evt-fb-105, email: s08@example.com, share_audience: public }
+  - { event_id: evt-fb-105, email: s09@example.com, share_audience: public }
+  - { event_id: evt-fb-105, email: s10@example.com, share_audience: public }
+
+  # --- evt-fb-106 (Barcelona): 4 friends going public + 2 strangers ---
+  - { event_id: evt-fb-106, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-fb-106, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-fb-106, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-fb-106, email: hugo@example.com, share_publicly: true }
+  - { event_id: evt-fb-106, email: s01@example.com, share_audience: public }
+  - { event_id: evt-fb-106, email: s02@example.com, share_audience: public }
+
+saves:
+  # --- original minimal events ---
+  - event_id: evt-fb-002
+    email: alice@example.com
+    audience: friends
+
+  # --- evt-fb-100 (Madrid hero):
+  #     2 friends saving (audience=friends) + 10 strangers saving public ---
+  - { event_id: evt-fb-100, email: nia@example.com, audience: friends }
+  - { event_id: evt-fb-100, email: omar@example.com, audience: friends }
+  - { event_id: evt-fb-100, email: t01@example.com, audience: public }
+  - { event_id: evt-fb-100, email: t02@example.com, audience: public }
+  - { event_id: evt-fb-100, email: t03@example.com, audience: public }
+  - { event_id: evt-fb-100, email: t04@example.com, audience: public }
+  - { event_id: evt-fb-100, email: t05@example.com, audience: public }
+  - { event_id: evt-fb-100, email: t06@example.com, audience: public }
+  - { event_id: evt-fb-100, email: t07@example.com, audience: public }
+  - { event_id: evt-fb-100, email: t08@example.com, audience: public }
+  - { event_id: evt-fb-100, email: t09@example.com, audience: public }
+  - { event_id: evt-fb-100, email: t10@example.com, audience: public }
+
+  # --- evt-fb-102 (Rome): 1 friend saving with audience=friends ---
+  - { event_id: evt-fb-102, email: nia@example.com, audience: friends }

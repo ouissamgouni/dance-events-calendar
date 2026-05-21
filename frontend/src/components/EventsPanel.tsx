@@ -14,8 +14,10 @@ import {
     bulkRetryGeocoding,
     bulkAssignTags,
     runTagSuggestionsBulk,
+    adminBulkEngagement,
+    fetchAdminUsers,
 } from '../api';
-import type { AdminTagGroup } from '../api';
+import type { AdminTagGroup, AdminBulkEngagementKind, AdminBulkEngagementAudience, AdminUserRow } from '../api';
 import LocationBadge from './LocationBadge';
 import AdminEventDetailPanel from './AdminEventDetailPanel';
 import { useAdminPrefs } from '../context/AdminPrefsContext';
@@ -63,6 +65,13 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
     const [tagGroups, setTagGroups] = useState<AdminTagGroup[]>([]);
     const [bulkTagPickerOpen, setBulkTagPickerOpen] = useState(false);
     const [bulkTagIds, setBulkTagIds] = useState<number[]>([]);
+    // Curate-to-lists dialog state. Targets are admin-managed users.
+    const [curatePickerOpen, setCuratePickerOpen] = useState(false);
+    const [managedUsers, setManagedUsers] = useState<AdminUserRow[]>([]);
+    const [selectedCurateHandles, setSelectedCurateHandles] = useState<Set<string>>(new Set());
+    const [curateKind, setCurateKind] = useState<AdminBulkEngagementKind>('save');
+    const [curateAudience, setCurateAudience] = useState<AdminBulkEngagementAudience | ''>('');
+    const [selectedVisibility, setSelectedVisibility] = useState<'hidden' | 'blocked' | ''>('');
     // Hide past events by default; toggle (here or in the admin header) to
     // include them. Mirrors the global admin pref so all panels stay in sync.
     const { includePast, setIncludePast } = useAdminPrefs();
@@ -86,9 +95,10 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 tag_ids: selectedTagIds || undefined,
                 ungeolocated: selectedGeoStatus === 'ungeolocated' || presetFilters.ungeolocated || undefined,
                 include_past: !hidePast || undefined,
+                visibility: selectedVisibility || undefined,
             };
         },
-        [preset, page, debouncedSearch, selectedReviewStatus, selectedCalendar, selectedTagIds, selectedGeoStatus, hidePast],
+        [preset, page, debouncedSearch, selectedReviewStatus, selectedCalendar, selectedTagIds, selectedGeoStatus, hidePast, selectedVisibility],
     );
 
     // Load events
@@ -132,6 +142,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             setAdminDetailEventId(null);
             setBulkTagPickerOpen(false);
             setBulkTagIds([]);
+            setSelectedCurateHandles(new Set());
             // Don't reset hidePast here — it's now driven by the global
             // admin pref so reopening the panel respects the user's choice.
         }
@@ -143,6 +154,13 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             fetchAdminTagGroups().then(setTagGroups).catch(() => { });
         }
     }, [isOpen]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        if (!isOpen) return;
+        fetchAdminUsers({ managedOnly: true, limit: 200 })
+            .then((res) => setManagedUsers(res.items.filter((u) => u.handle && !u.deleted_at && !u.is_admin)))
+            .catch(() => setManagedUsers([]));
+    }, [isOpen]);
 
     // Fetch when filters/page change
     useEffect(() => {
@@ -197,6 +215,15 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
         );
     };
 
+    const handleToggleCurateHandle = (handle: string) => {
+        setSelectedCurateHandles((prev) => {
+            const next = new Set(prev);
+            if (next.has(handle)) next.delete(handle);
+            else next.add(handle);
+            return next;
+        });
+    };
+
     const handleBulkAssignTags = async () => {
         if (selectedIds.size === 0 || bulkTagIds.length === 0) return;
         setBusy('bulk-tags');
@@ -210,6 +237,43 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             loadEvents();
         } catch {
             setMessage('Failed to assign tags.');
+        } finally {
+            setBusy('');
+        }
+    };
+
+    const handleBulkCurate = async () => {
+        if (selectedIds.size === 0) return;
+        const handles = [...selectedCurateHandles];
+        if (handles.length === 0) {
+            setMessage('Select one or more admin-managed users.');
+            return;
+        }
+        setBusy('bulk-curate');
+        try {
+            const res = await adminBulkEngagement(
+                handles,
+                [...selectedIds],
+                curateKind,
+                'add',
+                { audience: curateAudience || undefined },
+            );
+            const skippedItems = res.items.filter((item) => item.status.startsWith('skipped'));
+            const skipped = skippedItems.length > 0 ? ` (${skippedItems.length} skipped)` : '';
+            const skippedDetails = skippedItems.slice(0, 3).map((item) => {
+                const detail = item.detail ? `: ${item.detail}` : '';
+                return `@${item.handle} / ${item.event_id}${detail}`;
+            });
+            const skippedText = skippedDetails.length > 0
+                ? ` Skipped: ${skippedDetails.join('; ')}${skippedItems.length > 3 ? `; +${skippedItems.length - 3} more` : ''}.`
+                : '';
+            setMessage(
+                `Curated ${res.changed_count} ${curateKind} entry(ies) across ${handles.length} account(s)${skipped}.${skippedText}`,
+            );
+            setCuratePickerOpen(false);
+            setSelectedCurateHandles(new Set());
+        } catch (e) {
+            setMessage(e instanceof Error ? e.message : 'Failed to curate.');
         } finally {
             setBusy('');
         }
@@ -423,6 +487,22 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                             >
                                 {hidePast ? 'Hide past' : 'Include past'}
                             </button>
+
+                            {/* Visibility pills */}
+                            {(['hidden', 'blocked'] as const).map((v) => (
+                                <button
+                                    key={v}
+                                    onClick={() => { setSelectedVisibility((prev) => (prev === v ? '' : v)); setPage(0); }}
+                                    className={`text-[10px] font-medium px-2 py-0.5 border transition ${selectedVisibility === v
+                                        ? v === 'hidden'
+                                            ? 'bg-amber-100 border-amber-400 text-amber-800'
+                                            : 'bg-slate-200 border-slate-400 text-slate-800'
+                                        : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                                        }`}
+                                >
+                                    {v.charAt(0).toUpperCase() + v.slice(1)}
+                                </button>
+                            ))}
                         </div>
                     )}
                 </div>
@@ -469,7 +549,14 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                 {events.map((event) => (
                                     <tr
                                         key={event.event_id}
-                                        className={`hover:bg-gray-50/50 transition cursor-pointer ${selectedIds.has(event.event_id) ? 'bg-blue-50/30' : ''}`}
+                                        className={`hover:bg-opacity-80 transition cursor-pointer ${event.is_blocked
+                                            ? 'bg-slate-100 hover:bg-slate-200/70'
+                                            : event.is_hidden
+                                                ? 'bg-amber-50 hover:bg-amber-100/70'
+                                                : selectedIds.has(event.event_id)
+                                                    ? 'bg-blue-50/30'
+                                                    : 'hover:bg-gray-50/50'
+                                            }`}
                                         onClick={() => setAdminDetailEventId(event.event_id)}
                                     >
                                         <td className="px-2 py-1.5" onClick={(e) => e.stopPropagation()}>
@@ -502,14 +589,22 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                             {formatDate(event.start)}
                                         </td>
                                         <td className="px-2 py-1.5">
-                                            <span
-                                                className={`inline-block text-[10px] font-medium px-1.5 py-0.5 ${event.review_status === 'pending'
-                                                    ? 'bg-amber-50 text-amber-700'
-                                                    : 'bg-emerald-50 text-emerald-700'
-                                                    }`}
-                                            >
-                                                {event.review_status ?? 'reviewed'}
-                                            </span>
+                                            <div className="flex flex-wrap gap-1">
+                                                <span
+                                                    className={`inline-block text-[10px] font-medium px-1.5 py-0.5 ${event.review_status === 'pending'
+                                                        ? 'bg-amber-50 text-amber-700'
+                                                        : 'bg-emerald-50 text-emerald-700'
+                                                        }`}
+                                                >
+                                                    {event.review_status ?? 'reviewed'}
+                                                </span>
+                                                {event.is_blocked && (
+                                                    <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 bg-slate-200 text-slate-700">Blocked</span>
+                                                )}
+                                                {event.is_hidden && !event.is_blocked && (
+                                                    <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 bg-amber-100 text-amber-700">Hidden</span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="px-2 py-1.5 text-center">
                                             <LocationBadge
@@ -641,6 +736,81 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                     </div>
                 )}
 
+                {/* Curate-to-Lists Picker */}
+                {curatePickerOpen && (
+                    <div className="px-4 py-2.5 border-t border-indigo-200 bg-white shrink-0 space-y-2">
+                        <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">
+                            Curate {selectedIds.size} event(s) to admin-managed lists
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <label className="text-[10px] text-gray-600 flex items-center gap-1">
+                                List:
+                                <select
+                                    value={curateKind}
+                                    onChange={(e) => setCurateKind(e.target.value as AdminBulkEngagementKind)}
+                                    className="text-[10px] border border-gray-300 px-1 py-0.5"
+                                >
+                                    <option value="save">Saved</option>
+                                    <option value="going">Going</option>
+                                </select>
+                            </label>
+                            <label className="text-[10px] text-gray-600 flex items-center gap-1">
+                                Audience:
+                                <select
+                                    value={curateAudience}
+                                    onChange={(e) => setCurateAudience(e.target.value as AdminBulkEngagementAudience | '')}
+                                    className="text-[10px] border border-gray-300 px-1 py-0.5"
+                                    title="Per-row audience. Defaults to each target's profile setting when blank."
+                                >
+                                    <option value="">target default</option>
+                                    <option value="public">public</option>
+                                    <option value="friends">friends</option>
+                                    <option value="private">private</option>
+                                </select>
+                            </label>
+                        </div>
+                        <div className="max-h-28 overflow-y-auto border border-gray-200 bg-white">
+                            {managedUsers.length === 0 ? (
+                                <p className="px-2 py-2 text-[10px] text-gray-500">No admin-managed users yet.</p>
+                            ) : managedUsers.map((u) => {
+                                const handle = u.handle ?? '';
+                                const active = selectedCurateHandles.has(handle);
+                                return (
+                                    <label key={u.user_id} className="flex cursor-pointer items-center gap-2 border-b border-gray-100 px-2 py-1.5 last:border-b-0 hover:bg-gray-50">
+                                        <input
+                                            type="checkbox"
+                                            checked={active}
+                                            onChange={() => handleToggleCurateHandle(handle)}
+                                            className="h-3 w-3"
+                                        />
+                                        <span className="min-w-0 flex-1 truncate text-[11px] text-gray-700">
+                                            @{handle}{u.managed_label ? ` - ${u.managed_label}` : ''}
+                                        </span>
+                                    </label>
+                                );
+                            })}
+                        </div>
+                        <p className="text-[10px] text-gray-500">
+                            Only admin-managed users are listed. No notifications are fanned out.
+                        </p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleBulkCurate}
+                                disabled={!!busy || selectedCurateHandles.size === 0}
+                                className="text-[10px] font-medium px-2.5 py-1 bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 transition"
+                            >
+                                {busy === 'bulk-curate' ? 'Curating…' : 'Apply'}
+                            </button>
+                            <button
+                                onClick={() => { setCuratePickerOpen(false); setSelectedCurateHandles(new Set()); }}
+                                className="text-[10px] text-gray-500 hover:text-gray-700"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Bulk Action Bar */}
                 {selectedIds.size > 0 && (
                     <div className="flex items-center gap-2 px-4 py-2 border-t border-blue-200 bg-blue-50 shrink-0">
@@ -654,6 +824,14 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                             className="text-[10px] font-medium px-2 py-1 bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition"
                         >
                             Assign Tags
+                        </button>
+                        <button
+                            onClick={() => { setCuratePickerOpen((o) => !o); }}
+                            disabled={!!busy}
+                            className="text-[10px] font-medium px-2 py-1 bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition"
+                            title="Add to Saved/Going on admin-managed curator accounts"
+                        >
+                            Curate to Lists
                         </button>
                         <button
                             onClick={handleBulkReview}

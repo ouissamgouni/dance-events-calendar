@@ -126,13 +126,24 @@ task start:dev:debug    # same + debugpy on port 5678
 task start:dev:mock     # same but with mock calendar (no Google creds needed)
 ```
 
-Add `BROWSERS=N` to any `start:*` command that opens a browser to control how many browser instances open. `BROWSERS=0` (default) reuses your existing Chrome window; `BROWSERS=N` opens N fresh, fully-isolated Chrome sessions (separate cookie jar and localStorage — useful for testing multi-user flows):
+Browser control on any `start:*` command uses these parameters:
+- `BROWSER=none|shared|isolated` (default `none` for `start:*`)
+  - `none`     servers only, no browser action
+  - `shared`   focus existing Chrome tab matching URL, else open one tab in your default Chrome profile (cookies + localStorage shared with all your normal browsing)
+  - `isolated` open `COUNT` Chrome sessions, each with its own `--user-data-dir` (own cookies + localStorage; better than incognito). Idempotent: re-running focuses the existing window. Use `RESET_BROWSER=1` to wipe profile dirs first for a true clean start.
+- `COUNT=N` (only used with `BROWSER=isolated`, default `1`)
+- `RESET_BROWSER=1` (only used with `BROWSER=isolated`; wipes profile dirs before launching)
 
 ```bash
-task start:dev BROWSERS=1          # one fresh isolated session
-task start:dev BROWSERS=3          # three isolated sessions at once
-SCENARIO=share-im-going task start:scenario BROWSERS=2
+task start:dev                                          # servers only
+task start:dev BROWSER=shared                           # focus existing dev tab
+task start:dev BROWSER=isolated                         # one isolated session
+task start:dev BROWSER=isolated COUNT=3                 # three isolated sessions
+SCENARIO=share-im-going task start:scenario BROWSER=isolated COUNT=2
+SCENARIO=foo task start:scenario BROWSER=isolated RESET_BROWSER=1   # wipe + relaunch
 ```
+
+Isolated sessions live under `/tmp/chrome-profiles/<label>-<i>` and are idempotent: re-running the same task focuses the existing window instead of duplicating it. Pass `RESET_BROWSER=1` to delete the profile dir before launching. Scenario stop tasks clean their own browser profiles automatically (pass `KEEP_BROWSER=1` to opt out).
 
 ### 3. Attach VSCode Debugger
 
@@ -180,8 +191,8 @@ scenarios/<name>/
 ```bash
 task start:scenario                                       # default scenario (local code + Docker DB)
 SCENARIO=locations-map task start:scenario                # named scenario (own DB + ports)
-SCENARIO=share-im-going task start:scenario BROWSERS=1    # open one fresh isolated Chrome session
-SCENARIO=share-im-going task start:scenario BROWSERS=2    # open two isolated sessions (multi-user)
+SCENARIO=share-im-going task start:scenario BROWSER=isolated           # one isolated Chrome session
+SCENARIO=share-im-going task start:scenario BROWSER=isolated COUNT=2  # two isolated sessions (multi-user)
 
 # From a git ref (all-Docker)
 task start:scenario:ref -- feature/my-branch
@@ -557,7 +568,7 @@ task start:dev:frontend
 task test:unit:frontend
 
 # Multi-user / share flows benefit from isolated browsers
-SCENARIO=share-im-going task start:scenario BROWSERS=2
+SCENARIO=share-im-going task start:scenario BROWSER=isolated COUNT=2
 
 task git:pr && task git:pr:ready
 
@@ -667,8 +678,9 @@ infra change to `develop` afterwards so the next real release picks it up.
 | Command | Description |
 |---------|-------------|
 | `task start:dev` | DB + backend (reload) + frontend |
-| `task start:dev BROWSERS=1` | Same, opens one fresh isolated Chrome session |
-| `task start:dev BROWSERS=N` | Same, opens N fresh isolated Chrome sessions |
+| `task start:dev BROWSER=isolated` | Same, opens one isolated Chrome session |
+| `task start:dev BROWSER=isolated COUNT=N` | Same, opens N isolated Chrome sessions |
+| `task start:dev BROWSER=isolated RESET_BROWSER=1` | Same, but wipe profile dirs first |
 | `task start:dev:debug` | Same + debugpy on port 5678 |
 | `task start:dev:mock` | Same with mock calendar (no Google creds) |
 | `task start:dev:db` | Dev database only |
@@ -726,8 +738,8 @@ Set `HOST_DIR=<path>` if secrets/credentials live outside the CI checkout, and
 | `task deploy:staging:local` | Build from develop + docker-compose up |
 | `task deploy:staging:local:ref -- <ref>` | Build from git ref + docker-compose up |
 | `task deploy:staging:local:cwd` | Build from working directory + docker-compose up |
-| `task start:staging:local BROWSERS=1` | Same, opens one fresh isolated Chrome session |
-| `task start:staging:local BROWSERS=N` | Same, opens N fresh isolated Chrome sessions |
+| `task start:staging:local BROWSER=isolated` | Same, opens one isolated Chrome session |
+| `task start:staging:local BROWSER=isolated COUNT=N` | Same, opens N isolated Chrome sessions |
 | `task start:staging:local` | Start staging with existing images |
 | `task stop:staging:local` | Stop staging stack |
 | `task stop:staging:local:volumes` | Stop + destroy data ⚠️ |
@@ -776,16 +788,49 @@ Set `HOST_DIR=<path>` if secrets/credentials live outside the CI checkout, and
 | Command | Description |
 |---------|-------------|
 | `task start:scenario` | Local code + Docker DB + live reload |
-| `task start:scenario BROWSERS=1` | Same, opens one fresh isolated Chrome session |
-| `task start:scenario BROWSERS=N` | Same, opens N fresh isolated Chrome sessions |
+| `task start:scenario BROWSER=isolated` | Same, opens one isolated Chrome session |
+| `task start:scenario BROWSER=isolated COUNT=N` | Same, opens N isolated Chrome sessions |
+| `task start:scenario BROWSER=isolated RESET_BROWSER=1` | Same, but wipe profile dirs first |
 | `task start:scenario:ref -- <ref>` | All-Docker from git ref |
-| `task stop:scenario` | Stop one scenario |
-| `task stop:scenario:all` | Stop all running scenarios |
+| `task stop:scenario` | Stop one scenario (also closes its isolated Chrome sessions) |
+| `task stop:scenario KEEP_BROWSER=1` | Same, but leave isolated Chrome sessions open |
+| `task stop:scenario:all` | Stop all running scenarios (closes their isolated Chrome sessions) |
+| `task stop:scenario:all KEEP_BROWSER=1` | Same, but leave isolated Chrome sessions open |
 | `task db:seed:scenario` | Seed scenario DB |
 | `task db:reset:scenario` | Reset scenario DB ⚠️ |
 | `task logs:scenario` | Tail scenario logs |
 
 All scenario commands accept `SCENARIO=<name>`.
+
+### Browser
+
+Three orthogonal parameters control browser behaviour on `start:*` tasks:
+
+- `BROWSER=none|shared|isolated` (default `none` for `start:*`, default `shared` for `start:open:umami`)
+  - `none`     servers only, no browser opened
+  - `shared`   focus an existing Chrome tab matching the URL, else open one tab in your default Chrome profile (cookies + localStorage shared with all your normal browsing)
+  - `isolated` open `COUNT` Chrome sessions, each with its own `--user-data-dir` (independent cookies + localStorage). Idempotent: re-running focuses the existing window.
+- `COUNT=N` (only consulted with `BROWSER=isolated`, default `1`)
+- `RESET_BROWSER=1` (only consulted with `BROWSER=isolated`; wipes the matching profile dirs first for a true clean start)
+
+Isolated profile dirs live under `/tmp/chrome-profiles/<label>-<i>` and are stable per (env, scenario, index) — re-running the same task focuses the existing window instead of duplicating it. Pass `RESET_BROWSER=1` to delete the dir before launching.
+
+| Command | Description |
+|---------|-------------|
+| `task open:shared:dev` | Focus or open one tab on dev in your default Chrome |
+| `task open:shared:scenario SCENARIO=<name>` | Same, on a scenario |
+| `task open:shared:staging:local` | Same, on local staging |
+| `task open:shared:staging:remote` | Same, on remote staging |
+| `task open:shared:prod` | Same, on production |
+| `task open:isolated:dev [COUNT=N] [RESET_BROWSER=1]` | Open N isolated Chrome sessions on dev |
+| `task open:isolated:scenario SCENARIO=<name> [COUNT=N] [RESET_BROWSER=1]` | Same, on a scenario |
+| `task open:isolated:staging:local [COUNT=N] [RESET_BROWSER=1]` | Same, on local staging |
+| `task open:isolated:staging:remote [COUNT=N] [RESET_BROWSER=1]` | Same, on remote staging |
+| `task open:isolated:prod [COUNT=N] [RESET_BROWSER=1]` | Same, on production |
+| `task open:clean` | Remove ALL isolated Chrome profile dirs |
+| `task open:clean:dev` | Remove only `dev-*` isolated profile dirs (keep scenarios) |
+
+Scenario stop tasks (`stop:scenario`, `stop:scenario:all`) close their isolated Chrome sessions and remove the matching profile dirs by default. Pass `KEEP_BROWSER=1` to leave them open.
 
 ### Git & Release
 

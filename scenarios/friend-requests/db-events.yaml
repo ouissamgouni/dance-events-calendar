@@ -1,0 +1,69 @@
+# Pre-seeded events + attendances for the friend-requests scenario.
+#
+# We need at least one event alice (friends-only account) is going to
+# so step 2 can prove that a *pending* follower (bob) does NOT see it
+# in the friends-going feed. Two events are seeded:
+#
+#   evt-fr-001 — alice is going, share_audience=friends.
+#     Visible to her approved friends ONLY. After step 3 (approve),
+#     bob → alice becomes mutual → alice's friend → evt-fr-001 starts
+#     appearing in his friends_going feed.
+#   evt-fr-002 — alice is going, share_audience=public.
+#     Public attendance row so anon + non-friend viewers still have
+#     SOMETHING to render — used as the public-bucket control in the
+#     anon-tab smoke check (not in a numbered step but documented
+#     here for completeness).
+base_week: 0
+events:
+  - id: evt-fr-001
+    calendar_id: salsa-cal-001
+    title: Salsa Social Friday (friends-only attendance)
+    description: |
+      Headline event. Alice is going with share_audience=friends.
+      Bob (pending) MUST NOT see this in friends_going; after Alice
+      approves him in step 3 he MUST start seeing it.
+    location: Dance Studio, 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w0 Fri 21:00
+    end: w0 Sat 01:00
+    price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-fr-002
+    calendar_id: salsa-cal-001
+    title: Cuban Night (public attendance control)
+    description: |
+      Alice is going with share_audience=public. Always visible to
+      everyone — anchors the test that the gating in step 2 is
+      strictly about audience, not about hiding the event itself.
+    location: Skybar, Av. de la Liberté, Brussels, Belgium
+    latitude: 50.8503
+    longitude: 4.3517
+    start: w0 Sat 20:00
+    end: w0 Sun 00:00
+    price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+
+attendances:
+  - event_id: evt-fr-001
+    email: alice@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: evt-fr-002
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public

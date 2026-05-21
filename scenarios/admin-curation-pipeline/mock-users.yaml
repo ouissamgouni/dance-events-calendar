@@ -1,0 +1,18 @@
+# Admin-curated lists (Phase 3) — per-calendar pipeline rules.
+#
+# Cast:
+#   - admin           — site admin (ADMIN_EMAIL); configures rules.
+#   - curator-paris   — admin-managed puppet account; receives auto-curated rows.
+users:
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin
+    account_visibility: public
+  - email: curator-paris@example.com
+    name: Paris Salsa Curator
+    handle: curator-paris
+    account_visibility: public
+    is_admin_managed: true
+    managed_label: Paris Salsa Curator
+    share_attendance_default: true
+    share_attendance_default_audience: public

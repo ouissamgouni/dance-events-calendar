@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
@@ -7,10 +7,15 @@ import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import {
     checkHandleAvailable,
     fetchMyRatings,
-    updateUserPreferences,
     updateUserProfile,
 } from '../api';
 import type { MyRating } from '../types';
+import PreferencesSection from '../components/PreferencesSection';
+import VisibilitySection, { ProfileLinksEditor } from '../components/VisibilitySection';
+import BioEditor from '../components/BioEditor';
+import NetworkPanel from '../components/NetworkPanel';
+import ReferralCard from '../components/ReferralCard';
+import OrganizerClaimSection from '../components/OrganizerClaimSection';
 
 function slugifyHandle(name: string): string {
     const base = name
@@ -28,15 +33,14 @@ function slugifyHandle(name: string): string {
 export default function Account() {
     const { user, loading, logout, deleteAccount, refreshUser } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const { savedCount } = useSavedEvents();
     const { attendingCount } = useAttendingEvents();
-    const { showRatings } = useFeatureFlags();
+    const { showRatings, organizerClaimsEnabled } = useFeatureFlags();
     const [confirming, setConfirming] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [myRatings, setMyRatings] = useState<MyRating[] | null>(null);
-    const [shareDefault, setShareDefault] = useState<boolean>(user?.share_attendance_default ?? true);
-    const [shareSaving, setShareSaving] = useState(false);
 
     // --- Profile editing (display_name + handle) ---
     const [profileEditing, setProfileEditing] = useState(false);
@@ -61,6 +65,21 @@ export default function Account() {
         setNameDraft(user?.name ?? '');
         setHandleDraft(user?.handle ?? '');
     }, [user?.name, user?.handle]);
+
+    // Honour ``/account#section-id`` URL hashes by scrolling the matching
+    // section into view once the page has rendered. React Router doesn't
+    // do this automatically. Re-runs on hash change so an in-app link to
+    // ``/account#network`` from a different page also lands correctly.
+    useEffect(() => {
+        if (!location.hash || loading) return;
+        const id = location.hash.slice(1);
+        // Defer to next paint so the target section is mounted.
+        const t = window.setTimeout(() => {
+            const el = document.getElementById(id);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 50);
+        return () => window.clearTimeout(t);
+    }, [location.hash, loading, user]);
 
     // Debounced availability check on handle draft.
     useEffect(() => {
@@ -128,10 +147,6 @@ export default function Account() {
     };
 
     useEffect(() => {
-        setShareDefault(user?.share_attendance_default ?? true);
-    }, [user?.share_attendance_default]);
-
-    useEffect(() => {
         if (showRatings && user) {
             fetchMyRatings().then(setMyRatings).catch(() => setMyRatings([]));
         }
@@ -146,7 +161,29 @@ export default function Account() {
     }
 
     if (!user) {
-        return <Navigate to="/login" replace />;
+        // Anonymous users still get the Settings page — the Preferences
+        // section is the canonical editor for everyone (see plan.md §
+        // Settings page). Profile / sign-out / activity sections are
+        // replaced by a single sign-in CTA.
+        return (
+            <div className="mx-auto max-w-xl px-4 py-3 text-xs">
+                <h1 className="text-lg font-bold text-slate-900 mb-3">Settings</h1>
+                <PreferencesSection />
+                <section className="rounded-lg border border-slate-200 bg-white p-4">
+                    <h2 className="text-sm font-semibold text-slate-900 mb-2">Account</h2>
+                    <p className="text-xs text-slate-600 mb-3">
+                        Sign in with Google to sync your preferences across devices and
+                        unlock saved events, “I’m going”, and your shareable calendar.
+                    </p>
+                    <Link
+                        to="/login"
+                        className="inline-block bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-600"
+                    >
+                        Sign in
+                    </Link>
+                </section>
+            </div>
+        );
     }
 
     const handleSignOut = async () => {
@@ -172,36 +209,30 @@ export default function Account() {
     };
 
     return (
-        <div className="mx-auto max-w-xl px-6 py-10">
-            <h1 className="text-2xl font-bold text-slate-900 mb-6">Your account</h1>
+        <div className="mx-auto max-w-xl px-4 py-3 text-xs">
+            <h1 className="text-lg font-bold text-slate-900 mb-2">Settings</h1>
 
-            <section className="rounded-lg border border-slate-200 bg-white p-6 mb-6">
-                <div className="flex items-center gap-4">
-                    {user.avatar_url ? (
-                        <img
-                            src={user.avatar_url}
-                            alt=""
-                            className="h-14 w-14 rounded-full"
-                            referrerPolicy="no-referrer"
-                        />
-                    ) : (
-                        <div className="h-14 w-14 rounded-full bg-slate-200 flex items-center justify-center text-xl font-semibold text-slate-500">
-                            {user.name?.[0]?.toUpperCase() ?? '?'}
-                        </div>
-                    )}
-                    <div>
-                        <div className="font-semibold text-slate-900">{user.name}</div>
-                        <div className="text-sm text-slate-500">{user.email}</div>
-                        {user.is_admin && (
-                            <div className="text-xs text-amber-700 mt-1">Administrator</div>
-                        )}
-                    </div>
-                </div>
-            </section>
+            <nav className="mb-3 flex gap-1.5 overflow-x-auto pb-1 scrollbar-none" aria-label="Settings sections">
+                {[
+                    { label: 'Profile', href: '#profile' },
+                    { label: 'My events', href: '#my-events' },
+                    { label: 'My network', href: '#network' },
+                    { label: 'Preferences', href: '#preferences' },
+                    { label: 'Privacy', href: '#privacy' },
+                ].map((item) => (
+                    <a
+                        key={item.href}
+                        href={item.href}
+                        className="shrink-0 border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:border-blue-500 hover:text-blue-500"
+                    >
+                        {item.label}
+                    </a>
+                ))}
+            </nav>
 
-            <section className="rounded-lg border border-slate-200 bg-white p-6 mb-6">
-                <div className="flex items-start justify-between gap-4">
-                    <h2 className="text-base font-semibold text-slate-900">Profile</h2>
+            <section id="profile" className="rounded-lg border border-slate-200 bg-white p-4 mb-3 scroll-mt-4">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                    <h2 className="text-sm font-semibold text-slate-900">Profile</h2>
                     {!profileEditing && (
                         <button
                             type="button"
@@ -211,43 +242,52 @@ export default function Account() {
                                     setHandleDraft(suggestedHandle);
                                 }
                             }}
-                            className="text-sm text-rose-600 hover:text-rose-700 font-medium"
+                            className="text-xs text-blue-500 hover:text-blue-600 font-medium"
                         >
                             Edit
                         </button>
                     )}
                 </div>
 
-                {!profileEditing ? (
-                    <dl className="mt-3 space-y-2 text-sm">
-                        <div className="flex gap-2">
-                            <dt className="w-24 text-slate-500">Name</dt>
-                            <dd className="text-slate-900">{user.name}</dd>
+                <div className="flex items-center gap-3">
+                    {user.avatar_url ? (
+                        <img
+                            src={user.avatar_url}
+                            alt=""
+                            className="h-11 w-11 rounded-full"
+                            referrerPolicy="no-referrer"
+                        />
+                    ) : (
+                        <div className="h-11 w-11 rounded-full bg-slate-200 flex items-center justify-center text-base font-semibold text-slate-500">
+                            {user.name?.[0]?.toUpperCase() ?? '?'}
                         </div>
-                        <div className="flex gap-2 items-baseline">
-                            <dt className="w-24 text-slate-500">Handle</dt>
-                            <dd className="text-slate-900">
-                                {user.handle ? (
-                                    <span className="font-mono">@{user.handle}</span>
-                                ) : (
-                                    <span className="text-amber-700">
-                                        Not set —{' '}
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setProfileEditing(true);
-                                                if (suggestedHandle) setHandleDraft(suggestedHandle);
-                                            }}
-                                            className="underline"
-                                        >
-                                            pick one
-                                        </button>
-                                    </span>
-                                )}
-                            </dd>
+                    )}
+                    <div className="min-w-0">
+                        <div className="flex min-w-0 items-baseline gap-1.5">
+                            <span className="truncate text-sm font-semibold text-slate-900">{user.name}</span>
+                            {user.handle ? (
+                                <span className="shrink-0 font-mono text-xs text-slate-500">@{user.handle}</span>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setProfileEditing(true);
+                                        if (suggestedHandle) setHandleDraft(suggestedHandle);
+                                    }}
+                                    className="shrink-0 text-xs text-blue-500 hover:text-blue-600"
+                                >
+                                    set handle
+                                </button>
+                            )}
                         </div>
-                    </dl>
-                ) : (
+                        <div className="truncate text-xs text-slate-500">{user.email}</div>
+                        {user.is_admin && (
+                            <div className="text-xs text-amber-700 mt-1">Administrator</div>
+                        )}
+                    </div>
+                </div>
+
+                {profileEditing && (
                     <div className="mt-3 space-y-3">
                         <label className="block">
                             <span className="block text-xs font-medium text-slate-600 mb-1">
@@ -258,15 +298,15 @@ export default function Account() {
                                 value={nameDraft}
                                 onChange={(e) => setNameDraft(e.target.value)}
                                 maxLength={120}
-                                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                                className="w-full border border-slate-300 px-3 py-2 text-xs"
                             />
                         </label>
                         <label className="block">
                             <span className="block text-xs font-medium text-slate-600 mb-1">
                                 Handle
                             </span>
-                            <div className="flex items-stretch rounded-md border border-slate-300 overflow-hidden focus-within:border-slate-400">
-                                <span className="bg-slate-50 px-2 py-2 text-sm text-slate-500 border-r border-slate-300">
+                            <div className="flex items-stretch border border-slate-300 overflow-hidden focus-within:border-slate-400">
+                                <span className="bg-slate-50 px-2 py-2 text-xs text-slate-500 border-r border-slate-300">
                                     @
                                 </span>
                                 <input
@@ -278,7 +318,7 @@ export default function Account() {
                                     autoCorrect="off"
                                     spellCheck={false}
                                     placeholder={suggestedHandle || 'your_handle'}
-                                    className="flex-1 px-3 py-2 text-sm font-mono outline-none"
+                                    className="flex-1 px-3 py-2 text-xs font-mono outline-none"
                                 />
                             </div>
                             <span className="block mt-1 text-xs min-h-[1rem]">
@@ -301,14 +341,14 @@ export default function Account() {
                             </span>
                         </label>
                         {profileError && (
-                            <p className="text-sm text-red-700">{profileError}</p>
+                            <p className="text-xs text-red-700">{profileError}</p>
                         )}
                         <div className="flex items-center gap-2">
                             <button
                                 type="button"
                                 onClick={handleProfileSave}
                                 disabled={profileSaving || handleStatus.state === 'checking' || handleStatus.state === 'error'}
-                                className="rounded-md bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-50"
+                                className="bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
                             >
                                 {profileSaving ? 'Saving…' : 'Save'}
                             </button>
@@ -321,47 +361,65 @@ export default function Account() {
                                     setHandleDraft(user.handle ?? '');
                                 }}
                                 disabled={profileSaving}
-                                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                                className="border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
                             >
                                 Cancel
                             </button>
                         </div>
                     </div>
                 )}
+
+                <BioEditor handle={user.handle ?? null} />
+                <ProfileLinksEditor handle={user.handle ?? null} />
             </section>
 
-            <section className="rounded-lg border border-slate-200 bg-white p-6 mb-6">
-                <h2 className="text-base font-semibold text-slate-900 mb-2">My Events</h2>
-                <p className="text-sm text-slate-600">
-                    {savedCount} saved · {attendingCount} going
-                </p>
-                <Link to="/my-calendar" className="mt-2 inline-block text-sm text-rose-600 hover:text-rose-700 font-medium">
-                    Show calendar →
-                </Link>
-            </section>
+            <div className={`flex flex-col md:flex-row gap-3 mb-3 items-start`}>
+                <section id="my-events" className="flex-1 w-full min-w-0 rounded-lg border border-slate-200 bg-white p-4 scroll-mt-4">
+                    <h2 className="text-sm font-semibold text-slate-900 mb-2">My Events</h2>
+                    <p className="text-xs text-slate-600">
+                        {savedCount} saved · {attendingCount} going
+                    </p>
+                    <Link to="/my-calendar" className="mt-2 inline-block text-xs text-blue-500 hover:text-blue-600 font-medium">
+                        Show calendar →
+                    </Link>
+                </section>
 
-            <section className="rounded-lg border border-slate-200 bg-white p-6 mb-6">
-                <h2 className="text-base font-semibold text-slate-900 mb-2">Sync</h2>
-                <p className="text-sm text-slate-600">
-                    Your bookmarked events, “I’m going” events, and your share-my-calendar
-                    link are synced to this account and follow you across devices.
-                </p>
-            </section>
+                {organizerClaimsEnabled && (
+                    <div className="flex-1 w-full min-w-0">
+                        <OrganizerClaimSection handle={user.handle ?? null} />
+                    </div>
+                )}
+
+
+            </div>
+
+            <NetworkPanel />
+
+            <ReferralCard />
+
+            <div id="preferences" className="scroll-mt-4">
+                <PreferencesSection />
+            </div>
+
+            <div id="privacy" className="scroll-mt-4">
+                <VisibilitySection handle={user.handle ?? null} />
+            </div>
+
 
             {showRatings && (
-                <section className="rounded-lg border border-slate-200 bg-white p-6 mb-6">
-                    <h2 className="text-base font-semibold text-slate-900 mb-3">My Ratings</h2>
+                <section className="rounded-lg border border-slate-200 bg-white p-4 mb-3">
+                    <h2 className="text-sm font-semibold text-slate-900 mb-3">My Ratings</h2>
                     {myRatings === null ? (
-                        <p className="text-sm text-slate-400">Loading…</p>
+                        <p className="text-xs text-slate-400">Loading…</p>
                     ) : myRatings.length === 0 ? (
-                        <p className="text-sm text-slate-500">You haven't rated any events yet.</p>
+                        <p className="text-xs text-slate-500">You haven't rated any events yet.</p>
                     ) : (
                         <ul className="divide-y divide-slate-100">
                             {myRatings.map((r) => (
                                 <li key={r.id} className="py-2.5">
                                     <Link
                                         to={`/event/${r.event_id}`}
-                                        className="text-sm font-medium text-slate-800 hover:text-rose-600"
+                                        className="text-xs font-medium text-slate-800 hover:text-blue-500"
                                     >
                                         {r.event_title || r.event_id}
                                     </Link>
@@ -385,80 +443,44 @@ export default function Account() {
                 </section>
             )}
 
-            <section className="rounded-lg border border-slate-200 bg-white p-6 mb-6">
-                <h2 className="text-base font-semibold text-slate-900 mb-2">Privacy</h2>
-                <label className="flex items-start gap-3 text-sm text-slate-700 cursor-pointer">
-                    <input
-                        type="checkbox"
-                        checked={shareDefault}
-                        disabled={shareSaving}
-                        onChange={async (e) => {
-                            const next = e.target.checked;
-                            setShareDefault(next);
-                            setShareSaving(true);
-                            try {
-                                await updateUserPreferences({ share_attendance_default: next });
-                                // Refresh AuthContext so other consumers
-                                // (e.g. GoingButton on the same page) see
-                                // the new value without a full reload.
-                                await refreshUser();
-                            } catch {
-                                setShareDefault(!next);
-                            } finally {
-                                setShareSaving(false);
-                            }
-                        }}
-                        className="mt-0.5"
-                    />
-                    <span>
-                        Share my name by default when I mark myself going to an event.
-                        <span className="block text-xs text-slate-500 mt-0.5">
-                            When enabled, you will appear in the attendee list shown to other
-                            signed-in users. You can override this per-event from the “I’m going”
-                            button.
-                        </span>
-                    </span>
-                </label>
-            </section>
-
-            <section className="rounded-lg border border-slate-200 bg-white p-6 mb-6">
-                <h2 className="text-base font-semibold text-slate-900 mb-2">Help &amp; feedback</h2>
-                <p className="text-sm text-slate-600 mb-2">
+            <section className="rounded-lg border border-slate-200 bg-white p-4 mb-3">
+                <h2 className="text-sm font-semibold text-slate-900 mb-2">Help &amp; feedback</h2>
+                <p className="text-xs text-slate-600 mb-2">
                     Found a bug, have an idea, or want to say hi? We read every message.
                 </p>
                 <a
                     href="mailto:support@joinmovida.com?subject=Movida%20feedback"
-                    className="inline-block rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    className="inline-block border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
                 >
                     Send feedback
                 </a>
             </section>
 
-            <section className="rounded-lg border border-slate-200 bg-white p-6 mb-6">
-                <h2 className="text-base font-semibold text-slate-900 mb-3">Session</h2>
+            <section className="rounded-lg border border-slate-200 bg-white p-4 mb-3">
+                <h2 className="text-sm font-semibold text-slate-900 mb-3">Session</h2>
                 <button
                     onClick={handleSignOut}
                     disabled={busy}
-                    className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                    className="border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                 >
                     Sign out
                 </button>
             </section>
 
-            <section className="rounded-lg border border-red-200 bg-red-50 p-6">
-                <h2 className="text-base font-semibold text-red-900 mb-2">Delete your account</h2>
-                <p className="text-sm text-red-800 mb-3">
+            <section className="rounded-lg border border-red-200 bg-red-50 p-4">
+                <h2 className="text-sm font-semibold text-red-900 mb-2">Delete your account</h2>
+                <p className="text-xs text-red-800 mb-3">
                     Permanently removes your account and all personal data we hold for you
                     (saved events, attending events, share link). This cannot be undone.
                     See our{' '}
                     <Link to="/privacy" className="underline">privacy policy</Link>.
                 </p>
-                {error && <p className="text-sm text-red-700 mb-3">{error}</p>}
+                {error && <p className="text-xs text-red-700 mb-3">{error}</p>}
                 {!confirming ? (
                     <button
                         onClick={() => setConfirming(true)}
                         disabled={busy}
-                        className="rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                        className="bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
                     >
                         Delete my account
                     </button>
@@ -467,14 +489,14 @@ export default function Account() {
                         <button
                             onClick={handleDelete}
                             disabled={busy}
-                            className="rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                            className="bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
                         >
                             {busy ? 'Deleting…' : 'Yes, permanently delete'}
                         </button>
                         <button
                             onClick={() => setConfirming(false)}
                             disabled={busy}
-                            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                            className="border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
                         >
                             Cancel
                         </button>

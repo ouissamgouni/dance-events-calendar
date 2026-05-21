@@ -18,6 +18,15 @@ interface AttendanceSummariesContextValue {
     /** Invalidate the cache for a specific event id. */
     invalidate: (eventId: string) => void;
     /**
+     * Invalidate the cache for many event ids at once. Used after an
+     * events-list refetch (filter change, area pan, etc.) to ensure the
+     * displayed avatars + counts always reflect the latest server state
+     * for events currently on screen, matching the behavior the user
+     * gets from a hard page refresh — without invalidating cached
+     * summaries for events that are NOT in the new result.
+     */
+    invalidateMany: (eventIds: readonly string[]) => void;
+    /**
      * Per-event version counter. Bumps every time `invalidate(eventId)` runs.
      * Consumers that maintain their own derived state (e.g. a separately
      * fetched full attendee list) can include this value in their effect
@@ -110,14 +119,38 @@ export function AttendanceSummariesProvider({ children }: { children: ReactNode 
         setVersion((v) => v + 1);
     }, [scheduleFlush]);
 
+    const invalidateMany = useCallback((eventIds: readonly string[]) => {
+        if (!eventIds.length) return;
+        let touched = false;
+        let enqueuedAny = false;
+        for (const eventId of eventIds) {
+            if (!eventId) continue;
+            const hadEntry = cacheRef.current.delete(eventId);
+            invalidationKeysRef.current.set(
+                eventId,
+                (invalidationKeysRef.current.get(eventId) ?? 0) + 1,
+            );
+            // Always re-enqueue for events on screen; also enqueue unseen
+            // ones if they were previously cached, so a later mount gets
+            // fresh data instead of the just-evicted stale row.
+            if ((refCountRef.current.get(eventId) ?? 0) > 0 || hadEntry) {
+                pendingRef.current.add(eventId);
+                enqueuedAny = true;
+            }
+            touched = true;
+        }
+        if (enqueuedAny) scheduleFlush();
+        if (touched) setVersion((v) => v + 1);
+    }, [scheduleFlush]);
+
     const getInvalidationKey = useCallback(
         (eventId: string) => invalidationKeysRef.current.get(eventId) ?? 0,
         [],
     );
 
     const value = useMemo<AttendanceSummariesContextValue>(
-        () => ({ register, get, version, invalidate, getInvalidationKey }),
-        [register, get, version, invalidate, getInvalidationKey],
+        () => ({ register, get, version, invalidate, invalidateMany, getInvalidationKey }),
+        [register, get, version, invalidate, invalidateMany, getInvalidationKey],
     );
 
     return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
@@ -150,6 +183,17 @@ export function useAttendanceSummary(eventId: string | null | undefined): Attend
 export function useInvalidateAttendanceSummary(): (eventId: string) => void {
     const ctx = useContext(Ctx);
     return ctx?.invalidate ?? (() => { /* no-op */ });
+}
+
+/**
+ * Bulk-invalidation handle for callers that just refetched a list of
+ * events (filter change, area pan, manual refresh, etc.) and want the
+ * displayed avatars + counts to refresh for the events currently on
+ * screen. Returns a no-op outside the provider.
+ */
+export function useInvalidateAttendanceSummaries(): (eventIds: readonly string[]) => void {
+    const ctx = useContext(Ctx);
+    return ctx?.invalidateMany ?? (() => { /* no-op */ });
 }
 
 /**

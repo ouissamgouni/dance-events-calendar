@@ -1,0 +1,286 @@
+test_plan:
+  name: "User Preferences — Preferred Tags & Preferred Map Area"
+  description: >
+    Verify the user preferences feature: anonymous default explorer area
+    (DEFAULT_AREA_BBOX = "Europe & nearby"), Settings page editor for tags +
+    area, "Save as my defaults" affordance in the explorer, anon→authed merge
+    (gated on server preferences_set_at IS NULL), URL params overriding prefs,
+    and localStorage persistence/round-trip.
+
+    Seeded data:
+      • 7 events INSIDE the default bbox (Paris, Berlin, Madrid, Rome, Athens,
+        Istanbul, Casablanca) tagged across salsa / bachata / kizomba.
+      • 3 events OUTSIDE the default bbox (New York, Tokyo, Buenos Aires) so
+        the bbox filter is observable end-to-end.
+      • 2 mock users: alice (used for the anon→authed merge gate, no
+        server-side prefs initially) and bob (used in a second browser
+        profile to demonstrate the "server has prefs" branch).
+
+  steps:
+    # ── Anonymous: default area chip + bbox filter ─────────────────────────
+    - id: 1
+      title: "Anon visit shows default Europe & nearby chip"
+      description: >
+        Open an incognito / fresh browser window. Navigate to the home page (/)
+        in Explorer view. Do NOT sign in.
+      expected: >
+        An always-visible filter chip is rendered in the left filter column,
+        immediately BELOW the tag filter pills: *"🧭 Default area: Europe &
+        nearby · settings · show all"* (xs text). The "Save as default" button
+        is NOT visible (no filters/area drift). On the right-hand map, areas
+        OUTSIDE the bbox are dimmed (translucent dark overlay); the bbox itself
+        is bordered with a thin blue line.
+
+    - id: 2
+      title: "Default bbox excludes events outside Europe & nearby"
+      description: >
+        Inspect the event list / map markers on the home page.
+      expected: >
+        The 7 European events appear (Paris, Berlin, Madrid, Rome, Athens,
+        Istanbul, Casablanca). The 3 events outside the bbox (New York, Tokyo,
+        Buenos Aires) are NOT shown — neither in the list nor on the map.
+
+    - id: 3
+      title: "'show all' clears the area filter for the session"
+      description: >
+        Click the *show all* link on the area chip.
+      expected: >
+        The list/map now also includes the 3 outside-bbox events (NYC, Tokyo,
+        Buenos Aires) — total 10 events. The chip changes to *"🌐 Worldwide (no
+        area) · reset"* (amber). The map dimming overlay is removed.
+
+    - id: 4
+      title: "Reload re-applies the default area"
+      description: >
+        Reload the page (F5). The "show all" override was session-only.
+      expected: >
+        The default-area chip is back (*"🧭 Default area: Europe & nearby"*);
+        only the 7 European events are visible again, and the map dimming
+        overlay is restored.
+
+    # ── Anonymous: Settings page editor ────────────────────────────────────
+    - id: 5
+      title: "Header menu now reads 'Settings' (not 'Account')"
+      description: >
+        Open the header user menu (still anonymous).
+      expected: >
+        The menu item is labelled *Settings* (the previous "Account" label has
+        been replaced). Clicking it navigates to the Settings page.
+
+    - id: 6
+      title: "Settings page shows Preferences section for anon users"
+      description: >
+        Navigate to Settings. Locate the "Preferences" section above the
+        existing share-attendance toggle / account section.
+      expected: >
+        A "Preferences" section is visible with two parts:
+          • Preferred tags — ALL enabled tag groups are rendered, each as its
+            own labelled chip multi-select (e.g. "Format", "Dance Style", and
+            any other enabled groups). Disabled groups/tags are hidden.
+          • Preferred area — embedded map showing the default Europe & nearby
+            bbox as a translucent rectangle, with "Use current map view",
+            "Reset to default", and "Clear" actions.
+        There is NO "Save" button — changes autosave. A small inline status next
+        to the section title reads "Saving…" / "Saved." / "Saved". The
+        non-preferences sections (profile, sign-out, im-going history) are
+        replaced by a single "Sign in with Google to sync your preferences
+        across devices" CTA.
+
+    - id: 7
+      title: "Anon preferred tags autosave on toggle"
+      description: >
+        In the Dance Style chip group, click "Salsa" then "Bachata" so both are
+        selected. Leave Kizomba and Zouk unselected. Wait ~1s after the last
+        toggle (debounce window).
+      expected: >
+        The status next to "Preferences" briefly reads "Saving…" then "Saved."
+        without any button click. The two chips remain selected. Open browser
+        devtools → Application → Local Storage → key `movida.preferences.v1`:
+        the JSON payload contains `preferred_tag_ids` with two ids and a
+        non-null `set_at` timestamp.
+
+    - id: 7b
+      title: "Toggling a tag from a different group also autosaves"
+      description: >
+        In a different group (e.g. "Format"), select one tag (e.g. "Festival").
+      expected: >
+        Status flips to "Saving…" → "Saved.". `preferred_tag_ids` in
+        localStorage now contains the format tag id alongside the dance-style
+        ids — confirming all groups contribute to the same flat list.
+
+    - id: 8
+      title: "Set anonymous preferred area to Iberia (autosaves on commit)"
+      description: >
+        Pan / zoom the embedded map so the visible area covers roughly the
+        Iberian Peninsula (Madrid + surroundings, lng −10 to 5, lat 35 to 45).
+        Click "Use current map view".
+      expected: >
+        The status flips to "Saving…" → "Saved." immediately on click — no Save
+        button required. The map redraws the saved bbox as a translucent
+        rectangle. localStorage `movida.preferences.v1` now also has
+        `preferred_area` with the four numeric bounds and a label string.
+
+    - id: 9
+      title: "Explorer reflects saved anon preferences"
+      description: >
+        Navigate back to the home page (/).
+      expected: >
+        The chip now reads *"📍 Your area: <label> · settings · show all"*
+        (label derived from the saved bbox — e.g. "Custom area"). Only events
+        inside the Iberia bbox appear (Madrid). The dance-style filter pills
+        show Salsa + Bachata as active. Kizomba-only events (Madrid Kizomba
+        Fundamentals) are hidden because the tag filter is AND-combined with the
+        bbox. The map's spotlight overlay reflects the new bbox.
+
+    # ── Anonymous: Save as my defaults ─────────────────────────────────────
+    - id: 10
+      title: "'Save as default' appears when filters drift from prefs"
+      description: >
+        From the explorer, change the dance-style filter — click "Kizomba" so
+        the active tags become {Salsa, Bachata, Kizomba}.
+      expected: >
+        A blue *"Save filters as default"* button becomes visible to the right
+        of the area chip (was hidden in step 9 because filters matched prefs
+        exactly). Note: the CTA copy is context-aware — since only tags changed,
+        it reads *"filters"* (not "location" or "filters & location").
+
+    - id: 11
+      title: "Click the Save CTA updates prefs"
+      description: >
+        Click the *"Save filters as default"* button.
+      expected: >
+        Inline confirmation "Saved." appears next to the chip. The button hides
+        again (filters now match prefs). localStorage `preferred_tag_ids` is
+        updated to include all three tags.
+
+    - id: 11b
+      title: "Pan map → CTA reads 'Save location as default' → click saves it"
+      description: >
+        On the explorer, pan/zoom the right-hand map so the visible viewport
+        clearly drifts from the saved Iberia bbox (e.g. zoom out to all of
+        France / Germany).
+      expected: >
+        The Save CTA reappears with copy *"Save location as default"* (only the
+        area drifted, tags still match). Click it: the saved area is taken from
+        the CURRENT map viewport. The chip flips to *"📍 Your area: …"* with the
+        new bounds, the spotlight overlay re-renders to match, and the button
+        hides again.
+
+    - id: 11c
+      title: "Tags + map both drift → CTA reads 'Save filters & location'"
+      description: >
+        Toggle a tag AND pan the map so both differ from prefs.
+      expected: >
+        Save CTA copy reads *"Save filters & location as default"*. Click it:
+        both update in a single PATCH. Chip flips to *"📍 Your area: …"* with
+        new bounds; tag pills now match the new prefs.
+
+    # ── URL params override saved prefs ────────────────────────────────────
+    - id: 12
+      title: "URL params take precedence over prefs"
+      description: >
+        Open a new tab and navigate to a home URL with explicit filter params,
+        e.g. /?tag_ids=<bachata-id>&min_lat=35&min_lng=-10&max_lat=45&max_lng=5
+        (use the actual numeric tag id visible in the network tab from previous
+        calls).
+      expected: >
+        Only the bachata-tagged event(s) inside the Iberia bbox are shown. Saved
+        prefs are ignored for this view. The chip wording reflects the URL's
+        bbox, not the saved bbox.
+
+    # ── Anonymous → authed merge: server preferences_set_at IS NULL ────────
+    - id: 13
+      title: "Sign in as Alice (no server prefs) merges anon prefs"
+      description: >
+        Stay in the SAME browser window (so localStorage prefs persist).
+        Navigate to /login. Click "Sign in as Alice".
+      expected: >
+        Sign-in succeeds. The home explorer keeps the same filters (Iberia bbox
+        + Salsa/Bachata/Kizomba tags) — the anon prefs were merged into Alice's
+        user row. Open Settings: the Preferences section shows the same selected
+        chips and area as before sign-in.
+
+    - id: 14
+      title: "Sign out keeps prefs as anonymous (becomes anon again)"
+      description: >
+        Sign out from the user menu.
+      expected: >
+        Returned to anonymous state. The explorer still applies the same prefs
+        (localStorage was not cleared). The area chip and tag pills reflect the
+        prefs Alice just merged in.
+
+    - id: 15
+      title: "Sign back in as Alice — server prefs still match"
+      description: >
+        Sign in as Alice again.
+      expected: >
+        No visible change. Server returns Alice's stored prefs which match the
+        local ones. localStorage is overwritten with the server payload
+        (effectively a no-op).
+
+    # ── Cross-device: server has prefs → anon prefs ignored ────────────────
+    - id: 16
+      title: "Edit Alice's prefs server-side (autosave round-trip)"
+      description: >
+        Still signed in as Alice. Open Settings → Preferences. Deselect every
+        currently-active tag chip and select ONLY {Kizomba}. Then on the area
+        picker, pan to a different region (e.g. Berlin region, lng 5 to 20, lat
+        45 to 55) and click "Use current map view" (this button still exists
+        inside the SETTINGS area picker; the explorer no longer needs it because
+        Save as my defaults captures the current map view).
+      expected: >
+        Status flips to "Saving…" → "Saved." after each commit (debounced for
+        tag toggles, immediate for area). Network tab: PATCH
+        /api/auth/preferences returns 200 for each save with the updated
+        payload. localStorage updated. Home explorer reflects the new prefs
+        (only Berlin-area kizomba/etc events).
+
+    - id: 17
+      title: "Open a fresh browser profile, set DIFFERENT anon prefs"
+      description: >
+        Open a SECOND browser window — a new incognito profile or a different
+        browser. This gives a clean localStorage. Visit Settings → Preferences,
+        select ONLY {Zouk} as the preferred tag (it autosaves). Skip the area
+        for this step.
+      expected: >
+        localStorage `movida.preferences.v1` in the second profile contains
+        `preferred_tag_ids: [<zouk-id>]` and `preferred_area: null`.
+
+    - id: 18
+      title: "Sign in as Alice in the second profile — server prefs win"
+      description: >
+        In the second profile, navigate to /login and click "Sign in as Alice".
+      expected: >
+        Sign-in succeeds. The explorer reflects ALICE'S server-side prefs
+        (Berlin-area + Kizomba) — NOT the {Zouk} anon prefs from this profile's
+        localStorage. The anon prefs were silently discarded because Alice
+        already has `preferences_set_at` set server-side. localStorage in this
+        profile is now overwritten with the server payload (Berlin-area +
+        Kizomba).
+
+    # ── Defensive parser & corrupted state ─────────────────────────────────
+    - id: 19
+      title: "Corrupted localStorage does not break sign-in"
+      description: >
+        Sign out. Open devtools → Application → Local Storage. Set
+        `movida.preferences.v1` to a malformed value, e.g. the literal string
+        `not-json`. Reload the page, then sign in as Bob.
+      expected: >
+        The page does not crash. Sign-in completes successfully. The Settings
+        Preferences section shows Bob's defaults (no prefs — area chip reads
+        *"Showing events across Europe & nearby"*). localStorage gets reset to a
+        valid empty preferences blob (or stays absent until first save).
+
+    # ── Clear preferences ──────────────────────────────────────────────────
+    - id: 20
+      title: "Clear preferences from Settings"
+      description: >
+        Sign in as Alice. Go to Settings → Preferences. Click "Clear all".
+      expected: >
+        Status flips to "Saving…" → "Saved.". Server PATCH /api/auth/preferences
+        returns 200 with `preferred_area: null`, `preferred_tag_ids: []`, and a
+        NON-null `set_at` (the explicit-clear is still a recorded preference
+        choice). All chips are deselected and the area picker shows the default
+        bbox. The "Clear all" button disappears (no prefs to clear). Home
+        explorer reverts to the *"Showing events across Europe & nearby"* chip
+        and shows the 7 default-bbox events again.

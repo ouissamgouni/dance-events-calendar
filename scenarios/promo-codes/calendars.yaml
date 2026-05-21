@@ -1,0 +1,4 @@
+calendars:
+  - id: "promo-cal-001"
+    name: "Promo Codes Test Calendar"
+    color: "#3b82f6"

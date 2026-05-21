@@ -1,0 +1,37 @@
+# Phase E (E4) — friend-of-friend "People you may know" scenario.
+#
+# Two viewers in the cast:
+#   • `viewer` — mutual friends with alice/bob/carol; sees FoF picks.
+#   • `loner` — has no friends; the FoF card must NOT render for them.
+#
+# Reachable-through-friends candidates: pop1 (3 mutuals), pop2 (2),
+# pop3 (1). One already-followed candidate `pop1-followed` is used to
+# prove the exclusion path.
+users:
+  - email: viewer@example.com
+    name: View Erfof
+    handle: viewer
+  - email: loner@example.com
+    name: Lonnie Loner
+    handle: loner
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+  - email: carol@example.com
+    name: Carol Nguyen
+    handle: carol
+  - email: popular1@example.com
+    name: Popular One
+    handle: pop1
+  - email: popular2@example.com
+    name: Popular Two
+    handle: pop2
+  - email: popular3@example.com
+    name: Popular Three
+    handle: pop3
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

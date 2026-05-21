@@ -1,0 +1,928 @@
+# Map-clustering exploration seed.
+#
+# Distribution:
+#   * 16 events tightly packed in central Paris (within ~700m of Louvre)
+#     so their pins overlap visibly at city-zoom and stack into an
+#     unreadable mess at country-zoom.
+#   * 8 events in Berlin Mitte (secondary cluster, ~500m radius).
+#   * 6 outliers in Madrid / Rome / Lisbon / Amsterdam / Vienna / Prague
+#     so the map has a continent-wide context.
+#
+# When you load /, zoom to fit Europe: you should see 3 visually
+# distinct "blobs" plus 6 isolated pins. Today the blobs overlap into
+# illegible discs. Once clustering ships, each blob should collapse
+# into a single "N" badge that expands on zoom-in.
+base_week: 0
+events:
+  # --- Paris central cluster (16 events) -------------------------------
+  - id: evt-cluster-par-01
+    calendar_id: salsa-cal-001
+    title: Louvre Salsa Sunset
+    description: Outdoor social by the pyramid.
+    location: Cour Napoléon, 75001 Paris, France
+    latitude: 48.8606
+    longitude: 2.3376
+    start: w0 Fri 19:00
+    end: w0 Fri 23:00
+    price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:outdoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-cluster-par-02
+    calendar_id: bachata-cal-002
+    title: Tuileries Bachata Brunch
+    description: Daytime bachata.
+    location: Jardin des Tuileries, 75001 Paris, France
+    latitude: 48.8635
+    longitude: 2.3275
+    start: w0 Sat 12:00
+    end: w0 Sat 15:00
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:bachata
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-cluster-par-03
+    calendar_id: kizomba-cal-003
+    title: Châtelet Kizomba Night
+    description: Late-night sensual kizomba.
+    location: Place du Châtelet, 75001 Paris, France
+    latitude: 48.8580
+    longitude: 2.3475
+    start: w0 Sat 22:00
+    end: w1 Sun 04:00
+    price_is_free: false
+    price_min: 12
+    price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:kizomba
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-cluster-par-04
+    calendar_id: salsa-cal-001
+    title: Opéra Salsa Tuesday
+    description: Weekday social.
+    location: Place de l'Opéra, 75009 Paris, France
+    latitude: 48.8719
+    longitude: 2.3316
+    start: w0 Tue 20:00
+    end: w0 Tue 23:30
+    price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-cluster-par-05
+    calendar_id: bachata-cal-002
+    title: Palais-Royal Bachata Mixer
+    description: Welcome class + social.
+    location: Place du Palais-Royal, 75001 Paris, France
+    latitude: 48.8627
+    longitude: 2.3370
+    start: w0 Wed 19:30
+    end: w0 Wed 23:00
+    price_is_free: false
+    price_min: 8
+    price_currency: EUR
+    tags:
+    - format:class
+    - dance-style:bachata
+    - level:all-levels
+    - venue:indoor
+    - scale:small
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-cluster-par-06
+    calendar_id: salsa-cal-001
+    title: Forum des Halles Salsa Open
+    description: Indoor social.
+    location: 101 Porte Berger, 75001 Paris, France
+    latitude: 48.8625
+    longitude: 2.3460
+    start: w0 Thu 20:30
+    end: w1 Fri 00:30
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-cluster-par-07
+    calendar_id: kizomba-cal-003
+    title: Pont Neuf Kizomba Riverside
+    description: Open-air on the bridge.
+    location: Pont Neuf, 75001 Paris, France
+    latitude: 48.8570
+    longitude: 2.3415
+    start: w1 Fri 21:00
+    end: w1 Sat 01:30
+    price_is_free: true
+    tags:
+    - format:social
+    - dance-style:kizomba
+    - level:all-levels
+    - venue:outdoor
+    - scale:medium
+    - scope:local
+  - id: evt-cluster-par-08
+    calendar_id: salsa-cal-001
+    title: Madeleine Salsa Saturday
+    description: Headliner Saturday social.
+    location: Place de la Madeleine, 75008 Paris, France
+    latitude: 48.8700
+    longitude: 2.3245
+    start: w1 Sat 21:30
+    end: w2 Sun 03:00
+    price_is_free: false
+    price_min: 15
+    price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-cluster-par-09
+    calendar_id: bachata-cal-002
+    title: Concorde Bachata Picnic
+    description: Outdoor afternoon picnic + bachata.
+    location: Place de la Concorde, 75008 Paris, France
+    latitude: 48.8656
+    longitude: 2.3211
+    start: w1 Sun 14:00
+    end: w1 Sun 18:00
+    price_is_free: true
+    tags:
+    - format:social
+    - dance-style:bachata
+    - level:all-levels
+    - venue:outdoor
+    - scale:medium
+    - scope:local
+  - id: evt-cluster-par-10
+    calendar_id: salsa-cal-001
+    title: Vendôme Salsa Late Night
+    description: Late after-party.
+    location: Place Vendôme, 75001 Paris, France
+    latitude: 48.8675
+    longitude: 2.3294
+    start: w1 Sat 23:30
+    end: w2 Sun 04:30
+    price_is_free: false
+    price_min: 20
+    price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-cluster-par-11
+    calendar_id: kizomba-cal-003
+    title: Rivoli Kizomba Wednesday
+    description: Midweek social.
+    location: 165 Rue de Rivoli, 75001 Paris, France
+    latitude: 48.8612
+    longitude: 2.3357
+    start: w1 Wed 20:30
+    end: w2 Thu 00:00
+    price_is_free: false
+    price_min: 9
+    price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:kizomba
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-cluster-par-12
+    calendar_id: salsa-cal-001
+    title: Les Halles Salsa Friday
+    description: DJ Mambo Friday.
+    location: 39 Rue Berger, 75001 Paris, France
+    latitude: 48.8623
+    longitude: 2.3447
+    start: w2 Fri 21:00
+    end: w2 Sat 02:00
+    price_is_free: false
+    price_min: 14
+    price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:good-music
+  - id: evt-cluster-par-13
+    calendar_id: bachata-cal-002
+    title: Saint-Honoré Bachata Sensual
+    description: Sensual bachata workshop + social.
+    location: 234 Rue Saint-Honoré, 75001 Paris, France
+    latitude: 48.8651
+    longitude: 2.3315
+    start: w2 Sat 17:00
+    end: w2 Sat 21:30
+    price_is_free: false
+    price_min: 25
+    price_currency: EUR
+    tags:
+    - format:workshop
+    - dance-style:bachata
+    - level:all-levels
+    - venue:indoor
+    - scale:small
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-cluster-par-14
+    calendar_id: salsa-cal-001
+    title: Châtelet Salsa Sunday Brunch
+    description: Sunday brunch + social.
+    location: 1 Place du Châtelet, 75004 Paris, France
+    latitude: 48.8582
+    longitude: 2.3478
+    start: w2 Sun 11:30
+    end: w2 Sun 16:00
+    price_is_free: false
+    price_min: 22
+    price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-cluster-par-15
+    calendar_id: kizomba-cal-003
+    title: Pyramides Kizomba Thursday
+    description: Beginner-friendly evening.
+    location: Place des Pyramides, 75001 Paris, France
+    latitude: 48.8632
+    longitude: 2.3325
+    start: w2 Thu 20:00
+    end: w2 Thu 23:00
+    price_is_free: true
+    tags:
+    - format:social
+    - dance-style:kizomba
+    - level:beginner-friendly
+    - venue:indoor
+    - scale:medium
+    - scope:local
+  - id: evt-cluster-par-16
+    calendar_id: bachata-cal-002
+    title: Halles Bachata Weekend Festival
+    description: Multi-room festival kickoff.
+    location: Forum des Halles, 75001 Paris, France
+    latitude: 48.8628
+    longitude: 2.3450
+    start: w3 Fri 20:00
+    end: w4 Sun 04:00
+    price_is_free: false
+    price_min: 45
+    price_currency: EUR
+
+  # --- Berlin Mitte cluster (8 events) ---------------------------------
+    tags:
+    - format:festival
+    - dance-style:bachata
+    - level:all-levels
+    - venue:indoor
+    - scale:large
+    - scope:international
+  - id: evt-cluster-ber-01
+    calendar_id: salsa-cal-001
+    title: Alexanderplatz Salsa Open Air
+    description: Square social.
+    location: Alexanderplatz, 10178 Berlin, Germany
+    latitude: 52.5219
+    longitude: 13.4132
+    start: w0 Fri 20:00
+    end: w0 Sat 00:00
+    price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:outdoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-cluster-ber-02
+    calendar_id: bachata-cal-002
+    title: Hackescher Markt Bachata
+    description: Hidden-courtyard social.
+    location: Hackescher Markt, 10178 Berlin, Germany
+    latitude: 52.5226
+    longitude: 13.4019
+    start: w0 Sat 21:00
+    end: w1 Sun 02:00
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:bachata
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-cluster-ber-03
+    calendar_id: kizomba-cal-003
+    title: Friedrichstraße Kizomba Wednesday
+    description: Weekday social.
+    location: Friedrichstraße 100, 10117 Berlin, Germany
+    latitude: 52.5198
+    longitude: 13.3884
+    start: w0 Wed 20:30
+    end: w1 Thu 00:30
+    price_is_free: false
+    price_min: 8
+    price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:kizomba
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-cluster-ber-04
+    calendar_id: salsa-cal-001
+    title: Museumsinsel Salsa Sunset
+    description: Riverside social.
+    location: Bodestraße, 10178 Berlin, Germany
+    latitude: 52.5212
+    longitude: 13.3974
+    start: w1 Fri 19:30
+    end: w1 Fri 23:00
+    price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:outdoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-cluster-ber-05
+    calendar_id: bachata-cal-002
+    title: Unter den Linden Bachata Mixer
+    description: Welcome class + social.
+    location: Unter den Linden 50, 10117 Berlin, Germany
+    latitude: 52.5172
+    longitude: 13.3892
+    start: w1 Thu 20:00
+    end: w1 Thu 23:30
+    price_is_free: false
+    price_min: 12
+    price_currency: EUR
+    tags:
+    - format:class
+    - dance-style:bachata
+    - level:all-levels
+    - venue:indoor
+    - scale:small
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-cluster-ber-06
+    calendar_id: kizomba-cal-003
+    title: Mitte Kizomba Friday
+    description: Late-night sensual.
+    location: Torstraße 1, 10119 Berlin, Germany
+    latitude: 52.5279
+    longitude: 13.4093
+    start: w2 Fri 22:00
+    end: w3 Sat 04:00
+    price_is_free: false
+    price_min: 14
+    price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:kizomba
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-cluster-ber-07
+    calendar_id: salsa-cal-001
+    title: Rosa-Luxemburg-Platz Salsa
+    description: Outdoor social.
+    location: Rosa-Luxemburg-Platz, 10178 Berlin, Germany
+    latitude: 52.5274
+    longitude: 13.4115
+    start: w2 Sat 21:00
+    end: w3 Sun 02:00
+    price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:outdoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-cluster-ber-08
+    calendar_id: bachata-cal-002
+    title: Holzmarkt Bachata Festival
+    description: Riverside festival weekend.
+    location: Holzmarkt 25, 10243 Berlin, Germany
+    latitude: 52.5125
+    longitude: 13.4259
+    start: w3 Sat 18:00
+    end: w4 Sun 04:00
+    price_is_free: false
+    price_min: 40
+    price_currency: EUR
+
+  # --- Outliers (6 events) ---------------------------------------------
+    tags:
+    - format:festival
+    - dance-style:bachata
+    - level:all-levels
+    - venue:outdoor
+    - scale:large
+    - scope:international
+  - id: evt-cluster-mad-01
+    calendar_id: salsa-cal-001
+    title: Madrid Salsa Saturday
+    description: Headliner night.
+    location: Calle de Atocha 34, 28012 Madrid, Spain
+    latitude: 40.4140
+    longitude: -3.7035
+    start: w1 Sat 22:00
+    end: w2 Sun 03:00
+    price_is_free: false
+    price_min: 12
+    price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-cluster-rom-01
+    calendar_id: bachata-cal-002
+    title: Rome Bachata Trastevere
+    description: Cosy neighborhood social.
+    location: Piazza di Santa Maria in Trastevere, 00153 Rome, Italy
+    latitude: 41.8896
+    longitude: 12.4695
+    start: w2 Fri 21:00
+    end: w2 Sat 01:30
+    price_is_free: true
+    tags:
+    - format:social
+    - dance-style:bachata
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-cluster-lis-01
+    calendar_id: kizomba-cal-003
+    title: Lisbon Kizomba Cais
+    description: Riverside kizomba.
+    location: B.Leza, Cais da Ribeira Nova, 1200 Lisbon, Portugal
+    latitude: 38.7077
+    longitude: -9.1493
+    start: w2 Sat 22:00
+    end: w3 Sun 03:00
+    price_is_free: false
+    price_min: 8
+    price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:kizomba
+    - level:all-levels
+    - venue:outdoor
+    - scale:medium
+    - scope:local
+  - id: evt-cluster-ams-01
+    calendar_id: salsa-cal-001
+    title: Amsterdam Salsa Canal
+    description: Daytime canal social.
+    location: Weteringschans 6, 1017 Amsterdam, Netherlands
+    latitude: 52.3625
+    longitude: 4.8836
+    start: w3 Sun 16:00
+    end: w3 Sun 20:00
+    price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-cluster-vie-01
+    calendar_id: bachata-cal-002
+    title: Vienna Bachata Volksgarten
+    description: Park social.
+    location: Burgring, 1010 Vienna, Austria
+    latitude: 48.2082
+    longitude: 16.3669
+    start: w3 Sat 19:00
+    end: w3 Sat 23:00
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:bachata
+    - level:all-levels
+    - venue:outdoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+  - id: evt-cluster-pra-01
+    calendar_id: kizomba-cal-003
+    title: Prague Kizomba Roxy
+    description: Club night.
+    location: Dlouhá 33, 110 00 Prague, Czechia
+    latitude: 50.0894
+    longitude: 14.4256
+    start: w4 Fri 22:00
+    end: w5 Sat 03:00
+    price_is_free: false
+    price_min: 9
+    price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:kizomba
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
+
+# --------------------------------------------------------------
+# Attendances + saves — mirrors the following-badge scenario so the
+# cluster fixture also exercises friend / followed-not-friends
+# signals at realistic densities.
+#
+# Hero event: evt-cluster-par-08 (Madeleine Salsa Saturday, Paris)
+#   5 friends going        (alice, emma, frank, gina, hugo)
+#   2 friends saved        (nia, omar — audience=friends)
+#   6 followed-not-friends going public
+#                          (pablo, quinn, rita, samir, tara, ulysses)
+#   10 strangers going     (s01..s10, share_audience: public)
+#   10 strangers saving    (t01..t10, audience: public)
+# Expected aggregate for Bob: following_friend_count = 11.
+#
+# Lighter mixes on a few other pins so the Paris/Berlin clusters
+# show a mix of decorated and undecorated pins (proves a future
+# cluster layer must NOT drop following decorations when expanding).
+# --------------------------------------------------------------
+
+attendances:
+  # --- Paris hero (evt-cluster-par-08) ---
+  - {
+      event_id: evt-cluster-par-08,
+      email: alice@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-cluster-par-08,
+      email: emma@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-cluster-par-08,
+      email: frank@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-cluster-par-08,
+      email: gina@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-cluster-par-08,
+      email: hugo@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-cluster-par-08,
+      email: pablo@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-par-08,
+      email: quinn@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-par-08,
+      email: rita@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-par-08,
+      email: samir@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-par-08,
+      email: tara@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-par-08,
+      email: ulysses@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-par-08,
+      email: s01@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-par-08,
+      email: s02@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-par-08,
+      email: s03@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-par-08,
+      email: s04@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-par-08,
+      email: s05@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-par-08,
+      email: s06@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-par-08,
+      email: s07@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-par-08,
+      email: s08@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-par-08,
+      email: s09@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-par-08,
+      email: s10@example.com,
+      share_audience: public,
+    }
+
+  # --- Paris lighter mixes ---
+  # evt-cluster-par-01 (Louvre Salsa Sunset): 3 friends going + 2 strangers
+  - {
+      event_id: evt-cluster-par-01,
+      email: alice@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-cluster-par-01,
+      email: emma@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-cluster-par-01,
+      email: frank@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-cluster-par-01,
+      email: s01@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-par-01,
+      email: s02@example.com,
+      share_audience: public,
+    }
+  # evt-cluster-par-12 (Les Halles Salsa Friday): 1 friend + 4 strangers
+  - {
+      event_id: evt-cluster-par-12,
+      email: gina@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-cluster-par-12,
+      email: s03@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-par-12,
+      email: s04@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-par-12,
+      email: s05@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-par-12,
+      email: s06@example.com,
+      share_audience: public,
+    }
+  # evt-cluster-par-16 (Halles Bachata Weekend Festival): 4 friends going
+  - {
+      event_id: evt-cluster-par-16,
+      email: emma@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-cluster-par-16,
+      email: frank@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-cluster-par-16,
+      email: gina@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-cluster-par-16,
+      email: hugo@example.com,
+      share_publicly: true,
+    }
+
+  # --- Berlin lighter mixes ---
+  # evt-cluster-ber-01 (Alexanderplatz): 2 friends going + 3 followed-not-friends
+  - {
+      event_id: evt-cluster-ber-01,
+      email: alice@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-cluster-ber-01,
+      email: emma@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-cluster-ber-01,
+      email: pablo@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-ber-01,
+      email: quinn@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-ber-01,
+      email: rita@example.com,
+      share_audience: public,
+    }
+  # evt-cluster-ber-08 (Holzmarkt Bachata Festival): 6 strangers going (no friend signal)
+  - {
+      event_id: evt-cluster-ber-08,
+      email: s05@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-ber-08,
+      email: s06@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-ber-08,
+      email: s07@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-ber-08,
+      email: s08@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-ber-08,
+      email: s09@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-ber-08,
+      email: s10@example.com,
+      share_audience: public,
+    }
+
+  # --- Outliers ---
+  # evt-cluster-mad-01 (Madrid): 2 friends going public
+  - {
+      event_id: evt-cluster-mad-01,
+      email: frank@example.com,
+      share_publicly: true,
+    }
+  - {
+      event_id: evt-cluster-mad-01,
+      email: hugo@example.com,
+      share_publicly: true,
+    }
+  # evt-cluster-rom-01 (Rome): only followed-not-friends (3, public)
+  - {
+      event_id: evt-cluster-rom-01,
+      email: pablo@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-rom-01,
+      email: samir@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-rom-01,
+      email: tara@example.com,
+      share_audience: public,
+    }
+  # evt-cluster-lis-01 (Lisbon): only strangers (5, public)
+  - {
+      event_id: evt-cluster-lis-01,
+      email: s01@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-lis-01,
+      email: s02@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-lis-01,
+      email: s03@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-lis-01,
+      email: s04@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cluster-lis-01,
+      email: s05@example.com,
+      share_audience: public,
+    }
+
+saves:
+  # --- Paris hero ---
+  - { event_id: evt-cluster-par-08, email: nia@example.com, audience: friends }
+  - { event_id: evt-cluster-par-08, email: omar@example.com, audience: friends }
+  - { event_id: evt-cluster-par-08, email: t01@example.com, audience: public }
+  - { event_id: evt-cluster-par-08, email: t02@example.com, audience: public }
+  - { event_id: evt-cluster-par-08, email: t03@example.com, audience: public }
+  - { event_id: evt-cluster-par-08, email: t04@example.com, audience: public }
+  - { event_id: evt-cluster-par-08, email: t05@example.com, audience: public }
+  - { event_id: evt-cluster-par-08, email: t06@example.com, audience: public }
+  - { event_id: evt-cluster-par-08, email: t07@example.com, audience: public }
+  - { event_id: evt-cluster-par-08, email: t08@example.com, audience: public }
+  - { event_id: evt-cluster-par-08, email: t09@example.com, audience: public }
+  - { event_id: evt-cluster-par-08, email: t10@example.com, audience: public }
+  # --- evt-cluster-ber-08 (Holzmarkt festival): 1 friend saving with audience=friends ---
+  - { event_id: evt-cluster-ber-08, email: nia@example.com, audience: friends }

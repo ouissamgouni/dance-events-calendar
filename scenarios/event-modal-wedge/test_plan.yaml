@@ -1,0 +1,152 @@
+test_plan:
+  name: "Phase E (E5) — Merged 'Interest' section on the event detail"
+  description: >
+    Verify the merged "Interest" section that replaces the previous
+    split "Who's going" attendee list + "Who you know going" wedge on
+    the event detail view. The section MUST:
+      1. Show a counts row (N going · M saved).
+      2. Render three horizontal chip rows in priority order, deduped
+         by user_id:
+           a. Friends going        — bold chip, no Follow CTA
+           b. Friends of friends   — chip + "via @alice" + inline Follow
+           c. Also going (public)  — muted chip + inline Follow
+      3. Cap each bucket inline (Friends 6, FoF 3, Also going 3) and
+         show a single "Show all N →" link when any bucket is sliced
+         or public_going_count exceeds what's shown.
+      4. Open a sectioned modal (no tabs) listing all attendees in
+         three stacked sections (Friends / FoF / Also going) with a
+         tail line "+N anonymous public going" when applicable.
+      5. Continue to respect share_audience server-side — private
+         rows must never surface in any bucket, modal, or count
+         (GDPR guardrail).
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=event-modal-wedge"
+    - >
+      Pre-seeded follow graph: viewer<->alice (mutual), alice<->bob
+      (mutual). viewer does NOT follow bob, carol, dave, eve, frank,
+      gina, hugo, ivy, or jack. carol's attendance row has
+      share_audience=private and MUST stay hidden in every surface.
+    - >
+      Pre-seeded attendances on evt-wedge-001: alice (friend),
+      bob (FoF via alice), carol (private, hidden), and 7 public
+      strangers (dave, eve, frank, gina, hugo, ivy, jack) so the
+      "Also going" bucket exceeds its 6-chip inline cap.
+
+  steps:
+    - id: 1
+      title: "Interest section shows counts + three deduped chip rows"
+      description: >
+        /login → "Sign in as Viewer Wedge". Open / (Home) and click
+        evt-wedge-001 (Salsa Social Friday) to open the event detail.
+      expected: >
+        Under the event details a single section titled "Interest"
+        renders (no separate "Who's going" + "Who you know going"
+        blocks). The section is collapsible (chevron toggle on the
+        "Interest" header) and is OPEN by default. All section
+        content renders at text size `xs`. It contains:
+          • Counts row: "10 going · 0 saved" (the raw
+            attendance-summary count includes carol's private row,
+            even though carol is hidden from every name surface).
+          • "★ Friends going" chip row with Alice (no Follow button).
+          • "· Friends of friends" chip row with Bob + "via @alice"
+            + a blue "Follow" pill.
+          • "· Also going" chip row with 3 of the 7 public strangers
+            (dave, eve, frank — first three from the attendees
+            endpoint), each with a "Follow" pill.
+          • Right-aligned "Show all 9 →" link below the buckets
+            (9 = alice + bob + 7 visible public; carol stays hidden).
+        Alice MUST appear only in the Friends row (not duplicated in
+        Also going). Bob MUST appear only in FoF. No "rounded-*"
+        classes on the chip pills or section borders (avatars only).
+        Clicking the "Interest" header collapses the entire body
+        (counts row, chips, Show-all CTA) and a second click expands
+        it again.
+
+    - id: 2
+      title: "Carol (private) is invisible — GDPR guardrail"
+      description: >
+        Still on evt-wedge-001, inspect every rendered chip row, the
+        counts row, and (after step 3) the modal sections + anonymous
+        tail.
+      expected: >
+        Carol's handle, name, initials are nowhere in the DOM —
+        not in any chip row, not in the modal sections, not in the
+        anonymous-tail line. The counts row reads "10 going" (raw
+        summary that includes her private row as an opaque count
+        only), and the deduped visible attendee count in the
+        "Show all 9 →" CTA is 9 (alice + bob + 7 public), proving
+        her name is never resolved client-side.
+
+    - id: 3
+      title: "'Show all' opens the sectioned modal (no tabs)"
+      description: >
+        Click "Show all 9 →" at the bottom of the Interest section.
+      expected: >
+        A modal opens titled `Going to "Salsa Social Friday (wedge
+        demo)"`. The modal renders ABOVE any open EventModal (it
+        does NOT slip behind — z-index higher than 9999) and all
+        body content is text size `xs`. The body is a single
+        scrollable list with three stacked, labeled sections in
+        order — no tabs / segmented control anywhere:
+          1. "★ Friends going (1)" → row for Alice with a
+             non-interactive "Friend ✓" badge on the right.
+          2. "· Friends of friends (1)" → row for Bob with a second
+             line "via @alice" (link) and a "Follow" button.
+          3. "· Also going (7)" → rows for dave, eve, frank, gina,
+             hugo, ivy, jack, each with a "Follow" button.
+        Section headers stay sticky while scrolling the body. Modal
+        corners are square (no `rounded-*` on the surface). Esc and
+        the close button both dismiss.
+
+    - id: 4
+      title: "Inline Follow on a Public row flips state optimistically"
+      description: >
+        In the modal's "Also going" section, click Follow next to
+        Frank.
+      expected: >
+        Network: POST /api/social/follow/frank → 200. The button
+        flips immediately to "Following" (secondary style, no rose
+        color). Closing and reopening the modal keeps it "Following".
+        Frank now appears in NetworkPanel → Following. The Interest
+        section's Also-going chip for Frank also reads "Following"
+        on next render (or hides the CTA — implementation choice,
+        but state MUST be consistent between inline + modal).
+
+    - id: 5
+      title: "Follow on an FoF row promotes Bob across buckets"
+      description: >
+        In the modal's "Friends of friends" section, click Follow
+        next to Bob (Bob already follows viewer via alice's graph,
+        making this a mutual follow → friend).
+      expected: >
+        Network: POST /api/social/follow/bob → 200. After modal
+        close + Interest re-render, Bob has moved out of FoF: he is
+        now either in "Friends going" (mutual follow established) or
+        at minimum no longer shown as FoF. Counts row unchanged
+        ("10 going"). No duplicate Bob row across sections.
+
+    - id: 6
+      title: "Empty Interest renders graceful placeholders"
+      description: >
+        Close the modal and open evt-wedge-002 (Bachata Brunch),
+        which has zero attendances.
+      expected: >
+        The Interest section shows:
+          • Counts row: "0 going · 0 saved".
+          • The existing "No one has shared their name yet — be the
+            first…" placeholder under the chip area.
+          • No Show-all CTA, no modal trigger, no crash.
+
+    - id: 7
+      title: "Anon viewer sees counts + sign-in CTA only"
+      description: >
+        Sign out (or open an incognito tab on the same scenario
+        port). Open evt-wedge-001 from the home page.
+      expected: >
+        The Interest section shows the counts row ("10 going · 0
+        saved") and the existing CTA "Sign in to see who's going".
+        No chip rows, no Show-all CTA, no GET /going-wedge request
+        is issued (verify in DevTools Network). No initials, no
+        shadow avatars, no opaque counts that could leak carol's
+        private attendance.

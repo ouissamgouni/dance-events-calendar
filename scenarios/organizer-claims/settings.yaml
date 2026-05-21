@@ -1,0 +1,5 @@
+# Site settings — turn on the organizer_claims flag so the user-facing
+# claim section on /account and the admin slide-over both appear from
+# first boot.
+settings:
+  organizer_claims_enabled: true

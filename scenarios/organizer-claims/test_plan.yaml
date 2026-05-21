@@ -1,0 +1,182 @@
+test_plan:
+  name: "Organizer Claims — critical path"
+  description: |
+    Verify the user-submitted organizer-claim feature end-to-end.
+
+    The feature is now split into two distinct flows backed by the
+    same admin panel:
+
+      A. **Badge claim** (``kind=badge``) — account-level request to
+         become a verified organizer. Requires bio + ≥1 social link.
+         No events attached. Admin approval flips
+         ``is_verified_organizer`` on the user.
+      B. **Events claim** (``kind=events``) — per-event attribution.
+         Only available to already-verified organizers. Submitted from
+         /account by searching the catalogue and picking events. Admin
+         approval attributes each event to the organizer AND auto-marks
+         the organizer as Going with public visibility, so the event
+         shows up on the organizer's profile calendar.
+
+    Seeded:
+      - Olive Organizer: already verified (badge approved at boot) and
+        attributed to evt-organizer-001 (events claim approved at boot).
+      - Carl Claimant: bio + Instagram set, pending badge claim
+        awaiting admin review.
+      - Nora NoProfile: no bio / no socials — used to verify the
+        prerequisite gate.
+
+    Sign-in tip: at /login, dev mode shows one button per mock user.
+    Use "Dev Admin" for admin steps, "Carl Claimant" / "Olive Organizer"
+    / "Nora NoProfile" for user-facing steps.
+
+  steps:
+    - id: 1
+      title: "Verified organizer pill on event detail"
+      description: |
+        Sign in as "Dev User" (or stay signed-out). Open
+        evt-organizer-001 from the calendar.
+      expected: |
+        Below the date row, an "Organized by @olive ✓" pill is
+        rendered (blue verified mark). Clicking it navigates to
+        /u/olive.
+
+    - id: 2
+      title: "Organizer's own calendar shows the attributed event"
+      description: |
+        Open Olive's public profile at /u/olive.
+      expected: |
+        evt-organizer-001 appears in her "Going" / public calendar
+        section — the events-claim approval automatically marked her as
+        publicly going on it.
+
+    - id: 3
+      title: "Account page — prerequisite gate for badge claim"
+      description: |
+        Sign in as "Nora NoProfile" (no bio, no socials). Go to
+        /account and expand the "Become a verified organizer" section.
+      expected: |
+        The section explains a bio + at least one social link
+        (Instagram or Facebook) is required before submitting. The
+        "Request verified-organizer badge" button is hidden or
+        disabled.
+
+    - id: 4
+      title: "Account page — Carl sees his pending badge claim"
+      description: |
+        Sign in as "Carl Claimant" and open /account.
+      expected: |
+        The "Become a verified organizer" section shows an info banner
+        "Your verified-organizer request is pending admin review." The
+        claims history below lists one row tagged "Verified badge"
+        with a "pending" badge and a Cancel action. No event-search
+        UI is shown (Carl is not yet verified).
+
+    - id: 5
+      title: "Cancel and re-submit a badge claim"
+      description: |
+        Still as Carl, click "Cancel" on the pending badge claim. The
+        list empties. Then click "Request verified-organizer badge".
+      expected: |
+        A fresh pending badge claim appears in the history and the
+        banner returns. Reloading /account confirms persistence.
+
+    - id: 6
+      title: "Admin slide-over — kind filter + decision UI"
+      description: |
+        Sign in as "Dev Admin". Open /admin → Data tab → "Organizer
+        Claims" toolbar button. On the "pending" tab, toggle the kind
+        filter between "All", "Verified badge", and "Events".
+      expected: |
+        On "Verified badge" Carl's claim is the only row, tagged with
+        an indigo "Verified badge" pill. There are NO per-event
+        toggles; only a single "Grant verified-organizer badge"
+        checkbox (on by default) plus an admin-notes textarea.
+        Switching to "Events" hides Carl's row entirely; switching to
+        "All" shows it again.
+
+    - id: 7
+      title: "Admin approves Carl's badge"
+      description: |
+        With kind filter back to "All" (or "Verified badge"), keep the
+        grant-badge checkbox ticked, optionally type a note, and click
+        "Save decision".
+      expected: |
+        Carl's row drops off the pending tab. Switching to "approved"
+        shows it. Olive's two seeded approved claims (one badge, one
+        events) are listed under "approved" too — each with its
+        respective indigo/sky pill.
+
+    - id: 8
+      title: "Carl can now submit an events claim"
+      description: |
+        Sign in as "Carl Claimant" and open /account. Expand the
+        section (now titled "Claim events you organize").
+      expected: |
+        The section shows a search input "Type at least 2 characters…"
+        instead of the badge-request button, and Carl now displays a
+        green "verified organizer" pill in the section header. The
+        claims history still lists his approved badge claim.
+
+    - id: 9
+      title: "Search + pick events"
+      description: |
+        Type "Organizer" in the search box.
+      expected: |
+        After ~200ms, a dropdown lists upcoming events whose titles
+        match (evt-organizer-002, evt-organizer-003, etc.). Clicking
+        a row adds it as a chip below the search input. The counter
+        updates ("2 picked, max 20"). Clicking the same row again
+        shows "added" and is disabled.
+
+    - id: 10
+      title: "Submit the events claim"
+      description: |
+        With evt-organizer-002 and evt-organizer-003 picked, click
+        "Submit 2 event claims".
+      expected: |
+        Form clears, a green success banner appears, and the claims
+        history now lists a new pending row tagged "Events" with the
+        two line items underneath, each in "pending" state.
+
+    - id: 11
+      title: "Admin approves the events claim"
+      description: |
+        Sign in as Dev Admin, open the Organizer Claims slide-over,
+        and on Carl's pending Events row toggle both line items to
+        "approved", then "Save decision".
+      expected: |
+        The row drops from "pending". The decision UI for this row
+        shows a hint "Approving an event attributes it to this user
+        and adds it to their public calendar as Going." (No
+        grant-badge checkbox here — that's badge-claims only.)
+
+    - id: 12
+      title: "Attribution + auto-going propagate"
+      description: |
+        Sign-out, open evt-organizer-003 from the public calendar,
+        then open /u/carl.
+      expected: |
+        evt-organizer-003 now shows an "Organized by @carl ✓" pill on
+        the detail page, AND it appears in Carl's public profile
+        calendar (auto-going with public audience). Same for
+        evt-organizer-002.
+
+    - id: 13
+      title: "Notification sent to claimant"
+      description: |
+        Sign in as Carl and open the notifications bell.
+      expected: |
+        A new notification of kind ``organizer_claim_decided`` is
+        present, indicating the admin reviewed his events claim.
+        Clicking it navigates to /account.
+
+    - id: 14
+      title: "Feature flag off → UI disappears"
+      description: |
+        As Dev Admin, in /admin → Configuration tab, toggle
+        "Organizer claims" off. Reload evt-organizer-001 and /account.
+      expected: |
+        The "Organized by" pills are hidden on event detail pages. On
+        /account, the organizer-claims section disappears. The
+        "Organizer Claims" button in the admin Data toolbar still
+        works (admin endpoints are not flag-gated).

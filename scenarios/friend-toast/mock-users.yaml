@@ -1,0 +1,19 @@
+# Phase E (E6) — Mutual-follow celebration toast.
+#
+# Cast:
+#   - viewer — persona under test (already following alpha; alpha must
+#              follow back during the test to fire a new_friend notif).
+#   - alpha  — second persona; follows viewer back in step 2.
+#   - admin
+users:
+  - email: viewer@example.com
+    name: Viewer Persona
+    handle: viewer
+    account_visibility: public
+  - email: alpha@example.com
+    name: Alpha Garcia
+    handle: alpha
+    account_visibility: public
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

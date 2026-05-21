@@ -14,7 +14,7 @@ import GoingButton from '../components/GoingButton';
 import SaveEventButton from '../components/SaveEventButton';
 import RateEventButton from '../components/RateEventButton';
 import EventReviewsSection from '../components/EventReviewsSection';
-import AttendeeList from '../components/AttendeeList';
+import InterestSection from '../components/InterestSection';
 import ShareButton from '../components/ShareButton';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import type { CalendarEvent, TagGroup } from '../types';
@@ -231,25 +231,23 @@ export default function EventDetailPage() {
                                     )}
                                 </div>
 
-                                {/* Suggest tags panel */}
+                                {/* Suggest tags modal */}
                                 {showSuggestTags && (
-                                    <div className="border-t border-slate-100 px-4 pt-3 pb-2">
-                                        <SuggestTagsButton
-                                            eventId={event.event_id}
-                                            tagGroups={tagGroups}
-                                            existingTagIds={new Set(event.tags?.map((t) => t.id) ?? [])}
-                                            deviceId={getDeviceId()}
-                                            onClose={() => setShowSuggestTags(false)}
-                                        />
-                                    </div>
+                                    <SuggestTagsButton
+                                        eventId={event.event_id}
+                                        tagGroups={tagGroups}
+                                        existingTagIds={new Set(event.tags?.map((t) => t.id) ?? [])}
+                                        deviceId={getDeviceId()}
+                                        onClose={() => setShowSuggestTags(false)}
+                                    />
                                 )}
 
-                                {/* Interest — combined engagement section: going attendees + total saves. */}
-                                <div className="border-t border-slate-100 px-4 py-3">
-                                    <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
-                                        Interest
-                                    </h3>
-                                    <AttendeeList eventId={event.event_id} expanded />
+                                {/* Interest — combined engagement section: going attendees + total saves.
+                                    InterestSection provides its own top border + padding; only horizontal padding here.
+                                    px-6 matches EventDetailContent's wrapper so this section visually aligns
+                                    with the promo-codes section rendered just above (inside EventDetailContent). */}
+                                <div className="px-6 pb-3">
+                                    <InterestSection eventId={event.event_id} eventTitle={event.title} />
                                 </div>
 
                                 {/* Actions bar — primary CTA (Going) is visually emphasised; the
@@ -270,7 +268,7 @@ export default function EventDetailPage() {
                                                 if (!tagGroups.length) fetchTagGroups().then(setTagGroups).catch(() => { });
                                                 setShowSuggestTags((v) => !v);
                                             }}
-                                            className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded px-2.5 py-1 transition shrink-0"
+                                            className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 transition shrink-0"
                                         >
                                             Suggest{' '}
                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="inline h-3.5 w-3.5 align-[-1px]">

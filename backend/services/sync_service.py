@@ -8,6 +8,7 @@ from datetime import datetime
 from sqlmodel import Session, select
 
 from backend.db.models import (
+    BlockedEvent,
     CachedEvent,
     CalendarDefaultTag,
     CalendarSetting,
@@ -172,6 +173,32 @@ class SyncService:
                 log.enrichment_progress = progress.to_dict()
                 session.add(log)
                 session.commit()
+
+        # Phase 3: post-sync curation hook. Apply per-calendar rules to
+        # auto-add freshly-synced events to admin-managed targets'
+        # Saved/Going lists. Failures here are logged but never fail
+        # the sync — curation is best-effort enhancement, not the
+        # source of truth for ingest.
+        try:
+            from backend.api.deps import get_admin_user_id
+            from backend.services.curation_hook import apply_curation_rules
+
+            with DBSession(engine) as session:
+                admin_id = get_admin_user_id(session)
+                hook_result = apply_curation_rules(
+                    session, event_ids, admin_user_id=admin_id
+                )
+                session.commit()
+                if hook_result.rows_changed or hook_result.rules_evaluated:
+                    logger.info(
+                        "Curation hook (log_id=%s): %d rules, %d rows changed, %d targets invalid",
+                        log_id,
+                        hook_result.rules_evaluated,
+                        hook_result.rows_changed,
+                        hook_result.rules_skipped_target_invalid,
+                    )
+        except Exception:
+            logger.exception("Curation hook failed (log_id=%s)", log_id)
 
         elapsed = time.perf_counter() - started
         logger.info(
@@ -464,7 +491,13 @@ class SyncService:
                     )
                     duplicates_merged += 1
                 else:
-                    # Genuinely new event
+                    # Genuinely new event — skip if admin has blocked this ID
+                    if session.get(BlockedEvent, event.event_id) is not None:
+                        logger.debug(
+                            "Skipping blocked event_id=%s during sync",
+                            event.event_id,
+                        )
+                        continue
                     new_event = CachedEvent(
                         event_id=event.event_id,
                         calendar_id=event.calendar_id,

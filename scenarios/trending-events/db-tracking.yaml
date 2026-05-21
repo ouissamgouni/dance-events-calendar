@@ -1,0 +1,110 @@
+# Pre-seeded EventView rows — the third (smallest-weight) signal in the
+# trending score. Crucially used to demonstrate that views alone, without
+# going RSVPs, CANNOT push an event into trending (view-bait suppression
+# via `trending_floor_going`).
+views:
+  # evt-trend-001 — 5 views
+  - event_id: evt-trend-001
+    device_id: seed-trend-view-1
+    source: explorer-list
+    country: France
+    city: Paris
+  - event_id: evt-trend-001
+    device_id: seed-trend-view-2
+    source: explorer-list
+    country: France
+    city: Paris
+  - event_id: evt-trend-001
+    device_id: seed-trend-view-3
+    source: explorer-map
+    country: Germany
+  - event_id: evt-trend-001
+    device_id: seed-trend-view-4
+    source: explorer-map
+    country: Spain
+  - event_id: evt-trend-001
+    device_id: seed-trend-view-5
+    source: shared-link
+    country: UK
+  # evt-trend-002 — 3 views
+  - event_id: evt-trend-002
+    device_id: seed-trend-view-6
+    source: explorer-list
+    country: Germany
+    city: Berlin
+  - event_id: evt-trend-002
+    device_id: seed-trend-view-7
+    source: explorer-list
+    country: Germany
+    city: Berlin
+  - event_id: evt-trend-002
+    device_id: seed-trend-view-8
+    source: explorer-map
+    country: France
+  # evt-trend-003 — 80 views (lots of curiosity, only 1 RSVP)
+  # We seed 8 unique device_ids and rely on the algorithm using the
+  # raw row count, so we just repeat 10 source variants per device.
+  # For brevity, seed 8 representative rows; if the algorithm later
+  # switches to distinct-device counting, bump this list.
+  - event_id: evt-trend-003
+    device_id: seed-trend-view-9
+    source: explorer-list
+    country: Belgium
+  - event_id: evt-trend-003
+    device_id: seed-trend-view-10
+    source: explorer-list
+    country: Belgium
+  - event_id: evt-trend-003
+    device_id: seed-trend-view-11
+    source: explorer-list
+    country: France
+  - event_id: evt-trend-003
+    device_id: seed-trend-view-12
+    source: explorer-map
+    country: France
+  - event_id: evt-trend-003
+    device_id: seed-trend-view-13
+    source: explorer-map
+    country: Germany
+  - event_id: evt-trend-003
+    device_id: seed-trend-view-14
+    source: shared-link
+    country: Germany
+  - event_id: evt-trend-003
+    device_id: seed-trend-view-15
+    source: shared-link
+    country: UK
+  - event_id: evt-trend-003
+    device_id: seed-trend-view-16
+    source: shared-link
+    country: UK
+  # evt-trend-004 — view-bait: many views, zero going, zero saved
+  - event_id: evt-trend-004
+    device_id: seed-trend-view-17
+    source: explorer-list
+    country: UK
+  - event_id: evt-trend-004
+    device_id: seed-trend-view-18
+    source: explorer-list
+    country: UK
+  - event_id: evt-trend-004
+    device_id: seed-trend-view-19
+    source: explorer-list
+    country: France
+  - event_id: evt-trend-004
+    device_id: seed-trend-view-20
+    source: explorer-map
+    country: Germany
+  - event_id: evt-trend-004
+    device_id: seed-trend-view-21
+    source: explorer-map
+    country: Belgium
+  # evt-trend-005 — past event, 10 views (must still be excluded)
+  - event_id: evt-trend-005
+    device_id: seed-trend-view-22
+    source: explorer-list
+    country: Spain
+  - event_id: evt-trend-005
+    device_id: seed-trend-view-23
+    source: explorer-list
+    country: Spain

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { getActiveReferral } from '../hooks/useReferralAttribution';
 
 const STORAGE_KEY = 'signup_banner_dismissed_at';
 // Re-show the banner this many days after a dismiss so users who weren't
@@ -20,23 +21,43 @@ function isDismissedRecently(): boolean {
     }
 }
 
+/** Detect an active ``?ref=share&src=…`` attribution \u2014 either persisted
+ *  in localStorage or still present in the current URL (e.g. on first
+ *  paint of a deep link, before the route child has run its effect). */
+function hasActiveShareReferral(): boolean {
+    if (getActiveReferral()) return true;
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    return params.get('ref') === 'share' && !!params.get('src');
+}
+
 /**
  * Slim, anonymous-only sign-in nudge rendered under the top nav.
  * Dismiss is sticky for ``RESHOW_AFTER_DAYS`` days via localStorage.
- * Hidden immediately on sign-in. Pairs with the per-action `SignInNudge`
- * popover; this banner sets the value prop, that popover converts intent.
+ * Hidden immediately on sign-in, and also suppressed when the
+ * share-referral banner is active so anon visitors aren't faced with
+ * two stacked sign-in CTAs (the share-referral banner carries its own
+ * value-prop copy in that case).
+ * Pairs with the per-action `SignInNudge` popover; this banner sets
+ * the value prop, that popover converts intent.
  */
 export default function SignUpBanner() {
     const { user, loading } = useAuth();
     const [dismissed, setDismissed] = useState<boolean>(true);
+    const [shareReferralActive, setShareReferralActive] = useState<boolean>(false);
 
     useEffect(() => {
         // Defer the localStorage check to mount so SSR/first-render is
         // deterministic and we don't flash the banner on signed-in reloads.
         setDismissed(isDismissedRecently());
+        const evaluate = () => setShareReferralActive(hasActiveShareReferral());
+        evaluate();
+        // Re-evaluate when the route child persists the attribution.
+        window.addEventListener('referral:changed', evaluate);
+        return () => window.removeEventListener('referral:changed', evaluate);
     }, []);
 
-    if (loading || user || dismissed) return null;
+    if (loading || user || dismissed || shareReferralActive) return null;
 
     const handleDismiss = () => {
         try {

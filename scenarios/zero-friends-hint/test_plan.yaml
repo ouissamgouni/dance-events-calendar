@@ -1,0 +1,40 @@
+test_plan:
+  name: "Phase E (E2) — Zero-friends warning on AudiencePicker"
+  description: >
+    Verify the inline hint that surfaces when a signed-in user with
+    zero friends picks the ``Friends`` audience tier in any audience
+    picker.
+
+  preconditions:
+    - "task start:scenario SCENARIO=zero-friends-hint"
+    - "Pre-seeded users: viewer (0 friends), alpha, admin."
+    - "alpha→viewer one-way (viewer follows back in step 3)."
+
+  steps:
+    - id: 1
+      title: "Sign in as viewer; open any AudiencePicker"
+      description: >
+        On /login, click ``Sign in as Viewer Persona``. Open the Going
+        modal on any public event, or the share-attendance default at
+        /account → Privacy & visibility. Click the ``Friends`` radio.
+      expected: >
+        Below the radiogroup, an inline hint appears with
+        ``data-testid="audience-zero-friends-hint"`` — "You have no
+        friends yet" with a link to /account#network. The Public and
+        Private radios do NOT show the hint. DevTools: GET /api/auth/me
+        returns ``"friend_count": 0``.
+
+    - id: 2
+      title: "Sign in as alpha; follow viewer (already done) — irrelevant"
+      description: "Nothing to do; this is just a reminder that alpha→viewer is pre-seeded."
+      expected: "—"
+
+    - id: 3
+      title: "Sign back in as viewer, follow alpha → mutual; hint disappears"
+      description: >
+        Open /account#network → Following tab → Follow alpha. (Alternatively
+        navigate to /u/alpha and click Follow.) Re-open the AudiencePicker
+        and re-pick Friends.
+      expected: >
+        The ``audience-zero-friends-hint`` element is GONE. DevTools:
+        GET /api/auth/me now returns ``friend_count: 1``.

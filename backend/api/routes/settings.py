@@ -133,10 +133,19 @@ def get_settings(session: Session = Depends(get_session)):
         show_popularity=_get_bool_setting(session, "show_popularity"),
         show_ratings=_get_bool_setting(session, "show_ratings"),
         popularity_threshold=_get_int_setting(session, "popularity_threshold", 10),
+        following_badge_enabled=_get_bool_setting(session, "following_badge_enabled"),
+        unseen_state_enabled=_get_bool_setting(session, "unseen_state_enabled"),
+        trending_enabled=_get_bool_setting(session, "trending_enabled"),
+        trending_window_days=_get_int_setting(session, "trending_window_days", 30),
+        trending_floor_going=_get_int_setting(session, "trending_floor_going", 3),
+        trending_top_n=_get_int_setting(session, "trending_top_n", 3),
+        trending_top_percent=_get_int_setting(session, "trending_top_percent", 100),
         event_color_bar_color=_get_str_setting(
             session, "event_color_bar_color", "#64748b"
         ),
         tag_sort_mode=_get_str_setting(session, "tag_sort_mode", "group"),
+        promo_codes_enabled=_get_bool_setting(session, "promo_codes_enabled"),
+        organizer_claims_enabled=_get_bool_setting(session, "organizer_claims_enabled"),
     )
 
 
@@ -206,6 +215,55 @@ def update_settings(
             )
         session.add(row)
 
+    if body.following_badge_enabled is not None:
+        _set_bool_setting(
+            session, "following_badge_enabled", body.following_badge_enabled
+        )
+
+    if body.unseen_state_enabled is not None:
+        _set_bool_setting(session, "unseen_state_enabled", body.unseen_state_enabled)
+
+    if body.trending_enabled is not None:
+        _set_bool_setting(session, "trending_enabled", body.trending_enabled)
+
+    if body.trending_window_days is not None:
+        row = session.get(SiteSetting, "trending_window_days")
+        if row:
+            row.value = str(body.trending_window_days)
+        else:
+            row = SiteSetting(
+                key="trending_window_days", value=str(body.trending_window_days)
+            )
+        session.add(row)
+
+    if body.trending_floor_going is not None:
+        row = session.get(SiteSetting, "trending_floor_going")
+        if row:
+            row.value = str(body.trending_floor_going)
+        else:
+            row = SiteSetting(
+                key="trending_floor_going", value=str(body.trending_floor_going)
+            )
+        session.add(row)
+
+    if body.trending_top_n is not None:
+        row = session.get(SiteSetting, "trending_top_n")
+        if row:
+            row.value = str(body.trending_top_n)
+        else:
+            row = SiteSetting(key="trending_top_n", value=str(body.trending_top_n))
+        session.add(row)
+
+    if body.trending_top_percent is not None:
+        row = session.get(SiteSetting, "trending_top_percent")
+        if row:
+            row.value = str(body.trending_top_percent)
+        else:
+            row = SiteSetting(
+                key="trending_top_percent", value=str(body.trending_top_percent)
+            )
+        session.add(row)
+
     if body.event_color_bar_color is not None:
         row = session.get(SiteSetting, "event_color_bar_color")
         if row:
@@ -224,6 +282,14 @@ def update_settings(
             row = SiteSetting(key="tag_sort_mode", value=body.tag_sort_mode)
         session.add(row)
 
+    if body.promo_codes_enabled is not None:
+        _set_bool_setting(session, "promo_codes_enabled", body.promo_codes_enabled)
+
+    if body.organizer_claims_enabled is not None:
+        _set_bool_setting(
+            session, "organizer_claims_enabled", body.organizer_claims_enabled
+        )
+
     session.commit()
 
     return SiteSettingsResponse(
@@ -236,8 +302,17 @@ def update_settings(
         show_popularity=_get_bool_setting(session, "show_popularity"),
         show_ratings=_get_bool_setting(session, "show_ratings"),
         popularity_threshold=_get_int_setting(session, "popularity_threshold", 10),
+        following_badge_enabled=_get_bool_setting(session, "following_badge_enabled"),
+        unseen_state_enabled=_get_bool_setting(session, "unseen_state_enabled"),
+        trending_enabled=_get_bool_setting(session, "trending_enabled"),
+        trending_window_days=_get_int_setting(session, "trending_window_days", 30),
+        trending_floor_going=_get_int_setting(session, "trending_floor_going", 3),
+        trending_top_n=_get_int_setting(session, "trending_top_n", 3),
+        trending_top_percent=_get_int_setting(session, "trending_top_percent", 100),
         event_color_bar_color=_get_str_setting(
             session, "event_color_bar_color", "#64748b"
         ),
         tag_sort_mode=_get_str_setting(session, "tag_sort_mode", "group"),
+        promo_codes_enabled=_get_bool_setting(session, "promo_codes_enabled"),
+        organizer_claims_enabled=_get_bool_setting(session, "organizer_claims_enabled"),
     )

@@ -2,9 +2,11 @@ import logging
 import re
 from typing import Optional
 
+from sqlalchemy import func
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from slowapi import Limiter
 from backend.api.rate_limit import client_ip
+from sqlalchemy.orm import selectinload
 from sqlmodel import Session, col, select
 
 from backend.api.deps import get_client_ip, require_admin
@@ -18,6 +20,7 @@ from backend.api.schemas import (
     TagGroupUpdate,
     TagResponse,
     TagSuggestionApproveRequest,
+    TagSuggestionCountResponse,
     TagSuggestionCreate,
     TagSuggestionRejectRequest,
     TagSuggestionResponse,
@@ -75,6 +78,7 @@ def _group_to_response(group: TagGroup) -> TagGroupResponse:
         ordinal=group.ordinal,
         allow_multiple=group.allow_multiple,
         enabled=group.enabled,
+        onboarding_eligible=group.onboarding_eligible,
         scope=group.scope,
         tags=[_tag_to_response(t) for t in sorted(group.tags, key=lambda t: t.ordinal)],
     )
@@ -134,6 +138,31 @@ def _assert_event_scope_tag(session: Session, tag_id: int) -> Tag:
     return tag
 
 
+def _apply_tag_suggestion_filters(
+    query,
+    *,
+    status: str | None,
+    source: str | None,
+    event_id: str | None,
+    include_past: bool,
+):
+    from datetime import datetime as _dt
+
+    if status:
+        query = query.where(TagSuggestion.status == status)
+    if source:
+        query = query.where(TagSuggestion.source == source)
+    if event_id:
+        query = query.where(TagSuggestion.event_id == event_id)
+    if not include_past:
+        upcoming_ids = select(CachedEvent.event_id).where(
+            CachedEvent.deleted_at == None,  # noqa: E711
+            CachedEvent.end > _dt.utcnow(),
+        )
+        query = query.where(TagSuggestion.event_id.in_(upcoming_ids))
+    return query
+
+
 # ── helpers shared with other routes ──────────────────────────────────
 
 
@@ -148,6 +177,8 @@ def get_event_tags(
         .join(Tag, EventTag.tag_id == Tag.id)
         .join(TagGroup, Tag.group_id == TagGroup.id)
         .where(EventTag.event_id.in_(event_ids))
+        .where(Tag.enabled == True)  # noqa: E712
+        .where(TagGroup.enabled == True)  # noqa: E712
         .order_by(TagGroup.ordinal, Tag.ordinal)
     ).all()
     result: dict[str, list[TagResponse]] = {}
@@ -193,6 +224,10 @@ def list_tag_groups(
             "review-list filter chips."
         ),
     ),
+    onboarding: bool = Query(
+        default=False,
+        description="When true, return only tag groups marked for onboarding.",
+    ),
 ):
     """List tag groups within a given scope (default: event).
 
@@ -205,12 +240,15 @@ def list_tag_groups(
     from sqlalchemy import func
     from fastapi.responses import JSONResponse
 
-    groups = session.exec(
+    group_query = (
         select(TagGroup)
         .where(TagGroup.enabled == True)  # noqa: E712
         .where(TagGroup.scope == scope)
         .order_by(TagGroup.ordinal)
-    ).all()
+    )
+    if onboarding:
+        group_query = group_query.where(TagGroup.onboarding_eligible == True)  # noqa: E712
+    groups = session.exec(group_query).all()
 
     # Count events per tag (only non-deleted events), optionally scoped to a date range
     count_q = (
@@ -641,6 +679,30 @@ def remove_event_tag(
 # ── Admin: Tag Suggestions ───────────────────────────────────────────
 
 
+@router.get(
+    "/api/admin/tags/suggestions/count",
+    response_model=TagSuggestionCountResponse,
+)
+def count_tag_suggestions(
+    status: str | None = Query(default=None),
+    source: str | None = Query(default=None, regex="^(user|heuristic)$"),
+    event_id: str | None = Query(default=None),
+    include_past: bool = Query(default=False),
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    query = select(func.count()).select_from(TagSuggestion)
+    query = _apply_tag_suggestion_filters(
+        query,
+        status=status,
+        source=source,
+        event_id=event_id,
+        include_past=include_past,
+    )
+    count = session.exec(query).one()
+    return TagSuggestionCountResponse(count=count)
+
+
 @router.get("/api/admin/tags/suggestions", response_model=list[TagSuggestionResponse])
 def list_tag_suggestions(
     status: str | None = Query(default=None),
@@ -656,35 +718,35 @@ def list_tag_suggestions(
     (``CachedEvent.end > now``). Pass ``include_past=true`` to include
     suggestions for past events too — typically only useful for audits.
     """
-    from datetime import datetime as _dt
-
     query = select(TagSuggestion).order_by(col(TagSuggestion.created_at).desc())
-    if status:
-        query = query.where(TagSuggestion.status == status)
-    if source:
-        query = query.where(TagSuggestion.source == source)
-    if event_id:
-        query = query.where(TagSuggestion.event_id == event_id)
-    if not include_past:
-        upcoming_ids = select(CachedEvent.event_id).where(
-            CachedEvent.deleted_at == None,  # noqa: E711
-            CachedEvent.end > _dt.utcnow(),
-        )
-        query = query.where(TagSuggestion.event_id.in_(upcoming_ids))
+    query = _apply_tag_suggestion_filters(
+        query,
+        status=status,
+        source=source,
+        event_id=event_id,
+        include_past=include_past,
+    )
     suggestions = session.exec(query).all()
 
     # Enrich with event titles and tag info
     event_ids = list({s.event_id for s in suggestions})
+    tag_ids = list({s.tag_id for s in suggestions if s.tag_id is not None})
     events_map: dict[str, CachedEvent] = {}
+    tags_map: dict[int, Tag] = {}
     if event_ids:
         events = session.exec(
             select(CachedEvent).where(CachedEvent.event_id.in_(event_ids))
         ).all()
         events_map = {e.event_id: e for e in events}
+    if tag_ids:
+        tags = session.exec(
+            select(Tag).options(selectinload(Tag.group)).where(Tag.id.in_(tag_ids))
+        ).all()
+        tags_map = {tag.id: tag for tag in tags if tag.id is not None}
 
     result = []
     for s in suggestions:
-        tag = session.get(Tag, s.tag_id) if s.tag_id else None
+        tag = tags_map.get(s.tag_id) if s.tag_id else None
         ev = events_map.get(s.event_id)
         result.append(
             _suggestion_to_response(

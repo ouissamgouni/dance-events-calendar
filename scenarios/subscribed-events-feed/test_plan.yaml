@@ -1,0 +1,260 @@
+test_plan:
+  name: "Subscribed events feed — notifications + MyCalendar aggregation (Phase C)"
+  description: >
+    Verify the Phase C in-app notification feed and the MyCalendar
+    "From subscriptions" section end-to-end. Backend produces two
+    notification kinds (subscription_going, subscription_suggested)
+    fanned out at write time, gated by a CalendarSubscription with
+    notify_new_events=true and re-checked against can_view at emit
+    time AND at read time (so revoking visibility hides past
+    notifications from the recipient's feed too). The MyCalendar
+    section is a read-time aggregation across the viewer's current
+    subscriptions and includes both attribution kinds (Going +
+    approved Suggestion), with an optional from_handle filter.
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=subscribed-events-feed"
+    - >
+      Pre-seed: bob (subscriber-to-be), alice + carol (public-calendar
+      targets), dave (negative control, never subscribed), admin (for
+      suggestion approval). Four events evt-sef-001..004 are seeded;
+      alice already has a Going+share_publicly attendance on
+      evt-sef-001 BEFORE the test starts so the read-time backfill
+      contract can be verified independently of fan-out.
+    - "Use a fresh browser profile or incognito window per signed-in user."
+    - >
+      Cookie banner: accept "Personalization" so /api/auth/* and
+      /api/social/* are not blocked by the consent gate.
+
+  steps:
+    # ── Follow (auto-subscribes) + read-time backfill ───────────
+    - id: 1
+      title: "Bob follows alice (which auto-subscribes him to her calendar)"
+      description: >
+        Sign in as Bob on Browser B (/login → "Sign in as Bob Martin").
+        Navigate to /@alice (alice's public profile). Click "Follow".
+        After follow, the bell toggle inside the Following pill is ON
+        by default (notify_new_events=true).
+      expected: >
+        POST /api/social/users/alice/follow → 200 with
+        {is_following:true, is_subscribed:true, notify_new_events:true}.
+        The button flips to "Following" with a bell icon (sub-control)
+        showing the notify state. The subscribers count on alice's
+        profile increments by one (optimistic + then confirmed by GET
+        /api/social/users/alice). Alice's row now exists in
+        calendar_subscriptions with subscriber_id=bob, target_user_id=alice
+        — created automatically by the follow action, no separate
+        Subscribe click required.
+
+    - id: 2
+      title: "MyCalendar 'From subscriptions' backfills Alice's existing Going"
+      description: >
+        Still on Browser B (Bob), open /my-calendar. Locate the
+        "From your subscriptions" section (renders only when the viewer
+        has at least one active subscription).
+      expected: >
+        Network: GET /api/social/me/subscribed-events → 200 with
+        items=[{event_id:"evt-sef-001", via:[{actor:{handle:"alice"},
+        kind:"subscription_going"}]}]. The section renders one event
+        card (evt-sef-001 — Salsa Social Friday) with the attribution
+        badge "Alice is going". This proves the aggregation is
+        READ-TIME (alice's Going was set BEFORE bob subscribed) and
+        NOT dependent on the notification table.
+
+    - id: 3
+      title: "Notification bell does NOT show backfilled activity"
+      description: >
+        Still on Browser B, look at the notification bell in the
+        top nav. Open it / navigate to /notifications.
+      expected: >
+        Network: GET /api/notifications/unread-count → {count:0}, and
+        GET /api/notifications → {items:[], total:0, unread_count:0}.
+        Critically: alice's pre-existing Going on evt-sef-001 produced
+        NO notification — fan-out only fires at write time, never
+        retroactively on subscribe. This separation is the contract
+        that makes subscribing safe (you don't get spammed with the
+        target's entire backlog).
+
+    # ── Going fan-out (after follow/subscribe) ──────────────────
+    - id: 4
+      title: "Alice marks evt-sef-002 as Going (audience Public) → Bob gets a notification"
+      description: >
+        Sign in as Alice on Browser A (/login → "Sign in as Alice
+        Rivera"). Open /event/evt-sef-002 and click "I'm going". Pick
+        🌐 Public in the audience picker (the audience must be Public
+        OR Friends — with mutual follow — for fan-out to fire; 🔒 Private
+        suppresses it).
+      expected: >
+        POST /api/track/event-attendance → 201. Server-side, fan-out
+        inserts one Notification row (recipient=bob, actor=alice,
+        kind=subscription_going, event_id=evt-sef-002). Switch back to
+        Browser B (Bob) and refresh. The bell shows a "1" badge:
+        GET /api/notifications/unread-count → {count:1}. Open the
+        feed: GET /api/notifications → items contains a row with
+        kind=subscription_going, event_title="Bachata Workshop",
+        actor.handle="alice", read_at=null.
+
+    - id: 5
+      title: "MyCalendar section also picks up the new Going"
+      description: >
+        Still on Browser B (Bob), open /my-calendar and refresh the
+        "From your subscriptions" section.
+      expected: >
+        Section now lists TWO events: evt-sef-001 (backfilled) and
+        evt-sef-002 (newly Going). Each card shows the "Alice is
+        going" attribution. The notification feed and the MyCalendar
+        section are independent surfaces driven by the SAME source
+        of truth (alice's Going+share_publicly) but read via
+        different endpoints (/api/notifications vs
+        /api/social/me/subscribed-events).
+
+    # ── share_publicly gate ──────────────────────────────────────
+    - id: 6
+      title: "share_publicly OFF on a fresh Going does NOT fan out"
+      description: >
+        On Browser A (Alice), open /event/evt-sef-003 and click "I'm
+        going" but BEFORE the toggle settles, expand the privacy
+        controls and turn "Share publicly" OFF. (Or set the per-row
+        privacy default to private in /account → Privacy & visibility
+        first.)
+      expected: >
+        POST /api/track/event-attendance succeeds with
+        share_publicly:false. On Browser B (Bob), refresh /notifications:
+        unread_count is unchanged (still 1, from step 4). The MyCalendar
+        section also does NOT include evt-sef-003. share_publicly is
+        the chokepoint — it controls BOTH whether the row is visible to
+        non-friends AND whether it produces a notification.
+
+    - id: 7
+      title: "Re-flipping share_publicly ON does not duplicate the notification"
+      description: >
+        Still on Browser A (Alice), on /event/evt-sef-002, toggle
+        Share publicly OFF then back ON. Then refresh Bob's
+        /notifications.
+      expected: >
+        Bob's notification feed still contains exactly ONE row for
+        evt-sef-002. The unique constraint (recipient, kind, actor,
+        event) makes fan-out idempotent — flipping off+on is a no-op
+        from the notification perspective. The MyCalendar section's
+        evt-sef-002 row also disappears while share_publicly=false
+        and reappears when toggled back on (it reads share_publicly
+        live, not at write time).
+
+    # ── Negative control: non-subscribed targets ─────────────────
+    - id: 8
+      title: "Dave's Going does NOT surface for Bob"
+      description: >
+        Open Browser D, /login → "Sign in as Dave Smith". Open
+        /event/evt-sef-004 and click "I'm going" (Share publicly ON).
+      expected: >
+        Server: POST /api/track/event-attendance → 201. Bob has NEVER
+        subscribed to dave (only alice in steps 1+) — fan-out picks
+        zero subscribers, no Notification row is inserted, and
+        evt-sef-004 does NOT appear in Bob's MyCalendar "From
+        subscriptions" section. Switching to Browser B and refreshing
+        /notifications confirms unread_count is still 1.
+
+    # ── Follow a second target + filter UI ───────────────────
+    - id: 9
+      title: "Bob follows carol (auto-subscribe); carol marks evt-sef-003 Going"
+      description: >
+        On Browser B (Bob), open /@carol and click "Follow" (the bell
+        toggle stays ON by default after follow). Then on a new browser
+        (or carol's session), sign in as Carol Nguyen and on
+        /event/evt-sef-003 click "I'm going" with audience 🌐 Public.
+        (If you already used evt-sef-003 in step 6 with alice's private
+        Going, that row is independent — carol gets her own row.)
+      expected: >
+        Bob's subscribers list (GET /api/social/me/subscriptions on
+        the My Calendar page) now contains both alice and carol. Bob's
+        notification bell increments to 2 unread (alice/evt-sef-002 +
+        carol/evt-sef-003). MyCalendar "From subscriptions" section
+        shows 3 cards now: evt-sef-001 (alice, backfilled), evt-sef-002
+        (alice, fan-out from step 4), evt-sef-003 (carol, fan-out from
+        this step).
+
+    - id: 10
+      title: "Filter MyCalendar section by a single subscribed calendar"
+      description: >
+        Still on Browser B (Bob), in the "From your subscriptions"
+        section header, locate the per-subscription filter dropdown /
+        chips. Pick "Alice Rivera (@alice)".
+      expected: >
+        Network: GET /api/social/me/subscribed-events?from_handle=alice
+        → 200 with items containing only evt-sef-001 + evt-sef-002.
+        evt-sef-003 (carol) is filtered out. Switching the dropdown to
+        "Carol Nguyen (@carol)" re-issues the request with
+        ?from_handle=carol and returns only evt-sef-003. Selecting
+        "All" clears the parameter and returns all three.
+
+    # ── Mark-read flows ──────────────────────────────────────────
+    - id: 11
+      title: "Mark a single notification as read clears its dot"
+      description: >
+        Still on Browser B (Bob), on /notifications, click the
+        notification card for alice/evt-sef-002 (or its dedicated
+        "Mark read" affordance if the row has one).
+      expected: >
+        Network: POST /api/notifications/{id}/read → 200 with
+        read_at populated. The unread dot on that row disappears, and
+        the bell badge decrements from 2 → 1. The row stays in the
+        list (read notifications are not auto-hidden so the user can
+        still re-open the source event).
+
+    - id: 12
+      title: "'Mark all read' clears the badge"
+      description: >
+        Still on Browser B (Bob), click the "Mark all read" action in
+        the /notifications header.
+      expected: >
+        Network: POST /api/notifications/read-all → {count:0}. The
+        bell badge disappears. GET /api/notifications/unread-count
+        → {count:0}. All previously-unread rows now have a read_at
+        timestamp (the row count itself is unchanged).
+
+    # ── Suggested fan-out ────────────────────────────────────────
+    - id: 13
+      title: "Alice submits a suggestion → admin approves → Bob gets subscription_suggested"
+      description: >
+        On Browser A (Alice), open /suggest and submit a new event
+        (title "Alice's Suggested Salsa", any future date). On Browser
+        Admin, /login as admin@example.com, open /admin/suggestions,
+        find the new suggestion and click "Approve" (assigning it to
+        any enabled calendar).
+      expected: >
+        Server: POST /api/admin/suggestions/{id}/approve → 200; a new
+        CachedEvent is created and one Notification row with
+        kind=subscription_suggested, actor=alice, event_id=<new event>,
+        recipient=bob is inserted. On Browser B (Bob), refresh
+        /notifications: unread_count=1 again, and the new row renders
+        with attribution "Alice suggested this event". Critically, an
+        ANONYMOUS suggestion (one submitted while logged out) does NOT
+        generate any notification — fan-out only fires when
+        submitter_user_id is set on the EventSuggestion row.
+
+    # ── Visibility revoke (re-check at emit time AND at read time) ──
+    - id: 14
+      title: "Alice tightens account_visibility to friends; new Going does NOT fan out, AND past notifications hide"
+      description: >
+        On Browser A (Alice), open /account → Privacy & visibility,
+        and switch "Account visibility" from Public to Friends. Then
+        on /event/evt-sef-001, toggle Going OFF then back ON (with
+        Share publicly ON) so a fresh fan-out attempt is triggered.
+      expected: >
+        Even though bob still has the calendar_subscriptions row
+        (visibility tightening does NOT auto-delete subscriptions —
+        the row is preserved so the owner sees who's subscribed),
+        fan-out re-checks can_view(bob, alice) at emit time and
+        returns False (alice is now friends-only and bob is not a
+        mutual follow). No new Notification row is inserted.
+
+        Additionally, /api/notifications and
+        /api/notifications/unread-count re-apply can_view(recipient,
+        actor) at READ time, so Bob's earlier notifications from
+        Alice (steps 4 and 13) ALSO disappear from his feed and the
+        bell badge drops accordingly while alice is friends-only —
+        the historical rows remain in the database but are filtered
+        out of the response. The MyCalendar "From subscriptions"
+        section drops alice's rows on Bob's next refresh (the read
+        endpoint applies the same can_view re-check). Switching
+        alice back to Public restores both surfaces and the
+        previously-hidden notification rows reappear in Bob's feed.

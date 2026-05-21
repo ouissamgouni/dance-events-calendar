@@ -53,6 +53,10 @@ export default function SuggestEventModal({ onClose }: Props) {
     const [priceMax, setPriceMax] = useState<string>('');
     const [priceCurrency, setPriceCurrency] = useState<string>('EUR');
 
+    // When the suggester is signed in, default to auto-saving the
+    // approved event to their Calendar tab. Hidden for anon submissions.
+    const [autoSave, setAutoSave] = useState<boolean>(true);
+
     useEffect(() => {
         if (user?.name && !submitterName) setSubmitterName(user.name);
         if (user?.email && !submitterEmail) setSubmitterEmail(user.email);
@@ -151,6 +155,7 @@ export default function SuggestEventModal({ onClose }: Props) {
                 price_min: priceIsFree ? null : pMin,
                 price_max: priceIsFree ? null : pMax,
                 price_currency: priceIsFree || (pMin === null && pMax === null) ? null : priceCurrency,
+                auto_save: autoSave,
                 website,
                 screen_size: `${screen.width}x${screen.height}`,
                 timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -323,6 +328,19 @@ export default function SuggestEventModal({ onClose }: Props) {
                             <input type="text" value={submitterName} onChange={(e) => setSubmitterName(e.target.value)} placeholder="Your name" className={inputClsFull} />
                             <input type="email" value={submitterEmail} onChange={(e) => setSubmitterEmail(e.target.value)} placeholder="Your email" className={inputClsFull} />
                         </div>
+                        {user && (
+                            <label className="mt-3 flex items-start gap-2 text-xs text-slate-700 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={autoSave}
+                                    onChange={(e) => setAutoSave(e.target.checked)}
+                                    className="mt-0.5"
+                                />
+                                <span>
+                                    Add this event to my Calendar when it gets approved.
+                                </span>
+                            </label>
+                        )}
                     </div>
                 </div>
 

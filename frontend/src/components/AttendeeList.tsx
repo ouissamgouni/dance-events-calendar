@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { fetchAttendanceSummary, fetchEventAttendees } from '../api';
 import type { Attendee, AttendanceSummary } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -131,12 +132,36 @@ export default function AttendeeList({ eventId, initialSummary, expanded = false
                 </div>
             ) : (
                 <ul className="flex flex-wrap gap-2 items-center">
-                    {attendees.map((a) => (
-                        <li key={a.user_id} className="flex items-center gap-1.5 bg-slate-50 rounded-full pl-0.5 pr-2.5 py-0.5">
-                            <Avatar attendee={a} size="sm" />
-                            <span className="text-xs text-slate-800 whitespace-nowrap">{a.display_name ?? 'Attendee'}</span>
-                        </li>
-                    ))}
+                    {attendees.map((a) => {
+                        const inner = (
+                            <>
+                                <Avatar attendee={a} size="sm" />
+                                <span className="text-xs text-slate-800 whitespace-nowrap">
+                                    {a.display_name ?? 'Attendee'}
+                                </span>
+                            </>
+                        );
+                        return (
+                            <li
+                                key={a.user_id}
+                                className="bg-slate-50 rounded-full pl-0.5 pr-2.5 py-0.5"
+                            >
+                                {a.handle ? (
+                                    <Link
+                                        to={`/u/${a.handle}`}
+                                        className="flex items-center gap-1.5 hover:bg-slate-100 -m-px rounded-full"
+                                        title={`View @${a.handle}'s profile`}
+                                    >
+                                        {inner}
+                                    </Link>
+                                ) : (
+                                    <span className="flex items-center gap-1.5">
+                                        {inner}
+                                    </span>
+                                )}
+                            </li>
+                        );
+                    })}
                     {!expanded && hiddenCount > 0 && (
                         <li className="text-xs text-slate-500">+{hiddenCount} more</li>
                     )}

@@ -1,0 +1,7 @@
+# No follows for viewer at scenario start. This is intentional: the
+# Following picker and /discover suggestions must fall back to curators.
+#
+# The spare subscriber user is intentionally not connected here. If you want
+# to manually test subscriber-count ranking, sign in as Sara Subscriber and
+# subscribe to a curator profile during exploration.
+follows: []

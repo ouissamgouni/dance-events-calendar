@@ -1,0 +1,9 @@
+# Pre-seeded follow graph for the users-management scenario.
+#
+# Minimal edges so the admin-initiated delete cascade has something to
+# verify (Alice -> Dave): when admin deletes Dave, Alice's following count
+# must drop by 1, proving the admin path uses the same purge_user_account
+# helper as the self-service GDPR flow.
+follows:
+  - follower: alice
+    followee: dave

@@ -1,0 +1,4 @@
+calendars:
+  - id: "organizer-cal-001"
+    name: "Organizer Claims Test Calendar"
+    color: "#10b981"

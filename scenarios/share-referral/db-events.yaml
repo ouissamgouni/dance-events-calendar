@@ -1,0 +1,30 @@
+# Pre-seeded events for the share-referral (D2) scenario.
+#
+# Every step of the test plan navigates to
+# ``/event/<id>?ref=share&src=<share_code>``. The id needs to resolve
+# to a real, public event so the page renders the share-referral
+# banner instead of a 404. A single event is enough — the scenario is
+# about the banner, not the event detail.
+base_week: 0
+events:
+  - id: evt-sr-001
+    calendar_id: salsa-cal-001
+    title: Salsa Social Friday (share-link host)
+    description: |
+      Headline event. The share-referral banner under test renders
+      above this event's detail page when arrived via
+      ?ref=share&src=<share_code>.
+    location: Dance Studio, 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w0 Fri 21:00
+    end: w0 Sat 01:00
+    price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere

@@ -17,6 +17,14 @@ events:
   start: w0 Fri 21:00
   end: w0 Sat 01:00
   price_is_free: true
+  tags:
+  - format:social
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-acct-002
   calendar_id: salsa-cal-001
   title: Saturday Bachata Night
@@ -36,6 +44,15 @@ events:
   price_is_free: false
   price_min: 10
   price_currency: EUR
+  tags:
+  - format:social
+  - dance-style:salsa
+  - dance-style:bachata
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-acct-003
   calendar_id: salsa-cal-001
   title: Sunday Kizomba
@@ -53,6 +70,15 @@ events:
   start: w1 Sun 17:00
   end: w1 Sun 21:00
   price_is_free: true
+  tags:
+  - format:social
+  - dance-style:salsa
+  - dance-style:kizomba
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-acct-004
   calendar_id: salsa-cal-001
   title: Rueda de Casino
@@ -72,3 +98,11 @@ events:
   price_is_free: false
   price_min: 8
   price_currency: EUR
+  tags:
+  - format:social
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere

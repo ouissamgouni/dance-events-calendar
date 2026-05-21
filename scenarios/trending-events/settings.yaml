@@ -1,0 +1,26 @@
+# Site settings pre-seeded into the SiteSetting table.
+#
+# `trending_enabled: true` flips the popularity badge + sort to use the
+# new commitment-weighted score (popularity_score) instead of raw
+# view_count. `show_popularity: true` is required for the badge to
+# render at all (admin gate).
+#
+# `trending_floor_going: 1` is intentionally *lower* than the production
+# default (3) so this scenario can demonstrate the score with modest
+# seed data — every "trending" event in db-events.yaml has at least
+# 1 going.
+#
+# `trending_top_n` and `trending_top_percent` combine into an effective
+# cap of crowned events: min(top_n, ceil(visible * percent / 100)).
+# Seeded as 5 / 10 so that with ~23 visible events the percent gate
+# (ceil(23 * 0.10) = 3) wins over the absolute cap (5) — proving both
+# knobs are wired end-to-end. Setting top_n=1 or percent=100 in the
+# Admin UI yields visibly different ring counts on the map.
+settings:
+  show_popularity: true
+  popularity_threshold: 1
+  trending_enabled: true
+  trending_window_days: 30
+  trending_floor_going: 1
+  trending_top_n: 5
+  trending_top_percent: 10

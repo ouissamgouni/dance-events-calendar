@@ -1,0 +1,34 @@
+# Mock users pre-seeded for the friends-graph scenario.
+#
+# Four regular users let us exercise the asymmetric follow model:
+# - Alice & Bob become mutual (friends)
+# - Carol follows Alice but Alice does not follow back (one-way)
+# - Dave is a stranger used to verify private/friends-only gating from the outside
+# Admin is included to verify the verified-organizer toggle endpoint.
+#
+# Account visibility defaults to "public" (signed-up users are discoverable
+# by default). Alice, Bob and Carol are set to "friends" so the test plan
+# can exercise the friends-only gating (mutual follow required to view /
+# subscribe). Dave stays "public" so the test plan can exercise the second
+# subscribe path: subscribing to a stranger whose account is public, no
+# follow required either way.
+users:
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    account_visibility: friends
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+    account_visibility: friends
+  - email: carol@example.com
+    name: Carol Nguyen
+    handle: carol
+    account_visibility: friends
+  - email: dave@example.com
+    name: Dave Smith
+    handle: dave
+    account_visibility: public
+  - email: admin@example.com # matches ADMIN_EMAIL → admin badge
+    name: Dev Admin
+    handle: admin

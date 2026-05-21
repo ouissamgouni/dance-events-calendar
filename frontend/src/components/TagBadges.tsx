@@ -6,10 +6,11 @@ interface Props {
 }
 
 export default function TagBadges({ tags, maxVisible = 5 }: Props) {
-    if (!tags.length) return null;
+    const enabledTags = tags.filter((tag) => tag.enabled);
+    if (!enabledTags.length) return null;
 
-    const visible = tags.slice(0, maxVisible);
-    const overflow = tags.length - maxVisible;
+    const visible = enabledTags.slice(0, maxVisible);
+    const overflow = enabledTags.length - maxVisible;
 
     return (
         <div className="flex flex-wrap gap-1">
@@ -18,7 +19,7 @@ export default function TagBadges({ tags, maxVisible = 5 }: Props) {
                 return (
                     <span
                         key={tag.id}
-                        className="inline-flex items-center rounded-sm px-2 py-0.5 text-[10px] font-medium"
+                        className="inline-flex items-center px-1.5 py-px text-[9px] font-medium leading-3"
                         style={{
                             backgroundColor: `${c}20`,
                             color: c,
@@ -31,7 +32,7 @@ export default function TagBadges({ tags, maxVisible = 5 }: Props) {
                 );
             })}
             {overflow > 0 && (
-                <span className="inline-flex items-center rounded-sm px-2 py-0.5 text-[10px] font-medium text-gray-400">
+                <span className="inline-flex items-center px-1.5 py-px text-[9px] font-medium leading-3 text-gray-400">
                     +{overflow}
                 </span>
             )}

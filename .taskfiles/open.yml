@@ -1,139 +1,223 @@
 version: "3"
 
 # ════════════════════════════════════════════════════════════════════════════
-# open:session — open one or more fresh, fully-isolated Chrome sessions
-# pointing at any environment.
+# open:* — open one or more browser windows pointing at any environment.
 #
-# Each session has its own --user-data-dir → independent cookie jar /
-# localStorage. Better than incognito (which shares state within a Chrome
-# process). Profile dirs live under /tmp/chrome-* until you close the
-# window or run `task open:clean`.
+# Two modes:
+#   • shared    → focus an existing Chrome tab matching the URL, else open one
+#                 tab in your default Chrome profile. Cookies + localStorage
+#                 are SHARED with all your normal browsing and with every
+#                 other `shared` invocation. Best for: solo dev loop, quick
+#                 smoke check.
+#   • isolated  → open COUNT (default 1) Chrome sessions, each with its own
+#                 --user-data-dir → independent cookie jar / localStorage.
+#                 Better than incognito (which shares state within a Chrome
+#                 process). Profile dirs are stable per (env, scenario, index)
+#                 under /tmp/chrome-profiles/, so re-running the same task is
+#                 idempotent: it focuses the existing window instead of
+#                 duplicating it. Pass RESET_BROWSER=1 to wipe the profile
+#                 dirs first for a true clean start. Best for: scenario QA,
+#                 multi-user share flows.
 #
-# All sub-tasks accept BROWSERS=N (default 1). N=2 is useful for
-# multi-user flows (Alice + Bob).
+# Examples:
+#   task open:shared:dev
+#   task open:isolated:dev                                       # 1 isolated session
+#   task open:isolated:scenario SCENARIO=share-im-going COUNT=2  # multi-user QA
+#   task open:isolated:scenario SCENARIO=foo RESET_BROWSER=1     # wipe state first
+#   task open:isolated:staging:remote
+#   task open:isolated:prod
 #
-#   task open:session:dev               # http://localhost:5173
-#   task open:session:scenario          # http://localhost:<scenario-web-port>
-#       SCENARIO=share-im-going BROWSERS=2
-#   task open:session:staging:local     # http://localhost:3001
-#   task open:session:staging:remote    # https://develop.joinmovida.com
-#   task open:session:prod              # https://joinmovida.com
+# Cleanup:
+#   task open:clean        nuke all isolated profile dirs
+#   task open:clean:dev    nuke only dev-* isolated profile dirs
 #
-# `task open:session` (no suffix) is kept as a back-compat alias for
-# the scenario form.
+# Note: stop:scenario and stop:scenario:all clean their own isolated profiles
+# automatically (pass KEEP_BROWSER=1 to opt out).
 # ════════════════════════════════════════════════════════════════════════════
 
 vars:
   SCENARIO_PORTS_SH: .taskfiles/scenario_ports.sh
 
 tasks:
-
   # ─────────────────────────────────────────────────────────────────────
-  # Internal: open BROWSERS isolated sessions pointing at URL
+  # Internal: dispatch to open-browsers.sh with mode + count + label + reset
   # ─────────────────────────────────────────────────────────────────────
   _open:
     internal: true
     cmds:
       - |
         URL="{{.URL}}"
+        MODE="{{.MODE | default `isolated`}}"
+        COUNT="{{.COUNT | default `1`}}"
         LABEL="{{.LABEL | default `session`}}"
-        BROWSERS="{{.BROWSERS | default `1`}}"
-        if ! echo "$BROWSERS" | grep -Eq '^[0-9]+$' || [ "$BROWSERS" -lt 1 ]; then
-          echo "❌ BROWSERS must be a positive integer (got '$BROWSERS')"
-          exit 1
-        fi
-        echo "═══════════════════════════════════════════════════════════════"
-        echo "  Opening $BROWSERS fresh isolated session(s)"
-        echo "  Target: $URL"
-        echo "  Label : $LABEL"
-        echo "═══════════════════════════════════════════════════════════════"
-        i=1
-        while [ "$i" -le "$BROWSERS" ]; do
-          {{.ROOT_DIR}}/.taskfiles/open-fresh-session.sh "$URL" "${LABEL}-${i}"
-          i=$((i+1))
-        done
+        RESET="{{.RESET_BROWSER | default `0`}}"
+        {{.ROOT_DIR}}/.taskfiles/open-browsers.sh "$URL" "$MODE" "$COUNT" "$LABEL" "$RESET"
 
   # ─────────────────────────────────────────────────────────────────────
-  # Per-environment shortcuts
+  # shared:* — focus existing Chrome tab (or open one) in default profile
   # ─────────────────────────────────────────────────────────────────────
 
-  session:dev:
-    desc: "Open BROWSERS=N (default 1) fresh isolated Chrome sessions on dev
-      (http://localhost:5173)."
-    dotenv: [ "config/base.env", "config/dev.env" ]
+  shared:dev:
+    desc: "Focus or open a tab on dev (http://localhost:5173) in your default
+      Chrome profile (shared cookies)."
+    dotenv: ["config/base.env", "config/dev.env"]
     cmds:
       - task: _open
         vars:
           URL: "http://localhost:${FRONTEND_PORT:-5173}"
+          MODE: "shared"
           LABEL: "dev"
-          BROWSERS: "{{.BROWSERS | default \"1\"}}"
 
-  session:scenario:
-    desc: "Open BROWSERS=N (default 1) fresh isolated Chrome sessions on a scenario.
-      SCENARIO=name."
+  shared:scenario:
+    desc: "Focus or open a tab on a scenario (SCENARIO=name) in your default
+      Chrome profile (shared cookies)."
     vars:
-      SCENARIO: "{{.SCENARIO | default \"default\"}}"
+      SCENARIO: '{{.SCENARIO | default "default"}}'
+      SC_WEB_PORT:
+        sh: source {{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}" && echo "$SC_WEB_PORT"
     cmds:
-      - |
-        source {{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
-        task open:_open URL="http://localhost:${SC_WEB_PORT}" LABEL="{{.SCENARIO}}" BROWSERS="{{.BROWSERS | default `1`}}"
+      - task: _open
+        vars:
+          URL: "http://localhost:{{.SC_WEB_PORT}}"
+          MODE: "shared"
+          LABEL: "scenario-{{.SCENARIO}}"
 
-  session:staging:local:
-    desc: "Open BROWSERS=N (default 1) fresh isolated Chrome sessions on local
-      staging (docker-compose, http://localhost:3001)."
-    dotenv: [ "config/base.env", "config/staging.local.env" ]
+  shared:staging:local:
+    desc: "Focus or open a tab on local staging (http://localhost:3001) in your
+      default Chrome profile (shared cookies)."
+    dotenv: ["config/base.env", "config/staging.local.env"]
     cmds:
       - task: _open
         vars:
           URL: "http://localhost:${FRONTEND_PORT:-3001}"
+          MODE: "shared"
           LABEL: "staging-local"
-          BROWSERS: "{{.BROWSERS | default \"1\"}}"
 
-  session:staging:remote:
-    desc: "Open BROWSERS=N (default 1) fresh isolated Chrome sessions on remote
-      staging (https://develop.joinmovida.com)."
+  shared:staging:remote:
+    desc:
+      "Focus or open a tab on remote staging (https://develop.joinmovida.com)
+      in your default Chrome profile (shared cookies)."
     cmds:
       - task: _open
         vars:
           URL: "https://develop.joinmovida.com"
+          MODE: "shared"
           LABEL: "staging-remote"
-          BROWSERS: "{{.BROWSERS | default \"1\"}}"
 
-  session:prod:
-    desc: "Open BROWSERS=N (default 1) fresh isolated Chrome sessions on production
-      (https://joinmovida.com)."
+  shared:prod:
+    desc: "Focus or open a tab on production (https://joinmovida.com) in your
+      default Chrome profile (shared cookies)."
     cmds:
       - task: _open
         vars:
           URL: "https://joinmovida.com"
+          MODE: "shared"
           LABEL: "prod"
-          BROWSERS: "{{.BROWSERS | default \"1\"}}"
 
   # ─────────────────────────────────────────────────────────────────────
-  # Back-compat: bare `open:session` defaults to scenario form (legacy
-  # callers that pass SCENARIO=... and N=index still work because the
-  # script de-dupes profile dirs by random suffix).
+  # isolated:* — open COUNT sessions with own --user-data-dir
   # ─────────────────────────────────────────────────────────────────────
-  session:
-    desc: "Alias of open:session:scenario (back-compat). Prefer the explicit form."
-    vars:
-      SCENARIO: "{{.SCENARIO | default \"default\"}}"
-      BROWSERS: "{{if .BROWSERS}}{{.BROWSERS}}{{else if .N}}{{.N}}{{else}}1{{end}}"
+
+  isolated:dev:
+    desc: "Open COUNT=N (default 1) isolated Chrome sessions on dev. Idempotent
+      (focuses existing window). RESET_BROWSER=1 to wipe profile first."
+    dotenv: ["config/base.env", "config/dev.env"]
     cmds:
-      - task: session:scenario
+      - task: _open
         vars:
-          SCENARIO: "{{.SCENARIO}}"
-          BROWSERS: "{{.BROWSERS}}"
+          URL: "http://localhost:${FRONTEND_PORT:-5173}"
+          MODE: "isolated"
+          LABEL: "dev"
+          COUNT: '{{.COUNT | default "1"}}'
+          RESET_BROWSER: '{{.RESET_BROWSER | default "0"}}'
+
+  isolated:scenario:
+    desc: "Open COUNT=N (default 1) isolated Chrome sessions on a scenario.
+      SCENARIO=name. Idempotent. RESET_BROWSER=1 to wipe profile first."
+    vars:
+      SCENARIO: '{{.SCENARIO | default "default"}}'
+      SC_WEB_PORT:
+        sh: source {{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}" && echo "$SC_WEB_PORT"
+    cmds:
+      - task: _open
+        vars:
+          URL: "http://localhost:{{.SC_WEB_PORT}}"
+          MODE: "isolated"
+          LABEL: "scenario-{{.SCENARIO}}"
+          COUNT: '{{.COUNT | default "1"}}'
+          RESET_BROWSER: '{{.RESET_BROWSER | default "0"}}'
+
+  isolated:staging:local:
+    desc: "Open COUNT=N (default 1) isolated Chrome sessions on local staging.
+      Idempotent. RESET_BROWSER=1 to wipe profile first."
+    dotenv: ["config/base.env", "config/staging.local.env"]
+    cmds:
+      - task: _open
+        vars:
+          URL: "http://localhost:${FRONTEND_PORT:-3001}"
+          MODE: "isolated"
+          LABEL: "staging-local"
+          COUNT: '{{.COUNT | default "1"}}'
+          RESET_BROWSER: '{{.RESET_BROWSER | default "0"}}'
+
+  isolated:staging:remote:
+    desc: "Open COUNT=N (default 1) isolated Chrome sessions on remote staging.
+      Idempotent. RESET_BROWSER=1 to wipe profile first."
+    cmds:
+      - task: _open
+        vars:
+          URL: "https://develop.joinmovida.com"
+          MODE: "isolated"
+          LABEL: "staging-remote"
+          COUNT: '{{.COUNT | default "1"}}'
+          RESET_BROWSER: '{{.RESET_BROWSER | default "0"}}'
+
+  isolated:prod:
+    desc: "Open COUNT=N (default 1) isolated Chrome sessions on production.
+      Idempotent. RESET_BROWSER=1 to wipe profile first."
+    cmds:
+      - task: _open
+        vars:
+          URL: "https://joinmovida.com"
+          MODE: "isolated"
+          LABEL: "prod"
+          COUNT: '{{.COUNT | default "1"}}'
+          RESET_BROWSER: '{{.RESET_BROWSER | default "0"}}'
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Cleanup
+  # ─────────────────────────────────────────────────────────────────────
 
   clean:
-    desc: Remove all temporary Chrome profile dirs created by open:session
+    desc: Remove ALL isolated Chrome profile dirs created by open:isolated:*
     cmds:
       - |
-        COUNT=$(find /tmp -maxdepth 1 -type d -name 'chrome-*' 2>/dev/null | wc -l | tr -d ' ')
-        if [ "$COUNT" = "0" ]; then
-          echo "No temporary Chrome session dirs found."
+        ROOT="/tmp/chrome-profiles"
+        LEGACY=$(find /tmp -maxdepth 1 -type d -name 'chrome-*' ! -path "$ROOT" 2>/dev/null)
+        NEW=""
+        [ -d "$ROOT" ] && NEW=$(find "$ROOT" -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
+        if [ -z "$LEGACY" ] && [ -z "$NEW" ]; then
+          echo "No isolated Chrome profile dirs found."
           exit 0
         fi
-        echo "Removing $COUNT Chrome session dir(s) under /tmp/chrome-* ..."
-        find /tmp -maxdepth 1 -type d -name 'chrome-*' -exec rm -rf {} + 2>/dev/null || true
+        echo "Removing isolated Chrome profile dirs..."
+        [ -n "$NEW" ] && rm -rf "$ROOT"/* 2>/dev/null || true
+        [ -n "$LEGACY" ] && find /tmp -maxdepth 1 -type d -name 'chrome-*' ! -path "$ROOT" -exec rm -rf {} + 2>/dev/null || true
         echo "✅ Done."
+
+  clean:dev:
+    desc: Remove only dev-* isolated Chrome profile dirs (keeps scenario sessions)
+    cmds:
+      - |
+        ROOT="/tmp/chrome-profiles"
+        if [ ! -d "$ROOT" ]; then
+          echo "No isolated profile root at $ROOT."
+          exit 0
+        fi
+        MATCHES=$(find "$ROOT" -mindepth 1 -maxdepth 1 -type d -name 'dev-*' 2>/dev/null)
+        if [ -z "$MATCHES" ]; then
+          echo "No dev-* isolated profile dirs found."
+          exit 0
+        fi
+        echo "$MATCHES" | xargs rm -rf 2>/dev/null || true
+        echo "✅ Removed dev-* isolated profile dirs."

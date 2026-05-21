@@ -31,12 +31,16 @@ interface EventListPanelProps {
     pastEventIds?: Set<string>;
     /** Optional callback to open the "Suggest an event" flow from the empty state. */
     onSuggestEvent?: () => void;
+    /** When true, render the New state UI (dot + bold title + chip + counter). */
+    newEnabled?: boolean;
+    /** Set of event ids added after the current viewer's local baseline. */
+    newEventIds?: Set<string>;
 }
 
 function PriceBadge({ event }: { event: CalendarEvent }) {
     if (event.price_is_free) {
         return (
-            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+            <span className="inline-flex items-center bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
                 Free
             </span>
         );
@@ -46,7 +50,7 @@ function PriceBadge({ event }: { event: CalendarEvent }) {
             ? `${event.price_currency} ${event.price_min}–${event.price_max}`
             : `${event.price_currency} ${event.price_min}`;
         return (
-            <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+            <span className="inline-flex items-center bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
                 {priceText}
             </span>
         );
@@ -54,40 +58,40 @@ function PriceBadge({ event }: { event: CalendarEvent }) {
     return null;
 }
 
-function PopularityBadge({ viewCount, allViewCounts, threshold }: { viewCount: number; allViewCounts: number[]; threshold: number }) {
-    if (viewCount === 0) return null;
-
-    // Check if this is in top 3 of current visible events
-    const sorted = [...allViewCounts].sort((a, b) => b - a);
-    const isTop3 = viewCount > 0 && sorted.indexOf(viewCount) < 3 && sorted[0] > 0;
-
-    const countBadge = (
-        <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-            👁 {viewCount}
+function PopularityBadge({
+    score,
+    allScores,
+    threshold,
+    topN,
+    topPercent,
+}: {
+    score: number;
+    allScores: number[];
+    threshold: number;
+    topN: number;
+    topPercent: number;
+}) {
+    if (score <= 0 || score < threshold) return null;
+    // Top-K of currently visible events where K is the effective cap
+    //   min(topN, ceil(positiveVisible * topPercent / 100))
+    // The score itself stays hidden — it's an internal blend (going +
+    // saved + tiny view term, decayed by age), not a user-facing count.
+    const sorted = [...allScores].sort((a, b) => b - a);
+    const positiveCount = sorted.filter((s) => s > 0).length;
+    const effectiveCap = Math.max(
+        1,
+        Math.min(topN, Math.ceil((positiveCount * topPercent) / 100)),
+    );
+    const isTopK = sorted.indexOf(score) < effectiveCap && sorted[0] > 0;
+    if (!isTopK) return null;
+    return (
+        <span
+            className="inline-flex items-center gap-0.5 bg-orange-50 px-1.5 py-0.5 text-[10px] font-medium text-orange-700"
+            data-testid="trending-badge"
+        >
+            🔥 Trending
         </span>
     );
-
-    if (isTop3 && viewCount >= threshold) {
-        return (
-            <>
-                <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700">
-                    🔥 Trending
-                </span>
-                {countBadge}
-            </>
-        );
-    }
-    if (viewCount >= threshold) {
-        return (
-            <>
-                <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700">
-                    🔥 Popular
-                </span>
-                {countBadge}
-            </>
-        );
-    }
-    return countBadge;
 }
 
 function isInBounds(event: CalendarEvent, bounds: MapBounds): boolean {
@@ -119,12 +123,17 @@ export default function EventListPanel({
     onEventHover,
     pastEventIds,
     onSuggestEvent,
+    newEnabled = false,
+    newEventIds,
 }: EventListPanelProps) {
     const { isSaved } = useSavedEvents();
-    const { showRatings } = useFeatureFlags();
+    const { showRatings, trendingEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled } = useFeatureFlags();
     const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const scrollRef = useRef<HTMLDivElement>(null);
     const [showBottomFade, setShowBottomFade] = useState(false);
+    // Client-side only filter: hide events that are not new for this viewer.
+    // Per the scenario, no network call is made when toggled.
+    const [newOnly, setNewOnly] = useState(false);
 
     const updateFade = useCallback(() => {
         const el = scrollRef.current;
@@ -147,9 +156,18 @@ export default function EventListPanel({
         }
     }, [hoveredEventId]);
 
+    // Counter over the unfiltered list so toggling the chip doesn't make it jump.
+    const newCount = newEnabled && newEventIds
+        ? events.reduce((n, e) => (newEventIds.has(e.event_id) ? n + 1 : n), 0)
+        : 0;
+    const effectiveNewOnly = newOnly && newCount > 0;
+
     // Show all events — on-map first, off-map / ungeolocated pushed to the bottom.
     // When pastEventIds is provided, keep upcoming events before past events.
-    const sortedEvents = [...events].sort((a, b) => {
+    const visibleEvents = newEnabled && effectiveNewOnly && newEventIds
+        ? events.filter((e) => newEventIds.has(e.event_id))
+        : events;
+    const sortedEvents = [...visibleEvents].sort((a, b) => {
         if (pastEventIds) {
             const aPast = pastEventIds.has(a.event_id);
             const bPast = pastEventIds.has(b.event_id);
@@ -165,7 +183,15 @@ export default function EventListPanel({
         const aOnMap = isOnMap(a, mapBounds);
         const bOnMap = isOnMap(b, mapBounds);
         if (aOnMap !== bOnMap) return aOnMap ? -1 : 1;
-        if (sortBy === 'popularity') return b.view_count - a.view_count;
+        if (sortBy === 'popularity') {
+            // popularity_score is the weighted, time-decayed score
+            // computed server-side when ``trending_enabled`` is on. When
+            // the flag is off, all scores are 0 and this becomes a no-op
+            // tiebreaker (the secondary date sort below takes over).
+            const sa = a.popularity_score ?? 0;
+            const sb = b.popularity_score ?? 0;
+            if (sa !== sb) return sb - sa;
+        }
         return new Date(a.start).getTime() - new Date(b.start).getTime();
     });
 
@@ -175,7 +201,7 @@ export default function EventListPanel({
 
     const onMapCount = mapBounds ? events.filter((e) => isOnMap(e, mapBounds)).length : events.length;
 
-    const allViewCounts = sortedEvents.map((e) => e.view_count);
+    const allViewCounts = sortedEvents.map((e) => e.popularity_score ?? 0);
 
     const formatDate = (d: Date) =>
         d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -206,8 +232,33 @@ export default function EventListPanel({
                             Popular {sortBy === 'popularity' && '↓'}
                         </button>
                     )}
+                    {newEnabled && newCount > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => setNewOnly((v) => !v)}
+                            aria-pressed={effectiveNewOnly}
+                            data-testid="new-events-only-chip"
+                            className={`sort-btn inline-flex items-center gap-1 border px-1.5 py-0.5 ${effectiveNewOnly
+                                ? 'border-blue-500 bg-blue-500 text-white'
+                                : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'}`}
+                        >
+                            {/* eslint-disable-next-line no-restricted-syntax -- small status dot */}
+                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" aria-hidden="true" />
+                            <span className="sm:hidden">New</span>
+                            <span className="hidden sm:inline">New only</span>
+                        </button>
+                    )}
                 </div>
             </div>
+            {newEnabled && newCount > 0 && (
+                <div className="flex items-center justify-between gap-2 px-3 py-1.5 text-[11px]" data-testid="new-events-bar">
+                    <span className="text-slate-600" data-testid="new-events-counter">
+                        {/* eslint-disable-next-line no-restricted-syntax -- small status dot */}
+                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500 mr-1.5 align-middle" aria-hidden="true" />
+                        {newCount} new since your last visit
+                    </span>
+                </div>
+            )}
 
             <div className="event-list-scroll-wrapper">
                 <div className="event-list-scroll" ref={scrollRef} onScroll={updateFade}>
@@ -219,7 +270,7 @@ export default function EventListPanel({
                                 <button
                                     type="button"
                                     onClick={onSuggestEvent}
-                                    className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-4 py-2 shadow-sm transition"
+                                    className="mt-4 inline-flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-4 py-2 shadow-sm transition"
                                 >
                                     + Suggest an event
                                 </button>
@@ -230,6 +281,7 @@ export default function EventListPanel({
                             const start = new Date(event.start);
                             const onMap = isOnMap(event, mapBounds);
                             const isHighlighted = hoveredEventId === event.event_id;
+                            const isNew = newEnabled && !!newEventIds?.has(event.event_id);
                             return (
                                 <Fragment key={event.event_id}>
                                     {idx === firstPastIndex && (
@@ -263,7 +315,20 @@ export default function EventListPanel({
                                             })()}
                                         </div>
                                         <div className="event-card-content relative">
-                                            <h4 className="event-card-title">{event.title}</h4>
+                                            <h4
+                                                className={`event-card-title${isNew ? ' font-semibold' : ''}`}
+                                                data-new={isNew ? 'true' : undefined}
+                                            >
+                                                {isNew && (
+                                                    <span
+                                                        className="inline-block h-1.5 w-1.5 bg-blue-500 mr-1.5 align-middle"
+                                                        style={{ borderRadius: '9999px' }}
+                                                        aria-label="New"
+                                                        data-testid="new-event-dot"
+                                                    />
+                                                )}
+                                                {event.title}
+                                            </h4>
                                             <p className="event-card-date">
                                                 {event.all_day ? formatDate(start) : `${formatDate(start)} · ${formatTime(start)}`}
                                             </p>
@@ -273,22 +338,40 @@ export default function EventListPanel({
                                             {!onMap && (
                                                 <span className="event-card-offmap-badge">Off map</span>
                                             )}
-                                            {((showPrices && (event.price_is_free || (event.price_min != null && event.price_currency))) ||
-                                                (showPopularity && event.view_count > 0)) && (
-                                                    <div className="event-card-badges">
-                                                        {showPrices && <PriceBadge event={event} />}
-                                                        {showPopularity && (
-                                                            <PopularityBadge viewCount={event.view_count} allViewCounts={allViewCounts} threshold={popularityThreshold} />
-                                                        )}
-                                                    </div>
-                                                )}
+                                            {((showPrices && (event.price_is_free || (event.price_min != null && event.price_currency)))) && (
+                                                <div className="event-card-badges">
+                                                    {showPrices && <PriceBadge event={event} />}
+                                                </div>
+                                            )}
                                             {event.tags?.length > 0 && (
                                                 <div className="mt-1">
                                                     <TagBadges tags={event.tags} maxVisible={3} />
                                                 </div>
                                             )}
-                                            <div className="mt-1">
-                                                <AttendeeAvatarStack eventId={event.event_id} />
+                                            <div className="mt-1 flex items-center gap-2">
+                                                <AttendeeAvatarStack
+                                                    eventId={event.event_id}
+                                                    friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
+                                                />
+                                                {event.has_active_promo_codes && (
+                                                    <img
+                                                        src="/promo-code.png"
+                                                        alt=""
+                                                        aria-hidden="true"
+                                                        title="Has promo codes"
+                                                        className="w-4 h-4 object-contain"
+                                                        data-testid="event-card-promo-icon"
+                                                    />
+                                                )}
+                                                {showPopularity && trendingEnabled && (
+                                                    <PopularityBadge
+                                                        score={event.popularity_score ?? 0}
+                                                        allScores={allViewCounts}
+                                                        threshold={popularityThreshold}
+                                                        topN={trendingTopN}
+                                                        topPercent={trendingTopPercent}
+                                                    />
+                                                )}
                                             </div>
                                             <div className="absolute top-0 right-0 flex items-center gap-1.5">
                                                 <ActionCountCluster eventId={event.event_id} showRatings={!!showRatings} isSavedFlag={isSaved(event.event_id)} />

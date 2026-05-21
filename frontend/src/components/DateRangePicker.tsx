@@ -7,7 +7,10 @@ interface DateRangePickerProps {
 }
 
 function formatDate(date: Date): string {
-    return date.toISOString().split('T')[0];
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
 }
 
 export default function DateRangePicker({ startDate, endDate, onChange }: DateRangePickerProps) {
@@ -16,25 +19,27 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
     const presets = useMemo(() => {
         const today = new Date();
         const year = today.getFullYear();
-        const dayOfWeek = today.getDay(); // 0=Sun, 6=Sat
+        const dayOfWeek = today.getDay(); // 0=Sun, 5=Fri, 6=Sat
 
         // ── Weekend (contextual "This" / "Next") ─────────────
-        let weekendSat: Date;
+        // Weekend is Friday-Sunday.
+        let weekendStart: Date;
         let weekendLabel: string;
-        if (dayOfWeek === 0) {
-            // Sunday → weekend is over, target next Sat–Sun
-            weekendSat = new Date(today);
-            weekendSat.setDate(today.getDate() + 6);
-            weekendLabel = 'Next weekend';
-        } else {
-            // Mon–Sat → upcoming (or current) Sat–Sun
-            const daysUntilSat = dayOfWeek === 6 ? 0 : 6 - dayOfWeek;
-            weekendSat = new Date(today);
-            weekendSat.setDate(today.getDate() + daysUntilSat);
+        if (dayOfWeek >= 5 || dayOfWeek === 0) {
+            // Fri/Sat/Sun -> current weekend.
+            const daysSinceFriday = dayOfWeek === 0 ? 2 : dayOfWeek - 5;
+            weekendStart = new Date(today);
+            weekendStart.setDate(today.getDate() - daysSinceFriday);
             weekendLabel = 'This weekend';
+        } else {
+            // Mon-Thu -> upcoming Friday-Sunday.
+            const daysUntilFriday = 5 - dayOfWeek;
+            weekendStart = new Date(today);
+            weekendStart.setDate(today.getDate() + daysUntilFriday);
+            weekendLabel = 'Next weekend';
         }
-        const weekendSun = new Date(weekendSat);
-        weekendSun.setDate(weekendSat.getDate() + 1);
+        const weekendEnd = new Date(weekendStart);
+        weekendEnd.setDate(weekendStart.getDate() + 2);
 
         // ── Next week ─────────────────────────────────────────
         const nextWeek = new Date(today);
@@ -91,7 +96,7 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
             const label =
                 offset === 0
                     ? `This ${seasons[seasonIdx].icon}`
-                    : `→ ${seasons[seasonIdx].icon}`;
+                    : `Next ${seasons[seasonIdx].icon}`;
             // Mobile (Option D): icon only; current season prefixed with a small dot.
             const mobileLabel =
                 offset === 0
@@ -108,10 +113,10 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
 
         // ── Build in fixed display order ─────────────────────
         return [
-            { label: weekendLabel, mobileLabel: 'Wknd', start: formatDate(weekendSat), end: formatDate(weekendSun) },
-            { label: '→ Week', mobileLabel: '→ 7d', start: formatDate(today), end: formatDate(nextWeek) },
-            { label: '→ Month', mobileLabel: '→ 30d', start: formatDate(today), end: formatDate(nextMonth) },
-            { label: '→ 6 months', mobileLabel: '→ 6mo', start: formatDate(today), end: formatDate(next6Months) },
+            { label: weekendLabel, mobileLabel: 'Wknd', start: formatDate(weekendStart), end: formatDate(weekendEnd) },
+            { label: 'Next Week', mobileLabel: 'Next 7d', start: formatDate(today), end: formatDate(nextWeek) },
+            { label: 'Next Month', mobileLabel: 'Next 30d', start: formatDate(today), end: formatDate(nextMonth) },
+            { label: 'Next 6 months', mobileLabel: 'Next 6mo', start: formatDate(today), end: formatDate(next6Months) },
             ...seasonPresets,
         ];
     }, []);

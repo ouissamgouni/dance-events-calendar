@@ -3,9 +3,9 @@ import { createPortal } from 'react-dom';
 import type { AdminRating, TagSuggestionResponse } from '../types';
 import {
     approveRating,
-    rejectRating,
-    fetchAdminTagSuggestions,
     approveTagSuggestion,
+    fetchAdminTagSuggestions,
+    rejectRating,
     rejectTagSuggestion,
 } from '../api';
 
@@ -38,17 +38,6 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
             .finally(() => setLoadingLinked(false));
     }, [rating.linked_tag_suggestion_ids]);
 
-    const refreshLinked = async () => {
-        if (rating.linked_tag_suggestion_ids.length === 0) return;
-        try {
-            const all = await fetchAdminTagSuggestions();
-            const idSet = new Set(rating.linked_tag_suggestion_ids);
-            setLinked(all.filter((s) => idSet.has(s.id)));
-        } catch {
-            // silent
-        }
-    };
-
     const handleApprove = async () => {
         setSubmitting(true);
         setError('');
@@ -77,8 +66,8 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
 
     const handleApproveSuggestion = async (id: number, tagId?: number) => {
         try {
-            await approveTagSuggestion(id, tagId);
-            await refreshLinked();
+            const updated = await approveTagSuggestion(id, tagId);
+            setLinked((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to approve suggestion');
         }
@@ -86,8 +75,8 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
 
     const handleRejectSuggestion = async (id: number) => {
         try {
-            await rejectTagSuggestion(id);
-            await refreshLinked();
+            const updated = await rejectTagSuggestion(id);
+            setLinked((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to reject suggestion');
         }

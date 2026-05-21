@@ -1,0 +1,38 @@
+# Taxonomy used by the user-preferences scenario. The Settings Preferences
+# editor exposes ALL enabled tag groups as chip multi-selects, so both groups
+# defined below (`format` and `dance-style`) appear in Settings and contribute
+# to the user's saved `preferred_tag_ids`.
+tag_groups:
+  - slug: format
+    label: Format
+    ordinal: 10
+    allow_multiple: true
+    color: "#f472b6"
+    tags:
+      - slug: social
+        label: Social
+        is_hero_filter: true
+        hero_ordinal: 0
+      - slug: workshop
+        label: Workshop
+      - slug: festival
+        label: Festival
+
+  - slug: dance-style
+    label: Dance Style
+    ordinal: 50
+    allow_multiple: true
+    color: "#fb923c"
+    tags:
+      - slug: salsa
+        label: Salsa
+        is_hero_filter: true
+        hero_ordinal: 1
+      - slug: bachata
+        label: Bachata
+        is_hero_filter: true
+        hero_ordinal: 2
+      - slug: kizomba
+        label: Kizomba
+      - slug: zouk
+        label: Zouk

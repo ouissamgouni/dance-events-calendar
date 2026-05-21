@@ -262,9 +262,21 @@ function QaTestPlanPanelInner({
                                             </p>
                                             <p className="text-xs text-gray-600 mb-1">{step.description}</p>
                                             <div className="bg-blue-50 px-2 py-1 rounded-sm mb-1">
-                                                <p className="text-xs text-blue-700">
-                                                    <strong>Expected:</strong> {step.expected}
-                                                </p>
+                                                {typeof step.expected === 'string' ? (
+                                                    <p className="text-xs text-blue-700">
+                                                        <strong>Expected:</strong> {step.expected}
+                                                    </p>
+                                                ) : (
+                                                    <div className="text-xs text-blue-700 space-y-1">
+                                                        <p><strong>Expected:</strong></p>
+                                                        {Object.entries(step.expected).map(([variant, text]) => (
+                                                            <p key={variant}>
+                                                                <strong className="font-semibold">{variant}:</strong>{' '}
+                                                                {String(text)}
+                                                            </p>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                             <p className="text-xs text-gray-500 italic">✓ {step.verification}</p>
                                         </div>

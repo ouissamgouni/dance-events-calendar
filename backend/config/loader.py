@@ -73,6 +73,18 @@ def get_admin_email() -> str:
     return os.getenv("ADMIN_EMAIL", "")
 
 
+def get_analytics_enabled() -> bool:
+    """Master switch for analytics collection (backend tracking + frontend Umami).
+
+    Defaults to True. Set ANALYTICS_ENABLED=false (or 0/no/off) to disable
+    server-side /api/track/* writes and signal the frontend (via /api/config/info)
+    to skip loading Umami and stop sending tracking POSTs. Functional state
+    (UserSavedEvent, UserEventAttendance) is unaffected.
+    """
+    parsed = _parse_bool(os.getenv("ANALYTICS_ENABLED"))
+    return True if parsed is None else parsed
+
+
 def get_session_secret() -> str:
     secret = os.getenv("SESSION_SECRET")
     if not secret:

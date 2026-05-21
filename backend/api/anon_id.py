@@ -23,9 +23,18 @@ has always been an opaque per-anon-identity string.
 from __future__ import annotations
 
 import os
+import re
 from uuid import uuid4
 
 from fastapi import Request, Response
+
+# Accept any opaque, cookie-safe identifier between 4 and 128 characters
+# (alphanumeric / `-` / `_`). The dedupe key is not a security boundary
+# (it only groups rows owned by the same anonymous human, all of which
+# already have user_id IS NULL), so we don't need to require UUID shape;
+# we only need to keep the seeded value safe to embed in a Set-Cookie
+# header. Tests rely on short labels like "d-anon" being accepted here.
+_PREFERRED_VALUE_RE = re.compile(r"^[A-Za-z0-9_-]{4,128}$")
 
 ANON_COOKIE_NAME = "movida_aid"
 # 2 years — long enough that a "stable enough" identity is preserved across
@@ -45,16 +54,38 @@ def read_anon_id(request: Request) -> str | None:
     return request.cookies.get(ANON_COOKIE_NAME)
 
 
-def get_or_set_anon_id(request: Request, response: Response) -> str:
+def get_or_set_anon_id(
+    request: Request,
+    response: Response,
+    *,
+    preferred_value: str | None = None,
+) -> str:
     """Return the anon-id cookie value, minting and setting it if absent.
 
     Idempotent within a request (returns the existing cookie if already set).
     The Set-Cookie header is only added when a new value is minted.
+
+    ``preferred_value`` lets the caller seed the cookie with an existing
+    client-side identifier (typically the legacy ``movida_device_id`` from
+    localStorage) instead of a fresh UUID. This eliminates a multi-machine
+    race where two parallel "first writes" from the same anonymous human
+    each mint different anon ids on different backend instances and produce
+    duplicate ``UserSavedEvent`` / ``UserEventAttendance`` rows that defeat
+    the ``(device_id, event_id)`` unique constraint. Once the cookie is
+    set, subsequent localStorage clears do not change it (it is httpOnly),
+    so the localStorage-clear inflation protection the cookie was added
+    for is preserved.
+
+    Untrusted ``preferred_value`` strings are validated against a strict
+    UUID-shape regex; invalid values fall back to a freshly minted UUID.
     """
     existing = read_anon_id(request)
     if existing:
         return existing
-    value = uuid4().hex
+    if preferred_value and _PREFERRED_VALUE_RE.match(preferred_value):
+        value = preferred_value
+    else:
+        value = uuid4().hex
     secure = _is_secure()
     response.set_cookie(
         key=ANON_COOKIE_NAME,
@@ -69,3 +100,23 @@ def get_or_set_anon_id(request: Request, response: Response) -> str:
         path="/",
     )
     return value
+
+
+def clear_anon_id(response: Response) -> None:
+    """Clear the anonymous-id cookie.
+
+    Used on logout / account delete so the next anonymous session on the
+    same browser is a fresh identity (otherwise saves/going made by the
+    next anonymous user on this device would inherit the previous user's
+    httpOnly ``movida_aid`` row identity).
+
+    Cookie attributes (path, samesite, secure) must match the setter in
+    ``get_or_set_anon_id`` for the browser to actually clear the cookie.
+    """
+    secure = _is_secure()
+    response.delete_cookie(
+        key=ANON_COOKIE_NAME,
+        path="/",
+        samesite="none" if secure else "lax",
+        secure=secure,
+    )

@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import Cookie, Depends, HTTPException, Request
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from sqlmodel import Session, select
+from sqlalchemy import func
 
 from backend.config.loader import (
     get_admin_email,
@@ -12,7 +13,7 @@ from backend.config.loader import (
     get_trusted_proxies,
 )
 from backend.db.database import get_session
-from backend.db.models import User
+from backend.db.models import User, UserFollow
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +82,57 @@ def require_admin(user: dict = Depends(get_current_user)) -> dict:
     return user
 
 
+def is_admin_user(user: User | None) -> bool:
+    """True when ``user`` is the configured site admin.
+
+    Single source of truth for admin identification — wraps the
+    env-var-based ``ADMIN_EMAIL`` comparison so callers don't inline
+    case-folded email checks.
+    """
+    if user is None or not user.email:
+        return False
+    admin_email = (get_admin_email() or "").lower()
+    if not admin_email:
+        return False
+    return user.email.lower() == admin_email
+
+
+def get_admin_user_id(session: Session) -> UUID | None:
+    """Return the admin User's id, or None if no admin email configured
+    or no matching user row exists yet.
+
+    Used by public discovery surfaces to exclude the human admin
+    account from search / FoF results. Returns None defensively so
+    callers can no-op the exclusion in setups without an admin.
+    """
+    admin_email = (get_admin_email() or "").lower()
+    if not admin_email:
+        return None
+    row = session.exec(
+        select(User.id).where(func.lower(User.email) == admin_email)
+    ).first()
+    return row
+
+
+def require_flag(name: str):
+    """Dependency factory: 404 when the given site-setting boolean flag is off.
+
+    Used to gate user-facing endpoints behind admin-controlled feature
+    flags (``promo_codes_enabled``, ``organizer_claims_enabled``).
+    Admin endpoints should not use this — admins must always be able to
+    triage backlog after disabling a feature.
+    """
+
+    def _dep(session: Session = Depends(get_session)) -> None:
+        from backend.db.models import SiteSetting
+
+        row = session.get(SiteSetting, name)
+        if not row or row.value.lower() != "true":
+            raise HTTPException(status_code=404, detail="Not found")
+
+    return _dep
+
+
 def create_session_token(
     email: str, name: str, user_id: str | None = None, is_admin: bool = False
 ) -> str:
@@ -118,3 +170,117 @@ def get_client_ip(request: Request) -> str:
         return forwarded_for.split(",")[0].strip()
 
     return client_host
+
+
+# --- Social visibility chokepoint --------------------------------------------
+
+# Account-level visibility (Instagram-style gate). Two values only — legacy
+# ``private`` is coerced to ``friends`` at the migration boundary.
+ACCOUNT_VISIBILITY_VALUES = ("public", "friends")
+# 3-tier per-event audience tier (used by share_audience / saved.audience).
+AUDIENCE_VALUES = ("public", "friends", "private")
+
+
+def _account_visibility(owner: User) -> str:
+    value = getattr(owner, "account_visibility", None)
+    if value not in ACCOUNT_VISIBILITY_VALUES:
+        return "friends"
+    return value
+
+
+def is_mutual_follow(session: Session, viewer_id: UUID, owner_id: UUID) -> bool:
+    """True iff both ``viewer_id`` and ``owner_id`` follow each other.
+
+    Phase E (E8): only ``status='approved'`` edges count toward
+    mutuality. Pending follow-requests grant zero visibility.
+    """
+    if viewer_id == owner_id:
+        return True
+    rows = session.exec(
+        select(UserFollow.follower_id, UserFollow.followee_id)
+        .where(
+            (
+                (UserFollow.follower_id == viewer_id)
+                & (UserFollow.followee_id == owner_id)
+            )
+            | (
+                (UserFollow.follower_id == owner_id)
+                & (UserFollow.followee_id == viewer_id)
+            )
+        )
+        .where(UserFollow.status == "approved")
+    ).all()
+    return len(rows) >= 2
+
+
+def can_view(
+    session: Session,
+    viewer: User | None,
+    owner: User,
+    scope: str | None = None,
+) -> bool:
+    """Return True if ``viewer`` is allowed to read ``owner``'s profile / lists.
+
+    The ``scope`` parameter is accepted for backwards-compatibility but
+    ignored — visibility is now governed by a single account-level gate
+    (``owner.account_visibility``):
+
+    - ``public``  — anyone (including anonymous) may read.
+    - ``friends`` — only the owner and their mutual follows.
+
+    Endpoints calling this helper should respond with **404** (not 403)
+    when it returns False to avoid leaking the existence of restricted
+    resources.
+    """
+    if viewer is not None and viewer.id == owner.id:
+        return True
+    visibility = _account_visibility(owner)
+    if visibility == "public":
+        return True
+    # 'friends' — requires authenticated viewer with mutual follow.
+    if viewer is None:
+        return False
+    return is_mutual_follow(session, viewer.id, owner.id)
+
+
+def _audience_passes(
+    session: Session,
+    viewer: User | None,
+    owner: User,
+    audience: str,
+) -> bool:
+    """Apply a 3-tier per-event audience tier
+    (``public``/``friends``/``private``)."""
+    if audience not in AUDIENCE_VALUES:
+        audience = "private"
+    if viewer is not None and viewer.id == owner.id:
+        return True
+    if audience == "public":
+        return True
+    if audience == "private":
+        return False
+    if viewer is None:
+        return False
+    return is_mutual_follow(session, viewer.id, owner.id)
+
+
+def can_view_event_in_calendar(
+    session: Session,
+    viewer: User | None,
+    owner: User,
+    event_audience: str,
+) -> bool:
+    """Decide whether a single event row should appear on ``owner``'s
+    calendar to ``viewer``. Two-step gate:
+
+        viewer must pass:
+            event_audience  AND
+            owner.account_visibility
+
+    Owner is always allowed to see their own rows.
+    """
+    if viewer is not None and viewer.id == owner.id:
+        return True
+    return _audience_passes(session, viewer, owner, event_audience) and can_view(
+        session, viewer, owner
+    )

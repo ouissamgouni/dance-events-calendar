@@ -13,7 +13,7 @@ from backend.api.schemas import (
     EventExportRequest,
     ShareEventRequest,
 )
-from backend.config.loader import get_admin_email
+from backend.config.loader import get_admin_email, get_analytics_enabled
 from backend.db.database import get_session
 from backend.db.models import (
     EventAttendance,
@@ -28,6 +28,7 @@ from backend.db.models import (
     ShareToken,
 )
 from backend.services.ip_geolocation import geolocate_ip
+from backend.services.notifications import fan_out_going, withdraw_going
 
 router = APIRouter(prefix="/api", tags=["tracking"])
 
@@ -88,6 +89,8 @@ async def track_event_view(
     session: Session = Depends(get_session),
     current_user: User | None = Depends(get_current_user_optional),
 ):
+    if not get_analytics_enabled():
+        return {"status": "disabled"}
     if _is_admin(current_user):
         return {"status": "skipped", "reason": "admin"}
     view = EventView(
@@ -112,7 +115,11 @@ def track_event_save(
     session: Session = Depends(get_session),
     current_user: User | None = Depends(get_current_user_optional),
 ):
-    if payload.record_analytics and not _is_admin(current_user):
+    if (
+        payload.record_analytics
+        and not _is_admin(current_user)
+        and get_analytics_enabled()
+    ):
         session.add(
             EventSave(
                 event_id=payload.event_id,
@@ -125,7 +132,15 @@ def track_event_save(
     # Stable anonymous identity (httpOnly cookie). Survives localStorage
     # clears, so re-clicking save after wiping local data does not insert a
     # second UserSavedEvent row and inflate total_saved.
-    anon_id = get_or_set_anon_id(request, response)
+    #
+    # Seed the cookie with the client's localStorage device_id on first
+    # write. Without seeding, two parallel "first" writes from the same
+    # anonymous human (no cookie yet) land on different backend machines,
+    # mint independent UUIDs, and produce duplicate rows that bypass the
+    # (device_id, event_id) unique constraint — visible in prod as
+    # double-counted total_saved / total_going. Seeding makes both
+    # parallel requests use the same key so the constraint protects them.
+    anon_id = get_or_set_anon_id(request, response, preferred_value=payload.device_id)
     # For anonymous callers the cookie value is the dedupe key. For authed
     # callers we keep the payload device_id (so cross-device dedupe via
     # user_id keeps working as before).
@@ -151,15 +166,34 @@ def track_event_save(
                 )
             ).first()
         if existing:
+            mutated = False
             if user_id and existing.user_id is None:
                 existing.user_id = user_id
+                mutated = True
+            if current_user is not None and payload.audience is not None:
+                existing.audience = payload.audience
+                mutated = True
+            if mutated:
                 session.add(existing)
         else:
+            if current_user is not None:
+                # Per-event audience: explicit value wins, otherwise fall
+                # back to the user's ``share_attendance_default_audience``
+                # (the same default that drives the Going picker), which
+                # itself defaults to ``friends`` per GDPR privacy-by-default.
+                audience = (
+                    payload.audience
+                    if payload.audience is not None
+                    else (current_user.share_attendance_default_audience or "friends")
+                )
+            else:
+                audience = "private"
             session.add(
                 UserSavedEvent(
                     device_id=state_key,
                     event_id=payload.event_id,
                     user_id=user_id,
+                    audience=audience,
                 )
             )
     else:
@@ -201,7 +235,11 @@ def track_event_attendance(
     session: Session = Depends(get_session),
     current_user: User | None = Depends(get_current_user_optional),
 ):
-    if payload.record_analytics and not _is_admin(current_user):
+    if (
+        payload.record_analytics
+        and not _is_admin(current_user)
+        and get_analytics_enabled()
+    ):
         session.add(
             EventAttendance(
                 event_id=payload.event_id,
@@ -211,17 +249,34 @@ def track_event_attendance(
         )
 
     user_id = current_user.id if current_user else None
-    anon_id = get_or_set_anon_id(request, response)
+    # See track_event_save for the rationale on seeding the cookie with
+    # payload.device_id (multi-machine first-write race).
+    anon_id = get_or_set_anon_id(request, response, preferred_value=payload.device_id)
     state_key = anon_id if user_id is None else payload.device_id
 
     # Maintain materialized state table.
     if payload.action == "going":
-        existing = session.exec(
-            select(UserEventAttendance).where(
-                UserEventAttendance.device_id == state_key,
-                UserEventAttendance.event_id == payload.event_id,
-            )
-        ).first()
+        if user_id is not None:
+            existing = session.exec(
+                select(UserEventAttendance)
+                .where(
+                    UserEventAttendance.user_id == user_id,
+                    UserEventAttendance.event_id == payload.event_id,
+                )
+                .order_by(
+                    UserEventAttendance.created_by_admin_user_id.is_not(None).desc(),
+                    (UserEventAttendance.device_id == state_key).desc(),
+                    UserEventAttendance.attending_since.asc(),
+                    UserEventAttendance.id.asc(),
+                )
+            ).first()
+        else:
+            existing = session.exec(
+                select(UserEventAttendance).where(
+                    UserEventAttendance.device_id == state_key,
+                    UserEventAttendance.event_id == payload.event_id,
+                )
+            ).first()
         if existing is None and user_id is None:
             # Back-compat: pick up a pre-cookie row keyed by legacy device_id.
             existing = session.exec(
@@ -231,23 +286,43 @@ def track_event_attendance(
                     UserEventAttendance.user_id.is_(None),
                 )
             ).first()
+        # Track final share_publicly state for Phase C fan-out.
+        share_publicly_after = False
+        share_publicly_before = bool(existing.share_publicly) if existing else False
+        # Resolve incoming desired audience: explicit ``share_audience`` wins,
+        # then legacy ``share_publicly`` (true→public, false→private), else
+        # None (no change).
+        incoming_audience: str | None = payload.share_audience
+        if incoming_audience is None and payload.share_publicly is not None:
+            incoming_audience = "public" if payload.share_publicly else "private"
         if existing:
             if user_id and existing.user_id is None:
                 existing.user_id = user_id
             # Only authenticated callers can change the visibility flag.
             # Anonymous callers' field is ignored (rows with user_id=NULL
             # are always treated as private/anonymous in the read path).
-            if current_user is not None and payload.share_publicly is not None:
-                existing.share_publicly = payload.share_publicly
+            if current_user is not None and incoming_audience is not None:
+                existing.share_audience = incoming_audience
+                existing.share_publicly = incoming_audience == "public"
             session.add(existing)
+            share_publicly_after = bool(existing.share_publicly)
         else:
             if current_user is not None:
-                share_publicly = (
-                    payload.share_publicly
-                    if payload.share_publicly is not None
-                    else current_user.share_attendance_default
+                resolved_audience = (
+                    incoming_audience
+                    if incoming_audience is not None
+                    else (
+                        current_user.share_attendance_default_audience
+                        or (
+                            "public"
+                            if current_user.share_attendance_default
+                            else "private"
+                        )
+                    )
                 )
+                share_publicly = resolved_audience == "public"
             else:
+                resolved_audience = "private"
                 share_publicly = False
             session.add(
                 UserEventAttendance(
@@ -255,8 +330,53 @@ def track_event_attendance(
                     event_id=payload.event_id,
                     user_id=user_id,
                     share_publicly=share_publicly,
+                    share_audience=resolved_audience,
                 )
             )
+            share_publicly_after = bool(share_publicly)
+
+        # Phase C: fan out to subscribers when the row ends up shared
+        # (public or friends) AND the actor is authenticated. Audience
+        # is propagated to the fan-out so friends-tier RSVPs only notify
+        # mutual friends. Idempotent via unique
+        # (recipient, kind, actor, event); we still gate on a transition
+        # to avoid pointless work on no-op repeat-Going pings.
+        current_share_audience = (
+            existing.share_audience if existing is not None else resolved_audience
+        )
+        if current_user is not None and current_share_audience in ("public", "friends"):
+            # Fire when transitioning into a shared state OR when audience
+            # changed between shared tiers (e.g. friends -> public widens
+            # the eligible recipient set).
+            should_fan = (existing is None and share_publicly_after) or (
+                existing is not None
+                and (
+                    not share_publicly_before  # private -> shared
+                    or share_publicly_after != share_publicly_before  # bool changed
+                )
+            )
+            # Always fan out on the initial insert if shared.
+            if existing is None and current_share_audience in ("public", "friends"):
+                should_fan = True
+            if should_fan:
+                fan_out_going(
+                    session,
+                    current_user,
+                    payload.event_id,
+                    audience=current_share_audience,
+                )
+        # Conversely, when the user transitions an existing Going row
+        # from a shared tier back to ``private``, withdraw any
+        # notifications that were already fanned out. Without this,
+        # opting out of public sharing would silently leave the
+        # (now-private) attendance visible in subscribers' feeds.
+        elif (
+            current_user is not None
+            and existing is not None
+            and share_publicly_before
+            and not share_publicly_after
+        ):
+            withdraw_going(session, current_user, payload.event_id)
     else:
         if user_id:
             user_rows = session.exec(
@@ -278,6 +398,10 @@ def track_event_attendance(
             ).first()
             if row:
                 session.delete(row)
+        # Withdraw any subscription_going notifications when the
+        # authenticated owner toggles Going off entirely.
+        if current_user is not None:
+            withdraw_going(session, current_user, payload.event_id)
 
     session.commit()
     return {"status": "tracked"}
@@ -292,6 +416,8 @@ async def track_link_click(
     session: Session = Depends(get_session),
     current_user: User | None = Depends(get_current_user_optional),
 ):
+    if not get_analytics_enabled():
+        return {"status": "disabled"}
     if _is_admin(current_user):
         return {"status": "skipped", "reason": "admin"}
     click = EventLinkClick(
@@ -315,6 +441,8 @@ def track_export(
     session: Session = Depends(get_session),
     current_user: User | None = Depends(get_current_user_optional),
 ):
+    if not get_analytics_enabled():
+        return {"status": "disabled"}
     if _is_admin(current_user):
         return {"status": "skipped", "reason": "admin"}
     export = EventExport(
@@ -345,6 +473,8 @@ def track_share(
       landing). We accept it as-is — worst case is an invalid code that
       simply produces an unattributable row.
     """
+    if not get_analytics_enabled():
+        return {"status": "disabled"}
     if _is_admin(current_user):
         return {"status": "skipped", "reason": "admin"}
 

@@ -1,0 +1,18 @@
+# Pre-seeded follow graph for the friend-requests scenario.
+#
+# Two rows are seeded:
+#   1. dave -> alice (status="approved")
+#        Existing approved follower from before E8 shipped. Proves the
+#        new flow leaves legacy approved rows untouched (alice sees
+#        dave in "Followers" from step 1).
+#   2. bob -> carol (status="pending")
+#        Pre-existing inbound request to carol so step 5 can assert
+#        an alternate-cast inbox without clicking. carol approves it
+#        and the standard mutual-friend side-effects fire.
+follows:
+  - follower: dave
+    followee: alice
+    status: approved
+  - follower: bob
+    followee: carol
+    status: pending

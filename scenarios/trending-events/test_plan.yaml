@@ -1,0 +1,210 @@
+test_plan:
+  name: "Trending Events — popularity score (Track 3)"
+  description: >
+    Verify the new commitment-weighted popularity score end-to-end. The
+    score is `raw / (hours_age + 24)^0.4` where
+    `raw = 5*going + 1*saved + 0.05*view`, gated by `trending_floor_going`
+    (events with fewer than N going RSVPs are floored to 0) and
+    unconditionally 0 for past events. The seed below produces a
+    deterministic ordering on first boot:
+
+      Sort by Popular ↓ MUST be:
+        1. Headliner Salsa Saturday      (evt-trend-001) — going-heavy
+        2. Bachata Workshop with Carlos  (evt-trend-002) — saved-heavy
+        3. Cuban Night (boundary case)   (evt-trend-003) — at floor
+
+      And MUST NOT contain:
+        * View-Bait Free Bachata Crash Course (evt-trend-004) — under floor
+        * Last Week's Salsa Tuesday           (evt-trend-005) — past
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=trending-events"
+    - >
+      The scenario pre-seeds 5 candidate events plus 5 mock users with
+      attendances (going), saves, and views calibrated so the ranking is
+      deterministic — see the comment block at the top of db-events.yaml.
+    - "settings.yaml flips on `trending_enabled` and `show_popularity` so the badge renders without admin intervention."
+
+  steps:
+    - id: 1
+      title: "Sort-by-Popular surfaces the going-heaviest event first"
+      description: >
+        Open / (Home, signed out is fine — the score is global and does
+        not depend on the viewer). In the event list panel, click the
+        "Popular" sort chip.
+      expected: >
+        Network: GET /api/events returns each event with a non-zero
+        `popularity_score` for evt-trend-001/002/003 and `popularity_score=0`
+        for evt-trend-004 (under floor) and evt-trend-005 (past). The list
+        re-renders sorted by popularity descending; the first card is
+        evt-trend-001 (Headliner Salsa Saturday) carrying a 🔥 Trending
+        badge (it is the top of the visible top-3).
+
+    - id: 2
+      title: "Saved-heavy event ranks second, not first"
+      description: >
+        Still on / with sort=Popular, look at the second card.
+      expected: >
+        evt-trend-002 (Bachata Workshop) is the second card, also
+        decorated with 🔥 Trending. This proves the 5x weighting on going
+        beats a +3 saves advantage (4*5+3 = 23 vs 2*5+5 = 15).
+
+    - id: 3
+      title: "Anti-view-bait floor blocks evt-trend-004 from trending"
+      description: >
+        Scroll the list. Locate evt-trend-004 (View-Bait — Free Bachata
+        Crash Course). Inspect the response payload for the event in the
+        network tab.
+      expected: >
+        evt-trend-004 has `popularity_score == 0.0` despite having ~5x
+        more views than the runner-up. No 🔥 badge appears on the card.
+        Demonstrates `trending_floor_going` correctly suppresses
+        zero-commitment events from trending. (The legacy 👁 view-count
+        chip is also hidden in trending mode.)
+
+    - id: 4
+      title: "Past-event guard suppresses evt-trend-005 from trending"
+      description: >
+        Locate evt-trend-005 (Last Week's Salsa Tuesday). It already
+        ended — by default the explorer hides past events, so toggle the
+        date range to include "last week" before it shows up.
+      expected: >
+        Even with 3 going + 2 saved (more than evt-trend-003), the past
+        event has `popularity_score == 0.0` and no 🔥 badge. Proves the
+        `e.end < now` guard is unconditional.
+
+    - id: 5
+      title: "Admin UI exposes Trending toggle + window + floor controls"
+      description: >
+        Sign in as admin (admin@example.com). Navigate to /admin and pick
+        the Configuration tab. In the right-hand feature-flag panel
+        verify that the following controls are present in this order
+        (under "Show popularity"):
+          - "Trending" toggle (currently ON because settings.yaml seeded
+            `trending_enabled: true`)
+          - "Trending window (days)" numeric input (seeded value: 30)
+          - "Trending floor (going)" numeric input (seeded value: 1)
+          - "Trending top N" numeric input (seeded value: 5)
+          - "Trending top %" numeric input (seeded value: 10)
+          - "Following badge" toggle (independent — should be OFF here)
+          - "Unseen state" toggle (independent — should be OFF here)
+      expected: >
+        All controls render and reflect the seeded values. The four
+        Trending sub-inputs are only visible when the Trending toggle is
+        ON (toggle it off and back on to verify they collapse / expand).
+        Each control's helper text is visible explaining its effect on
+        the score.
+
+    - id: 6
+      title: "Raising trending_floor_going via the UI suppresses the boundary event"
+      description: >
+        Still on /admin/configuration, change "Trending floor (going)"
+        from 1 to 2 (Tab or Enter to commit). Reload / in another tab.
+      expected: >
+        Network: PUT /api/settings → 200 with `trending_floor_going: 2`.
+        On reload, evt-trend-003 (Cuban Night, only 1 going) now has
+        `popularity_score == 0` and loses the 🔥 badge — proves the
+        floor input is wired to the live algorithm. Lower it back to 1
+        and the badge returns.
+
+    - id: 7
+      title: "Shrinking trending_window_days excludes older signals"
+      description: >
+        Set "Trending window (days)" to 1 (Tab to commit). Reload /.
+      expected: >
+        Network: PUT /api/settings → 200 with `trending_window_days: 1`.
+        Going / saved / view counts older than 24h are dropped from the
+        score. In a fresh seed run all signals were just inserted (so
+        nothing changes); to fully demonstrate, advance system clock or
+        wait > 24h. Reset the window to 30 before continuing.
+
+    - id: 8
+      title: "Toggling Trending OFF hides the popularity badge entirely"
+      description: >
+        On /admin/configuration flip the "Trending" toggle off. The
+        sub-inputs (window / floor) collapse. Reload /.
+      expected: >
+        No event card shows a Trending chip. The legacy view-count
+        fallback ("🔥 Popular" / "👁 N") has been removed — the
+        commitment-weighted score is now the only popularity signal in
+        the product. Sort-by-Popular still ranks by `popularity_score`
+        (so evt-trend-004 with 200 views + 0 going stays near the
+        bottom, proving view-bait can never win even with the badge
+        hidden). Re-enable Trending and the orange chips return.
+
+    - id: 9
+      title: "Trending pins get an orange ring overlay"
+      description: >
+        Re-enable Trending. Reload / and confirm the explorer map is
+        visible. Locate the pins for the top-3 events by
+        `popularity_score` (those whose card shows the orange "🔥
+        Trending" chip).
+      expected: >
+        Each of those pins renders a thin orange ring (#f97316) drawn
+        just inside its colored disc. Non-trending pins render the
+        standard disc with no ring. Toggling Trending OFF removes the
+        ring from all pins on the next reload. Proves the pin and the
+        card use the same top-3 + above-threshold rule.
+
+    - id: 10
+      title: "Top-3 cap holds across an expanded European dataset"
+      description: >
+        The seed includes 15 additional "spread" events (evt-trend-010
+        through evt-trend-023) scattered across Amsterdam, Rome,
+        Barcelona, Lisbon, Prague, Vienna, Copenhagen, Dublin,
+        Stockholm, Warsaw, Zurich, Paris, Berlin and Brussels, with
+        each carrying 1-2 going RSVPs (above the floor, but well below
+        evt-trend-001/002). Pan the map across Europe so multiple
+        cities are visible.
+      expected: >
+        Even with 20+ "trending-eligible" events visible, only the
+        top-3 by `popularity_score` — evt-trend-001 (Paris),
+        evt-trend-002 (Berlin) and evt-trend-003 (Brussels) — wear the
+        orange ring and the orange Trending chip. Proves the cap
+        prevents the badge from inflating into noise as the candidate
+        pool grows. Card layout uses the compact bottom-left "🔥 Top
+        N" chip (text-[10px], square corners), matching the frontend
+        instructions.
+
+    - id: 11
+      title: "Admin UI exposes Trending top N + Trending top %; effective cap is min(N, ceil(visible × %/100))"
+      description: >
+        Settings seed `trending_top_n: 5` and `trending_top_percent: 10`.
+        With ~23 trending-eligible events visible, the percent gate
+        (ceil(23 × 0.10) = 3) wins over the absolute cap (5), so on
+        first boot exactly 3 events get the ring + chip — the same
+        three asserted in step 10.
+
+        Sign in as admin, open /admin → Configuration. Under the
+        Trending toggle confirm two new inputs are rendered in this
+        order after "Trending floor (going)":
+          - "Trending top N" (seeded value: 5, range 1-50)
+          - "Trending top %" (seeded value: 10, range 1-100)
+
+        Run each of the following knob changes (commit each with Tab
+        or Enter, reload / between changes, and verify on BOTH the
+        list cards AND the map pin rings):
+
+          (a) Change top N from 5 → 1. PUT /api/settings → 200
+              `{trending_top_n: 1}`. Effective cap = min(1, 3) = 1.
+              Exactly one event keeps its 🔥 chip + ring (the highest
+              `popularity_score`, evt-trend-001).
+          (b) Reset top N to 5. Effective cap returns to 3.
+          (c) Change top % from 10 → 5. PUT /api/settings → 200
+              `{trending_top_percent: 5}`. Effective cap =
+              min(5, ceil(23 × 0.05) = 2) = 2. Exactly two events
+              keep their chip + ring.
+          (d) Reset top % to 100. Effective cap = min(5, 23) = 5.
+              Five events now wear the chip + ring, proving the
+              percent ceiling was the gate (not top N).
+          (e) Restore the seeded values (top N = 5, top % = 10) so
+              subsequent runs/steps see the documented baseline.
+
+      expected: >
+        Both inputs render with helper text explaining the
+        min(N, ceil(visible × %/100)) formula. Each PUT round-trips
+        through /api/settings and the count of orange rings on the
+        map matches the count of orange chips in the list at every
+        intermediate state — proving the cap is shared end-to-end
+        between PopularityBadge (list) and EventMap (pins) and that
+        both knobs are individually wired.

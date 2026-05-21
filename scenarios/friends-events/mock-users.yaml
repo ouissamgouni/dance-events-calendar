@@ -1,0 +1,26 @@
+# Mock users pre-seeded for the friends-events scenario.
+#
+# Same shape as friends-graph but focused on the explorer friend filter:
+# - Alice & Bob become mutual (friends) — primary filter pair
+# - Carol follows Alice but Alice does not follow back (one-way) — used to
+#   verify the filter strictly requires mutual friendship, not just a follow
+# - Dave is a stranger — used to confirm strangers' attendance never leaks
+#   into Bob's friend-filtered list
+# - Admin is included only because ADMIN_EMAIL must resolve to an existing
+#   user; admin does not participate in the friend filter assertions
+users:
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+  - email: carol@example.com
+    name: Carol Nguyen
+    handle: carol
+  - email: dave@example.com
+    name: Dave Smith
+    handle: dave
+  - email: admin@example.com # matches ADMIN_EMAIL → admin badge
+    name: Dev Admin
+    handle: admin

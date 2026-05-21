@@ -1,0 +1,98 @@
+test_plan:
+  name: "Phase E (E8) — Friend-requests for friends-only accounts"
+  description: >
+    Verify the request/approve flow that gates follows when the
+    target's account_visibility is "friends". A pending UserFollow row
+    grants ZERO visibility (counts, mutual-friend joins, friends-going
+    feed, can_view), and only flips to approved via the explicit
+    approve route. The flag FEATURE_FRIEND_REQUESTS=true is pinned in
+    this scenario's config.env.
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=friend-requests"
+    - >
+      Pre-seeded follows: dave->alice (approved, legacy follower);
+      bob->carol (pending, used by step 5 as an alternate-cast inbox).
+
+  steps:
+    - id: 1
+      title: "Bob requests to follow alice — lands as pending"
+      description: >
+        /login as Bob Requester. Navigate to /u/alice.
+      expected: >
+        The follow button label reads "Request to follow" (because
+        alice.account_visibility == "friends"). Click it.
+        Network: POST /api/social/follow/alice → 200 with
+        `follow_status: "pending"`, `is_following: false`,
+        `followers_count` UNCHANGED from before the click.
+        The button label flips to "Requested" and stays grey.
+        Alice's profile header still shows the pre-click follower
+        count (only dave). No calendar subscription was created on
+        bob's side.
+
+    - id: 2
+      title: "Pending follow grants zero visibility"
+      description: >
+        Still as Bob, scroll alice's profile and the explorer's
+        Following → Friends only filter chip.
+      expected: >
+        alice's friends-only content remains hidden — the pending row
+        does NOT escalate visibility. Specifically:
+          • GET /api/social/profile/alice still returns the public-only
+            slice (no friends_going / wedge friend bucket entries).
+          • GET /api/events?interest_source=friends does NOT include
+            evt-fr-001 (Salsa Social Friday) even though alice is
+            going with share_audience=friends.
+          • The public-attendance event evt-fr-002 (Cuban Night) is
+            still listed (proves the filter is by audience, not by
+            event existence).
+
+    - id: 3
+      title: "Alice sees the request in the inbox and approves"
+      description: >
+        Sign out, sign in as Alice Friendsonly. Open /account and
+        locate the amber "Follow requests (1)" panel above the
+        "My network" tabs.
+      expected: >
+        Network: GET /api/social/me/follow-requests → 200 with one
+        item {handle: "bob", ...}. Click "Approve".
+        POST /api/social/me/follow-requests/bob/approve → 200 with
+        `follow_status: "approved"`. The row disappears from the
+        inbox (panel collapses to hidden when empty). The
+        "Followers" tab now lists bob. A `new_follower` notification
+        fires for alice (visible in the bell icon).
+
+    - id: 4
+      title: "Decline removes the row silently"
+      description: >
+        Sign out, then sign in as Bob and re-request to follow
+        alice (button label "Request to follow"). Sign out, sign in
+        as Alice and click "Decline" on the row.
+      expected: >
+        DELETE/POST .../decline → 204. The amber panel collapses.
+        Sign back in as Bob → /u/alice. The follow button reads
+        "Request to follow" again (NOT "Requested"). No notification
+        was created for Bob about the decline (silent failure path).
+
+    - id: 5
+      title: "Pre-seeded carol→bob row clears via approval"
+      description: >
+        Sign in as Carol Empty. Open /account. The amber inbox
+        panel shows "Follow requests (1)" with bob inside (pre-seeded
+        via db-follows.yaml status=pending). Click "Approve".
+      expected: >
+        POST .../bob/approve → 200. Row disappears. Followers tab
+        contains bob. Proves the YAML seed path for pending rows
+        works end-to-end and that the inbox is reachable from any
+        friends-only account, not just alice.
+
+    - id: 6
+      title: "Public target bypasses pending (control)"
+      description: >
+        Sign in as Bob. Navigate to /u/dave (account_visibility=
+        "public"). Click Follow.
+      expected: >
+        POST /api/social/follow/dave → 200 with
+        `follow_status: "approved"`, `is_following: true`,
+        `is_subscribed: true`. No pending row is ever created for
+        public targets — the flag only gates the friends-only path.

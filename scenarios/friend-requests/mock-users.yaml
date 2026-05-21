@@ -1,0 +1,32 @@
+# Phase E (E8) — friend-requests for friends-only accounts.
+#
+# Cast (4 dancers + 1 admin):
+#   • alice — account_visibility="friends". The protagonist receiving
+#             requests. Steps 1–3 are played from her POV.
+#   • bob   — account_visibility="public". Sends a follow request to
+#             alice in step 1 — must land as PENDING.
+#   • carol — account_visibility="friends". Used in step 5 to assert
+#             the "no pending row" empty-state path.
+#   • dave  — account_visibility="public". Used in step 6 (flag-off
+#             control via DELETEing FEATURE_FRIEND_REQUESTS at runtime).
+#   • admin — admin user.
+users:
+  - email: alice@example.com
+    name: Alice Friendsonly
+    handle: alice
+    account_visibility: friends
+  - email: bob@example.com
+    name: Bob Requester
+    handle: bob
+    account_visibility: public
+  - email: carol@example.com
+    name: Carol Empty
+    handle: carol
+    account_visibility: friends
+  - email: dave@example.com
+    name: Dave Public
+    handle: dave
+    account_visibility: public
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

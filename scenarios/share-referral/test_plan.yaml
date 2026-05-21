@@ -1,0 +1,114 @@
+test_plan:
+  name: "Phase E (D2) — share-link doubles as referral"
+  description: >
+    Verify the share-referral banner: an anon visitor arriving on a
+    ``?ref=share&src=<share_code>`` URL sees a "Follow @sharer?" prompt
+    with the opt-in defaulted ON. After sign-in (or if already signed
+    in) a single click follows the sharer (one-way; the sharer is NOT
+    auto-followed back). Self-shares are filtered. Share-link
+    conversions do NOT show up in the E7 referral leaderboard. The
+    generic "Sign in to save events…" banner is suppressed while the
+    share-referral banner is active so visitors aren't faced with two
+    stacked sign-in CTAs.
+
+  preconditions:
+    - "task start:scenario SCENARIO=share-referral"
+    - "Pre-seeded users: sharer, viewer, admin."
+    - "Use a fresh browser profile or incognito when switching users."
+
+  steps:
+    - id: 1
+      title: "Capture the sharer's share_code"
+      description: >
+        Sign in as sharer (Dev Mock). Open DevTools → GET /api/auth/me
+        and copy the ``share_code`` field. Sign out.
+      expected: "share_code is a lowercase 8-char base32 token."
+
+    - id: 2
+      title: "Anon visitor lands on a ?ref=share&src=<code> URL → banner appears"
+      description: >
+        In an INCOGNITO window, navigate to
+        ``/event/evt-sr-001?ref=share&src=<share_code>`` (the
+        scenario seeds ``evt-sr-001`` for exactly this purpose). Stay
+        signed out.
+      expected: >
+        Top of the page (under the nav) shows
+        ``data-testid="share-referral-banner"`` with copy
+        "You arrived via @sharer — sign in to follow them." plus a
+        value-prop subtext ("Signing in also lets you save events
+        across devices…"). The opt-in checkbox
+        ``data-testid="share-referral-opt-in"`` is CHECKED by
+        default (D2 decision). A "Sign in" CTA replaces the
+        Continue button. The generic ``SignUpBanner`` is
+        suppressed — only the share-referral banner shows.
+
+    - id: 3
+      title: "Sign in as viewer with opt-in checked → auto-redeem"
+      description: "Click Sign in, complete the Dev Mock login as viewer."
+      expected: >
+        Because the opt-in was checked at click time we stash an
+        intent flag (``share_referral_banner_intent:<code>``) and
+        auto-fire POST /api/auth/redeem-share-follow after sign-in
+        — no second "Continue" click. Banner jumps straight to the
+        green confirmation row with
+        ``data-testid="share-referral-banner-redeemed"`` and copy
+        "You're now following @sharer." plus an "Open profile"
+        link. Auto-hides after ~6s. Network panel: a single POST
+        with response ``{ sharer_handle: "sharer",
+        follow_created: true }``. Friends tab now lists @sharer as
+        someone you follow; the reverse edge is NOT created (the
+        sharer must follow back manually if they want to).
+
+    - id: 4
+      title: "Anon visitor with opt-in UN-checked → no auto-redeem"
+      description: >
+        Repeat step 2 in a fresh incognito, untick the opt-in,
+        click Sign in, complete the login.
+      expected: >
+        No intent flag is stashed; no redemption fires after
+        sign-in. The banner disappears (no active intent and the
+        user opted out of following). Friends tab does NOT list
+        @sharer.
+
+    - id: 5
+      title: "Hard refresh: banner does NOT reappear"
+      description: "Reload the page."
+      expected: >
+        No banner. localStorage carries
+        ``share_referral_banner_consumed:<share_code>`` so the
+        redeem fires at most once per share.
+
+    - id: 6
+      title: "Negative: sharer arriving on their own link sees nothing"
+      description: >
+        Sign in as sharer, then visit
+        ``/event/<id>?ref=share&src=<their own share_code>``.
+      expected: >
+        No banner — self-shares are filtered client-side
+        (`user.share_code === shareCode`).
+
+    - id: 7
+      title: "Negative: dismiss + new share_code → banner returns"
+      description: >
+        Sign in as viewer (fresh incognito), visit
+        ``/event/<id>?ref=share&src=<sharer code>``, click the ×.
+        Then visit the same URL again with a DIFFERENT share_code.
+      expected: >
+        After the dismiss, banner stays hidden for the original
+        share_code (localStorage
+        ``share_referral_banner_dismissed:<share_code>`` set). A new
+        URL with a different share_code shows the banner again — the
+        dismiss is per-share, not global.
+
+    - id: 8
+      title: "Negative: share-link conversion does NOT bump E7 leaderboard"
+      description: >
+        Sign in as sharer. Open the share-link Account card. Note
+        ``used_count`` on the displayed referral. (It will be 0
+        because the sharer never minted an E7 invite code.) DevTools:
+        GET /api/social/me/referral confirms ``used_count: 0`` even
+        after step 4 redeemed the share-link.
+      expected: >
+        ``used_count`` remains 0. Share-link conversions are
+        tracked separately and do NOT credit the inviter on the
+        E7 leaderboard (D2 decision).

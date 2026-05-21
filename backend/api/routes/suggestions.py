@@ -7,7 +7,8 @@ from slowapi import Limiter
 from backend.api.rate_limit import client_ip
 from sqlmodel import Session, col, select
 
-from backend.api.deps import get_client_ip, require_admin
+from backend.api.deps import get_client_ip, get_current_user_optional, require_admin
+from backend.db.models import User
 from backend.api.schemas import (
     EventSuggestionCreate,
     EventSuggestionPublicResponse,
@@ -30,6 +31,7 @@ from backend.db.models import (
 from backend.services.email import send_suggestion_notification
 from backend.services.geocoding import geocode_location
 from backend.services.ip_geolocation import geolocate_ip
+from backend.services.notifications import fan_out_suggested
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +85,7 @@ def submit_suggestion(
     request: Request,
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
     """Public endpoint: submit an event suggestion."""
     # Honeypot check — silent reject
@@ -106,6 +109,7 @@ def submit_suggestion(
         all_day=body.all_day,
         submitter_name=body.submitter_name,
         submitter_email=body.submitter_email,
+        submitter_user_id=current_user.id if current_user else None,
         submitter_ip=client_ip,
         submitter_user_agent=request.headers.get("user-agent"),
         submitter_language=request.headers.get("accept-language"),
@@ -120,6 +124,7 @@ def submit_suggestion(
         price_max=body.price_max,
         price_currency=body.price_currency,
         price_is_free=body.price_is_free,
+        auto_save=body.auto_save,
     )
 
     session.add(suggestion)
@@ -313,6 +318,35 @@ def approve_suggestion(
     suggestion.reviewed_at = datetime.utcnow()
     suggestion.reviewed_by = admin.get("email")
     session.add(suggestion)
+
+    # Phase C: fan out subscription_suggested notifications when the
+    # suggestion was submitted by an authenticated user.
+    if suggestion.submitter_user_id is not None:
+        actor = session.get(User, suggestion.submitter_user_id)
+        if actor is not None:
+            fan_out_suggested(session, actor, event_id)
+            # Auto-save the new event to the submitter's Calendar tab
+            # unless they opted out at submission time. Idempotent:
+            # ``UniqueConstraint(device_id, event_id)`` would block
+            # duplicates anyway; we pre-check for clarity.
+            if suggestion.auto_save:
+                from backend.db.models import UserSavedEvent
+
+                existing = session.exec(
+                    select(UserSavedEvent).where(
+                        UserSavedEvent.user_id == actor.id,
+                        UserSavedEvent.event_id == event_id,
+                    )
+                ).first()
+                if existing is None:
+                    session.add(
+                        UserSavedEvent(
+                            device_id=str(actor.id),
+                            event_id=event_id,
+                            user_id=actor.id,
+                            audience="public",
+                        )
+                    )
 
     session.commit()
     session.refresh(suggestion)

@@ -1,0 +1,8 @@
+# Pre-seed: bob follows admin (admin is "popular") and alice follows bob.
+# This sets up FoF: alice → bob → admin. Phase -1 must EXCLUDE admin
+# from alice's friends-of-friends suggestions.
+follows:
+  - follower: bob
+    followee: admin
+  - follower: alice
+    followee: bob

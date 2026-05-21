@@ -1,0 +1,14 @@
+# Pre-seeded follow graph for the friends-graph scenario.
+#
+# Resulting graph:
+#   alice <-> bob          (mutual = "friends")
+#   carol -> alice         (one-way; alice does NOT follow back)
+#   dave   isolated        (no follows in either direction)
+#   admin  isolated
+follows:
+  - follower: alice
+    followee: bob
+  - follower: bob
+    followee: alice
+  - follower: carol
+    followee: alice

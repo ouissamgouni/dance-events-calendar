@@ -1,0 +1,101 @@
+test_plan:
+  name: "Phase E (E7) — referral links"
+  description: >
+    Inviter generates a stable referral link from /account; clicking
+    it auto-creates a mutual UserFollow pair on the redeemer's first
+    sign-in (or immediately when the redeemer is already signed in).
+    Code generation is idempotent (single row per inviter), redemption
+    requires consent, and invalid codes return a silent 200 to avoid
+    leaking inviter existence (GDPR by-design).
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=phase-e-referrals"
+    - >
+      Empty pre-seeded follow graph — every UserFollow created during
+      this test plan is the direct result of a redemption step, which
+      makes assertions on the My network panel unambiguous.
+
+  steps:
+    - id: 1
+      title: "Inviter sees a stable referral link on /account"
+      description: >
+        /login → "Sign in as Iris Inviter", skip onboarding,
+        navigate to /account, scroll to the "Invite friends" card.
+      expected: >
+        Network: GET /api/social/me/referral → 200 with a 10-char
+        base-32 code and url ending in /r/<CODE>. used_count = 0.
+        Card shows "No one has used your link yet.".
+
+    - id: 2
+      title: "Code is idempotent across reloads"
+      description: >
+        Refresh /account.
+      expected: >
+        GET /api/social/me/referral → 200 with the SAME code as in
+        step 1 (UNIQUE constraint on inviter_user_id ⇒ get-or-create
+        returns the existing row).
+
+    - id: 3
+      title: "Copy + paste flow — anonymous redeemer"
+      description: >
+        Click Copy in the card (pill briefly shows "Copied!"). Open a
+        new incognito window and paste the URL.
+      expected: >
+        /r/<CODE> sets a `ref_code` cookie (visible in DevTools →
+        Application → Cookies, Max-Age ~30 days, Path /, SameSite Lax)
+        and renders "Sign in to accept your invite…". After 800 ms the
+        page redirects to /login.
+
+    - id: 4
+      title: "Post-login redemption creates mutual follow"
+      description: >
+        From /login in the incognito window, /login → "Sign in as
+        Nora Newbie".
+      expected: >
+        AuthContext post-login hook reads the cookie, POSTs
+        /api/auth/redeem-referral with consent=true, then clears the
+        cookie. Open /account → "My network" → both the "Following"
+        and "Followers" tabs list `inviter` (mutual edge). Sign back in
+        as Iris Inviter and refresh /account: used_count in the card
+        is now 1.
+
+    - id: 5
+      title: "Direct redemption while signed in"
+      description: >
+        Sign in as Sam Signedin (skip onboarding). Open the inviter's
+        /r/<CODE> URL directly in the same tab.
+      expected: >
+        /api/auth/redeem-referral is called immediately; the page
+        flips to "You and @inviter are now mutual friends." with a
+        blue "Explore events" CTA. used_count rises to 2 in the
+        inviter's card.
+
+    - id: 6
+      title: "Second click is a no-op (mutual_follow_created=false)"
+      description: >
+        Still as Sam, reopen /r/<CODE>.
+      expected: >
+        /api/auth/redeem-referral returns 200 with
+        `mutual_follow_created: false` (edges already exist). The page
+        renders "You and @inviter are now connected." (no second
+        notification, no duplicate UserFollow row, no extra
+        used_count tick — backend's per-redeemer idempotency).
+
+    - id: 7
+      title: "Invalid code does not leak inviter existence"
+      description: >
+        Still as Sam, open /r/THISCODEDOESNOTEXIST.
+      expected: >
+        /api/auth/redeem-referral returns 200 (NOT 404 — that would
+        leak which codes exist) with `inviter_handle: null`. The
+        landing page shows "That invite link isn't valid anymore"
+        with a Continue button. No UserFollow row is created.
+
+    - id: 8
+      title: "Self-redeem is silently rejected"
+      description: >
+        Sign in as Iris Inviter and open her OWN /r/<CODE>.
+      expected: >
+        /api/auth/redeem-referral returns 200 with
+        `mutual_follow_created: false`. No self-loop UserFollow row is
+        created. used_count is NOT incremented.

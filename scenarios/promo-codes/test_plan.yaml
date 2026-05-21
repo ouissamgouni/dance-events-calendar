@@ -1,0 +1,99 @@
+test_plan:
+  name: "Promo Codes — critical path"
+  description: |
+    Verify the user-submitted promo code feature end-to-end. The scenario
+    pre-seeds three events and three promo codes (1 approved, 1 pending,
+    1 rejected) so most steps just check what's already there.
+
+    Sign-in tip: at /login, dev mode shows one button per mock user. Use
+    "Dev Admin" for admin steps, "Penny Promoter" or "Dev User" for
+    user-facing steps.
+
+  steps:
+    - id: 1
+      title: "Approved promo visible on the public detail page"
+      description: |
+        Sign in as "Dev User" (or stay signed-out). Open evt-promo-001 from
+        the calendar. Scroll to the price block.
+      expected: |
+        A "Promo codes" badge sits next to the price. Clicking it reveals
+        a list containing exactly one approved code (EARLYBIRD) with
+        description "10% off until door close" and a link to the source
+        URL. The pending code (NEEDREVIEW) is NOT shown to non-admins.
+
+    - id: 2
+      title: "Submit a new promo code (signed-in)"
+      description: |
+        Still on evt-promo-001, click "+ Add promo code". Fill in code
+        "FRIENDS20", description "Member-only", paste any URL, leave
+        expires_at blank, submit.
+      expected: |
+        Form closes. A "Pending review" note replaces the form for the
+        newly submitted code. The public list still shows EARLYBIRD only
+        (the new code is awaiting moderation).
+
+    - id: 3
+      title: "Submitter sees their pending row in the section"
+      description: |
+        Reload evt-promo-001 while still signed in as the submitter.
+      expected: |
+        The promo codes section shows EARLYBIRD (approved) and FRIENDS20
+        (with a small amber "pending" badge visible only to the submitter
+        + admins).
+
+    - id: 4
+      title: "Duplicate code is rejected"
+      description: |
+        Click "+ Add promo code" again on evt-promo-001 and submit code
+        "earlybird" (any case).
+      expected: |
+        Submit fails with an inline message about an existing code on this
+        event. No new pending row appears.
+
+    - id: 5
+      title: "Admin slide-over — pending tab"
+      description: |
+        Sign in as "Dev Admin". Go to /admin → Data tab → click the
+        "Promo Codes" toolbar button.
+      expected: |
+        Slide-over opens on the "pending" tab. Rows include NEEDREVIEW
+        and FRIENDS20 with submitter handle/email, event title, and
+        Approve / Reject buttons.
+
+    - id: 6
+      title: "Admin approves a code"
+      description: |
+        In the slide-over, click "Approve" on NEEDREVIEW.
+      expected: |
+        Row disappears from the pending tab. Switching to "approved" shows
+        NEEDREVIEW with the green badge. Re-opening evt-promo-001 (as any
+        viewer) now lists EARLYBIRD + NEEDREVIEW.
+
+    - id: 7
+      title: "Admin rejects a code with notes"
+      description: |
+        Back to the pending tab, click "Reject" on FRIENDS20. Type
+        "Already covered by EARLYBIRD" in the textarea, then Confirm.
+      expected: |
+        Row moves to the "rejected" tab. The admin_notes line is visible
+        on the rejected row. Public detail page does NOT show FRIENDS20.
+
+    - id: 8
+      title: "Submitter receives a notification"
+      description: |
+        Sign in as "Penny Promoter". Open the notifications bell.
+      expected: |
+        At least one notification of kind ``promo_code_approved`` /
+        ``promo_code_rejected`` is rendered (e.g. EARLYBIRD approval,
+        SPAMCODE rejection). Clicking the row navigates to the
+        corresponding event detail page.
+
+    - id: 9
+      title: "Feature flag off → UI disappears"
+      description: |
+        As Dev Admin, in /admin → Configuration tab, toggle
+        "Promo codes" off. Reload evt-promo-001.
+      expected: |
+        The promo codes section is hidden on the detail page even though
+        approved codes exist. In the admin Data toolbar, the
+        "Promo Codes" button disappears.

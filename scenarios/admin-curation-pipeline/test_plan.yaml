@@ -1,0 +1,78 @@
+test_plan:
+  name: "Admin-curated lists (Phase 3) — per-calendar pipeline rules"
+  description: >
+    Verify the admin can configure a per-calendar curation rule that
+    auto-applies a target (saved or going) to every event ingested from
+    that calendar. Post-sync hook ``apply_curation_rules`` should fire
+    after enrichment commits without ever failing the sync.
+
+  preconditions:
+    - "task start:scenario SCENARIO=admin-curation-pipeline"
+    - "task db:up && task db:migrate (head: 8c2f3d4e5a01)"
+    - "Pre-seeded users: admin, curator-paris (admin-managed, default audience public)."
+    - "Mock calendar service is configured with ≥1 calendar (cal-1)."
+
+  steps:
+    - id: 1
+      title: "Confirm curator-paris is admin-managed"
+      description: "Sign in as admin. In /admin Users tab, find curator-paris."
+      expected: "Row shows ``managed: Paris Salsa Curator`` pill and the curator's default RSVP/save audience is public."
+
+    - id: 2
+      title: "Open curation rules for cal-1"
+      description: >
+        In the Calendars admin row for cal-1, click the "Rules" toggle.
+      expected: "Inline ``CalendarCurationRulesPanel`` opens, empty."
+
+    - id: 3
+      title: "Add a saved-rule for curator-paris"
+      description: >
+        Click "Add rule". Target = curator-paris, kind = saved,
+        audience = public, enabled = on. Save.
+      expected: >
+        POST /api/admin/calendars/cal-1/curation-rules → 201.
+        Row renders with a green Enabled badge.
+
+    - id: 4
+      title: "Trigger sync"
+      description: "Click Sync on the cal-1 calendar row."
+      expected: >
+        Sync completes 200. New events from cal-1 each gain a
+        ``UserSavedEvent`` row for curator-paris with
+        ``created_by_admin_user_id=admin.id`` and
+        ``device_id=admin:<curator.id>``.
+
+    - id: 5
+      title: "Public profile shows the auto-curated events"
+      description: "Visit /u/curator-paris in incognito (Calendar tab)."
+      expected: >
+        Every freshly-synced cal-1 event renders with the indigo
+        "Curated" pill and the Saved badge. Older self-curated rows
+        keep their non-curated styling.
+
+    - id: 6
+      title: "Rejecting non-managed targets"
+      description: >
+        Try adding a rule pointing at the admin user (who is NOT
+        admin_managed) via the panel.
+      expected: >
+        POST returns 409 with ``detail`` mentioning ``is_admin_managed``.
+        Inline panel surfaces the error and does not insert the row.
+
+    - id: 7
+      title: "Disable rule + re-sync"
+      description: >
+        Toggle the rule off (PATCH ``enabled=false``). Run a second sync.
+      expected: >
+        Newly ingested events do NOT get curated rows. Existing curated
+        rows are not removed (we never auto-uncurate).
+
+    - id: 8
+      title: "Curation never fails sync"
+      description: >
+        In a dev DB, manually break the rule (e.g. set
+        ``target_user_id`` to a deleted UUID via SQL) and re-sync.
+      expected: >
+        Sync completes successfully; an error is logged from the
+        ``apply_curation_rules`` try/except wrapper but the calendar's
+        events still land in the DB.

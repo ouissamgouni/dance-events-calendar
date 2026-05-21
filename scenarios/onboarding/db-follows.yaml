@@ -1,0 +1,35 @@
+# Pre-seed follows that make the onboarding suggestion rules visible.
+#
+# `newbie` already follows `alreadyfollowed` and has a pending request to
+# `pendingtarget`, so both must be excluded from suggestions even though they
+# would otherwise be valid accounts. `nohandle@example.com` receives a follow
+# by email but has no handle, so it must also be filtered out.
+#
+# The popular tail is deterministic:
+#   pop1 has 3 followers,
+#   pop2 and pop3 each have 2 followers, so handle ascending breaks the tie.
+follows:
+  - follower: newbie
+    followee: alreadyfollowed
+    status: approved
+  - follower: newbie
+    followee: pendingtarget
+    status: pending
+  - follower: admin
+    followee: pop1
+  - follower: admin
+    followee: pop2
+  - follower: admin
+    followee: pop3
+  - follower: admin
+    followee: alreadyfollowed
+  - follower: admin
+    followee: nohandle@example.com
+  - follower: salsahub
+    followee: pop1
+  - follower: bachataco
+    followee: pop1
+  - follower: curatoralpha
+    followee: pop2
+  - follower: curatorbeta
+    followee: pop3

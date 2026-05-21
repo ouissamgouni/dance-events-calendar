@@ -1,0 +1,36 @@
+# Follow graph (extended for the European-spread events):
+#   Mutual (friends of bob — surface in the friend signal):
+#     alice <-> bob, emma <-> bob, frank <-> bob, gina <-> bob,
+#     hugo <-> bob, nia <-> bob, omar <-> bob
+#   One-way (bob -> them; public RSVPs feed the followed-not-friends
+#   signal, but they're NOT mutual friends):
+#     bob -> pablo, bob -> quinn, bob -> rita,
+#     bob -> samir, bob -> tara, bob -> ulysses
+#   Pre-existing control (kept for backward compatibility):
+#     carol -> alice  (carol is NOT bob's friend; her attendance must
+#                      NOT trigger the friend badge for Bob)
+follows:
+  # --- mutual friendships of bob ---
+  - { follower: alice, followee: bob }
+  - { follower: bob, followee: alice }
+  - { follower: emma, followee: bob }
+  - { follower: bob, followee: emma }
+  - { follower: frank, followee: bob }
+  - { follower: bob, followee: frank }
+  - { follower: gina, followee: bob }
+  - { follower: bob, followee: gina }
+  - { follower: hugo, followee: bob }
+  - { follower: bob, followee: hugo }
+  - { follower: nia, followee: bob }
+  - { follower: bob, followee: nia }
+  - { follower: omar, followee: bob }
+  - { follower: bob, followee: omar }
+  # --- one-way: bob follows them, no follow-back ---
+  - { follower: bob, followee: pablo }
+  - { follower: bob, followee: quinn }
+  - { follower: bob, followee: rita }
+  - { follower: bob, followee: samir }
+  - { follower: bob, followee: tara }
+  - { follower: bob, followee: ulysses }
+  # --- pre-existing one-way control ---
+  - { follower: carol, followee: alice }

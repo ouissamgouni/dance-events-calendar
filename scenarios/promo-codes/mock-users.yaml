@@ -1,0 +1,7 @@
+users:
+  - email: dev-user@example.com
+    name: Dev User
+  - email: submitter@example.com
+    name: Penny Promoter
+  - email: admin@example.com # matches ADMIN_EMAIL → admin
+    name: Dev Admin

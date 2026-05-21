@@ -16,6 +16,14 @@ events:
   longitude: 2.3716
   start: w-14 Sat 21:00
   end: w-14 Sun 03:00
+  tags:
+  - format:social
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-jan-budapest
   calendar_id: bachata-cal-002
   title: Winter Bachata Festival – Budapest
@@ -46,6 +54,15 @@ events:
   longitude: 19.051
   start: w-13 Fri 18:00
   end: w-13 Sun 23:00
+  tags:
+  - format:festival
+  - dance-style:bachata
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:large
+  - scope:international
+  - vibe:good-music
+  - vibe:social-atmosphere
 - id: evt-jan-london
   calendar_id: kizomba-cal-003
   title: Kizomba Fuego – London
@@ -62,6 +79,16 @@ events:
   longitude: -0.13
   start: w-12 Sat 21:00
   end: w-12 Sun 03:00
+  tags:
+  - format:social
+  - dance-style:salsa
+  - dance-style:kizomba
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:good-music
+  - vibe:social-atmosphere
 - id: evt-feb-rome
   calendar_id: salsa-cal-001
   title: Valentine Salsa Night – Rome
@@ -78,6 +105,14 @@ events:
   longitude: 12.4691
   start: w-9 Sat 19:00
   end: w-9 Sat 23:30
+  tags:
+  - format:social
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-feb-berlin
   calendar_id: bachata-cal-002
   title: Berlin Bachata Vibes
@@ -94,6 +129,14 @@ events:
   longitude: 13.3884
   start: w-8 Sat 21:00
   end: w-8 Sun 03:00
+  tags:
+  - format:social
+  - dance-style:bachata
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-feb-lisbon
   calendar_id: kizomba-cal-003
   title: Carnaval Kizomba – Lisbon
@@ -110,6 +153,14 @@ events:
   longitude: -9.2092
   start: w-7 Sat 22:00
   end: w-7 Sun 04:00
+  tags:
+  - format:social
+  - dance-style:kizomba
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-mar-athens
   calendar_id: salsa-cal-001
   title: Spring Salsa Workshop – Athens
@@ -130,6 +181,13 @@ events:
   longitude: 23.729
   start: w-6 Sat 14:00
   end: w-6 Sat 18:00
+  tags:
+  - format:workshop
+  - dance-style:salsa
+  - level:all-levels
+  - venue:rooftop
+  - scale:small
+  - scope:local
 - id: evt-mar-barcelona
   calendar_id: bachata-cal-002
   title: Bachata Cubana Party – Barcelona
@@ -146,6 +204,16 @@ events:
   longitude: 2.1568
   start: w-5 Sat 22:00
   end: w-5 Sun 03:00
+  tags:
+  - format:social
+  - dance-style:salsa
+  - dance-style:bachata
+  - level:beginner-friendly
+  - venue:outdoor
+  - scale:medium
+  - scope:local
+  - vibe:live-band
+  - vibe:social-atmosphere
 - id: evt-mar-paris
   calendar_id: kizomba-cal-003
   title: Kizomba Bootcamp – Paris
@@ -166,6 +234,13 @@ events:
   longitude: 2.353
   start: w-4 Sat 10:00
   end: w-4 Sun 17:00
+  tags:
+  - format:festival
+  - dance-style:kizomba
+  - level:all-levels
+  - venue:indoor
+  - scale:large
+  - scope:international
 - id: evt-mar-amsterdam
   calendar_id: salsa-cal-001
   title: Latin Night Amsterdam
@@ -186,6 +261,15 @@ events:
   longitude: 4.8821
   start: w-3 Sat 21:00
   end: w-3 Sun 02:30
+  tags:
+  - format:class
+  - dance-style:salsa
+  - dance-style:bachata
+  - level:all-levels
+  - venue:indoor
+  - scale:small
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-apr-paris
   calendar_id: salsa-cal-001
   title: Salsa Social Night – Paris
@@ -202,6 +286,15 @@ events:
   longitude: 2.3741
   start: w0 Fri 20:30
   end: w0 Sat 01:00
+  tags:
+  - format:social
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:good-music
+  - vibe:social-atmosphere
 - id: evt-apr-vienna
   calendar_id: bachata-cal-002
   title: Wien Bachata Congress
@@ -232,6 +325,16 @@ events:
   longitude: 16.331
   start: w1 Thu 18:00
   end: w1 Sun 04:00
+  tags:
+  - format:congress
+  - dance-style:bachata
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:large
+  - scope:international
+  - vibe:good-music
+  - vibe:social-atmosphere
+  - vibe:crowded
 - id: evt-apr-athens
   calendar_id: kizomba-cal-003
   title: Kizomba Under the Acropolis – Athens
@@ -248,6 +351,15 @@ events:
   longitude: 23.729
   start: w1 Wed 21:00
   end: w1 Thu 02:30
+  tags:
+  - format:social
+  - dance-style:kizomba
+  - level:beginner-friendly
+  - venue:rooftop
+  - scale:medium
+  - scope:local
+  - vibe:good-music
+  - vibe:social-atmosphere
 - id: evt-may-lisbon
   calendar_id: salsa-cal-001
   title: Salsa & Kizomba Festival – Lisbon
@@ -278,6 +390,16 @@ events:
   longitude: -9.2092
   start: w2 Fri 10:00
   end: w2 Sun 23:00
+  tags:
+  - format:festival
+  - dance-style:salsa
+  - dance-style:kizomba
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:large
+  - scope:international
+  - vibe:good-music
+  - vibe:social-atmosphere
 - id: evt-may-prague
   calendar_id: bachata-cal-002
   title: Bachata en Praga
@@ -298,6 +420,14 @@ events:
   longitude: 14.44
   start: w3 Sat 20:00
   end: w3 Sun 01:00
+  tags:
+  - format:class
+  - dance-style:bachata
+  - level:all-levels
+  - venue:indoor
+  - scale:small
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-may-london
   calendar_id: salsa-cal-001
   title: London Salsa Splash
@@ -314,6 +444,16 @@ events:
   longitude: -0.1152
   start: w5 Sat 14:00
   end: w6 Mon 22:00
+  tags:
+  - format:social
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:outdoor
+  - scale:medium
+  - scope:local
+  - vibe:live-band
+  - vibe:good-music
+  - vibe:social-atmosphere
 - id: evt-may-milan
   calendar_id: kizomba-cal-003
   title: Kizomba al Lago – Milan
@@ -330,6 +470,14 @@ events:
   longitude: 9.17
   start: w5 Sat 19:30
   end: w5 Sat 23:30
+  tags:
+  - format:social
+  - dance-style:kizomba
+  - level:beginner-friendly
+  - venue:outdoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-jun-paris
   calendar_id: salsa-cal-001
   title: Fête de la Musique Salsa – Paris
@@ -346,6 +494,14 @@ events:
   longitude: 2.3639
   start: w9 Sun 18:00
   end: w10 Mon 04:00
+  tags:
+  - format:social
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:outdoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-jun-dubrovnik
   calendar_id: bachata-cal-002
   title: Bachata Night Dubrovnik
@@ -362,6 +518,14 @@ events:
   longitude: 18.1113
   start: w8 Sat 21:00
   end: w8 Sun 02:00
+  tags:
+  - format:social
+  - dance-style:bachata
+  - level:beginner-friendly
+  - venue:rooftop
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-jun-stockholm
   calendar_id: kizomba-cal-003
   title: Midsommar Kizomba – Stockholm
@@ -378,6 +542,14 @@ events:
   longitude: 18.034
   start: w9 Sat 20:00
   end: w9 Sun 02:00
+  tags:
+  - format:social
+  - dance-style:kizomba
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-jun-barcelona
   calendar_id: salsa-cal-001
   title: Salsa on the Beach – Barcelona
@@ -394,6 +566,14 @@ events:
   longitude: 2.192
   start: w10 Sat 19:00
   end: w10 Sat 23:00
+  tags:
+  - format:social
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:outdoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-jul-budapest
   calendar_id: salsa-cal-001
   title: Budapest Summer Salsa Open
@@ -410,6 +590,14 @@ events:
   longitude: 19.062
   start: w11 Sat 20:00
   end: w11 Sun 02:00
+  tags:
+  - format:social
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:outdoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-jul-santorini
   calendar_id: bachata-cal-002
   title: Santorini Bachata Retreat
@@ -440,6 +628,15 @@ events:
   longitude: 25.437
   start: w12 Thu 10:00
   end: w12 Sun 22:00
+  tags:
+  - format:festival
+  - dance-style:bachata
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:large
+  - scope:international
+  - vibe:good-music
+  - vibe:social-atmosphere
 - id: evt-jul-london
   calendar_id: kizomba-cal-003
   title: Kizomba Summer – London
@@ -456,6 +653,14 @@ events:
   longitude: -0.0725
   start: w13 Sat 20:00
   end: w13 Sun 02:00
+  tags:
+  - format:social
+  - dance-style:kizomba
+  - level:beginner-friendly
+  - venue:outdoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-aug-naples
   calendar_id: salsa-cal-001
   title: Salsa al Tramonto – Napoli
@@ -472,6 +677,14 @@ events:
   longitude: 14.235
   start: w15 Sat 20:00
   end: w15 Sun 00:30
+  tags:
+  - format:social
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:outdoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-aug-porto
   calendar_id: bachata-cal-002
   title: Porto Bachata & Wine Night
@@ -488,6 +701,14 @@ events:
   longitude: -8.606
   start: w16 Sat 21:00
   end: w16 Sun 02:00
+  tags:
+  - format:social
+  - dance-style:bachata
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-aug-berlin
   calendar_id: kizomba-cal-003
   title: Berlin Open Air Kizomba
@@ -504,6 +725,14 @@ events:
   longitude: 13.402
   start: w17 Sat 17:00
   end: w17 Sat 22:00
+  tags:
+  - format:social
+  - dance-style:kizomba
+  - level:beginner-friendly
+  - venue:outdoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-aug-lisbon
   calendar_id: kizomba-cal-003
   title: Lisbon Kizomba Festival
@@ -534,6 +763,15 @@ events:
   longitude: -9.178
   start: w16 Wed 10:00
   end: w16 Sun 23:00
+  tags:
+  - format:festival
+  - dance-style:kizomba
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:large
+  - scope:international
+  - vibe:good-music
+  - vibe:social-atmosphere
 - id: evt-sep-paris
   calendar_id: salsa-cal-001
   title: Rentrée Salsa – Paris
@@ -550,6 +788,14 @@ events:
   longitude: 2.392
   start: w20 Sat 14:00
   end: w20 Sun 02:00
+  tags:
+  - format:festival
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:large
+  - scope:international
+  - vibe:social-atmosphere
 - id: evt-sep-barcelona
   calendar_id: bachata-cal-002
   title: Bachata Sensual Intensive – Barcelona
@@ -580,6 +826,15 @@ events:
   longitude: 2.163
   start: w21 Sat 10:00
   end: w21 Sun 17:00
+  tags:
+  - format:festival
+  - dance-style:bachata
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:large
+  - scope:international
+  - vibe:good-music
+  - vibe:social-atmosphere
 - id: evt-sep-thessaloniki
   calendar_id: kizomba-cal-003
   title: Thessaloniki Kizomba Weekend
@@ -610,6 +865,16 @@ events:
   longitude: 22.9417
   start: w22 Sat 18:00
   end: w22 Sun 23:00
+  tags:
+  - format:workshop
+  - dance-style:kizomba
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:small
+  - scope:local
+  - vibe:live-band
+  - vibe:good-music
+  - vibe:social-atmosphere
 - id: evt-oct-rome
   calendar_id: salsa-cal-001
   title: Salsa Congress – Rome
@@ -640,6 +905,16 @@ events:
   longitude: 12.474
   start: w24 Fri 18:00
   end: w24 Sun 23:00
+  tags:
+  - format:congress
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:large
+  - scope:international
+  - vibe:good-music
+  - vibe:social-atmosphere
+  - vibe:crowded
 - id: evt-oct-amsterdam
   calendar_id: bachata-cal-002
   title: Amsterdam Bachata Weekender
@@ -670,6 +945,16 @@ events:
   longitude: 4.8821
   start: w26 Fri 19:00
   end: w26 Sun 03:00
+  tags:
+  - format:festival
+  - dance-style:bachata
+  - dance-style:kizomba
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:large
+  - scope:international
+  - vibe:good-music
+  - vibe:social-atmosphere
 - id: evt-oct-madrid
   calendar_id: kizomba-cal-003
   title: Kizomba Noche – Madrid
@@ -686,6 +971,14 @@ events:
   longitude: -3.7003
   start: w27 Sat 22:00
   end: w27 Sun 03:00
+  tags:
+  - format:social
+  - dance-style:kizomba
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-nov-paris
   calendar_id: salsa-cal-001
   title: Salsa & Jazz – Paris
@@ -702,6 +995,15 @@ events:
   longitude: 2.3487
   start: w29 Sat 20:00
   end: w29 Sun 01:00
+  tags:
+  - format:social
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:live-band
+  - vibe:social-atmosphere
 - id: evt-nov-london
   calendar_id: bachata-cal-002
   title: London Bachata Marathon
@@ -718,6 +1020,15 @@ events:
   longitude: -0.0982
   start: w30 Sat 12:00
   end: w30 Sun 12:00
+  tags:
+  - format:festival
+  - dance-style:bachata
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:large
+  - scope:international
+  - vibe:good-music
+  - vibe:social-atmosphere
 - id: evt-nov-budapest
   calendar_id: kizomba-cal-003
   title: Budapest Autumn Kizomba Social
@@ -734,6 +1045,14 @@ events:
   longitude: 19.046
   start: w31 Sat 20:00
   end: w31 Sun 02:00
+  tags:
+  - format:social
+  - dance-style:kizomba
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-dec-vienna
   calendar_id: salsa-cal-001
   title: Christmas Salsa Ball – Vienna
@@ -764,6 +1083,15 @@ events:
   longitude: 16.366
   start: w34 Sat 19:00
   end: w34 Sun 01:00
+  tags:
+  - format:social
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:good-music
+  - vibe:social-atmosphere
 - id: evt-dec-seville
   calendar_id: bachata-cal-002
   title: Bachata de Navidad – Seville
@@ -780,6 +1108,14 @@ events:
   longitude: -5.987
   start: w35 Sat 21:00
   end: w35 Sun 03:00
+  tags:
+  - format:social
+  - dance-style:bachata
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-dec-lisbon
   calendar_id: kizomba-cal-003
   title: NYE Kizomba Countdown – Lisbon
@@ -796,6 +1132,14 @@ events:
   longitude: -9.165
   start: w37 Thu 22:00
   end: w37 Fri 05:00
+  tags:
+  - format:social
+  - dance-style:kizomba
+  - level:beginner-friendly
+  - venue:outdoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-spring-copenhagen
   calendar_id: salsa-cal-001
   title: Copenhagen Salsa Spring Night
@@ -816,6 +1160,15 @@ events:
   longitude: 12.551
   start: w2 Sat 20:30
   end: w2 Sun 02:00
+  tags:
+  - format:class
+  - dance-style:salsa
+  - level:all-levels
+  - venue:indoor
+  - scale:small
+  - scope:local
+  - vibe:good-music
+  - vibe:social-atmosphere
 - id: evt-spring-warsaw
   calendar_id: bachata-cal-002
   title: Warsaw Bachata Spring Social
@@ -832,6 +1185,15 @@ events:
   longitude: 21.0446
   start: w4 Sat 21:00
   end: w4 Sun 03:00
+  tags:
+  - format:social
+  - dance-style:bachata
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:good-music
+  - vibe:social-atmosphere
 - id: evt-spring-brussels
   calendar_id: kizomba-cal-003
   title: Brussels Kizomba Garden Social
@@ -848,6 +1210,14 @@ events:
   longitude: 4.395
   start: w6 Sat 17:00
   end: w6 Sat 22:00
+  tags:
+  - format:social
+  - dance-style:kizomba
+  - level:beginner-friendly
+  - venue:outdoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-sum-nice
   calendar_id: salsa-cal-001
   title: Côte d'Azur Salsa Night – Nice
@@ -864,6 +1234,14 @@ events:
   longitude: 7.2659
   start: w10 Sat 19:30
   end: w10 Sun 01:00
+  tags:
+  - format:social
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-sum-valencia
   calendar_id: bachata-cal-002
   title: Valencia Bachata Nights
@@ -880,6 +1258,15 @@ events:
   longitude: -0.3516
   start: w13 Fri 21:00
   end: w13 Sat 03:00
+  tags:
+  - format:social
+  - dance-style:bachata
+  - level:beginner-friendly
+  - venue:outdoor
+  - scale:medium
+  - scope:local
+  - vibe:good-music
+  - vibe:social-atmosphere
 - id: evt-sum-edinburgh
   calendar_id: kizomba-cal-003
   title: Edinburgh Kizomba Fringe Social
@@ -910,6 +1297,15 @@ events:
   longitude: -3.1817
   start: w17 Sat 21:00
   end: w17 Sun 02:30
+  tags:
+  - format:festival
+  - dance-style:kizomba
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:large
+  - scope:international
+  - vibe:good-music
+  - vibe:social-atmosphere
 - id: evt-fall-dublin
   calendar_id: salsa-cal-001
   title: Dublin Salsa Autumn Fiesta
@@ -926,6 +1322,17 @@ events:
   longitude: -6.2817
   start: w23 Sat 21:00
   end: w23 Sun 03:00
+  tags:
+  - format:social
+  - dance-style:salsa
+  - dance-style:bachata
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:live-band
+  - vibe:good-music
+  - vibe:social-atmosphere
 - id: evt-fall-warsaw
   calendar_id: bachata-cal-002
   title: Warsaw Bachata Autumn Congress
@@ -956,6 +1363,16 @@ events:
   longitude: 21.0059
   start: w27 Fri 18:00
   end: w27 Sun 23:00
+  tags:
+  - format:congress
+  - dance-style:bachata
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:large
+  - scope:international
+  - vibe:good-music
+  - vibe:social-atmosphere
+  - vibe:crowded
 - id: evt-fall-copenhagen
   calendar_id: kizomba-cal-003
   title: Copenhagen Kizomba Autumn Social
@@ -972,6 +1389,14 @@ events:
   longitude: 12.549
   start: w31 Sat 21:00
   end: w31 Sun 03:00
+  tags:
+  - format:social
+  - dance-style:kizomba
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-online-001
   calendar_id: bachata-cal-002
   title: Online Bachata Styling Workshop
@@ -989,6 +1414,12 @@ events:
     Book early — this event has sold out in previous editions.
   start: w1 Wed 18:00
   end: w1 Wed 20:00
+  tags:
+  - format:workshop
+  - dance-style:bachata
+  - level:all-levels
+  - scale:small
+  - scope:local
 - id: evt-vague-001
   calendar_id: salsa-cal-001
   title: Salsa Social @ Dave's Place
@@ -1003,6 +1434,14 @@ events:
   location: Dave's Place
   start: w3 Fri 20:00
   end: w3 Sat 01:00
+  tags:
+  - format:social
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-vague-002
   calendar_id: kizomba-cal-003
   title: Kizomba Jam — TBA
@@ -1017,6 +1456,14 @@ events:
   location: TBA
   start: w8 Fri 19:00
   end: w8 Fri 23:00
+  tags:
+  - format:social
+  - dance-style:kizomba
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-vague-003
   calendar_id: bachata-cal-002
   title: Bachata Brunch
@@ -1031,6 +1478,14 @@ events:
   location: Studio 54
   start: w11 Sun 11:00
   end: w11 Sun 15:00
+  tags:
+  - format:social
+  - dance-style:bachata
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-nullisland
   calendar_id: salsa-cal-001
   title: Mystery Salsa Night
@@ -1047,6 +1502,14 @@ events:
   longitude: 0.0
   start: w5 Wed 21:00
   end: w5 Thu 02:00
+  tags:
+  - format:social
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-geocode-me
   calendar_id: kizomba-cal-003
   title: Kizomba by the River
@@ -1061,6 +1524,14 @@ events:
   location: Pont Alexandre III, Paris, France
   start: w7 Mon 17:00
   end: w7 Mon 21:00
+  tags:
+  - format:social
+  - dance-style:kizomba
+  - level:beginner-friendly
+  - venue:outdoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-allday-001
   calendar_id: salsa-cal-001
   title: Lyon Salsa Summer Camp
@@ -1092,6 +1563,15 @@ events:
   start: w13 Fri 00:00
   end: w13 Sun 23:59
   all_day: true
+  tags:
+  - format:festival
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:large
+  - scope:international
+  - vibe:good-music
+  - vibe:social-atmosphere
 - id: evt-early-2025
   calendar_id: bachata-cal-002
   title: Marseille Bachata Kick-off
@@ -1108,6 +1588,14 @@ events:
   longitude: 5.423
   start: w-65 Sat 18:00
   end: w-65 Sun 23:00
+  tags:
+  - format:social
+  - dance-style:bachata
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:social-atmosphere
 - id: evt-late-2026
   calendar_id: kizomba-cal-003
   title: New Year Kizomba Gala 2026
@@ -1138,3 +1626,12 @@ events:
   longitude: 2.34
   start: w37 Thu 21:00
   end: w37 Fri 04:00
+  tags:
+  - format:social
+  - dance-style:kizomba
+  - level:beginner-friendly
+  - venue:indoor
+  - scale:medium
+  - scope:local
+  - vibe:good-music
+  - vibe:social-atmosphere

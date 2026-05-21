@@ -87,6 +87,14 @@ const Calendar = forwardRef<FullCalendar, Props>(
                         </div>
                     )}
                     <span className="fc-event-title-text">{arg.event.title}</span>
+                    {ev.has_active_promo_codes && (
+                        <img
+                            src="/promo-code.png"
+                            alt=""
+                            aria-hidden="true"
+                            className="fc-event-promo-icon"
+                        />
+                    )}
                 </div>
             );
         }, [offMapEventIds]);

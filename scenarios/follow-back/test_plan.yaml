@@ -1,0 +1,42 @@
+test_plan:
+  name: "Phase E (E1) — Follow-back button on new_follower notifications"
+  description: >
+    Verify a Follow-back CTA renders on every ``new_follower`` notification
+    where ``actor.is_following == false``. Clicking it must optimistically
+    flip the row and create the reverse edge on the backend.
+
+  preconditions:
+    - "task start:scenario SCENARIO=follow-back"
+    - "Pre-seeded users: viewer, dave, admin. dave→viewer (one-way)."
+    - "Use a fresh browser profile or incognito when switching users."
+
+  steps:
+    - id: 1
+      title: "Manufacture a live new_follower row"
+      description: >
+        The YAML seeder bypasses the notification fan-out, so the pre-seeded
+        dave→viewer edge does NOT create a new_follower row by itself. In a
+        second browser profile (Browser B): sign in as dave (Dev Mock),
+        visit /u/viewer and click Follow. Sign out.
+      expected: >
+        DevTools on Browser A (signed in as viewer) → GET /api/notifications
+        shows a row with kind=new_follower, actor.handle=dave,
+        actor.is_following=false.
+
+    - id: 2
+      title: "Follow-back button is rendered"
+      description: "Open the notifications panel as viewer."
+      expected: >
+        On the @dave row, a primary blue square ``Follow back`` button is
+        rendered (E1). Other rows where the actor already follows back
+        do NOT show the button.
+
+    - id: 3
+      title: "Click Follow back → optimistic flip + reverse edge created"
+      description: "Click the Follow-back button."
+      expected: >
+        Button optimistically swaps to a non-clickable ``✓ Following``
+        pill (secondary slate style, square corners). DevTools:
+        POST /api/social/users/dave/follow → 201 with ``is_friend: true``
+        in the response (the reverse edge completes a mutual). The row
+        does not re-fetch spontaneously.

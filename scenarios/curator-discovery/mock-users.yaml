@@ -1,0 +1,40 @@
+# Curator discovery fallback scenario.
+#
+# Cast:
+#   - viewer: signed-in user with zero follows/subscriptions at start.
+#   - subscriber: spare public user for manual subscription experiments.
+#   - curator-paris / curator-bachata: admin-managed public curator accounts.
+#   - ordinary: non-curator control that must not appear in curator suggestions.
+#   - admin: site admin account.
+users:
+  - email: viewer@example.com
+    name: Val Zero
+    handle: viewer
+    account_visibility: public
+  - email: subscriber@example.com
+    name: Sara Subscriber
+    handle: subscriber
+    account_visibility: public
+  - email: curator-paris@example.com
+    name: Paris Salsa Curator
+    handle: curator-paris
+    account_visibility: public
+    is_admin_managed: true
+    managed_label: Paris Salsa Curator
+    bio: Hand-picked salsa and bachata nights across Paris.
+  - email: curator-bachata@example.com
+    name: Bachata Curator
+    handle: curator-bachata
+    account_visibility: public
+    is_admin_managed: true
+    managed_label: Bachata Curator
+    bio: Editorial bachata calendar for social dancers.
+  - email: ordinary@example.com
+    name: Ordinary Organizer
+    handle: ordinary
+    account_visibility: public
+    is_verified_organizer: true
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin
+    account_visibility: public

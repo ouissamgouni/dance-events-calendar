@@ -1,0 +1,51 @@
+test_plan:
+  name: "Admin hidden from social discovery (Phase -1)"
+  description: >
+    Verify the site admin account is excluded from public social
+    surfaces (handle search, discovery, friends-of-friends) so admin
+    activity (curation, moderation) does not leak into normal users'
+    social feeds. The admin profile itself remains visible at
+    /u/admin if you know the handle.
+
+  preconditions:
+    - "task start:scenario SCENARIO=admin-hidden-from-search"
+    - "Pre-seeded follows: bob→admin, alice→bob (alice's FoF includes admin via bob)."
+
+  steps:
+    - id: 1
+      title: "Handle search excludes admin"
+      description: >
+        Sign in as alice. In the people search, query ``adm``.
+      expected: >
+        Results do NOT include @admin. GET
+        /api/social/users/search?q=adm response contains no entry
+        with ``handle: admin``.
+
+    - id: 2
+      title: "Discover suggestions exclude admin"
+      description: "Open the Discover suggestions list as alice."
+      expected: >
+        @admin does NOT appear in the suggestions list, even though
+        bob (whom alice follows) follows admin.
+        GET /api/social/suggestions response omits admin.
+
+    - id: 3
+      title: "Friends-of-friends omits admin"
+      description: "Open the FoF panel as alice."
+      expected: >
+        @admin is not listed as a FoF suggestion via the bob path.
+        GET /api/social/users/fof response omits admin.
+
+    - id: 4
+      title: "Direct profile is still reachable"
+      description: "Visit /u/admin directly as alice."
+      expected: >
+        The admin profile renders normally (Phase -1 hides from
+        discovery only, not from direct visits — handle is public).
+
+    - id: 5
+      title: "Admin can still be followed manually"
+      description: "On /u/admin, click Follow as alice."
+      expected: >
+        POST /api/social/users/admin/follow → 201. The edge persists
+        but admin remains hidden from discovery feeds for other users.

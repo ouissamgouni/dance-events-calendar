@@ -1,11 +1,14 @@
 """Unit tests for DatabaseSeeder logic."""
 
 import pytest
-from unittest.mock import MagicMock, patch
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from sqlmodel import SQLModel, Session, create_engine, select
+
+from backend.db.models import Tag, TagGroup, User
 from backend.db.seed import DatabaseSeeder, resolve_relative_dt
+from backend.db import seed as seed_module
 
 
 @pytest.mark.unit
@@ -127,3 +130,132 @@ class TestDatabaseSeeder:
             assert "title" in evt
             assert "start" in evt
             assert "end" in evt
+
+    def test_seed_uses_default_tags_and_users_when_missing(self, tmp_path, monkeypatch):
+        scenarios_dir = tmp_path / "scenarios"
+        default_dir = scenarios_dir / "default"
+        scenario_dir = scenarios_dir / "sparse"
+        default_dir.mkdir(parents=True)
+        scenario_dir.mkdir()
+        (default_dir / "tags.yaml").write_text(
+            "tag_groups:\n"
+            "  - slug: format\n"
+            "    label: Format\n"
+            "    tags:\n"
+            "      - slug: social\n"
+            "        label: Social\n"
+        )
+        (default_dir / "mock-users.yaml").write_text(
+            "users:\n  - email: fallback@example.com\n    name: Fallback User\n"
+        )
+        monkeypatch.setattr(seed_module, "SCENARIOS_DIR", scenarios_dir)
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            DatabaseSeeder(session).seed(scenario_dir)
+
+            group = session.exec(
+                select(TagGroup).where(TagGroup.slug == "format")
+            ).first()
+            tag = session.exec(select(Tag).where(Tag.slug == "social")).first()
+            user = session.exec(
+                select(User).where(User.email == "fallback@example.com")
+            ).first()
+
+        assert group is not None
+        assert tag is not None
+        assert user is not None
+
+    def test_seed_admin_managed_user_defaults_to_public_audience(
+        self, tmp_path, monkeypatch
+    ):
+        scenarios_dir = tmp_path / "scenarios"
+        scenario_dir = scenarios_dir / "managed"
+        scenario_dir.mkdir(parents=True)
+        (scenario_dir / "mock-users.yaml").write_text(
+            "users:\n"
+            "  - email: curator@example.com\n"
+            "    name: Curator\n"
+            "    handle: curator\n"
+            "    is_admin_managed: true\n"
+            "    share_attendance_default_audience: private\n"
+        )
+        monkeypatch.setattr(seed_module, "SCENARIOS_DIR", scenarios_dir)
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            DatabaseSeeder(session).seed(scenario_dir)
+
+            user = session.exec(
+                select(User).where(User.email == "curator@example.com")
+            ).first()
+
+        assert user is not None
+        assert user.is_admin_managed is True
+        assert user.share_attendance_default is True
+        assert user.share_attendance_default_audience == "public"
+
+    def test_all_scenarios_have_tag_and_user_coverage(self):
+        import yaml
+
+        from backend.db.seed import SCENARIOS_DIR
+
+        default_tags = SCENARIOS_DIR / "default" / "tags.yaml"
+        default_users = SCENARIOS_DIR / "default" / "mock-users.yaml"
+        assert default_tags.exists()
+        assert default_users.exists()
+        assert yaml.safe_load(default_tags.read_text()).get("tag_groups")
+        assert yaml.safe_load(default_users.read_text()).get("users")
+        for scenario_dir in SCENARIOS_DIR.iterdir():
+            if not scenario_dir.is_dir():
+                continue
+            assert (scenario_dir / "tags.yaml").exists() or default_tags.exists()
+            assert (scenario_dir / "mock-users.yaml").exists() or default_users.exists()
+
+    def test_db_events_use_resolvable_fixture_tags(self):
+        import yaml
+
+        from backend.db.seed import SCENARIOS_DIR
+
+        tag_test_scenarios = {"event-tags", "tag-enhancer"}
+
+        def tag_slugs(scenario_dir: Path) -> set[str]:
+            tags_path = scenario_dir / "tags.yaml"
+            if not tags_path.exists():
+                tags_path = SCENARIOS_DIR / "default" / "tags.yaml"
+            data = yaml.safe_load(tags_path.read_text()) or {}
+            slugs: set[str] = set()
+            for group in data.get("tag_groups") or []:
+                group_slug = group.get("slug")
+                for tag in group.get("tags") or []:
+                    tag_slug = tag.get("slug")
+                    if group_slug and tag_slug:
+                        slugs.add(f"{group_slug}:{tag_slug}")
+            return slugs
+
+        for events_path in SCENARIOS_DIR.glob("*/db-events.yaml"):
+            scenario_dir = events_path.parent
+            available_tags = tag_slugs(scenario_dir)
+            data = yaml.safe_load(events_path.read_text()) or {}
+            for event in data.get("events") or []:
+                event_tags = event.get("tags") or []
+                if scenario_dir.name not in tag_test_scenarios:
+                    assert event_tags, f"{events_path}:{event.get('id')} has no tags"
+                for slug in event_tags:
+                    assert slug in available_tags, (
+                        f"{events_path}:{event.get('id')} references unknown tag {slug}"
+                    )
+            for suggestion in data.get("tag_suggestions") or []:
+                tag_slug = suggestion.get("tag")
+                if tag_slug:
+                    assert tag_slug in available_tags, (
+                        f"{events_path}: tag suggestion references unknown tag {tag_slug}"
+                    )

@@ -1,0 +1,186 @@
+test_plan:
+  name: "Following Badge — at-a-glance friends signal (Track 1)"
+  description: >
+    Verify the new "Following" badge — a small avatar/dot on event cards
+    and map pins indicating that at least one user you follow (mutually)
+    is going or saved this event. The badge is the at-a-glance
+    complement to the explorer interest filter chip
+    (?interest_source=friends): the chip is "show me ONLY those events",
+    the badge is "I can still see all events, but the ones with friend
+    signal are visually marked".
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=following-badge"
+    - >
+      Pre-seeded follow graph mirrors friends-events for the original
+      4 minimal events (alice<->bob mutual, carol→alice one-way), and
+      adds a broader cast for the European-spread events:
+      7 mutual friends of bob (alice, emma, frank, gina, hugo, nia, omar),
+      6 one-way followees (pablo, quinn, rita, samir, tara, ulysses),
+      and 20 strangers (s01..s10 going, t01..t10 saving).
+    - >
+      Events span multiple European cities (Paris, Berlin, Brussels,
+      London, Madrid, Amsterdam, Rome, Prague, Vienna, Lisbon,
+      Barcelona) so the map view exercises realistic pin density.
+      The hero event evt-fb-100 (Madrid) seeds a "rich" mix:
+      5 friends going + 2 friends saved + 6 followed-not-friends going
+      publicly + 10 strangers going + 10 strangers saving.
+    - "settings.yaml flips on `following_badge_enabled`."
+
+  steps:
+    - id: 1
+      title: "Bob sees a blue-ringed friend avatar in the card's avatar track"
+      description: >
+        /login → "Sign in as Bob Martin". Open / (Home).
+      expected: >
+        evt-fb-001 (Salsa Social Friday) renders an inline avatar
+        track below the tags row. The first avatar in the track is
+        Alice's, wrapped in a blue ring (`ring-2 ring-blue-500`) so
+        followed friends visually lead the track. A small inline
+        people-icon (PeopleIcon SVG, `text-blue-600`) prefixes the
+        track to flag the friend signal. Non-friend attendees (if any)
+        follow with the standard white ring. Hovering Alice's avatar
+        shows her display name. No standalone rose chip is rendered —
+        the friend signal is communicated solely through the avatar
+        track (this is the unified design that replaced the previous
+        rose Following chip + separate attendance avatars row).
+
+    - id: 2
+      title: "Saved-only friends also lead the avatar track"
+      description: >
+        Still as Bob, locate evt-fb-002 (Bachata Workshop) in the list.
+      expected: >
+        Alice's avatar appears with the same blue ring at the head of
+        the avatar track. Proves both going AND saved signals from
+        mutuals feed `following_friends_preview` and surface in the
+        unified track (server-side `_following_friend_signals` dedup
+        per user across the two signals).
+
+    - id: 3
+      title: "One-way follower attendance does NOT promote into the friend slot"
+      description: >
+        Locate evt-fb-003 (Cuban Night). Carol is going, but Carol is
+        only a one-way follower of Alice — she is not Bob's mutual
+        friend.
+      expected: >
+        Carol may appear in the generic attendee avatars (white ring,
+        no PeopleIcon prefix) but never with a blue ring and the
+        track does not show the friend-signal prefix. Proves the
+        friend treatment respects the same mutual-follow rule as the
+        explorer's friends-only interest scope.
+
+    - id: 4
+      title: "Stranger event has no badge"
+      description: >
+        Locate evt-fb-004 (Stranger Bachata).
+      expected: >
+        No badge. Proves the badge is OFF by default — no false positives.
+
+    - id: 5
+      title: "Admin UI exposes the Following badge toggle"
+      description: >
+        Sign in as admin (admin@example.com). Navigate to
+        /admin/configuration. In the right-hand feature-flag panel,
+        locate the "Following badge" row (sits below the Trending
+        block).
+      expected: >
+        The toggle is currently ON (settings.yaml seeded
+        `following_badge_enabled: true`) with the helper text
+        "Avatar/dot when a mutual friend is going or saved". The
+        Trending and Unseen toggles are OFF (independent — proves the
+        three flags don't bleed into each other).
+
+    - id: 6
+      title: "Toggling Following badge OFF removes the friend prefix from all tracks"
+      description: >
+        Still on /admin/configuration, flip "Following badge" off.
+        Reload / in Bob's browser.
+      expected: >
+        Network: PUT /api/settings → 200 with
+        `following_badge_enabled: false`. On the cards, Alice's
+        avatar loses its blue ring and the PeopleIcon prefix on the
+        track disappears (the server still includes
+        `following_friends_preview` in the response, but the frontend
+        only passes it into `AttendeeAvatarStack` when the flag is
+        ON). Generic attendee avatars continue to render as before.
+        The legacy "Friends → Interested" filter chip still works
+        (separate feature, not gated by this toggle). Re-enable the
+        toggle and the blue ring + PeopleIcon return on next reload.
+
+    - id: 7
+      title: "Map pins show the blue Following count overlay"
+      description: >
+        Re-enable the Following badge if needed and sign back in as Bob.
+        Open / (Home), confirm the explorer map is visible. Locate the
+        pins for evt-fb-001 (Alice going) and evt-fb-002 (Alice saved)
+        on the map.
+      expected: >
+        Both pins render a small blue (#3b82f6) chip at the
+        bottom-right of the colored disc, with a white inline
+        people-icon SVG followed by the count "1" (the
+        `following_friend_count` decoration). The chip uses square
+        corners (no border-radius), matching the frontend square-
+        corner rule. The pins for evt-fb-003 (one-way Carol) and
+        evt-fb-004 (stranger) render the standard colored disc with
+        no chip. Clicking either decorated pin opens the popup which
+        renders an `AttendeeAvatarStack` (the same compact
+        avatars-and-overflow component used on event cards) above
+        the tag row — Alice's avatar appears first with a blue ring
+        and a small inline PeopleIcon prefix flagging the friend
+        signal. No standalone "<N> friend interested" text line is
+        rendered; the avatar stack is the single affordance for the
+        social signal in the popup. Proves the map and the card
+        consume the same `following_friend_count` /
+        `following_friends_preview` signals and that the popup body
+        is now unified with the card design.
+
+    - id: 8
+      title: "Hero event aggregates 5 friends + 6 followed-not-friends = 11"
+      description: >
+        Still as Bob, scroll the list to evt-fb-100 "European Salsa
+        Congress (Madrid)" (or pan the map to Spain and click the pin).
+      expected: >
+        The pin's blue Following chip reads "11"
+        (`following_friend_count` = 5 friends going + 6 public RSVPs
+        from followed-not-friends; the 2 friend saves do NOT count
+        toward the chip number, and the 10 strangers + 10 stranger
+        saves never count). The card's avatar stack shows 5 avatars
+        with blue rings (alice, emma, frank, gina, hugo — the
+        going-friends populate `following_friends_preview` first),
+        a PeopleIcon prefix, and a "+N more" suffix that accounts
+        for the remaining public attendees. Opening the map popup
+        renders the same `AttendeeAvatarStack` (5 blue-ringed friend
+        avatars first, then overflow count).
+
+    - id: 9
+      title: "Followed-not-friends RSVPs don't add blue rings"
+      description: >
+        Pan to Vienna (evt-fb-104 "Donau Salsa Open Air") — only
+        followed-not-friends are going (pablo, quinn, rita, public).
+      expected: >
+        Pin chip reads "3" (`following_friend_count` aggregates the
+        3 public RSVPs from followed-not-friends). The avatar stack
+        in the card / popup shows pablo, quinn, rita with the
+        standard white ring (NOT blue) and no PeopleIcon prefix —
+        proves the blue-ring affordance is reserved for mutual
+        friends, while followed-not-friends only contribute to the
+        numeric count.
+
+    - id: 10
+      title: "Friends-only-visibility RSVPs from non-friends are NOT counted"
+      description: >
+        Audit the API response for evt-fb-100 (Network tab). The hero
+        seed includes nia + omar saving with `audience: friends` (they
+        ARE friends of bob, so visible to bob), plus the 10 strangers
+        saving with `audience: public` (visible but NOT counted as
+        following signal). It does NOT include any friends-only RSVPs
+        from non-friends — that variant is exercised implicitly by
+        evt-fb-003 (carol going, share_publicly: true is public-
+        equivalent; the badge stays off because carol is not a friend
+        and her RSVP is not from a followed-not-friend either).
+      expected: >
+        `following_friend_count` for evt-fb-100 is exactly 11.
+        `following_friends_preview` contains at most 5 entries and
+        only includes mutual friends of bob (no carol, no pablo, no
+        stranger). Proves the audience rules and the friend / followed
+        partitions are enforced server-side.

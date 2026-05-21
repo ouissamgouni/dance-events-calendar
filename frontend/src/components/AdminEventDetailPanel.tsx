@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchEvent, updateEvent } from '../api';
+import { blockEvent, fetchAdminEvent, unblockEvent, updateEvent } from '../api';
 import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
 import AdminEventDetailContent from './AdminEventDetailContent';
 import EventMap from './EventMap';
@@ -23,6 +23,10 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
     const [savingTitle, setSavingTitle] = useState(false);
     const titleCancelledRef = useRef(false);
 
+    // Hide / block confirm state
+    const [confirmAction, setConfirmAction] = useState<'block' | 'restore' | null>(null);
+    const [actionLoading, setActionLoading] = useState(false);
+
     const isOpen = eventId !== null;
 
     useEffect(() => {
@@ -35,7 +39,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
         setLoading(true);
         setError(false);
         setEvent(null);
-        fetchEvent(eventId, { fresh: true })
+        fetchAdminEvent(eventId)
             .then((e) => { setEvent(e); setTitleValue(e.title); })
             .catch(() => setError(true))
             .finally(() => setLoading(false));
@@ -62,7 +66,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
 
     const handleTagsUpdated = () => {
         if (!eventId) return;
-        fetchEvent(eventId, { fresh: true })
+        fetchAdminEvent(eventId)
             .then((e) => { setEvent(e); setTitleValue(e.title); })
             .catch(() => { });
         notifyAdminDataChanged();
@@ -71,10 +75,54 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
     const handleManualRefresh = () => {
         if (!eventId) return;
         setLoading(true);
-        fetchEvent(eventId, { fresh: true })
+        fetchAdminEvent(eventId)
             .then((e) => { setEvent(e); setTitleValue(e.title); })
             .catch(() => setError(true))
             .finally(() => setLoading(false));
+    };
+
+    const handleHide = async () => {
+        if (!event) return;
+        setActionLoading(true);
+        try {
+            const updated = await updateEvent(event.event_id, { is_hidden: true });
+            setEvent(updated);
+            onEventUpdated?.(updated.event_id);
+            notifyAdminDataChanged();
+        } finally { setActionLoading(false); }
+    };
+
+    const handleUnhide = async () => {
+        if (!event) return;
+        setActionLoading(true);
+        try {
+            const updated = await updateEvent(event.event_id, { is_hidden: false });
+            setEvent(updated);
+            onEventUpdated?.(updated.event_id);
+            notifyAdminDataChanged();
+        } finally { setActionLoading(false); }
+    };
+
+    const handleBlock = async () => {
+        if (!event) return;
+        setActionLoading(true);
+        try {
+            const updated = await blockEvent(event.event_id);
+            setEvent(updated);
+            onEventUpdated?.(updated.event_id);
+            notifyAdminDataChanged();
+        } finally { setActionLoading(false); setConfirmAction(null); }
+    };
+
+    const handleRestore = async () => {
+        if (!event) return;
+        setActionLoading(true);
+        try {
+            const updated = await unblockEvent(event.event_id);
+            setEvent(updated);
+            onEventUpdated?.(updated.event_id);
+            notifyAdminDataChanged();
+        } finally { setActionLoading(false); setConfirmAction(null); }
     };
 
     const handleTitleBlur = async () => {
@@ -135,6 +183,16 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                             </p>
                         )}
                         <p className="text-[10px] text-gray-400 mt-0.5 uppercase tracking-wide">Event detail · admin</p>
+                        {event && (
+                            <div className="flex gap-1 mt-1">
+                                {event.is_blocked && (
+                                    <span className="text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.5 font-medium uppercase tracking-wide">Blocked</span>
+                                )}
+                                {event.is_hidden && !event.is_blocked && (
+                                    <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 font-medium uppercase tracking-wide">Hidden</span>
+                                )}
+                            </div>
+                        )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                         <button
@@ -207,15 +265,118 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
 
                 {/* Footer */}
                 {event && (
-                    <div className="shrink-0 border-t border-gray-200 bg-gray-50 px-5 py-2.5 flex items-center gap-3">
-                        <Link
-                            to={`/event/${event.event_id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-rose-500 hover:text-rose-700 hover:underline"
-                        >
-                            See full details ↗
-                        </Link>
+                    <div className="shrink-0 border-t border-gray-200 bg-gray-50 px-5 py-2.5 flex flex-col gap-2">
+                        <div className="flex items-center gap-3">
+                            <Link
+                                to={`/event/${event.event_id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-rose-500 hover:text-rose-700 hover:underline"
+                            >
+                                See full details ↗
+                            </Link>
+                        </div>
+                        {/* Admin visibility actions */}
+                        {event.is_blocked ? (
+                            /* Blocked state — only restore */
+                            confirmAction === 'restore' ? (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs text-gray-600">Restore this event?</span>
+                                    <button
+                                        onClick={handleRestore}
+                                        disabled={actionLoading}
+                                        className="text-xs px-2 py-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                                    >
+                                        Yes, restore
+                                    </button>
+                                    <button
+                                        onClick={() => setConfirmAction(null)}
+                                        className="text-xs px-2 py-1 text-gray-400 hover:text-gray-600"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => setConfirmAction('restore')}
+                                    className="text-xs px-2 py-1 border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 self-start"
+                                >
+                                    Restore
+                                </button>
+                            )
+                        ) : event.is_hidden ? (
+                            /* Hidden (not blocked) — unhide or permanently remove */
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={handleUnhide}
+                                    disabled={actionLoading}
+                                    className="text-xs px-2 py-1 border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                                >
+                                    Unhide
+                                </button>
+                                {confirmAction === 'block' ? (
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-600">Permanently remove?</span>
+                                        <button
+                                            onClick={handleBlock}
+                                            disabled={actionLoading}
+                                            className="text-xs px-2 py-1 bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+                                        >
+                                            Yes, remove
+                                        </button>
+                                        <button
+                                            onClick={() => setConfirmAction(null)}
+                                            className="text-xs px-2 py-1 text-gray-400 hover:text-gray-600"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => setConfirmAction('block')}
+                                        className="text-xs px-2 py-1 bg-red-600 hover:bg-red-700 text-white"
+                                    >
+                                        Permanently Remove
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            /* Normal state — hide or permanently remove */
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={handleHide}
+                                    disabled={actionLoading}
+                                    className="text-xs px-2 py-1 border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                                >
+                                    Hide
+                                </button>
+                                {confirmAction === 'block' ? (
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-600">Permanently remove?</span>
+                                        <button
+                                            onClick={handleBlock}
+                                            disabled={actionLoading}
+                                            className="text-xs px-2 py-1 bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+                                        >
+                                            Yes, remove
+                                        </button>
+                                        <button
+                                            onClick={() => setConfirmAction(null)}
+                                            className="text-xs px-2 py-1 text-gray-400 hover:text-gray-600"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={() => setConfirmAction('block')}
+                                        className="text-xs px-2 py-1 bg-red-600 hover:bg-red-700 text-white"
+                                    >
+                                        Permanently Remove
+                                    </button>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

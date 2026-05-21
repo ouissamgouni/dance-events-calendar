@@ -33,7 +33,6 @@ version: "3"
 # ════════════════════════════════════════════════════════════════════════════
 
 tasks:
-
   # ──────────────────────────────────────────────────────────────────────────
   # Internal: ref → worktree provisioner (called as deps by remote deploy tasks)
   #
@@ -76,6 +75,13 @@ tasks:
         fi
         SHORT=$(git rev-parse --short=7 "$REF_SHA")
         WT=".worktrees/ref-$SHORT"
+        if [ -d "$WT" ]; then
+          WT_SHA=$(git -C "$WT" rev-parse HEAD 2>/dev/null || echo "")
+          if [ "$WT_SHA" != "$REF_SHA" ]; then
+            echo "→ Recreating stale worktree $WT (expected $SHORT, found ${WT_SHA:-unknown})..."
+            git worktree remove --force "$WT" >/dev/null
+          fi
+        fi
         if [ ! -d "$WT" ]; then
           echo "→ Creating worktree $WT from $REF ($SHORT)..."
           mkdir -p .worktrees
@@ -121,6 +127,13 @@ tasks:
         fi
         SHORT=$(git rev-parse --short=7 "$REF_SHA")
         WT=".worktrees/ref-$SHORT"
+        if [ -d "$WT" ]; then
+          WT_SHA=$(git -C "$WT" rev-parse HEAD 2>/dev/null || echo "")
+          if [ "$WT_SHA" != "$REF_SHA" ]; then
+            echo "→ Recreating stale worktree $WT (expected $SHORT, found ${WT_SHA:-unknown})..."
+            git worktree remove --force "$WT" >/dev/null
+          fi
+        fi
         if [ ! -d "$WT" ]; then
           echo "→ Creating worktree $WT from $REF ($SHORT)..."
           mkdir -p .worktrees
@@ -162,7 +175,7 @@ tasks:
     internal: true
     vars:
       ENV: "{{.ENV}}"
-      COMPONENT: "{{.COMPONENT | default \"\"}}"
+      COMPONENT: '{{.COMPONENT | default ""}}'
     cmds:
       - |
         ENV="{{.ENV}}"
@@ -232,7 +245,8 @@ tasks:
         fi
 
   prod:status:
-    desc: "Show what is currently deployed to prod per component (released tag vs
+    desc:
+      "Show what is currently deployed to prod per component (released tag vs
       deployed SHA + drift)."
     cmds:
       - task: _status
@@ -257,7 +271,8 @@ tasks:
         vars: { ENV: "prod", COMPONENT: "frontend" }
 
   staging:status:
-    desc: "Show what is currently deployed to staging per component (deployed SHA +
+    desc:
+      "Show what is currently deployed to staging per component (deployed SHA +
       drift vs origin/develop)."
     cmds:
       - task: _status
@@ -280,7 +295,7 @@ tasks:
     internal: true
     vars:
       REF: "{{.REF}}"
-      COMPONENT: "{{.COMPONENT | default \"\"}}"
+      COMPONENT: '{{.COMPONENT | default ""}}'
     cmds:
       - |
         TARGET_REF="{{.REF}}"
@@ -387,7 +402,8 @@ tasks:
     desc: "Show git diff report between deployed prod refs and a target ref
       (default: origin/main)."
     vars:
-      REF: "{{if .REF}}{{.REF}}{{else}}{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}origin/main{{end}}{{end}}"
+      REF: "{{if .REF}}{{.REF}}{{else}}{{if
+        .CLI_ARGS}}{{.CLI_ARGS}}{{else}}origin/main{{end}}{{end}}"
     cmds:
       - task: _status-diff-prod
         vars: { REF: "{{.REF}}" }
@@ -395,7 +411,8 @@ tasks:
   prod:status:diff:db:
     desc: "Alias of deploy:prod:status:db:diff (backward compatibility)."
     vars:
-      REF: "{{if .REF}}{{.REF}}{{else}}{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}origin/main{{end}}{{end}}"
+      REF: "{{if .REF}}{{.REF}}{{else}}{{if
+        .CLI_ARGS}}{{.CLI_ARGS}}{{else}}origin/main{{end}}{{end}}"
     cmds:
       - task: prod:status:db:diff
         vars: { REF: "{{.REF}}" }
@@ -403,7 +420,8 @@ tasks:
   prod:status:diff:backend:
     desc: "Alias of deploy:prod:status:backend:diff (backward compatibility)."
     vars:
-      REF: "{{if .REF}}{{.REF}}{{else}}{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}origin/main{{end}}{{end}}"
+      REF: "{{if .REF}}{{.REF}}{{else}}{{if
+        .CLI_ARGS}}{{.CLI_ARGS}}{{else}}origin/main{{end}}{{end}}"
     cmds:
       - task: prod:status:backend:diff
         vars: { REF: "{{.REF}}" }
@@ -411,7 +429,8 @@ tasks:
   prod:status:diff:frontend:
     desc: "Alias of deploy:prod:status:frontend:diff (backward compatibility)."
     vars:
-      REF: "{{if .REF}}{{.REF}}{{else}}{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}origin/main{{end}}{{end}}"
+      REF: "{{if .REF}}{{.REF}}{{else}}{{if
+        .CLI_ARGS}}{{.CLI_ARGS}}{{else}}origin/main{{end}}{{end}}"
     cmds:
       - task: prod:status:frontend:diff
         vars: { REF: "{{.REF}}" }
@@ -420,7 +439,8 @@ tasks:
     desc: "Show git diff report between prod DB deploy ref and a target ref
       (default: origin/main)."
     vars:
-      REF: "{{if .REF}}{{.REF}}{{else}}{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}origin/main{{end}}{{end}}"
+      REF: "{{if .REF}}{{.REF}}{{else}}{{if
+        .CLI_ARGS}}{{.CLI_ARGS}}{{else}}origin/main{{end}}{{end}}"
     cmds:
       - task: _status-diff-prod
         vars: { REF: "{{.REF}}", COMPONENT: "db" }
@@ -429,16 +449,19 @@ tasks:
     desc: "Show git diff report between prod backend deploy ref and a target ref
       (default: origin/main)."
     vars:
-      REF: "{{if .REF}}{{.REF}}{{else}}{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}origin/main{{end}}{{end}}"
+      REF: "{{if .REF}}{{.REF}}{{else}}{{if
+        .CLI_ARGS}}{{.CLI_ARGS}}{{else}}origin/main{{end}}{{end}}"
     cmds:
       - task: _status-diff-prod
         vars: { REF: "{{.REF}}", COMPONENT: "backend" }
 
   prod:status:frontend:diff:
-    desc: "Show git diff report between prod frontend deploy ref and a target ref
+    desc:
+      "Show git diff report between prod frontend deploy ref and a target ref
       (default: origin/main)."
     vars:
-      REF: "{{if .REF}}{{.REF}}{{else}}{{if .CLI_ARGS}}{{.CLI_ARGS}}{{else}}origin/main{{end}}{{end}}"
+      REF: "{{if .REF}}{{.REF}}{{else}}{{if
+        .CLI_ARGS}}{{.CLI_ARGS}}{{else}}origin/main{{end}}{{end}}"
     cmds:
       - task: _status-diff-prod
         vars: { REF: "{{.REF}}", COMPONENT: "frontend" }
@@ -470,9 +493,9 @@ tasks:
         "config/secrets.staging.env",
       ]
     vars:
-      SOURCE_DIR: "{{.SOURCE_DIR | default \".\"}}"
-      HOST_DIR: "{{.HOST_DIR | default \".\"}}"
-      ALEMBIC: "{{.ALEMBIC | default \".venv/bin/alembic\"}}"
+      SOURCE_DIR: '{{.SOURCE_DIR | default "."}}'
+      HOST_DIR: '{{.HOST_DIR | default "."}}'
+      ALEMBIC: '{{.ALEMBIC | default ".venv/bin/alembic"}}'
     cmds:
       - |
         if [ -z "$DATABASE_URL" ]; then
@@ -495,16 +518,17 @@ tasks:
         echo "   To reconcile reference data with scenarios/staging/ run:"
         echo "     task db:seed:staging:remote"
       - task: _record-deploy
-        vars: { ENV: staging, COMPONENT: db, SHA: "{{.GIT_SHA | default \"\"}}" }
+        vars: { ENV: staging, COMPONENT: db, SHA: '{{.GIT_SHA | default ""}}' }
 
   staging:remote:cwd:backend:
     desc: "[CWD primitive] Stage Fly secrets + deploy backend from SOURCE_DIR
       (default CWD)."
-    dotenv: [ "config/base.env", "config/secrets.env", "config/secrets.staging.env" ]
+    dotenv:
+      ["config/base.env", "config/secrets.env", "config/secrets.staging.env"]
     vars:
-      SOURCE_DIR: "{{.SOURCE_DIR | default \".\"}}"
-      HOST_DIR: "{{.HOST_DIR | default \".\"}}"
-      LOG_LEVEL: "{{.LOG_LEVEL | default \"\"}}"
+      SOURCE_DIR: '{{.SOURCE_DIR | default "."}}'
+      HOST_DIR: '{{.HOST_DIR | default "."}}'
+      LOG_LEVEL: '{{.LOG_LEVEL | default ""}}'
     cmds:
       - |
         if [ ! -f "{{.HOST_DIR}}/config/secrets.staging.env" ]; then
@@ -545,10 +569,12 @@ tasks:
           echo "⚠️  Health check failed or timed out — check: task logs:staging:remote"
         fi
       - task: _record-deploy
-        vars: { ENV: staging, COMPONENT: backend, SHA: "{{.GIT_SHA | default \"\"}}" }
+        vars:
+          { ENV: staging, COMPONENT: backend, SHA: '{{.GIT_SHA | default ""}}' }
 
   staging:remote:cwd:frontend:
-    desc: "[CWD primitive] Build + deploy staging frontend to Cloudflare Pages from
+    desc:
+      "[CWD primitive] Build + deploy staging frontend to Cloudflare Pages from
       SOURCE_DIR."
     dotenv:
       [
@@ -558,9 +584,9 @@ tasks:
         "config/secrets.staging.env",
       ]
     vars:
-      SOURCE_DIR: "{{.SOURCE_DIR | default \".\"}}"
-      HOST_DIR: "{{.HOST_DIR | default \".\"}}"
-      PROJECT_NAME: "{{.PROJECT_NAME | default \"movida\"}}"
+      SOURCE_DIR: '{{.SOURCE_DIR | default "."}}'
+      HOST_DIR: '{{.HOST_DIR | default "."}}'
+      PROJECT_NAME: '{{.PROJECT_NAME | default "movida"}}'
     cmds:
       - |
         if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
@@ -591,7 +617,12 @@ tasks:
           --branch=develop
         echo "✅ Staging frontend deployed: https://develop.joinmovida.com (alias: https://develop.movida.pages.dev)"
       - task: _record-deploy
-        vars: { ENV: staging, COMPONENT: frontend, SHA: "{{.GIT_SHA | default \"\"}}" }
+        vars:
+          {
+            ENV: staging,
+            COMPONENT: frontend,
+            SHA: '{{.GIT_SHA | default ""}}',
+          }
 
   prod:remote:cwd:db:
     desc: "[CWD primitive] Run prod DB migrations from CWD/SOURCE_DIR."
@@ -603,9 +634,9 @@ tasks:
         "config/secrets.prod.env",
       ]
     vars:
-      SOURCE_DIR: "{{.SOURCE_DIR | default \".\"}}"
-      HOST_DIR: "{{.HOST_DIR | default \".\"}}"
-      ALEMBIC: "{{.ALEMBIC | default \".venv/bin/alembic\"}}"
+      SOURCE_DIR: '{{.SOURCE_DIR | default "."}}'
+      HOST_DIR: '{{.HOST_DIR | default "."}}'
+      ALEMBIC: '{{.ALEMBIC | default ".venv/bin/alembic"}}'
     cmds:
       - |
         if [ -z "$DATABASE_URL" ]; then
@@ -627,15 +658,16 @@ tasks:
         echo "   To reconcile reference data with scenarios/prod/ run:"
         echo "     task db:seed:prod"
       - task: _record-deploy
-        vars: { ENV: prod, COMPONENT: db, SHA: "{{.GIT_SHA | default \"\"}}" }
+        vars: { ENV: prod, COMPONENT: db, SHA: '{{.GIT_SHA | default ""}}' }
 
   prod:remote:cwd:backend:
-    desc: "[CWD primitive] Stage Fly secrets + deploy backend to movida.fly.dev from
+    desc:
+      "[CWD primitive] Stage Fly secrets + deploy backend to movida.fly.dev from
       SOURCE_DIR."
-    dotenv: [ "config/base.env", "config/secrets.env", "config/secrets.prod.env" ]
+    dotenv: ["config/base.env", "config/secrets.env", "config/secrets.prod.env"]
     vars:
-      SOURCE_DIR: "{{.SOURCE_DIR | default \".\"}}"
-      HOST_DIR: "{{.HOST_DIR | default \".\"}}"
+      SOURCE_DIR: '{{.SOURCE_DIR | default "."}}'
+      HOST_DIR: '{{.HOST_DIR | default "."}}'
     cmds:
       - |
         if [ ! -f "{{.HOST_DIR}}/config/secrets.prod.env" ]; then
@@ -672,7 +704,8 @@ tasks:
           echo "⚠️  Health check failed or timed out — check: task fly:logs"
         fi
       - task: _record-deploy
-        vars: { ENV: prod, COMPONENT: backend, SHA: "{{.GIT_SHA | default \"\"}}" }
+        vars:
+          { ENV: prod, COMPONENT: backend, SHA: '{{.GIT_SHA | default ""}}' }
 
   prod:remote:cwd:frontend:
     desc: "[CWD primitive] Build + deploy prod frontend to Cloudflare Pages from
@@ -685,9 +718,9 @@ tasks:
         "config/secrets.prod.env",
       ]
     vars:
-      SOURCE_DIR: "{{.SOURCE_DIR | default \".\"}}"
-      HOST_DIR: "{{.HOST_DIR | default \".\"}}"
-      PROJECT_NAME: "{{.PROJECT_NAME | default \"movida\"}}"
+      SOURCE_DIR: '{{.SOURCE_DIR | default "."}}'
+      HOST_DIR: '{{.HOST_DIR | default "."}}'
+      PROJECT_NAME: '{{.PROJECT_NAME | default "movida"}}'
     cmds:
       - |
         if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
@@ -718,7 +751,8 @@ tasks:
           --branch=main
         echo "✅ Prod frontend deployed: https://joinmovida.com (alias: https://movida.pages.dev)"
       - task: _record-deploy
-        vars: { ENV: prod, COMPONENT: frontend, SHA: "{{.GIT_SHA | default \"\"}}" }
+        vars:
+          { ENV: prod, COMPONENT: frontend, SHA: '{{.GIT_SHA | default ""}}' }
 
   # ══════════════════════════════════════════════════════════════════════════
   # CI orchestrators — full deploy from CWD (no git checks, no worktree)
@@ -744,7 +778,8 @@ tasks:
   # ══════════════════════════════════════════════════════════════════════════
 
   staging:remote:db:
-    desc: "Run DB migrations on Neon staging (develop branch). REF must be a develop
+    desc:
+      "Run DB migrations on Neon staging (develop branch). REF must be a develop
       commit."
     vars:
       REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
@@ -772,11 +807,12 @@ tasks:
           GIT_SHA: "{{.GIT_SHA}}"
 
   staging:remote:backend:
-    desc: "Stage Fly secrets + deploy backend to movida-staging.fly.dev. REF must be
+    desc:
+      "Stage Fly secrets + deploy backend to movida-staging.fly.dev. REF must be
       a develop commit."
     vars:
       REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
-      LOG_LEVEL: "{{.LOG_LEVEL | default \"\"}}"
+      LOG_LEVEL: '{{.LOG_LEVEL | default ""}}'
       WT_ABS:
         sh: |
           REF="{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
@@ -807,7 +843,7 @@ tasks:
       develop commit."
     vars:
       REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
-      PROJECT_NAME: "{{.PROJECT_NAME | default \"movida\"}}"
+      PROJECT_NAME: '{{.PROJECT_NAME | default "movida"}}'
       WT_ABS:
         sh: |
           REF="{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
@@ -867,8 +903,8 @@ tasks:
         echo "   Frontend: https://develop.joinmovida.com (alias: https://develop.movida.pages.dev)"
         echo ""
         echo "Verify:"
-        echo "   task open:session:staging:remote              → Open in fresh isolated browser"
-        echo "   task open:session:staging:remote BROWSERS=2   → Multi-user QA"
+        echo "   task open:isolated:staging:remote              → Open in isolated browser"
+        echo "   task open:isolated:staging:remote COUNT=2      → Multi-user QA"
         echo "   task deploy:staging:status  → what is currently deployed"
         echo "   task db:check:staging:remote   → DB migration state"
         echo "   task db:check:tags-drift:staging:remote → reference-tag drift vs scenarios/staging/"
@@ -886,7 +922,8 @@ tasks:
   # ══════════════════════════════════════════════════════════════════════════
 
   prod:remote:db:
-    desc: "Run DB migrations on Neon prod (main branch). REF must be an annotated
+    desc:
+      "Run DB migrations on Neon prod (main branch). REF must be an annotated
       release tag."
     vars:
       REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
@@ -991,11 +1028,12 @@ tasks:
           GIT_SHA: "{{.GIT_SHA}}"
 
   prod:remote:frontend:
-    desc: "Build + deploy prod frontend to Cloudflare Pages (public: joinmovida.com,
+    desc:
+      "Build + deploy prod frontend to Cloudflare Pages (public: joinmovida.com,
       alias: movida.pages.dev). REF must be an annotated release tag."
     vars:
       REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
-      PROJECT_NAME: "{{.PROJECT_NAME | default \"movida\"}}"
+      PROJECT_NAME: '{{.PROJECT_NAME | default "movida"}}'
       WT_ABS:
         sh: |
           REF="{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
@@ -1099,8 +1137,8 @@ tasks:
         echo "   Frontend: https://joinmovida.com (alias: https://movida.pages.dev)"
         echo ""
         echo "Verify:"
-        echo "   task open:session:prod              → Open in fresh isolated browser"
-        echo "   task open:session:prod BROWSERS=2   → Multi-user smoke check"
+        echo "   task open:isolated:prod              → Open in isolated browser"
+        echo "   task open:isolated:prod COUNT=2      → Multi-user smoke check"
         echo "   task deploy:prod:status  → what is currently deployed"
         echo "   task db:check:prod          → DB migration state"
         echo "   task db:check:tags-drift:prod → reference-tag drift vs scenarios/prod/"
@@ -1115,7 +1153,8 @@ tasks:
   # ──────────────────────────────────────────────────────────────────────────
 
   staging:local:
-    desc: "Build from develop + deploy to local staging (docker-compose). DRY_RUN=1
+    desc:
+      "Build from develop + deploy to local staging (docker-compose). DRY_RUN=1
       to preview."
     dotenv:
       [
@@ -1124,7 +1163,7 @@ tasks:
         "config/secrets.staging.local.env",
       ]
     vars:
-      DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
+      DRY_RUN: '{{.DRY_RUN | default "0"}}'
     cmds:
       - |
         if [ "{{.DRY_RUN}}" = "1" ]; then
@@ -1155,8 +1194,8 @@ tasks:
         echo "   Database: localhost:${POSTGRES_PORT:-5436}"
         echo ""
         echo "Next steps:"
-        echo "   task open:session:staging:local              → Open in fresh isolated browser"
-        echo "   task open:session:staging:local BROWSERS=2   → Multi-user QA"
+        echo "   task open:isolated:staging:local              → Open in isolated browser"
+        echo "   task open:isolated:staging:local COUNT=2      → Multi-user QA"
         echo "   task logs:staging:local   → View logs"
         echo "═══════════════════════════════════════════════════════════════"
 
@@ -1170,7 +1209,7 @@ tasks:
       ]
     vars:
       REF: "{{if .REF}}{{.REF}}{{else}}{{.CLI_ARGS}}{{end}}"
-      DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
+      DRY_RUN: '{{.DRY_RUN | default "0"}}'
     cmds:
       - |
         REF="{{.REF}}"
@@ -1211,7 +1250,7 @@ tasks:
         "config/secrets.staging.local.env",
       ]
     vars:
-      DRY_RUN: "{{.DRY_RUN | default \"0\"}}"
+      DRY_RUN: '{{.DRY_RUN | default "0"}}'
     cmds:
       - |
         if [ "{{.DRY_RUN}}" = "1" ]; then

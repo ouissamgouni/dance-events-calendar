@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { AdminTag, AdminTagGroup } from '../api';
 import { fetchAdminTagGroups, createTagGroup, updateTagGroup, createTag, updateTag, deleteTag } from '../api';
 import TagSynonymsEditor from './TagSynonymsEditor';
+import { ConfirmDialog } from './AppDialog';
 
 const CARD_BG_COLORS = [
     'bg-rose-50', 'bg-sky-50', 'bg-amber-50', 'bg-emerald-50',
@@ -34,6 +35,7 @@ export default function AdminTagCategories() {
     const [draggingTagId, setDraggingTagId] = useState<number | null>(null);
     const [tagDropTargetGroupId, setTagDropTargetGroupId] = useState<number | null>(null);
     const [tagActionError, setTagActionError] = useState<string | null>(null);
+    const [deleteTagTarget, setDeleteTagTarget] = useState<AdminTag | null>(null);
 
     const load = () => {
         fetchAdminTagGroups()
@@ -65,6 +67,13 @@ export default function AdminTagCategories() {
             prev.map((g) => (g.id === groupId ? { ...g, enabled } : g)),
         );
         await updateTagGroup(groupId, { enabled });
+    };
+
+    const handleToggleOnboardingEligible = async (groupId: number, onboardingEligible: boolean) => {
+        setGroups((prev) =>
+            prev.map((g) => (g.id === groupId ? { ...g, onboarding_eligible: onboardingEligible } : g)),
+        );
+        await updateTagGroup(groupId, { onboarding_eligible: onboardingEligible });
     };
 
     const handleToggleTag = async (tagId: number, enabled: boolean) => {
@@ -177,10 +186,13 @@ export default function AdminTagCategories() {
     };
 
     const handleDeleteTag = async (tag: AdminTag) => {
-        const usage = tag.event_count
-            ? `\n\nThis tag is currently applied to ${tag.event_count} event${tag.event_count === 1 ? '' : 's'}; those assignments will be removed.`
-            : '';
-        if (!window.confirm(`Delete tag "${tag.label}"?${usage}`)) return;
+        setDeleteTagTarget(tag);
+    };
+
+    const confirmDeleteTag = async () => {
+        const tag = deleteTagTarget;
+        if (!tag) return;
+        setDeleteTagTarget(null);
         // Optimistic remove.
         setGroups((prev) =>
             prev.map((g) => ({ ...g, tags: g.tags.filter((t) => t.id !== tag.id) })),
@@ -338,6 +350,18 @@ export default function AdminTagCategories() {
                                             className="h-4 w-4 cursor-pointer border-0 p-0 shrink-0"
                                             title="Change category color"
                                         />
+                                        <label
+                                            className="inline-flex items-center gap-1 text-[10px] font-medium text-gray-500 shrink-0"
+                                            title="Show this category during onboarding preferences"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={group.onboarding_eligible}
+                                                onChange={(e) => handleToggleOnboardingEligible(group.id, e.target.checked)}
+                                                className="h-3 w-3 border border-gray-300 accent-blue-500"
+                                            />
+                                            Onboarding
+                                        </label>
                                         {editingGroupId === group.id ? (
                                             <input
                                                 type="text"
@@ -522,6 +546,17 @@ export default function AdminTagCategories() {
                     </div>
                 )}
             </div>
+            <ConfirmDialog
+                open={deleteTagTarget !== null}
+                title="Delete Tag"
+                message={`Delete tag "${deleteTagTarget?.label ?? ''}"?${deleteTagTarget?.event_count
+                    ? `\n\nThis tag is currently applied to ${deleteTagTarget.event_count} event${deleteTagTarget.event_count === 1 ? '' : 's'}; those assignments will be removed.`
+                    : ''}`}
+                confirmLabel="Delete"
+                destructive
+                onCancel={() => setDeleteTagTarget(null)}
+                onConfirm={() => void confirmDeleteTag()}
+            />
         </div>
     );
 }
