@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 import yaml
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from slowapi import Limiter
@@ -43,6 +43,7 @@ from backend.config.loader import (
 from backend.db.database import get_session
 from backend.db.seed import scenario_file_with_default
 from backend.db.models import (
+    BlockedUserIdentity,
     CalendarSubscription,
     EventRating,
     ShareToken,
@@ -54,6 +55,7 @@ from backend.db.models import (
     UserReferral,
     UserSavedEvent,
 )
+from backend.services.email import send_new_user_notification
 
 logger = logging.getLogger(__name__)
 
@@ -163,6 +165,8 @@ def _upsert_user_from_claims(
     else:
         # Reactivate a soft-deleted account on re-login.
         user.deleted_at = None
+        if email and user.email != email:
+            user.email = email
         if provider_subject and not user.provider_subject:
             user.provider_subject = provider_subject
         if name and not user.display_name:
@@ -184,6 +188,20 @@ def _upsert_user_from_claims(
     session.commit()
     session.refresh(user)
     return user, is_new_user
+
+
+def _active_block_for_identity(
+    session: Session, *, provider: str, provider_subject: Optional[str]
+) -> Optional[BlockedUserIdentity]:
+    if not provider_subject:
+        return None
+    return session.exec(
+        select(BlockedUserIdentity).where(
+            (BlockedUserIdentity.provider == provider)
+            & (BlockedUserIdentity.provider_subject == provider_subject)
+            & (BlockedUserIdentity.revoked_at.is_(None))
+        )
+    ).first()
 
 
 def _merge_device_data(
@@ -375,11 +393,19 @@ def _apply_anon_preferences(
     session.commit()
 
 
+def _notify_admin_new_user(user: User) -> None:
+    admin_email = get_admin_email()
+    if not admin_email:
+        return
+    send_new_user_notification(user, admin_email)
+
+
 @router.post("/google")
 @limiter.limit("10/minute")
 def login_with_google(
     request: Request,
     body: GoogleLoginRequest,
+    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
 ):
     """Verify a Google ID token, upsert the user, merge anon data, set the cookie."""
@@ -432,6 +458,14 @@ def login_with_google(
         picture = idinfo.get("picture")
         provider_subject = idinfo.get("sub")
 
+    if _active_block_for_identity(
+        session, provider="google", provider_subject=provider_subject
+    ):
+        return JSONResponse(
+            status_code=403,
+            content={"detail": "This account is blocked from signing in"},
+        )
+
     user, is_new_user = _upsert_user_from_claims(
         session,
         email=email,
@@ -442,6 +476,8 @@ def login_with_google(
     _merge_device_data(session, user, body.device_id, anon_id=read_anon_id(request))
     _apply_anon_preferences(session, user, body.anon_preferences)
     session.refresh(user)
+    if is_new_user:
+        background_tasks.add_task(_notify_admin_new_user, user)
 
     is_admin = _is_admin_email(user.email)
     response = JSONResponse(
@@ -920,7 +956,6 @@ def purge_user_account(session: Session, user_id) -> None:
         db_user.email = f"deleted-{db_user.id}@example.invalid"
         db_user.display_name = None
         db_user.avatar_url = None
-        db_user.provider_subject = None
         db_user.deleted_at = datetime.utcnow()
         session.add(db_user)
 

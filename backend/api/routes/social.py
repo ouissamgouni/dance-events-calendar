@@ -37,6 +37,9 @@ from backend.api.event_serializer import serialize_events
 from backend.api.rate_limit import client_ip
 from backend.api.routes.auth import purge_user_account
 from backend.api.schemas import (
+    AdminBlockedUser,
+    AdminBlockedUserListResponse,
+    AdminBlockUserRequest,
     AdminUser,
     AdminUserListResponse,
     CalendarSubscriptionRequest,
@@ -80,6 +83,7 @@ from backend.api.schemas import (
 )
 from backend.db.database import get_session
 from backend.db.models import (
+    BlockedUserIdentity,
     CachedEvent,
     CalendarSetting,
     CalendarSubscription,
@@ -172,6 +176,7 @@ def _following_count(session: Session, user_id: UUID) -> int:
 
 
 def _to_admin_user(session: Session, user: User) -> AdminUser:
+    active_block = _active_block_for_user(session, user)
     return AdminUser(
         user_id=str(user.id),
         email=user.email,
@@ -186,6 +191,38 @@ def _to_admin_user(session: Session, user: User) -> AdminUser:
         created_at=user.created_at,
         followers_count=_followers_count(session, user.id),
         following_count=_following_count(session, user.id),
+        active_block_id=active_block.id if active_block else None,
+        blocked_at=active_block.created_at if active_block else None,
+    )
+
+
+def _active_block_for_user(session: Session, user: User) -> BlockedUserIdentity | None:
+    if not user.provider_subject:
+        return None
+    return session.exec(
+        select(BlockedUserIdentity).where(
+            (BlockedUserIdentity.provider == user.provider)
+            & (BlockedUserIdentity.provider_subject == user.provider_subject)
+            & (BlockedUserIdentity.revoked_at.is_(None))
+        )
+    ).first()
+
+
+def _to_admin_blocked_user(block: BlockedUserIdentity) -> AdminBlockedUser:
+    return AdminBlockedUser(
+        id=block.id or 0,
+        provider=block.provider,
+        provider_subject=block.provider_subject,
+        email=block.email,
+        reason=block.reason,
+        created_at=block.created_at,
+        created_by_admin_user_id=str(block.created_by_admin_user_id)
+        if block.created_by_admin_user_id
+        else None,
+        revoked_at=block.revoked_at,
+        revoked_by_admin_user_id=str(block.revoked_by_admin_user_id)
+        if block.revoked_by_admin_user_id
+        else None,
     )
 
 
@@ -2358,6 +2395,101 @@ def admin_delete_user(
     purge_user_account(session, user.id)
     session.commit()
     return {"status": "deleted", "user_id": str(user.id)}
+
+
+# --- Admin: signup blocks ---------------------------------------------------
+
+
+def _create_user_block(
+    session: Session,
+    user: User,
+    admin_user_id: UUID | None,
+    reason: str | None,
+) -> BlockedUserIdentity:
+    if is_admin_user(user):
+        raise HTTPException(status_code=400, detail="Refusing to block an admin")
+    if not user.provider_subject:
+        raise HTTPException(status_code=400, detail="User has no provider subject")
+    existing = _active_block_for_user(session, user)
+    if existing is not None:
+        return existing
+    block = BlockedUserIdentity(
+        provider=user.provider,
+        provider_subject=user.provider_subject,
+        email=user.email,
+        reason=(reason or "").strip() or None,
+        created_by_admin_user_id=admin_user_id,
+    )
+    session.add(block)
+    session.commit()
+    session.refresh(block)
+    return block
+
+
+@router.post("/admin/users/id/{user_id}/block", response_model=AdminBlockedUser)
+def admin_block_user_by_id(
+    user_id: UUID,
+    payload: AdminBlockUserRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    user = _resolve_admin_user_id(session, user_id)
+    block = _create_user_block(
+        session, user, get_admin_user_id(session), payload.reason
+    )
+    return _to_admin_blocked_user(block)
+
+
+@router.post("/admin/users/{handle}/block", response_model=AdminBlockedUser)
+def admin_block_user(
+    handle: str,
+    payload: AdminBlockUserRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    user = _resolve_handle(session, handle)
+    block = _create_user_block(
+        session, user, get_admin_user_id(session), payload.reason
+    )
+    return _to_admin_blocked_user(block)
+
+
+@router.get("/admin/user-blocks", response_model=AdminBlockedUserListResponse)
+def admin_list_user_blocks(
+    include_revoked: bool = Query(default=False),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    stmt = select(BlockedUserIdentity)
+    if not include_revoked:
+        stmt = stmt.where(BlockedUserIdentity.revoked_at.is_(None))
+    total = int(session.exec(select(func.count()).select_from(stmt.subquery())).one())
+    rows = session.exec(
+        stmt.order_by(BlockedUserIdentity.created_at.desc()).limit(limit).offset(offset)
+    ).all()
+    return AdminBlockedUserListResponse(
+        items=[_to_admin_blocked_user(row) for row in rows], total=total
+    )
+
+
+@router.delete("/admin/user-blocks/{block_id}", response_model=AdminBlockedUser)
+def admin_revoke_user_block(
+    block_id: int,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    block = session.get(BlockedUserIdentity, block_id)
+    if block is None:
+        raise HTTPException(status_code=404, detail="Block not found")
+    if block.revoked_at is None:
+        block.revoked_at = datetime.utcnow()
+        block.revoked_by_admin_user_id = get_admin_user_id(session)
+        session.add(block)
+        session.commit()
+        session.refresh(block)
+    return _to_admin_blocked_user(block)
 
 
 # --- Calendar subscriptions (Phase B) ----------------------------------------

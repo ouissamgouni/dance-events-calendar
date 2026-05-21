@@ -1439,10 +1439,33 @@ class AdminUser(BaseModel):
     created_at: datetime
     followers_count: int = 0
     following_count: int = 0
+    active_block_id: Optional[int] = None
+    blocked_at: Optional[datetime] = None
 
 
 class AdminUserListResponse(BaseModel):
     items: list[AdminUser]
+    total: int
+
+
+class AdminBlockUserRequest(BaseModel):
+    reason: Optional[str] = None
+
+
+class AdminBlockedUser(BaseModel):
+    id: int
+    provider: str
+    provider_subject: str
+    email: Optional[str] = None
+    reason: Optional[str] = None
+    created_at: datetime
+    created_by_admin_user_id: Optional[str] = None
+    revoked_at: Optional[datetime] = None
+    revoked_by_admin_user_id: Optional[str] = None
+
+
+class AdminBlockedUserListResponse(BaseModel):
+    items: list[AdminBlockedUser]
     total: int
 
 

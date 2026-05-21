@@ -89,6 +89,25 @@ def send_promo_code_notification(
     _send_admin_email(subject, html, admin_email, "promo code notification")
 
 
+def send_new_user_notification(user, admin_email: str) -> None:
+    """Email the admin when a user account is created."""
+    subject = f"New User Signup: {escape(user.email)}"
+    handle = f"@{user.handle}" if user.handle else "Not set"
+    created = str(user.created_at) if user.created_at else "Unknown"
+    html = f"""
+    <h2>New User Signup</h2>
+    <p><strong>Name:</strong> {escape(user.display_name or user.email)}</p>
+    <p><strong>Email:</strong> {escape(user.email)}</p>
+    <p><strong>Handle:</strong> {escape(handle)}</p>
+    <p><strong>Provider:</strong> {escape(user.provider)}</p>
+    <p><strong>User ID:</strong> {escape(str(user.id))}</p>
+    <p><strong>Created:</strong> {escape(created)}</p>
+    <hr>
+    <p><em>This email is sent once, when the user account is first created.</em></p>
+    """
+    _send_admin_email(subject, html, admin_email, "new user notification")
+
+
 def send_organizer_claim_notification(
     claim, user_label: str, event_count: int, admin_email: str
 ) -> None:

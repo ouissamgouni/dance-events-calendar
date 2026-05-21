@@ -1,0 +1,134 @@
+test_plan:
+  name: "Account Deletion + Signup Blocking"
+  description: >
+    Verify the account-deletion regression fix and the admin signup-blocking
+    feature together. A deleted user who signs up again must reactivate the
+    same provider identity instead of creating duplicate deleted rows. Admin
+    blocks are explicit moderation records: blocked users cannot sign in, a
+    revoked block allows sign-in again, and account deletion alone never creates
+    a block.
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=account-deletion-blocking"
+    - >
+      The scenario pre-seeds three users: admin@example.com (matches
+      ADMIN_EMAIL), returner@example.com, and victim@example.com.
+    - "Use a fresh browser profile or incognito window per signed-in user."
+    - >
+      In DevTools Network, keep Preserve log enabled for /api/auth/google and
+      /api/social/admin/* calls so the response bodies can be inspected.
+    - >
+      Optional DB checks can be run against the scenario database. The stable
+      dev-auth provider subjects are mock|returner@example.com and
+      mock|victim@example.com.
+
+  steps:
+    - id: 1
+      title: "Returner signs in for the first time"
+      description: >
+        Open Browser A, go to /login, and click "Sign in as Rita Returner".
+        Inspect the POST /api/auth/google response in DevTools.
+      expected: >
+        Sign-in succeeds with HTTP 200. The response has
+        email="returner@example.com", is_new_user=false if the scenario seed
+        already created the user row, and a stable user_id. Save this user_id
+        for the next steps.
+
+    - id: 2
+      title: "Returner deletes their account"
+      description: >
+        In Browser A, open /account, click "Delete my account", and confirm.
+        Optionally query the database for provider_subject
+        mock|returner@example.com.
+      expected: >
+        DELETE /api/auth/me returns 200. Browser A is signed out and redirected
+        to "/". The users row is soft-deleted: deleted_at is set, email is
+        anonymized to deleted-<uuid>@example.invalid, display name/avatar are
+        cleared, and provider_subject remains mock|returner@example.com.
+
+    - id: 3
+      title: "Returner signs up again and reuses the same user row"
+      description: >
+        In Browser A, go back to /login and click "Sign in as Rita Returner"
+        again. Inspect the POST /api/auth/google response.
+      expected: >
+        Sign-in succeeds with HTTP 200. The response user_id matches the user_id
+        saved in step 1, is_new_user=false, and email is restored to
+        returner@example.com. The account is active again (deleted_at cleared),
+        proving the preserved provider_subject was used for reactivation.
+
+    - id: 4
+      title: "Second delete does not create duplicate deleted rows"
+      description: >
+        Delete Rita Returner's account again from /account. Then query the
+        database for users.provider_subject = 'mock|returner@example.com'.
+      expected: >
+        The second DELETE /api/auth/me returns 200. The database query returns
+        exactly one users row for mock|returner@example.com, and that row is the
+        same user_id from step 1 with deleted_at set. There are not multiple
+        deleted-<uuid>@example.invalid rows for the same provider identity.
+
+    - id: 5
+      title: "Admin blocks Victim from signing in"
+      description: >
+        Open Browser X, go to /login, and click "Sign in as Dev Admin".
+        Navigate to /admin, open the Users tab, find Victor Victim, click
+        "Block", enter reason "scenario block", and confirm.
+      expected: >
+        POST /api/social/admin/users/id/<victim_user_id>/block returns 200 with
+        provider="google", provider_subject="mock|victim@example.com", reason
+        "scenario block", and revoked_at=null. The Victor Victim row shows a
+        red "blocked" badge and the row action changes from Block to Unblock.
+        The admin row cannot be blocked from this table.
+
+    - id: 6
+      title: "Blocked Victim cannot sign in"
+      description: >
+        Open Browser B in a separate fresh profile. Go to /login and click
+        "Sign in as Victor Victim". Inspect POST /api/auth/google.
+      expected: >
+        The auth request returns HTTP 403 with detail
+        "This account is blocked from signing in". Browser B does not receive a
+        session cookie, does not land on /account, and remains signed out.
+
+    - id: 7
+      title: "Admin can list and revoke the block"
+      description: >
+        In Browser X, stay on /admin/users. Verify Victor Victim still has the
+        blocked badge, then click "Unblock" and confirm. Optionally inspect
+        GET /api/social/admin/user-blocks?include_revoked=true.
+      expected: >
+        DELETE /api/social/admin/user-blocks/<block_id> returns 200 and the
+        response now has revoked_at set. The Users tab refreshes, the blocked
+        badge disappears, and Victor Victim's action changes back to Block. The
+        block list includes the revoked block when include_revoked=true.
+
+    - id: 8
+      title: "Revoked block allows Victim to sign in again"
+      description: >
+        In Browser B, retry "Sign in as Victor Victim".
+      expected: >
+        POST /api/auth/google returns 200. Browser B lands on /account with
+        email victim@example.com. The existing Victor Victim user row is reused;
+        no new active block is created.
+
+    - id: 9
+      title: "Deletion alone never creates a signup block"
+      description: >
+        In Browser B, delete Victor Victim's account from /account. Then sign in
+        as Dev Admin in Browser X and inspect /admin/users with Include deleted
+        enabled and /api/social/admin/user-blocks?include_revoked=true.
+      expected: >
+        Victor Victim appears as a soft-deleted user when Include deleted is on,
+        but no new active block appears. The only block record for
+        mock|victim@example.com is the revoked admin-created block from step 7.
+        This confirms GDPR deletion and moderation blocking are separate flows.
+
+    - id: 10
+      title: "Non-admin callers cannot manage blocks"
+      description: >
+        Sign in as Victor Victim or Rita Returner in a non-admin browser and
+        attempt to call GET /api/social/admin/user-blocks or POST
+        /api/social/admin/users/id/<some_user_id>/block from DevTools.
+      expected: >
+        The admin block endpoints return HTTP 403 for non-admin callers. No
+        block rows are created or revoked.

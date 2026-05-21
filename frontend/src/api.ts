@@ -1161,10 +1161,29 @@ export interface AdminUserRow {
     created_at: string;
     followers_count: number;
     following_count: number;
+    active_block_id: number | null;
+    blocked_at: string | null;
 }
 
 export interface AdminUserList {
     items: AdminUserRow[];
+    total: number;
+}
+
+export interface AdminBlockedUserRow {
+    id: number;
+    provider: string;
+    provider_subject: string;
+    email: string | null;
+    reason: string | null;
+    created_at: string;
+    created_by_admin_user_id: string | null;
+    revoked_at: string | null;
+    revoked_by_admin_user_id: string | null;
+}
+
+export interface AdminBlockedUserList {
+    items: AdminBlockedUserRow[];
     total: number;
 }
 
@@ -1192,6 +1211,45 @@ export async function adminDeleteUser(userId: string): Promise<{ status: string;
         { method: 'DELETE', credentials: 'include' },
     );
     return parseJsonResponse<{ status: string; user_id: string }>(res, 'Failed to delete user');
+}
+
+export async function adminBlockUser(
+    userId: string,
+    reason?: string | null,
+): Promise<AdminBlockedUserRow> {
+    const res = await fetch(
+        `${BASE}/social/admin/users/id/${encodeURIComponent(userId)}/block`,
+        {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason: reason ?? null }),
+        },
+    );
+    return parseJsonResponse<AdminBlockedUserRow>(res, 'Failed to block user');
+}
+
+export async function adminFetchBlockedUsers(
+    opts?: { includeRevoked?: boolean; limit?: number; offset?: number },
+): Promise<AdminBlockedUserList> {
+    const sp = new URLSearchParams();
+    if (opts?.includeRevoked) sp.set('include_revoked', 'true');
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    if (opts?.offset) sp.set('offset', String(opts.offset));
+    const qs = sp.toString();
+    const res = await fetch(
+        `${BASE}/social/admin/user-blocks${qs ? `?${qs}` : ''}`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<AdminBlockedUserList>(res, 'Failed to fetch blocked users');
+}
+
+export async function adminRevokeUserBlock(blockId: number): Promise<AdminBlockedUserRow> {
+    const res = await fetch(
+        `${BASE}/social/admin/user-blocks/${encodeURIComponent(String(blockId))}`,
+        { method: 'DELETE', credentials: 'include' },
+    );
+    return parseJsonResponse<AdminBlockedUserRow>(res, 'Failed to unblock user');
 }
 
 export async function adminSetVerifiedOrganizer(
