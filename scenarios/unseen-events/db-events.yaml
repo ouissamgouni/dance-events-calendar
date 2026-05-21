@@ -1,18 +1,26 @@
-# Three upcoming events. All start as "unseen" on first page load
-# (per-viewer state lives in localStorage; no DB seed needed).
+# Three upcoming events. On first page load they establish the local
+# "new events" baseline (per-viewer state lives in localStorage; no DB seed needed).
 base_week: 0
 events:
   - id: evt-unseen-001
     calendar_id: salsa-cal-001
     title: Friday Night Salsa Social
     description: |
-      Weekly social. Use this card to verify the Unseen badge dot.
+      Weekly social. Use this card to verify the New badge dot after baseline.
     location: Dance Studio, 10 Rue de Rivoli, Paris, France
     latitude: 48.8566
     longitude: 2.3522
     start: w0 Fri 21:00
     end: w0 Sat 01:00
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-unseen-002
     calendar_id: salsa-cal-001
     title: Saturday Salsa Bootcamp
@@ -26,14 +34,29 @@ events:
     price_is_free: false
     price_min: 40
     price_currency: EUR
+    tags:
+    - format:festival
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:large
+    - scope:international
   - id: evt-unseen-003
     calendar_id: salsa-cal-001
     title: Sunday Cuban Night
     description: |
-      Used to verify "Unseen only" filter excludes already-seen events.
+      Used to verify the "New only" filter narrows to locally-new events.
     location: Skybar, Av. de la Liberté, Brussels, Belgium
     latitude: 50.8503
     longitude: 4.3517
     start: w0 Sun 20:00
     end: w0 Mon 00:00
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere

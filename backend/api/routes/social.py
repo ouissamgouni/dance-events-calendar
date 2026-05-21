@@ -1794,6 +1794,7 @@ def _user_to_search_result(
     subscriber_ids: Optional[set[UUID]] = None,
     followed_ids: Optional[set[UUID]] = None,
     friend_ids: Optional[set[UUID]] = None,
+    source: Optional[str] = None,
 ) -> UserSearchResult:
     """Project a ``User`` row into the discovery card shape.
 
@@ -1835,6 +1836,7 @@ def _user_to_search_result(
         is_subscribed=is_subscribed,
         is_followed_by_viewer=is_followed_by_viewer,
         is_friend=is_friend,
+        source=source,
     )
 
 
@@ -1846,6 +1848,67 @@ def _viewer_subscription_ids(session: Session, viewer: User) -> set[UUID]:
         )
     ).all()
     return {r for r in rows}
+
+
+def _viewer_followed_ids(session: Session, viewer: User) -> set[UUID]:
+    rows = session.exec(
+        select(UserFollow.followee_id)
+        .where(UserFollow.follower_id == viewer.id)
+        .where(UserFollow.status == "approved")
+    ).all()
+    return {UUID(str(r)) if not isinstance(r, UUID) else r for r in rows}
+
+
+def _viewer_follow_edge_ids(session: Session, viewer: User) -> set[UUID]:
+    rows = session.exec(
+        select(UserFollow.followee_id).where(UserFollow.follower_id == viewer.id)
+    ).all()
+    return {UUID(str(r)) if not isinstance(r, UUID) else r for r in rows}
+
+
+def _curator_users(
+    session: Session,
+    viewer: Optional[User],
+    *,
+    limit: int,
+    q: Optional[str] = None,
+    excluded_ids: Optional[set[UUID]] = None,
+    exclude_followed: bool = False,
+    exclude_subscribed: bool = False,
+) -> list[User]:
+    excluded: set[UUID] = set(excluded_ids or set())
+    if viewer is not None:
+        excluded.add(viewer.id)
+        if exclude_followed:
+            excluded.update(_viewer_follow_edge_ids(session, viewer))
+        if exclude_subscribed:
+            excluded.update(_viewer_subscription_ids(session, viewer))
+
+    stmt = (
+        select(User)
+        .outerjoin(CalendarSubscription, CalendarSubscription.target_user_id == User.id)
+        .where(User.is_admin_managed == True)  # noqa: E712
+        .where(User.deleted_at.is_(None))
+        .where(User.handle.is_not(None))
+        .group_by(User.id)
+    )
+    needle = (q or "").strip().lower()
+    if needle:
+        like = f"{needle}%"
+        stmt = stmt.where(
+            or_(
+                func.lower(User.handle).like(like),
+                func.lower(User.display_name).like(like),
+            )
+        )
+    if excluded:
+        stmt = stmt.where(~col(User.id).in_(excluded))
+    stmt = stmt.order_by(
+        func.count(CalendarSubscription.subscriber_id).desc(),
+        User.managed_label.is_not(None).desc(),
+        User.handle.asc(),
+    ).limit(limit)
+    return list(session.exec(stmt).all())
 
 
 @router.get(
@@ -1860,7 +1923,7 @@ def search_users(
     session: Session = Depends(get_session),
     viewer: User | None = Depends(get_current_user_optional),
 ):
-    """Case-insensitive prefix search on handle and display_name.
+    """Case-insensitive search on handle and display_name.
 
     Excludes soft-deleted users. Friends-only accounts remain enumerable
     (their profile body is gated separately by ``can_view``); the only
@@ -1872,14 +1935,15 @@ def search_users(
     needle = (q or "").strip().lower()
     if not needle:
         return UserSearchResponse(items=[])
-    like = f"{needle}%"
+    prefix_like = f"{needle}%"
+    contains_like = f"%{needle}%"
     stmt = (
         select(User)
         .where(User.deleted_at.is_(None))
         .where(
             or_(
-                func.lower(User.handle).like(like),
-                func.lower(User.display_name).like(like),
+                func.lower(User.handle).like(prefix_like),
+                func.lower(User.display_name).like(contains_like),
             )
         )
     )
@@ -1895,6 +1959,45 @@ def search_users(
     return UserSearchResponse(
         items=[
             _user_to_search_result(session, viewer, u, subscriber_ids=sub_ids)
+            for u in rows
+        ]
+    )
+
+
+@router.get(
+    "/curators",
+    response_model=UserSearchResponse,
+)
+@limiter.limit("30/minute")
+def list_curators(
+    request: Request,
+    q: Optional[str] = Query(default=None, min_length=1, max_length=64),
+    limit: int = Query(default=12, ge=1, le=25),
+    exclude_subscribed: bool = Query(default=False),
+    exclude_followed: bool = Query(default=False),
+    session: Session = Depends(get_session),
+    viewer: User | None = Depends(get_current_user_optional),
+):
+    rows = _curator_users(
+        session,
+        viewer,
+        limit=limit,
+        q=q,
+        exclude_followed=exclude_followed,
+        exclude_subscribed=exclude_subscribed,
+    )
+    sub_ids = _viewer_subscription_ids(session, viewer) if viewer else None
+    followed_ids = _viewer_followed_ids(session, viewer) if viewer else None
+    return UserSearchResponse(
+        items=[
+            _user_to_search_result(
+                session,
+                viewer,
+                u,
+                subscriber_ids=sub_ids,
+                followed_ids=followed_ids,
+                source="curator",
+            )
             for u in rows
         ]
     )
@@ -1940,7 +2043,26 @@ def discover_suggested(
         ).all()
     )
     if not network_ids:
-        return SuggestedUsersResponse(items=[])
+        curators = _curator_users(
+            session,
+            viewer,
+            limit=limit,
+            exclude_followed=True,
+            exclude_subscribed=True,
+        )
+        sub_ids = _viewer_subscription_ids(session, viewer)
+        return SuggestedUsersResponse(
+            items=[
+                _user_to_search_result(
+                    session,
+                    viewer,
+                    u,
+                    subscriber_ids=sub_ids,
+                    source="curator",
+                )
+                for u in curators
+            ]
+        )
 
     # People that the viewer's network is subscribed to. Exclude users
     # the viewer already follows or subscribes to, self, and the site
@@ -1959,9 +2081,6 @@ def discover_suggested(
         .where(~CalendarSubscription.target_user_id.in_(excluded))
         .group_by(CalendarSubscription.target_user_id)
     ).all()
-    if not rows:
-        return SuggestedUsersResponse(items=[])
-
     # Rank by intermediary count desc, then by absolute subscriber count
     # desc as a tiebreak. ``_subscribers_count`` is cheap (one query per
     # candidate) and the result set is bounded by ``limit`` * a small
@@ -1971,12 +2090,16 @@ def discover_suggested(
     ]
     candidate_ids = [r[0] for r in ranked]
 
-    candidates = list(
-        session.exec(
-            select(User)
-            .where(User.id.in_(candidate_ids))
-            .where(User.deleted_at.is_(None))
-        ).all()
+    candidates = (
+        list(
+            session.exec(
+                select(User)
+                .where(User.id.in_(candidate_ids))
+                .where(User.deleted_at.is_(None))
+            ).all()
+        )
+        if candidate_ids
+        else []
     )
     intermediary_count = {r[0]: int(r[1]) for r in ranked}
     candidates.sort(
@@ -1989,12 +2112,36 @@ def discover_suggested(
     candidates = candidates[:limit]
 
     sub_ids = _viewer_subscription_ids(session, viewer)
-    return SuggestedUsersResponse(
-        items=[
-            _user_to_search_result(session, viewer, u, subscriber_ids=sub_ids)
-            for u in candidates
-        ]
-    )
+    items = [
+        _user_to_search_result(
+            session,
+            viewer,
+            u,
+            subscriber_ids=sub_ids,
+            source="network",
+        )
+        for u in candidates
+    ]
+    if len(items) < limit:
+        curators = _curator_users(
+            session,
+            viewer,
+            limit=limit - len(items),
+            excluded_ids={u.id for u in candidates},
+            exclude_followed=True,
+            exclude_subscribed=True,
+        )
+        items.extend(
+            _user_to_search_result(
+                session,
+                viewer,
+                u,
+                subscriber_ids=sub_ids,
+                source="curator",
+            )
+            for u in curators
+        )
+    return SuggestedUsersResponse(items=items)
 
 
 # --- Admin: verified-organizer toggle ----------------------------------------

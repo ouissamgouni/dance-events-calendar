@@ -1,14 +1,18 @@
 # Site settings pre-seeded into the SiteSetting table.
 #
-# `unseen_state_enabled: true` flips on the New/Unseen state UI:
-#   - small dot decoration + bolder title on cards/pins for events the
-#     viewer hasn't visited yet
-#   - "Unseen only" filter chip in the explorer
-#   - a header counter ("3 new since your last visit")
+# `unseen_state_enabled: true` flips on the New event markers UI:
+#   - small dot decoration + bolder title on cards/pins for events added
+#     after the viewer's local baseline
+#   - "New only" filter chip in the explorer
+#   - a header counter for locally-new events
 #
-# Per-viewer state (which events have been seen) is tracked client-side
-# in localStorage keyed by event_id, so the scenario does not need to
-# seed any per-user state — every event is "unseen" until the user
-# clicks it once.
+# Per-viewer state is tracked client-side in localStorage keyed by event_id,
+# so the scenario does not need to seed any per-user state. The first loaded
+# event inventory establishes the baseline instead of marking every existing
+# event as new.
+#
+# `mock-sync-events.yaml` is separate from `db-events.yaml`: it is returned by
+# the mock calendar service when an admin runs Sync Now, which lets the scenario
+# verify that only sync-added events become New for an existing viewer.
 settings:
   unseen_state_enabled: true

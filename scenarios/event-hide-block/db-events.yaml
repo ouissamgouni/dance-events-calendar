@@ -19,6 +19,15 @@ events:
     price_is_free: true
 
   # Visible — used to test Permanently Remove (block) action
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:beginner-friendly
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:good-music
+    - vibe:social-atmosphere
   - id: evt-hide-002
     calendar_id: bachata-cal-002
     title: Bachata Sensual Night
@@ -38,6 +47,14 @@ events:
     price_currency: EUR
 
   # Already hidden — used to test Unhide action
+    tags:
+    - format:class
+    - dance-style:bachata
+    - level:beginner-friendly
+    - venue:indoor
+    - scale:small
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-hide-003
     calendar_id: salsa-cal-001
     title: Salsa On2 Workshop (hidden)
@@ -57,6 +74,13 @@ events:
     is_hidden: true
 
   # Already blocked (permanently removed) — used to test Restore action
+    tags:
+    - format:workshop
+    - dance-style:salsa
+    - level:intermediate
+    - venue:indoor
+    - scale:small
+    - scope:local
   - id: evt-hide-004
     calendar_id: bachata-cal-002
     title: Kizomba Urban Night (blocked)
@@ -75,3 +99,13 @@ events:
     price_currency: EUR
     is_hidden: true
     is_blocked: true
+    tags:
+    - format:social
+    - dance-style:bachata
+    - dance-style:kizomba
+    - level:beginner-friendly
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:good-music
+    - vibe:social-atmosphere

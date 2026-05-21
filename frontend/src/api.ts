@@ -1367,6 +1367,7 @@ export interface UserSearchResult {
     is_subscribed: boolean;
     is_friend?: boolean;
     is_followed_by_viewer?: boolean;
+    source?: 'network' | 'curator';
 }
 
 export interface UserSearchResponse {
@@ -1383,6 +1384,26 @@ export async function searchUsers(
         credentials: 'include',
     });
     return parseJsonResponse<UserSearchResponse>(res, 'Failed to search users');
+}
+
+export async function fetchCurators(
+    opts?: {
+        q?: string;
+        limit?: number;
+        excludeSubscribed?: boolean;
+        excludeFollowed?: boolean;
+    },
+): Promise<UserSearchResponse> {
+    const sp = new URLSearchParams();
+    if (opts?.q) sp.set('q', opts.q);
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    if (opts?.excludeSubscribed) sp.set('exclude_subscribed', 'true');
+    if (opts?.excludeFollowed) sp.set('exclude_followed', 'true');
+    const qs = sp.toString();
+    const res = await fetch(`${BASE}/social/curators${qs ? `?${qs}` : ''}`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<UserSearchResponse>(res, 'Failed to fetch curators');
 }
 
 export async function fetchSuggestedUsers(
@@ -2302,11 +2323,12 @@ export async function deleteUserData(deviceId: string): Promise<{ deleted: Recor
 
 // --- Tags ---
 
-export async function fetchTagGroups(params?: { startDate?: string; endDate?: string; scope?: 'event' | 'review' }): Promise<TagGroup[]> {
+export async function fetchTagGroups(params?: { startDate?: string; endDate?: string; scope?: 'event' | 'review'; onboarding?: boolean }): Promise<TagGroup[]> {
     const qs = new URLSearchParams();
     if (params?.startDate) qs.set('start_date', params.startDate);
     if (params?.endDate) qs.set('end_date', params.endDate);
     if (params?.scope) qs.set('scope', params.scope);
+    if (params?.onboarding) qs.set('onboarding', 'true');
     const url = qs.toString() ? `${BASE}/tags?${qs}` : `${BASE}/tags`;
     const res = await fetch(url, { cache: 'no-cache' });
     return parseJsonResponse<TagGroup[]>(res, 'Failed to fetch tags');
@@ -2466,7 +2488,7 @@ export async function fetchAdminTagGroups(): Promise<AdminTagGroup[]> {
     return res.json();
 }
 
-export async function createTagGroup(data: { label: string; color?: string }): Promise<TagGroup> {
+export async function createTagGroup(data: { label: string; color?: string; onboarding_eligible?: boolean }): Promise<TagGroup> {
     const res = await fetch(`${BASE}/admin/tags/groups`, {
         method: 'POST',
         headers: adminJsonHeaders,
@@ -2477,7 +2499,7 @@ export async function createTagGroup(data: { label: string; color?: string }): P
     return res.json();
 }
 
-export async function updateTagGroup(groupId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean }): Promise<TagGroup> {
+export async function updateTagGroup(groupId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean; onboarding_eligible?: boolean }): Promise<TagGroup> {
     const res = await fetch(`${BASE}/admin/tags/groups/${groupId}`, {
         method: 'PATCH',
         headers: adminJsonHeaders,

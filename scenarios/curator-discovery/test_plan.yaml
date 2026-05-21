@@ -1,0 +1,121 @@
+test_plan:
+  name: "Curator Discovery — fallback suggestions for zero-follow users"
+  description: >
+    Covers the cold-start curator exposure flow: no-result curator
+    fallbacks in header search and Discover people, signed-in zero-follow
+    fallbacks in the Following person picker, authenticated /discover
+    suggestion top-up, and the moment a user follows a curator and
+    benefits from that curator's exposed events.
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=curator-discovery"
+    - >
+      Cast: viewer (zero follows/subscriptions), curator-paris and
+      curator-bachata (admin-managed curator accounts), ordinary (verified
+      organizer but not a curator), admin.
+    - >
+      If the onboarding gate appears after signing in as viewer, click
+      Skip/Done once. The scenario intentionally keeps viewer at zero
+      follows at the start; skipping onboarding should not create follows.
+    - >
+      Cookie banner: accept Personalization so /api/auth/* and
+      /api/social/* calls are not blocked by consent.
+
+  steps:
+    - id: 1
+      title: "Anonymous header suggests curators only after no user matches"
+      description: >
+        Open / signed out. Focus the header search input without typing,
+        then type a query that has no normal user match, e.g. "zzzz".
+      expected: >
+        Empty focus does not fetch /api/social/curators and does not show
+        curator suggestions. After typing, Network first calls
+        GET /api/social/search/users?q=zzzz. When that returns `items: []`,
+        the dropdown shows a compact xs-sized "Suggestions" section backed
+        by GET /api/social/curators?limit=5. Rows include curator-bachata
+        and curator-paris with the curator badge; there is no "Curated
+        calendars" helper line. The "See more on Discover" row is still
+        visible while suggestions are shown. The ordinary verified organizer
+        is NOT in this Suggestions section. Clicking a curator row navigates
+        to /u/{handle}, and the public profile renders normally.
+
+    - id: 2
+      title: "Anonymous /discover shows no-result curator fallback plus sign-in hint"
+      description: >
+        Still signed out, open /discover. Confirm the empty page state, then
+        search for "zzzz" in the page search box.
+      expected: >
+        The authenticated "Suggested for you" graph section is not rendered
+        for anonymous users. Instead, the page shows a neutral sign-in hint:
+        "Sign in to see more people from your network." Searching first
+        calls GET /api/social/search/users?q=zzzz. If the normal search
+        returns no users, the page renders a "Suggestions" subsection backed
+        by GET /api/social/curators?limit=12. This mirrors the header
+        no-result fallback while keeping personalized graph suggestions
+        auth-only.
+
+    - id: 3
+      title: "Signed-in zero-follow viewer gets curator top-up on /discover"
+      description: >
+        Sign in as Val Zero (viewer), skip onboarding if shown, then open
+        /discover with an empty search box.
+      expected: >
+        Network: GET /api/social/discover/suggested?limit=12 returns items
+        whose `source` is "curator". The page renders "Suggested for you"
+        with curator-bachata and curator-paris. Since there are no network
+        suggestions, no "People in your network" subsection is shown; the
+        rows still carry the curator badge.
+
+    - id: 4
+      title: "Following picker falls back to curator Suggestions"
+      description: >
+        As viewer, open Home (/). Click the Following filter, then click
+        "+ Pick a person".
+      expected: >
+        Network first calls GET /api/social/me/following and returns
+        `items: []`. The popover renders the empty-follow fallback as a
+        separate "Suggestions" section with "Curators you can follow". It
+        then calls GET
+        /api/social/curators?limit=12&exclude_followed=true. Curator rows
+        show the curator badge and a blue Follow button. The ordinary
+        organizer is not listed in the Suggestions section.
+
+    - id: 5
+      title: "Following a curator unlocks their exposed events"
+      description: >
+        In the picker from step 4, click Follow on curator-paris, then pick
+        curator-paris from the row. Keep the Following filter active.
+      expected: >
+        POST /api/social/users/curator-paris/follow returns 200. The picker
+        row flips to Following and dispatches the network change. The event
+        list fetches GET
+        /api/events?interest_source=follows&interest_user_handle=curator-paris
+        (interest_kind defaults to Any). The list shows exactly the public
+        activity seeded for curator-paris: evt-cd-001 (Curated Paris Salsa
+        Friday, Going) and evt-cd-002 (Curated Bachata Workshop, Saved).
+        It does NOT show evt-cd-003 (curator-bachata) or evt-cd-004
+        (ordinary organizer control).
+
+    - id: 6
+      title: "After follow, curator is no longer suggested as fallback"
+      description: >
+        Refresh Home as viewer, keep the Following picker closed, then open
+        "+ Pick a person" again.
+      expected: >
+        GET /api/social/me/following now returns curator-paris as a normal
+        followed row with the Following badge. The fallback Suggestions
+        section is not shown because the primary followees list is no longer
+        empty. If calling /api/social/curators?exclude_followed=true
+        directly, curator-paris is excluded while curator-bachata remains.
+
+    - id: 7
+      title: "Direct endpoint sanity checks"
+      description: >
+        With viewer signed in, call the endpoints from the browser console
+        or API client.
+      expected: >
+        GET /api/social/curators?limit=25 returns only admin-managed users
+        (`is_admin_managed: true`, `source: "curator"`). GET
+        /api/social/curators?q=ordinary returns `items: []` even though
+        ordinary is searchable through /api/social/search/users?q=ordinary.
+        GET /api/social/discover/suggested as anonymous returns `items: []`.

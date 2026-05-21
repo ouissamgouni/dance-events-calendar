@@ -532,6 +532,7 @@ class TagGroup(SQLModel, table=True):
     ordinal: int = Field(default=0)
     allow_multiple: bool = Field(default=True)
     enabled: bool = Field(default=True)
+    onboarding_eligible: bool = Field(default=False)
     # Scope separates first-class event taxonomy from review-only aspect tags.
     # 'event' = appears in explorer filter, event tag pills, suggestion form.
     # 'review' = appears in rate-event modal and review-list filter chips only.

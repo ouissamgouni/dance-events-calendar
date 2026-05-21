@@ -69,6 +69,13 @@ export default function AdminTagCategories() {
         await updateTagGroup(groupId, { enabled });
     };
 
+    const handleToggleOnboardingEligible = async (groupId: number, onboardingEligible: boolean) => {
+        setGroups((prev) =>
+            prev.map((g) => (g.id === groupId ? { ...g, onboarding_eligible: onboardingEligible } : g)),
+        );
+        await updateTagGroup(groupId, { onboarding_eligible: onboardingEligible });
+    };
+
     const handleToggleTag = async (tagId: number, enabled: boolean) => {
         setGroups((prev) =>
             prev.map((g) => ({
@@ -343,6 +350,18 @@ export default function AdminTagCategories() {
                                             className="h-4 w-4 cursor-pointer border-0 p-0 shrink-0"
                                             title="Change category color"
                                         />
+                                        <label
+                                            className="inline-flex items-center gap-1 text-[10px] font-medium text-gray-500 shrink-0"
+                                            title="Show this category during onboarding preferences"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={group.onboarding_eligible}
+                                                onChange={(e) => handleToggleOnboardingEligible(group.id, e.target.checked)}
+                                                className="h-3 w-3 border border-gray-300 accent-blue-500"
+                                            />
+                                            Onboarding
+                                        </label>
                                         {editingGroupId === group.id ? (
                                             <input
                                                 type="text"

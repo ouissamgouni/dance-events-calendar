@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { TagGroup } from '../types';
 import { submitTagSuggestion } from '../api';
 import TagsPicker, { type TagsPickerValue } from './TagsPicker';
@@ -37,6 +38,7 @@ export default function SuggestTagsButton({
     const [submitting, setSubmitting] = useState(false);
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState('');
+    const isEmbedded = mode === 'embedded';
 
     const totalCount = useMemo(() => {
         return value.selectedTagIds.length
@@ -55,6 +57,17 @@ export default function SuggestTagsButton({
         }
         onChange(out);
     }, [value, mode, onChange]);
+
+    useEffect(() => {
+        if (isEmbedded) return;
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') return;
+            event.stopImmediatePropagation();
+            onClose();
+        };
+        document.addEventListener('keydown', handleKeyDown, true);
+        return () => document.removeEventListener('keydown', handleKeyDown, true);
+    }, [isEmbedded, onClose]);
 
     const handleSubmit = async () => {
         if (totalCount === 0) {
@@ -90,25 +103,8 @@ export default function SuggestTagsButton({
         }
     };
 
-    if (success) {
-        return (
-            <div className="p-4 text-center">
-                <p className="text-emerald-600 font-medium text-sm">
-                    Thank you! {totalCount} suggestion{totalCount !== 1 ? 's' : ''} submitted.
-                </p>
-                <button onClick={onClose} className="mt-2 text-xs text-gray-500 hover:text-gray-700">
-                    Close
-                </button>
-            </div>
-        );
-    }
-
-    const isEmbedded = mode === 'embedded';
-
-    return (
-        <div className={isEmbedded ? 'space-y-3' : 'p-4 space-y-3'}>
-            {!isEmbedded && <h3 className="text-sm font-semibold text-gray-700">Suggest</h3>}
-
+    const form = (
+        <div className="space-y-3">
             <TagsPicker
                 tagGroups={tagGroups}
                 value={value}
@@ -147,5 +143,52 @@ export default function SuggestTagsButton({
                 </div>
             )}
         </div>
+    );
+
+    if (isEmbedded) return form;
+
+    return createPortal(
+        <div
+            className="fixed inset-0 z-[11000] flex items-center justify-center bg-slate-900/50 p-4"
+            onClick={(event) => {
+                event.stopPropagation();
+                onClose();
+            }}
+        >
+            <div
+                className="w-full max-w-md max-h-[90vh] overflow-y-auto border border-slate-200 bg-white shadow-xl"
+                onClick={(event) => event.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="suggest-tags-title"
+            >
+                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                    <h2 id="suggest-tags-title" className="text-sm font-semibold text-slate-800">Suggest tags</h2>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="text-xl leading-none text-slate-400 hover:text-slate-600"
+                        aria-label="Close suggest tags"
+                    >
+                        ×
+                    </button>
+                </div>
+                {success ? (
+                    <div className="p-5 text-center space-y-3">
+                        <p className="text-emerald-600 font-medium text-sm">
+                            Thank you! {totalCount} suggestion{totalCount !== 1 ? 's' : ''} submitted.
+                        </p>
+                        <button onClick={onClose} className="bg-blue-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-blue-700">
+                            Close
+                        </button>
+                    </div>
+                ) : (
+                    <div className="p-4">
+                        {form}
+                    </div>
+                )}
+            </div>
+        </div>,
+        document.body,
     );
 }

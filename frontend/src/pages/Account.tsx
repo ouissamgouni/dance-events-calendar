@@ -374,12 +374,6 @@ export default function Account() {
             </section>
 
             <div className={`flex flex-col md:flex-row gap-3 mb-3 items-start`}>
-                {organizerClaimsEnabled && (
-                    <div className="flex-1 w-full min-w-0">
-                        <OrganizerClaimSection handle={user.handle ?? null} />
-                    </div>
-                )}
-
                 <section id="my-events" className="flex-1 w-full min-w-0 rounded-lg border border-slate-200 bg-white p-4 scroll-mt-4">
                     <h2 className="text-sm font-semibold text-slate-900 mb-2">My Events</h2>
                     <p className="text-xs text-slate-600">
@@ -389,6 +383,14 @@ export default function Account() {
                         Show calendar →
                     </Link>
                 </section>
+
+                {organizerClaimsEnabled && (
+                    <div className="flex-1 w-full min-w-0">
+                        <OrganizerClaimSection handle={user.handle ?? null} />
+                    </div>
+                )}
+
+
             </div>
 
             <NetworkPanel />

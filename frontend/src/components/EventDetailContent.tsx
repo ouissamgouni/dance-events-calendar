@@ -634,17 +634,15 @@ export default function EventDetailContent({
                 >+ Add links</div>
             ) : null}
 
-            {/* Suggest tags panel */}
+            {/* Suggest tags modal */}
             {showSuggestTags && (
-                <div className="border-t border-slate-100 pt-2">
-                    <SuggestTagsButton
-                        eventId={event.event_id}
-                        tagGroups={tagGroups}
-                        existingTagIds={new Set(event.tags?.map((t) => t.id) ?? [])}
-                        deviceId={getDeviceId()}
-                        onClose={() => setShowSuggestTags(false)}
-                    />
-                </div>
+                <SuggestTagsButton
+                    eventId={event.event_id}
+                    tagGroups={tagGroups}
+                    existingTagIds={new Set(event.tags?.map((t) => t.id) ?? [])}
+                    deviceId={getDeviceId()}
+                    onClose={() => setShowSuggestTags(false)}
+                />
             )}
 
             {/* Who's going */}

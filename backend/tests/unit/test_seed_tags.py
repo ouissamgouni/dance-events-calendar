@@ -24,6 +24,7 @@ def test_seed_tags_rewrites_existing_synonyms_without_unique_violation(
         ordinal=10,
         allow_multiple=True,
         enabled=True,
+        onboarding_eligible=False,
         scope="event",
     )
     session.add(group)
@@ -51,6 +52,7 @@ tag_groups:
     label: Format
     ordinal: 10
     allow_multiple: true
+    onboarding_eligible: true
     tags:
       - slug: social
         label: Social
@@ -77,3 +79,7 @@ tag_groups:
 
     assert social_synonyms == ["fiesta", "social dance"]
     assert class_synonyms == ["lesson"]
+    refreshed_group = session.exec(
+        select(TagGroup).where(TagGroup.slug == "format")
+    ).one()
+    assert refreshed_group.onboarding_eligible is True

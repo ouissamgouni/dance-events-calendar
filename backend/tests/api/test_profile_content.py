@@ -102,6 +102,8 @@ def _make_user(
     handle: str,
     *,
     account_visibility: str = "public",
+    is_admin_managed: bool = False,
+    managed_label: str | None = None,
     # Back-compat shims for the pre-refactor three-scope kwargs. Any
     # non-"public" value collapses to ``account_visibility="friends"``
     # (the new model's single tightened gate). Callers that explicitly
@@ -123,6 +125,8 @@ def _make_user(
         provider="google",
         provider_subject=f"mock|{email}",
         account_visibility=account_visibility,
+        is_admin_managed=is_admin_managed,
+        managed_label=managed_label,
     )
     session.add(u)
     session.commit()
@@ -459,13 +463,19 @@ def test_suggested_tab_lists_only_approved_with_event(client, session):
 # --- Search -----------------------------------------------------------------
 
 
-def test_search_users_prefix_match_handle_and_name(client, session):
-    _make_user(session, "alice@example.com", "alice")
+def test_search_users_matches_handle_prefix_and_name_parts(client, session):
+    alice = _make_user(session, "alice@example.com", "alice")
+    alice.display_name = "Alice Smith"
+    session.add(alice)
+    session.commit()
     _make_user(session, "alex@example.com", "alex")
     _make_user(session, "bob@example.com", "bob")
     body = client.get("/api/social/search/users?q=al").json()
     handles = sorted(u["handle"] for u in body["items"])
     assert handles == ["alex", "alice"]
+
+    body = client.get("/api/social/search/users?q=smith").json()
+    assert [u["handle"] for u in body["items"]] == ["alice"]
 
 
 def test_search_users_excludes_fully_private_non_verified(client, session):
@@ -499,6 +509,62 @@ def test_search_users_includes_verified_even_if_private(client, session):
     assert [x["handle"] for x in body["items"]] == ["vorg"]
 
 
+def test_curators_endpoint_lists_ranked_curators(client, session):
+    alpha = _make_user(
+        session,
+        "alpha@example.com",
+        "curatoralpha",
+        is_admin_managed=True,
+    )
+    beta = _make_user(
+        session,
+        "beta@example.com",
+        "curatorbeta",
+        is_admin_managed=True,
+        managed_label="Featured",
+    )
+    _make_user(session, "normal@example.com", "curatornormal")
+    _subscribe(session, _make_user(session, "one@example.com", "one"), alpha)
+    _subscribe(session, _make_user(session, "two@example.com", "two"), beta)
+    _subscribe(session, _make_user(session, "three@example.com", "three"), beta)
+
+    body = client.get("/api/social/curators?q=curator&limit=2").json()
+    items = body["items"]
+    assert [x["handle"] for x in items] == ["curatorbeta", "curatoralpha"]
+    assert all(x["is_admin_managed"] is True for x in items)
+    assert all(x["source"] == "curator" for x in items)
+
+
+def test_curators_endpoint_excludes_followed_and_subscribed(client, session):
+    viewer = _make_user(session, "viewer@example.com", "viewer")
+    followed = _make_user(
+        session,
+        "followed@example.com",
+        "followedcurator",
+        is_admin_managed=True,
+    )
+    subscribed = _make_user(
+        session,
+        "subscribed@example.com",
+        "subscribedcurator",
+        is_admin_managed=True,
+    )
+    open_curator = _make_user(
+        session,
+        "open@example.com",
+        "opencurator",
+        is_admin_managed=True,
+    )
+    _follow(session, viewer, followed)
+    _subscribe(session, viewer, subscribed)
+
+    _login(client, "viewer@example.com")
+    body = client.get(
+        "/api/social/curators?exclude_followed=true&exclude_subscribed=true"
+    ).json()
+    assert [x["handle"] for x in body["items"]] == [open_curator.handle]
+
+
 # --- Discover suggested (friends-of-friends) --------------------------------
 
 
@@ -506,6 +572,22 @@ def test_discover_suggested_anonymous_returns_empty(client):
     r = client.get("/api/social/discover/suggested")
     assert r.status_code == 200
     assert r.json()["items"] == []
+
+
+def test_discover_suggested_without_network_returns_curators(client, session):
+    _make_user(session, "viewer@example.com", "viewer")
+    _make_user(
+        session,
+        "curator@example.com",
+        "curator",
+        is_admin_managed=True,
+    )
+
+    _login(client, "viewer@example.com")
+    body = client.get("/api/social/discover/suggested").json()
+    assert [(u["handle"], u["source"]) for u in body["items"]] == [
+        ("curator", "curator")
+    ]
 
 
 def test_discover_suggested_friends_of_friends(client, session):
@@ -523,6 +605,8 @@ def test_discover_suggested_friends_of_friends(client, session):
     assert "charlie" in handles
     assert "alice" not in handles
     assert "viewer" not in handles
+    charlie = next(u for u in body["items"] if u["handle"] == "charlie")
+    assert charlie["source"] == "network"
 
 
 def test_discover_suggested_excludes_already_subscribed(client, session):

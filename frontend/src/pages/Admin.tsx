@@ -433,10 +433,10 @@ export default function Admin() {
         setUnseenStateEnabled(newVal);
         try {
             await updateSettings({ unseen_state_enabled: newVal });
-            setMessage(`Unseen state ${newVal ? 'enabled' : 'disabled'}.`);
+            setMessage(`New event markers ${newVal ? 'enabled' : 'disabled'}.`);
         } catch {
             setUnseenStateEnabled(!newVal);
-            setMessage('Failed to update unseen state.');
+            setMessage('Failed to update new event markers.');
         }
     };
 
@@ -1192,14 +1192,15 @@ export default function Admin() {
                                 </button>
                             </div>
 
-                            {/* Adoption-boost: Unseen state (Track 2) */}
+                            {/* Adoption-boost: New event markers (Track 2) */}
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <span className="text-[11px] font-medium text-gray-700">Unseen state</span>
-                                    <p className="text-[10px] text-gray-400">Dot + bold title for events the viewer has not opened yet</p>
+                                    <span className="text-[11px] font-medium text-gray-700">New event markers</span>
+                                    <p className="text-[10px] text-gray-400">Dot + bold title for events added after the viewer's baseline</p>
                                 </div>
                                 <button
                                     onClick={handleToggleUnseenState}
+                                    aria-label="Toggle new event markers"
                                     className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${unseenStateEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
                                 >
                                     <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${unseenStateEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />

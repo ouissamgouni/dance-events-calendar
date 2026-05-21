@@ -34,6 +34,15 @@ events:
     start: w0 Fri 21:00
     end: w0 Sat 01:00
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:beginner-friendly
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:good-music
+    - vibe:social-atmosphere
   - id: evt-fg-002
     calendar_id: bachata-cal-002
     title: Bachata Workshop
@@ -48,6 +57,13 @@ events:
     price_min: 25
     price_max: 35
     price_currency: EUR
+    tags:
+    - format:workshop
+    - dance-style:bachata
+    - level:intermediate
+    - venue:indoor
+    - scale:small
+    - scope:local
   - id: evt-fg-003
     calendar_id: salsa-cal-001
     title: Cuban Night
@@ -61,6 +77,14 @@ events:
     price_is_free: false
     price_min: 10
     price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:beginner-friendly
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-fg-004
     calendar_id: bachata-cal-002
     title: Bachata Beginners Bootcamp
@@ -74,6 +98,13 @@ events:
     price_is_free: false
     price_min: 30
     price_currency: GBP
+    tags:
+    - format:festival
+    - dance-style:bachata
+    - level:beginner-friendly
+    - venue:indoor
+    - scale:large
+    - scope:international
   - id: evt-fg-005
     calendar_id: salsa-cal-001
     title: Salsa Tuesday Night
@@ -85,6 +116,15 @@ events:
     start: w2 Tue 20:30
     end: w2 Wed 00:00
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:good-music
+    - vibe:social-atmosphere
 attendances:
   - event_id: evt-fg-001
     email: alice@example.com

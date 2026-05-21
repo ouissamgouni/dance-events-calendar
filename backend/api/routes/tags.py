@@ -78,6 +78,7 @@ def _group_to_response(group: TagGroup) -> TagGroupResponse:
         ordinal=group.ordinal,
         allow_multiple=group.allow_multiple,
         enabled=group.enabled,
+        onboarding_eligible=group.onboarding_eligible,
         scope=group.scope,
         tags=[_tag_to_response(t) for t in sorted(group.tags, key=lambda t: t.ordinal)],
     )
@@ -221,6 +222,10 @@ def list_tag_groups(
             "review-list filter chips."
         ),
     ),
+    onboarding: bool = Query(
+        default=False,
+        description="When true, return only tag groups marked for onboarding.",
+    ),
 ):
     """List tag groups within a given scope (default: event).
 
@@ -233,12 +238,15 @@ def list_tag_groups(
     from sqlalchemy import func
     from fastapi.responses import JSONResponse
 
-    groups = session.exec(
+    group_query = (
         select(TagGroup)
         .where(TagGroup.enabled == True)  # noqa: E712
         .where(TagGroup.scope == scope)
         .order_by(TagGroup.ordinal)
-    ).all()
+    )
+    if onboarding:
+        group_query = group_query.where(TagGroup.onboarding_eligible == True)  # noqa: E712
+    groups = session.exec(group_query).all()
 
     # Count events per tag (only non-deleted events), optionally scoped to a date range
     count_q = (
@@ -730,9 +738,7 @@ def list_tag_suggestions(
         events_map = {e.event_id: e for e in events}
     if tag_ids:
         tags = session.exec(
-            select(Tag)
-            .options(selectinload(Tag.group))
-            .where(Tag.id.in_(tag_ids))
+            select(Tag).options(selectinload(Tag.group)).where(Tag.id.in_(tag_ids))
         ).all()
         tags_map = {tag.id: tag for tag in tags if tag.id is not None}
 

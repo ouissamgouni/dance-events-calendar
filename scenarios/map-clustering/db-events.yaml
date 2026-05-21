@@ -25,6 +25,14 @@ events:
     start: w0 Fri 19:00
     end: w0 Fri 23:00
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:outdoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-cluster-par-02
     calendar_id: bachata-cal-002
     title: Tuileries Bachata Brunch
@@ -37,6 +45,14 @@ events:
     price_is_free: false
     price_min: 10
     price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:bachata
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-cluster-par-03
     calendar_id: kizomba-cal-003
     title: Châtelet Kizomba Night
@@ -49,6 +65,14 @@ events:
     price_is_free: false
     price_min: 12
     price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:kizomba
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-cluster-par-04
     calendar_id: salsa-cal-001
     title: Opéra Salsa Tuesday
@@ -59,6 +83,14 @@ events:
     start: w0 Tue 20:00
     end: w0 Tue 23:30
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-cluster-par-05
     calendar_id: bachata-cal-002
     title: Palais-Royal Bachata Mixer
@@ -71,6 +103,14 @@ events:
     price_is_free: false
     price_min: 8
     price_currency: EUR
+    tags:
+    - format:class
+    - dance-style:bachata
+    - level:all-levels
+    - venue:indoor
+    - scale:small
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-cluster-par-06
     calendar_id: salsa-cal-001
     title: Forum des Halles Salsa Open
@@ -83,6 +123,14 @@ events:
     price_is_free: false
     price_min: 10
     price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-cluster-par-07
     calendar_id: kizomba-cal-003
     title: Pont Neuf Kizomba Riverside
@@ -93,6 +141,13 @@ events:
     start: w1 Fri 21:00
     end: w1 Sat 01:30
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:kizomba
+    - level:all-levels
+    - venue:outdoor
+    - scale:medium
+    - scope:local
   - id: evt-cluster-par-08
     calendar_id: salsa-cal-001
     title: Madeleine Salsa Saturday
@@ -105,6 +160,14 @@ events:
     price_is_free: false
     price_min: 15
     price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-cluster-par-09
     calendar_id: bachata-cal-002
     title: Concorde Bachata Picnic
@@ -115,6 +178,13 @@ events:
     start: w1 Sun 14:00
     end: w1 Sun 18:00
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:bachata
+    - level:all-levels
+    - venue:outdoor
+    - scale:medium
+    - scope:local
   - id: evt-cluster-par-10
     calendar_id: salsa-cal-001
     title: Vendôme Salsa Late Night
@@ -127,6 +197,14 @@ events:
     price_is_free: false
     price_min: 20
     price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-cluster-par-11
     calendar_id: kizomba-cal-003
     title: Rivoli Kizomba Wednesday
@@ -139,6 +217,14 @@ events:
     price_is_free: false
     price_min: 9
     price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:kizomba
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-cluster-par-12
     calendar_id: salsa-cal-001
     title: Les Halles Salsa Friday
@@ -151,6 +237,14 @@ events:
     price_is_free: false
     price_min: 14
     price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:good-music
   - id: evt-cluster-par-13
     calendar_id: bachata-cal-002
     title: Saint-Honoré Bachata Sensual
@@ -163,6 +257,14 @@ events:
     price_is_free: false
     price_min: 25
     price_currency: EUR
+    tags:
+    - format:workshop
+    - dance-style:bachata
+    - level:all-levels
+    - venue:indoor
+    - scale:small
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-cluster-par-14
     calendar_id: salsa-cal-001
     title: Châtelet Salsa Sunday Brunch
@@ -175,6 +277,14 @@ events:
     price_is_free: false
     price_min: 22
     price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-cluster-par-15
     calendar_id: kizomba-cal-003
     title: Pyramides Kizomba Thursday
@@ -185,6 +295,13 @@ events:
     start: w2 Thu 20:00
     end: w2 Thu 23:00
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:kizomba
+    - level:beginner-friendly
+    - venue:indoor
+    - scale:medium
+    - scope:local
   - id: evt-cluster-par-16
     calendar_id: bachata-cal-002
     title: Halles Bachata Weekend Festival
@@ -199,6 +316,13 @@ events:
     price_currency: EUR
 
   # --- Berlin Mitte cluster (8 events) ---------------------------------
+    tags:
+    - format:festival
+    - dance-style:bachata
+    - level:all-levels
+    - venue:indoor
+    - scale:large
+    - scope:international
   - id: evt-cluster-ber-01
     calendar_id: salsa-cal-001
     title: Alexanderplatz Salsa Open Air
@@ -209,6 +333,14 @@ events:
     start: w0 Fri 20:00
     end: w0 Sat 00:00
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:outdoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-cluster-ber-02
     calendar_id: bachata-cal-002
     title: Hackescher Markt Bachata
@@ -221,6 +353,14 @@ events:
     price_is_free: false
     price_min: 10
     price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:bachata
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-cluster-ber-03
     calendar_id: kizomba-cal-003
     title: Friedrichstraße Kizomba Wednesday
@@ -233,6 +373,14 @@ events:
     price_is_free: false
     price_min: 8
     price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:kizomba
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-cluster-ber-04
     calendar_id: salsa-cal-001
     title: Museumsinsel Salsa Sunset
@@ -243,6 +391,14 @@ events:
     start: w1 Fri 19:30
     end: w1 Fri 23:00
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:outdoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-cluster-ber-05
     calendar_id: bachata-cal-002
     title: Unter den Linden Bachata Mixer
@@ -255,6 +411,14 @@ events:
     price_is_free: false
     price_min: 12
     price_currency: EUR
+    tags:
+    - format:class
+    - dance-style:bachata
+    - level:all-levels
+    - venue:indoor
+    - scale:small
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-cluster-ber-06
     calendar_id: kizomba-cal-003
     title: Mitte Kizomba Friday
@@ -267,6 +431,14 @@ events:
     price_is_free: false
     price_min: 14
     price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:kizomba
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-cluster-ber-07
     calendar_id: salsa-cal-001
     title: Rosa-Luxemburg-Platz Salsa
@@ -277,6 +449,14 @@ events:
     start: w2 Sat 21:00
     end: w3 Sun 02:00
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:outdoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-cluster-ber-08
     calendar_id: bachata-cal-002
     title: Holzmarkt Bachata Festival
@@ -291,6 +471,13 @@ events:
     price_currency: EUR
 
   # --- Outliers (6 events) ---------------------------------------------
+    tags:
+    - format:festival
+    - dance-style:bachata
+    - level:all-levels
+    - venue:outdoor
+    - scale:large
+    - scope:international
   - id: evt-cluster-mad-01
     calendar_id: salsa-cal-001
     title: Madrid Salsa Saturday
@@ -303,6 +490,14 @@ events:
     price_is_free: false
     price_min: 12
     price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-cluster-rom-01
     calendar_id: bachata-cal-002
     title: Rome Bachata Trastevere
@@ -313,6 +508,14 @@ events:
     start: w2 Fri 21:00
     end: w2 Sat 01:30
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:bachata
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-cluster-lis-01
     calendar_id: kizomba-cal-003
     title: Lisbon Kizomba Cais
@@ -325,6 +528,13 @@ events:
     price_is_free: false
     price_min: 8
     price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:kizomba
+    - level:all-levels
+    - venue:outdoor
+    - scale:medium
+    - scope:local
   - id: evt-cluster-ams-01
     calendar_id: salsa-cal-001
     title: Amsterdam Salsa Canal
@@ -335,6 +545,14 @@ events:
     start: w3 Sun 16:00
     end: w3 Sun 20:00
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-cluster-vie-01
     calendar_id: bachata-cal-002
     title: Vienna Bachata Volksgarten
@@ -347,6 +565,14 @@ events:
     price_is_free: false
     price_min: 10
     price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:bachata
+    - level:all-levels
+    - venue:outdoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-cluster-pra-01
     calendar_id: kizomba-cal-003
     title: Prague Kizomba Roxy
@@ -359,6 +585,14 @@ events:
     price_is_free: false
     price_min: 9
     price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:kizomba
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
 
 # --------------------------------------------------------------
 # Attendances + saves — mirrors the following-badge scenario so the

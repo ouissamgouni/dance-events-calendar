@@ -3,12 +3,12 @@
  *
  * Wraps the routed content. If the current user is signed in and has
  * never completed onboarding (``onboarded_at == null``), redirects to
- * ``/onboarding/follow?next=<current>`` exactly once per app load.
+ * ``/onboarding/preferences?next=<current>`` exactly once per app load.
  *
  * Bypassed when:
  *   • user is anonymous (``user == null``);
  *   • auth is still loading;
- *   • current path is already ``/onboarding/follow`` (avoid loop);
+ *   • current path is already under ``/onboarding`` (avoid loop);
  *   • current path is ``/login`` or ``/r/:code`` (entry flows that
  *     must not pre-empt redirects of their own);
  *   • current path starts with ``/admin`` (admins skip onboarding —
@@ -34,7 +34,7 @@ export default function OnboardingGate() {
             return;
         }
         const nextParam = encodeURIComponent(path + location.search);
-        navigate(`/onboarding/follow?next=${nextParam}`, { replace: true });
+        navigate(`/onboarding/preferences?next=${nextParam}`, { replace: true });
     }, [user, loading, location.pathname, location.search, navigate]);
 
     return null;

@@ -18,6 +18,14 @@ events:
     start: w0 Fri 21:00
     end: w0 Sat 01:00
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-zfh-002
     calendar_id: salsa-cal-001
     title: Cuban Night (secondary picker host)
@@ -30,3 +38,11 @@ events:
     start: w0 Sat 20:00
     end: w0 Sun 00:00
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere

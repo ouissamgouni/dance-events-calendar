@@ -231,17 +231,15 @@ export default function EventDetailPage() {
                                     )}
                                 </div>
 
-                                {/* Suggest tags panel */}
+                                {/* Suggest tags modal */}
                                 {showSuggestTags && (
-                                    <div className="border-t border-slate-100 px-4 pt-3 pb-2">
-                                        <SuggestTagsButton
-                                            eventId={event.event_id}
-                                            tagGroups={tagGroups}
-                                            existingTagIds={new Set(event.tags?.map((t) => t.id) ?? [])}
-                                            deviceId={getDeviceId()}
-                                            onClose={() => setShowSuggestTags(false)}
-                                        />
-                                    </div>
+                                    <SuggestTagsButton
+                                        eventId={event.event_id}
+                                        tagGroups={tagGroups}
+                                        existingTagIds={new Set(event.tags?.map((t) => t.id) ?? [])}
+                                        deviceId={getDeviceId()}
+                                        onClose={() => setShowSuggestTags(false)}
+                                    />
                                 )}
 
                                 {/* Interest — combined engagement section: going attendees + total saves.

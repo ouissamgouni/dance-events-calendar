@@ -21,6 +21,7 @@ export interface TagGroup {
     ordinal: number;
     allow_multiple: boolean;
     enabled: boolean;
+    onboarding_eligible: boolean;
     scope?: 'event' | 'review';
     tags: Tag[];
 }

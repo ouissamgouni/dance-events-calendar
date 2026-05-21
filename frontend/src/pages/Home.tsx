@@ -38,13 +38,13 @@ function formatDate(date: Date): string {
 
 export default function Home() {
     const { user } = useAuth();
-    const { showPrices, showPopularity, popularityThreshold, tagSortMode, unseenStateEnabled, followingBadgeEnabled } = useFeatureFlags();
-    const { seen: seenEventIds, markSeen } = useSeenEvents();
+    const { showPrices, showPopularity, popularityThreshold, tagSortMode, unseenStateEnabled, followingBadgeEnabled, trendingEnabled } = useFeatureFlags();
     const [showSuggestModal, setShowSuggestModal] = useState(false);
     // Session-only toggle for the friends-going overlay on map pins.
     // Enabled by default; lets users temporarily hide the friends chip
     // without disabling the site-wide ``followingBadgeEnabled`` flag.
     const [mapFollowingBadgeOverlay, setMapFollowingBadgeOverlay] = useState(true);
+    const [mapTrendingOverlay, setMapTrendingOverlay] = useState(true);
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
 
@@ -61,6 +61,8 @@ export default function Home() {
     const viewMode: ViewMode = location.pathname === '/calendar' ? 'calendar' : 'explorer';
     const invalidateAttendanceSummaries = useInvalidateAttendanceSummaries();
     const [events, setEvents] = useState<CalendarEvent[]>([]);
+    const eventIds = useMemo(() => events.map((event) => event.event_id), [events]);
+    const { newEventIds, markSeen } = useSeenEvents(eventIds);
     const [sinceDate, setSinceDate] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -879,8 +881,8 @@ export default function Home() {
                                         hoveredEventId={hoveredEventId}
                                         onEventHover={handleEventHover}
                                         onSuggestEvent={() => setShowSuggestModal(true)}
-                                        unseenEnabled={unseenStateEnabled}
-                                        seenEventIds={seenEventIds}
+                                        newEnabled={unseenStateEnabled}
+                                        newEventIds={newEventIds}
                                     />
                                 </div>
                             </div>
@@ -902,10 +904,11 @@ export default function Home() {
                                         flyToArea={flyToAreaBbox}
                                         flyToAreaToken={flyToAreaToken}
                                         initialArea={initialAreaRef.current}
-                                        seenEventIds={seenEventIds}
+                                        newEventIds={newEventIds}
                                         popularityThreshold={popularityThreshold}
                                         onMarkSeen={markSeen}
                                         showFollowingBadgeOverlay={mapFollowingBadgeOverlay}
+                                        showTrendingOverlay={mapTrendingOverlay}
                                     />
                                 </div>
                                 {/* Default-area bar: ONE bordered pill that
@@ -999,20 +1002,39 @@ export default function Home() {
                                                 Saved.
                                             </span>
                                         )}
-                                        {followingBadgeEnabled && (
-                                            <label
-                                                className="shrink-0 inline-flex items-center gap-1.5 ml-auto cursor-pointer select-none whitespace-nowrap"
-                                                title="Show the friends-going overlay on map pins"
-                                                data-testid="map-following-badge-toggle"
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    className="h-3 w-3 accent-blue-500"
-                                                    checked={mapFollowingBadgeOverlay}
-                                                    onChange={(e) => setMapFollowingBadgeOverlay(e.target.checked)}
-                                                />
-                                                <span className="opacity-80">friends overlay</span>
-                                            </label>
+                                        {(trendingEnabled || followingBadgeEnabled) && (
+                                            <div className="shrink-0 ml-auto flex items-center gap-3">
+                                                {trendingEnabled && (
+                                                    <label
+                                                        className="inline-flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap"
+                                                        title="Show the trending overlay on map pins"
+                                                        data-testid="map-trending-overlay-toggle"
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            className="h-3 w-3 accent-blue-500"
+                                                            checked={mapTrendingOverlay}
+                                                            onChange={(e) => setMapTrendingOverlay(e.target.checked)}
+                                                        />
+                                                        <span className="opacity-80">trending overlay</span>
+                                                    </label>
+                                                )}
+                                                {followingBadgeEnabled && (
+                                                    <label
+                                                        className="inline-flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap"
+                                                        title="Show the friends-going overlay on map pins"
+                                                        data-testid="map-following-badge-toggle"
+                                                    >
+                                                        <input
+                                                            type="checkbox"
+                                                            className="h-3 w-3 accent-blue-500"
+                                                            checked={mapFollowingBadgeOverlay}
+                                                            onChange={(e) => setMapFollowingBadgeOverlay(e.target.checked)}
+                                                        />
+                                                        <span className="opacity-80">friends overlay</span>
+                                                    </label>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                     {/* Inline name-this-area form. Submitting
@@ -1072,8 +1094,8 @@ export default function Home() {
                                     hoveredEventId={hoveredEventId}
                                     onEventHover={handleEventHover}
                                     onSuggestEvent={() => setShowSuggestModal(true)}
-                                    unseenEnabled={unseenStateEnabled}
-                                    seenEventIds={seenEventIds}
+                                    newEnabled={unseenStateEnabled}
+                                    newEventIds={newEventIds}
                                 />
                             </div>
                         </div>
@@ -1165,7 +1187,7 @@ export default function Home() {
                                         hoveredEventId={hoveredEventId}
                                         onEventHover={handleEventHover}
                                         detailLinkSource="calendar-map"
-                                        seenEventIds={seenEventIds}
+                                        newEventIds={newEventIds}
                                         popularityThreshold={popularityThreshold}
                                         onMarkSeen={markSeen}
                                     />

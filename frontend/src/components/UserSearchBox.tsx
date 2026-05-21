@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { searchUsers, type UserSearchResult } from '../api';
+import { fetchCurators, searchUsers, type UserSearchResult } from '../api';
 
 /**
  * Header user-search box (Phase D, D.5).
@@ -15,7 +15,9 @@ import { searchUsers, type UserSearchResult } from '../api';
 export default function UserSearchBox() {
     const [q, setQ] = useState('');
     const [results, setResults] = useState<UserSearchResult[]>([]);
+    const [suggestions, setSuggestions] = useState<UserSearchResult[]>([]);
     const [loading, setLoading] = useState(false);
+    const [suggestionsLoading, setSuggestionsLoading] = useState(false);
     const [open, setOpen] = useState(false);
     const [activeIdx, setActiveIdx] = useState(-1);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -29,10 +31,12 @@ export default function UserSearchBox() {
             // eslint-disable-next-line react-hooks/set-state-in-effect -- short-circuit reset for too-short input
             setResults([]);
             setLoading(false);
+            setActiveIdx(-1);
             return;
         }
         let cancelled = false;
         setLoading(true);
+        setSuggestions([]);
         searchUsers(term, { limit: 8 })
             .then((res) => {
                 if (cancelled) return;
@@ -49,6 +53,35 @@ export default function UserSearchBox() {
             cancelled = true;
         };
     }, [debounced]);
+
+    useEffect(() => {
+        const term = debounced.trim();
+        const shouldFetch =
+            open && term.length >= 2 && !loading && results.length === 0;
+        if (!shouldFetch) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- reset when suggestions are not part of the current dropdown state
+            setSuggestions([]);
+            setSuggestionsLoading(false);
+            return;
+        }
+        let cancelled = false;
+        setSuggestionsLoading(true);
+        fetchCurators({ limit: 5 })
+            .then((res) => {
+                if (cancelled) return;
+                setSuggestions(res.items);
+                setActiveIdx(res.items.length > 0 ? 0 : -1);
+            })
+            .catch(() => {
+                if (!cancelled) setSuggestions([]);
+            })
+            .finally(() => {
+                if (!cancelled) setSuggestionsLoading(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [debounced, loading, open, results.length]);
 
     // Click-outside closes the dropdown without clearing input.
     useEffect(() => {
@@ -77,16 +110,17 @@ export default function UserSearchBox() {
             return;
         }
         if (!open) return;
+        const menuRows = results.length > 0 ? results : suggestions;
         if (e.key === 'ArrowDown') {
             e.preventDefault();
-            setActiveIdx((i) => Math.min(results.length - 1, i + 1));
+            setActiveIdx((i) => Math.min(menuRows.length - 1, i + 1));
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
             setActiveIdx((i) => Math.max(0, i - 1));
         } else if (e.key === 'Enter') {
             e.preventDefault();
-            if (activeIdx >= 0 && results[activeIdx]) {
-                navigate(`/u/${results[activeIdx].handle}`);
+            if (activeIdx >= 0 && menuRows[activeIdx]) {
+                navigate(`/u/${menuRows[activeIdx].handle}`);
                 reset();
             } else if (q.trim()) {
                 navigate(`/discover?q=${encodeURIComponent(q.trim())}`);
@@ -99,6 +133,7 @@ export default function UserSearchBox() {
         setOpen(false);
         setQ('');
         setResults([]);
+        setSuggestions([]);
         setMobileExpanded(false);
     };
 
@@ -118,11 +153,14 @@ export default function UserSearchBox() {
             setQ(e.target.value);
             setOpen(true);
         },
-        onFocus: () => q.trim().length >= 2 && setOpen(true),
+        onFocus: () => setOpen(true),
         onKeyDown,
         placeholder: 'Search people…',
         'aria-label': 'Search users',
     };
+
+    const term = q.trim();
+    const showDropdown = open && term.length >= 2;
 
     return (
         <div ref={containerRef} className="relative">
@@ -192,60 +230,105 @@ export default function UserSearchBox() {
                 </div>
             )}
 
-            {open && (q.trim().length >= 2) && (
+            {showDropdown && (
                 <div className="absolute right-0 mt-1 w-64 max-w-[calc(100vw-1rem)] bg-white border border-slate-200 shadow-lg z-50 max-h-80 overflow-auto">
                     {loading && (
                         <div className="p-3 text-xs text-slate-500">Searching…</div>
                     )}
-                    {!loading && results.length === 0 && (
+                    {!loading && term.length >= 2 && results.length === 0 && (
                         <div className="p-3 text-xs text-slate-500">
-                            No users match “{q.trim()}”.
+                            No users match “{term}”.
                         </div>
                     )}
                     {!loading &&
                         results.map((u, i) => (
-                            <Link
-                                key={u.handle}
-                                to={`/u/${u.handle}`}
-                                onClick={reset}
-                                className={
-                                    'flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 ' +
-                                    (i === activeIdx ? 'bg-slate-50' : '')
-                                }
-                            >
-                                <Avatar url={u.avatar_url} name={u.display_name || u.handle} />
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-1 text-slate-900 truncate">
-                                        <span className="truncate">
-                                            {u.display_name || `@${u.handle}`}
-                                        </span>
-                                        {u.is_verified_organizer && (
-                                            <img
-                                                src="/orga.png"
-                                                alt=""
-                                                title="Verified organizer"
-                                                aria-label="Verified organizer"
-                                                className="w-3.5 h-3.5 object-contain"
-                                            />
-                                        )}
-                                    </div>
-                                    <div className="text-[11px] text-slate-500 truncate">
-                                        @{u.handle} · {u.subscribers_count} subscriber
-                                        {u.subscribers_count === 1 ? '' : 's'}
-                                    </div>
-                                </div>
-                            </Link>
+                            <UserRow key={u.handle} user={u} active={i === activeIdx} onClick={reset} />
                         ))}
-                    <Link
-                        to={`/discover?q=${encodeURIComponent(q.trim())}`}
-                        onClick={reset}
-                        className="block px-3 py-2 text-xs text-blue-600 hover:bg-slate-50 border-t border-slate-100"
-                    >
-                        See more on Discover →
-                    </Link>
+                    {!loading && results.length === 0 && (suggestionsLoading || suggestions.length > 0) && (
+                        <>
+                            <div className="px-3 pt-3 pb-1 border-t border-slate-100">
+                                <div className="text-[11px] font-semibold text-slate-700 uppercase">
+                                    Suggestions
+                                </div>
+                            </div>
+                            {suggestionsLoading ? (
+                                <div className="p-3 text-xs text-slate-500">Loading…</div>
+                            ) : (
+                                suggestions.map((u, i) => (
+                                    <UserRow
+                                        key={u.handle}
+                                        user={u}
+                                        active={i === activeIdx}
+                                        onClick={reset}
+                                    />
+                                ))
+                            )}
+                        </>
+                    )}
+                    {term.length >= 2 && (
+                        <Link
+                            to={`/discover?q=${encodeURIComponent(term)}`}
+                            onClick={reset}
+                            className="block px-3 py-2 text-xs text-blue-600 hover:bg-slate-50 border-t border-slate-100"
+                        >
+                            See more on Discover →
+                        </Link>
+                    )}
                 </div>
             )}
         </div>
+    );
+}
+
+function UserRow({
+    user,
+    active,
+    onClick,
+}: {
+    user: UserSearchResult;
+    active: boolean;
+    onClick: () => void;
+}) {
+    return (
+        <Link
+            to={`/u/${user.handle}`}
+            onClick={onClick}
+            className={
+                'flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-slate-50 ' +
+                (active ? 'bg-slate-50' : '')
+            }
+        >
+            <Avatar url={user.avatar_url} name={user.display_name || user.handle} />
+            <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1 text-slate-900 truncate">
+                    <span className="truncate">
+                        {user.display_name || `@${user.handle}`}
+                    </span>
+                    {user.is_verified_organizer && (
+                        <img
+                            src="/orga.png"
+                            alt=""
+                            title="Verified organizer"
+                            aria-label="Verified organizer"
+                            className="w-3.5 h-3.5 object-contain"
+                        />
+                    )}
+                    {user.is_admin_managed && (
+                        <img
+                            src="/badge.png"
+                            alt=""
+                            title="Curator"
+                            aria-label="Curator"
+                            className="w-3.5 h-3.5 object-contain"
+                        />
+                    )}
+                </div>
+                <div className="text-[11px] text-slate-500 truncate">
+                    @{user.handle} · {user.subscribers_count} subscriber
+                    {user.subscribers_count === 1 ? '' : 's'}
+                </div>
+            </div>
+        </Link>
     );
 }
 

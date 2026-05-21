@@ -18,6 +18,14 @@ events:
     start: w0 Fri 21:00
     end: w0 Sat 01:00
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-fb-002
     calendar_id: bachata-cal-002
     title: Bachata Workshop
@@ -31,6 +39,13 @@ events:
     price_is_free: false
     price_min: 25
     price_currency: EUR
+    tags:
+    - format:workshop
+    - dance-style:bachata
+    - level:all-levels
+    - venue:indoor
+    - scale:small
+    - scope:local
   - id: evt-fb-003
     calendar_id: salsa-cal-001
     title: Cuban Night (one-way follower control)
@@ -43,6 +58,14 @@ events:
     start: w1 Sat 20:00
     end: w1 Sun 00:00
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-fb-004
     calendar_id: bachata-cal-002
     title: Stranger Bachata (no friends seeded)
@@ -77,6 +100,13 @@ events:
   # The other evt-fb-1xx events scatter lighter compositions across
   # Europe so the map view shows realistic pin density.
   # --------------------------------------------------------------
+    tags:
+    - format:social
+    - dance-style:bachata
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
   - id: evt-fb-100
     calendar_id: salsa-cal-001
     title: European Salsa Congress (Madrid)
@@ -92,6 +122,14 @@ events:
     price_is_free: false
     price_min: 45
     price_currency: EUR
+    tags:
+    - format:congress
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:large
+    - scope:international
+    - vibe:crowded
   - id: evt-fb-101
     calendar_id: salsa-cal-001
     title: Canal Salsa Social (Amsterdam)
@@ -104,6 +142,14 @@ events:
     start: w0 Fri 20:00
     end: w0 Sat 00:30
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-fb-102
     calendar_id: bachata-cal-002
     title: Trastevere Bachata Night (Rome)
@@ -118,6 +164,14 @@ events:
     price_is_free: false
     price_min: 15
     price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:bachata
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-fb-103
     calendar_id: salsa-cal-001
     title: Old Town Salsa (Prague)
@@ -132,6 +186,14 @@ events:
     price_is_free: false
     price_min: 12
     price_currency: CZK
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:good-music
   - id: evt-fb-104
     calendar_id: salsa-cal-001
     title: Donau Salsa Open Air (Vienna)
@@ -146,6 +208,13 @@ events:
     start: w1 Sat 18:00
     end: w1 Sat 23:00
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:outdoor
+    - scale:medium
+    - scope:local
   - id: evt-fb-105
     calendar_id: bachata-cal-002
     title: Alfama Bachata Rooftop (Lisbon)
@@ -160,6 +229,13 @@ events:
     price_is_free: false
     price_min: 20
     price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:bachata
+    - level:all-levels
+    - venue:rooftop
+    - scale:medium
+    - scope:local
   - id: evt-fb-106
     calendar_id: salsa-cal-001
     title: Gothic Quarter Salsa (Barcelona)
@@ -174,6 +250,13 @@ events:
     price_is_free: false
     price_min: 18
     price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:medium
+    - scope:local
 
 attendances:
   # --- original minimal events ---

@@ -31,16 +31,16 @@ interface EventListPanelProps {
     pastEventIds?: Set<string>;
     /** Optional callback to open the "Suggest an event" flow from the empty state. */
     onSuggestEvent?: () => void;
-    /** When true, render the Unseen state UI (dot + bold title + chip + counter). */
-    unseenEnabled?: boolean;
-    /** Set of event ids the current viewer has already opened. */
-    seenEventIds?: Set<string>;
+    /** When true, render the New state UI (dot + bold title + chip + counter). */
+    newEnabled?: boolean;
+    /** Set of event ids added after the current viewer's local baseline. */
+    newEventIds?: Set<string>;
 }
 
 function PriceBadge({ event }: { event: CalendarEvent }) {
     if (event.price_is_free) {
         return (
-            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+            <span className="inline-flex items-center bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
                 Free
             </span>
         );
@@ -50,7 +50,7 @@ function PriceBadge({ event }: { event: CalendarEvent }) {
             ? `${event.price_currency} ${event.price_min}–${event.price_max}`
             : `${event.price_currency} ${event.price_min}`;
         return (
-            <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+            <span className="inline-flex items-center bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
                 {priceText}
             </span>
         );
@@ -123,17 +123,17 @@ export default function EventListPanel({
     onEventHover,
     pastEventIds,
     onSuggestEvent,
-    unseenEnabled = false,
-    seenEventIds,
+    newEnabled = false,
+    newEventIds,
 }: EventListPanelProps) {
     const { isSaved } = useSavedEvents();
     const { showRatings, trendingEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled } = useFeatureFlags();
     const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const scrollRef = useRef<HTMLDivElement>(null);
     const [showBottomFade, setShowBottomFade] = useState(false);
-    // Client-side only filter: hide events the viewer has already opened.
+    // Client-side only filter: hide events that are not new for this viewer.
     // Per the scenario, no network call is made when toggled.
-    const [unseenOnly, setUnseenOnly] = useState(false);
+    const [newOnly, setNewOnly] = useState(false);
 
     const updateFade = useCallback(() => {
         const el = scrollRef.current;
@@ -156,10 +156,16 @@ export default function EventListPanel({
         }
     }, [hoveredEventId]);
 
+    // Counter over the unfiltered list so toggling the chip doesn't make it jump.
+    const newCount = newEnabled && newEventIds
+        ? events.reduce((n, e) => (newEventIds.has(e.event_id) ? n + 1 : n), 0)
+        : 0;
+    const effectiveNewOnly = newOnly && newCount > 0;
+
     // Show all events — on-map first, off-map / ungeolocated pushed to the bottom.
     // When pastEventIds is provided, keep upcoming events before past events.
-    const visibleEvents = unseenEnabled && unseenOnly && seenEventIds
-        ? events.filter((e) => !seenEventIds.has(e.event_id))
+    const visibleEvents = newEnabled && effectiveNewOnly && newEventIds
+        ? events.filter((e) => newEventIds.has(e.event_id))
         : events;
     const sortedEvents = [...visibleEvents].sort((a, b) => {
         if (pastEventIds) {
@@ -195,13 +201,6 @@ export default function EventListPanel({
 
     const onMapCount = mapBounds ? events.filter((e) => isOnMap(e, mapBounds)).length : events.length;
 
-    // Counter for the section header: number of events in this list that
-    // the viewer hasn't opened yet. Computed over the *unfiltered* list so
-    // toggling the chip doesn't make the counter jump to zero.
-    const unseenCount = unseenEnabled && seenEventIds
-        ? events.reduce((n, e) => (seenEventIds.has(e.event_id) ? n : n + 1), 0)
-        : 0;
-
     const allViewCounts = sortedEvents.map((e) => e.popularity_score ?? 0);
 
     const formatDate = (d: Date) =>
@@ -233,28 +232,31 @@ export default function EventListPanel({
                             Popular {sortBy === 'popularity' && '↓'}
                         </button>
                     )}
+                    {newEnabled && newCount > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => setNewOnly((v) => !v)}
+                            aria-pressed={effectiveNewOnly}
+                            data-testid="new-events-only-chip"
+                            className={`sort-btn inline-flex items-center gap-1 border px-1.5 py-0.5 ${effectiveNewOnly
+                                ? 'border-blue-500 bg-blue-500 text-white'
+                                : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'}`}
+                        >
+                            {/* eslint-disable-next-line no-restricted-syntax -- small status dot */}
+                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" aria-hidden="true" />
+                            <span className="sm:hidden">New</span>
+                            <span className="hidden sm:inline">New only</span>
+                        </button>
+                    )}
                 </div>
             </div>
-            {unseenEnabled && (
-                <div className="flex items-center justify-between gap-2 px-3 py-1.5 text-[11px]" data-testid="unseen-bar">
-                    {unseenCount > 0 ? (
-                        <span className="text-slate-600" data-testid="unseen-counter">
-                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500 mr-1.5 align-middle" aria-hidden="true" />
-                            {unseenCount} new since your last visit
-                        </span>
-                    ) : <span />}
-                    <button
-                        type="button"
-                        onClick={() => setUnseenOnly((v) => !v)}
-                        aria-pressed={unseenOnly}
-                        data-testid="unseen-only-chip"
-                        className={`shrink-0 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium transition ${unseenOnly
-                            ? 'border-blue-500 bg-blue-50 text-blue-700'
-                            : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'}`}
-                    >
-                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" aria-hidden="true" />
-                        Unseen only
-                    </button>
+            {newEnabled && newCount > 0 && (
+                <div className="flex items-center justify-between gap-2 px-3 py-1.5 text-[11px]" data-testid="new-events-bar">
+                    <span className="text-slate-600" data-testid="new-events-counter">
+                        {/* eslint-disable-next-line no-restricted-syntax -- small status dot */}
+                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500 mr-1.5 align-middle" aria-hidden="true" />
+                        {newCount} new since your last visit
+                    </span>
                 </div>
             )}
 
@@ -268,7 +270,7 @@ export default function EventListPanel({
                                 <button
                                     type="button"
                                     onClick={onSuggestEvent}
-                                    className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-4 py-2 shadow-sm transition"
+                                    className="mt-4 inline-flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-4 py-2 shadow-sm transition"
                                 >
                                     + Suggest an event
                                 </button>
@@ -279,6 +281,7 @@ export default function EventListPanel({
                             const start = new Date(event.start);
                             const onMap = isOnMap(event, mapBounds);
                             const isHighlighted = hoveredEventId === event.event_id;
+                            const isNew = newEnabled && !!newEventIds?.has(event.event_id);
                             return (
                                 <Fragment key={event.event_id}>
                                     {idx === firstPastIndex && (
@@ -313,14 +316,15 @@ export default function EventListPanel({
                                         </div>
                                         <div className="event-card-content relative">
                                             <h4
-                                                className={`event-card-title${unseenEnabled && seenEventIds && !seenEventIds.has(event.event_id) ? ' font-semibold' : ''}`}
-                                                data-unseen={unseenEnabled && seenEventIds && !seenEventIds.has(event.event_id) ? 'true' : undefined}
+                                                className={`event-card-title${isNew ? ' font-semibold' : ''}`}
+                                                data-new={isNew ? 'true' : undefined}
                                             >
-                                                {unseenEnabled && seenEventIds && !seenEventIds.has(event.event_id) && (
+                                                {isNew && (
                                                     <span
-                                                        className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500 mr-1.5 align-middle"
-                                                        aria-label="Unseen"
-                                                        data-testid="unseen-dot"
+                                                        className="inline-block h-1.5 w-1.5 bg-blue-500 mr-1.5 align-middle"
+                                                        style={{ borderRadius: '9999px' }}
+                                                        aria-label="New"
+                                                        data-testid="new-event-dot"
                                                     />
                                                 )}
                                                 {event.title}

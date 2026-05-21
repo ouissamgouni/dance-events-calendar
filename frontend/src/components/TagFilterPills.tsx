@@ -219,7 +219,6 @@ export default function TagFilterPills({
                     </button>
                 )}
                 {allOrdered.map(renderPill)}
-                {trailingSlot}
             </div>
 
             {/* Collapsed overflow: floating "Show more" with gradient fade so
@@ -253,6 +252,8 @@ export default function TagFilterPills({
                     Show less
                 </button>
             )}
+
+            {trailingSlot}
         </div>
     );
 }

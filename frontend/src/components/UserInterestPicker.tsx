@@ -20,6 +20,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+    fetchCurators,
     fetchInterestSummary,
     fetchMyFollowing,
     followUser,
@@ -38,6 +39,7 @@ interface Props {
 export default function UserInterestPicker({ onPick, onClose }: Props) {
     const [q, setQ] = useState('');
     const [rows, setRows] = useState<UserCardModel[]>([]);
+    const [suggestions, setSuggestions] = useState<UserCardModel[]>([]);
     const [loading, setLoading] = useState(false);
     const [metrics, setMetrics] = useState<Map<string, InterestSummaryItem>>(new Map());
     const containerRef = useRef<HTMLDivElement>(null);
@@ -64,26 +66,38 @@ export default function UserInterestPicker({ onPick, onClose }: Props) {
     }, []);
 
     // Row source. Empty query → followees; non-empty → global search.
+    // When that primary source is empty, show curators as an explicit
+    // Suggestions section instead of pretending they are followees.
     useEffect(() => {
         const term = debounced.trim();
         let cancelled = false;
         // eslint-disable-next-line react-hooks/set-state-in-effect -- spinner before async fetch, matches header UserSearchBox pattern
         setLoading(true);
-        const fetcher = term.length >= 2
-            ? searchUsers(term, { limit: 12 }).then((res) =>
-                res.items.map(searchResultToCard),
-            )
-            : fetchMyFollowing({ limit: 25 }).then((res) =>
-                res.items.map(followUserToCard),
-            );
-        fetcher
-            .then((items) => {
+        setSuggestions([]);
+        const run = async () => {
+            const items = term.length >= 2
+                ? (await searchUsers(term, { limit: 12 })).items.map(searchResultToCard)
+                : (await fetchMyFollowing({ limit: 25 })).items.map(followUserToCard);
+            const fallback = items.length === 0
+                ? (await fetchCurators({
+                    limit: 12,
+                    excludeFollowed: true,
+                })).items.map(searchResultToCard)
+                : [];
+            return { items, fallback };
+        };
+        run()
+            .then(({ items, fallback }) => {
                 if (cancelled) return;
                 setRows(items);
-                setActiveIdx(items.length > 0 ? 0 : -1);
+                setSuggestions(fallback);
+                setActiveIdx(items.length > 0 || fallback.length > 0 ? 0 : -1);
             })
             .catch(() => {
-                if (!cancelled) setRows([]);
+                if (!cancelled) {
+                    setRows([]);
+                    setSuggestions([]);
+                }
             })
             .finally(() => {
                 if (!cancelled) setLoading(false);
@@ -96,13 +110,14 @@ export default function UserInterestPicker({ onPick, onClose }: Props) {
     // Enrich with upcoming-activity counts, one batched call per row set.
     // Skipped when there are no rows (avoids a no-op request).
     useEffect(() => {
-        if (rows.length === 0) {
+        const users = [...rows, ...suggestions];
+        if (users.length === 0) {
             // eslint-disable-next-line react-hooks/set-state-in-effect -- short-circuit reset when no rows to enrich
             setMetrics(new Map());
             return;
         }
         let cancelled = false;
-        fetchInterestSummary(rows.map((r) => r.handle))
+        fetchInterestSummary(users.map((r) => r.handle))
             .then((items) => {
                 if (cancelled) return;
                 const m = new Map<string, InterestSummaryItem>();
@@ -115,7 +130,9 @@ export default function UserInterestPicker({ onPick, onClose }: Props) {
         return () => {
             cancelled = true;
         };
-    }, [rows]);
+    }, [rows, suggestions]);
+
+    const visibleRows = rows.length > 0 ? rows : suggestions;
 
     const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Escape') {
@@ -125,14 +142,14 @@ export default function UserInterestPicker({ onPick, onClose }: Props) {
         }
         if (e.key === 'ArrowDown') {
             e.preventDefault();
-            setActiveIdx((i) => Math.min(rows.length - 1, i + 1));
+            setActiveIdx((i) => Math.min(visibleRows.length - 1, i + 1));
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
             setActiveIdx((i) => Math.max(0, i - 1));
         } else if (e.key === 'Enter') {
             e.preventDefault();
-            if (activeIdx >= 0 && rows[activeIdx]) {
-                onPick(rows[activeIdx].handle);
+            if (activeIdx >= 0 && visibleRows[activeIdx]) {
+                onPick(visibleRows[activeIdx].handle);
             }
         }
     };
@@ -146,11 +163,23 @@ export default function UserInterestPicker({ onPick, onClose }: Props) {
                 r.handle === handle ? { ...r, is_followed_by_viewer: true } : r,
             ),
         );
+        setSuggestions((prev) =>
+            prev.map((r) =>
+                r.handle === handle ? { ...r, is_followed_by_viewer: true } : r,
+            ),
+        );
         try {
             await followUser(handle);
             window.dispatchEvent(new Event('network:changed'));
         } catch {
             setRows((prev) =>
+                prev.map((r) =>
+                    r.handle === handle
+                        ? { ...r, is_followed_by_viewer: false }
+                        : r,
+                ),
+            );
+            setSuggestions((prev) =>
                 prev.map((r) =>
                     r.handle === handle
                         ? { ...r, is_followed_by_viewer: false }
@@ -181,7 +210,7 @@ export default function UserInterestPicker({ onPick, onClose }: Props) {
                 {loading && (
                     <div className="p-3 text-xs text-slate-500">Loading…</div>
                 )}
-                {!loading && rows.length === 0 && (
+                {!loading && rows.length === 0 && suggestions.length === 0 && (
                     <div className="p-3 text-xs text-slate-500">
                         {debounced.trim().length >= 2
                             ? `No users match “${debounced.trim()}”.`
@@ -213,6 +242,42 @@ export default function UserInterestPicker({ onPick, onClose }: Props) {
                             }
                         />
                     ))}
+                {!loading && rows.length === 0 && suggestions.length > 0 && (
+                    <>
+                        <div className="px-3 pt-3 pb-1 border-t border-slate-100">
+                            <div className="text-[11px] font-semibold text-slate-700 uppercase">
+                                Suggestions
+                            </div>
+                            <div className="text-[11px] text-slate-500">
+                                Curators you can follow
+                            </div>
+                        </div>
+                        {suggestions.map((u, i) => (
+                            <UserResultCard
+                                key={u.handle}
+                                user={u}
+                                variant="rich"
+                                active={i === activeIdx}
+                                metrics={metrics.get(u.handle)}
+                                onSelect={(picked) => onPick(picked.handle)}
+                                trailing={
+                                    u.is_followed_by_viewer === false ? (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                void handleFollow(u.handle);
+                                            }}
+                                            className="px-2 py-0.5 text-[11px] bg-blue-500 text-white border border-blue-500 hover:bg-blue-600"
+                                        >
+                                            Follow
+                                        </button>
+                                    ) : undefined
+                                }
+                            />
+                        ))}
+                    </>
+                )}
             </div>
         </div>
     );
@@ -224,6 +289,7 @@ function searchResultToCard(u: UserSearchResult): UserCardModel {
         display_name: u.display_name,
         avatar_url: u.avatar_url,
         is_verified_organizer: u.is_verified_organizer,
+        is_admin_managed: u.is_admin_managed,
         // Intentionally omit subscribers_count: the picker shows
         // interest metrics (going/saved) on the secondary line; mixing
         // in "N subscribers" would visually diverge from the followees

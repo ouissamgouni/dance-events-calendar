@@ -1,14 +1,14 @@
 test_plan:
-  name: "Phase E (E3) — onboarding follow screen"
+  name: "Onboarding preferences and follow suggestions"
   description: >
-    First-sign-in flow that surfaces a one-screen list of seed
-    suggestions (verified organizers first, admin-managed curators next,
-    then most-followed users), a batch follow CTA, and a Skip path. Either
-    action stamps `users.onboarded_at` so the App-level guard never bounces
-    the user back here on subsequent loads.
+    First-sign-in flow that first asks for preferences using admin-eligible
+    onboarding tag groups, then surfaces follow suggestions. Follow buttons
+    save immediately from each card. Done and Skip stamp `users.onboarded_at`
+    so the App-level guard never bounces the user back here on subsequent
+    loads.
 
   preconditions:
-    - "Run with: task start:scenario SCENARIO=phase-e-onboarding"
+    - "Run with: task start:scenario SCENARIO=onboarding"
     - >
       Cast: `newbie` (fresh, no onboarded_at), three verified organizers
       (`salsahub`, `bachataco`, `verifiedcurator`), two admin-managed
@@ -20,36 +20,60 @@ test_plan:
       The API also excludes soft-deleted users. This scenario documents that
       rule but does not seed a soft-deleted user because the scenario user
       seeder does not currently accept `deleted_at`.
+    - >
+      `tags.yaml` marks only the `dance-style` tag group as
+      `onboarding_eligible`; the `format` group is intentionally not eligible.
 
   steps:
     - id: 1
-      title: "Fresh sign-in lands on /onboarding/follow"
+      title: "Fresh sign-in lands on onboarding preferences"
       description: >
         Open / in a brand-new browser session. /login → "Sign in as
         Nora Newbie".
       expected: >
-        URL becomes /onboarding/follow?next=%2F. The suggestion list is
-        preselected and grouped by rank: all verified organizers appear before
-        any curator-only account; `verifiedcurator` appears once, not repeated
-        in the curator section; curator-only accounts appear as
-        `curatoralpha`, then `curatorbeta`; the popular tail appears as
-        `pop1`, `pop2`, `pop3` because `pop1` has the highest follower count
-        and `pop2`/`pop3` tie-break by handle. Each selected row uses the
-        selected-state styling and copy, and the primary CTA is
-        "Follow 8 and continue".
+        URL becomes /onboarding/preferences?next=%2F. The preferred tags card
+        shows `Dance Style` tags (`Salsa`, `Bachata`, `Kizomba`, `Zouk`) and
+        does not show the non-eligible `Format` tags. The map view preferences
+        section is collapsed by default. Skip is visible in the header, and
+        Continue is enabled even before any preference is selected.
+
+    - id: 1a
+      title: "Preferences skip advances to follow suggestions"
+      description: >
+        From /onboarding/preferences?next=%2F, tap Skip.
+      expected: >
+        URL becomes /onboarding/follow?next=%2F without stamping
+        onboarded_at. The follow suggestions step still appears with its own
+        Skip button and Done CTA.
 
     - id: 2
-      title: "Suggestion exclusions are enforced"
+      title: "Preferences continue to follow suggestions"
       description: >
-        Inspect the same freshly loaded onboarding list from step 1.
+        Select `Salsa` and `Bachata`. Leave the map section collapsed and tap
+        Continue.
       expected: >
+        Network saves preferred tag ids through /api/auth/preferences. URL
+        becomes /onboarding/follow?next=%2F. The suggestion list is unselected:
+        every card has a `Follow` button and the bottom CTA reads `Done`.
+
+    - id: 3
+      title: "Suggestion ranking and exclusions are enforced"
+      description: >
+        Inspect the freshly loaded onboarding follow list.
+      expected: >
+        All verified organizers appear before any curator-only account;
+        `verifiedcurator` appears once, not repeated in the curator section;
+        curator-only accounts appear as
+        `curatoralpha`, then `curatorbeta`; the popular tail appears as
+        `pop1`, `pop2`, `pop3` because `pop1` has the highest follower count
+        and `pop2`/`pop3` tie-break by handle.
         The list does not include `newbie` (self), `alreadyfollowed` (existing
         approved follow), `pendingtarget` (existing pending outgoing request),
         or `nohandle@example.com` (candidate without a handle). Soft-deleted
         users are also excluded by the endpoint, but are not represented in
         this scenario fixture because the seeder does not support `deleted_at`.
 
-    - id: 3
+    - id: 4
       title: "Limit truncates after higher-ranked groups"
       description: >
         With Nora signed in, call
@@ -61,33 +85,35 @@ test_plan:
         `pop1`, `pop2`, or `pop3` until a higher limit leaves room for the
         most-followed tail.
 
-    - id: 4
-      title: "Deselect a couple and complete"
+    - id: 5
+      title: "Follow from cards and complete"
       description: >
-        Tap the row for `bachataco` and the row for `pop3` to deselect
-        them. The bottom-right CTA updates live to read "Follow 6 and
-        continue".
+        Tap `Follow` on `salsahub`, `verifiedcurator`, and `pop1`. Tap the
+        `Following` button on `pop1` again to undo it, then tap Done.
       expected: >
-        Click the CTA. Network: POST
-        /api/social/onboarding/complete → 200, body contains
-        `onboarded_at` (ISO timestamp) and `followed` containing exactly these
-        handles, in any order:
-        ["salsahub","verifiedcurator","curatoralpha","curatorbeta","pop1","pop2"].
+        Each first card click immediately POSTs
+        /api/social/users/{handle}/follow and the card changes to `Following`.
+        Tapping `Following` again immediately DELETEs
+        /api/social/users/pop1/follow and the card returns to `Follow`.
+        Done POSTs /api/social/onboarding/complete with `handles: []` → 200,
+        body contains `onboarded_at` and `followed: []` because follows were
+        already persisted individually.
         App navigates to /. Refreshing the page stays on / — the guard no
         longer redirects.
 
-    - id: 5
+    - id: 6
       title: "Skip path still stamps onboarded_at"
       description: >
-        Reset DB (re-run `task start:scenario SCENARIO=phase-e-onboarding`),
-        sign in as Nora Newbie again, and tap "Skip" in the top-right.
+        Reset DB (re-run `task start:scenario SCENARIO=onboarding`), sign in
+        as Nora Newbie again, continue through preferences, and tap "Skip" in
+        the top-right of the follow page.
       expected: >
         POST /api/social/onboarding/complete with `handles: []` → 200
         with `onboarded_at` set and `followed: []`. App navigates to
         /. No new UserFollow rows created (check NetworkPanel
         "Following" tab is empty).
 
-    - id: 6
+    - id: 7
       title: "Pre-onboarded user never sees the screen"
       description: >
         While still signed in as Nora (already onboarded), navigate
@@ -95,6 +121,7 @@ test_plan:
       expected: >
         The route still renders the suggestions list (the page itself
         is reachable by URL — only the *guard* is suppressed). Tapping
-        Skip or Follow updates onboarded_at again with a fresh
-        timestamp and bounces back to /. This proves the gate is the
-        only redirector — the page itself stays usable for testing.
+        Follow immediately follows that card but stays on the page; tapping
+        Skip or Done updates onboarded_at again with a fresh timestamp and
+        bounces back to /. This proves the gate is the only redirector — the
+        page itself stays usable for testing.

@@ -65,6 +65,20 @@ logger = logging.getLogger(__name__)
 SCENARIOS_DIR = Path(__file__).parents[2] / "scenarios"
 
 
+def scenario_file_with_default(scenario_dir: Path, filename: str) -> Path:
+    path = scenario_dir / filename
+    if path.exists():
+        return path
+    default_path = SCENARIOS_DIR / "default" / filename
+    if (
+        default_path.exists()
+        and scenario_dir.resolve() != default_path.parent.resolve()
+    ):
+        logger.info("Using default scenario %s for %s", filename, scenario_dir.name)
+        return default_path
+    return path
+
+
 class DatabaseSeeder:
     def __init__(self, session: Session):
         self.session = session
@@ -81,7 +95,7 @@ class DatabaseSeeder:
 
         uses_mock_calendar = get_calendar_service_type() == "mock"
 
-        self._seed_tags(scenario_dir / "tags.yaml")
+        self._seed_tags(scenario_file_with_default(scenario_dir, "tags.yaml"))
         self._seed_tag_synonyms_defaults()
         self._seed_calendars(scenario_dir / "calendars.yaml")
         self._seed_calendar_default_tags(scenario_dir / "calendars.yaml")
@@ -99,7 +113,7 @@ class DatabaseSeeder:
         self._seed_event_tags(scenario_dir / "db-events.yaml")
         self._seed_tag_suggestions(scenario_dir / "db-events.yaml")
         self._seed_tracking(scenario_dir / "db-tracking.yaml")
-        self._seed_users(scenario_dir / "mock-users.yaml")
+        self._seed_users(scenario_file_with_default(scenario_dir, "mock-users.yaml"))
         # Follows must come AFTER users (FK on follower_id/followee_id).
         self._seed_follows(scenario_dir / "db-follows.yaml")
         # Attendances must come AFTER users (FK on user_id) and after events.
@@ -122,6 +136,7 @@ class DatabaseSeeder:
             label: Format
             ordinal: 0
             allow_multiple: true
+            onboarding_eligible: true
             color: "#f472b6"
             tags:
               - slug: social
@@ -165,6 +180,7 @@ class DatabaseSeeder:
             allow_multiple = group_data.get("allow_multiple", True)
             color = group_data.get("color")
             enabled = group_data.get("enabled", True)
+            onboarding_eligible = group_data.get("onboarding_eligible", False)
             scope = group_data.get("scope", "event")
             if scope not in ("event", "review"):
                 logger.warning(
@@ -180,6 +196,7 @@ class DatabaseSeeder:
                 group.allow_multiple = allow_multiple
                 group.color = color
                 group.enabled = enabled
+                group.onboarding_eligible = onboarding_eligible
                 group.scope = scope
                 self.session.add(group)
                 logger.info("Updated tag group: %s", slug)
@@ -191,6 +208,7 @@ class DatabaseSeeder:
                     allow_multiple=allow_multiple,
                     color=color,
                     enabled=enabled,
+                    onboarding_eligible=onboarding_eligible,
                     scope=scope,
                 )
                 self.session.add(group)

@@ -17,6 +17,15 @@ events:
     start: w0 Fri 21:00
     end: w0 Sat 01:00
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:beginner-friendly
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:good-music
+    - vibe:social-atmosphere
   - id: evt-save-002
     calendar_id: bachata-cal-002
     title: Bachata Sensual Workshop
@@ -41,6 +50,13 @@ events:
     price_min: 25
     price_max: 35
     price_currency: EUR
+    tags:
+    - format:workshop
+    - dance-style:bachata
+    - level:intermediate
+    - venue:indoor
+    - scale:small
+    - scope:local
   - id: evt-save-003
     calendar_id: salsa-cal-001
     title: Salsa on the Rooftop
@@ -60,6 +76,15 @@ events:
     price_is_free: false
     price_min: 10
     price_currency: EUR
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:beginner-friendly
+    - venue:rooftop
+    - scale:medium
+    - scope:local
+    - vibe:live-band
+    - vibe:social-atmosphere
   - id: evt-save-004
     calendar_id: bachata-cal-002
     title: Bachata Weekender
@@ -94,6 +119,16 @@ events:
     price_min: 80
     price_max: 120
     price_currency: EUR
+    tags:
+    - format:congress
+    - dance-style:bachata
+    - level:beginner-friendly
+    - venue:indoor
+    - scale:large
+    - scope:international
+    - vibe:good-music
+    - vibe:social-atmosphere
+    - vibe:crowded
   - id: evt-save-005
     calendar_id: salsa-cal-001
     title: Rueda de Casino Night
@@ -109,6 +144,13 @@ events:
     start: w2 Wed 19:30
     end: w2 Wed 21:00
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:beginner-friendly
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-save-006
     calendar_id: salsa-cal-001
     title: Salsa Beginners Night
@@ -126,6 +168,14 @@ events:
     start: w2 Tue 20:00
     end: w2 Tue 22:00
     price_is_free: true
+    tags:
+    - format:class
+    - dance-style:salsa
+    - level:beginner-friendly
+    - venue:indoor
+    - scale:small
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-save-007
     calendar_id: bachata-cal-002
     title: Bachata Ladies Styling Workshop
@@ -150,6 +200,14 @@ events:
     price_min: 20
     price_max: 28
     price_currency: GBP
+    tags:
+    - format:workshop
+    - dance-style:bachata
+    - level:beginner-friendly
+    - venue:indoor
+    - scale:small
+    - scope:local
+    - vibe:good-music
   - id: evt-save-008
     calendar_id: salsa-cal-001
     title: Salsa con Timba — Live Orchestra Night
@@ -170,6 +228,15 @@ events:
     price_is_free: false
     price_min: 15
     price_currency: EUR
+    tags:
+    - format:class
+    - dance-style:salsa
+    - level:beginner-friendly
+    - venue:indoor
+    - scale:small
+    - scope:local
+    - vibe:live-band
+    - vibe:social-atmosphere
   - id: evt-save-past-001
     calendar_id: salsa-cal-001
     title: Last Week's Salsa Social
@@ -187,6 +254,14 @@ events:
     start: w-1 Fri 21:00
     end: w-1 Sat 01:00
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:beginner-friendly
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-save-past-002
     calendar_id: bachata-cal-002
     title: Old Bachata Workshop
@@ -210,6 +285,13 @@ events:
     price_is_free: false
     price_min: 25
     price_currency: EUR
+    tags:
+    - format:workshop
+    - dance-style:bachata
+    - level:all-levels
+    - venue:indoor
+    - scale:small
+    - scope:local
   - id: evt-save-past-003
     calendar_id: bachata-cal-002
     title: Spring Bachata Festival
@@ -239,3 +321,12 @@ events:
     price_min: 70
     price_max: 100
     price_currency: EUR
+    tags:
+    - format:festival
+    - dance-style:bachata
+    - level:beginner-friendly
+    - venue:indoor
+    - scale:large
+    - scope:international
+    - vibe:good-music
+    - vibe:social-atmosphere

@@ -744,6 +744,7 @@ class TagGroupResponse(BaseModel):
     ordinal: int = 0
     allow_multiple: bool = True
     enabled: bool = True
+    onboarding_eligible: bool = False
     scope: str = "event"
     tags: list[TagResponse] = []
 
@@ -752,6 +753,7 @@ class TagGroupCreate(BaseModel):
     label: str = Field(..., min_length=1, max_length=100)
     slug: Optional[str] = Field(default=None, max_length=100)
     color: Optional[str] = None
+    onboarding_eligible: bool = False
     scope: Optional[str] = Field(
         default="event",
         pattern="^(event|review)$",
@@ -765,6 +767,7 @@ class TagGroupUpdate(BaseModel):
     allow_multiple: Optional[bool] = None
     color: Optional[str] = None
     enabled: Optional[bool] = None
+    onboarding_eligible: Optional[bool] = None
     scope: Optional[str] = Field(default=None, pattern="^(event|review)$")
 
 
@@ -1589,6 +1592,9 @@ class UserSearchResult(BaseModel):
     # Whether the *viewer* is subscribed to this user's calendar. Always
     # False for anonymous viewers and for self.
     is_subscribed: bool = False
+    is_followed_by_viewer: bool = False
+    is_friend: bool = False
+    source: Optional[str] = None
 
 
 class UserSearchResponse(BaseModel):

@@ -4,20 +4,21 @@
  * Shown once to every new user immediately after first sign-in via an
  * App-level guard that watches ``user.onboarded_at``. The screen
  * presents up to 10 "seed" accounts (verified organizers first, then
- * most-followed users) and offers two ways out:
- *   • Done   — POST batch follow + stamps ``onboarded_at``
- *   • Skip   — POST empty batch + still stamps ``onboarded_at``
+ * most-followed users). Each card follows immediately. Done and Skip both
+ * stamp ``onboarded_at`` so the guard never bounces the user here again.
  *
  * Either action terminates onboarding so the guard never bounces the
  * user here again. We refresh the auth user after the POST so
  * downstream consumers (NetworkPanel, friend_count) see the new state.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
     completeOnboarding,
     fetchOnboardingSuggestions,
+    followUser,
     searchUsers,
+    unfollowUser,
     type UserSearchResult,
 } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -28,6 +29,8 @@ import { useAuth } from '../context/AuthContext';
  *  to bootstrap a useful feed. */
 const SUGGESTION_LIMIT = 12;
 
+type FollowStatus = 'idle' | 'following' | 'unfollowing' | 'followed' | 'requested' | 'error';
+
 export default function OnboardingFollow() {
     const navigate = useNavigate();
     const [sp] = useSearchParams();
@@ -36,11 +39,11 @@ export default function OnboardingFollow() {
 
     const [items, setItems] = useState<UserSearchResult[] | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [selected, setSelected] = useState<Set<string>>(new Set());
+    const [followStatus, setFollowStatus] = useState<Record<string, FollowStatus>>({});
     const [submitting, setSubmitting] = useState(false);
 
     // Inline search for users not surfaced in the seed list. Picked
-    // results are appended to ``items`` and pre-selected.
+    // results are appended to ``items`` so they can be followed from a card.
     const [search, setSearch] = useState('');
     const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
     const [searching, setSearching] = useState(false);
@@ -52,9 +55,11 @@ export default function OnboardingFollow() {
             .then((r) => {
                 if (cancelled) return;
                 setItems(r.items);
-                setSelected(
-                    new Set(r.items.map((it) => it.handle ?? '').filter(Boolean)),
-                );
+                setFollowStatus(Object.fromEntries(
+                    r.items
+                        .map((it) => [it.handle ?? '', it.is_followed_by_viewer ? 'followed' : 'idle'] as const)
+                        .filter(([handle]) => Boolean(handle)),
+                ));
             })
             .catch((e: unknown) => {
                 if (!cancelled) {
@@ -67,12 +72,9 @@ export default function OnboardingFollow() {
     useEffect(() => {
         const term = debouncedSearch.trim();
         if (term.length < 2) {
-            setSearchResults([]);
-            setSearching(false);
             return;
         }
         let cancelled = false;
-        setSearching(true);
         searchUsers(term, { limit: 8 })
             .then((r) => { if (!cancelled) setSearchResults(r.items); })
             .catch(() => { if (!cancelled) setSearchResults([]); })
@@ -80,17 +82,7 @@ export default function OnboardingFollow() {
         return () => { cancelled = true; };
     }, [debouncedSearch]);
 
-    const toggle = useCallback((handle: string) => {
-        setSelected((prev) => {
-            const nextSet = new Set(prev);
-            if (nextSet.has(handle)) nextSet.delete(handle);
-            else nextSet.add(handle);
-            return nextSet;
-        });
-    }, []);
-
-    /** Add a search result to the list and mark it selected. */
-    const addFromSearch = useCallback((u: UserSearchResult) => {
+    const addToSuggestions = useCallback((u: UserSearchResult) => {
         const handle = u.handle;
         if (!handle) return;
         setItems((prev) => {
@@ -98,19 +90,48 @@ export default function OnboardingFollow() {
             if (base.some((it) => it.handle === handle)) return base;
             return [...base, u];
         });
-        setSelected((prev) => {
-            const nextSet = new Set(prev);
-            nextSet.add(handle);
-            return nextSet;
-        });
         setSearch('');
         setSearchResults([]);
     }, []);
 
-    const finish = useCallback(async (handles: string[]) => {
+    const getStatus = useCallback((u: UserSearchResult): FollowStatus => {
+        const handle = u.handle ?? '';
+        return followStatus[handle] ?? (u.is_followed_by_viewer ? 'followed' : 'idle');
+    }, [followStatus]);
+
+    const handleFollowToggle = useCallback(async (u: UserSearchResult) => {
+        const handle = u.handle;
+        if (!handle) return;
+        const current = followStatus[handle] ?? (u.is_followed_by_viewer ? 'followed' : 'idle');
+        if (current === 'following' || current === 'unfollowing') return;
+        addToSuggestions(u);
+        setError(null);
+        try {
+            const isFollowing = current === 'followed' || current === 'requested';
+            setFollowStatus((prev) => ({ ...prev, [handle]: isFollowing ? 'unfollowing' : 'following' }));
+            const result = isFollowing
+                ? await unfollowUser(handle)
+                : await followUser(handle);
+            const nextStatus: FollowStatus = result.is_following
+                ? result.follow_status === 'pending' ? 'requested' : 'followed'
+                : 'idle';
+            setFollowStatus((prev) => ({ ...prev, [handle]: nextStatus }));
+            setItems((prev) => (prev ?? []).map((it) => (
+                it.handle === handle
+                    ? { ...it, is_followed_by_viewer: result.is_following, is_friend: result.is_friend, is_subscribed: result.is_subscribed }
+                    : it
+            )));
+            window.dispatchEvent(new Event('network:changed'));
+        } catch (e) {
+            setFollowStatus((prev) => ({ ...prev, [handle]: current }));
+            setError(e instanceof Error ? e.message : 'Failed to update follow');
+        }
+    }, [addToSuggestions, followStatus]);
+
+    const finish = useCallback(async () => {
         setSubmitting(true);
         try {
-            await completeOnboarding(handles);
+            await completeOnboarding([]);
             await refreshUser();
             window.dispatchEvent(new CustomEvent('network:changed'));
             navigate(next, { replace: true });
@@ -119,9 +140,6 @@ export default function OnboardingFollow() {
             setSubmitting(false);
         }
     }, [navigate, next, refreshUser]);
-
-    const selectedCount = selected.size;
-    const handlesArray = useMemo(() => Array.from(selected), [selected]);
 
     return (
         <div className="mx-auto max-w-2xl px-4 py-8">
@@ -137,7 +155,7 @@ export default function OnboardingFollow() {
                 </div>
                 <button
                     type="button"
-                    onClick={() => void finish([])}
+                    onClick={() => void finish()}
                     disabled={submitting}
                     aria-label="Skip onboarding"
                     className="text-sm text-slate-500 hover:text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -154,8 +172,7 @@ export default function OnboardingFollow() {
 
             {/* Inline search box so users can find specific accounts that
                 aren't surfaced in the seed list (e.g. a friend who is
-                neither verified nor most-followed). Adds the picked result
-                to the list above as already-selected. */}
+                neither verified nor most-followed). */}
             <div className="mb-4">
                 <label htmlFor="onboarding-user-search" className="sr-only">
                     Search for a specific person
@@ -164,7 +181,11 @@ export default function OnboardingFollow() {
                     id="onboarding-user-search"
                     type="search"
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={(e) => {
+                        const nextSearch = e.target.value;
+                        setSearch(nextSearch);
+                        setSearching(nextSearch.trim().length >= 2);
+                    }}
                     placeholder="Search by name or @handle"
                     aria-label="Search users"
                     className="w-full border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:border-blue-400"
@@ -179,19 +200,20 @@ export default function OnboardingFollow() {
                         )}
                         {searchResults.map((u) => {
                             const handle = u.handle ?? '';
-                            const already = handle ? selected.has(handle) : false;
+                            const already = !!handle && !!items?.some((it) => it.handle === handle);
                             return (
                                 <button
                                     key={handle || u.display_name}
                                     type="button"
-                                    onClick={() => addFromSearch(u)}
-                                    disabled={already}
-                                    aria-label={already ? `Already added @${handle}` : `Add @${handle}`}
+                                    onClick={() => addToSuggestions(u)}
+                                    aria-label={already ? `View @${handle} in suggestions` : `Add @${handle} to suggestions`}
                                     className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {u.avatar_url ? (
+                                        // eslint-disable-next-line no-restricted-syntax -- Avatars are allowed to be circular.
                                         <img src={u.avatar_url} alt="" className="h-7 w-7 rounded-full object-cover" />
                                     ) : (
+                                        // eslint-disable-next-line no-restricted-syntax -- Avatar placeholders are allowed to be circular.
                                         <div className="h-7 w-7 rounded-full bg-slate-200" />
                                     )}
                                     <div className="flex-1 min-w-0">
@@ -201,7 +223,7 @@ export default function OnboardingFollow() {
                                         <div className="text-[11px] text-slate-500 truncate">@{handle}</div>
                                     </div>
                                     <span className="text-[11px] text-slate-500">
-                                        {already ? 'Added' : 'Add'}
+                                        {already ? 'In list' : 'Add'}
                                     </span>
                                 </button>
                             );
@@ -220,22 +242,19 @@ export default function OnboardingFollow() {
                 <ul className="divide-y divide-slate-100 border border-slate-200 bg-white">
                     {items.map((u) => {
                         const handle = u.handle ?? '';
-                        const isSelected = handle ? selected.has(handle) : false;
+                        const status = getStatus(u);
+                        const isDone = status === 'followed' || status === 'requested';
+                        const isBusy = status === 'following' || status === 'unfollowing';
                         return (
                             <li key={handle || u.display_name}>
-                                <button
-                                    type="button"
-                                    onClick={() => handle && toggle(handle)}
-                                    aria-pressed={isSelected}
+                                <div
                                     className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50"
                                 >
                                     {u.avatar_url ? (
-                                        <img
-                                            src={u.avatar_url}
-                                            alt=""
-                                            className="h-10 w-10 rounded-full object-cover"
-                                        />
+                                        // eslint-disable-next-line no-restricted-syntax -- Avatars are allowed to be circular.
+                                        <img src={u.avatar_url} alt="" className="h-10 w-10 rounded-full object-cover" />
                                     ) : (
+                                        // eslint-disable-next-line no-restricted-syntax -- Avatar placeholders are allowed to be circular.
                                         <div className="h-10 w-10 rounded-full bg-slate-200" />
                                     )}
                                     <div className="flex-1 min-w-0">
@@ -266,17 +285,29 @@ export default function OnboardingFollow() {
                                             @{handle}
                                         </div>
                                     </div>
-                                    <span
+                                    <button
+                                        type="button"
+                                        onClick={() => void handleFollowToggle(u)}
+                                        disabled={!handle || isBusy}
+                                        title={isDone ? 'Click to undo' : undefined}
                                         className={
-                                            'px-3 py-1 text-xs font-medium border ' +
-                                            (isSelected
-                                                ? 'bg-blue-500 border-blue-500 text-white'
-                                                : 'border-slate-200 bg-white text-slate-700')
+                                            'border px-3 py-1 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50 ' +
+                                            (isDone
+                                                ? 'border-blue-500 bg-blue-500 text-white'
+                                                : status === 'error'
+                                                    ? 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                                                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50')
                                         }
                                     >
-                                        {isSelected ? 'Following' : 'Follow'}
-                                    </span>
-                                </button>
+                                        {isBusy
+                                            ? status === 'unfollowing' ? 'Undoing…' : 'Following…'
+                                            : status === 'requested'
+                                                ? 'Requested'
+                                                : status === 'followed'
+                                                    ? 'Following'
+                                                    : 'Follow'}
+                                    </button>
+                                </div>
                             </li>
                         );
                     })}
@@ -287,14 +318,10 @@ export default function OnboardingFollow() {
                 <button
                     type="button"
                     disabled={submitting}
-                    onClick={() => void finish(handlesArray)}
+                    onClick={() => void finish()}
                     className="bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    {submitting
-                        ? 'Saving…'
-                        : selectedCount === 0
-                            ? 'Done'
-                            : `Follow ${selectedCount} and continue`}
+                    {submitting ? 'Saving…' : 'Done'}
                 </button>
             </div>
         </div>

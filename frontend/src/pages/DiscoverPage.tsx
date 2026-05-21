@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
+    fetchCurators,
     fetchSuggestedUsers,
     searchUsers,
     type UserSearchResult,
@@ -27,6 +28,8 @@ export default function DiscoverPage() {
     const initialQ = params.get('q') ?? '';
     const [q, setQ] = useState(initialQ);
     const [results, setResults] = useState<UserSearchResult[] | null>(null);
+    const [curatorResults, setCuratorResults] = useState<UserSearchResult[]>([]);
+    const [curatorsLoading, setCuratorsLoading] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -48,19 +51,33 @@ export default function DiscoverPage() {
         if (term.length < 2) {
             // eslint-disable-next-line react-hooks/set-state-in-effect -- short-input reset, no async work to schedule
             setResults(null);
+            setCuratorResults([]);
+            setCuratorsLoading(false);
             return;
         }
         let cancelled = false;
         setLoading(true);
         setError(null);
-        setError(null);
         searchUsers(term, { limit: 25 })
-            .then((res) => {
-                if (!cancelled) setResults(res.items);
+            .then(async (res) => {
+                if (cancelled) return;
+                setResults(res.items);
+                if (res.items.length === 0) {
+                    setCuratorsLoading(true);
+                    try {
+                        const curators = await fetchCurators({ limit: 12 });
+                        if (!cancelled) setCuratorResults(curators.items);
+                    } finally {
+                        if (!cancelled) setCuratorsLoading(false);
+                    }
+                } else {
+                    setCuratorResults([]);
+                }
             })
             .catch((err: unknown) => {
                 if (!cancelled) {
                     setError(err instanceof Error ? err.message : 'Search failed');
+                    setCuratorResults([]);
                 }
             })
             .finally(() => {
@@ -99,17 +116,48 @@ export default function DiscoverPage() {
                     ) : error ? (
                         <p className="text-sm text-red-600">{error}</p>
                     ) : !results || results.length === 0 ? (
-                        <p className="text-sm text-slate-500">
-                            No users match “{q.trim()}”.
-                        </p>
+                        <div className="space-y-3">
+                            <p className="text-sm text-slate-500">
+                                No users match “{q.trim()}”.
+                            </p>
+                            {(curatorsLoading || curatorResults.length > 0) && (
+                                <section>
+                                    <h2 className="text-xs font-semibold text-slate-700 uppercase mb-2">
+                                        Suggestions
+                                    </h2>
+                                    {curatorsLoading ? (
+                                        <p className="text-sm text-slate-500">Loading…</p>
+                                    ) : (
+                                        <UserGrid users={curatorResults} />
+                                    )}
+                                </section>
+                            )}
+                        </div>
                     ) : (
                         <UserGrid users={results} />
                     )}
                 </div>
             </section>
 
+            {!user && <AnonDiscoverHint />}
             {user && <SuggestedSection />}
         </div>
+    );
+}
+
+function AnonDiscoverHint() {
+    return (
+        <section className="border border-slate-200 bg-slate-50 p-3 flex items-center justify-between gap-3">
+            <p className="text-sm text-slate-600">
+                Sign in to see more people from your network.
+            </p>
+            <Link
+                to="/login"
+                className="bg-blue-500 text-white hover:bg-blue-600 px-3 py-1 text-xs font-semibold"
+            >
+                Sign in
+            </Link>
+        </section>
     );
 }
 
@@ -135,8 +183,13 @@ function SuggestedSection() {
     }, []);
 
     // Stay quiet on cold-start (no follows/subs yet) — empty hint already
-    // communicated by the search box. The section header would be noise.
+    // communicated by the search box. Curator top-ups keep this populated
+    // for authenticated zero-graph users when available.
     if (!loading && (!users || users.length === 0)) return null;
+
+    const networkUsers = (users ?? []).filter((u) => u.source !== 'curator');
+    const curatorUsers = (users ?? []).filter((u) => u.source === 'curator');
+    const hasGroups = networkUsers.length > 0 && curatorUsers.length > 0;
 
     return (
         <section>
@@ -144,14 +197,31 @@ function SuggestedSection() {
                 Suggested for you
             </h2>
             <p className="text-xs text-slate-500 mb-3">
-                People that those you follow are subscribed to.
+                People to follow and curated calendars to subscribe to.
             </p>
             {loading ? (
                 <p className="text-sm text-slate-500">Loading…</p>
+            ) : hasGroups ? (
+                <div className="space-y-4">
+                    <SuggestionGroup title="People in your network" users={networkUsers} />
+                    <SuggestionGroup title="Curated calendars" users={curatorUsers} />
+                </div>
             ) : (
                 <UserGrid users={users ?? []} />
             )}
         </section>
+    );
+}
+
+function SuggestionGroup({ title, users }: { title: string; users: UserSearchResult[] }) {
+    if (users.length === 0) return null;
+    return (
+        <div>
+            <h3 className="text-xs font-semibold text-slate-700 uppercase mb-2">
+                {title}
+            </h3>
+            <UserGrid users={users} />
+        </div>
     );
 }
 
@@ -176,6 +246,15 @@ function UserGrid({ users }: { users: UserSearchResult[] }) {
                                     alt=""
                                     title="Verified organizer"
                                     aria-label="Verified organizer"
+                                    className="inline-block w-3.5 h-3.5 ml-1 align-middle object-contain"
+                                />
+                            )}
+                            {u.is_admin_managed && (
+                                <img
+                                    src="/badge.png"
+                                    alt=""
+                                    title="Curator"
+                                    aria-label="Curator"
                                     className="inline-block w-3.5 h-3.5 ml-1 align-middle object-contain"
                                 />
                             )}

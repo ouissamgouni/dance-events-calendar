@@ -33,10 +33,20 @@ def _mock_session():
 
 
 def _make_tag_group(
-    id=1, slug="format", label="Format", ordinal=0, allow_multiple=True
+    id=1,
+    slug="format",
+    label="Format",
+    ordinal=0,
+    allow_multiple=True,
+    onboarding_eligible=False,
 ):
     g = TagGroup(
-        id=id, slug=slug, label=label, ordinal=ordinal, allow_multiple=allow_multiple
+        id=id,
+        slug=slug,
+        label=label,
+        ordinal=ordinal,
+        allow_multiple=allow_multiple,
+        onboarding_eligible=onboarding_eligible,
     )
     g.tags = []
     return g
@@ -103,8 +113,23 @@ class TestListTags:
         data = resp.json()
         assert len(data) == 1
         assert data[0]["slug"] == "format"
+        assert data[0]["onboarding_eligible"] is False
         assert len(data[0]["tags"]) == 1
         assert data[0]["tags"][0]["slug"] == "social"
+
+    def test_list_tags_onboarding_filters_eligible_groups(self, client):
+        c, session = client
+        group = _make_tag_group(onboarding_eligible=True)
+        tag = _make_tag()
+        tag.group = group
+        group.tags = [tag]
+
+        session.exec.return_value.all.side_effect = [[group], []]
+        resp = c.get("/api/tags?onboarding=true")
+        assert resp.status_code == 200
+        query = session.exec.call_args_list[0].args[0]
+        assert "onboarding_eligible" in str(query)
+        assert resp.json()[0]["onboarding_eligible"] is True
 
     def test_group_response_sorts_tags_by_ordinal(self):
         group = _make_tag_group()
@@ -272,6 +297,21 @@ class TestAdminEventTags:
         resp = c.patch("/api/admin/tags/groups/1", json={"ordinal": 2})
         assert resp.status_code == 200
         assert group.ordinal == 2
+
+    def test_admin_updates_tag_group_onboarding_eligibility(self, admin_client):
+        c, session = admin_client
+        group = _make_tag_group(id=1, onboarding_eligible=False)
+        session.get.side_effect = lambda model, id: {
+            (TagGroup, 1): group,
+        }.get((model, id))
+
+        resp = c.patch(
+            "/api/admin/tags/groups/1",
+            json={"onboarding_eligible": True},
+        )
+        assert resp.status_code == 200
+        assert group.onboarding_eligible is True
+        assert resp.json()["onboarding_eligible"] is True
 
     def test_admin_approve_tag_suggestion(self, admin_client):
         c, session = admin_client

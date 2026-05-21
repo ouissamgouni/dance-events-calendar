@@ -16,6 +16,12 @@ events:
   longitude: 13.3884
   start: w0 Fri 20:00
   end: w0 Fri 23:30
+  tags:
+  - format:social
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:indoor
+  - vibe:social-atmosphere
 - id: mock-sug-002
   calendar_id: bachata-cal-002
   title: Bachata Sensual Workshop – Paris
@@ -36,6 +42,11 @@ events:
   longitude: 2.3741
   start: w1 Sat 14:00
   end: w1 Sat 17:00
+  tags:
+  - format:workshop
+  - dance-style:bachata
+  - level:all-levels
+  - venue:indoor
 - id: mock-sug-003
   calendar_id: salsa-cal-001
   title: Salsa on the Rooftop – Barcelona
@@ -52,6 +63,13 @@ events:
   longitude: 2.1699
   start: w1 Fri 21:00
   end: w1 Sat 02:00
+  tags:
+  - format:social
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:rooftop
+  - vibe:live-band
+  - vibe:social-atmosphere
 - id: mock-sug-004
   calendar_id: bachata-cal-002
   title: Bachata Stars Night – Amsterdam
@@ -72,6 +90,13 @@ events:
   longitude: 4.915
   start: w2 Sat 20:00
   end: w2 Sun 03:00
+  tags:
+  - format:workshop
+  - dance-style:bachata
+  - level:all-levels
+  - venue:indoor
+  - vibe:good-music
+  - vibe:social-atmosphere
 - id: mock-sug-005
   calendar_id: salsa-cal-001
   title: Havana Nights – London
@@ -88,3 +113,11 @@ events:
   longitude: -0.13
   start: w2 Fri 21:00
   end: w2 Sat 03:00
+  tags:
+  - format:social
+  - dance-style:salsa
+  - level:beginner-friendly
+  - venue:indoor
+  - vibe:live-band
+  - vibe:good-music
+  - vibe:social-atmosphere

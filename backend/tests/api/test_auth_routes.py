@@ -24,6 +24,7 @@ os.environ["DEV_AUTH"] = "true"
 from backend.api.main import app  # noqa: E402
 from backend.api.routes import auth as auth_module  # noqa: E402
 from backend.db.database import get_session  # noqa: E402
+from backend.db import seed as seed_module  # noqa: E402
 from backend.db.models import (  # noqa: E402
     CalendarSubscription,
     ShareToken,
@@ -226,6 +227,27 @@ def test_dev_users_endpoint_returns_seeded_users(client, monkeypatch, tmp_path):
     assert users == [
         {"email": "alice@example.com", "name": "Alice"},
         {"email": "bob@example.com", "name": "bob"},
+    ]
+
+
+@pytest.mark.unit
+def test_dev_users_endpoint_falls_back_to_default_users(client, monkeypatch, tmp_path):
+    scenarios_dir = tmp_path / "scenarios"
+    scenario_dir = scenarios_dir / "sparse"
+    default_dir = scenarios_dir / "default"
+    scenario_dir.mkdir(parents=True)
+    default_dir.mkdir()
+    (default_dir / "mock-users.yaml").write_text(
+        "users:\n  - email: Default@Example.com\n    name: Default User\n"
+    )
+    monkeypatch.setenv("SCENARIO_DIR", str(scenario_dir))
+    monkeypatch.setattr(seed_module, "SCENARIOS_DIR", scenarios_dir)
+
+    resp = client.get("/api/auth/dev-users")
+
+    assert resp.status_code == 200
+    assert resp.json()["users"] == [
+        {"email": "default@example.com", "name": "Default User"}
     ]
 
 

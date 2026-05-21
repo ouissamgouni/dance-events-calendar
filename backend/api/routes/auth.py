@@ -41,6 +41,7 @@ from backend.config.loader import (
     get_google_client_id,
 )
 from backend.db.database import get_session
+from backend.db.seed import scenario_file_with_default
 from backend.db.models import (
     CalendarSubscription,
     EventRating,
@@ -522,7 +523,7 @@ def _load_mock_users_from_scenario() -> list[dict]:
     scenario_dir = os.getenv("SCENARIO_DIR")
     if not scenario_dir:
         return []
-    path = Path(scenario_dir) / "mock-users.yaml"
+    path = scenario_file_with_default(Path(scenario_dir), "mock-users.yaml")
     if not path.exists():
         return []
     try:

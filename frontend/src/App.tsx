@@ -31,6 +31,7 @@ import ProfilePage from './pages/ProfilePage';
 import DiscoverPage from './pages/DiscoverPage';
 import SharedCalendarPage from './pages/SharedCalendarPage';
 import Privacy from './pages/Privacy';
+import OnboardingPreferences from './pages/OnboardingPreferences';
 import OnboardingFollow from './pages/OnboardingFollow';
 import ReferralLanding from './pages/ReferralLanding';
 import OnboardingGate from './components/OnboardingGate';
@@ -108,6 +109,7 @@ function AppShell() {
           <main className="flex-1 overflow-auto">
             <Routes>
               <Route path="/" element={<Home />} />
+              <Route path="/onboarding/preferences" element={<OnboardingPreferences />} />
               <Route path="/onboarding/follow" element={<OnboardingFollow />} />
               <Route path="/r/:code" element={<ReferralLanding />} />
               <Route path="/calendar" element={<Home />} />

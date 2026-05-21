@@ -1,92 +1,122 @@
 test_plan:
-  name: "Unseen Events — new/unseen state UI (Track 2)"
+  name: "New Events — baseline-aware state UI (Track 2)"
   description: >
-    Verify the new "Unseen" state — a small dot + bolder title on event
-    cards and pins for events the current viewer has not yet opened,
-    plus an "Unseen only" filter chip and a section counter. Per-viewer
-    state lives in localStorage keyed by event_id (no server-side state,
-    no DB writes — first-class anonymous-friendly behaviour).
+    Verify the "New" state — a small dot + bolder title on event cards
+    and pins for events added after the current viewer's local baseline,
+    plus a "New" / "New only" filter chip and a section counter. Per-viewer
+    state lives in localStorage (no server-side state, no DB writes —
+    first-class anonymous-friendly behaviour).
 
   preconditions:
     - "Run with: task start:scenario SCENARIO=unseen-events"
     - "Use a fresh browser profile or hard-clear localStorage before step 1."
     - "settings.yaml flips on `unseen_state_enabled`."
+    - "config.env uses `CALENDAR_SERVICE=mock`, so admin Sync Now reads `mock-sync-events.yaml`."
+    - "db-events.yaml contains the initial viewer baseline; mock-sync-events.yaml contains events that should appear only after admin sync."
 
   steps:
     - id: 1
-      title: "All seeded events show the Unseen dot on first load"
+      title: "Viewer sees existing events and establishes the New baseline"
       description: >
-        Open / (Home, signed out is fine — the feature is anonymous).
-        Inspect the three event cards.
+        Open / and sign in with the mock user viewer@example.com if the
+        scenario browser asks for a user. Inspect the event list.
       expected: >
-        Every card carries a small Unseen dot (left of the title) and
-        the title is rendered with a slightly bolder font weight. The
-        list-section header shows the counter "3 new since your last
-        visit".
+        The three db-seeded events are visible: Friday Night Salsa Social,
+        Saturday Salsa Bootcamp, and Sunday Cuban Night. No card carries a
+        New dot on first load, titles use regular weight, the New filter is
+        hidden, and the New counter bar is hidden. localStorage contains a
+        `new_events_state_v1` entry with the seeded event ids in
+        `known_event_ids`. This prevents first-time visitors from seeing every
+        existing event marked as new.
 
     - id: 2
-      title: "Opening an event clears its Unseen dot"
+      title: "Admin runs mocked sync to add new events"
       description: >
-        Click evt-unseen-001 (Friday Night Salsa Social) to open the
-        detail view. Click the back button.
+        Sign out or switch to admin@example.com. Navigate to
+        /admin/configuration and click "Sync Now". Wait for the sync progress
+        to finish successfully.
       expected: >
-        Back on / the evt-unseen-001 card no longer shows the Unseen
-        dot and its title reverts to the regular weight. The section
-        counter drops to "2 new since your last visit". `localStorage`
-        contains a `seen_events` (or similar) entry including
-        `evt-unseen-001`.
+        The sync completes successfully and imports the two events from
+        mock-sync-events.yaml: Fresh Salsa Rooftop Social and New Bachata
+        Meets Salsa Lab. Existing db-seeded events remain unchanged.
 
     - id: 3
-      title: "Unseen-only filter chip narrows the list"
+      title: "Viewer refresh shows only sync-added events as New"
       description: >
-        On / above the event list, locate the "Unseen only" chip and
-        click it.
+        Switch back to viewer@example.com in the same browser profile used in
+        step 1. Open / and refresh the page.
       expected: >
-        The list re-renders with only evt-unseen-002 and evt-unseen-003
-        (evt-unseen-001 was marked seen in step 2 and is filtered out).
-        The chip is purely a client-side filter — no extra network call
-        is made.
+        The two sync-added events carry a small New dot and slightly bolder
+        title. The original three db-seeded events do not show New markers.
+        The list-section header shows "2 new since your last visit". The New
+        filter appears to the right of the sort buttons; on mobile-size
+        screens its visible label is "New", while wider screens show
+        "New only".
 
     - id: 4
-      title: "Admin UI exposes the Unseen state toggle"
+      title: "New filter narrows the list and hides when nothing is new"
+      description: >
+        Click the New / New only filter next to the sort buttons.
+      expected: >
+        The list re-renders with only Fresh Salsa Rooftop Social and New
+        Bachata Meets Salsa Lab. The chip is purely a client-side filter — no
+        extra network call is made. After opening both New events and returning
+        to /, both markers clear, the counter bar is hidden, and the New filter
+        is no longer shown because there are no new events left.
+
+    - id: 5
+      title: "Opening one new event clears only that marker"
+      description: >
+        Repeat steps 1-3 with fresh localStorage, then open only Fresh Salsa
+        Rooftop Social and return to /.
+      expected: >
+        Fresh Salsa Rooftop Social no longer shows a New dot and its title
+        reverts to regular weight. New Bachata Meets Salsa Lab remains marked
+        New. The counter drops to "1 new since your last visit", and
+        `new_events_state_v1.known_event_ids` now includes
+        `evt-new-sync-001`.
+
+    - id: 6
+      title: "Admin UI exposes the New event markers toggle"
       description: >
         Sign in as admin (admin@example.com). Navigate to
         /admin/configuration. In the right-hand feature-flag panel,
-        locate the "Unseen state" row.
+        locate the "New event markers" row.
       expected: >
         The toggle is currently ON (settings.yaml seeded
         `unseen_state_enabled: true`) with the helper text
-        "Dot + bold title for events the viewer has not opened yet".
+        "Dot + bold title for events added after the viewer's baseline".
         The Trending and Following badge toggles are OFF (independent —
         proves the three flags don't bleed into each other).
 
-    - id: 5
-      title: "Toggling Unseen state OFF removes all Unseen UI"
+    - id: 7
+      title: "Toggling New event markers OFF removes all New UI"
       description: >
-        Still on /admin/configuration, flip "Unseen state" off. Reload
+        Still on /admin/configuration, flip "New event markers" off. Reload
         / (signed-out viewer is fine).
       expected: >
         Network: PUT /api/settings → 200 with
-        `unseen_state_enabled: false`. Unseen dots and bold-title
-        styling disappear. The "Unseen only" chip is hidden. The
+        `unseen_state_enabled: false`. New dots and bold-title
+        styling disappear. The "New only" chip is hidden. The
         header counter is hidden. localStorage is not cleared (so
-        re-enabling restores the earlier seen state). Re-enable the
+        re-enabling restores the earlier local state). Re-enable the
         toggle and the badges/filter return on next reload. Proves the
         feature is fully gated by the toggle.
 
-    - id: 6
-      title: "Map pins also show the Unseen dot"
+    - id: 8
+      title: "Map pins also show the New dot"
       description: >
-        Re-enable the Unseen state and clear `seen_events` from
-        localStorage. Reload / and confirm the explorer map is visible.
-        Locate the pins for the three seeded events.
+        Re-enable the New event markers and repeat steps 1-3 with fresh
+        localStorage. Confirm the explorer map is visible. Locate the pins for
+        the sync-added events if geocoding/enrichment has resolved their
+        coordinates in the scenario environment.
       expected: >
-        Each pin renders a small blue (#3b82f6) dot at the top-right
+        Each New pin renders a small blue (#3b82f6) dot at the top-right
         of the colored disc — matching the card's `bg-blue-500`
-        unseen affordance (positive "new content" signal stays blue,
+        new affordance (positive "new content" signal stays blue,
         per the frontend color rule that reserves red for
         destructive/error states). Clicking a pin opens its popup
         AND marks the event as seen (the dot disappears from both
         the pin and its list card on next render). Proves the pin's
-        dot is driven by the same `seen_events` localStorage set as
-        the card's dot.
+        dot is driven by the same `new_events_state_v1` localStorage state
+        as the card's dot.

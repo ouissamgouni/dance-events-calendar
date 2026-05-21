@@ -47,6 +47,15 @@ events:
     start: w0 Fri 21:00
     end: w0 Sat 01:00
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:salsa
+    - level:beginner-friendly
+    - venue:indoor
+    - scale:medium
+    - scope:local
+    - vibe:good-music
+    - vibe:social-atmosphere
   - id: evt-sef-002
     calendar_id: bachata-cal-002
     title: Bachata Workshop
@@ -57,6 +66,13 @@ events:
     longitude: 13.405
     start: w0 Sat 14:00
     end: w0 Sat 17:00
+    tags:
+    - format:workshop
+    - dance-style:bachata
+    - level:intermediate
+    - venue:indoor
+    - scale:small
+    - scope:local
   - id: evt-sef-003
     calendar_id: salsa-cal-001
     title: Cuban Night
@@ -67,6 +83,14 @@ events:
     longitude: -3.7038
     start: w0 Sun 20:00
     end: w1 Mon 00:00
+    tags:
+    - format:workshop
+    - dance-style:salsa
+    - level:all-levels
+    - venue:indoor
+    - scale:small
+    - scope:local
+    - vibe:social-atmosphere
   - id: evt-sef-004
     calendar_id: bachata-cal-002
     title: Reggaeton Block Party
@@ -78,6 +102,14 @@ events:
     start: w0 Sat 22:00
     end: w0 Sun 02:00
     price_is_free: true
+    tags:
+    - format:social
+    - dance-style:bachata
+    - level:all-levels
+    - venue:outdoor
+    - scale:medium
+    - scope:local
+    - vibe:social-atmosphere
 
 attendances:
   # Pre-existing share_publicly Going from alice. Used to verify that

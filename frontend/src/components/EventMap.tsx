@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
-import { MapContainer, Polygon, Rectangle, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { createPortal } from 'react-dom';
+import { MapContainer, Polygon, Rectangle, TileLayer, useMap } from 'react-leaflet';
 import { Link } from 'react-router-dom';
 import L from 'leaflet';
+import 'leaflet.markercluster';
 import type { CalendarEvent } from '../types';
 import SaveEventButton from './SaveEventButton';
 import GoingButton from './GoingButton';
@@ -41,57 +43,54 @@ function adaptiveMarkerPadding(map: L.Map): [number, number] {
 
 /** Per-event signal overlays composed onto the colored disc. All optional. */
 interface PinDecorations {
-    /** True when popularity_score is top-3 + above threshold; draws an orange ring. */
+    /** True when popularity_score is in the current top slice; draws the trending badge. */
     trending?: boolean;
-    /** Count of mutual friends with going/saved; draws a rose chip at bottom-right. */
+    /** Count of followed people going; draws a blue chip at bottom-right. */
     followingCount?: number;
-    /** True when the viewer hasn't opened this event; draws a rose dot at top-right. */
-    unseen?: boolean;
+    /** True when the event was added after the viewer's local baseline; draws a blue dot at top-right. */
+    newEvent?: boolean;
     /** Total going count for the event; rendered as a small slate chip at
      * top-left so the pin conveys "how many attendees" even when there are
      * no mutual friends. */
     totalGoing?: number;
 }
 
-/** Build the SVG fragment for the trending ring (drawn just inside the box). */
-function trendingRing(size: number): string {
-    const cx = size / 2;
-    const r = size / 2 - 1;
-    return `<circle cx="${cx}" cy="${cx}" r="${r}" fill="none" stroke="#f97316" stroke-width="2" />`;
+function imageChipIcon(src: string, alt: string): string {
+    return `<img src="${src}" alt="${alt}" width="8" height="8" style="display:block;width:8px;height:8px;object-fit:contain;margin-right:2px;" />`;
 }
 
-/** Build the HTML for the following-friend chip (bottom-right). Blue
- * (social signal, not warning) + an inline "people" silhouette so the
- * count reads as "N people you follow" even at pin size. */
+function trendingBadge(size: number): string {
+    const badgeSize = size >= 36 ? 16 : 14;
+    return `<span style="position:absolute;right:-5px;top:-6px;display:inline-flex;align-items:center;justify-content:center;width:${badgeSize}px;height:${badgeSize}px;background:transparent;border:0;box-sizing:content-box;"><img src="/trending.png" alt="Trending" width="${badgeSize}" height="${badgeSize}" style="display:block;width:${badgeSize}px;height:${badgeSize}px;object-fit:contain;" /></span>`;
+}
+
+/** Build the HTML for the following-friend chip (bottom-right). */
 function followingChip(count: number): string {
     const label = count >= 10 ? '9+' : String(count);
-    // Inline SVG: 8x8 two-head people glyph in white. Tight against the
-    // count for a "icon · N" composition that fits in ~26px width.
-    const icon =
-        '<svg viewBox="0 0 20 20" width="8" height="8" fill="currentColor" aria-hidden="true" style="vertical-align:middle;margin-right:1px;">' +
-        '<path d="M7 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm6 0a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM1.5 16.25c0-2.69 2.46-4.5 5.5-4.5s5.5 1.81 5.5 4.5v.5h-11v-.5Zm12.25.5v-.5c0-1.18-.42-2.2-1.14-3.01.36-.05.74-.07 1.14-.07 2.62 0 4.5 1.45 4.5 3.58Z"/></svg>';
-    return `<span style="position:absolute;right:-6px;bottom:-6px;display:inline-flex;align-items:center;min-width:18px;height:14px;padding:0 4px;background:#3b82f6;color:white;font-size:9px;font-weight:700;line-height:14px;border:1.5px solid white;box-sizing:content-box;font-family:system-ui,sans-serif;">${icon}${label}</span>`;
+    const icon = imageChipIcon('/friends.png', 'Friends going');
+    return `<span style="position:absolute;right:-6px;bottom:-6px;display:inline-flex;align-items:center;min-width:18px;height:14px;padding:0 4px;background:white;color:black;font-size:9px;font-weight:700;line-height:14px;border:1.5px solid rgba(255,255,255,0.8);box-sizing:content-box;font-family:system-ui,sans-serif;">${icon}${label}</span>`;
 }
 
-/** Build the HTML for the unseen dot (top-right). Blue dot matches the
- * unseen affordance on the cards (`bg-blue-500`). */
-function unseenDot(): string {
+/** Build the HTML for the new-event dot (top-right). Blue dot matches the
+ * new-event affordance on the cards (`bg-blue-500`). */
+function newEventDot(): string {
     return `<span style="position:absolute;right:-2px;top:-2px;width:8px;height:8px;border-radius:9999px;background:#3b82f6;border:1.5px solid white;box-sizing:content-box;"></span>`;
 }
 
 /** Build the HTML for the total-going chip (top-left). Slate (neutral)
  * so it reads as "how many" without competing with the friends-going
- * (blue) or unseen (blue) social signals. */
+ * (blue) or new-event (blue) social signals. */
 function totalGoingChip(count: number): string {
     const label = count >= 100 ? '99+' : String(count);
-    return `<span style="position:absolute;left:-6px;top:-6px;display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;padding:0 3px;background:#475569;color:white;font-size:9px;font-weight:700;line-height:14px;border:1.5px solid white;box-sizing:content-box;font-family:system-ui,sans-serif;">${label}</span>`;
+    const icon = imageChipIcon('/user.png', 'Going');
+    return `<span style="position:absolute;left:-6px;top:-6px;display:inline-flex;align-items:center;justify-content:center;min-width:14px;height:14px;padding:0 3px;background:#475569;color:white;font-size:9px;font-weight:700;line-height:14px;border:1.5px solid white;box-sizing:content-box;font-family:system-ui,sans-serif;">${icon}${label}</span>`;
 }
 
 function makeColoredIcon(color: string | null, dec?: PinDecorations): L.DivIcon {
     const fill = color || '#3b82f6';
-    const ring = dec?.trending ? trendingRing(28) : '';
+    const trendBadge = dec?.trending ? trendingBadge(28) : '';
     const followBadge = dec?.followingCount && dec.followingCount > 0 ? followingChip(dec.followingCount) : '';
-    const unseenBadge = dec?.unseen ? unseenDot() : '';
+    const newBadge = dec?.newEvent ? newEventDot() : '';
     const totalBadge = dec?.totalGoing && dec.totalGoing > 0 ? totalGoingChip(dec.totalGoing) : '';
     return L.divIcon({
         className: '',
@@ -101,16 +100,15 @@ function makeColoredIcon(color: string | null, dec?: PinDecorations): L.DivIcon 
         html: `<div style="position:relative;width:28px;height:28px;"><svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
             <circle cx="14" cy="14" r="11" fill="${fill}" stroke="white" stroke-width="2.5" />
             <circle cx="14" cy="14" r="4" fill="white" opacity="0.9" />
-            ${ring}
-        </svg>${totalBadge}${unseenBadge}${followBadge}</div>`,
+        </svg>${totalBadge}${newBadge}${trendBadge}${followBadge}</div>`,
     });
 }
 
 function makeHighlightedIcon(color: string | null, dec?: PinDecorations): L.DivIcon {
     const fill = color || '#3b82f6';
-    const ring = dec?.trending ? trendingRing(36) : '';
+    const trendBadge = dec?.trending ? trendingBadge(36) : '';
     const followBadge = dec?.followingCount && dec.followingCount > 0 ? followingChip(dec.followingCount) : '';
-    const unseenBadge = dec?.unseen ? unseenDot() : '';
+    const newBadge = dec?.newEvent ? newEventDot() : '';
     const totalBadge = dec?.totalGoing && dec.totalGoing > 0 ? totalGoingChip(dec.totalGoing) : '';
     return L.divIcon({
         className: '',
@@ -121,8 +119,18 @@ function makeHighlightedIcon(color: string | null, dec?: PinDecorations): L.DivI
             <circle cx="18" cy="18" r="16" fill="${fill}" opacity="0.25" />
             <circle cx="18" cy="18" r="12" fill="${fill}" stroke="white" stroke-width="3" />
             <circle cx="18" cy="18" r="4.5" fill="white" opacity="0.9" />
-            ${ring}
-        </svg>${totalBadge}${unseenBadge}${followBadge}</div>`,
+        </svg>${totalBadge}${newBadge}${trendBadge}${followBadge}</div>`,
+    });
+}
+
+function makeClusterIcon(cluster: L.MarkerCluster): L.DivIcon {
+    const count = cluster.getChildCount();
+    const size = count >= 50 ? 46 : count >= 10 ? 40 : 34;
+    return L.divIcon({
+        className: '',
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+        html: `<div style="width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center;background:#3b82f6;color:white;border:3px solid white;box-shadow:0 2px 10px rgba(15,23,42,0.22);font:800 13px/1 system-ui,sans-serif;box-sizing:border-box;">${count}</div>`,
     });
 }
 
@@ -160,10 +168,9 @@ interface Props {
      * imperative flyToArea re-fit. When provided, the marker auto-fit is
      * also suppressed for the first render. */
     initialArea?: { min_lat: number; min_lng: number; max_lat: number; max_lng: number } | null;
-    /** Set of event_ids the viewer has already opened. Drives the Unseen
-     * dot overlay when ``unseenStateEnabled`` is on. Optional — when
-     * omitted no events are treated as seen. */
-    seenEventIds?: Set<string>;
+    /** Set of event_ids added after the viewer's local baseline. Drives the
+     * dot overlay when ``unseenStateEnabled`` is on. */
+    newEventIds?: Set<string>;
     /** Threshold for the trending pin ring. Defaults to 10 to match the
      * list panel's ``PopularityBadge``. */
     popularityThreshold?: number;
@@ -176,6 +183,65 @@ interface Props {
      * disabling the badge elsewhere (cards, modal). Defaults to ``true``.
      * Has no effect when the site-wide flag is off. */
     showFollowingBadgeOverlay?: boolean;
+    /** Per-render override for the trending overlay on map pins. Defaults to true and
+     * has no effect when the site-wide ``trendingEnabled`` flag is off. */
+    showTrendingOverlay?: boolean;
+}
+
+interface PopupPortal {
+    key: string;
+    host: HTMLDivElement;
+    event: CalendarEvent;
+    followingCount: number;
+    showFollowingOverlay: boolean;
+}
+
+function EventPopupContent({ event, followingCount, showFollowingOverlay, showRatings, detailLinkSource, formatDate, onEventClick, onMarkSeen }: {
+    event: CalendarEvent;
+    followingCount: number;
+    showFollowingOverlay: boolean;
+    showRatings: boolean;
+    detailLinkSource?: string;
+    formatDate: (event: CalendarEvent) => string;
+    onEventClick?: (event: CalendarEvent) => void;
+    onMarkSeen?: (eventId: string) => void;
+}) {
+    return (
+        <div className="space-y-1.5 text-xs min-w-[180px]">
+            <p
+                className="font-semibold text-sm cursor-pointer hover:text-slate-600"
+                onClick={() => { onMarkSeen?.(event.event_id); onEventClick?.(event); }}
+            >
+                {event.title}
+            </p>
+            <p className="text-slate-500">{formatDate(event)}</p>
+            {event.location && (
+                <p className="text-slate-600">📍 {event.location}</p>
+            )}
+            {followingCount > 0 && (
+                <AttendeeAvatarStack
+                    eventId={event.event_id}
+                    friendsPreview={showFollowingOverlay ? event.following_friends_preview : undefined}
+                />
+            )}
+            {event.tags?.length > 0 && (
+                <TagBadges tags={event.tags} maxVisible={3} />
+            )}
+            <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                <div className="flex items-center gap-1">
+                    <SaveEventButton eventId={event.event_id} appearance="icon" size="sm" stopPropagation />
+                    <GoingButton eventId={event.event_id} appearance="icon" size="sm" stopPropagation />
+                    {showRatings && <RateEventButton eventId={event.event_id} appearance="icon" size="sm" stopPropagation />}
+                </div>
+                <Link
+                    to={`/event/${event.event_id}${detailLinkSource ? `?src=${detailLinkSource}` : ''}`}
+                    className="text-[10px] font-medium text-blue-500 hover:text-blue-600"
+                >
+                    Details →
+                </Link>
+            </div>
+        </div>
+    );
 }
 
 function BoundsReporter({ onBoundsChange }: { onBoundsChange?: (bounds: MapBounds, userDriven: boolean) => void }) {
@@ -237,6 +303,7 @@ function MapController({
     focusedEventId,
     focusedPosition,
     markerRefs,
+    clusterGroupRef,
     autoFitToken,
     flyToAreaToken,
     skipInitialFit,
@@ -245,6 +312,7 @@ function MapController({
     focusedEventId: string | null;
     focusedPosition: [number, number] | null;
     markerRefs: MutableRefObject<Map<string, L.Marker>>;
+    clusterGroupRef: MutableRefObject<L.MarkerClusterGroup | null>;
     autoFitToken: number | undefined;
     flyToAreaToken: number | undefined;
     /** When true, suppress the very first marker auto-fit (the parent has
@@ -268,6 +336,11 @@ function MapController({
             const openPopup = () => {
                 if (!focusedEventId) return;
                 const marker = markerRefs.current.get(focusedEventId);
+                const clusterGroup = clusterGroupRef.current;
+                if (marker && clusterGroup) {
+                    clusterGroup.zoomToShowLayer(marker, () => marker.openPopup());
+                    return;
+                }
                 if (marker) marker.openPopup();
             };
             map.once('moveend', openPopup);
@@ -286,7 +359,7 @@ function MapController({
                 map.flyToBounds(L.latLngBounds(positions), { padding: adaptiveMarkerPadding(map), duration: 0.8 });
             }
         }
-    }, [focusedEventId, focusedPosition, map, markerRefs, positions]);
+    }, [clusterGroupRef, focusedEventId, focusedPosition, map, markerRefs, positions]);
 
     // Snapshot of the positions key captured at the moment of a token
     // bump. While set, the next *change* in positions is treated as the
@@ -458,9 +531,144 @@ function FlyToAreaController({
     return null;
 }
 
-export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, seenEventIds, popularityThreshold = 10, onMarkSeen, showFollowingBadgeOverlay = true }: Props) {
+function MarkerClusterLayer({
+    events,
+    hoveredEventId,
+    eventColorBarColor,
+    followingBadgeEnabled,
+    showFollowingBadgeOverlay,
+    unseenStateEnabled,
+    newEventIds,
+    trendingEnabled,
+    showTrendingOverlay,
+    popularityThreshold,
+    topScores,
+    showRatings,
+    markerRefs,
+    clusterGroupRef,
+    detailLinkSource,
+    formatDate,
+    onEventClick,
+    onEventHover,
+    onMarkSeen,
+}: {
+    events: CalendarEvent[];
+    hoveredEventId?: string | null;
+    eventColorBarColor: string | null;
+    followingBadgeEnabled: boolean;
+    showFollowingBadgeOverlay: boolean;
+    unseenStateEnabled: boolean;
+    newEventIds?: Set<string>;
+    trendingEnabled: boolean;
+    showTrendingOverlay: boolean;
+    popularityThreshold: number;
+    topScores: number[];
+    showRatings: boolean;
+    markerRefs: MutableRefObject<Map<string, L.Marker>>;
+    clusterGroupRef: MutableRefObject<L.MarkerClusterGroup | null>;
+    detailLinkSource?: string;
+    formatDate: (event: CalendarEvent) => string;
+    onEventClick?: (event: CalendarEvent) => void;
+    onEventHover?: (eventId: string | null) => void;
+    onMarkSeen?: (eventId: string) => void;
+}) {
+    const map = useMap();
+    const [popupPortals, setPopupPortals] = useState<PopupPortal[]>([]);
+
+    useEffect(() => {
+        const clusterGroup = L.markerClusterGroup({
+            chunkedLoading: true,
+            disableClusteringAtZoom: 16,
+            iconCreateFunction: makeClusterIcon,
+            maxClusterRadius: 60,
+            showCoverageOnHover: false,
+            spiderfyOnMaxZoom: true,
+            zoomToBoundsOnClick: true,
+        });
+        clusterGroupRef.current = clusterGroup;
+        map.addLayer(clusterGroup);
+
+        return () => {
+            map.removeLayer(clusterGroup);
+            clusterGroupRef.current = null;
+        };
+    }, [clusterGroupRef, map]);
+
+    useEffect(() => {
+        const clusterGroup = clusterGroupRef.current;
+        if (!clusterGroup) return;
+
+        clusterGroup.clearLayers();
+        markerRefs.current.clear();
+
+        const nextPortals: PopupPortal[] = [];
+
+        events.forEach((event) => {
+            const showFollowingOverlay = followingBadgeEnabled && showFollowingBadgeOverlay;
+            const followingCount = showFollowingOverlay ? (event.following_friend_count ?? 0) : 0;
+            const newEvent = unseenStateEnabled && !!newEventIds?.has(event.event_id);
+            const score = event.popularity_score ?? 0;
+            const trending = trendingEnabled
+                && showTrendingOverlay
+                && score >= popularityThreshold
+                && topScores.includes(score);
+            const totalGoing = event.going_count ?? 0;
+            const decorations: PinDecorations = { trending, followingCount, newEvent, totalGoing };
+            const isHovered = hoveredEventId === event.event_id;
+            const marker = L.marker([event.latitude!, event.longitude!], {
+                icon: isHovered ? makeHighlightedIcon(eventColorBarColor, decorations) : makeColoredIcon(eventColorBarColor, decorations),
+            });
+            const popupHost = document.createElement('div');
+
+            marker.bindPopup(popupHost);
+            marker.on('mouseover', () => onEventHover?.(event.event_id));
+            marker.on('mouseout', () => onEventHover?.(null));
+            marker.on('click', () => onMarkSeen?.(event.event_id));
+
+            markerRefs.current.set(event.event_id, marker);
+            clusterGroup.addLayer(marker);
+            nextPortals.push({
+                key: event.event_id,
+                host: popupHost,
+                event,
+                followingCount,
+                showFollowingOverlay,
+            });
+        });
+
+        setPopupPortals(nextPortals);
+
+        return () => {
+            clusterGroup.clearLayers();
+            markerRefs.current.clear();
+            setPopupPortals([]);
+        };
+    }, [clusterGroupRef, detailLinkSource, eventColorBarColor, events, followingBadgeEnabled, formatDate, hoveredEventId, markerRefs, newEventIds, onEventClick, onEventHover, onMarkSeen, popularityThreshold, showFollowingBadgeOverlay, showRatings, showTrendingOverlay, topScores, trendingEnabled, unseenStateEnabled]);
+
+    return (
+        <>
+            {popupPortals.map((portal) => createPortal(
+                <EventPopupContent
+                    event={portal.event}
+                    followingCount={portal.followingCount}
+                    showFollowingOverlay={portal.showFollowingOverlay}
+                    showRatings={showRatings}
+                    detailLinkSource={detailLinkSource}
+                    formatDate={formatDate}
+                    onEventClick={onEventClick}
+                    onMarkSeen={onMarkSeen}
+                />,
+                portal.host,
+                portal.key,
+            ))}
+        </>
+    );
+}
+
+export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, newEventIds, popularityThreshold = 10, onMarkSeen, showFollowingBadgeOverlay = true, showTrendingOverlay = true }: Props) {
     const { showRatings, eventColorBarColor, followingBadgeEnabled, unseenStateEnabled, trendingEnabled, trendingTopN, trendingTopPercent } = useFeatureFlags();
     const markerRefs = useRef(new Map<string, L.Marker>());
+    const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
     const geoEvents = useMemo(
         () => events.filter((e) => e.latitude != null && e.longitude != null),
         [events],
@@ -494,15 +702,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
 
     const focusedEventId = focusedEvent?.event_id ?? null;
 
-    const registerMarker = useCallback((eventId: string, marker: L.Marker | null) => {
-        if (marker) {
-            markerRefs.current.set(eventId, marker);
-            return;
-        }
-        markerRefs.current.delete(eventId);
-    }, []);
-
-    const formatDate = (e: CalendarEvent) => {
+    const formatDate = useCallback((e: CalendarEvent) => {
         const start = new Date(e.start);
         const date = start.toLocaleDateString(undefined, {
             weekday: 'short',
@@ -515,7 +715,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
             minute: '2-digit',
         });
         return `${date} · ${time}`;
-    };
+    }, []);
 
     return (
         <MapContainer
@@ -582,74 +782,34 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                 focusedEventId={focusedEventId}
                 focusedPosition={focusedPosition}
                 markerRefs={markerRefs}
+                clusterGroupRef={clusterGroupRef}
                 autoFitToken={autoFitToken}
                 flyToAreaToken={flyToAreaToken}
                 skipInitialFit={!!initialArea}
             />
             <FlyToAreaController flyToArea={flyToArea} flyToAreaToken={flyToAreaToken} />
             <BoundsReporter onBoundsChange={onBoundsChange} />
-            {geoEvents.map((e) => {
-                const showFollowingOverlay = followingBadgeEnabled && showFollowingBadgeOverlay;
-                const followingCount = showFollowingOverlay ? (e.following_friend_count ?? 0) : 0;
-                const unseen = unseenStateEnabled && !!seenEventIds && !seenEventIds.has(e.event_id);
-                const score = e.popularity_score ?? 0;
-                const trending = trendingEnabled
-                    && score >= popularityThreshold
-                    && topScores.includes(score);
-                const totalGoing = e.going_count ?? 0;
-                const dec: PinDecorations = { trending, followingCount, unseen, totalGoing };
-                const isHovered = hoveredEventId === e.event_id;
-                return (
-                    <Marker
-                        key={e.event_id}
-                        ref={(marker) => registerMarker(e.event_id, marker)}
-                        position={[e.latitude!, e.longitude!]}
-                        icon={isHovered ? makeHighlightedIcon(eventColorBarColor, dec) : makeColoredIcon(eventColorBarColor, dec)}
-                        eventHandlers={{
-                            mouseover: () => onEventHover?.(e.event_id),
-                            mouseout: () => onEventHover?.(null),
-                            click: () => onMarkSeen?.(e.event_id),
-                        }}
-                    >
-                        <Popup>
-                            <div className="space-y-1.5 text-xs min-w-[180px]">
-                                <p
-                                    className="font-semibold text-sm cursor-pointer hover:text-slate-600"
-                                    onClick={() => { onMarkSeen?.(e.event_id); onEventClick?.(e); }}
-                                >
-                                    {e.title}
-                                </p>
-                                <p className="text-slate-500">{formatDate(e)}</p>
-                                {e.location && (
-                                    <p className="text-slate-600">📍 {e.location}</p>
-                                )}
-                                {followingCount > 0 && (
-                                    <AttendeeAvatarStack
-                                        eventId={e.event_id}
-                                        friendsPreview={showFollowingOverlay ? e.following_friends_preview : undefined}
-                                    />
-                                )}
-                                {e.tags?.length > 0 && (
-                                    <TagBadges tags={e.tags} maxVisible={3} />
-                                )}
-                                <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-                                    <div className="flex items-center gap-1">
-                                        <SaveEventButton eventId={e.event_id} appearance="icon" size="sm" stopPropagation />
-                                        <GoingButton eventId={e.event_id} appearance="icon" size="sm" stopPropagation />
-                                        {showRatings && <RateEventButton eventId={e.event_id} appearance="icon" size="sm" stopPropagation />}
-                                    </div>
-                                    <Link
-                                        to={`/event/${e.event_id}${detailLinkSource ? `?src=${detailLinkSource}` : ''}`}
-                                        className="text-[10px] font-medium text-rose-500 hover:text-rose-700"
-                                    >
-                                        Details →
-                                    </Link>
-                                </div>
-                            </div>
-                        </Popup>
-                    </Marker>
-                );
-            })}
+            <MarkerClusterLayer
+                events={geoEvents}
+                hoveredEventId={hoveredEventId}
+                eventColorBarColor={eventColorBarColor}
+                followingBadgeEnabled={followingBadgeEnabled}
+                showFollowingBadgeOverlay={showFollowingBadgeOverlay}
+                unseenStateEnabled={unseenStateEnabled}
+                newEventIds={newEventIds}
+                trendingEnabled={trendingEnabled}
+                showTrendingOverlay={showTrendingOverlay}
+                popularityThreshold={popularityThreshold}
+                topScores={topScores}
+                showRatings={showRatings}
+                markerRefs={markerRefs}
+                clusterGroupRef={clusterGroupRef}
+                detailLinkSource={detailLinkSource}
+                formatDate={formatDate}
+                onEventClick={onEventClick}
+                onEventHover={onEventHover}
+                onMarkSeen={onMarkSeen}
+            />
         </MapContainer>
     );
 }
