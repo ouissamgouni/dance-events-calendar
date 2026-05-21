@@ -19,7 +19,7 @@ export default function OnboardingPreferences() {
         selectedTagIds: [],
         freeTexts: {},
     });
-    const [areaExpanded, setAreaExpanded] = useState(false);
+    const [areaExpanded, setAreaExpanded] = useState(true);
     const [areaLabelDraft, setAreaLabelDraft] = useState(prefs.area?.label ?? DEFAULT_AREA_BBOX.label);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -147,9 +147,9 @@ export default function OnboardingPreferences() {
                     aria-expanded={areaExpanded}
                 >
                     <span>
-                        <span className="block text-sm font-semibold text-slate-900">Map view preferences</span>
+                        <span className="block text-sm font-semibold text-slate-900">Default event area</span>
                         <span className="mt-0.5 block text-xs text-slate-500">
-                            {prefs.area?.label ?? 'Use the default area'}
+                            {prefs.area?.label ?? `Events start around ${DEFAULT_AREA_BBOX.label}`}
                         </span>
                     </span>
                     <span className="text-xs text-slate-400" aria-hidden="true">{areaExpanded ? '▾' : '▸'}</span>
@@ -157,6 +157,9 @@ export default function OnboardingPreferences() {
 
                 {areaExpanded && (
                     <div className="mt-3">
+                        <p className="mb-3 text-xs text-slate-600">
+                            This sets the first map area and event search area you see. It does not share your location.
+                        </p>
                         <AreaMapPicker
                             value={prefs.area}
                             onChange={handleAreaChange}
@@ -169,30 +172,32 @@ export default function OnboardingPreferences() {
                                     }
                                 }, 0);
                             }}
+                            controlsStart={(
+                                <div className="flex shrink-0 items-center gap-2">
+                                    <label htmlFor="onboarding-area-name" className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                                        Name
+                                    </label>
+                                    <input
+                                        id="onboarding-area-name"
+                                        ref={areaNameInputRef}
+                                        type="text"
+                                        value={areaLabelDraft}
+                                        onChange={(e) => setAreaLabelDraft(e.target.value)}
+                                        onBlur={() => { void commitAreaLabel(); }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                e.currentTarget.blur();
+                                            }
+                                        }}
+                                        maxLength={10}
+                                        placeholder="Area name"
+                                        size={12}
+                                        className="w-28 border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    />
+                                </div>
+                            )}
                         />
-                        <div className="mt-2 flex items-center gap-2">
-                            <label htmlFor="onboarding-area-name" className="shrink-0 text-[11px] text-slate-500">
-                                Saved as
-                            </label>
-                            <input
-                                id="onboarding-area-name"
-                                ref={areaNameInputRef}
-                                type="text"
-                                value={areaLabelDraft}
-                                onChange={(e) => setAreaLabelDraft(e.target.value)}
-                                onBlur={() => { void commitAreaLabel(); }}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        e.currentTarget.blur();
-                                    }
-                                }}
-                                maxLength={10}
-                                placeholder="Name"
-                                size={12}
-                                className="w-28 shrink-0 border border-slate-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            />
-                        </div>
                     </div>
                 )}
             </section>

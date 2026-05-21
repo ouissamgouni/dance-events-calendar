@@ -33,9 +33,21 @@ test_plan:
       expected: >
         URL becomes /onboarding/preferences?next=%2F. The preferred tags card
         shows `Dance Style` tags (`Salsa`, `Bachata`, `Kizomba`, `Zouk`) and
-        does not show the non-eligible `Format` tags. The map view preferences
-        section is collapsed by default. Skip is visible in the header, and
-        Continue is enabled even before any preference is selected.
+        does not show the non-eligible `Format` tags. The default event area
+        section is expanded by default and explains that the map controls the
+        starting event area, not the user's physical location. Skip is visible
+        in the header, and Continue is enabled even before any preference is
+        selected.
+
+    - id: 1b
+      title: "Default event area guide stays fixed while choosing a map area"
+      description: >
+        From /onboarding/preferences?next=%2F, pan and zoom the default event
+        area map, then tap `Save area in box`.
+      expected: >
+        The highlighted box stays fixed on screen while the map moves beneath
+        it. Saving uses the area inside that fixed box, focuses the area-name
+        field, and persists through /api/auth/preferences without an error.
 
     - id: 1a
       title: "Preferences skip advances to follow suggestions"

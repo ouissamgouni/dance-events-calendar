@@ -172,7 +172,7 @@ export default function PreferencesSection() {
             {expanded && (
                 <div className="mt-3">
                     <p className="text-xs text-slate-600 mb-3">
-                        Used as default filters in the explorer.
+                        These tags and map area are used as your starting event filters.
                     </p>
 
                     {/* ── Preferred tags (all enabled groups) ── */}
@@ -200,18 +200,16 @@ export default function PreferencesSection() {
                         )}
                     </div>
 
-                    {/* ── Preferred area ── */}
+                    {/* ── Default event area ── */}
                     <div className="mb-3">
                         <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1.5">
-                            Preferred area
+                            Default event area
                         </label>
                         <AreaMapPicker
                             value={prefs.area}
                             onChange={handleAreaChange}
                             onUseCurrentView={() => {
-                                // Defer until after the area save commits
-                                // and the input mounts (it only renders
-                                // when prefs.area is non-null).
+                                // Defer until after the area save commits.
                                 window.setTimeout(() => {
                                     const el = areaNameInputRef.current;
                                     if (el) {
@@ -220,38 +218,33 @@ export default function PreferencesSection() {
                                     }
                                 }, 0);
                             }}
+                            controlsStart={(
+                                <div className="flex shrink-0 items-center gap-2">
+                                    <label htmlFor="pref-area-name" className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                                        Name
+                                    </label>
+                                    <input
+                                        id="pref-area-name"
+                                        ref={areaNameInputRef}
+                                        type="text"
+                                        value={areaLabelDraft}
+                                        onChange={(e) => setAreaLabelDraft(e.target.value)}
+                                        onBlur={() => { void commitAreaLabel(); }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                                e.preventDefault();
+                                                (e.currentTarget as HTMLInputElement).blur();
+                                            }
+                                        }}
+                                        maxLength={10}
+                                        placeholder="Area name"
+                                        size={12}
+                                        className="w-28 border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        data-testid="preferences-area-name"
+                                    />
+                                </div>
+                            )}
                         />
-                        {/* Always show the Saved-as field, even before the
-                            user explicitly saves — prefilled with the
-                            implicit default label. Editing it commits the
-                            default bbox under the new name. */}
-                        <div className="mt-2 flex items-center gap-2">
-                                <label
-                                    htmlFor="pref-area-name"
-                                    className="text-[11px] text-slate-500 shrink-0"
-                                >
-                                    Saved as
-                                </label>
-                                <input
-                                    id="pref-area-name"
-                                    ref={areaNameInputRef}
-                                    type="text"
-                                    value={areaLabelDraft}
-                                    onChange={(e) => setAreaLabelDraft(e.target.value)}
-                                    onBlur={() => { void commitAreaLabel(); }}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            (e.currentTarget as HTMLInputElement).blur();
-                                        }
-                                    }}
-                                    maxLength={10}
-                                    placeholder="Name"
-                                    size={12}
-                                    className="shrink-0 w-28 border border-slate-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                    data-testid="preferences-area-name"
-                                />
-                        </div>
                     </div>
 
                     {error && <p className="text-xs text-red-700 mb-2">{error}</p>}
