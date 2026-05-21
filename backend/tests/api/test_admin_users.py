@@ -3,7 +3,7 @@
 Covers:
 - ``GET /api/social/admin/users`` (auth gating, search, pagination,
   follower counts, deleted filter, verified filter).
-- ``DELETE /api/social/admin/users/{handle}`` (auth gating, social-edge
+- ``DELETE /api/social/admin/users/id/{user_id}`` (auth gating, social-edge
   cleanup parity with self-service deletion, refusal to delete the admin's
   own account).
 """
@@ -183,7 +183,7 @@ def test_admin_managed_toggle_sets_public_default_audience(client, session):
 
     _login(client, "admin@example.com")
     r = client.patch(
-        "/api/social/admin/users/alice/managed",
+        f"/api/social/admin/users/id/{users['alice'].id}/managed",
         json={"is_admin_managed": True, "managed_label": "Paris curator"},
     )
     assert r.status_code == 200, r.text
@@ -198,30 +198,60 @@ def test_admin_managed_toggle_sets_public_default_audience(client, session):
     assert alice.share_attendance_default_set_by_user is True
 
 
-# --- DELETE /admin/users/{handle} -------------------------------------------
+@pytest.mark.unit
+def test_admin_actions_work_for_user_without_handle(client, session):
+    users = _seed_users(session)
+    users["alice"].handle = None
+    session.add(users["alice"])
+    session.commit()
+    session.refresh(users["alice"])
+
+    _login(client, "admin@example.com")
+    r = client.patch(
+        f"/api/social/admin/users/id/{users['alice'].id}/verified",
+        json={"is_verified_organizer": True},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["handle"] is None
+    assert r.json()["is_verified_organizer"] is True
+
+    r2 = client.patch(
+        f"/api/social/admin/users/id/{users['alice'].id}/managed",
+        json={"is_admin_managed": True, "managed_label": "Legacy account"},
+    )
+    assert r2.status_code == 200, r2.text
+    assert r2.json()["handle"] is None
+    assert r2.json()["is_admin_managed"] is True
+
+    r3 = client.delete(f"/api/social/admin/users/id/{users['alice'].id}")
+    assert r3.status_code == 200, r3.text
+    assert r3.json()["status"] == "deleted"
+
+
+# --- DELETE /admin/users/id/{user_id} ---------------------------------------
 
 
 @pytest.mark.unit
 def test_admin_delete_user_requires_admin(client, session):
-    _seed_users(session)
+    users = _seed_users(session)
     _login(client, "alice@example.com")
-    r = client.delete("/api/social/admin/users/bob")
+    r = client.delete(f"/api/social/admin/users/id/{users['bob'].id}")
     assert r.status_code == 403
 
 
 @pytest.mark.unit
-def test_admin_delete_user_404_for_unknown_handle(client, session):
+def test_admin_delete_user_404_for_unknown_user_id(client, session):
     _seed_users(session)
     _login(client, "admin@example.com")
-    r = client.delete("/api/social/admin/users/nobody")
+    r = client.delete("/api/social/admin/users/id/00000000-0000-0000-0000-000000000000")
     assert r.status_code == 404
 
 
 @pytest.mark.unit
 def test_admin_delete_user_refuses_to_delete_admin(client, session):
-    _seed_users(session)
+    users = _seed_users(session)
     _login(client, "admin@example.com")
-    r = client.delete("/api/social/admin/users/admin")
+    r = client.delete(f"/api/social/admin/users/id/{users['admin'].id}")
     assert r.status_code == 400
     # Admin row is still present and active.
     admin = session.exec(select(User).where(User.handle == "admin")).first()
@@ -249,7 +279,7 @@ def test_admin_delete_user_purges_social_edges(client, session):
     assert session.exec(select(UserFollow)).all()
 
     _login(client, "admin@example.com")
-    r = client.delete("/api/social/admin/users/carol")
+    r = client.delete(f"/api/social/admin/users/id/{users['carol'].id}")
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["status"] == "deleted"
@@ -258,12 +288,12 @@ def test_admin_delete_user_purges_social_edges(client, session):
     assert session.exec(select(UserFollow)).all() == []
     assert session.exec(select(CalendarSubscription)).all() == []
     # Carol soft-deleted + anonymised.
+    session.expire_all()
     carol = session.exec(
         select(User).where(User.email.like("deleted-%@example.invalid"))
     ).first()
     assert carol is not None
     assert carol.deleted_at is not None
-    # Subsequent admin lookup by old handle returns 404 (deleted users are
-    # excluded by _resolve_handle).
-    r2 = client.delete("/api/social/admin/users/carol")
+    # Subsequent admin lookup by id returns 404 (deleted users are excluded).
+    r2 = client.delete(f"/api/social/admin/users/id/{users['carol'].id}")
     assert r2.status_code == 404

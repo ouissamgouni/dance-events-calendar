@@ -22,6 +22,7 @@ primary_region = "cdg"
   LOG_LEVEL = "debug"
   ENV_NAME = "staging"
   CALENDAR_SERVICE = "google"
+  PUBLIC_APP_URL = "https://develop.joinmovida.com"
   # Frontend origins. The session cookie is set on api-develop.joinmovida.com
   # (same-site as the frontend), so develop.joinmovida.com is the only origin
   # that needs credentialed CORS. Pages preview URL is kept for ad-hoc testing.

@@ -1186,20 +1186,20 @@ export async function fetchAdminUsers(
     return parseJsonResponse<AdminUserList>(res, 'Failed to fetch users');
 }
 
-export async function adminDeleteUser(handle: string): Promise<{ status: string; user_id: string }> {
+export async function adminDeleteUser(userId: string): Promise<{ status: string; user_id: string }> {
     const res = await fetch(
-        `${BASE}/social/admin/users/${encodeURIComponent(handle)}`,
+        `${BASE}/social/admin/users/id/${encodeURIComponent(userId)}`,
         { method: 'DELETE', credentials: 'include' },
     );
     return parseJsonResponse<{ status: string; user_id: string }>(res, 'Failed to delete user');
 }
 
 export async function adminSetVerifiedOrganizer(
-    handle: string,
+    userId: string,
     isVerified: boolean,
-): Promise<PublicProfile> {
+): Promise<AdminUserRow> {
     const res = await fetch(
-        `${BASE}/social/admin/users/${encodeURIComponent(handle)}/verified`,
+        `${BASE}/social/admin/users/id/${encodeURIComponent(userId)}/verified`,
         {
             method: 'PATCH',
             credentials: 'include',
@@ -1207,16 +1207,16 @@ export async function adminSetVerifiedOrganizer(
             body: JSON.stringify({ is_verified_organizer: isVerified }),
         },
     );
-    return parseJsonResponse<PublicProfile>(res, 'Failed to update verified flag');
+    return parseJsonResponse<AdminUserRow>(res, 'Failed to update verified flag');
 }
 
 export async function adminSetAdminManaged(
-    handle: string,
+    userId: string,
     isAdminManaged: boolean,
     managedLabel?: string | null,
-): Promise<PublicProfile> {
+): Promise<AdminUserRow> {
     const res = await fetch(
-        `${BASE}/social/admin/users/${encodeURIComponent(handle)}/managed`,
+        `${BASE}/social/admin/users/id/${encodeURIComponent(userId)}/managed`,
         {
             method: 'PATCH',
             credentials: 'include',
@@ -1227,7 +1227,7 @@ export async function adminSetAdminManaged(
             }),
         },
     );
-    return parseJsonResponse<PublicProfile>(res, 'Failed to update managed flag');
+    return parseJsonResponse<AdminUserRow>(res, 'Failed to update managed flag');
 }
 
 export async function updateMyVisibility(
