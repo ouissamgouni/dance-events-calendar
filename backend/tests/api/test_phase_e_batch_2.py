@@ -381,6 +381,29 @@ def test_e7_get_referral_is_idempotent(client, session):
     assert r1.json()["used_count"] == 0
 
 
+def test_e7_get_referral_uses_public_app_url(client, session, monkeypatch):
+    monkeypatch.setenv("PUBLIC_APP_URL", "https://example.test/")
+    _make_user(session, "viewer@example.com", "viewer")
+    _login(client, "viewer@example.com")
+    r = client.get("/api/social/me/referral")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["url"] == f"https://example.test/r/{body['code']}"
+
+
+@pytest.mark.parametrize(
+    ("env_name", "expected_base"),
+    [
+        ("staging", "https://develop.joinmovida.com"),
+        ("production", "https://joinmovida.com"),
+    ],
+)
+def test_e7_referral_cloud_fallback_is_public(monkeypatch, env_name, expected_base):
+    monkeypatch.delenv("PUBLIC_APP_URL", raising=False)
+    monkeypatch.setenv("ENV_NAME", env_name)
+    assert social_module._referral_url("ABC123") == f"{expected_base}/r/ABC123"
+
+
 def test_e7_post_referral_returns_same_code_as_get(client, session):
     _make_user(session, "viewer@example.com", "viewer")
     _login(client, "viewer@example.com")
