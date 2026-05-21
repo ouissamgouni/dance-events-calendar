@@ -158,9 +158,9 @@ interface Props {
     /** Optional bbox to fly to imperatively. Combined with
      * ``flyToAreaToken`` (a monotonic counter) so the parent can request a
      * map flyToBounds without re-firing on every render. Used by the
-     * "Default area" snap-back action so the map view (and therefore the
-     * events query, which now follows the viewport) returns to the user's
-     * configured default area. */
+     * "Default area" snap-back action so the map view returns to the user's
+     * configured default area while the parent keeps filtering events by the
+     * active area, not by the live viewport. */
     flyToArea?: { min_lat: number; min_lng: number; max_lat: number; max_lng: number } | null;
     flyToAreaToken?: number;
     /** Optional initial bbox to open the map at, captured ONCE on mount.
@@ -371,12 +371,12 @@ function MapController({
     // When the parent issues an imperative flyToArea (Default / Europe /
     // World pills) we want a TWO-STEP behaviour:
     //   1. ``FlyToAreaController`` snaps the map to the requested bbox now
-    //      (forces the events query to refetch with that bbox).
+    //      (the parent controls which events are in the active area).
     //   2. We then tighten the view to the actual marker bounds — either
-    //      after the refetch lands (positions change → branch below), or
-    //      right away if positions already match (e.g. clicking the same
-    //      preset twice). Much more useful than staying framed on a
-    //      continent-sized bbox when events cluster in a few cities.
+    //      after positions change, or right away if positions already match
+    //      (e.g. clicking the same preset twice). Much more useful than
+    //      staying framed on a continent-sized bbox when events cluster in a
+    //      few cities.
     const lastFlyToken = useRef<number | undefined>(flyToAreaToken);
     useEffect(() => {
         if (flyToAreaToken === undefined) return;
@@ -387,9 +387,9 @@ function MapController({
             .join('|');
         positionsSnapshotAtBump.current = positionsKey;
         // Schedule a follow-up fit-to-markers a bit after the area fit, so
-        // even when the events query doesn't refetch (same area, same
-        // results) we still tighten around the existing markers. Skipped
-        // when the positions snapshot mechanism below has already fired.
+        // even when positions do not change we still tighten around the
+        // existing markers. Skipped when the positions snapshot mechanism
+        // below has already fired.
         const timer = setTimeout(() => {
             if (positionsSnapshotAtBump.current !== positionsKey) return; // already consumed
             positionsSnapshotAtBump.current = null;

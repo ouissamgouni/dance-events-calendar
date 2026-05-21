@@ -36,6 +36,58 @@ function formatDate(date: Date): string {
     return `${y}-${m}-${d}`;
 }
 
+function areaToMapBounds(area: PreferredAreaPayload): MapBounds {
+    return {
+        south: area.min_lat,
+        north: area.max_lat,
+        west: area.min_lng,
+        east: area.max_lng,
+    };
+}
+
+function eventMatchesBounds(event: CalendarEvent, bounds: MapBounds): boolean {
+    if (event.latitude == null || event.longitude == null) return true;
+    return (
+        event.latitude >= bounds.south &&
+        event.latitude <= bounds.north &&
+        event.longitude >= bounds.west &&
+        event.longitude <= bounds.east
+    );
+}
+
+function filterEventsByTags(events: CalendarEvent[], activeTagIds: Set<number>, tagGroups: TagGroup[]): CalendarEvent[] {
+    if (activeTagIds.size === 0) return events;
+
+    // Disjunctive faceting filter logic:
+    //  - Within a multi-select group: OR (event must match ANY selected tag in that group)
+    //  - Across groups: AND (event must satisfy every group that has a selection)
+    // Single-select groups behave the same as OR (only one tag can be selected).
+    const tagToGroupSlug = new Map<number, string>();
+    for (const g of tagGroups) {
+        for (const t of g.tags) tagToGroupSlug.set(t.id, g.slug);
+    }
+    const groupBuckets = new Map<string, number[]>();
+    const ungrouped: number[] = [];
+    for (const id of activeTagIds) {
+        const slug = tagToGroupSlug.get(id);
+        if (!slug) { ungrouped.push(id); continue; }
+        const arr = groupBuckets.get(slug);
+        if (arr) arr.push(id);
+        else groupBuckets.set(slug, [id]);
+    }
+
+    return events.filter((event) => {
+        const tagSet = new Set((event.tags ?? []).map((tag) => tag.id));
+        for (const ids of groupBuckets.values()) {
+            if (!ids.some((id) => tagSet.has(id))) return false;
+        }
+        for (const id of ungrouped) {
+            if (!tagSet.has(id)) return false;
+        }
+        return true;
+    });
+}
+
 export default function Home() {
     const { user } = useAuth();
     const { showPrices, showPopularity, popularityThreshold, tagSortMode, unseenStateEnabled } = useFeatureFlags();
@@ -210,14 +262,13 @@ export default function Home() {
         return DEFAULT_AREA_BBOX;
     }, [areaSessionOverride, prefs.area]);
 
-    // Explorer mode fetches the full event set (worldwide) and filters by
-    // the current map viewport on the client — the catalogue is small
-    // enough that a per-pan API roundtrip isn't worth it, and this way
-    // panning instantly reveals the events under the new viewport without
-    // a refetch round-trip or relying on a server-side bbox match.
+    // Explorer mode fetches the full date/interest event set and filters by
+    // the active/default area on the client. The live map viewport is used for
+    // on-map/off-map presentation only, so panning does not hide otherwise
+    // matching events from the list or from the next filter-driven refit.
 
     // Chip state. Four user-visible cases:
-    //   • 'map-view'  — user has panned/zoomed; results follow viewport
+    //   • 'map-view'  — user has panned/zoomed; chip reflects live map view
     //   • 'show-all'  — user clicked the worldwide icon this session
     //   • 'user'      — user has saved prefs and we're applying them
     //   • 'default'   — hardcoded DEFAULT_AREA_BBOX (preset override or no prefs)
@@ -377,22 +428,20 @@ export default function Home() {
         setHoveredEventId(eventId);
     }, []);
 
-    // CalendarEvents query source:
-    //  • If the user has panned/zoomed (``userMapBounds`` set), follow that viewport.
-    //  • Otherwise use the configured area (preset / saved / default).
-    // This keeps Default/Europe/World clicks from picking up extra events
-    // outside the requested area when the map's aspect ratio forces a
-    // wider visible viewport than the bbox.
+    // Events query source: Explorer pulls the date/interest-filtered set once
+    // and applies the active area + tag filters client-side. The live map
+    // viewport only classifies events as on-map/off-map; it no longer hides
+    // matching events from the Explorer list or subsequent map refits.
     const initialLoadDone = useRef(false);
     const [visibleRange, setVisibleRange] = useState<{ start: Date; end: Date } | null>(null);
     useEffect(() => {
         if (!initialLoadDone.current) setLoading(true);
         let params: { startDate?: string; endDate?: string; area?: PreferredAreaPayload | null; interestSource?: 'follows' | 'friends'; interestKind?: 'any' | 'going' | 'saved'; interestUserHandle?: string } | undefined;
         if (viewMode === 'explorer') {
-            // No ``area`` here on purpose — we always pull the full set
-            // and filter by the current map viewport on the client (see
-            // ``filteredEvents``). Keeps panning instantaneous regardless
-            // of which preset is selected.
+            // No ``area`` here on purpose — we pull the full date/interest set
+            // and apply the active area locally. That keeps panning instant,
+            // while semantic filters (tags/following) can still refit to all
+            // matching events in the active/default area.
             const interestActive = interestSource !== null || !!interestUserHandle;
             params = {
                 startDate,
@@ -464,79 +513,25 @@ export default function Home() {
         setActiveTagIds(new Set());
     }, [bumpAutoFit]);
 
-    const filteredEvents = useMemo(() => {
-        // Step 1: viewport filter (explorer only). The bbox we filter by:
-        //  • If the user has panned/zoomed (``userMapBounds`` set), use
-        //    that — they're driving the viewport.
-        //  • Else, use the configured ``effectiveArea`` (preset / saved /
-        //    default). NOT the live ``mapBounds`` — on mobile the map's
-        //    aspect ratio forces Leaflet to display a viewport noticeably
-        //    wider than the requested bbox, which would otherwise pull in
-        //    e.g. Asian events when the user picked "Europe".
-        //  • Worldwide opt-out (``effectiveArea === null`` and no
-        //    user pan) skips the filter entirely.
-        // Events without coordinates always pass through.
-        let base = events;
-        if (viewMode === 'explorer') {
-            const filterBbox: { south: number; north: number; west: number; east: number } | null =
-                userMapBounds
-                    ? userMapBounds
-                    : effectiveArea
-                        ? {
-                            south: effectiveArea.min_lat,
-                            north: effectiveArea.max_lat,
-                            west: effectiveArea.min_lng,
-                            east: effectiveArea.max_lng,
-                        }
-                        : null;
-            if (filterBbox) {
-                const b = filterBbox;
-                base = events.filter((e) => {
-                    if (e.latitude == null || e.longitude == null) return true;
-                    return (
-                        e.latitude >= b.south &&
-                        e.latitude <= b.north &&
-                        e.longitude >= b.west &&
-                        e.longitude <= b.east
-                    );
-                });
-            }
-        }
-        if (activeTagIds.size === 0) return base;
+    const areaScopedEvents = useMemo(() => {
+        if (viewMode !== 'explorer' || !effectiveArea) return events;
+        const bounds = areaToMapBounds(effectiveArea);
+        return events.filter((event) => eventMatchesBounds(event, bounds));
+    }, [events, effectiveArea, viewMode]);
 
-        // Disjunctive faceting filter logic:
-        //  - Within a multi-select group: OR (event must match ANY selected tag in that group)
-        //  - Across groups: AND (event must satisfy every group that has a selection)
-        // Single-select groups behave the same as OR (only one tag can be selected).
-        const tagToGroupSlug = new Map<number, string>();
-        for (const g of tagGroups) {
-            for (const t of g.tags) tagToGroupSlug.set(t.id, g.slug);
-        }
-        const groupBuckets = new Map<string, number[]>();
-        const ungrouped: number[] = [];
-        for (const id of activeTagIds) {
-            const slug = tagToGroupSlug.get(id);
-            if (!slug) { ungrouped.push(id); continue; }
-            const arr = groupBuckets.get(slug);
-            if (arr) arr.push(id);
-            else groupBuckets.set(slug, [id]);
-        }
+    const filteredEvents = useMemo(
+        () => filterEventsByTags(events, activeTagIds, tagGroups),
+        [events, activeTagIds, tagGroups],
+    );
 
-        return base.filter((e) => {
-            const tagSet = new Set((e.tags ?? []).map((t) => t.id));
-            for (const ids of groupBuckets.values()) {
-                if (!ids.some((id) => tagSet.has(id))) return false;
-            }
-            for (const id of ungrouped) {
-                if (!tagSet.has(id)) return false;
-            }
-            return true;
-        });
-    }, [events, activeTagIds, tagGroups, viewMode, userMapBounds, effectiveArea]);
+    const explorerMatchingEvents = useMemo(
+        () => filterEventsByTags(areaScopedEvents, activeTagIds, tagGroups),
+        [areaScopedEvents, activeTagIds, tagGroups],
+    );
 
     // Disjunctive facet counts.
     //
-    // Filter semantics (must match `filteredEvents` above):
+    // Filter semantics (must match `filterEventsByTags` above):
     //   - Within a group: OR (event matches ANY selected tag in that group)
     //   - Across groups: AND (every group with a selection must be satisfied)
     //
@@ -564,7 +559,8 @@ export default function Home() {
             else activeByGroup.set(slug, [id]);
         }
 
-        const eventTagSets = events.map((e) => new Set((e.tags ?? []).map((t) => t.id)));
+        const countSourceEvents = viewMode === 'explorer' ? areaScopedEvents : events;
+        const eventTagSets = countSourceEvents.map((e) => new Set((e.tags ?? []).map((t) => t.id)));
 
         for (const g of tagGroups) {
             // Each entry is one OTHER group's selected IDs; event must contain
@@ -588,7 +584,7 @@ export default function Home() {
             }
         }
         return map;
-    }, [events, tagGroups, activeTagIds]);
+    }, [events, areaScopedEvents, viewMode, tagGroups, activeTagIds]);
 
     const handleDatesChange = useCallback((start: Date, end: Date) => {
         setVisibleRange((prev) => {
@@ -867,7 +863,7 @@ export default function Home() {
                                 {/* Event list: hidden on mobile until after map, fills remaining height on desktop */}
                                 <div className="hidden lg:block lg:flex-1 lg:min-h-0 lg:overflow-hidden">
                                     <EventListPanel
-                                        events={filteredEvents}
+                                        events={explorerMatchingEvents}
                                         mapBounds={mapBounds}
                                         onEventClick={handleExplorerListEventClick}
                                         showPrices={showPrices}
@@ -891,7 +887,7 @@ export default function Home() {
                             <div className="order-2 lg:order-2 lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6 flex flex-col gap-2 min-w-0">
                                 <div className="h-[180px] lg:h-auto lg:flex-1 lg:min-h-0">
                                     <EventMap
-                                        events={filteredEvents}
+                                        events={explorerMatchingEvents}
                                         onEventClick={handleExplorerMapEventClick}
                                         onBoundsChange={handleBoundsChange}
                                         hoveredEventId={hoveredEventId}
@@ -1047,7 +1043,7 @@ export default function Home() {
                             {/* Event list on mobile: order-3, hidden on desktop */}
                             <div className="order-3 lg:hidden">
                                 <EventListPanel
-                                    events={filteredEvents}
+                                    events={explorerMatchingEvents}
                                     mapBounds={mapBounds}
                                     onEventClick={handleExplorerListEventClick}
                                     showPrices={showPrices}

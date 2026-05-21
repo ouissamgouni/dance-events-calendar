@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import {
     fetchAdminUsers,
     adminDeleteUser,
+    adminBlockUser,
+    adminRevokeUserBlock,
     adminSetVerifiedOrganizer,
     adminSetAdminManaged,
 } from '../api';
@@ -37,6 +39,8 @@ export default function AdminUsersTab() {
     const [busyUserId, setBusyUserId] = useState<string | null>(null);
     const [managedPrompt, setManagedPrompt] = useState<{ row: AdminUserRow; mode: 'manage' | 'label' } | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<AdminUserRow | null>(null);
+    const [blockPrompt, setBlockPrompt] = useState<AdminUserRow | null>(null);
+    const [unblockTarget, setUnblockTarget] = useState<AdminUserRow | null>(null);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -138,6 +142,36 @@ export default function AdminUsersTab() {
         }
     };
 
+    const saveBlockPrompt = async (value: string) => {
+        const row = blockPrompt;
+        if (!row) return;
+        setBlockPrompt(null);
+        setBusyUserId(row.user_id);
+        try {
+            await adminBlockUser(row.user_id, value.trim() || null);
+            await load();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Failed to block');
+        } finally {
+            setBusyUserId(null);
+        }
+    };
+
+    const confirmUnblock = async () => {
+        const row = unblockTarget;
+        if (!row?.active_block_id) return;
+        setUnblockTarget(null);
+        setBusyUserId(row.user_id);
+        try {
+            await adminRevokeUserBlock(row.active_block_id);
+            await load();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Failed to unblock');
+        } finally {
+            setBusyUserId(null);
+        }
+    };
+
     const userLabel = (row: AdminUserRow | null): string => {
         if (!row) return 'this user';
         if (row.display_name && row.handle) return `${row.display_name} (@${row.handle})`;
@@ -224,6 +258,7 @@ export default function AdminUsersTab() {
                         )}
                         {rows.map((row) => {
                             const isDeleted = row.deleted_at !== null;
+                            const isBlocked = row.active_block_id !== null;
                             return (
                                 <tr key={row.user_id} className="border-t border-slate-200 hover:bg-slate-50">
                                     <td className="px-3 py-2">
@@ -280,6 +315,14 @@ export default function AdminUsersTab() {
                                                     deleted
                                                 </span>
                                             )}
+                                            {isBlocked && (
+                                                <span
+                                                    className="px-1.5 py-px text-xs bg-red-50 text-red-700 border border-red-200"
+                                                    title={row.blocked_at ? `Blocked ${fmtDate(row.blocked_at)}` : 'Blocked from signing in'}
+                                                >
+                                                    blocked
+                                                </span>
+                                            )}
                                         </div>
                                     </td>
                                     <td className="px-3 py-2">
@@ -322,6 +365,27 @@ export default function AdminUsersTab() {
                                             >
                                                 Delete
                                             </button>
+                                            {isBlocked ? (
+                                                <button
+                                                    type="button"
+                                                    disabled={busyUserId === row.user_id}
+                                                    onClick={() => setUnblockTarget(row)}
+                                                    className="px-2 py-1 text-xs border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    title="Allow this account to sign in again"
+                                                >
+                                                    Unblock
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    disabled={isDeleted || row.is_admin || busyUserId === row.user_id}
+                                                    onClick={() => setBlockPrompt(row)}
+                                                    className="px-2 py-1 text-xs border border-red-300 text-red-700 bg-white hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    title={row.is_admin ? "Can't block the admin from here" : 'Block this account from signing in'}
+                                                >
+                                                    Block
+                                                </button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -376,6 +440,26 @@ export default function AdminUsersTab() {
                 destructive
                 onCancel={() => setDeleteTarget(null)}
                 onConfirm={() => void confirmDelete()}
+            />
+            <PromptDialog
+                open={blockPrompt !== null}
+                title="Block User"
+                message={`Block ${userLabel(blockPrompt)} from signing in again. Optional internal reason.`}
+                initialValue=""
+                placeholder="Reason for block"
+                maxLength={240}
+                confirmLabel="Block"
+                destructive
+                onCancel={() => setBlockPrompt(null)}
+                onConfirm={(value) => void saveBlockPrompt(value)}
+            />
+            <ConfirmDialog
+                open={unblockTarget !== null}
+                title="Unblock User"
+                message={`Allow ${userLabel(unblockTarget)} to sign in again?`}
+                confirmLabel="Unblock"
+                onCancel={() => setUnblockTarget(null)}
+                onConfirm={() => void confirmUnblock()}
             />
         </section>
     );

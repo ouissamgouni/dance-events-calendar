@@ -34,6 +34,20 @@ test_plan:
         location, and dates.
 
     - id: 3
+      title: "Explorer filters refit beyond the current map viewport"
+      description: >
+        In Explorer, pan/zoom tightly around Paris so only the Paris cluster is
+        visible. Click a dance-style tag pill that has matches in other seeded
+        European cities, such as Salsa or Bachata. Watch the map and the event
+        list after the filter applies.
+      expected: >
+        The map refits to all matching events within the active/default area,
+        not just the events that were already visible in the Paris viewport.
+        The event list shows all matching events, with currently visible map
+        events first and any events outside the current viewport labelled as
+        off map until the refit brings them into view.
+
+    - id: 4
       title: "Calendar date navigation filters map"
       description: >
         Navigate the calendar to a different month (e.g. forward to Sep 2025).
@@ -43,7 +57,7 @@ test_plan:
         Map markers update to match the calendar's visible range. Events outside
         the range disappear from the map.
 
-    - id: 4
+    - id: 5
       title: "Events without coordinates don't appear on map"
       description: >
         Check that events with vague/missing locations (Online Zoom, Dave's
@@ -53,7 +67,7 @@ test_plan:
         No markers for locationless events. Calendar still lists them.
 
     # ── Admin Login ─────────────────────────────────────────────
-    - id: 5
+    - id: 6
       title: "Dev login works"
       description: >
         Navigate to /login. In DEV_AUTH mode the page shows mock-user buttons +
@@ -65,7 +79,7 @@ test_plan:
         configured ADMIN_EMAIL).
 
     # ── Admin — Calendars & Sync ────────────────────────────────
-    - id: 6
+    - id: 7
       title: "Admin shows 3 enabled calendars"
       description: >
         On the admin page, check the calendars section. All 3 seeded calendars
@@ -75,7 +89,7 @@ test_plan:
         3 calendars listed: Salsa (#e11d48), Bachata (#7c3aed), Kizomba
         (#2563eb). All enabled (toggles on).
 
-    - id: 7
+    - id: 8
       title: "Manual sync completes"
       description: >
         Click "Sync Now". A sync log entry should appear in the Sync Logs
@@ -84,7 +98,7 @@ test_plan:
         Sync log shows status=success, trigger=manual, calendars_synced=3.
 
     # ── Admin — Event Editing ───────────────────────────────────
-    - id: 8
+    - id: 9
       title: "Edit event location with address autocomplete"
       description: >
         In admin events list, click on "TBA" event (evt-vague-002). In the edit
@@ -95,16 +109,16 @@ test_plan:
         Selecting a suggestion fills the location field and populates
         latitude/longitude fields automatically.
 
-    - id: 9
+    - id: 10
       title: "Save edited event"
       description: >
-        After selecting the address in step 8, click Save. Go back to Home page
+        After selecting the address in step 9, click Save. Go back to Home page
         and check the map.
       expected: >
         Event saved successfully. The "TBA" event now appears on the map at the
         correct location with updated coordinates.
 
-    - id: 10
+    - id: 11
       title: "Edit event without changing location"
       description: >
         In admin, click on any event (e.g. Paris Salsa Congress 2026). Change
@@ -114,7 +128,7 @@ test_plan:
         still appears at same position on map.
 
     # ── Admin — Settings ────────────────────────────────────────
-    - id: 11
+    - id: 12
       title: "Update sync interval"
       description: >
         In admin settings, change sync interval to 30 minutes. Save.
@@ -122,7 +136,7 @@ test_plan:
         Setting saved. GET /api/settings returns sync_interval_minutes=30.
 
     # ── Edge Cases ──────────────────────────────────────────────
-    - id: 12
+    - id: 13
       title: "All-day event renders correctly"
       description: >
         Find "Lyon Kizomba Open Air" (evt-allday-001) in the calendar. It's a
@@ -131,7 +145,7 @@ test_plan:
         Event spans across multiple days in calendar view (no specific time
         shown). Marker appears on map at Lyon coordinates.
 
-    - id: 13
+    - id: 14
       title: "Null-island event (0,0) on map"
       description: >
         Check if "Null Island Bachata" (evt-nullisland) appears on the map. It

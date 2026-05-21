@@ -1,0 +1,15 @@
+# Mock users for the account-deletion-blocking scenario.
+#
+# - admin: has access to /admin/users and can create/revoke signup blocks.
+# - returner: exercises delete -> signup -> delete dedupe.
+# - victim: exercises explicit admin block/unblock.
+users:
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin
+  - email: returner@example.com
+    name: Rita Returner
+    handle: returner
+  - email: victim@example.com
+    name: Victor Victim
+    handle: victim

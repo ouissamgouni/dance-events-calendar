@@ -1,0 +1,4 @@
+calendars:
+  - id: "signup-email-cal"
+    name: "Signup Email QA"
+    color: "#0f766e"

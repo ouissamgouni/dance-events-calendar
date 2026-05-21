@@ -1,0 +1,76 @@
+test_plan:
+  name: "Admin Signup Email — first signup only"
+  description: |
+    Verify that the configured admin receives one email when a user account is
+    first created, and does not receive another email when the same user logs
+    in again. This scenario uses DEV_AUTH and a local SMTP catcher so no real
+    Google credentials or outbound email provider are required.
+
+  preconditions:
+    - "Start a local SMTP catcher on port 1025 with a web UI, e.g. Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`."
+    - "Run the scenario with: `SCENARIO=admin-signup-email task start:scenario BROWSER=isolated RESET_BROWSER=1`."
+    - "Open the SMTP catcher UI, e.g. Mailpit at http://127.0.0.1:8025, and clear any existing messages."
+    - "The scenario sets `ADMIN_EMAIL=admin@example.com`, `SMTP_HOST=127.0.0.1`, `SMTP_PORT=1025`, and `SMTP_FROM=noreply@example.test`."
+
+  steps:
+    - id: 1
+      title: "Scenario boots with mock auth and SMTP test config"
+      description: |
+        Open the scenario frontend and navigate to /login. Confirm the backend
+        is running in dev auth mode and the login page shows the seeded
+        "Dev Admin" button plus the free-form mock email input.
+      expected: |
+        /api/auth/mode returns `dev_auth: true`. The login page renders without
+        requiring Google OAuth, and no email has been received yet.
+
+    - id: 2
+      title: "First-time user signup sends one admin email"
+      description: |
+        In the free-form mock email input, sign in as
+        `new-salsero@example.com`. Wait a moment for the background task, then
+        check the SMTP catcher inbox.
+      expected: |
+        Sign-in succeeds and the response / app state marks the user as new.
+        The SMTP catcher receives exactly one message addressed to
+        `admin@example.com` with subject `New User Signup: new-salsero@example.com`.
+        The HTML body includes the user's email, generated handle, provider,
+        user id, and created timestamp.
+
+    - id: 3
+      title: "Repeat login does not send a second email"
+      description: |
+        Sign out, then sign in again as `new-salsero@example.com`. Refresh the
+        SMTP catcher inbox after the login completes.
+      expected: |
+        Sign-in succeeds for the same user. The inbox still contains exactly
+        one signup email for `new-salsero@example.com`; no duplicate message is
+        created on repeat login.
+
+    - id: 4
+      title: "Second distinct signup sends a second email"
+      description: |
+        Sign out and sign in as `new-bachatero@example.com`. Refresh the SMTP
+        catcher inbox.
+      expected: |
+        A second email appears with subject
+        `New User Signup: new-bachatero@example.com`. There are now two signup
+        emails total, one per newly created user account.
+
+    - id: 5
+      title: "Seeded admin login is also first-signup guarded"
+      description: |
+        Sign out and click "Sign in as Dev Admin". Because this user is seeded
+        by mock-users.yaml before QA begins, it should be a login to an existing
+        user row rather than a newly created account.
+      expected: |
+        The admin login succeeds and the app treats the user as admin. The SMTP
+        catcher does not receive a new `New User Signup: admin@example.com`
+        email during this login.
+
+    - id: 6
+      title: "Backend logs show no SMTP errors"
+      description: |
+        Inspect the scenario backend logs after the three login flows.
+      expected: |
+        Logs include successful new user notification sends for the two new
+        user emails and no warnings about failed SMTP delivery.

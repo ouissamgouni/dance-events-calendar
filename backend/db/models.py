@@ -114,6 +114,36 @@ class User(SQLModel, table=True):
     onboarded_at: Optional[datetime] = Field(default=None)
 
 
+class BlockedUserIdentity(SQLModel, table=True):
+    """Admin-created signup block keyed to the auth provider identity."""
+
+    __tablename__ = "blocked_user_identities"
+    __table_args__ = (
+        Index(
+            "ux_blocked_user_identities_active_subject",
+            "provider",
+            "provider_subject",
+            unique=True,
+            postgresql_where=text("revoked_at IS NULL"),
+            sqlite_where=text("revoked_at IS NULL"),
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    provider: str = Field(default="google", max_length=32, index=True)
+    provider_subject: str = Field(max_length=255, index=True)
+    email: Optional[str] = Field(default=None, max_length=255, index=True)
+    reason: Optional[str] = Field(default=None, sa_column=Column(Text))
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    created_by_admin_user_id: Optional[UUID] = Field(
+        default=None, foreign_key="users.id", index=True
+    )
+    revoked_at: Optional[datetime] = Field(default=None, index=True)
+    revoked_by_admin_user_id: Optional[UUID] = Field(
+        default=None, foreign_key="users.id", index=True
+    )
+
+
 class CalendarSetting(SQLModel, table=True):
     __tablename__ = "calendar_settings"
 

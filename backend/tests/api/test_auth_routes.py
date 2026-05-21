@@ -26,6 +26,7 @@ from backend.api.routes import auth as auth_module  # noqa: E402
 from backend.db.database import get_session  # noqa: E402
 from backend.db import seed as seed_module  # noqa: E402
 from backend.db.models import (  # noqa: E402
+    BlockedUserIdentity,
     CalendarSubscription,
     ShareToken,
     User,
@@ -33,6 +34,8 @@ from backend.db.models import (  # noqa: E402
     UserFollow,
     UserSavedEvent,
 )
+
+_REAL_NOTIFY_ADMIN_NEW_USER = auth_module._notify_admin_new_user
 
 
 @pytest.fixture
@@ -71,6 +74,11 @@ def client(engine):
         yield TestClient(app)
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def disable_admin_signup_email(monkeypatch):
+    monkeypatch.setattr(auth_module, "_notify_admin_new_user", lambda user_id: None)
 
 
 def _login(client: TestClient, *, email: str, device_id: str | None = None):
@@ -118,6 +126,45 @@ def test_auth_google_reuses_user_on_repeat_login(client, session, monkeypatch):
     users = session.exec(select(User)).all()
     assert len(users) == 1
     assert r1.json()["user_id"] == r2.json()["user_id"]
+
+
+@pytest.mark.unit
+def test_auth_google_notifies_admin_only_on_first_signup(client, monkeypatch):
+    sent_users = []
+    monkeypatch.setattr(auth_module, "get_admin_email", lambda: "admin@example.com")
+    monkeypatch.setattr(
+        auth_module,
+        "_notify_admin_new_user",
+        lambda user: sent_users.append(user),
+    )
+
+    r1 = _login(client, email="alice@example.com")
+    assert r1.status_code == 200, r1.text
+    assert r1.json()["is_new_user"] is True
+
+    r2 = _login(client, email="alice@example.com")
+    assert r2.status_code == 200, r2.text
+    assert r2.json()["is_new_user"] is False
+
+    assert [user.id for user in sent_users] == [UUID(r1.json()["user_id"])]
+
+
+@pytest.mark.unit
+def test_notify_admin_new_user_skips_when_admin_email_empty(monkeypatch):
+    sent = []
+    monkeypatch.setattr(
+        auth_module, "_notify_admin_new_user", _REAL_NOTIFY_ADMIN_NEW_USER
+    )
+    monkeypatch.setattr(auth_module, "get_admin_email", lambda: "")
+    monkeypatch.setattr(
+        auth_module,
+        "send_new_user_notification",
+        lambda user, admin_email: sent.append((user, admin_email)),
+    )
+
+    auth_module._notify_admin_new_user(UUID("00000000-0000-0000-0000-000000000001"))
+
+    assert sent == []
 
 
 @pytest.mark.unit
@@ -282,11 +329,93 @@ def test_delete_me_removes_user_and_personal_rows(client, session, monkeypatch):
     assert db_user is not None
     assert db_user.deleted_at is not None
     assert db_user.email.startswith("deleted-")
-    assert db_user.provider_subject is None
+    assert db_user.provider_subject == "mock|alice@example.com"
 
     # Cookie was cleared → /me now 401s.
     me = client.get("/api/auth/me")
     assert me.status_code == 401
+
+
+@pytest.mark.unit
+def test_delete_me_reactivates_same_user_on_repeat_signup(client, session, monkeypatch):
+    monkeypatch.setattr(auth_module, "get_admin_email", lambda: "admin@example.com")
+
+    first_login = _login(client, email="alice@example.com")
+    assert first_login.status_code == 200
+    user_id = UUID(first_login.json()["user_id"])
+    provider_subject = "mock|alice@example.com"
+
+    first_delete = client.delete("/api/auth/me")
+    assert first_delete.status_code == 200
+
+    second_login = _login(client, email="alice@example.com")
+    assert second_login.status_code == 200
+    assert second_login.json()["user_id"] == str(user_id)
+    assert second_login.json()["email"] == "alice@example.com"
+    assert second_login.json()["is_new_user"] is False
+
+    second_delete = client.delete("/api/auth/me")
+    assert second_delete.status_code == 200
+
+    session.expire_all()
+    rows = session.exec(
+        select(User).where(User.provider_subject == provider_subject)
+    ).all()
+    assert len(rows) == 1
+    assert rows[0].id == user_id
+    assert rows[0].deleted_at is not None
+    assert rows[0].email.startswith("deleted-")
+
+
+@pytest.mark.unit
+def test_admin_block_prevents_signup_until_revoked(client, session, monkeypatch):
+    monkeypatch.setattr(auth_module, "get_admin_email", lambda: "admin@example.com")
+
+    victim_login = _login(client, email="victim@example.com")
+    assert victim_login.status_code == 200
+    victim_id = UUID(victim_login.json()["user_id"])
+
+    admin_login = _login(client, email="admin@example.com")
+    assert admin_login.status_code == 200
+    admin_cookie = client.cookies.get("session_token")
+
+    block = client.post(
+        f"/api/social/admin/users/id/{victim_id}/block",
+        json={"reason": "spam"},
+    )
+    assert block.status_code == 200, block.text
+    block_id = block.json()["id"]
+    assert block.json()["reason"] == "spam"
+
+    blocked_login = _login(client, email="victim@example.com")
+    assert blocked_login.status_code == 403
+    assert blocked_login.json()["detail"] == "This account is blocked from signing in"
+    assert client.cookies.get("session_token") == admin_cookie
+
+    session.expire_all()
+    row = session.get(BlockedUserIdentity, block_id)
+    assert row is not None
+    assert row.revoked_at is None
+
+    revoked = client.delete(f"/api/social/admin/user-blocks/{block_id}")
+    assert revoked.status_code == 200, revoked.text
+    assert revoked.json()["revoked_at"] is not None
+
+    unblocked_login = _login(client, email="victim@example.com")
+    assert unblocked_login.status_code == 200
+    assert unblocked_login.json()["user_id"] == str(victim_id)
+
+
+@pytest.mark.unit
+def test_delete_me_does_not_create_signup_block(client, session, monkeypatch):
+    monkeypatch.setattr(auth_module, "get_admin_email", lambda: "admin@example.com")
+
+    login = _login(client, email="delete-only@example.com")
+    assert login.status_code == 200
+    delete = client.delete("/api/auth/me")
+    assert delete.status_code == 200
+
+    assert session.exec(select(BlockedUserIdentity)).all() == []
 
 
 @pytest.mark.unit

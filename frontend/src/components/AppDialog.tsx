@@ -79,6 +79,7 @@ export function PromptDialog({
     maxLength,
     confirmLabel = 'Save',
     cancelLabel = 'Cancel',
+    destructive = false,
     onConfirm,
     onCancel,
 }: PromptDialogProps) {
@@ -124,7 +125,12 @@ export function PromptDialog({
                     >
                         {cancelLabel}
                     </button>
-                    <button type="submit" className="bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600">
+                    <button
+                        type="submit"
+                        className={destructive
+                            ? 'bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700'
+                            : 'bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600'}
+                    >
                         {confirmLabel}
                     </button>
                 </div>
