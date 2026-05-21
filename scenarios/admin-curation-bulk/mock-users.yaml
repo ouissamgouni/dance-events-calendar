@@ -13,6 +13,8 @@ users:
     name: Paris Salsa Curator
     handle: curator-paris
     account_visibility: public
+    is_admin_managed: true
+    managed_label: Paris Salsa Curator
   - email: alice@example.com
     name: Alice Viewer
     handle: alice

@@ -28,6 +28,7 @@ import AdminTagCategories from '../components/AdminTagCategories';
 import AdminAnalytics from '../components/AdminAnalytics';
 import AdminUsersTab from '../components/AdminUsersTab';
 import CalendarCurationRulesPanel from '../components/CalendarCurationRulesPanel';
+import { ConfirmDialog } from '../components/AppDialog';
 import { useAdminCounters, notifyAdminDataChanged } from '../hooks/useAdminCounters';
 
 type AdminTab = 'data' | 'configuration' | 'analytics' | 'users';
@@ -97,6 +98,7 @@ export default function Admin() {
     const [exportStats, setExportStats] = useState<ExportStat[]>([]);
     const [expandedDefaultTagsCalId, setExpandedDefaultTagsCalId] = useState<string | null>(null);
     const [expandedRulesCalId, setExpandedRulesCalId] = useState<string | null>(null);
+    const [confirmReseedOpen, setConfirmReseedOpen] = useState(false);
     const [tagGroups, setTagGroups] = useState<AdminTagGroup[]>([]);
     const [calendarDefaultTagIds, setCalendarDefaultTagIds] = useState<Record<string, number[]>>({});
     const { tab: tabParam } = useParams<{ tab?: string }>();
@@ -283,12 +285,10 @@ export default function Admin() {
         }
     };
 
-    const handleSync = async (mode: SyncMode = 'incremental') => {
-        if (mode === 'reseed') {
-            const ok = window.confirm(
-                'Reseed: clears all sync tokens and re-fetches every event from since_date forward. Continue?',
-            );
-            if (!ok) return;
+    const handleSync = async (mode: SyncMode = 'incremental', confirmed = false) => {
+        if (mode === 'reseed' && !confirmed) {
+            setConfirmReseedOpen(true);
+            return;
         }
         setBusy('sync');
         setMessage('');
@@ -800,9 +800,9 @@ export default function Admin() {
                                                                 ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
                                                                 : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
                                                                 }`}
-                                                            title="Manage per-calendar curation rules (auto-add events to managed users' lists)"
+                                                            title="Manage per-calendar curation (auto-add events to managed users' lists)"
                                                         >
-                                                            Rules
+                                                            Curation
                                                         </button>
                                                         <button
                                                             onClick={() => handleToggle(cal)}
@@ -1310,6 +1310,17 @@ export default function Admin() {
             <OrganizerClaimsAdminPanel
                 isOpen={organizerClaimsPanelOpen}
                 onClose={() => setOrganizerClaimsPanelOpen(false)}
+            />
+            <ConfirmDialog
+                open={confirmReseedOpen}
+                title="Reseed Calendars"
+                message="Reseed clears all sync tokens and re-fetches every event from the From date forward. Continue?"
+                confirmLabel="Reseed"
+                onCancel={() => setConfirmReseedOpen(false)}
+                onConfirm={() => {
+                    setConfirmReseedOpen(false);
+                    void handleSync('reseed', true);
+                }}
             />
         </div>
     );

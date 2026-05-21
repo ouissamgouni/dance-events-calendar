@@ -15,6 +15,7 @@ import {
 } from '../api';
 import PeopleYouMayKnowCard from './PeopleYouMayKnowCard';
 import FollowRequestsPanel from './FollowRequestsPanel';
+import { ConfirmDialog } from './AppDialog';
 /**
  * Network panel for the /account page. Lets the signed-in user browse
  * who follows them, who they follow, and the intersection (mutual = friends).
@@ -113,13 +114,18 @@ export default function NetworkPanel() {
     const current = tab === 'leaderboard' || tab === 'suggestions' ? null : data[tab];
     const error = errors[tab];
     const [pending, setPending] = useState<string | null>(null);
+    const [removeTarget, setRemoveTarget] = useState<FollowUser | null>(null);
 
     async function handleRemove(target: FollowUser) {
         if (pending) return;
+        setRemoveTarget(target);
+    }
+
+    async function confirmRemove() {
+        const target = removeTarget;
+        if (!target || pending) return;
+        setRemoveTarget(null);
         const action = tab === 'followers' ? 'remove' : 'unfollow';
-        const verb = action === 'remove' ? 'Remove' : 'Unfollow';
-        const name = target.display_name || `@${target.handle}`;
-        if (!window.confirm(`${verb} ${name}?`)) return;
         setPending(target.handle);
         try {
             if (action === 'remove') {
@@ -165,10 +171,13 @@ export default function NetworkPanel() {
         }
     }
 
+    const removeVerb = tab === 'followers' ? 'Remove' : 'Unfollow';
+    const removeName = removeTarget?.display_name || (removeTarget ? `@${removeTarget.handle}` : 'this user');
+
     return (
         <section
             id="network"
-            className="rounded-lg border border-slate-200 bg-white p-4 mb-3 scroll-mt-4"
+            className="border border-slate-200 bg-white p-4 mb-3 scroll-mt-4"
         >
             <h2 className="text-sm font-semibold text-slate-900 mb-2">
                 My network
@@ -309,6 +318,14 @@ export default function NetworkPanel() {
                     })}
                 </ul>
             )}
+            <ConfirmDialog
+                open={removeTarget !== null}
+                title={`${removeVerb} User`}
+                message={`${removeVerb} ${removeName}?`}
+                confirmLabel={removeVerb}
+                onCancel={() => setRemoveTarget(null)}
+                onConfirm={() => void confirmRemove()}
+            />
         </section>
     );
 }

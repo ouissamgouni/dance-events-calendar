@@ -1,0 +1,7 @@
+calendars:
+  - id: "salsa-cal-001"
+    name: "Movida"
+    color: "#e11d48"
+  - id: "bachata-cal-002"
+    name: "Bachata Events"
+    color: "#7c3aed"

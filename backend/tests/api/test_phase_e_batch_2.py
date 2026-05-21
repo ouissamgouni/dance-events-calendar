@@ -92,6 +92,7 @@ def _make_user(
     handle: str,
     *,
     is_verified_organizer: bool = False,
+    is_admin_managed: bool = False,
     deleted: bool = False,
 ) -> User:
     u = User(
@@ -102,6 +103,7 @@ def _make_user(
         provider_subject=f"mock|{email}",
         account_visibility="public",
         is_verified_organizer=is_verified_organizer,
+        is_admin_managed=is_admin_managed,
     )
     if deleted:
         from datetime import datetime
@@ -182,6 +184,20 @@ def test_e3_onboarding_suggestions_excludes_self_and_already_followed(client, se
     handles = [item["handle"] for item in r.json()["items"]]
     assert "org" not in handles
     assert "viewer" not in handles  # never recommend self
+
+
+def test_e3_onboarding_suggestions_include_admin_managed_curators(client, session):
+    _make_user(session, "viewer@example.com", "viewer")
+    _make_user(session, "curator@example.com", "curator", is_admin_managed=True)
+
+    _login(client, "viewer@example.com")
+    r = client.get("/api/social/onboarding/suggestions?limit=4")
+    assert r.status_code == 200
+    items = r.json()["items"]
+    handles = [item["handle"] for item in items]
+    assert "curator" in handles
+    curator = next(item for item in items if item["handle"] == "curator")
+    assert curator["is_admin_managed"] is True
 
 
 def test_e3_onboarding_complete_creates_follows_and_stamps(client, session):
@@ -335,6 +351,19 @@ def test_e4_fof_suggestions_empty_when_viewer_has_no_friends(client, session):
     r = client.get("/api/social/me/suggestions")
     assert r.status_code == 200
     assert r.json() == {"items": [], "total": 0}
+
+
+def test_e4_suggestions_include_admin_managed_curators_without_mutuals(client, session):
+    _make_user(session, "viewer@example.com", "viewer")
+    _make_user(session, "curator@example.com", "curator", is_admin_managed=True)
+
+    _login(client, "viewer@example.com")
+    r = client.get("/api/social/me/suggestions")
+    assert r.status_code == 200
+    items = r.json()["items"]
+    assert [item["handle"] for item in items] == ["curator"]
+    assert items[0]["is_admin_managed"] is True
+    assert items[0]["mutual_friend_count"] == 0
 
 
 # --- E7: referrals ----------------------------------------------------------

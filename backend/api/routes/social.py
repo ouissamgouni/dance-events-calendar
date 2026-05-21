@@ -1830,6 +1830,7 @@ def _user_to_search_result(
         display_name=user.display_name,
         avatar_url=user.avatar_url,
         is_verified_organizer=bool(user.is_verified_organizer),
+        is_admin_managed=bool(user.is_admin_managed),
         subscribers_count=_subscribers_count(session, user.id),
         is_subscribed=is_subscribed,
         is_followed_by_viewer=is_followed_by_viewer,
@@ -2065,6 +2066,7 @@ def admin_list_users(
     q: Optional[str] = Query(default=None, max_length=120),
     include_deleted: bool = Query(default=False),
     verified_only: bool = Query(default=False),
+    managed_only: bool = Query(default=False),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     session: Session = Depends(get_session),
@@ -2083,6 +2085,8 @@ def admin_list_users(
         stmt = stmt.where(User.deleted_at.is_(None))
     if verified_only:
         stmt = stmt.where(User.is_verified_organizer == True)  # noqa: E712
+    if managed_only:
+        stmt = stmt.where(User.is_admin_managed == True)  # noqa: E712
     if q:
         needle = f"%{q.strip().lower()}%"
         stmt = stmt.where(
@@ -2692,8 +2696,9 @@ def onboarding_suggestions(
     Ranking (in order, dedup by user id, never include self / already-
     followed / soft-deleted):
 
-      1. Verified organizers — high-trust seed signal.
-      2. Most-followed accounts overall — fills remaining slots.
+    1. Verified organizers — high-trust seed signal.
+    2. Admin-managed curator accounts — editorial seed signal.
+    3. Most-followed accounts overall — fills remaining slots.
 
     Future iterations can layer area-locality once we add a geo column
     to ``users``; today the user model has no city, so we keep the
@@ -2724,7 +2729,30 @@ def onboarding_suggestions(
         if len(picked) >= limit:
             break
 
-    # 2. Most-followed accounts (by absolute followers count).
+    # 2. Admin-managed curator accounts.
+    if len(picked) < limit:
+        remaining = limit - len(picked)
+        skip_ids = excluded | seen
+        curators = list(
+            session.exec(
+                select(User)
+                .where(User.is_admin_managed == True)  # noqa: E712
+                .where(User.deleted_at.is_(None))
+                .where(User.handle.is_not(None))
+                .where(~col(User.id).in_(skip_ids))
+                .order_by(User.handle.asc())
+                .limit(remaining)
+            ).all()
+        )
+        for u in curators:
+            if u.id in seen:
+                continue
+            picked.append(u)
+            seen.add(u.id)
+            if len(picked) >= limit:
+                break
+
+    # 3. Most-followed accounts (by absolute followers count).
     if len(picked) < limit:
         remaining = limit - len(picked)
         skip_ids = excluded | seen
@@ -2860,35 +2888,42 @@ def friend_of_friend_suggestions(
     and accounts with no public handle. Anonymous viewers never hit
     this route (``require_user``).
     """
-    viewer_friends = _friend_ids(session, viewer.id)
-    if not viewer_friends:
-        return FoFSuggestionsResponse(items=[], total=0)
-
     excluded: set[UUID] = _already_followed_ids(session, viewer.id)
     excluded.add(viewer.id)
     admin_id = get_admin_user_id(session)
     if admin_id is not None:
         excluded.add(admin_id)
 
-    # Candidates = followees of viewer's friends (i.e. FoF), minus
-    # excluded set. ``mutual_friend_count`` per candidate = count of
-    # distinct viewer-friends in the join.
-    rows = session.exec(
-        select(
-            UserFollow.followee_id,
-            func.count(UserFollow.follower_id).label("mutuals"),
-        )
-        .where(col(UserFollow.follower_id).in_(viewer_friends))
-        .where(~col(UserFollow.followee_id).in_(excluded))
-        .group_by(UserFollow.followee_id)
-        .order_by(func.count(UserFollow.follower_id).desc())
+    candidate_scores: dict[UUID, int] = {}
+    viewer_friends = _friend_ids(session, viewer.id)
+    if viewer_friends:
+        rows = session.exec(
+            select(
+                UserFollow.followee_id,
+                func.count(UserFollow.follower_id).label("mutuals"),
+            )
+            .where(col(UserFollow.follower_id).in_(viewer_friends))
+            .where(~col(UserFollow.followee_id).in_(excluded))
+            .group_by(UserFollow.followee_id)
+            .order_by(func.count(UserFollow.follower_id).desc())
+        ).all()
+        candidate_scores.update({r[0]: int(r[1]) for r in rows})
+
+    curator_ids = session.exec(
+        select(User.id)
+        .where(User.is_admin_managed == True)  # noqa: E712
+        .where(User.deleted_at.is_(None))
+        .where(User.handle.is_not(None))
+        .where(~col(User.id).in_(excluded))
     ).all()
-    if not rows:
+    for curator_id in curator_ids:
+        candidate_scores.setdefault(curator_id, 0)
+
+    if not candidate_scores:
         return FoFSuggestionsResponse(items=[], total=0)
 
-    total = len(rows)
-    page = rows[offset : offset + limit]
-    candidate_ids = [r[0] for r in page]
+    total = len(candidate_scores)
+    candidate_ids = list(candidate_scores.keys())
 
     candidates = list(
         session.exec(
@@ -2898,14 +2933,15 @@ def friend_of_friend_suggestions(
             .where(User.handle.is_not(None))
         ).all()
     )
-    rank = {r[0]: int(r[1]) for r in page}
     candidates.sort(
         key=lambda u: (
-            -rank.get(u.id, 0),
+            -candidate_scores.get(u.id, 0),
             0 if u.is_verified_organizer else 1,
+            0 if u.is_admin_managed else 1,
             (u.handle or "").lower(),
         )
     )
+    candidates = candidates[offset : offset + limit]
 
     # Preview: up to 3 viewer-friends who follow each candidate.
     items: list[FoFSuggestionItem] = []
@@ -2925,7 +2961,8 @@ def friend_of_friend_suggestions(
                 display_name=u.display_name,
                 avatar_url=u.avatar_url,
                 is_verified_organizer=bool(u.is_verified_organizer),
-                mutual_friend_count=rank.get(u.id, 0),
+                is_admin_managed=bool(u.is_admin_managed),
+                mutual_friend_count=candidate_scores.get(u.id, 0),
                 mutual_friends_preview=[h for h in preview_rows if h],
             )
         )

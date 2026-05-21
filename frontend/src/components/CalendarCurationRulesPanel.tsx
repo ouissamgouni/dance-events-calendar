@@ -4,10 +4,13 @@ import {
     createCalendarCurationRule,
     updateCalendarCurationRule,
     deleteCalendarCurationRule,
+    fetchAdminUsers,
     type CalendarCurationRule,
+    type AdminUserRow,
     type AdminBulkEngagementAudience,
     type AdminBulkEngagementKind,
 } from '../api';
+import { ConfirmDialog } from './AppDialog';
 
 interface Props {
     calendarId: string;
@@ -30,10 +33,12 @@ export default function CalendarCurationRulesPanel({ calendarId }: Props) {
     const [rules, setRules] = useState<CalendarCurationRule[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [managedUsers, setManagedUsers] = useState<AdminUserRow[]>([]);
     const [newHandle, setNewHandle] = useState('');
     const [newKind, setNewKind] = useState<AdminBulkEngagementKind>('save');
     const [newAudience, setNewAudience] = useState<'' | AdminBulkEngagementAudience>('');
     const [saving, setSaving] = useState(false);
+    const [deleteRule, setDeleteRule] = useState<CalendarCurationRule | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -53,6 +58,23 @@ export default function CalendarCurationRulesPanel({ calendarId }: Props) {
             cancelled = true;
         };
     }, [calendarId]);
+
+    useEffect(() => {
+        let cancelled = false;
+        fetchAdminUsers({ managedOnly: true, limit: 200 })
+            .then((res) => {
+                if (cancelled) return;
+                const users = res.items.filter((u) => u.handle && !u.deleted_at && !u.is_admin);
+                setManagedUsers(users);
+                setNewHandle((prev) => prev || users[0]?.handle || '');
+            })
+            .catch(() => {
+                if (!cancelled) setManagedUsers([]);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     const handleAdd = async () => {
         const handle = newHandle.trim().replace(/^@/, '');
@@ -111,12 +133,13 @@ export default function CalendarCurationRulesPanel({ calendarId }: Props) {
     };
 
     const handleDelete = async (rule: CalendarCurationRule) => {
-        if (!window.confirm(`Delete curation rule for @${rule.target_handle ?? rule.target_user_id}?`)) return;
         try {
             await deleteCalendarCurationRule(calendarId, rule.id);
             setRules((prev) => prev.filter((r) => r.id !== rule.id));
         } catch (e) {
             setError((e as Error).message || 'Failed to delete rule');
+        } finally {
+            setDeleteRule(null);
         }
     };
 
@@ -169,7 +192,7 @@ export default function CalendarCurationRulesPanel({ calendarId }: Props) {
                                 {r.enabled ? 'On' : 'Off'}
                             </button>
                             <button
-                                onClick={() => handleDelete(r)}
+                                onClick={() => setDeleteRule(r)}
                                 className="text-[10px] text-red-600 hover:text-red-800"
                                 title="Delete rule"
                             >
@@ -181,13 +204,20 @@ export default function CalendarCurationRulesPanel({ calendarId }: Props) {
             )}
 
             <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-gray-100">
-                <input
-                    type="text"
-                    placeholder="@handle"
+                <select
                     value={newHandle}
                     onChange={(e) => setNewHandle(e.target.value)}
-                    className="text-[10px] border border-gray-200 px-1.5 py-0.5 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0 w-28"
-                />
+                    className="text-[10px] border border-gray-200 px-1 py-0.5 bg-white"
+                    aria-label="Curator account"
+                >
+                    {managedUsers.length === 0 ? (
+                        <option value="">No managed users</option>
+                    ) : managedUsers.map((u) => (
+                        <option key={u.user_id} value={u.handle ?? ''}>
+                            @{u.handle}{u.managed_label ? ` - ${u.managed_label}` : ''}
+                        </option>
+                    ))}
+                </select>
                 <select
                     value={newKind}
                     onChange={(e) => setNewKind(e.target.value as AdminBulkEngagementKind)}
@@ -211,11 +241,20 @@ export default function CalendarCurationRulesPanel({ calendarId }: Props) {
                 <button
                     onClick={handleAdd}
                     disabled={saving || !newHandle.trim()}
-                    className="text-[10px] font-medium px-2 py-0.5 bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+                    className="text-[10px] font-medium px-2 py-0.5 bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50"
                 >
                     {saving ? '…' : 'Add'}
                 </button>
             </div>
+            <ConfirmDialog
+                open={deleteRule !== null}
+                title="Delete Curation Rule"
+                message={`Delete curation rule for @${deleteRule?.target_handle ?? deleteRule?.target_user_id ?? ''}?`}
+                confirmLabel="Delete"
+                destructive
+                onCancel={() => setDeleteRule(null)}
+                onConfirm={() => { if (deleteRule) void handleDelete(deleteRule); }}
+            />
         </div>
     );
 }

@@ -2,18 +2,24 @@ test_plan:
   name: "Phase E (E3) — onboarding follow screen"
   description: >
     First-sign-in flow that surfaces a one-screen list of seed
-    suggestions (verified organizers first, then most-followed users),
-    a batch follow CTA, and a Skip path. Either action stamps
-    `users.onboarded_at` so the App-level guard never bounces the
-    user back here on subsequent loads.
+    suggestions (verified organizers first, admin-managed curators next,
+    then most-followed users), a batch follow CTA, and a Skip path. Either
+    action stamps `users.onboarded_at` so the App-level guard never bounces
+    the user back here on subsequent loads.
 
   preconditions:
     - "Run with: task start:scenario SCENARIO=phase-e-onboarding"
     - >
-      Cast: `newbie` (fresh, no onboarded_at), two verified organizers
-      (`salsahub`, `bachataco`), three popular accounts (`pop1`, `pop2`,
-      `pop3`) seeded with a handful of pre-existing follower edges so
-      the most-followed tail is deterministic.
+      Cast: `newbie` (fresh, no onboarded_at), three verified organizers
+      (`salsahub`, `bachataco`, `verifiedcurator`), two admin-managed
+      curators (`curatoralpha`, `curatorbeta`), three popular accounts
+      (`pop1`, `pop2`, `pop3`), plus exclusion probes for already-followed,
+      pending-follow, and no-handle users.
+
+    - >
+      The API also excludes soft-deleted users. This scenario documents that
+      rule but does not seed a soft-deleted user because the scenario user
+      seeder does not currently accept `deleted_at`.
 
   steps:
     - id: 1
@@ -22,26 +28,55 @@ test_plan:
         Open / in a brand-new browser session. /login → "Sign in as
         Nora Newbie".
       expected: >
-        URL becomes /onboarding/follow?next=%2F. The list shows
-        `salsahub` and `bachataco` in the first two rows with a small
-        blue verified pip, then `pop1`/`pop2`/`pop3` in descending
-        follower order. Each row's "Follow" pill is pre-selected (blue
-        background, label "Following").
+        URL becomes /onboarding/follow?next=%2F. The suggestion list is
+        preselected and grouped by rank: all verified organizers appear before
+        any curator-only account; `verifiedcurator` appears once, not repeated
+        in the curator section; curator-only accounts appear as
+        `curatoralpha`, then `curatorbeta`; the popular tail appears as
+        `pop1`, `pop2`, `pop3` because `pop1` has the highest follower count
+        and `pop2`/`pop3` tie-break by handle. Each selected row uses the
+        selected-state styling and copy, and the primary CTA is
+        "Follow 8 and continue".
 
     - id: 2
+      title: "Suggestion exclusions are enforced"
+      description: >
+        Inspect the same freshly loaded onboarding list from step 1.
+      expected: >
+        The list does not include `newbie` (self), `alreadyfollowed` (existing
+        approved follow), `pendingtarget` (existing pending outgoing request),
+        or `nohandle@example.com` (candidate without a handle). Soft-deleted
+        users are also excluded by the endpoint, but are not represented in
+        this scenario fixture because the seeder does not support `deleted_at`.
+
+    - id: 3
+      title: "Limit truncates after higher-ranked groups"
+      description: >
+        With Nora signed in, call
+        /api/social/onboarding/suggestions?limit=5 directly from the browser
+        session or API client.
+      expected: >
+        The response contains exactly five suggestions: the three verified
+        organizers plus `curatoralpha` and `curatorbeta`. It does not include
+        `pop1`, `pop2`, or `pop3` until a higher limit leaves room for the
+        most-followed tail.
+
+    - id: 4
       title: "Deselect a couple and complete"
       description: >
         Tap the row for `bachataco` and the row for `pop3` to deselect
-        them. The bottom-right CTA updates live to read "Follow 3 and
+        them. The bottom-right CTA updates live to read "Follow 6 and
         continue".
       expected: >
         Click the CTA. Network: POST
         /api/social/onboarding/complete → 200, body contains
-        `onboarded_at` (ISO timestamp) and `followed`:
-        ["salsahub","pop1","pop2"]. App navigates to /. Refreshing
-        the page stays on / — the guard no longer redirects.
+        `onboarded_at` (ISO timestamp) and `followed` containing exactly these
+        handles, in any order:
+        ["salsahub","verifiedcurator","curatoralpha","curatorbeta","pop1","pop2"].
+        App navigates to /. Refreshing the page stays on / — the guard no
+        longer redirects.
 
-    - id: 3
+    - id: 5
       title: "Skip path still stamps onboarded_at"
       description: >
         Reset DB (re-run `task start:scenario SCENARIO=phase-e-onboarding`),
@@ -52,7 +87,7 @@ test_plan:
         /. No new UserFollow rows created (check NetworkPanel
         "Following" tab is empty).
 
-    - id: 4
+    - id: 6
       title: "Pre-onboarded user never sees the screen"
       description: >
         While still signed in as Nora (already onboarded), navigate

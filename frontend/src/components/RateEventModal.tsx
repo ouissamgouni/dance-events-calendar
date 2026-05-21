@@ -7,6 +7,7 @@ import { getDeviceId } from '../utils/deviceId';
 import RatingStars from './RatingStars';
 import SuggestTagsButton, { type InlineTagSuggestion } from './SuggestTagsButton';
 import { trackRatingDeleted, trackRatingSubmitFailed, trackRatingSubmitted } from '../utils/tracking';
+import { ConfirmDialog } from './AppDialog';
 
 interface Props {
     eventId: string;
@@ -35,6 +36,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [thanks, setThanks] = useState(false);
+    const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
     useEffect(() => {
         fetchTagGroups().then(setTagGroups).catch(() => setTagGroups([]));
@@ -102,7 +104,12 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
 
     const handleDelete = async () => {
         if (!initialRating) return;
-        if (!confirm('Delete your rating?')) return;
+        setConfirmDeleteOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!initialRating) return;
+        setConfirmDeleteOpen(false);
         setSubmitting(true);
         try {
             await deleteMyRating(eventId);
@@ -251,7 +258,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                                     onClick={() => setShowSuggestTags((s) => !s)}
                                     className="text-xs text-slate-600 hover:text-slate-900 font-medium"
                                 >
-                                    {showSuggestTags ? '− Hide' : '+ Help improve this event'} (suggest tags)
+                                    {showSuggestTags ? '− Hide' : '+ Improve event tags'}
                                 </button>
                                 {showSuggestTags && (
                                     <div className="mt-2">
@@ -309,6 +316,15 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                         </div>
                     </div>
                 )}
+                <ConfirmDialog
+                    open={confirmDeleteOpen}
+                    title="Delete Rating"
+                    message="Delete your rating?"
+                    confirmLabel="Delete"
+                    destructive
+                    onCancel={() => setConfirmDeleteOpen(false)}
+                    onConfirm={() => void confirmDelete()}
+                />
             </div>
         </div>,
         document.body,

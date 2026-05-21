@@ -9,14 +9,14 @@ test_plan:
   preconditions:
     - "task start:scenario SCENARIO=admin-curation-pipeline"
     - "task db:up && task db:migrate (head: 8c2f3d4e5a01)"
-    - "Pre-seeded users: admin, curator-paris."
+    - "Pre-seeded users: admin, curator-paris (admin-managed)."
     - "Mock calendar service is configured with ≥1 calendar (cal-1)."
 
   steps:
     - id: 1
-      title: "Flag curator-paris as admin-managed"
-      description: "Sign in as admin. In /admin Users tab, click Manage on curator-paris."
-      expected: "Row shows ``managed`` pill; ``is_admin_managed=true`` in PATCH response."
+      title: "Confirm curator-paris is admin-managed"
+      description: "Sign in as admin. In /admin Users tab, find curator-paris."
+      expected: "Row shows ``managed: Paris Salsa Curator`` pill."
 
     - id: 2
       title: "Open curation rules for cal-1"

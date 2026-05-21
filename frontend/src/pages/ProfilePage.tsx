@@ -194,6 +194,9 @@ function ProfileHeader({
                                 {profile.is_verified_organizer && (
                                     <VerifiedBadge />
                                 )}
+                                {profile.is_admin_managed && (
+                                    <CuratorBadge />
+                                )}
                             </div>
                             <div className="mt-0.5 text-sm leading-tight text-slate-500">@{profile.handle}</div>
                         </div>
@@ -406,6 +409,23 @@ function VerifiedBadge() {
                 className="w-3.5 h-3.5 object-contain"
             />
             Verified organizer
+        </span>
+    );
+}
+
+function CuratorBadge() {
+    return (
+        <span
+            className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs text-blue-700"
+            title="Editorial curator"
+        >
+            <img
+                src="/badge.png"
+                alt=""
+                aria-hidden="true"
+                className="w-3.5 h-3.5 object-contain"
+            />
+            Curator
         </span>
     );
 }

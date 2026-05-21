@@ -673,7 +673,7 @@ export default function EventDetailContent({
                         eventId={event.event_id}
                         title={event.title}
                         url={`${window.location.origin}/event/${event.event_id}`}
-                        className="text-xs text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-full px-3 py-1 transition"
+                        className="text-xs text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1 transition"
                     />
                     {!editable && (
                         <button
@@ -681,9 +681,9 @@ export default function EventDetailContent({
                                 if (!tagGroups.length) fetchTagGroups().then(setTagGroups).catch(() => { });
                                 setShowSuggestTags(!showSuggestTags);
                             }}
-                            className="text-xs text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-full px-3 py-1 transition"
+                            className="text-xs text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1 transition"
                         >
-                            Suggest {' '}
+                            Suggest{' '}
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="inline h-3.5 w-3.5 align-[-1px]">
                                 <path fillRule="evenodd" d="M2 4.75A2.75 2.75 0 0 1 4.75 2h4.379a2.75 2.75 0 0 1 1.944.805l5.122 5.122a2.75 2.75 0 0 1 0 3.889l-4.38 4.379a2.75 2.75 0 0 1-3.888 0L2.805 11.073A2.75 2.75 0 0 1 2 9.129V4.75Zm4.5 1.75a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
                             </svg>

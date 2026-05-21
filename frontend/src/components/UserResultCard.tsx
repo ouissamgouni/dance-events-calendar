@@ -18,6 +18,7 @@ export interface UserCardModel {
     display_name: string | null;
     avatar_url: string | null;
     is_verified_organizer?: boolean;
+    is_admin_managed?: boolean;
     subscribers_count?: number;
     is_friend?: boolean;
     is_followed_by_viewer?: boolean;
@@ -68,6 +69,15 @@ export default function UserResultCard({
                             alt=""
                             title="Verified organizer"
                             aria-label="Verified organizer"
+                            className="w-3.5 h-3.5 object-contain"
+                        />
+                    )}
+                    {user.is_admin_managed && (
+                        <img
+                            src="/badge.png"
+                            alt=""
+                            title="Curator"
+                            aria-label="Curator"
                             className="w-3.5 h-3.5 object-contain"
                         />
                     )}

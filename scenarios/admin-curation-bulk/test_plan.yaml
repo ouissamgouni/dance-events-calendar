@@ -10,7 +10,7 @@ test_plan:
   preconditions:
     - "task start:scenario SCENARIO=admin-curation-bulk"
     - "task db:up && task db:migrate (heads: fb71a8c9d0e1, 8c2f3d4e5a01)"
-    - "Pre-seeded users: admin, curator-paris, alice."
+    - "Pre-seeded users: admin, curator-paris (admin-managed), alice."
     - "Mock calendar service yields at least 3 upcoming events after a sync."
 
   steps:
@@ -20,14 +20,11 @@ test_plan:
       expected: "At least 3 events appear in the Events panel."
 
     - id: 2
-      title: "Flag curator-paris as admin-managed"
+      title: "Confirm curator-paris is admin-managed"
       description: >
-        Open the Users tab in /admin. Click "Manage" on the curator-paris
-        row, then set a label "Paris Salsa Curator".
+        Open the Users tab in /admin and find the curator-paris row.
       expected: >
-        Row shows a "managed" pill and "Unmanage" button.
-        PATCH /api/social/admin/users/{id}/admin-managed → 200
-        with ``is_admin_managed: true``.
+        Row shows a "managed: Paris Salsa Curator" pill and "Unmanage" button.
 
     - id: 3
       title: "Bulk curate to Saved"

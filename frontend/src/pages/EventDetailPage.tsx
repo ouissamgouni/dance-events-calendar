@@ -270,7 +270,7 @@ export default function EventDetailPage() {
                                                 if (!tagGroups.length) fetchTagGroups().then(setTagGroups).catch(() => { });
                                                 setShowSuggestTags((v) => !v);
                                             }}
-                                            className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded px-2.5 py-1 transition shrink-0"
+                                            className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 transition shrink-0"
                                         >
                                             Suggest{' '}
                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="inline h-3.5 w-3.5 align-[-1px]">

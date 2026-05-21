@@ -107,7 +107,7 @@ export default function SuggestTagsButton({
 
     return (
         <div className={isEmbedded ? 'space-y-3' : 'p-4 space-y-3'}>
-            {!isEmbedded && <h3 className="text-sm font-semibold text-gray-700">Suggest Tags</h3>}
+            {!isEmbedded && <h3 className="text-sm font-semibold text-gray-700">Suggest</h3>}
 
             <TagsPicker
                 tagGroups={tagGroups}

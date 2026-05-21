@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import type { AdminTag, AdminTagGroup } from '../api';
 import { fetchAdminTagGroups, createTagGroup, updateTagGroup, createTag, updateTag, deleteTag } from '../api';
 import TagSynonymsEditor from './TagSynonymsEditor';
+import { ConfirmDialog } from './AppDialog';
 
 const CARD_BG_COLORS = [
     'bg-rose-50', 'bg-sky-50', 'bg-amber-50', 'bg-emerald-50',
@@ -34,6 +35,7 @@ export default function AdminTagCategories() {
     const [draggingTagId, setDraggingTagId] = useState<number | null>(null);
     const [tagDropTargetGroupId, setTagDropTargetGroupId] = useState<number | null>(null);
     const [tagActionError, setTagActionError] = useState<string | null>(null);
+    const [deleteTagTarget, setDeleteTagTarget] = useState<AdminTag | null>(null);
 
     const load = () => {
         fetchAdminTagGroups()
@@ -177,10 +179,13 @@ export default function AdminTagCategories() {
     };
 
     const handleDeleteTag = async (tag: AdminTag) => {
-        const usage = tag.event_count
-            ? `\n\nThis tag is currently applied to ${tag.event_count} event${tag.event_count === 1 ? '' : 's'}; those assignments will be removed.`
-            : '';
-        if (!window.confirm(`Delete tag "${tag.label}"?${usage}`)) return;
+        setDeleteTagTarget(tag);
+    };
+
+    const confirmDeleteTag = async () => {
+        const tag = deleteTagTarget;
+        if (!tag) return;
+        setDeleteTagTarget(null);
         // Optimistic remove.
         setGroups((prev) =>
             prev.map((g) => ({ ...g, tags: g.tags.filter((t) => t.id !== tag.id) })),
@@ -522,6 +527,17 @@ export default function AdminTagCategories() {
                     </div>
                 )}
             </div>
+            <ConfirmDialog
+                open={deleteTagTarget !== null}
+                title="Delete Tag"
+                message={`Delete tag "${deleteTagTarget?.label ?? ''}"?${deleteTagTarget?.event_count
+                    ? `\n\nThis tag is currently applied to ${deleteTagTarget.event_count} event${deleteTagTarget.event_count === 1 ? '' : 's'}; those assignments will be removed.`
+                    : ''}`}
+                confirmLabel="Delete"
+                destructive
+                onCancel={() => setDeleteTagTarget(null)}
+                onConfirm={() => void confirmDeleteTag()}
+            />
         </div>
     );
 }

@@ -670,6 +670,8 @@ class DatabaseSeeder:
                 "handle",
                 "account_visibility",
                 "is_verified_organizer",
+                "is_admin_managed",
+                "managed_label",
                 "instagram_url",
                 "facebook_url",
                 "bio",

@@ -15,8 +15,9 @@ import {
     bulkAssignTags,
     runTagSuggestionsBulk,
     adminBulkEngagement,
+    fetchAdminUsers,
 } from '../api';
-import type { AdminTagGroup, AdminBulkEngagementKind, AdminBulkEngagementAudience } from '../api';
+import type { AdminTagGroup, AdminBulkEngagementKind, AdminBulkEngagementAudience, AdminUserRow } from '../api';
 import LocationBadge from './LocationBadge';
 import AdminEventDetailPanel from './AdminEventDetailPanel';
 import { useAdminPrefs } from '../context/AdminPrefsContext';
@@ -64,11 +65,10 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
     const [tagGroups, setTagGroups] = useState<AdminTagGroup[]>([]);
     const [bulkTagPickerOpen, setBulkTagPickerOpen] = useState(false);
     const [bulkTagIds, setBulkTagIds] = useState<number[]>([]);
-    // Curate-to-lists dialog state. Targets are admin-managed handles
-    // entered as comma/space-separated text; backend skips any handle
-    // that isn't flagged ``is_admin_managed`` (per-row).
+    // Curate-to-lists dialog state. Targets are admin-managed users.
     const [curatePickerOpen, setCuratePickerOpen] = useState(false);
-    const [curateHandlesText, setCurateHandlesText] = useState('');
+    const [managedUsers, setManagedUsers] = useState<AdminUserRow[]>([]);
+    const [selectedCurateHandles, setSelectedCurateHandles] = useState<Set<string>>(new Set());
     const [curateKind, setCurateKind] = useState<AdminBulkEngagementKind>('save');
     const [curateAudience, setCurateAudience] = useState<AdminBulkEngagementAudience | ''>('');
     const [selectedVisibility, setSelectedVisibility] = useState<'hidden' | 'blocked' | ''>('');
@@ -142,6 +142,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             setAdminDetailEventId(null);
             setBulkTagPickerOpen(false);
             setBulkTagIds([]);
+            setSelectedCurateHandles(new Set());
             // Don't reset hidePast here — it's now driven by the global
             // admin pref so reopening the panel respects the user's choice.
         }
@@ -153,6 +154,13 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             fetchAdminTagGroups().then(setTagGroups).catch(() => { });
         }
     }, [isOpen]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        if (!isOpen) return;
+        fetchAdminUsers({ managedOnly: true, limit: 200 })
+            .then((res) => setManagedUsers(res.items.filter((u) => u.handle && !u.deleted_at && !u.is_admin)))
+            .catch(() => setManagedUsers([]));
+    }, [isOpen]);
 
     // Fetch when filters/page change
     useEffect(() => {
@@ -207,6 +215,15 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
         );
     };
 
+    const handleToggleCurateHandle = (handle: string) => {
+        setSelectedCurateHandles((prev) => {
+            const next = new Set(prev);
+            if (next.has(handle)) next.delete(handle);
+            else next.add(handle);
+            return next;
+        });
+    };
+
     const handleBulkAssignTags = async () => {
         if (selectedIds.size === 0 || bulkTagIds.length === 0) return;
         setBusy('bulk-tags');
@@ -227,12 +244,9 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
 
     const handleBulkCurate = async () => {
         if (selectedIds.size === 0) return;
-        const handles = curateHandlesText
-            .split(/[\s,]+/)
-            .map((h) => h.trim().replace(/^@/, ''))
-            .filter(Boolean);
+        const handles = [...selectedCurateHandles];
         if (handles.length === 0) {
-            setMessage('Enter one or more admin-managed handles.');
+            setMessage('Select one or more admin-managed users.');
             return;
         }
         setBusy('bulk-curate');
@@ -244,12 +258,20 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 'add',
                 { audience: curateAudience || undefined },
             );
-            const skipped = res.skipped_count > 0 ? ` (${res.skipped_count} skipped)` : '';
+            const skippedItems = res.items.filter((item) => item.status.startsWith('skipped'));
+            const skipped = skippedItems.length > 0 ? ` (${skippedItems.length} skipped)` : '';
+            const skippedDetails = skippedItems.slice(0, 3).map((item) => {
+                const detail = item.detail ? `: ${item.detail}` : '';
+                return `@${item.handle} / ${item.event_id}${detail}`;
+            });
+            const skippedText = skippedDetails.length > 0
+                ? ` Skipped: ${skippedDetails.join('; ')}${skippedItems.length > 3 ? `; +${skippedItems.length - 3} more` : ''}.`
+                : '';
             setMessage(
-                `Curated ${res.changed_count} ${curateKind} entry(ies) across ${handles.length} account(s)${skipped}.`,
+                `Curated ${res.changed_count} ${curateKind} entry(ies) across ${handles.length} account(s)${skipped}.${skippedText}`,
             );
             setCuratePickerOpen(false);
-            setCurateHandlesText('');
+            setSelectedCurateHandles(new Set());
         } catch (e) {
             setMessage(e instanceof Error ? e.message : 'Failed to curate.');
         } finally {
@@ -472,10 +494,10 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                     key={v}
                                     onClick={() => { setSelectedVisibility((prev) => (prev === v ? '' : v)); setPage(0); }}
                                     className={`text-[10px] font-medium px-2 py-0.5 border transition ${selectedVisibility === v
-                                            ? v === 'hidden'
-                                                ? 'bg-amber-100 border-amber-400 text-amber-800'
-                                                : 'bg-slate-200 border-slate-400 text-slate-800'
-                                            : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                                        ? v === 'hidden'
+                                            ? 'bg-amber-100 border-amber-400 text-amber-800'
+                                            : 'bg-slate-200 border-slate-400 text-slate-800'
+                                        : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
                                         }`}
                                 >
                                     {v.charAt(0).toUpperCase() + v.slice(1)}
@@ -528,12 +550,12 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                     <tr
                                         key={event.event_id}
                                         className={`hover:bg-opacity-80 transition cursor-pointer ${event.is_blocked
-                                                ? 'bg-slate-100 hover:bg-slate-200/70'
-                                                : event.is_hidden
-                                                    ? 'bg-amber-50 hover:bg-amber-100/70'
-                                                    : selectedIds.has(event.event_id)
-                                                        ? 'bg-blue-50/30'
-                                                        : 'hover:bg-gray-50/50'
+                                            ? 'bg-slate-100 hover:bg-slate-200/70'
+                                            : event.is_hidden
+                                                ? 'bg-amber-50 hover:bg-amber-100/70'
+                                                : selectedIds.has(event.event_id)
+                                                    ? 'bg-blue-50/30'
+                                                    : 'hover:bg-gray-50/50'
                                             }`}
                                         onClick={() => setAdminDetailEventId(event.event_id)}
                                     >
@@ -747,26 +769,40 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                 </select>
                             </label>
                         </div>
-                        <input
-                            type="text"
-                            value={curateHandlesText}
-                            onChange={(e) => setCurateHandlesText(e.target.value)}
-                            placeholder="Handles: @curator-paris, @curator-bachata (comma/space separated)"
-                            className="w-full text-[11px] border border-gray-300 px-2 py-1"
-                        />
+                        <div className="max-h-28 overflow-y-auto border border-gray-200 bg-white">
+                            {managedUsers.length === 0 ? (
+                                <p className="px-2 py-2 text-[10px] text-gray-500">No admin-managed users yet.</p>
+                            ) : managedUsers.map((u) => {
+                                const handle = u.handle ?? '';
+                                const active = selectedCurateHandles.has(handle);
+                                return (
+                                    <label key={u.user_id} className="flex cursor-pointer items-center gap-2 border-b border-gray-100 px-2 py-1.5 last:border-b-0 hover:bg-gray-50">
+                                        <input
+                                            type="checkbox"
+                                            checked={active}
+                                            onChange={() => handleToggleCurateHandle(handle)}
+                                            className="h-3 w-3"
+                                        />
+                                        <span className="min-w-0 flex-1 truncate text-[11px] text-gray-700">
+                                            @{handle}{u.managed_label ? ` - ${u.managed_label}` : ''}
+                                        </span>
+                                    </label>
+                                );
+                            })}
+                        </div>
                         <p className="text-[10px] text-gray-500">
-                            Non-admin-managed handles are skipped per-row. No notifications are fanned out.
+                            Only admin-managed users are listed. No notifications are fanned out.
                         </p>
                         <div className="flex gap-2">
                             <button
                                 onClick={handleBulkCurate}
-                                disabled={!!busy || !curateHandlesText.trim()}
-                                className="text-[10px] font-medium px-2.5 py-1 bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 transition"
+                                disabled={!!busy || selectedCurateHandles.size === 0}
+                                className="text-[10px] font-medium px-2.5 py-1 bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 transition"
                             >
                                 {busy === 'bulk-curate' ? 'Curating…' : 'Apply'}
                             </button>
                             <button
-                                onClick={() => { setCuratePickerOpen(false); setCurateHandlesText(''); }}
+                                onClick={() => { setCuratePickerOpen(false); setSelectedCurateHandles(new Set()); }}
                                 className="text-[10px] text-gray-500 hover:text-gray-700"
                             >
                                 Cancel

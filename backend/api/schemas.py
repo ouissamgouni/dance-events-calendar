@@ -1584,6 +1584,7 @@ class UserSearchResult(BaseModel):
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
     is_verified_organizer: bool = False
+    is_admin_managed: bool = False
     subscribers_count: int = 0
     # Whether the *viewer* is subscribed to this user's calendar. Always
     # False for anonymous viewers and for self.
@@ -1662,6 +1663,7 @@ class FoFSuggestionItem(BaseModel):
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
     is_verified_organizer: bool = False
+    is_admin_managed: bool = False
     mutual_friend_count: int = 0
     mutual_friends_preview: list[str] = []
 

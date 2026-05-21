@@ -87,6 +87,15 @@ export default function PeopleYouMayKnowCard() {
                                             className="w-3.5 h-3.5 object-contain"
                                         />
                                     )}
+                                    {it.is_admin_managed && (
+                                        <img
+                                            src="/badge.png"
+                                            alt=""
+                                            title="Curator"
+                                            aria-label="Curator"
+                                            className="w-3.5 h-3.5 object-contain"
+                                        />
+                                    )}
                                 </div>
                                 <div className="text-xs text-slate-500 truncate">
                                     {previewHead ? (

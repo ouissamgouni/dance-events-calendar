@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { fetchMySubscribers, removeMySubscriber, type SubscriberUser } from '../api';
+import { ConfirmDialog } from './AppDialog';
 
 /**
  * Owner-only "N subscribers" pill that opens a modal listing the users
@@ -78,6 +79,7 @@ function SubscribersModal({
     const [items, setItems] = useState<SubscriberUser[] | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [busyHandle, setBusyHandle] = useState<string | null>(null);
+    const [removeTarget, setRemoveTarget] = useState<string | null>(null);
 
     useEffect(() => {
         fetchMySubscribers({ limit: 100 })
@@ -91,13 +93,13 @@ function SubscribersModal({
     }, [onCountChange]);
 
     const handleRemove = async (handle: string) => {
-        if (
-            !window.confirm(
-                `Remove @${handle} from your subscribers? They'll stop receiving updates from your calendar.`,
-            )
-        ) {
-            return;
-        }
+        setRemoveTarget(handle);
+    };
+
+    const confirmRemove = async () => {
+        const handle = removeTarget;
+        if (!handle) return;
+        setRemoveTarget(null);
         setBusyHandle(handle);
         try {
             await removeMySubscriber(handle);
@@ -191,6 +193,14 @@ function SubscribersModal({
                     )}
                 </div>
             </div>
+            <ConfirmDialog
+                open={removeTarget !== null}
+                title="Remove Subscriber"
+                message={`Remove @${removeTarget ?? ''} from your subscribers? They'll stop receiving updates from your calendar.`}
+                confirmLabel="Remove"
+                onCancel={() => setRemoveTarget(null)}
+                onConfirm={() => void confirmRemove()}
+            />
         </div>
     );
 }

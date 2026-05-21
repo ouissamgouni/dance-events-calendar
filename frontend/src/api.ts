@@ -723,6 +723,7 @@ export interface FoFSuggestionItem {
     display_name: string | null;
     avatar_url: string | null;
     is_verified_organizer: boolean;
+    is_admin_managed?: boolean;
     mutual_friend_count: number;
     mutual_friends_preview: string[];
 }
@@ -1168,12 +1169,13 @@ export interface AdminUserList {
 }
 
 export async function fetchAdminUsers(
-    opts?: { q?: string; includeDeleted?: boolean; verifiedOnly?: boolean; limit?: number; offset?: number },
+    opts?: { q?: string; includeDeleted?: boolean; verifiedOnly?: boolean; managedOnly?: boolean; limit?: number; offset?: number },
 ): Promise<AdminUserList> {
     const sp = new URLSearchParams();
     if (opts?.q) sp.set('q', opts.q);
     if (opts?.includeDeleted) sp.set('include_deleted', 'true');
     if (opts?.verifiedOnly) sp.set('verified_only', 'true');
+    if (opts?.managedOnly) sp.set('managed_only', 'true');
     if (opts?.limit) sp.set('limit', String(opts.limit));
     if (opts?.offset) sp.set('offset', String(opts.offset));
     const qs = sp.toString();
@@ -1360,6 +1362,7 @@ export interface UserSearchResult {
     display_name: string | null;
     avatar_url: string | null;
     is_verified_organizer: boolean;
+    is_admin_managed?: boolean;
     subscribers_count: number;
     is_subscribed: boolean;
     is_friend?: boolean;
