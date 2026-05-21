@@ -256,18 +256,25 @@ def track_event_attendance(
 
     # Maintain materialized state table.
     if payload.action == "going":
-        existing = session.exec(
-            select(UserEventAttendance).where(
-                UserEventAttendance.device_id == state_key,
-                UserEventAttendance.event_id == payload.event_id,
-            )
-        ).first()
-        if existing is None and user_id is not None:
+        if user_id is not None:
             existing = session.exec(
-                select(UserEventAttendance).where(
+                select(UserEventAttendance)
+                .where(
                     UserEventAttendance.user_id == user_id,
                     UserEventAttendance.event_id == payload.event_id,
-                    UserEventAttendance.created_by_admin_user_id.is_not(None),
+                )
+                .order_by(
+                    UserEventAttendance.created_by_admin_user_id.is_not(None).desc(),
+                    (UserEventAttendance.device_id == state_key).desc(),
+                    UserEventAttendance.attending_since.asc(),
+                    UserEventAttendance.id.asc(),
+                )
+            ).first()
+        else:
+            existing = session.exec(
+                select(UserEventAttendance).where(
+                    UserEventAttendance.device_id == state_key,
+                    UserEventAttendance.event_id == payload.event_id,
                 )
             ).first()
         if existing is None and user_id is None:

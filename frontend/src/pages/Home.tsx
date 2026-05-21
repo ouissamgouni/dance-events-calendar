@@ -1002,40 +1002,7 @@ export default function Home() {
                                                 Saved.
                                             </span>
                                         )}
-                                        {(trendingEnabled || followingBadgeEnabled) && (
-                                            <div className="shrink-0 ml-auto flex items-center gap-3">
-                                                {trendingEnabled && (
-                                                    <label
-                                                        className="inline-flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap"
-                                                        title="Show the trending overlay on map pins"
-                                                        data-testid="map-trending-overlay-toggle"
-                                                    >
-                                                        <input
-                                                            type="checkbox"
-                                                            className="h-3 w-3 accent-blue-500"
-                                                            checked={mapTrendingOverlay}
-                                                            onChange={(e) => setMapTrendingOverlay(e.target.checked)}
-                                                        />
-                                                        <span className="opacity-80">trending overlay</span>
-                                                    </label>
-                                                )}
-                                                {followingBadgeEnabled && (
-                                                    <label
-                                                        className="inline-flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap"
-                                                        title="Show the friends-going overlay on map pins"
-                                                        data-testid="map-following-badge-toggle"
-                                                    >
-                                                        <input
-                                                            type="checkbox"
-                                                            className="h-3 w-3 accent-blue-500"
-                                                            checked={mapFollowingBadgeOverlay}
-                                                            onChange={(e) => setMapFollowingBadgeOverlay(e.target.checked)}
-                                                        />
-                                                        <span className="opacity-80">friends overlay</span>
-                                                    </label>
-                                                )}
-                                            </div>
-                                        )}
+
                                     </div>
                                     {/* Inline name-this-area form. Submitting
                                     persists prefs.area with the typed label;
@@ -1255,9 +1222,9 @@ function InterestFilterChips({
     // conventions). The component is purely presentational + a small
     // amount of local UI state for the picker popover.
     const chip = (active: boolean) =>
-        'px-2 py-1 text-xs border transition ' +
+        'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-2 py-1 text-xs border transition ' +
         (active
-            ? 'bg-blue-500 border-blue-500 text-white'
+            ? 'bg-[#5090f7] border-[#5090f7] text-white'
             : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500');
     // Anonymous users see the inline "Sign in to…" hint when they click
     // the Following pill (rather than the pill being disabled and the
@@ -1281,13 +1248,14 @@ function InterestFilterChips({
                     }
                 }}
                 className={chip(pickerActive)}
+                aria-label={signedIn ? 'Show events from people you follow' : 'Sign in to filter by people you follow'}
                 aria-pressed={pickerActive}
                 title={signedIn ? 'Show events from people you follow' : 'Sign in to filter by people you follow'}
             >
                 <svg
                     aria-hidden="true"
                     viewBox="0 0 20 20"
-                    className="mr-1 -mt-0.5 inline h-3.5 w-3.5"
+                    className="h-3.5 w-3.5 shrink-0"
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="1.6"
@@ -1299,7 +1267,7 @@ function InterestFilterChips({
                     <circle cx="14" cy="6" r="2.4" />
                     <path d="M13 12c2.8 0 5 2 5 5" />
                 </svg>
-                Following
+                <span className="hidden sm:inline">Following</span>
             </button>
             {/* Quick shortcut to the dedicated "From people I follow" calendar
             view. Revealed only when the Following filter is active so it
@@ -1322,16 +1290,17 @@ function InterestFilterChips({
             {signedIn && pickerActive && (
                 <>
                     {/* Scope pills: which graph to draw from. */}
-                    <div className="flex gap-1 border border-slate-200 bg-white">
+                    <div className="flex shrink-0 gap-0.5 border border-slate-200 bg-white">
                         <button
                             type="button"
                             onClick={() => onChange({ source: 'follows' })}
                             className={
-                                'px-2 py-1 text-xs transition ' +
+                                'px-1.5 py-1 text-[11px] transition sm:px-2 sm:text-xs ' +
                                 (interestSource === 'follows'
-                                    ? 'bg-blue-500 text-white'
+                                    ? 'bg-[#5090f7] text-white'
                                     : 'text-slate-600 hover:text-blue-500')
                             }
+                            aria-label="Show all people you follow"
                             aria-pressed={interestSource === 'follows'}
                             title="Everyone you follow (one-way OK)"
                         >
@@ -1341,31 +1310,34 @@ function InterestFilterChips({
                             type="button"
                             onClick={() => onChange({ source: 'friends' })}
                             className={
-                                'px-2 py-1 text-xs transition ' +
+                                'px-1.5 py-1 text-[11px] transition sm:px-2 sm:text-xs ' +
                                 (interestSource === 'friends'
-                                    ? 'bg-blue-500 text-white'
+                                    ? 'bg-[#5090f7] text-white'
                                     : 'text-slate-600 hover:text-blue-500')
                             }
+                            aria-label="Show mutual friends only"
                             aria-pressed={interestSource === 'friends'}
                             title="Mutual followers only"
                         >
-                            Friends only
+                            Friends
                         </button>
                     </div>
                     {/* Kind pills: which signal. */}
-                    <div className="flex gap-1 border border-slate-200 bg-white">
+                    <div className="flex shrink-0 gap-0.5 border border-slate-200 bg-white">
                         {(['any', 'going', 'saved'] as const).map((k) => (
                             <button
                                 key={k}
                                 type="button"
                                 onClick={() => onChange({ kind: k })}
                                 className={
-                                    'px-2 py-1 text-xs transition ' +
+                                    'px-1.5 py-1 text-[11px] transition sm:px-2 sm:text-xs ' +
                                     (interestKind === k
-                                        ? 'bg-blue-500 text-white'
+                                        ? 'bg-[#5090f7] text-white'
                                         : 'text-slate-600 hover:text-blue-500')
                                 }
+                                aria-label={k === 'any' ? 'Show any activity' : k === 'going' ? 'Show going activity' : 'Show saved activity'}
                                 aria-pressed={interestKind === k}
+                                title={k === 'any' ? 'Any activity' : k === 'going' ? 'Going activity' : 'Saved activity'}
                             >
                                 {k === 'any' ? 'Any' : k === 'going' ? 'Going' : 'Saved'}
                             </button>
@@ -1389,10 +1361,11 @@ function InterestFilterChips({
                             type="button"
                             onClick={() => setPickerOpen((v) => !v)}
                             className={chip(false)}
+                            aria-label="Filter to a single person you follow"
                             aria-expanded={pickerOpen}
                             title="Filter to a single person you follow"
                         >
-                            + Pick a person
+                            + <span className="sm:hidden">Person</span><span className="hidden sm:inline">Pick a person</span>
                         </button>
                     )}
                 </>

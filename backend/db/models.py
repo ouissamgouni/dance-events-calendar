@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import Column, JSON, Text, UniqueConstraint
+from sqlalchemy import Column, Index, JSON, Text, UniqueConstraint, text
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -688,7 +688,17 @@ class UserEventAttendance(SQLModel, table=True):
     """Materialized current attendance state — one row means the device is currently going."""
 
     __tablename__ = "user_event_attendances"
-    __table_args__ = (UniqueConstraint("device_id", "event_id"),)
+    __table_args__ = (
+        UniqueConstraint("device_id", "event_id"),
+        Index(
+            "ux_user_event_attendances_user_event_authed",
+            "user_id",
+            "event_id",
+            unique=True,
+            postgresql_where=text("user_id IS NOT NULL"),
+            sqlite_where=text("user_id IS NOT NULL"),
+        ),
+    )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     device_id: str = Field(index=True, max_length=64)
