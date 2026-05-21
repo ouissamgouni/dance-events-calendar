@@ -38,13 +38,10 @@ function formatDate(date: Date): string {
 
 export default function Home() {
     const { user } = useAuth();
-    const { showPrices, showPopularity, popularityThreshold, tagSortMode, unseenStateEnabled, followingBadgeEnabled, trendingEnabled } = useFeatureFlags();
+    const { showPrices, showPopularity, popularityThreshold, tagSortMode, unseenStateEnabled } = useFeatureFlags();
     const [showSuggestModal, setShowSuggestModal] = useState(false);
-    // Session-only toggle for the friends-going overlay on map pins.
-    // Enabled by default; lets users temporarily hide the friends chip
-    // without disabling the site-wide ``followingBadgeEnabled`` flag.
-    const [mapFollowingBadgeOverlay, setMapFollowingBadgeOverlay] = useState(true);
-    const [mapTrendingOverlay, setMapTrendingOverlay] = useState(true);
+    const mapFollowingBadgeOverlay = true;
+    const mapTrendingOverlay = true;
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
 
@@ -1224,7 +1221,7 @@ function InterestFilterChips({
     const chip = (active: boolean) =>
         'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-2 py-1 text-xs border transition ' +
         (active
-            ? 'bg-[#5090f7] border-[#5090f7] text-white'
+            ? 'bg-blue-500 border-blue-500 text-white'
             : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500');
     // Anonymous users see the inline "Sign in to…" hint when they click
     // the Following pill (rather than the pill being disabled and the
@@ -1297,7 +1294,7 @@ function InterestFilterChips({
                             className={
                                 'px-1.5 py-1 text-[11px] transition sm:px-2 sm:text-xs ' +
                                 (interestSource === 'follows'
-                                    ? 'bg-[#5090f7] text-white'
+                                    ? 'bg-blue-500 text-white'
                                     : 'text-slate-600 hover:text-blue-500')
                             }
                             aria-label="Show all people you follow"
@@ -1312,7 +1309,7 @@ function InterestFilterChips({
                             className={
                                 'px-1.5 py-1 text-[11px] transition sm:px-2 sm:text-xs ' +
                                 (interestSource === 'friends'
-                                    ? 'bg-[#5090f7] text-white'
+                                    ? 'bg-blue-500 text-white'
                                     : 'text-slate-600 hover:text-blue-500')
                             }
                             aria-label="Show mutual friends only"
@@ -1332,7 +1329,7 @@ function InterestFilterChips({
                                 className={
                                     'px-1.5 py-1 text-[11px] transition sm:px-2 sm:text-xs ' +
                                     (interestKind === k
-                                        ? 'bg-[#5090f7] text-white'
+                                        ? 'bg-blue-500 text-white'
                                         : 'text-slate-600 hover:text-blue-500')
                                 }
                                 aria-label={k === 'any' ? 'Show any activity' : k === 'going' ? 'Show going activity' : 'Show saved activity'}
