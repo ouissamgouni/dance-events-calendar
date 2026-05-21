@@ -15,6 +15,7 @@ primary_region = "cdg"
   PYTHONUNBUFFERED = "1"
   ENV_NAME = "production"
   CALENDAR_SERVICE = "google"
+  PUBLIC_APP_URL = "https://joinmovida.com"
   CORS_ORIGINS = "https://movida.pages.dev,https://joinmovida.com"
   # SMTP host/port/from (credentials are fly secrets)
   SMTP_HOST = "smtp-relay.brevo.com"

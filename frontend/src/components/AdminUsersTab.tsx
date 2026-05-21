@@ -34,7 +34,7 @@ export default function AdminUsersTab() {
     const [includeDeleted, setIncludeDeleted] = useState(false);
     const [verifiedOnly, setVerifiedOnly] = useState(false);
     const [offset, setOffset] = useState(0);
-    const [busyHandle, setBusyHandle] = useState<string | null>(null);
+    const [busyUserId, setBusyUserId] = useState<string | null>(null);
     const [managedPrompt, setManagedPrompt] = useState<{ row: AdminUserRow; mode: 'manage' | 'label' } | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<AdminUserRow | null>(null);
 
@@ -70,75 +70,80 @@ export default function AdminUsersTab() {
     };
 
     const onToggleVerified = async (row: AdminUserRow) => {
-        if (!row.handle) return;
-        setBusyHandle(row.handle);
+        setBusyUserId(row.user_id);
         try {
-            await adminSetVerifiedOrganizer(row.handle, !row.is_verified_organizer);
+            await adminSetVerifiedOrganizer(row.user_id, !row.is_verified_organizer);
             await load();
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to update');
         } finally {
-            setBusyHandle(null);
+            setBusyUserId(null);
         }
     };
 
     const onToggleManaged = async (row: AdminUserRow) => {
-        if (!row.handle) return;
         if (!row.is_admin_managed) {
             setManagedPrompt({ row, mode: 'manage' });
             return;
         }
-        setBusyHandle(row.handle);
+        setBusyUserId(row.user_id);
         try {
-            await adminSetAdminManaged(row.handle, false, row.managed_label);
+            await adminSetAdminManaged(row.user_id, false, row.managed_label);
             await load();
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to update');
         } finally {
-            setBusyHandle(null);
+            setBusyUserId(null);
         }
     };
 
     const onEditManagedLabel = async (row: AdminUserRow) => {
-        if (!row.handle || !row.is_admin_managed) return;
+        if (!row.is_admin_managed) return;
         setManagedPrompt({ row, mode: 'label' });
     };
 
     const saveManagedPrompt = async (value: string) => {
-        const handle = managedPrompt?.row.handle;
-        if (!handle) return;
+        const userId = managedPrompt?.row.user_id;
+        if (!userId) return;
         const { mode } = managedPrompt;
         const next = value.trim() || null;
         setManagedPrompt(null);
-        setBusyHandle(handle);
+        setBusyUserId(userId);
         try {
-            await adminSetAdminManaged(handle, true, next);
+            await adminSetAdminManaged(userId, true, next);
             await load();
         } catch (e) {
             setError(e instanceof Error ? e.message : mode === 'manage' ? 'Failed to manage user' : 'Failed to update');
         } finally {
-            setBusyHandle(null);
+            setBusyUserId(null);
         }
     };
 
     const onDelete = async (row: AdminUserRow) => {
-        if (!row.handle) return;
         setDeleteTarget(row);
     };
 
     const confirmDelete = async () => {
         const row = deleteTarget;
-        if (!row?.handle) return;
+        if (!row) return;
         setDeleteTarget(null);
-        setBusyHandle(row.handle);
+        setBusyUserId(row.user_id);
         try {
-            await adminDeleteUser(row.handle);
+            await adminDeleteUser(row.user_id);
             await load();
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to delete');
         } finally {
-            setBusyHandle(null);
+            setBusyUserId(null);
         }
+    };
+
+    const userLabel = (row: AdminUserRow | null): string => {
+        if (!row) return 'this user';
+        if (row.display_name && row.handle) return `${row.display_name} (@${row.handle})`;
+        if (row.display_name) return row.display_name;
+        if (row.handle) return `@${row.handle}`;
+        return row.email;
     };
 
     const fmtDate = (iso: string | null): string => {
@@ -281,7 +286,7 @@ export default function AdminUsersTab() {
                                         <div className="flex items-center gap-1.5">
                                             <button
                                                 type="button"
-                                                disabled={!row.handle || isDeleted || busyHandle === row.handle}
+                                                disabled={isDeleted || busyUserId === row.user_id}
                                                 onClick={() => onToggleVerified(row)}
                                                 className="px-2 py-1 text-xs border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
                                                 title={row.is_verified_organizer ? 'Remove verified badge' : 'Mark as verified organizer'}
@@ -290,7 +295,7 @@ export default function AdminUsersTab() {
                                             </button>
                                             <button
                                                 type="button"
-                                                disabled={!row.handle || isDeleted || row.is_admin || busyHandle === row.handle}
+                                                disabled={isDeleted || row.is_admin || busyUserId === row.user_id}
                                                 onClick={() => onToggleManaged(row)}
                                                 className="px-2 py-1 text-xs border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
                                                 title={row.is_admin_managed ? 'Unmark as admin-managed account' : 'Mark as admin-managed curator account'}
@@ -300,7 +305,7 @@ export default function AdminUsersTab() {
                                             {row.is_admin_managed && (
                                                 <button
                                                     type="button"
-                                                    disabled={!row.handle || isDeleted || busyHandle === row.handle}
+                                                    disabled={isDeleted || busyUserId === row.user_id}
                                                     onClick={() => onEditManagedLabel(row)}
                                                     className="px-2 py-1 text-xs border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
                                                     title="Edit internal managed label"
@@ -310,7 +315,7 @@ export default function AdminUsersTab() {
                                             )}
                                             <button
                                                 type="button"
-                                                disabled={!row.handle || isDeleted || row.is_admin || busyHandle === row.handle}
+                                                disabled={isDeleted || row.is_admin || busyUserId === row.user_id}
                                                 onClick={() => onDelete(row)}
                                                 className="px-2 py-1 text-xs border border-red-300 text-red-700 bg-white hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
                                                 title={row.is_admin ? "Can't delete the admin from here" : 'Delete this account'}
@@ -354,8 +359,8 @@ export default function AdminUsersTab() {
                 open={managedPrompt !== null}
                 title={managedPrompt?.mode === 'manage' ? 'Manage Curator Account' : 'Edit Curator Label'}
                 message={managedPrompt?.mode === 'manage'
-                    ? `Mark @${managedPrompt.row.handle} as admin-managed. Optional internal label.`
-                    : `Internal label for @${managedPrompt?.row.handle}. Leave blank to clear.`}
+                    ? `Mark ${userLabel(managedPrompt.row)} as admin-managed. Optional internal label.`
+                    : `Internal label for ${userLabel(managedPrompt?.row ?? null)}. Leave blank to clear.`}
                 initialValue={managedPrompt?.row.managed_label ?? ''}
                 placeholder="Paris Salsa Curator"
                 maxLength={120}
@@ -366,7 +371,7 @@ export default function AdminUsersTab() {
             <ConfirmDialog
                 open={deleteTarget !== null}
                 title="Delete User"
-                message={`Delete ${deleteTarget?.display_name || deleteTarget?.handle || 'this user'} (@${deleteTarget?.handle ?? ''})?\n\nThis purges saved events, attendance, follows, and subscriptions, then anonymises the account. Reviews are kept anonymised. This cannot be undone.`}
+                message={`Delete ${userLabel(deleteTarget)}?\n\nThis purges saved events, attendance, follows, and subscriptions, then anonymises the account. Reviews are kept anonymised. This cannot be undone.`}
                 confirmLabel="Delete"
                 destructive
                 onCancel={() => setDeleteTarget(null)}

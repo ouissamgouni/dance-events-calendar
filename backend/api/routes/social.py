@@ -131,6 +131,13 @@ def _resolve_handle(session: Session, handle: str) -> User:
     return user
 
 
+def _resolve_admin_user_id(session: Session, user_id: UUID) -> User:
+    user = session.get(User, user_id)
+    if user is None or user.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
+
 def _followers_count(session: Session, user_id: UUID) -> int:
     # Phase E (E8): pending follow-requests don't count as followers.
     return int(
@@ -161,6 +168,24 @@ def _following_count(session: Session, user_id: UUID) -> int:
             .where(UserFollow.follower_id == user_id)
             .where(UserFollow.status == "approved")
         ).one()
+    )
+
+
+def _to_admin_user(session: Session, user: User) -> AdminUser:
+    return AdminUser(
+        user_id=str(user.id),
+        email=user.email,
+        handle=user.handle,
+        display_name=user.display_name,
+        avatar_url=user.avatar_url,
+        is_admin=is_admin_user(user),
+        is_verified_organizer=bool(user.is_verified_organizer),
+        is_admin_managed=bool(user.is_admin_managed),
+        managed_label=user.managed_label,
+        deleted_at=user.deleted_at,
+        created_at=user.created_at,
+        followers_count=_followers_count(session, user.id),
+        following_count=_following_count(session, user.id),
     )
 
 
@@ -2151,6 +2176,25 @@ class _VerifiedToggleRequest(BaseModel):
     is_verified_organizer: bool
 
 
+def _set_verified_organizer(session: Session, user: User, is_verified: bool) -> None:
+    user.is_verified_organizer = bool(is_verified)
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+
+
+@router.patch("/admin/users/id/{user_id}/verified", response_model=AdminUser)
+def admin_set_verified_organizer_by_id(
+    user_id: UUID,
+    payload: _VerifiedToggleRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    user = _resolve_admin_user_id(session, user_id)
+    _set_verified_organizer(session, user, payload.is_verified_organizer)
+    return _to_admin_user(session, user)
+
+
 @router.patch("/admin/users/{handle}/verified", response_model=PublicProfileResponse)
 def admin_set_verified_organizer(
     handle: str,
@@ -2164,10 +2208,7 @@ def admin_set_verified_organizer(
     intended for organizers we have manually vetted off-platform.
     """
     user = _resolve_handle(session, handle)
-    user.is_verified_organizer = bool(payload.is_verified_organizer)
-    session.add(user)
-    session.commit()
-    session.refresh(user)
+    _set_verified_organizer(session, user, payload.is_verified_organizer)
     return get_public_profile(user.handle or "", session=session, viewer=None)
 
 
@@ -2178,6 +2219,36 @@ class _AdminManagedToggleRequest(BaseModel):
     is_admin_managed: bool
     # Optional internal label (max 120 chars). Empty string clears.
     managed_label: Optional[str] = None
+
+
+def _set_admin_managed(
+    session: Session,
+    user: User,
+    is_admin_managed: bool,
+    managed_label: str | None,
+) -> None:
+    user.is_admin_managed = bool(is_admin_managed)
+    if user.is_admin_managed:
+        user.share_attendance_default = True
+        user.share_attendance_default_audience = "public"
+        user.share_attendance_default_set_by_user = True
+    raw_label = (managed_label or "").strip()
+    user.managed_label = raw_label[:120] if raw_label else None
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+
+
+@router.patch("/admin/users/id/{user_id}/managed", response_model=AdminUser)
+def admin_set_admin_managed_by_id(
+    user_id: UUID,
+    payload: _AdminManagedToggleRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    user = _resolve_admin_user_id(session, user_id)
+    _set_admin_managed(session, user, payload.is_admin_managed, payload.managed_label)
+    return _to_admin_user(session, user)
 
 
 @router.patch("/admin/users/{handle}/managed", response_model=PublicProfileResponse)
@@ -2196,16 +2267,7 @@ def admin_set_admin_managed(
     Paris"). The label is **not** exposed on the public profile.
     """
     user = _resolve_handle(session, handle)
-    user.is_admin_managed = bool(payload.is_admin_managed)
-    if user.is_admin_managed:
-        user.share_attendance_default = True
-        user.share_attendance_default_audience = "public"
-        user.share_attendance_default_set_by_user = True
-    raw_label = (payload.managed_label or "").strip()
-    user.managed_label = raw_label[:120] if raw_label else None
-    session.add(user)
-    session.commit()
-    session.refresh(user)
+    _set_admin_managed(session, user, payload.is_admin_managed, payload.managed_label)
     return get_public_profile(user.handle or "", session=session, viewer=None)
 
 
@@ -2252,26 +2314,25 @@ def admin_list_users(
         stmt.order_by(User.created_at.desc()).limit(limit).offset(offset)
     ).all()
 
-    items: list[AdminUser] = []
-    for u in rows:
-        items.append(
-            AdminUser(
-                user_id=str(u.id),
-                email=u.email,
-                handle=u.handle,
-                display_name=u.display_name,
-                avatar_url=u.avatar_url,
-                is_admin=is_admin_user(u),
-                is_verified_organizer=bool(u.is_verified_organizer),
-                is_admin_managed=bool(u.is_admin_managed),
-                managed_label=u.managed_label,
-                deleted_at=u.deleted_at,
-                created_at=u.created_at,
-                followers_count=_followers_count(session, u.id),
-                following_count=_following_count(session, u.id),
-            )
-        )
+    items = [_to_admin_user(session, u) for u in rows]
     return AdminUserListResponse(items=items, total=total)
+
+
+@router.delete("/admin/users/id/{user_id}", status_code=200)
+def admin_delete_user_by_id(
+    user_id: UUID,
+    session: Session = Depends(get_session),
+    admin: dict = Depends(require_admin),
+):
+    user = _resolve_admin_user_id(session, user_id)
+    if is_admin_user(user):
+        raise HTTPException(
+            status_code=400,
+            detail="Refusing to delete the admin account via this endpoint",
+        )
+    purge_user_account(session, user.id)
+    session.commit()
+    return {"status": "deleted", "user_id": str(user.id)}
 
 
 @router.delete("/admin/users/{handle}", status_code=200)
@@ -3142,13 +3203,21 @@ def _generate_referral_code() -> str:
 def _public_app_url() -> str:
     """Return the public app base URL for referral links.
 
-    Reads ``PUBLIC_APP_URL`` env var (set in fly.toml / .env). Falls
-    back to ``http://localhost:5173`` for local dev so the link is
-    still copy-pasteable.
+    Reads ``PUBLIC_APP_URL`` env var (set in fly.toml / .env), with
+    environment-specific cloud fallbacks and localhost for local dev.
     """
     import os
 
-    return (os.getenv("PUBLIC_APP_URL") or "http://localhost:5173").rstrip("/")
+    configured = os.getenv("PUBLIC_APP_URL")
+    if configured:
+        return configured.rstrip("/")
+
+    env_name = (os.getenv("ENV_NAME") or "").strip().lower()
+    if env_name == "staging":
+        return "https://develop.joinmovida.com"
+    if env_name in {"prod", "production"}:
+        return "https://joinmovida.com"
+    return "http://localhost:5173"
 
 
 def _referral_url(code: str) -> str:
