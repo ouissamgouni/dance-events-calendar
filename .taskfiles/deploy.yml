@@ -75,6 +75,13 @@ tasks:
         fi
         SHORT=$(git rev-parse --short=7 "$REF_SHA")
         WT=".worktrees/ref-$SHORT"
+        if [ -d "$WT" ]; then
+          WT_SHA=$(git -C "$WT" rev-parse HEAD 2>/dev/null || echo "")
+          if [ "$WT_SHA" != "$REF_SHA" ]; then
+            echo "→ Recreating stale worktree $WT (expected $SHORT, found ${WT_SHA:-unknown})..."
+            git worktree remove --force "$WT" >/dev/null
+          fi
+        fi
         if [ ! -d "$WT" ]; then
           echo "→ Creating worktree $WT from $REF ($SHORT)..."
           mkdir -p .worktrees
@@ -120,6 +127,13 @@ tasks:
         fi
         SHORT=$(git rev-parse --short=7 "$REF_SHA")
         WT=".worktrees/ref-$SHORT"
+        if [ -d "$WT" ]; then
+          WT_SHA=$(git -C "$WT" rev-parse HEAD 2>/dev/null || echo "")
+          if [ "$WT_SHA" != "$REF_SHA" ]; then
+            echo "→ Recreating stale worktree $WT (expected $SHORT, found ${WT_SHA:-unknown})..."
+            git worktree remove --force "$WT" >/dev/null
+          fi
+        fi
         if [ ! -d "$WT" ]; then
           echo "→ Creating worktree $WT from $REF ($SHORT)..."
           mkdir -p .worktrees
