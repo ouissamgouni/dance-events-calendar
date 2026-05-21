@@ -2197,6 +2197,10 @@ def admin_set_admin_managed(
     """
     user = _resolve_handle(session, handle)
     user.is_admin_managed = bool(payload.is_admin_managed)
+    if user.is_admin_managed:
+        user.share_attendance_default = True
+        user.share_attendance_default_audience = "public"
+        user.share_attendance_default_set_by_user = True
     raw_label = (payload.managed_label or "").strip()
     user.managed_label = raw_label[:120] if raw_label else None
     session.add(user)

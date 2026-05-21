@@ -1,16 +1,16 @@
 test_plan:
   name: "Admin-curated lists (Phase 2) — bulk on-demand curation"
   description: >
-    Verify the admin can flag a regular account as admin-managed and then
+    Verify the admin can use an admin-managed curator account and then
     bulk-curate events from the Events panel into that account's Saved /
-    Going lists. Curated rows must show the "Curated" pill on the public
-    profile (Phase 4) and be isolated by ``device_id="admin:<admin.id>"``
-    so a real user signing in as the puppet would not see them as own.
+    Going lists. Curated rows must default to public visibility, show the
+    "Curated" pill on the public profile (Phase 4), and remain idempotent
+    when the curator later changes per-event visibility.
 
   preconditions:
     - "task start:scenario SCENARIO=admin-curation-bulk"
     - "task db:up && task db:migrate (heads: fb71a8c9d0e1, 8c2f3d4e5a01)"
-    - "Pre-seeded users: admin, curator-paris (admin-managed), alice."
+    - "Pre-seeded users: admin, curator-paris (admin-managed, default audience public), alice."
     - "Mock calendar service yields at least 3 upcoming events after a sync."
 
   steps:
@@ -25,6 +25,7 @@ test_plan:
         Open the Users tab in /admin and find the curator-paris row.
       expected: >
         Row shows a "managed: Paris Salsa Curator" pill and "Unmanage" button.
+        The curator's default RSVP/save audience is public.
 
     - id: 3
       title: "Bulk curate to Saved"
@@ -51,7 +52,7 @@ test_plan:
         All 3 events render with an indigo "Curated" badge (tooltip:
         "Curated by the editorial team") alongside the Going / Saved pill.
         GET /api/social/users/curator-paris/calendar response: every item
-        has ``curated: true``.
+        has ``curated: true`` and a public audience.
 
     - id: 6
       title: "Re-curation is idempotent"
@@ -59,11 +60,12 @@ test_plan:
       expected: "``written=0, skipped=2`` (already curated; audit cols unchanged)."
 
     - id: 7
-      title: "Curator isolation"
+      title: "Curator can change visibility without duplicating Going"
       description: >
-        Sign in as curator-paris (Dev Mock). Visit /calendar (own view).
+        Sign in as curator-paris (Dev Mock). On the curated Going event,
+        change the audience from public to private.
       expected: >
-        The Saved / Going lists rendered for the *signed-in self* do NOT
-        include the admin-curated rows — those live under
-        ``device_id="admin:<admin.id>"`` and are scoped to the admin
-        device, not the curator's own device.
+        The event remains in the curator's own Going list, the event's
+        total Going count stays unchanged, and the database still has a
+        single ``UserEventAttendance`` row for curator-paris on that event
+        with ``device_id="admin:<curator.id>"``.

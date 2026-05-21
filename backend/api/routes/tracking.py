@@ -262,6 +262,14 @@ def track_event_attendance(
                 UserEventAttendance.event_id == payload.event_id,
             )
         ).first()
+        if existing is None and user_id is not None:
+            existing = session.exec(
+                select(UserEventAttendance).where(
+                    UserEventAttendance.user_id == user_id,
+                    UserEventAttendance.event_id == payload.event_id,
+                    UserEventAttendance.created_by_admin_user_id.is_not(None),
+                )
+            ).first()
         if existing is None and user_id is None:
             # Back-compat: pick up a pre-cookie row keyed by legacy device_id.
             existing = session.exec(

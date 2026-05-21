@@ -256,6 +256,49 @@ def test_track_event_attendance_persists_share_publicly(client, session):
     assert anon.share_publicly is False
 
 
+@pytest.mark.unit
+def test_track_event_attendance_updates_admin_curated_row(client, session):
+    admin = _make_user(session, "admin@example.com", "Admin")
+    alice = _make_user(session, "alice@example.com", "Alice")
+    event_id = "evt-curated-going"
+    session.add(
+        UserEventAttendance(
+            event_id=event_id,
+            device_id=f"admin:{alice.id}",
+            user_id=alice.id,
+            share_publicly=True,
+            share_audience="public",
+            created_by_admin_user_id=admin.id,
+        )
+    )
+    session.commit()
+
+    _login(client, "alice@example.com", device_id="d-alice")
+    r = client.post(
+        "/api/track/event-attendance",
+        json={
+            "event_id": event_id,
+            "device_id": "d-alice",
+            "action": "going",
+            "share_audience": "private",
+        },
+    )
+    assert r.status_code == 201, r.text
+
+    rows = session.exec(
+        select(UserEventAttendance).where(UserEventAttendance.event_id == event_id)
+    ).all()
+    assert len(rows) == 1
+    assert rows[0].device_id == f"admin:{alice.id}"
+    assert rows[0].created_by_admin_user_id == admin.id
+    assert rows[0].share_audience == "private"
+    assert rows[0].share_publicly is False
+
+    summary = client.get(f"/api/events/{event_id}/attendance-summary")
+    assert summary.status_code == 200, summary.text
+    assert summary.json()["total_going"] == 1
+
+
 def _save(session: Session, *, event_id: str, device_id: str, user: User | None = None):
     session.add(
         UserSavedEvent(

@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from backend.api.main import app
-from backend.api.routes.tags import _group_to_response
+from backend.api.routes.tags import _group_to_response, get_event_tags
 from backend.db.database import get_session
 from backend.db.models import Tag, TagGroup, EventTag, TagSuggestion, CachedEvent
 
@@ -139,6 +139,16 @@ class TestListTags:
 
         data = _group_to_response(group)
         assert [t.slug for t in data.tags] == ["alpha", "zeta"]
+
+    def test_get_event_tags_filters_disabled_tags_and_groups(self):
+        session = MagicMock(spec=Session)
+        session.exec.return_value.all.return_value = []
+
+        get_event_tags(session, ["evt-001"])
+
+        query_text = str(session.exec.call_args.args[0]).lower()
+        assert "tags.enabled = true" in query_text
+        assert "tag_groups.enabled = true" in query_text
 
 
 @pytest.mark.unit

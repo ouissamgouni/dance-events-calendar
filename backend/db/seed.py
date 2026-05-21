@@ -690,12 +690,17 @@ class DatabaseSeeder:
                 "is_verified_organizer",
                 "is_admin_managed",
                 "managed_label",
+                "share_attendance_default",
+                "share_attendance_default_audience",
                 "instagram_url",
                 "facebook_url",
                 "bio",
             ):
                 if key in entry and entry[key] is not None:
                     user_kwargs[key] = entry[key]
+            if user_kwargs.get("is_admin_managed") is True:
+                user_kwargs["share_attendance_default"] = True
+                user_kwargs["share_attendance_default_audience"] = "public"
             self.session.add(User(**user_kwargs))
             logger.info("Created mock user: %s", email)
 

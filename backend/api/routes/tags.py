@@ -177,6 +177,8 @@ def get_event_tags(
         .join(Tag, EventTag.tag_id == Tag.id)
         .join(TagGroup, Tag.group_id == TagGroup.id)
         .where(EventTag.event_id.in_(event_ids))
+        .where(Tag.enabled == True)  # noqa: E712
+        .where(TagGroup.enabled == True)  # noqa: E712
         .order_by(TagGroup.ordinal, Tag.ordinal)
     ).all()
     result: dict[str, list[TagResponse]] = {}

@@ -14,3 +14,5 @@ users:
     account_visibility: public
     is_admin_managed: true
     managed_label: Paris Salsa Curator
+    share_attendance_default: true
+    share_attendance_default_audience: public

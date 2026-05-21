@@ -9,14 +9,14 @@ test_plan:
   preconditions:
     - "task start:scenario SCENARIO=admin-curation-pipeline"
     - "task db:up && task db:migrate (head: 8c2f3d4e5a01)"
-    - "Pre-seeded users: admin, curator-paris (admin-managed)."
+    - "Pre-seeded users: admin, curator-paris (admin-managed, default audience public)."
     - "Mock calendar service is configured with ≥1 calendar (cal-1)."
 
   steps:
     - id: 1
       title: "Confirm curator-paris is admin-managed"
       description: "Sign in as admin. In /admin Users tab, find curator-paris."
-      expected: "Row shows ``managed: Paris Salsa Curator`` pill."
+      expected: "Row shows ``managed: Paris Salsa Curator`` pill and the curator's default RSVP/save audience is public."
 
     - id: 2
       title: "Open curation rules for cal-1"
@@ -40,7 +40,7 @@ test_plan:
         Sync completes 200. New events from cal-1 each gain a
         ``UserSavedEvent`` row for curator-paris with
         ``created_by_admin_user_id=admin.id`` and
-        ``device_id=admin:<admin.id>``.
+        ``device_id=admin:<curator.id>``.
 
     - id: 5
       title: "Public profile shows the auto-curated events"

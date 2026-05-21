@@ -170,6 +170,39 @@ class TestDatabaseSeeder:
         assert tag is not None
         assert user is not None
 
+    def test_seed_admin_managed_user_defaults_to_public_audience(
+        self, tmp_path, monkeypatch
+    ):
+        scenarios_dir = tmp_path / "scenarios"
+        scenario_dir = scenarios_dir / "managed"
+        scenario_dir.mkdir(parents=True)
+        (scenario_dir / "mock-users.yaml").write_text(
+            "users:\n"
+            "  - email: curator@example.com\n"
+            "    name: Curator\n"
+            "    handle: curator\n"
+            "    is_admin_managed: true\n"
+            "    share_attendance_default_audience: private\n"
+        )
+        monkeypatch.setattr(seed_module, "SCENARIOS_DIR", scenarios_dir)
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            DatabaseSeeder(session).seed(scenario_dir)
+
+            user = session.exec(
+                select(User).where(User.email == "curator@example.com")
+            ).first()
+
+        assert user is not None
+        assert user.is_admin_managed is True
+        assert user.share_attendance_default is True
+        assert user.share_attendance_default_audience == "public"
+
     def test_all_scenarios_have_tag_and_user_coverage(self):
         import yaml
 

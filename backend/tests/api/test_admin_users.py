@@ -173,6 +173,31 @@ def test_admin_list_users_excludes_deleted_by_default(client, session):
     assert "carol" in handles2
 
 
+@pytest.mark.unit
+def test_admin_managed_toggle_sets_public_default_audience(client, session):
+    users = _seed_users(session)
+    users["alice"].share_attendance_default = False
+    users["alice"].share_attendance_default_audience = "private"
+    session.add(users["alice"])
+    session.commit()
+
+    _login(client, "admin@example.com")
+    r = client.patch(
+        "/api/social/admin/users/alice/managed",
+        json={"is_admin_managed": True, "managed_label": "Paris curator"},
+    )
+    assert r.status_code == 200, r.text
+
+    session.expire_all()
+    alice = session.exec(select(User).where(User.handle == "alice")).first()
+    assert alice is not None
+    assert alice.is_admin_managed is True
+    assert alice.managed_label == "Paris curator"
+    assert alice.share_attendance_default is True
+    assert alice.share_attendance_default_audience == "public"
+    assert alice.share_attendance_default_set_by_user is True
+
+
 # --- DELETE /admin/users/{handle} -------------------------------------------
 
 
