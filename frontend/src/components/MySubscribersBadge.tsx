@@ -13,7 +13,13 @@ import { ConfirmDialog } from './AppDialog';
  * fetches — the metric needs only ``total`` and the list page is small
  * enough that re-fetching avoids cache-staleness footguns.
  */
-export default function MySubscribersBadge({ className }: { className?: string }) {
+export default function MySubscribersBadge({
+    className,
+    mobileIconSrc,
+}: {
+    className?: string;
+    mobileIconSrc?: string;
+}) {
     const [count, setCount] = useState<number | null>(null);
     const [open, setOpen] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -43,19 +49,28 @@ export default function MySubscribersBadge({ className }: { className?: string }
                 onClick={() => setOpen(true)}
                 className={
                     className ??
-                    'inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-700 hover:text-blue-700 hover:bg-slate-100 rounded transition'
+                    'inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-700 hover:text-blue-700 hover:bg-slate-100 transition'
                 }
+                aria-label={`See ${count} subscriber${count === 1 ? '' : 's'} to your calendar`}
                 title="See who subscribed to your calendar"
             >
+                {mobileIconSrc && (
+                    <img
+                        src={mobileIconSrc}
+                        alt=""
+                        className="w-4 h-4 sm:hidden"
+                        aria-hidden="true"
+                    />
+                )}
                 <svg
-                    className="w-3.5 h-3.5"
+                    className={`${mobileIconSrc ? 'hidden sm:block ' : ''}w-3.5 h-3.5`}
                     viewBox="0 0 20 20"
                     fill="currentColor"
                     aria-hidden="true"
                 >
                     <path d="M10 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-7 8a7 7 0 1 1 14 0H3Z" />
                 </svg>
-                <span>
+                <span className={mobileIconSrc ? 'hidden sm:inline' : undefined}>
                     {count} subscriber{count === 1 ? '' : 's'}
                 </span>
             </button>

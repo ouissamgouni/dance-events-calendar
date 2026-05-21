@@ -177,6 +177,12 @@ interface Props {
     /** Called when a pin (or its popup title) is clicked; the parent uses
      * this to mark the event as seen. */
     onMarkSeen?: (eventId: string) => void;
+    /** Disable Leaflet popups for compact surfaces that render their own
+     * selected-event UI outside the map. */
+    disablePopups?: boolean;
+    /** Called when a marker itself is selected. Separate from popup title
+     * clicks, which continue through ``onEventClick``. */
+    onMarkerSelect?: (event: CalendarEvent) => void;
     /** Per-render override for the following-badge overlay on map pins.
      * When the site-wide ``followingBadgeEnabled`` flag is on, this lets
      * the user temporarily hide the friends-going chip on the map without
@@ -550,7 +556,9 @@ function MarkerClusterLayer({
     formatDate,
     onEventClick,
     onEventHover,
+    onMarkerSelect,
     onMarkSeen,
+    disablePopups,
 }: {
     events: CalendarEvent[];
     hoveredEventId?: string | null;
@@ -570,7 +578,9 @@ function MarkerClusterLayer({
     formatDate: (event: CalendarEvent) => string;
     onEventClick?: (event: CalendarEvent) => void;
     onEventHover?: (eventId: string | null) => void;
+    onMarkerSelect?: (event: CalendarEvent) => void;
     onMarkSeen?: (eventId: string) => void;
+    disablePopups?: boolean;
 }) {
     const map = useMap();
     const [popupPortals, setPopupPortals] = useState<PopupPortal[]>([]);
@@ -618,22 +628,29 @@ function MarkerClusterLayer({
             const marker = L.marker([event.latitude!, event.longitude!], {
                 icon: isHovered ? makeHighlightedIcon(eventColorBarColor, decorations) : makeColoredIcon(eventColorBarColor, decorations),
             });
-            const popupHost = document.createElement('div');
-
-            marker.bindPopup(popupHost);
+            let popupHost: HTMLDivElement | null = null;
+            if (!disablePopups) {
+                popupHost = document.createElement('div');
+                marker.bindPopup(popupHost);
+            }
             marker.on('mouseover', () => onEventHover?.(event.event_id));
             marker.on('mouseout', () => onEventHover?.(null));
-            marker.on('click', () => onMarkSeen?.(event.event_id));
+            marker.on('click', () => {
+                onMarkSeen?.(event.event_id);
+                onMarkerSelect?.(event);
+            });
 
             markerRefs.current.set(event.event_id, marker);
             clusterGroup.addLayer(marker);
-            nextPortals.push({
-                key: event.event_id,
-                host: popupHost,
-                event,
-                followingCount,
-                showFollowingOverlay,
-            });
+            if (popupHost) {
+                nextPortals.push({
+                    key: event.event_id,
+                    host: popupHost,
+                    event,
+                    followingCount,
+                    showFollowingOverlay,
+                });
+            }
         });
 
         setPopupPortals(nextPortals);
@@ -643,7 +660,7 @@ function MarkerClusterLayer({
             markerRefs.current.clear();
             setPopupPortals([]);
         };
-    }, [clusterGroupRef, detailLinkSource, eventColorBarColor, events, followingBadgeEnabled, formatDate, hoveredEventId, markerRefs, newEventIds, onEventClick, onEventHover, onMarkSeen, popularityThreshold, showFollowingBadgeOverlay, showRatings, showTrendingOverlay, topScores, trendingEnabled, unseenStateEnabled]);
+    }, [clusterGroupRef, detailLinkSource, disablePopups, eventColorBarColor, events, followingBadgeEnabled, formatDate, hoveredEventId, markerRefs, newEventIds, onEventClick, onEventHover, onMarkerSelect, onMarkSeen, popularityThreshold, showFollowingBadgeOverlay, showRatings, showTrendingOverlay, topScores, trendingEnabled, unseenStateEnabled]);
 
     return (
         <>
@@ -665,7 +682,7 @@ function MarkerClusterLayer({
     );
 }
 
-export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, newEventIds, popularityThreshold = 10, onMarkSeen, showFollowingBadgeOverlay = true, showTrendingOverlay = true }: Props) {
+export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true }: Props) {
     const { showRatings, eventColorBarColor, followingBadgeEnabled, unseenStateEnabled, trendingEnabled, trendingTopN, trendingTopPercent } = useFeatureFlags();
     const markerRefs = useRef(new Map<string, L.Marker>());
     const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
@@ -722,7 +739,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
             {...(initialArea
                 ? { bounds: [[initialArea.min_lat, initialArea.min_lng], [initialArea.max_lat, initialArea.max_lng]] as L.LatLngBoundsExpression }
                 : { center: EUROPE_CENTER, zoom: DEFAULT_ZOOM })}
-            className="h-full w-full rounded-xl shadow-sm"
+            className="h-full w-full shadow-sm"
             scrollWheelZoom={true}
             zoomSnap={0.5}
             zoomDelta={0.5}
@@ -808,7 +825,9 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                 formatDate={formatDate}
                 onEventClick={onEventClick}
                 onEventHover={onEventHover}
+                onMarkerSelect={onMarkerSelect}
                 onMarkSeen={onMarkSeen}
+                disablePopups={disablePopups}
             />
         </MapContainer>
     );

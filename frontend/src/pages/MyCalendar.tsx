@@ -241,15 +241,6 @@ export default function MyCalendar() {
     const eventsForList = showPastEvents ? displayedEvents : upcomingDisplayed;
     const mapEvents = eventsForList.length > 0 ? eventsForList : stableEmptyEvents;
 
-    const countLabel = useMemo(() => {
-        if (savedCount > 0 && attendingCount > 0) {
-            return `${savedCount} saved · ${attendingCount} going`;
-        }
-        if (savedCount > 0) return `${savedCount} saved`;
-        if (attendingCount > 0) return `${attendingCount} going`;
-        return null;
-    }, [savedCount, attendingCount]);
-
     return (
         <div className="min-h-screen bg-[#f8fafc]">
             <main className="mx-auto max-w-7xl px-4 py-4">
@@ -262,92 +253,7 @@ export default function MyCalendar() {
                             <path d="M5 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14l-5-2.5L5 18V4Z" />
                         </svg>
                         My Calendar
-                        {countLabel && (
-                            <span className="ml-2 text-sm font-normal text-slate-500">
-                                ({countLabel})
-                            </span>
-                        )}
                     </h1>
-                    {user && <MySubscribersBadge />}
-                    {allEventIds.length > 0 && (
-                        <div className="ml-auto flex items-center gap-2">
-                            <button
-                                onClick={handleExportIcs}
-                                disabled={!!exporting}
-                                className="hidden sm:inline-flex border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
-                            >
-                                {exporting === 'ics' ? 'Exporting…' : '📅 Export .ics'}
-                            </button>
-                            <button
-                                onClick={handleExportXlsx}
-                                disabled={!!exporting}
-                                className="hidden sm:inline-flex border border-slate-200 bg-white px-3 py-1 text-xs text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
-                            >
-                                {exporting === 'xlsx' ? 'Exporting…' : '📊 Export .xlsx'}
-                            </button>
-                            <div ref={exportMenuRef} className="relative sm:hidden">
-                                <button
-                                    onClick={() => setExportMenuOpen((v) => !v)}
-                                    disabled={!!exporting}
-                                    aria-haspopup="menu"
-                                    aria-expanded={exportMenuOpen}
-                                    className="inline-flex items-center gap-1 border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
-                                >
-                                    {exporting ? 'Exporting…' : (
-                                        <>
-                                            <span aria-hidden>📥</span>
-                                            <span>Export</span>
-                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={`w-3 h-3 transition-transform ${exportMenuOpen ? 'rotate-180' : ''}`}>
-                                                <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
-                                            </svg>
-                                        </>
-                                    )}
-                                </button>
-                                {exportMenuOpen && (
-                                    <div role="menu" className="absolute right-0 top-full mt-1 w-44 bg-white border border-slate-200 shadow-lg z-[9000]">
-                                        <button
-                                            role="menuitem"
-                                            onClick={() => { setExportMenuOpen(false); handleExportIcs(); }}
-                                            className="block w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 transition"
-                                        >
-                                            📅 Export .ics
-                                        </button>
-                                        <button
-                                            role="menuitem"
-                                            onClick={() => { setExportMenuOpen(false); handleExportXlsx(); }}
-                                            className="block w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 transition"
-                                        >
-                                            📊 Export .xlsx
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-                            <button
-                                onClick={handleShare}
-                                disabled={shareStatus === 'loading'}
-                                className="bg-blue-500 px-3 py-2 sm:py-1 text-xs text-white hover:bg-blue-600 transition disabled:opacity-50 inline-flex items-center gap-1"
-                            >
-                                {shareStatus === 'copied' ? (
-                                    <>✓ Link copied!</>
-                                ) : shareStatus === 'loading' ? (
-                                    <>Generating…</>
-                                ) : (
-                                    <>
-                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-                                            <path d="M13 4.5a2.5 2.5 0 1 1 .702 1.737L6.97 9.604a2.518 2.518 0 0 1 0 .792l6.733 3.367a2.5 2.5 0 1 1-.671 1.341l-6.733-3.367a2.5 2.5 0 1 1 0-3.475l6.733-3.367A2.52 2.52 0 0 1 13 4.5Z" />
-                                        </svg>
-                                        <span>Share</span>
-                                    </>
-                                )}
-                            </button>
-                            <button
-                                onClick={clearAll}
-                                className="border border-slate-200 bg-white px-3 py-2 sm:py-1 text-xs text-slate-600 hover:bg-slate-50 transition"
-                            >
-                                Clear all
-                            </button>
-                        </div>
-                    )}
                 </div>
 
                 {!user && allEventIds.length > 0 && !signInNudgeDismissed && (
@@ -397,12 +303,84 @@ export default function MyCalendar() {
                     </div>
                 )}
 
-                {activeView === 'subs' && subsCalendars.length > 0 && (
+                {activeView === 'mine' && allEventIds.length > 0 && (
                     <div className="mb-4 flex flex-wrap items-center gap-1.5">
+                        {user && (
+                            <MySubscribersBadge
+                                mobileIconSrc="/rss.png"
+                                className="shrink-0 inline-flex items-center gap-1 border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 transition"
+                            />
+                        )}
+                        <div ref={exportMenuRef} className="relative shrink-0">
+                            <button
+                                onClick={() => setExportMenuOpen((v) => !v)}
+                                disabled={!!exporting}
+                                aria-haspopup="menu"
+                                aria-expanded={exportMenuOpen}
+                                className="inline-flex items-center gap-1 border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
+                            >
+                                {exporting ? 'Exporting…' : (
+                                    <>
+                                        <span aria-hidden>📥</span>
+                                        <span>Export</span>
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={`w-3 h-3 transition-transform ${exportMenuOpen ? 'rotate-180' : ''}`}>
+                                            <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
+                                        </svg>
+                                    </>
+                                )}
+                            </button>
+                            {exportMenuOpen && (
+                                <div role="menu" className="absolute left-0 top-full mt-1 w-40 bg-white border border-slate-200 shadow-lg z-[9000]">
+                                    <button
+                                        role="menuitem"
+                                        onClick={() => { setExportMenuOpen(false); handleExportIcs(); }}
+                                        className="block w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 transition"
+                                    >
+                                        📅 Export .ics
+                                    </button>
+                                    <button
+                                        role="menuitem"
+                                        onClick={() => { setExportMenuOpen(false); handleExportXlsx(); }}
+                                        className="block w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 transition"
+                                    >
+                                        📊 Export .xlsx
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                        <button
+                            onClick={handleShare}
+                            disabled={shareStatus === 'loading'}
+                            className="shrink-0 bg-blue-500 px-2 py-1 text-xs text-white hover:bg-blue-600 transition disabled:opacity-50 inline-flex items-center gap-1"
+                        >
+                            {shareStatus === 'copied' ? (
+                                <>✓ Link copied!</>
+                            ) : shareStatus === 'loading' ? (
+                                <>Generating…</>
+                            ) : (
+                                <>
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                                        <path d="M13 4.5a2.5 2.5 0 1 1 .702 1.737L6.97 9.604a2.518 2.518 0 0 1 0 .792l6.733 3.367a2.5 2.5 0 1 1-.671 1.341l-6.733-3.367a2.5 2.5 0 1 1 0-3.475l6.733-3.367A2.52 2.52 0 0 1 13 4.5Z" />
+                                    </svg>
+                                    <span>Share</span>
+                                </>
+                            )}
+                        </button>
+                        <button
+                            onClick={clearAll}
+                            className="shrink-0 border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 transition"
+                        >
+                            Clear all
+                        </button>
+                    </div>
+                )}
+
+                {activeView === 'subs' && subsCalendars.length > 0 && (
+                    <div className="mb-4 flex items-center gap-1.5 overflow-x-auto pb-1">
                         <button
                             type="button"
                             onClick={() => setSubsHandleFilter(null)}
-                            className={`px-2.5 py-1 text-xs font-medium border transition ${subsHandleFilter === null
+                            className={`shrink-0 px-2.5 py-1 text-xs font-medium border transition ${subsHandleFilter === null
                                 ? 'bg-blue-500 border-blue-500 text-white'
                                 : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500'
                                 }`}
@@ -414,7 +392,7 @@ export default function MyCalendar() {
                                 key={s.handle}
                                 type="button"
                                 onClick={() => setSubsHandleFilter(s.handle)}
-                                className={`px-2.5 py-1 text-xs font-medium border transition inline-flex items-center gap-1 ${subsHandleFilter === s.handle
+                                className={`shrink-0 px-2.5 py-1 text-xs font-medium border transition inline-flex items-center gap-1 ${subsHandleFilter === s.handle
                                     ? 'bg-blue-500 border-blue-500 text-white'
                                     : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500'
                                     }`}
@@ -438,7 +416,7 @@ export default function MyCalendar() {
                                 <button
                                     key={f}
                                     onClick={() => setActiveFilter(f)}
-                                    className={`px-3 py-1 text-xs font-medium border transition ${activeFilter === f
+                                    className={`px-2 py-0.5 text-[11px] font-medium leading-5 border transition ${activeFilter === f
                                         ? 'bg-blue-500 border-blue-500 text-white'
                                         : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500'
                                         }`}
@@ -526,7 +504,7 @@ export default function MyCalendar() {
                                     />
                                 </div>
                             </div>
-                            <div className="order-2 lg:order-2 h-[180px] lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
+                            <div className="order-2 lg:order-2 h-[216px] lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
                                 <EventMap
                                     events={mapEvents}
                                     focusedEvent={selectedEvent}
