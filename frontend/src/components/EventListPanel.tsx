@@ -35,6 +35,29 @@ interface EventListPanelProps {
     newEnabled?: boolean;
     /** Set of event ids added after the current viewer's local baseline. */
     newEventIds?: Set<string>;
+    /** Hide one event from this list, used when mobile map selection renders it above the list. */
+    excludedEventId?: string | null;
+    /** Scroll highlighted cards into view when the highlight comes from the map/calendar. */
+    scrollHighlightedIntoView?: boolean;
+}
+
+export interface EventListCardProps {
+    event: CalendarEvent;
+    mapBounds: MapBounds | null;
+    onEventClick: (event: CalendarEvent) => void;
+    showPrices: boolean;
+    showPopularity: boolean;
+    popularityThreshold: number;
+    trendingTopN: number;
+    trendingTopPercent: number;
+    allViewCounts: number[];
+    followingBadgeEnabled: boolean;
+    showRatings: boolean;
+    isSavedFlag: boolean;
+    isHighlighted?: boolean;
+    isNew?: boolean;
+    onEventHover?: (eventId: string | null) => void;
+    cardRef?: (el: HTMLDivElement | null) => void;
 }
 
 function PriceBadge({ event }: { event: CalendarEvent }) {
@@ -110,6 +133,126 @@ function isOnMap(event: CalendarEvent, bounds: MapBounds | null): boolean {
     return isInBounds(event, bounds);
 }
 
+const formatCardDate = (d: Date) =>
+    d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+
+const formatCardTime = (d: Date) =>
+    d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+
+export function EventListCard({
+    event,
+    mapBounds,
+    onEventClick,
+    showPrices,
+    showPopularity,
+    popularityThreshold,
+    trendingTopN,
+    trendingTopPercent,
+    allViewCounts,
+    followingBadgeEnabled,
+    showRatings,
+    isSavedFlag,
+    isHighlighted = false,
+    isNew = false,
+    onEventHover,
+    cardRef,
+}: EventListCardProps) {
+    const start = new Date(event.start);
+    const onMap = isOnMap(event, mapBounds);
+
+    return (
+        <div
+            ref={cardRef}
+            role="button"
+            tabIndex={0}
+            className={`event-card${onMap ? '' : ' event-card-offmap'}${isHighlighted ? ' event-card-highlighted' : ''}`}
+            onClick={() => onEventClick(event)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onEventClick(event); } }}
+            onMouseEnter={() => onEventHover?.(event.event_id)}
+            onMouseLeave={() => onEventHover?.(null)}
+        >
+            <div className="event-card-color event-tag-stripes" aria-hidden="true">
+                {(() => {
+                    const colors = getTagColors(event);
+                    if (colors.length === 0) {
+                        return <span className="event-tag-stripe" style={{ backgroundColor: onMap ? '#6b7280' : '#d1d5db' }} />;
+                    }
+                    return colors.map((c, i) => (
+                        <span
+                            key={i}
+                            className="event-tag-stripe"
+                            style={{ backgroundColor: onMap ? c : '#d1d5db' }}
+                        />
+                    ));
+                })()}
+            </div>
+            <div className="event-card-content relative">
+                <h4
+                    className={`event-card-title${isNew ? ' font-semibold' : ''}`}
+                    data-new={isNew ? 'true' : undefined}
+                >
+                    {isNew && (
+                        <span
+                            className="inline-block h-1.5 w-1.5 bg-blue-500 mr-1.5 align-middle"
+                            style={{ borderRadius: '9999px' }}
+                            aria-label="New"
+                            data-testid="new-event-dot"
+                        />
+                    )}
+                    {event.title}
+                </h4>
+                <p className="event-card-date">
+                    {event.all_day ? formatCardDate(start) : `${formatCardDate(start)} · ${formatCardTime(start)}`}
+                </p>
+                {event.location && (
+                    <p className="event-card-location">📍 {event.location}</p>
+                )}
+                {!onMap && (
+                    <span className="event-card-offmap-badge">Off map</span>
+                )}
+                {((showPrices && (event.price_is_free || (event.price_min != null && event.price_currency)))) && (
+                    <div className="event-card-badges">
+                        {showPrices && <PriceBadge event={event} />}
+                    </div>
+                )}
+                {event.tags?.length > 0 && (
+                    <div className="mt-1">
+                        <TagBadges tags={event.tags} maxVisible={3} />
+                    </div>
+                )}
+                <div className="mt-1 flex items-center gap-2">
+                    <AttendeeAvatarStack
+                        eventId={event.event_id}
+                        friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
+                    />
+                    {event.has_active_promo_codes && (
+                        <img
+                            src="/promo-code.png"
+                            alt=""
+                            aria-hidden="true"
+                            title="Has promo codes"
+                            className="w-4 h-4 object-contain"
+                            data-testid="event-card-promo-icon"
+                        />
+                    )}
+                    {showPopularity && (
+                        <PopularityBadge
+                            score={event.popularity_score ?? 0}
+                            allScores={allViewCounts}
+                            threshold={popularityThreshold}
+                            topN={trendingTopN}
+                            topPercent={trendingTopPercent}
+                        />
+                    )}
+                </div>
+                <div className="absolute top-0 right-0 flex items-center gap-1.5">
+                    <ActionCountCluster eventId={event.event_id} showRatings={!!showRatings} isSavedFlag={isSavedFlag} />
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function EventListPanel({
     events,
     mapBounds,
@@ -125,6 +268,8 @@ export default function EventListPanel({
     onSuggestEvent,
     newEnabled = false,
     newEventIds,
+    excludedEventId,
+    scrollHighlightedIntoView = true,
 }: EventListPanelProps) {
     const { isSaved } = useSavedEvents();
     const { showRatings, trendingEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled } = useFeatureFlags();
@@ -149,24 +294,29 @@ export default function EventListPanel({
 
     // Scroll to highlighted card when hoveredEventId changes from an external source (map/calendar)
     useEffect(() => {
+        if (!scrollHighlightedIntoView) return;
         if (!hoveredEventId) return;
         const el = cardRefs.current.get(hoveredEventId);
         if (el) {
             el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         }
-    }, [hoveredEventId]);
+    }, [hoveredEventId, scrollHighlightedIntoView]);
+
+    const listEvents = excludedEventId
+        ? events.filter((event) => event.event_id !== excludedEventId)
+        : events;
 
     // Counter over the unfiltered list so toggling the chip doesn't make it jump.
     const newCount = newEnabled && newEventIds
-        ? events.reduce((n, e) => (newEventIds.has(e.event_id) ? n + 1 : n), 0)
+        ? listEvents.reduce((n, e) => (newEventIds.has(e.event_id) ? n + 1 : n), 0)
         : 0;
     const effectiveNewOnly = newOnly && newCount > 0;
 
     // Show all events — on-map first, off-map / ungeolocated pushed to the bottom.
     // When pastEventIds is provided, keep upcoming events before past events.
     const visibleEvents = newEnabled && effectiveNewOnly && newEventIds
-        ? events.filter((e) => newEventIds.has(e.event_id))
-        : events;
+        ? listEvents.filter((e) => newEventIds.has(e.event_id))
+        : listEvents;
     const sortedEvents = [...visibleEvents].sort((a, b) => {
         if (pastEventIds) {
             const aPast = pastEventIds.has(a.event_id);
@@ -199,14 +349,9 @@ export default function EventListPanel({
         ? sortedEvents.findIndex((e) => pastEventIds.has(e.event_id))
         : -1;
 
-    const onMapCount = mapBounds ? events.filter((e) => isOnMap(e, mapBounds)).length : events.length;
+    const onMapCount = mapBounds ? listEvents.filter((e) => isOnMap(e, mapBounds)).length : listEvents.length;
 
     const allViewCounts = sortedEvents.map((e) => e.popularity_score ?? 0);
-
-    const formatDate = (d: Date) =>
-        d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-    const formatTime = (d: Date) =>
-        d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 
     return (
         <div className="event-list-panel">
@@ -278,8 +423,6 @@ export default function EventListPanel({
                         </div>
                     ) : (
                         sortedEvents.map((event, idx) => {
-                            const start = new Date(event.start);
-                            const onMap = isOnMap(event, mapBounds);
                             const isHighlighted = hoveredEventId === event.event_id;
                             const isNew = newEnabled && !!newEventIds?.has(event.event_id);
                             return (
@@ -289,95 +432,24 @@ export default function EventListPanel({
                                             Past events
                                         </div>
                                     )}
-                                    <div
-                                        ref={(el) => { if (el) cardRefs.current.set(event.event_id, el); else cardRefs.current.delete(event.event_id); }}
-                                        role="button"
-                                        tabIndex={0}
-                                        className={`event-card${onMap ? '' : ' event-card-offmap'}${isHighlighted ? ' event-card-highlighted' : ''}`}
-                                        onClick={() => onEventClick(event)}
-                                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onEventClick(event); } }}
-                                        onMouseEnter={() => onEventHover?.(event.event_id)}
-                                        onMouseLeave={() => onEventHover?.(null)}
-                                    >
-                                        <div className="event-card-color event-tag-stripes" aria-hidden="true">
-                                            {(() => {
-                                                const colors = getTagColors(event);
-                                                if (colors.length === 0) {
-                                                    return <span className="event-tag-stripe" style={{ backgroundColor: onMap ? '#6b7280' : '#d1d5db' }} />;
-                                                }
-                                                return colors.map((c, i) => (
-                                                    <span
-                                                        key={i}
-                                                        className="event-tag-stripe"
-                                                        style={{ backgroundColor: onMap ? c : '#d1d5db' }}
-                                                    />
-                                                ));
-                                            })()}
-                                        </div>
-                                        <div className="event-card-content relative">
-                                            <h4
-                                                className={`event-card-title${isNew ? ' font-semibold' : ''}`}
-                                                data-new={isNew ? 'true' : undefined}
-                                            >
-                                                {isNew && (
-                                                    <span
-                                                        className="inline-block h-1.5 w-1.5 bg-blue-500 mr-1.5 align-middle"
-                                                        style={{ borderRadius: '9999px' }}
-                                                        aria-label="New"
-                                                        data-testid="new-event-dot"
-                                                    />
-                                                )}
-                                                {event.title}
-                                            </h4>
-                                            <p className="event-card-date">
-                                                {event.all_day ? formatDate(start) : `${formatDate(start)} · ${formatTime(start)}`}
-                                            </p>
-                                            {event.location && (
-                                                <p className="event-card-location">📍 {event.location}</p>
-                                            )}
-                                            {!onMap && (
-                                                <span className="event-card-offmap-badge">Off map</span>
-                                            )}
-                                            {((showPrices && (event.price_is_free || (event.price_min != null && event.price_currency)))) && (
-                                                <div className="event-card-badges">
-                                                    {showPrices && <PriceBadge event={event} />}
-                                                </div>
-                                            )}
-                                            {event.tags?.length > 0 && (
-                                                <div className="mt-1">
-                                                    <TagBadges tags={event.tags} maxVisible={3} />
-                                                </div>
-                                            )}
-                                            <div className="mt-1 flex items-center gap-2">
-                                                <AttendeeAvatarStack
-                                                    eventId={event.event_id}
-                                                    friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
-                                                />
-                                                {event.has_active_promo_codes && (
-                                                    <img
-                                                        src="/promo-code.png"
-                                                        alt=""
-                                                        aria-hidden="true"
-                                                        title="Has promo codes"
-                                                        className="w-4 h-4 object-contain"
-                                                        data-testid="event-card-promo-icon"
-                                                    />
-                                                )}
-                                                {showPopularity && trendingEnabled && (
-                                                    <PopularityBadge
-                                                        score={event.popularity_score ?? 0}
-                                                        allScores={allViewCounts}
-                                                        threshold={popularityThreshold}
-                                                        topN={trendingTopN}
-                                                        topPercent={trendingTopPercent}
-                                                    />
-                                                )}
-                                            </div>
-                                            <div className="absolute top-0 right-0 flex items-center gap-1.5">
-                                                <ActionCountCluster eventId={event.event_id} showRatings={!!showRatings} isSavedFlag={isSaved(event.event_id)} />
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <EventListCard
+                                        event={event}
+                                        mapBounds={mapBounds}
+                                        onEventClick={onEventClick}
+                                        showPrices={showPrices}
+                                        showPopularity={showPopularity && trendingEnabled}
+                                        popularityThreshold={popularityThreshold}
+                                        trendingTopN={trendingTopN}
+                                        trendingTopPercent={trendingTopPercent}
+                                        allViewCounts={allViewCounts}
+                                        followingBadgeEnabled={followingBadgeEnabled}
+                                        showRatings={!!showRatings}
+                                        isSavedFlag={isSaved(event.event_id)}
+                                        isHighlighted={isHighlighted}
+                                        isNew={isNew}
+                                        onEventHover={onEventHover}
+                                        cardRef={(el) => { if (el) cardRefs.current.set(event.event_id, el); else cardRefs.current.delete(event.event_id); }}
+                                    />
                                 </Fragment>
                             );
                         })

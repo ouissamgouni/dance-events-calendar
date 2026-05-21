@@ -14,11 +14,12 @@ import type { MapBounds } from '../components/EventMap';
 import EventModal from '../components/EventModal';
 import AdminEventDetailPanel from '../components/AdminEventDetailPanel';
 import DateRangePicker from '../components/DateRangePicker';
-import EventListPanel from '../components/EventListPanel';
+import EventListPanel, { EventListCard } from '../components/EventListPanel';
 import TagFilterPills from '../components/TagFilterPills';
 import AreaFilterChip from '../components/AreaFilterChip';
 import { usePreferences } from '../context/PreferencesContext';
 import { useInvalidateAttendanceSummaries } from '../context/AttendanceSummariesContext';
+import { useSavedEvents } from '../context/SavedEventsContext';
 import { DEFAULT_AREA_BBOX, DEFAULT_AREA_LABEL, clampArea, isDefaultArea } from '../constants/area';
 import type { PreferredAreaPayload } from '../api';
 import MineButton from '../components/MineButton';
@@ -90,7 +91,8 @@ function filterEventsByTags(events: CalendarEvent[], activeTagIds: Set<number>, 
 
 export default function Home() {
     const { user } = useAuth();
-    const { showPrices, showPopularity, popularityThreshold, tagSortMode, unseenStateEnabled } = useFeatureFlags();
+    const { showPrices, showPopularity, showRatings, popularityThreshold, tagSortMode, unseenStateEnabled, trendingEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled } = useFeatureFlags();
+    const { isSaved } = useSavedEvents();
     const [showSuggestModal, setShowSuggestModal] = useState(false);
     const mapFollowingBadgeOverlay = true;
     const mapTrendingOverlay = true;
@@ -416,6 +418,7 @@ export default function Home() {
     const [interestSource, setInterestSource] = useState<'follows' | 'friends' | null>(null);
     const [interestKind, setInterestKind] = useState<'any' | 'going' | 'saved'>('any');
     const [interestUserHandle, setInterestUserHandle] = useState<string | null>(null);
+    const [selectedExplorerMapEventId, setSelectedExplorerMapEventId] = useState<string | null>(null);
 
     // Calendar mode map bounds (for off-map styling in the calendar grid)
     const [calMapBounds, setCalMapBounds] = useState<MapBounds | null>(null);
@@ -529,6 +532,23 @@ export default function Home() {
         [areaScopedEvents, activeTagIds, tagGroups],
     );
 
+    const selectedExplorerMapEvent = useMemo(
+        () => explorerMatchingEvents.find((event) => event.event_id === selectedExplorerMapEventId) ?? null,
+        [explorerMatchingEvents, selectedExplorerMapEventId],
+    );
+
+    const explorerAllViewCounts = useMemo(
+        () => explorerMatchingEvents.map((event) => event.popularity_score ?? 0),
+        [explorerMatchingEvents],
+    );
+
+    useEffect(() => {
+        if (!selectedExplorerMapEventId) return;
+        if (viewMode !== 'explorer' || isDesktop || !selectedExplorerMapEvent) {
+            setSelectedExplorerMapEventId(null);
+        }
+    }, [isDesktop, selectedExplorerMapEvent, selectedExplorerMapEventId, viewMode]);
+
     // Disjunctive facet counts.
     //
     // Filter semantics (must match `filterEventsByTags` above):
@@ -634,6 +654,16 @@ export default function Home() {
         markSeen(evt.event_id);
         navigate(`/event/${evt.event_id}?src=explorer-map`);
     }, [navigate, markSeen]);
+
+    const handleExplorerMapMarkerSelect = useCallback((evt: CalendarEvent) => {
+        setSelectedExplorerMapEventId(evt.event_id);
+        setHoveredEventId(evt.event_id);
+    }, []);
+
+    const handleCloseExplorerMapSelection = useCallback(() => {
+        if (selectedExplorerMapEventId && hoveredEventId === selectedExplorerMapEventId) setHoveredEventId(null);
+        setSelectedExplorerMapEventId(null);
+    }, [hoveredEventId, selectedExplorerMapEventId]);
 
     const handleCloseModal = useCallback(() => {
         setSelectedEventRect(null);
@@ -885,7 +915,7 @@ export default function Home() {
                             and fills available height; the bar is shrink-0
                             so it doesn't get clipped. */}
                             <div className="order-2 lg:order-2 lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6 flex flex-col gap-2 min-w-0">
-                                <div className="h-[180px] lg:h-auto lg:flex-1 lg:min-h-0">
+                                <div className="explorer-map-shell relative h-[300px] sm:h-[368px] lg:h-auto lg:flex-1 lg:min-h-0 overflow-hidden">
                                     <EventMap
                                         events={explorerMatchingEvents}
                                         onEventClick={handleExplorerMapEventClick}
@@ -900,9 +930,45 @@ export default function Home() {
                                         newEventIds={newEventIds}
                                         popularityThreshold={popularityThreshold}
                                         onMarkSeen={markSeen}
+                                        disablePopups={!isDesktop}
+                                        onMarkerSelect={!isDesktop ? handleExplorerMapMarkerSelect : undefined}
                                         showFollowingBadgeOverlay={mapFollowingBadgeOverlay}
                                         showTrendingOverlay={mapTrendingOverlay}
                                     />
+                                    {selectedExplorerMapEvent && !isDesktop && (
+                                        <div className="map-selected-event-card absolute inset-x-2 bottom-2 z-[700] lg:hidden border border-blue-100 bg-white shadow-lg" data-testid="explorer-map-selected-event">
+                                            <button
+                                                type="button"
+                                                onClick={handleCloseExplorerMapSelection}
+                                                className="absolute -top-3 right-1 z-[701] inline-flex h-6 w-6 items-center justify-center border border-blue-100 bg-white text-slate-500 shadow-sm hover:text-slate-700"
+                                                aria-label="Close selected event"
+                                            >
+                                                ×
+                                            </button>
+                                            <EventListCard
+                                                event={selectedExplorerMapEvent}
+                                                mapBounds={mapBounds}
+                                                onEventClick={handleExplorerMapEventClick}
+                                                showPrices={showPrices}
+                                                showPopularity={showPopularity && trendingEnabled}
+                                                popularityThreshold={popularityThreshold}
+                                                trendingTopN={trendingTopN}
+                                                trendingTopPercent={trendingTopPercent}
+                                                allViewCounts={explorerAllViewCounts}
+                                                followingBadgeEnabled={followingBadgeEnabled}
+                                                showRatings={!!showRatings}
+                                                isSavedFlag={isSaved(selectedExplorerMapEvent.event_id)}
+                                                isNew={unseenStateEnabled && newEventIds.has(selectedExplorerMapEvent.event_id)}
+                                                onEventHover={handleEventHover}
+                                            />
+                                            <Link
+                                                to={`/event/${selectedExplorerMapEvent.event_id}?src=explorer-map`}
+                                                className="absolute bottom-2 right-2 z-[701] text-[11px] font-semibold text-blue-500 underline underline-offset-2 hover:text-blue-600 hover:no-underline"
+                                            >
+                                                Details
+                                            </Link>
+                                        </div>
+                                    )}
                                 </div>
                                 {/* Default-area bar: ONE bordered pill that
                                 visually groups the chip label + worldwide /
@@ -1056,6 +1122,7 @@ export default function Home() {
                                     onSuggestEvent={() => setShowSuggestModal(true)}
                                     newEnabled={unseenStateEnabled}
                                     newEventIds={newEventIds}
+                                    scrollHighlightedIntoView={false}
                                 />
                             </div>
                         </div>

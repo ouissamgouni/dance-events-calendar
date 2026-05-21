@@ -68,6 +68,16 @@ body {
   max-height: none !important;
 }
 
+.explorer-map-shell {
+  isolation: isolate;
+  contain: layout paint;
+}
+
+.map-selected-event-card .event-card {
+  border-bottom: 0;
+  padding: 0.5rem 4.5rem 0.5rem 0.7rem;
+}
+
 /* ── FullCalendar base ─────────────────────────────── */
 .fc {
   --fc-border-color: #e2e8f0;

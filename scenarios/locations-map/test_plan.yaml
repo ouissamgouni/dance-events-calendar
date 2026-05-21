@@ -1,156 +1,159 @@
 test_plan:
-  name: "Locations Map — Event Map, Editing & Geocoding"
+  name: "Locations Map — Explorer Map, Mobile Selection & Geocoding"
   description: >
-    Verify the event map displays seeded events correctly, admin can edit event
-    locations with address autocomplete, and geocoding fills missing
-    coordinates. Scenario uses mock calendar service with 31 events across 3
-    calendars.
+    Verify that the Explorer and Calendar maps render seeded event locations
+    correctly, that mobile/tablet marker taps use a selected-event card over the
+    bottom of the map instead of unstable Leaflet popups, and that admin
+    location edits or sync geocoding make missing-coordinate events appear on
+    the map. Scenario uses mock calendar data with 31 events across 3 calendars.
   steps:
-    # ── Home Page & Map ─────────────────────────────────────────
+    # ── Explorer Map ────────────────────────────────────────────
     - id: 1
-      title: "Home page loads with events on map"
+      title: "Explorer loads with geolocated events on the map"
       description: >
-        Open the home page. The calendar should show events and the map (right
-        side) should display markers for geolocated events. Map should auto-fit
-        to show all visible markers.
+        Open the Explorer home page at a desktop width. The map should be in the
+        main map column and the event list should be in the left column. Use the
+        default date range and area filter.
       expected: >
-        Calendar shows events. Map shows ~20+ markers across Europe and
-        worldwide. Map zooms to fit all markers (not stuck on Paris default).
+        The event list loads, the map auto-fits to the seeded geolocated events
+        in the active/default area, and markers appear across multiple European
+        cities instead of staying on the fallback Europe view.
 
     - id: 2
-      title: "Map markers show event popup and interact with explorer list"
+      title: "Desktop marker popup still works"
       description: >
-        Click a marker on the map (e.g. Paris Salsa Congress). A popup should
-        appear with event title, date, and location. While the popup is still
-        open, click on a different event in the explorer list on the left (e.g.
-        Madrid event). The map should zoom to the newly selected event and close
-        the previous popup cleanly. Finally, click the title in the new event's
-        popup to verify it opens the event detail modal.
+        At desktop width, click a visible marker such as "Salsa Social Night –
+        Paris". Then click a different event in the Explorer list, such as a
+        Madrid or Barcelona event.
       expected: >
-        Initial popup shows event info. Clicking a different event in the
-        explorer list causes the map to zoom to that event without reverting
-        focus. Previous popup closes automatically. New event detail modal opens
-        when clicking the title in the popup, showing full description,
-        location, and dates.
+        The marker opens a Leaflet popup with the event title, date, location,
+        tags, and action buttons. Clicking another event in the Explorer list
+        navigates to that event detail URL with the explorer-list source. The
+        original map popup does not leave stale UI behind.
 
     - id: 3
-      title: "Explorer filters refit beyond the current map viewport"
+      title: "Mobile marker tap shows selected event card over map"
+      description: >
+        Resize to a phone width. In Explorer, tap a map marker. Do not tap the
+        event card yet.
+      expected: >
+        No Leaflet popup appears on top of the small map. The page does not jump
+        sharply up or down. A white selected-event card appears over the bottom
+        of the map, like a compact popup replacement. The same event remains in
+        the mobile event list and is highlighted there when the user scrolls
+        down.
+
+    - id: 4
+      title: "Tablet stacked layout stays stable on marker taps"
+      description: >
+        Resize to a tablet width below the desktop breakpoint where the list is
+        stacked under the map. Tap several different map markers and pan the map
+        slightly between taps.
+      expected: >
+        Each tap replaces the selected-event card over the map. The map remains
+        visible and clipped to its container, the page does not auto-scroll into
+        the event list, and the list may reorder by on-map/off-map status without
+        forcing the viewport to jump.
+
+    - id: 5
+      title: "Selected mobile map card opens event details"
+      description: >
+        With a selected-event card visible over the map on phone or tablet,
+        click the card.
+      expected: >
+        The app opens the event detail page for that event with the
+        explorer-map source in the URL. Returning to Explorer should not restore
+        a stale Leaflet popup.
+
+    - id: 6
+      title: "Explorer filters refit beyond current map viewport"
       description: >
         In Explorer, pan/zoom tightly around Paris so only the Paris cluster is
         visible. Click a dance-style tag pill that has matches in other seeded
-        European cities, such as Salsa or Bachata. Watch the map and the event
-        list after the filter applies.
+        European cities, such as Salsa or Bachata.
       expected: >
         The map refits to all matching events within the active/default area,
-        not just the events that were already visible in the Paris viewport.
-        The event list shows all matching events, with currently visible map
-        events first and any events outside the current viewport labelled as
-        off map until the refit brings them into view.
+        not just events already visible in the Paris viewport. The event list
+        still includes matching events, with currently visible map events first
+        and off-viewport events labelled as off map until the refit brings them
+        into view.
 
-    - id: 4
-      title: "Calendar date navigation filters map"
-      description: >
-        Navigate the calendar to a different month (e.g. forward to Sep 2025).
-        The map should update to show only events visible in the current date
-        range.
-      expected: >
-        Map markers update to match the calendar's visible range. Events outside
-        the range disappear from the map.
-
-    - id: 5
-      title: "Events without coordinates don't appear on map"
-      description: >
-        Check that events with vague/missing locations (Online Zoom, Dave's
-        Place, TBA, Studio 54) do NOT appear as markers on the map. They should
-        still appear in the calendar view.
-      expected: >
-        No markers for locationless events. Calendar still lists them.
-
-    # ── Admin Login ─────────────────────────────────────────────
-    - id: 6
-      title: "Dev login works"
-      description: >
-        Navigate to /login. In DEV_AUTH mode the page shows mock-user buttons +
-        a free-form email input (no Google button). Click "Sign in as Dev Admin"
-        if seeded, otherwise type the ADMIN_EMAIL value into the input and
-        submit.
-      expected: >
-        Redirected to /admin. User shown as logged in (admin@example.com or
-        configured ADMIN_EMAIL).
-
-    # ── Admin — Calendars & Sync ────────────────────────────────
     - id: 7
-      title: "Admin shows 3 enabled calendars"
+      title: "Events without usable coordinates do not render map markers"
       description: >
-        On the admin page, check the calendars section. All 3 seeded calendars
-        (Salsa, Bachata, Kizomba) should be listed and enabled with correct
-        colors.
+        Check the map and event list for events that have no coordinates or
+        unusable placeholder coordinates: Online Bachata Styling Workshop,
+        Salsa Social @ Dave's Place, Kizomba Jam — TBA, Bachata Brunch, and
+        Mystery Salsa Night at latitude/longitude 0,0.
       expected: >
-        3 calendars listed: Salsa (#e11d48), Bachata (#7c3aed), Kizomba
-        (#2563eb). All enabled (toggles on).
+        These events can appear in the event list for their date range, but they
+        do not render as map markers. The 0,0 Mystery Salsa Night is treated as
+        missing/unusable coordinates, matching the fixture note.
 
+    # ── Calendar Map ────────────────────────────────────────────
     - id: 8
-      title: "Manual sync completes"
+      title: "Calendar date navigation filters the map"
       description: >
-        Click "Sync Now". A sync log entry should appear in the Sync Logs
-        section.
+        Switch to Calendar mode. Navigate through the calendar date range and
+        observe the map markers for the visible calendar window.
       expected: >
-        Sync log shows status=success, trigger=manual, calendars_synced=3.
+        The map markers update to match the calendar's visible date range.
+        Events outside the range disappear from the map while still existing in
+        the broader seeded scenario data.
 
-    # ── Admin — Event Editing ───────────────────────────────────
     - id: 9
-      title: "Edit event location with address autocomplete"
+      title: "All-day multi-day event appears correctly"
       description: >
-        In admin events list, click on "TBA" event (evt-vague-002). In the edit
-        modal, type "Salle Wagram Paris" in the location field. Wait for
-        autocomplete suggestions to appear. Select one.
+        Find "Lyon Salsa Summer Camp" (evt-allday-001) in Calendar mode. It is
+        a 3-day all-day event from Friday through Sunday.
       expected: >
-        Autocomplete dropdown shows address suggestions from Nominatim.
-        Selecting a suggestion fills the location field and populates
-        latitude/longitude fields automatically.
+        The event spans multiple calendar days with no specific time shown, and
+        its marker appears on the map at the Lyon coordinates.
 
+    # ── Admin Location Editing & Geocoding ──────────────────────
     - id: 10
-      title: "Save edited event"
+      title: "Dev admin login works"
       description: >
-        After selecting the address in step 9, click Save. Go back to Home page
-        and check the map.
+        Navigate to /login. In DEV_AUTH mode, click "Sign in as Dev Admin" if it
+        is shown; otherwise type admin@example.com or the configured ADMIN_EMAIL
+        value into the email input and submit.
       expected: >
-        Event saved successfully. The "TBA" event now appears on the map at the
-        correct location with updated coordinates.
+        The app redirects to /admin and shows the user as a logged-in admin.
 
     - id: 11
-      title: "Edit event without changing location"
+      title: "Edit missing event location with address autocomplete"
       description: >
-        In admin, click on any event (e.g. Paris Salsa Congress 2026). Change
-        only the description. Save.
+        In the admin events list, open "Kizomba Jam — TBA" (evt-vague-002). In
+        the edit form, replace the location with "Salle Wagram Paris". Wait for
+        address suggestions, then select a matching suggestion.
       expected: >
-        Event updated. Original coordinates preserved (not re-geocoded). Event
-        still appears at same position on map.
+        The autocomplete dropdown shows address suggestions. Selecting one fills
+        the location field and populates latitude/longitude fields.
 
-    # ── Admin — Settings ────────────────────────────────────────
     - id: 12
-      title: "Update sync interval"
+      title: "Saved edited location appears on Explorer map"
       description: >
-        In admin settings, change sync interval to 30 minutes. Save.
+        Save the edited evt-vague-002 event. Return to Explorer and use a date
+        range that includes the event.
       expected: >
-        Setting saved. GET /api/settings returns sync_interval_minutes=30.
+        The event appears in the Explorer list with the updated location and now
+        has a marker on the map near Paris.
 
-    # ── Edge Cases ──────────────────────────────────────────────
     - id: 13
-      title: "All-day event renders correctly"
+      title: "Editing non-location fields preserves coordinates"
       description: >
-        Find "Lyon Kizomba Open Air" (evt-allday-001) in the calendar. It's a
-        3-day all-day event (Jul 17-19).
+        In admin, open a geolocated event such as "Salsa Social Night – Paris"
+        (evt-apr-paris). Change only the description and save.
       expected: >
-        Event spans across multiple days in calendar view (no specific time
-        shown). Marker appears on map at Lyon coordinates.
+        The event saves successfully, its original latitude/longitude remain
+        unchanged, and the marker stays in the same map position.
 
     - id: 14
-      title: "Null-island event (0,0) on map"
+      title: "Sync geocodes real address without coordinates"
       description: >
-        Check if "Null Island Bachata" (evt-nullisland) appears on the map. It
-        has coordinates (0, 0) — Gulf of Guinea.
+        Run a manual sync from admin, then check "Kizomba by the River"
+        (evt-geocode-me), which has a real address but no coordinates in the
+        fixture.
       expected: >
-        Marker appears at (0,0) on the map. This is technically valid
-        coordinates. When map zooms to fit all markers, the worldwide view
-        includes this point.
+        Sync completes successfully. The event gains coordinates from geocoding
+        and appears on the Explorer map near Pont Alexandre III in Paris.
