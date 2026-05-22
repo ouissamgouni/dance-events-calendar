@@ -160,7 +160,7 @@ export default function UserSearchBox() {
     };
 
     const term = q.trim();
-    const showDropdown = open && term.length >= 2;
+    const showDropdown = open && (term.length === 0 || term.length >= 2);
 
     return (
         <div ref={containerRef} className="relative">
@@ -232,6 +232,21 @@ export default function UserSearchBox() {
 
             {showDropdown && (
                 <div className="absolute right-0 mt-1 w-64 max-w-[calc(100vw-1rem)] bg-white border border-slate-200 shadow-lg z-50 max-h-80 overflow-auto">
+                    {term.length === 0 && (
+                        <Link
+                            to="/discover"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={reset}
+                            className="block px-3 py-2 hover:bg-slate-50"
+                        >
+                            <div className="text-xs font-medium text-slate-900">
+                                Find people
+                            </div>
+                            <div className="text-[11px] text-slate-500">
+                                Browse suggestions and curated calendars
+                            </div>
+                        </Link>
+                    )}
                     {loading && (
                         <div className="p-3 text-xs text-slate-500">Searching…</div>
                     )}

@@ -1,0 +1,36 @@
+# Follow graph for the suggestions parity scenario.
+#
+# viewer is mutual friends with alice/bob/carol. Those friends follow
+# pop1/pop2/pop3 with descending overlap:
+#   pop1: followed by alice + bob + carol (3 mutual witnesses)
+#   pop2: followed by alice + bob (2 mutual witnesses)
+#   pop3: followed by alice (1 mutual witness)
+#
+# The expected ordered suggestion set for viewer is:
+#   pop1, pop2, pop3, curator-bachata, curator-paris
+# where curators are the zero-score fallback/top-up candidates.
+follows:
+  - follower: viewer
+    followee: alice
+  - follower: alice
+    followee: viewer
+  - follower: viewer
+    followee: bob
+  - follower: bob
+    followee: viewer
+  - follower: viewer
+    followee: carol
+  - follower: carol
+    followee: viewer
+  - follower: alice
+    followee: pop1
+  - follower: alice
+    followee: pop2
+  - follower: alice
+    followee: pop3
+  - follower: bob
+    followee: pop1
+  - follower: bob
+    followee: pop2
+  - follower: carol
+    followee: pop1

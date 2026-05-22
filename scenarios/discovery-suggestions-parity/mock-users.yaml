@@ -1,0 +1,60 @@
+# Suggestions parity scenario.
+#
+# Cast:
+#   - viewer: mutual friends with alice/bob/carol; should see FoF suggestions.
+#   - loner: zero graph; should see curator fallback only.
+#   - alice/bob/carol: viewer's mutual friends, used as suggestion witnesses.
+#   - pop1/pop2/pop3: FoF candidates ranked by mutual-friend count.
+#   - curator-paris/curator-bachata: admin-managed fallback candidates.
+#   - admin: site admin control, excluded by backend discovery helpers.
+users:
+  - email: viewer@example.com
+    name: Vera Viewer
+    handle: viewer
+    account_visibility: public
+  - email: loner@example.com
+    name: Leo Loner
+    handle: loner
+    account_visibility: public
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    account_visibility: public
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+    account_visibility: public
+  - email: carol@example.com
+    name: Carol Nguyen
+    handle: carol
+    account_visibility: public
+  - email: popular1@example.com
+    name: Popular One
+    handle: pop1
+    account_visibility: public
+  - email: popular2@example.com
+    name: Popular Two
+    handle: pop2
+    account_visibility: public
+  - email: popular3@example.com
+    name: Popular Three
+    handle: pop3
+    account_visibility: public
+  - email: curator-paris@example.com
+    name: Paris Salsa Curator
+    handle: curator-paris
+    account_visibility: public
+    is_admin_managed: true
+    managed_label: Paris Salsa Curator
+    bio: Hand-picked salsa and bachata nights across Paris.
+  - email: curator-bachata@example.com
+    name: Bachata Curator
+    handle: curator-bachata
+    account_visibility: public
+    is_admin_managed: true
+    managed_label: Bachata Curator
+    bio: Editorial bachata calendar for social dancers.
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin
+    account_visibility: public

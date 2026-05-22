@@ -784,9 +784,9 @@ export default function Home() {
 
     return (
         <div className="min-h-screen bg-[#f8fafc]">
-            <main className="mx-auto max-w-7xl px-4 py-4">
+            <main className="mx-auto max-w-7xl px-4 py-2 sm:py-4">
                 {!loading && !error && (
-                    <div className="mb-4 flex flex-col gap-2">
+                    <div className="mb-3 sm:mb-4 flex flex-col gap-2">
                         <div className="flex items-center gap-3">
                             <div className="flex gap-1 bg-slate-200 p-1 shrink-0 w-fit">
                                 <Link
@@ -824,9 +824,9 @@ export default function Home() {
                 )}
                 {!loading && !error && viewMode === 'explorer' && (
                     <>
-                        <div className="flex flex-col lg:flex-row gap-6 lg:items-start">
+                        <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 lg:items-start">
                             {/* Left column: filters + list */}
-                            <div className="order-1 lg:order-1 lg:w-[350px] lg:shrink-0 flex flex-col gap-4 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
+                            <div className="order-1 lg:order-1 lg:w-[350px] lg:shrink-0 flex flex-col gap-3 lg:gap-4 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
                                 <DateRangePicker
                                     startDate={startDate}
                                     endDate={endDate}
@@ -914,7 +914,7 @@ export default function Home() {
                             and event list). On desktop the column is sticky
                             and fills available height; the bar is shrink-0
                             so it doesn't get clipped. */}
-                            <div className="order-2 lg:order-2 lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6 flex flex-col gap-2 min-w-0">
+                            <div className="order-2 lg:order-2 lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6 flex flex-col gap-1.5 sm:gap-2 min-w-0">
                                 <div className="explorer-map-shell relative h-[270px] sm:h-[331px] lg:h-auto lg:flex-1 lg:min-h-0 overflow-hidden">
                                     <EventMap
                                         events={explorerMatchingEvents}
@@ -977,10 +977,10 @@ export default function Home() {
                                 being applied, here's what you can do with
                                 it" unit. */}
                                 <div
-                                    className="shrink-0 flex flex-col gap-1 px-2 py-1 border bg-slate-100 border-slate-200 text-slate-700 text-xs min-w-0"
+                                    className="shrink-0 flex flex-col gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 border bg-slate-100 border-slate-200 text-slate-700 text-xs min-w-0"
                                     data-testid="area-default-bar"
                                 >
-                                    <div className="flex flex-wrap items-center gap-2 min-w-0">
+                                    <div className="flex flex-wrap items-center gap-1 sm:gap-2 min-w-0">
                                         <AreaFilterChip state={areaChipState} />
                                         {/* Snap-back pill: fly the map to
                                             the configured default area
@@ -1282,7 +1282,7 @@ function InterestFilterChips({
     // conventions). The component is purely presentational + a small
     // amount of local UI state for the picker popover.
     const chip = (active: boolean) =>
-        'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-2 py-1 text-xs border transition ' +
+        'inline-flex shrink-0 items-center gap-1 whitespace-nowrap px-2 py-0.5 text-xs border transition sm:gap-1.5 sm:py-1 ' +
         (active
             ? 'bg-blue-500 border-blue-500 text-white'
             : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500');
@@ -1296,7 +1296,7 @@ function InterestFilterChips({
         : showAnonHint;
     const [pickerOpen, setPickerOpen] = useState(false);
     return (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1 sm:gap-2">
 
             <button
                 type="button"
@@ -1338,7 +1338,7 @@ function InterestFilterChips({
                     data-testid="follows-shortcut"
                     aria-label="Open the calendar from people I follow"
                     title="Open the calendar from people I follow"
-                    className="inline-flex items-center px-2 py-1 text-xs border border-slate-200 bg-white text-slate-600 hover:border-blue-500 hover:text-blue-500 transition"
+                    className="hidden sm:inline-flex items-center px-2 py-1 text-xs border border-slate-200 bg-white text-slate-600 hover:border-blue-500 hover:text-blue-500 transition"
                 >
                     {/* Heroicons calendar outline */}
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="w-3.5 h-3.5" aria-hidden="true">
@@ -1355,7 +1355,7 @@ function InterestFilterChips({
                             type="button"
                             onClick={() => onChange({ source: 'follows' })}
                             className={
-                                'px-1.5 py-1 text-[11px] transition sm:px-2 sm:text-xs ' +
+                                'px-1.5 py-0.5 text-[11px] transition sm:px-2 sm:py-1 sm:text-xs ' +
                                 (interestSource === 'follows'
                                     ? 'bg-blue-500 text-white'
                                     : 'text-slate-600 hover:text-blue-500')
@@ -1370,7 +1370,7 @@ function InterestFilterChips({
                             type="button"
                             onClick={() => onChange({ source: 'friends' })}
                             className={
-                                'px-1.5 py-1 text-[11px] transition sm:px-2 sm:text-xs ' +
+                                'px-1.5 py-0.5 text-[11px] transition sm:px-2 sm:py-1 sm:text-xs ' +
                                 (interestSource === 'friends'
                                     ? 'bg-blue-500 text-white'
                                     : 'text-slate-600 hover:text-blue-500')
@@ -1390,7 +1390,7 @@ function InterestFilterChips({
                                 type="button"
                                 onClick={() => onChange({ kind: k })}
                                 className={
-                                    'px-1.5 py-1 text-[11px] transition sm:px-2 sm:text-xs ' +
+                                    'px-1.5 py-0.5 text-[11px] transition sm:px-2 sm:py-1 sm:text-xs ' +
                                     (interestKind === k
                                         ? 'bg-blue-500 text-white'
                                         : 'text-slate-600 hover:text-blue-500')

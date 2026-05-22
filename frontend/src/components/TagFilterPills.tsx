@@ -204,7 +204,7 @@ export default function TagFilterPills({
         <div className="relative">
             <div
                 ref={containerRef}
-                className="flex flex-wrap gap-1 items-center"
+                className="flex flex-wrap gap-0.5 sm:gap-1 items-center"
                 style={containerStyle}
             >
                 {activeTagIds.size > 0 && (
