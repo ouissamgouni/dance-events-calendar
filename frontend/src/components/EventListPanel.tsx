@@ -245,7 +245,7 @@ export function EventListCard({
                         />
                     )}
                 </div>
-                <div className="absolute top-0 right-0 flex items-center gap-1.5">
+                <div className="event-card-actions absolute top-0 right-0 flex items-center gap-1.5">
                     <ActionCountCluster eventId={event.event_id} showRatings={!!showRatings} isSavedFlag={isSavedFlag} />
                 </div>
             </div>

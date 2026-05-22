@@ -75,7 +75,11 @@ body {
 
 .map-selected-event-card .event-card {
   border-bottom: 0;
-  padding: 0.5rem 4.5rem 0.5rem 0.7rem;
+  padding: 0.5rem 0.7rem;
+}
+
+.map-selected-event-card .event-card-title {
+  padding-right: 5.25rem;
 }
 
 /* ── FullCalendar base ─────────────────────────────── */
@@ -484,7 +488,12 @@ body {
 }
 
 .event-card-highlighted {
-  background: #eef2ff !important;
+  background: white !important;
+  box-shadow: inset 3px 0 0 #3b82f6;
+}
+
+.event-card-highlighted:hover {
+  background: #f8fafc !important;
 }
 
 .event-card-offmap {

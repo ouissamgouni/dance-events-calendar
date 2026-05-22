@@ -915,7 +915,7 @@ export default function Home() {
                             and fills available height; the bar is shrink-0
                             so it doesn't get clipped. */}
                             <div className="order-2 lg:order-2 lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6 flex flex-col gap-2 min-w-0">
-                                <div className="explorer-map-shell relative h-[300px] sm:h-[368px] lg:h-auto lg:flex-1 lg:min-h-0 overflow-hidden">
+                                <div className="explorer-map-shell relative h-[270px] sm:h-[331px] lg:h-auto lg:flex-1 lg:min-h-0 overflow-hidden">
                                     <EventMap
                                         events={explorerMatchingEvents}
                                         onEventClick={handleExplorerMapEventClick}
@@ -940,7 +940,7 @@ export default function Home() {
                                             <button
                                                 type="button"
                                                 onClick={handleCloseExplorerMapSelection}
-                                                className="absolute -top-3 right-1 z-[701] inline-flex h-6 w-6 items-center justify-center border border-blue-100 bg-white text-slate-500 shadow-sm hover:text-slate-700"
+                                                className="absolute -top-7 right-0 z-[701] inline-flex h-6 w-6 items-center justify-center border border-blue-100 bg-white text-slate-500 shadow-sm hover:text-slate-700"
                                                 aria-label="Close selected event"
                                             >
                                                 ×

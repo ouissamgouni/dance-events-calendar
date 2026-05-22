@@ -97,8 +97,8 @@ function AppShell() {
               >
                 + Submit
               </Link>
-              <NotificationBell />
               <UserSearchBox />
+              <NotificationBell />
               <HeaderUserMenu />
               <InstagramBadge />
             </div>
