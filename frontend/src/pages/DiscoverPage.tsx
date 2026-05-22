@@ -3,8 +3,9 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
     fetchCurators,
-    fetchSuggestedUsers,
+    fetchMySuggestions,
     searchUsers,
+    type FoFSuggestionItem,
     type UserSearchResult,
 } from '../api';
 
@@ -32,6 +33,7 @@ export default function DiscoverPage() {
     const [curatorsLoading, setCuratorsLoading] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const trimmedQ = q.trim();
 
     // Sync ``q`` -> URL so reloads / back nav preserve the search.
     useEffect(() => {
@@ -107,7 +109,7 @@ export default function DiscoverPage() {
                     className="w-full text-sm border border-slate-200 px-3 py-2 focus:outline-none focus:border-blue-500"
                 />
                 <div className="mt-4">
-                    {q.trim().length === 0 ? null : q.trim().length < 2 ? (
+                    {trimmedQ.length === 0 ? null : trimmedQ.length < 2 ? (
                         <p className="text-xs text-slate-500">
                             Type at least two characters to search.
                         </p>
@@ -118,7 +120,7 @@ export default function DiscoverPage() {
                     ) : !results || results.length === 0 ? (
                         <div className="space-y-3">
                             <p className="text-sm text-slate-500">
-                                No users match “{q.trim()}”.
+                                No users match “{trimmedQ}”.
                             </p>
                             {(curatorsLoading || curatorResults.length > 0) && (
                                 <section>
@@ -140,7 +142,7 @@ export default function DiscoverPage() {
             </section>
 
             {!user && <AnonDiscoverHint />}
-            {user && <SuggestedSection />}
+            {user && trimmedQ.length === 0 && <DefaultDiscoverSections />}
         </div>
     );
 }
@@ -161,18 +163,19 @@ function AnonDiscoverHint() {
     );
 }
 
-function SuggestedSection() {
-    const [users, setUsers] = useState<UserSearchResult[] | null>(null);
+function DefaultDiscoverSections() {
+    const [suggestedUsers, setSuggestedUsers] = useState<FoFSuggestionItem[] | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         let cancelled = false;
-        fetchSuggestedUsers({ limit: 12 })
-            .then((res) => {
-                if (!cancelled) setUsers(res.items);
+        fetchMySuggestions({ limit: 12 })
+            .then((suggested) => {
+                if (cancelled) return;
+                setSuggestedUsers(suggested.items);
             })
             .catch(() => {
-                if (!cancelled) setUsers([]);
+                if (!cancelled) setSuggestedUsers([]);
             })
             .finally(() => {
                 if (!cancelled) setLoading(false);
@@ -182,50 +185,69 @@ function SuggestedSection() {
         };
     }, []);
 
-    // Stay quiet on cold-start (no follows/subs yet) — empty hint already
-    // communicated by the search box. Curator top-ups keep this populated
-    // for authenticated zero-graph users when available.
-    if (!loading && (!users || users.length === 0)) return null;
+    const networkUsers = (suggestedUsers ?? []).filter((u) => !u.is_admin_managed);
+    const curatedUsers = (suggestedUsers ?? []).filter((u) => u.is_admin_managed);
 
-    const networkUsers = (users ?? []).filter((u) => u.source !== 'curator');
-    const curatorUsers = (users ?? []).filter((u) => u.source === 'curator');
-    const hasGroups = networkUsers.length > 0 && curatorUsers.length > 0;
+    if (loading) {
+        return <p className="text-sm text-slate-500">Loading suggestions…</p>;
+    }
+
+    if (networkUsers.length === 0 && curatedUsers.length === 0) {
+        return (
+            <section className="border border-slate-200 bg-slate-50 p-3">
+                <p className="text-sm text-slate-600">
+                    Search by name or handle, or visit your network to follow people you know.
+                </p>
+                <Link
+                    to="/account#network"
+                    className="inline-block mt-2 text-xs font-semibold text-blue-600 hover:text-blue-700"
+                >
+                    Open my network
+                </Link>
+            </section>
+        );
+    }
 
     return (
-        <section>
-            <h2 className="text-base font-semibold text-slate-900 mb-2">
-                Suggested for you
-            </h2>
-            <p className="text-xs text-slate-500 mb-3">
-                People to follow and curated calendars to subscribe to.
-            </p>
-            {loading ? (
-                <p className="text-sm text-slate-500">Loading…</p>
-            ) : hasGroups ? (
-                <div className="space-y-4">
-                    <SuggestionGroup title="People in your network" users={networkUsers} />
-                    <SuggestionGroup title="Curated calendars" users={curatorUsers} />
-                </div>
-            ) : (
-                <UserGrid users={users ?? []} />
-            )}
-        </section>
-    );
-}
-
-function SuggestionGroup({ title, users }: { title: string; users: UserSearchResult[] }) {
-    if (users.length === 0) return null;
-    return (
-        <div>
-            <h3 className="text-xs font-semibold text-slate-700 uppercase mb-2">
-                {title}
-            </h3>
-            <UserGrid users={users} />
+        <div className="space-y-6">
+            <UserSection
+                title="Suggested for you"
+                description="People followed by your network and accounts you may want to follow."
+                users={networkUsers}
+            />
+            <UserSection
+                title="Curated calendars"
+                description="Editorial calendars and organizers worth subscribing to."
+                users={curatedUsers}
+            />
         </div>
     );
 }
 
-function UserGrid({ users }: { users: UserSearchResult[] }) {
+function UserSection({
+    title,
+    description,
+    users,
+}: {
+    title: string;
+    description: string;
+    users: DiscoverUser[];
+}) {
+    if (users.length === 0) return null;
+    return (
+        <section>
+            <h2 className="text-base font-semibold text-slate-900 mb-2">
+                {title}
+            </h2>
+            <p className="text-xs text-slate-500 mb-3">{description}</p>
+            <UserGrid users={users} />
+        </section>
+    );
+}
+
+type DiscoverUser = UserSearchResult | FoFSuggestionItem;
+
+function UserGrid({ users }: { users: DiscoverUser[] }) {
     return (
         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {users.map((u) => (
@@ -259,20 +281,39 @@ function UserGrid({ users }: { users: UserSearchResult[] }) {
                                 />
                             )}
                         </Link>
-                        <div className="text-xs text-slate-500 truncate">
-                            @{u.handle} · {u.subscribers_count} subscriber
-                            {u.subscribers_count === 1 ? '' : 's'}
-                            {u.is_subscribed && (
-                                <span className="ml-1 text-emerald-600">
-                                    · subscribed
-                                </span>
-                            )}
-                        </div>
+                        <UserMeta user={u} />
                     </div>
                 </li>
             ))}
         </ul>
     );
+}
+
+function UserMeta({ user }: { user: DiscoverUser }) {
+    if ('mutual_friends_preview' in user && user.mutual_friends_preview.length > 0) {
+        const first = user.mutual_friends_preview[0];
+        const hiddenCount = user.mutual_friend_count - 1;
+        return (
+            <div className="text-xs text-slate-500 truncate">
+                Followed by @{first}
+                {hiddenCount > 0 && ` + ${hiddenCount} more`}
+            </div>
+        );
+    }
+    if ('subscribers_count' in user) {
+        return (
+            <div className="text-xs text-slate-500 truncate">
+                @{user.handle} · {user.subscribers_count} subscriber
+                {user.subscribers_count === 1 ? '' : 's'}
+                {user.is_subscribed && (
+                    <span className="ml-1 text-emerald-600">
+                        · subscribed
+                    </span>
+                )}
+            </div>
+        );
+    }
+    return <div className="text-xs text-slate-500 truncate">@{user.handle}</div>;
 }
 
 function Avatar({ url, name }: { url: string | null; name: string }) {

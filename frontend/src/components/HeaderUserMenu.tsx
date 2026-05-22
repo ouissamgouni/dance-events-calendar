@@ -95,6 +95,13 @@ export default function HeaderUserMenu({ className }: { className?: string }) {
                         My Calendar
                     </Link>
                     <Link
+                        to="/discover"
+                        role="menuitem"
+                        className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                        Find people
+                    </Link>
+                    <Link
                         to="/account#network"
                         role="menuitem"
                         className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"

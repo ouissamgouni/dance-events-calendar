@@ -2,10 +2,11 @@ test_plan:
   name: "Curator Discovery — fallback suggestions for zero-follow users"
   description: >
     Covers the cold-start curator exposure flow: no-result curator
-    fallbacks in header search and Discover people, signed-in zero-follow
-    fallbacks in the Following person picker, authenticated /discover
-    suggestion top-up, and the moment a user follows a curator and
-    benefits from that curator's exposed events.
+    fallbacks in header search and Discover people, the header/account
+    entry points into /discover, signed-in zero-follow fallbacks in the
+    Following person picker, authenticated /discover curator top-up, and
+    the moment a user follows a curator and benefits from that curator's
+    exposed events.
 
   preconditions:
     - "Run with: task start:scenario SCENARIO=curator-discovery"
@@ -23,23 +24,33 @@ test_plan:
 
   steps:
     - id: 1
-      title: "Anonymous header suggests curators only after no user matches"
+      title: "Header search empty state links to Find people"
       description: >
-        Open / signed out. Focus the header search input without typing,
-        then type a query that has no normal user match, e.g. "zzzz".
+        Open / signed out. Focus the header search input without typing.
       expected: >
-        Empty focus does not fetch /api/social/curators and does not show
-        curator suggestions. After typing, Network first calls
-        GET /api/social/search/users?q=zzzz. When that returns `items: []`,
-        the dropdown shows a compact xs-sized "Suggestions" section backed
-        by GET /api/social/curators?limit=5. Rows include curator-bachata
-        and curator-paris with the curator badge; there is no "Curated
-        calendars" helper line. The "See more on Discover" row is still
-        visible while suggestions are shown. The ordinary verified organizer
-        is NOT in this Suggestions section. Clicking a curator row navigates
-        to /u/{handle}, and the public profile renders normally.
+        The dropdown opens immediately with a compact "Find people" row
+        and helper text "Browse suggestions and curated calendars". It
+        does not fetch /api/social/search/users or /api/social/curators
+        while the query is empty. Clicking the row navigates to /discover
+        and closes/resets the header search.
 
     - id: 2
+      title: "Anonymous header suggests curators only after no user matches"
+      description: >
+        Open / signed out. Focus the header search input, then type a query
+        that has no normal user match, e.g. "zzzz".
+      expected: >
+        Network first calls GET /api/social/search/users?q=zzzz. When that
+        returns `items: []`, the dropdown shows a compact xs-sized
+        "Suggestions" section backed by GET /api/social/curators?limit=5.
+        Rows include curator-bachata and curator-paris with the curator
+        badge; there is no "Curated calendars" helper line. The "See more
+        on Discover" row is still visible while suggestions are shown. The
+        ordinary verified organizer is NOT in this Suggestions section.
+        Clicking a curator row navigates to /u/{handle}, and the public
+        profile renders normally.
+
+    - id: 3
       title: "Anonymous /discover shows no-result curator fallback plus sign-in hint"
       description: >
         Still signed out, open /discover. Confirm the empty page state, then
@@ -54,19 +65,28 @@ test_plan:
         no-result fallback while keeping personalized graph suggestions
         auth-only.
 
-    - id: 3
-      title: "Signed-in zero-follow viewer gets curator top-up on /discover"
+    - id: 4
+      title: "Signed-in account menu exposes Find people"
       description: >
         Sign in as Val Zero (viewer), skip onboarding if shown, then open
-        /discover with an empty search box.
+        the account menu in the header.
       expected: >
-        Network: GET /api/social/discover/suggested?limit=12 returns items
-        whose `source` is "curator". The page renders "Suggested for you"
-        with curator-bachata and curator-paris. Since there are no network
-        suggestions, no "People in your network" subsection is shown; the
-        rows still carry the curator badge.
+        The menu contains a "Find people" item between My Calendar and
+        Invite friends. Clicking it navigates to /discover.
 
-    - id: 4
+    - id: 5
+      title: "Signed-in zero-follow viewer gets curator default state on /discover"
+      description: >
+        With Val Zero signed in, open /discover with an empty search box.
+      expected: >
+        Network calls GET /api/social/me/suggestions?limit=12, the same
+        suggestion source used by Account -> My network -> Suggestions.
+        Because viewer has no mutual-friend suggestions, the page does not
+        render an empty "Suggested for you" block. It renders "Curated
+        calendars" with curator-bachata and curator-paris, each carrying
+        the curator badge. The ordinary verified organizer is NOT listed.
+
+    - id: 6
       title: "Following picker falls back to curator Suggestions"
       description: >
         As viewer, open Home (/). Click the Following filter, then click
@@ -80,10 +100,10 @@ test_plan:
         show the curator badge and a blue Follow button. The ordinary
         organizer is not listed in the Suggestions section.
 
-    - id: 5
+    - id: 7
       title: "Following a curator unlocks their exposed events"
       description: >
-        In the picker from step 4, click Follow on curator-paris, then pick
+        In the picker from step 6, click Follow on curator-paris, then pick
         curator-paris from the row. Keep the Following filter active.
       expected: >
         POST /api/social/users/curator-paris/follow returns 200. The picker
@@ -96,7 +116,7 @@ test_plan:
         It does NOT show evt-cd-003 (curator-bachata) or evt-cd-004
         (ordinary organizer control).
 
-    - id: 6
+    - id: 8
       title: "After follow, curator is no longer suggested as fallback"
       description: >
         Refresh Home as viewer, keep the Following picker closed, then open
@@ -108,7 +128,7 @@ test_plan:
         empty. If calling /api/social/curators?exclude_followed=true
         directly, curator-paris is excluded while curator-bachata remains.
 
-    - id: 7
+    - id: 9
       title: "Direct endpoint sanity checks"
       description: >
         With viewer signed in, call the endpoints from the browser console
