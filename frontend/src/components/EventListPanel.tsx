@@ -159,6 +159,11 @@ export function EventListCard({
 }: EventListCardProps) {
     const start = new Date(event.start);
     const onMap = isOnMap(event, mapBounds);
+    const offMapBadge = !onMap ? (
+        <span className="event-card-offmap-badge" role="img" aria-label="Off map" title="Off map">
+            <img src="/location-off.png" alt="" aria-hidden="true" className="event-card-offmap-icon" />
+        </span>
+    ) : null;
 
     return (
         <div
@@ -175,13 +180,13 @@ export function EventListCard({
                 {(() => {
                     const colors = getTagColors(event);
                     if (colors.length === 0) {
-                        return <span className="event-tag-stripe" style={{ backgroundColor: onMap ? '#6b7280' : '#d1d5db' }} />;
+                        return <span className="event-tag-stripe" style={{ backgroundColor: '#6b7280' }} />;
                     }
                     return colors.map((c, i) => (
                         <span
                             key={i}
                             className="event-tag-stripe"
-                            style={{ backgroundColor: onMap ? c : '#d1d5db' }}
+                            style={{ backgroundColor: c }}
                         />
                     ));
                 })()}
@@ -205,10 +210,15 @@ export function EventListCard({
                     {event.all_day ? formatCardDate(start) : `${formatCardDate(start)} · ${formatCardTime(start)}`}
                 </p>
                 {event.location && (
-                    <p className="event-card-location">📍 {event.location}</p>
+                    <p className="event-card-location">
+                        {offMapBadge}
+                        <span className="event-card-location-text">📍 {event.location}</span>
+                    </p>
                 )}
-                {!onMap && (
-                    <span className="event-card-offmap-badge">Off map</span>
+                {!onMap && !event.location && (
+                    <span className="event-card-offmap-badge event-card-offmap-badge-standalone" role="img" aria-label="Off map" title="Off map">
+                        <img src="/location-off.png" alt="" aria-hidden="true" className="event-card-offmap-icon" />
+                    </span>
                 )}
                 {((showPrices && (event.price_is_free || (event.price_min != null && event.price_currency)))) && (
                     <div className="event-card-badges">
