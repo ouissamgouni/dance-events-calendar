@@ -39,6 +39,21 @@ interface EventListPanelProps {
     excludedEventId?: string | null;
     /** Scroll highlighted cards into view when the highlight comes from the map/calendar. */
     scrollHighlightedIntoView?: boolean;
+    /**
+     * Optional CTA invoked when the user has rendered every event in the
+     * current period and asks for more. Parent extends the explorer's
+     * ``endDate`` by 3 months and refetches. When undefined, the
+     * "Show events from the next 3 months" button is hidden and only the
+     * paginate-within-period CTA is shown.
+     */
+    onExtendPeriod?: () => void;
+    /**
+     * Optional callback to clear all active filters from the empty state.
+     * When undefined, the "Clear filters" button is hidden.
+     */
+    onClearFilters?: () => void;
+    /** True while ``onExtendPeriod`` is in flight (disables the CTA). */
+    extendingPeriod?: boolean;
 }
 
 export interface EventListCardProps {
@@ -58,6 +73,12 @@ export interface EventListCardProps {
     isNew?: boolean;
     onEventHover?: (eventId: string | null) => void;
     cardRef?: (el: HTMLDivElement | null) => void;
+    /** First-card coachmark for the Save/Going CTAs. Triggers a subtle
+     * pulse on the action cluster and renders an inline hint underneath
+     * the card content explaining what tapping them does. Dismissed via
+     * the inline × button (writes localStorage flag). */
+    coachMark?: boolean;
+    onDismissCoachMark?: () => void;
 }
 
 function PriceBadge({ event }: { event: CalendarEvent }) {
@@ -139,6 +160,35 @@ const formatCardDate = (d: Date) =>
 const formatCardTime = (d: Date) =>
     d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 
+/** Initial number of events to render before the user taps Show more. */
+const INITIAL_VISIBLE = 20;
+/** How many additional events each Show more click reveals. */
+const SHOW_MORE_INCREMENT = 20;
+
+/** Local YYYY-MM-DD key used to bucket events into day groups. */
+function localDayKey(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+/**
+ * Human-friendly day header label: "Today", "Tomorrow", or weekday + date.
+ * Keeps the user oriented inside long, day-grouped lists.
+ */
+function formatDayHeader(d: Date): string {
+    const today = new Date();
+    const todayKey = localDayKey(today);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    const tomorrowKey = localDayKey(tomorrow);
+    const key = localDayKey(d);
+    if (key === todayKey) return 'Today';
+    if (key === tomorrowKey) return 'Tomorrow';
+    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
 export function EventListCard({
     event,
     mapBounds,
@@ -156,6 +206,8 @@ export function EventListCard({
     isNew = false,
     onEventHover,
     cardRef,
+    coachMark = false,
+    onDismissCoachMark,
 }: EventListCardProps) {
     const start = new Date(event.start);
     const onMap = isOnMap(event, mapBounds);
@@ -166,6 +218,7 @@ export function EventListCard({
     ) : null;
 
     return (
+        <>
         <div
             ref={cardRef}
             role="button"
@@ -255,11 +308,32 @@ export function EventListCard({
                         />
                     )}
                 </div>
-                <div className="event-card-actions absolute top-0 right-0 flex items-center gap-1.5">
+                <div className={`event-card-actions absolute top-0 right-0 flex items-center gap-1.5${coachMark ? ' animate-pulse' : ''}`}>
                     <ActionCountCluster eventId={event.event_id} showRatings={!!showRatings} isSavedFlag={isSavedFlag} />
                 </div>
             </div>
         </div>
+        {coachMark && (
+            <div
+                className="flex items-start justify-between gap-2 border border-blue-100 bg-blue-50 px-3 py-1.5 text-[11px] text-blue-800"
+                data-testid="event-card-coachmark"
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+            >
+                <span>
+                    Tap the bookmark to save events to your calendar, or the check to mark you’re going.
+                </span>
+                <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onDismissCoachMark?.(); }}
+                    aria-label="Dismiss hint"
+                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-blue-500 hover:text-blue-800 hover:bg-blue-100"
+                >
+                    ×
+                </button>
+            </div>
+        )}
+        </>
     );
 }
 
@@ -280,6 +354,9 @@ export default function EventListPanel({
     newEventIds,
     excludedEventId,
     scrollHighlightedIntoView = true,
+    onExtendPeriod,
+    onClearFilters,
+    extendingPeriod = false,
 }: EventListPanelProps) {
     const { isSaved } = useSavedEvents();
     const { showRatings, trendingEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled } = useFeatureFlags();
@@ -289,6 +366,30 @@ export default function EventListPanel({
     // Client-side only filter: hide events that are not new for this viewer.
     // Per the scenario, no network call is made when toggled.
     const [newOnly, setNewOnly] = useState(false);
+    // Progressive disclosure cap so the landing page doesn't dump hundreds
+    // of events on first paint. Resets whenever the underlying ``events``
+    // array identity changes (new filter / period / refetch).
+    const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
+    useEffect(() => {
+        setVisibleCount(INITIAL_VISIBLE);
+    }, [events]);
+
+    // First-card coachmark for Save/Going CTAs. Stored in localStorage so
+    // a dismissal sticks across reloads/devices for the same browser. We
+    // hydrate from storage on mount to avoid an SSR-like flash; the
+    // coachmark is only ever rendered on the first event card.
+    const COACHMARK_KEY = 'explorer.coachmark.saveGoing.shown';
+    const [coachMarkDismissed, setCoachMarkDismissed] = useState<boolean>(() => {
+        try {
+            return typeof window !== 'undefined' && window.localStorage.getItem(COACHMARK_KEY) === '1';
+        } catch {
+            return true;
+        }
+    });
+    const dismissCoachMark = useCallback(() => {
+        setCoachMarkDismissed(true);
+        try { window.localStorage.setItem(COACHMARK_KEY, '1'); } catch { /* storage may be blocked */ }
+    }, []);
 
     const updateFade = useCallback(() => {
         const el = scrollRef.current;
@@ -361,15 +462,28 @@ export default function EventListPanel({
 
     const onMapCount = mapBounds ? listEvents.filter((e) => isOnMap(e, mapBounds)).length : listEvents.length;
 
-    const allViewCounts = sortedEvents.map((e) => e.popularity_score ?? 0);
+    // Slice the sorted list to the current ``visibleCount`` so the user only
+    // sees what they explicitly asked for. The full count drives the
+    // "Showing X of Y" counter and the Show more remaining count.
+    const totalCount = sortedEvents.length;
+    const cappedVisible = Math.min(visibleCount, totalCount);
+    const renderedEvents = sortedEvents.slice(0, cappedVisible);
+    const remainingInPeriod = Math.max(0, totalCount - cappedVisible);
+    const periodExhausted = remainingInPeriod === 0;
+
+    const allViewCounts = renderedEvents.map((e) => e.popularity_score ?? 0);
 
     return (
         <div className="event-list-panel">
             <div className="event-list-header">
                 <span className="event-list-count">
-                    {onMapCount} event{onMapCount !== 1 ? 's' : ''}
-                    {mapBounds && onMapCount < sortedEvents.length && (
-                        <span className="text-slate-400 font-normal"> · {sortedEvents.length - onMapCount} off map</span>
+                    {totalCount === 0
+                        ? '0 events'
+                        : cappedVisible < totalCount
+                            ? `Showing ${cappedVisible} of ${totalCount}`
+                            : `${totalCount} event${totalCount !== 1 ? 's' : ''}`}
+                    {mapBounds && onMapCount < totalCount && (
+                        <span className="text-slate-400 font-normal"> · {totalCount - onMapCount} off map</span>
                     )}
                 </span>
                 <div className="event-list-sort">
@@ -417,52 +531,186 @@ export default function EventListPanel({
 
             <div className="event-list-scroll-wrapper">
                 <div className="event-list-scroll" ref={scrollRef} onScroll={updateFade}>
-                    {sortedEvents.length === 0 ? (
-                        <div className="event-list-empty">
-                            <p>No events in this area for the selected dates.</p>
-                            <p className="text-xs text-slate-400 mt-1">Try zooming out or adjusting the date range.</p>
-                            {onSuggestEvent && (
-                                <button
-                                    type="button"
-                                    onClick={onSuggestEvent}
-                                    className="mt-4 inline-flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-4 py-2 shadow-sm transition"
-                                >
-                                    + Suggest an event
-                                </button>
-                            )}
+                    {totalCount === 0 ? (
+                        <div
+                            className="event-list-empty bg-blue-50 border border-blue-100 p-4 m-3 text-center"
+                            data-testid="event-list-empty"
+                        >
+                            <p className="text-sm font-medium text-slate-800">
+                                No events match your filters
+                            </p>
+                            <p className="text-xs text-slate-600 mt-1">
+                                Try extending the period or clearing filters.
+                            </p>
+                            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                                {onExtendPeriod && (
+                                    <button
+                                        type="button"
+                                        onClick={onExtendPeriod}
+                                        disabled={extendingPeriod}
+                                        className="inline-flex items-center bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                        data-testid="event-list-empty-extend"
+                                    >
+                                        {extendingPeriod ? 'Loading…' : 'Extend +3 months'}
+                                    </button>
+                                )}
+                                {onClearFilters && (
+                                    <button
+                                        type="button"
+                                        onClick={onClearFilters}
+                                        className="inline-flex items-center border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-1.5 transition"
+                                        data-testid="event-list-empty-clear"
+                                    >
+                                        Clear filters
+                                    </button>
+                                )}
+                                {onSuggestEvent && (
+                                    <button
+                                        type="button"
+                                        onClick={onSuggestEvent}
+                                        className="inline-flex items-center border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-1.5 transition"
+                                    >
+                                        + Suggest an event
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     ) : (
-                        sortedEvents.map((event, idx) => {
-                            const isHighlighted = hoveredEventId === event.event_id;
-                            const isNew = newEnabled && !!newEventIds?.has(event.event_id);
-                            return (
-                                <Fragment key={event.event_id}>
-                                    {idx === firstPastIndex && (
-                                        <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wide border-t border-slate-200 mt-2">
-                                            Past events
-                                        </div>
-                                    )}
-                                    <EventListCard
-                                        event={event}
-                                        mapBounds={mapBounds}
-                                        onEventClick={onEventClick}
-                                        showPrices={showPrices}
-                                        showPopularity={showPopularity && trendingEnabled}
-                                        popularityThreshold={popularityThreshold}
-                                        trendingTopN={trendingTopN}
-                                        trendingTopPercent={trendingTopPercent}
-                                        allViewCounts={allViewCounts}
-                                        followingBadgeEnabled={followingBadgeEnabled}
-                                        showRatings={!!showRatings}
-                                        isSavedFlag={isSaved(event.event_id)}
-                                        isHighlighted={isHighlighted}
-                                        isNew={isNew}
-                                        onEventHover={onEventHover}
-                                        cardRef={(el) => { if (el) cardRefs.current.set(event.event_id, el); else cardRefs.current.delete(event.event_id); }}
-                                    />
-                                </Fragment>
-                            );
-                        })
+                        <>
+                            {(() => {
+                                // When sorting by date, render sticky day-group headers so the
+                                // user can scan the list day-by-day. Past events (when present)
+                                // still get their existing divider above the past block.
+                                const groupByDay = sortBy === 'date';
+                                let lastDayKey: string | null = null;
+                                return renderedEvents.map((event, idx) => {
+                                    const isHighlighted = hoveredEventId === event.event_id;
+                                    const isNew = newEnabled && !!newEventIds?.has(event.event_id);
+                                    const start = new Date(event.start);
+                                    const dayKey = localDayKey(start);
+                                    const isPast = !!pastEventIds?.has(event.event_id);
+                                    const showDayHeader =
+                                        groupByDay && !isPast && dayKey !== lastDayKey;
+                                    if (showDayHeader) {
+                                        // Compute the count of events on this day within the
+                                        // currently-rendered slice so the header reflects what
+                                        // the user sees (not events hidden behind Show more).
+                                        let countOnDay = 0;
+                                        for (const e of renderedEvents) {
+                                            if (pastEventIds?.has(e.event_id)) continue;
+                                            if (localDayKey(new Date(e.start)) === dayKey) {
+                                                countOnDay += 1;
+                                            }
+                                        }
+                                        lastDayKey = dayKey;
+                                        return (
+                                            <Fragment key={event.event_id}>
+                                                {idx === firstPastIndex && (
+                                                    <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wide border-t border-slate-200 mt-2">
+                                                        Past events
+                                                    </div>
+                                                )}
+                                                <div
+                                                    className="sticky top-0 z-[5] flex items-center justify-between gap-2 bg-slate-50 border-y border-slate-200 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600"
+                                                    data-testid="event-list-day-header"
+                                                    data-day={dayKey}
+                                                >
+                                                    <span>{formatDayHeader(start)}</span>
+                                                    <span className="text-slate-400 font-normal tabular-nums">
+                                                        {countOnDay}
+                                                    </span>
+                                                </div>
+                                                <EventListCard
+                                                    event={event}
+                                                    mapBounds={mapBounds}
+                                                    onEventClick={onEventClick}
+                                                    showPrices={showPrices}
+                                                    showPopularity={showPopularity && trendingEnabled}
+                                                    popularityThreshold={popularityThreshold}
+                                                    trendingTopN={trendingTopN}
+                                                    trendingTopPercent={trendingTopPercent}
+                                                    allViewCounts={allViewCounts}
+                                                    followingBadgeEnabled={followingBadgeEnabled}
+                                                    showRatings={!!showRatings}
+                                                    isSavedFlag={isSaved(event.event_id)}
+                                                    isHighlighted={isHighlighted}
+                                                    isNew={isNew}
+                                                    onEventHover={onEventHover}
+                                                    cardRef={(el) => { if (el) cardRefs.current.set(event.event_id, el); else cardRefs.current.delete(event.event_id); }}
+                                                    coachMark={!coachMarkDismissed && idx === 0 && !isPast}
+                                                    onDismissCoachMark={dismissCoachMark}
+                                                />
+                                            </Fragment>
+                                        );
+                                    }
+                                    if (isPast) lastDayKey = null;
+                                    return (
+                                        <Fragment key={event.event_id}>
+                                            {idx === firstPastIndex && (
+                                                <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wide border-t border-slate-200 mt-2">
+                                                    Past events
+                                                </div>
+                                            )}
+                                            <EventListCard
+                                                event={event}
+                                                mapBounds={mapBounds}
+                                                onEventClick={onEventClick}
+                                                showPrices={showPrices}
+                                                showPopularity={showPopularity && trendingEnabled}
+                                                popularityThreshold={popularityThreshold}
+                                                trendingTopN={trendingTopN}
+                                                trendingTopPercent={trendingTopPercent}
+                                                allViewCounts={allViewCounts}
+                                                followingBadgeEnabled={followingBadgeEnabled}
+                                                showRatings={!!showRatings}
+                                                isSavedFlag={isSaved(event.event_id)}
+                                                isHighlighted={isHighlighted}
+                                                isNew={isNew}
+                                                onEventHover={onEventHover}
+                                                cardRef={(el) => { if (el) cardRefs.current.set(event.event_id, el); else cardRefs.current.delete(event.event_id); }}
+                                                coachMark={!coachMarkDismissed && idx === 0 && !isPast}
+                                                onDismissCoachMark={dismissCoachMark}
+                                            />
+                                        </Fragment>
+                                    );
+                                });
+                            })()}
+                            {/* Progressive disclosure CTAs. Within the
+                                current period we paginate in 20-event
+                                increments; once exhausted we offer to
+                                extend the explorer window by 3 months
+                                (handled by the parent). Both buttons are
+                                square and use the secondary chrome from
+                                .github/instructions/frontend.instructions.md. */}
+                            {!periodExhausted && (
+                                <div className="px-3 py-3 text-center">
+                                    <button
+                                        type="button"
+                                        onClick={() => setVisibleCount((n) => n + SHOW_MORE_INCREMENT)}
+                                        className="inline-flex items-center justify-center border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-2 transition"
+                                        data-testid="event-list-show-more"
+                                    >
+                                        Show {Math.min(SHOW_MORE_INCREMENT, remainingInPeriod)} more
+                                        <span className="ml-1 text-slate-400 font-normal">
+                                            ({remainingInPeriod} remaining)
+                                        </span>
+                                    </button>
+                                </div>
+                            )}
+                            {periodExhausted && onExtendPeriod && (
+                                <div className="px-3 py-3 text-center">
+                                    <button
+                                        type="button"
+                                        onClick={onExtendPeriod}
+                                        disabled={extendingPeriod}
+                                        className="inline-flex items-center justify-center border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-2 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                        data-testid="event-list-extend-period"
+                                    >
+                                        {extendingPeriod ? 'Loading…' : 'Show events from the next 3 months'}
+                                    </button>
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
                 {showBottomFade && <div className="event-list-fade" />}

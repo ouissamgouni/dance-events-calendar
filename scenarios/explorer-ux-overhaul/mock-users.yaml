@@ -1,0 +1,17 @@
+# Explorer UX overhaul scenario — minimal cast.
+#
+# Just a viewer (for the explorer's anonymous + signed-in paths) plus an
+# admin so the /admin/* surfaces remain reachable. The UX behaviors under
+# test (pagination, day grouping, extend-period, search-this-area,
+# fullscreen, coachmark) are all about how events render — no follow
+# graph is required.
+users:
+  - email: viewer@example.com
+    name: Viewer Explorer
+    handle: viewer
+    account_visibility: public
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    role: admin
+    account_visibility: public

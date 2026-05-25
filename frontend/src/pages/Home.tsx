@@ -15,6 +15,8 @@ import EventModal from '../components/EventModal';
 import AdminEventDetailPanel from '../components/AdminEventDetailPanel';
 import DateRangePicker from '../components/DateRangePicker';
 import EventListPanel, { EventListCard } from '../components/EventListPanel';
+import SummaryBar from '../components/SummaryBar';
+import FilterSheet from '../components/FilterSheet';
 import TagFilterPills from '../components/TagFilterPills';
 import AreaFilterChip from '../components/AreaFilterChip';
 import { usePreferences } from '../context/PreferencesContext';
@@ -51,10 +53,14 @@ function formatDate(date: Date): string {
     return `${y}-${m}-${d}`;
 }
 
+// Explorer default window. Shortened from 6 months → 3 months so the landing
+// page doesn't dump the full year onto first-time mobile users. Users can
+// extend via the "Show events from the next 3 months" CTA in the list, or
+// pick the longer "Next 6 months" preset.
 function defaultExplorerDateRange(): { startDate: string; endDate: string } {
     const startDate = formatDate(new Date());
     const defaultEndDate = new Date();
-    defaultEndDate.setMonth(defaultEndDate.getMonth() + 6);
+    defaultEndDate.setMonth(defaultEndDate.getMonth() + 3);
     return { startDate, endDate: formatDate(defaultEndDate) };
 }
 
@@ -636,6 +642,107 @@ export default function Home() {
         setActiveTagIds(new Set());
     }, [bumpAutoFit]);
 
+    // Extend the explorer's end date by 3 months and refetch. Wired into
+    // ``EventListPanel`` so users hitting the end of the current period can
+    // pull in the next chunk without opening the date picker. Cleared by
+    // any subsequent preset/date change.
+    const [extendingPeriod, setExtendingPeriod] = useState(false);
+    const handleExtendPeriod = useCallback(() => {
+        const current = new Date(endDate);
+        if (Number.isNaN(current.getTime())) return;
+        const extended = new Date(current);
+        extended.setMonth(extended.getMonth() + 3);
+        setExtendingPeriod(true);
+        setEndDate(formatDate(extended));
+        bumpAutoFit();
+        // ``loading`` flips back to false in the events fetch effect; mirror
+        // it onto ``extendingPeriod`` via a microtask so the button shows a
+        // brief "Loading…" state. A dedicated flag avoids leaking the
+        // global loading state into the list-only CTA.
+        setTimeout(() => setExtendingPeriod(false), 0);
+    }, [endDate, bumpAutoFit]);
+
+    // Clear every active filter back to the explorer's defaults. Wired into
+    // the empty-state CTA so a user who over-filtered into "0 events" can
+    // recover in one tap without hunting down individual chips.
+    const handleClearAllFilters = useCallback(() => {
+        const defaults = defaultExplorerDateRange();
+        userTouchedTagsRef.current = true;
+        setActiveTagIds(new Set());
+        setInterestSource(null);
+        setInterestKind('any');
+        setInterestUserHandle(null);
+        setStartDate(defaults.startDate);
+        setEndDate(defaults.endDate);
+        setAreaSessionOverride(null);
+        bumpAutoFit();
+    }, [bumpAutoFit]);
+
+    // Remove a single tag from the active set (wired into SummaryBar chip ×).
+    const handleRemoveTag = useCallback((tagId: number) => {
+        userTouchedTagsRef.current = true;
+        bumpAutoFit();
+        setActiveTagIds((prev) => {
+            if (!prev.has(tagId)) return prev;
+            const next = new Set(prev);
+            next.delete(tagId);
+            return next;
+        });
+    }, [bumpAutoFit]);
+
+    // Clear the follows/friends interest filter from the SummaryBar chip ×.
+    const handleClearInterest = useCallback(() => {
+        setInterestSource(null);
+        setInterestKind('any');
+        setInterestUserHandle(null);
+    }, []);
+
+    // Reset any area session override (returns to saved prefs / default).
+    const handleClearAreaOverride = useCallback(() => {
+        setAreaSessionOverride(null);
+        bumpAutoFit();
+    }, [bumpAutoFit]);
+
+    // Mobile-only FilterSheet open state. The sheet wraps the same controls
+    // rendered inline on desktop so the landing page isn't crushed by a
+    // tall filter stack on phones. State stays lifted in this component so
+    // closing/opening the sheet doesn't reset anything.
+    const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+    const defaultDateRange = useMemo(() => defaultExplorerDateRange(), []);
+    const dateRangeDiffers =
+        startDate !== defaultDateRange.startDate || endDate !== defaultDateRange.endDate;
+    const activeFilterCount =
+        activeTagIds.size
+        + (interestSource ? 1 : 0)
+        + (interestUserHandle ? 1 : 0)
+        + (areaSessionOverride ? 1 : 0)
+        + (dateRangeDiffers ? 1 : 0);
+
+    // Map fullscreen toggle (mobile only — desktop layout already gives the
+    // map a tall column). The map container picks up ``fixed inset-0`` when
+    // active so users can scan markers without the URL bar / filters
+    // eating screen height. Leaflet's existing ResizeObserver handles
+    // invalidateSize after the class flip.
+    const [mapFullscreen, setMapFullscreen] = useState(false);
+
+    // Commit the current map viewport as the effective area filter. Paired
+    // with the "Search this area" pill that appears after the user pans
+    // the map; the pill disappears once committed because ``userMapBounds``
+    // is cleared below.
+    const handleSearchThisArea = useCallback(() => {
+        if (!userMapBounds) return;
+        const area: PreferredAreaPayload = {
+            label: 'Map view',
+            min_lat: userMapBounds.south,
+            max_lat: userMapBounds.north,
+            min_lng: userMapBounds.west,
+            max_lng: userMapBounds.east,
+        };
+        setAreaSessionOverride({ kind: 'preset', area: clampArea(area) });
+        setUserMapBounds(null);
+        bumpAutoFit();
+    }, [userMapBounds, bumpAutoFit]);
+
     const areaScopedEvents = useMemo(() => {
         if (viewMode !== 'explorer' || !effectiveArea) return events;
         const bounds = areaToMapBounds(effectiveArea);
@@ -902,6 +1009,64 @@ export default function Home() {
         return mid.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     }, [visibleRange]);
 
+    // Shared filter controls JSX. Rendered inline in the desktop left
+    // column AND inside the mobile FilterSheet. The components are all
+    // controlled (state lives in this component) so mounting twice is safe;
+    // the desktop instance is CSS-hidden on mobile while the sheet is
+    // closed.
+    const renderFilterControls = () => (
+        <>
+            <DateRangePicker
+                startDate={startDate}
+                endDate={endDate}
+                onChange={handleDateRangeChange}
+            />
+            {tagGroups.length > 0 && (
+                <TagFilterPills
+                    tagGroups={tagGroups}
+                    activeTagIds={activeTagIds}
+                    onToggle={handleToggleTag}
+                    onClear={handleClearTags}
+                    countOverrides={tagCountMap}
+                    sortMode={tagSortMode}
+                    trailingSlot={tagsDifferFromPrefs ? (
+                        <button
+                            type="button"
+                            onClick={handleSaveTagsAsDefault}
+                            disabled={savingDefaults}
+                            className="ml-1 inline-flex items-center whitespace-nowrap text-[11px] text-slate-500 underline hover:text-slate-700 hover:no-underline disabled:opacity-50 disabled:cursor-not-allowed"
+                            data-testid="save-tags-as-default"
+                        >
+                            {savingDefaults ? 'Saving…' : 'current as default'}
+                        </button>
+                    ) : undefined}
+                />
+            )}
+            <InterestFilterChips
+                signedIn={!!user}
+                interestSource={interestSource}
+                interestKind={interestKind}
+                interestUserHandle={interestUserHandle}
+                onChange={(next) => {
+                    bumpAutoFit();
+                    if (Object.prototype.hasOwnProperty.call(next, 'source')) {
+                        setInterestSource(next.source ?? null);
+                        if (next.source === null) setInterestUserHandle(null);
+                    }
+                    if (Object.prototype.hasOwnProperty.call(next, 'kind')) {
+                        setInterestKind(next.kind!);
+                    }
+                    if (Object.prototype.hasOwnProperty.call(next, 'userHandle')) {
+                        setInterestUserHandle(next.userHandle ?? null);
+                        if (next.userHandle && interestSource === null) {
+                            setInterestSource('follows');
+                        }
+                    }
+                }}
+            />
+        </>
+    );
+
     return (
         <div className="min-h-screen bg-[#f8fafc]">
             <main className="mx-auto max-w-7xl px-4 py-2 sm:py-4">
@@ -947,86 +1112,88 @@ export default function Home() {
                         <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 lg:items-start">
                             {/* Left column: filters + list */}
                             <div className="order-1 lg:order-1 lg:w-[350px] lg:shrink-0 flex flex-col gap-3 lg:gap-4 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
-                                <DateRangePicker
-                                    startDate={startDate}
-                                    endDate={endDate}
-                                    onChange={handleDateRangeChange}
-                                />
-                                {tagGroups.length > 0 && (
-                                    <TagFilterPills
-                                        tagGroups={tagGroups}
+                                {/* Mobile-only filter strip. Doubles as the
+                                "open FilterSheet" affordance AND the
+                                applied-filters summary so users see what's
+                                narrowing the result set without an extra
+                                stacked block. */}
+                                <div className="lg:hidden">
+                                    <SummaryBar
+                                        totalCount={explorerMatchingEvents.length}
+                                        visibleCount={explorerMatchingEvents.length}
+                                        startDate={startDate}
+                                        endDate={endDate}
+                                        areaLabel={
+                                            areaChipState.kind === 'map-view' ? 'Current map view'
+                                                : areaChipState.kind === 'show-all' ? 'Worldwide'
+                                                    : areaChipState.label
+                                        }
+                                        areaKind={areaChipState.kind}
+                                        areaIsDefault={areaChipState.kind === 'default' && !areaSessionOverride}
+                                        onClearArea={handleClearAreaOverride}
                                         activeTagIds={activeTagIds}
-                                        onToggle={handleToggleTag}
-                                        onClear={handleClearTags}
-                                        countOverrides={tagCountMap}
-                                        sortMode={tagSortMode}
-                                        trailingSlot={tagsDifferFromPrefs ? (
-                                            <button
-                                                type="button"
-                                                onClick={handleSaveTagsAsDefault}
-                                                disabled={savingDefaults}
-                                                className="ml-1 inline-flex items-center whitespace-nowrap text-[11px] text-slate-500 underline hover:text-slate-700 hover:no-underline disabled:opacity-50 disabled:cursor-not-allowed"
-                                                data-testid="save-tags-as-default"
-                                            >
-                                                {savingDefaults ? 'Saving…' : 'current as default'}
-                                            </button>
-                                        ) : undefined}
+                                        tagGroups={tagGroups}
+                                        onRemoveTag={handleRemoveTag}
+                                        interestSource={interestSource}
+                                        interestKind={interestKind}
+                                        interestUserHandle={interestUserHandle}
+                                        onClearInterest={handleClearInterest}
+                                        onClearAll={handleClearAllFilters}
+                                        loading={loading}
+                                        onOpenFilters={() => setFilterSheetOpen(true)}
+                                        activeFilterCount={activeFilterCount}
                                     />
-                                )}
-                                {/* Interest filter chips (Phase:
-                                following-interest). Restricts the feed to
-                                activity from people the viewer follows
-                                (one-way OK) or just mutual friends, with
-                                going/saved/any sub-filter and an optional
-                                single-user narrow. Per-row audience is
-                                still enforced server-side. */}
-                                <InterestFilterChips
-                                    signedIn={!!user}
-                                    interestSource={interestSource}
-                                    interestKind={interestKind}
-                                    interestUserHandle={interestUserHandle}
-                                    onChange={(next) => {
-                                        bumpAutoFit();
-                                        if (Object.prototype.hasOwnProperty.call(next, 'source')) {
-                                            setInterestSource(next.source ?? null);
-                                            // Clearing the source also clears the
-                                            // single-user narrow so we never show
-                                            // a "filter is on" pill while the user
-                                            // picker is hidden.
-                                            if (next.source === null) setInterestUserHandle(null);
-                                        }
-                                        if (Object.prototype.hasOwnProperty.call(next, 'kind')) {
-                                            setInterestKind(next.kind!);
-                                        }
-                                        if (Object.prototype.hasOwnProperty.call(next, 'userHandle')) {
-                                            setInterestUserHandle(next.userHandle ?? null);
-                                            // Selecting a user implicitly turns
-                                            // the filter on (source defaults to
-                                            // follows so the picker scope matches
-                                            // what's just been picked).
-                                            if (next.userHandle && interestSource === null) {
-                                                setInterestSource('follows');
-                                            }
-                                        }
-                                    }}
-                                />
+                                </div>
+                                {/* Desktop inline filter stack. Hidden on
+                                mobile (rendered inside FilterSheet instead). */}
+                                <div className="hidden lg:flex lg:flex-col lg:gap-4">
+                                    {renderFilterControls()}
+                                </div>
                                 {/* Event list: hidden on mobile until after map, fills remaining height on desktop */}
-                                <div className="hidden lg:block lg:flex-1 lg:min-h-0 lg:overflow-hidden">
-                                    <EventListPanel
-                                        events={explorerMatchingEvents}
-                                        mapBounds={mapBounds}
-                                        onEventClick={handleExplorerListEventClick}
-                                        showPrices={showPrices}
-                                        showPopularity={showPopularity}
-                                        popularityThreshold={popularityThreshold}
-                                        sortBy={sortBy}
-                                        onSortChange={setSortBy}
-                                        hoveredEventId={hoveredEventId}
-                                        onEventHover={handleEventHover}
-                                        onSuggestEvent={() => setShowSuggestModal(true)}
-                                        newEnabled={unseenStateEnabled}
-                                        newEventIds={newEventIds}
+                                <div className="hidden lg:flex lg:flex-col lg:flex-1 lg:min-h-0 lg:overflow-hidden">
+                                    <SummaryBar
+                                        totalCount={explorerMatchingEvents.length}
+                                        visibleCount={explorerMatchingEvents.length}
+                                        startDate={startDate}
+                                        endDate={endDate}
+                                        areaLabel={
+                                            areaChipState.kind === 'map-view' ? 'Current map view'
+                                                : areaChipState.kind === 'show-all' ? 'Worldwide'
+                                                    : areaChipState.label
+                                        }
+                                        areaKind={areaChipState.kind}
+                                        areaIsDefault={areaChipState.kind === 'default' && !areaSessionOverride}
+                                        onClearArea={handleClearAreaOverride}
+                                        activeTagIds={activeTagIds}
+                                        tagGroups={tagGroups}
+                                        onRemoveTag={handleRemoveTag}
+                                        interestSource={interestSource}
+                                        interestKind={interestKind}
+                                        interestUserHandle={interestUserHandle}
+                                        onClearInterest={handleClearInterest}
+                                        onClearAll={handleClearAllFilters}
+                                        loading={loading}
                                     />
+                                    <div className="flex-1 min-h-0 overflow-hidden">
+                                        <EventListPanel
+                                            events={explorerMatchingEvents}
+                                            mapBounds={mapBounds}
+                                            onEventClick={handleExplorerListEventClick}
+                                            showPrices={showPrices}
+                                            showPopularity={showPopularity}
+                                            popularityThreshold={popularityThreshold}
+                                            sortBy={sortBy}
+                                            onSortChange={setSortBy}
+                                            hoveredEventId={hoveredEventId}
+                                            onEventHover={handleEventHover}
+                                            onSuggestEvent={() => setShowSuggestModal(true)}
+                                            newEnabled={unseenStateEnabled}
+                                            newEventIds={newEventIds}
+                                            onExtendPeriod={handleExtendPeriod}
+                                            onClearFilters={handleClearAllFilters}
+                                            extendingPeriod={extendingPeriod}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                             {/* Map column: map + default-location bar stacked.
@@ -1035,7 +1202,15 @@ export default function Home() {
                             and fills available height; the bar is shrink-0
                             so it doesn't get clipped. */}
                             <div className="order-2 lg:order-2 lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6 flex flex-col gap-1.5 sm:gap-2 min-w-0">
-                                <div className="explorer-map-shell relative h-[270px] sm:h-[331px] lg:h-auto lg:flex-1 lg:min-h-0 overflow-hidden">
+                                <div
+                                    className={
+                                        mapFullscreen
+                                            ? 'explorer-map-shell fixed inset-0 z-[8000] bg-white overflow-hidden'
+                                            : 'explorer-map-shell relative h-[270px] sm:h-[331px] lg:h-auto lg:flex-1 lg:min-h-0 overflow-hidden'
+                                    }
+                                    data-testid="explorer-map-shell"
+                                    data-fullscreen={mapFullscreen ? 'true' : 'false'}
+                                >
                                     <EventMap
                                         events={explorerMatchingEvents}
                                         onEventClick={handleExplorerMapEventClick}
@@ -1089,6 +1264,36 @@ export default function Home() {
                                             </Link>
                                         </div>
                                     )}
+                                    {/* Search-this-area pill. Appears when
+                                    the user has panned/zoomed away from the
+                                    current effective area filter; tapping it
+                                    commits the live viewport as the area
+                                    filter and clears the userMapBounds flag
+                                    so the pill disappears. */}
+                                    {userMapBounds && (
+                                        <button
+                                            type="button"
+                                            onClick={handleSearchThisArea}
+                                            className="absolute top-2 left-1/2 -translate-x-1/2 z-[702] inline-flex items-center gap-1 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 shadow-md transition"
+                                            data-testid="map-search-this-area"
+                                        >
+                                            Search this area
+                                        </button>
+                                    )}
+                                    {/* Fullscreen toggle. Mobile-first;
+                                    rendered on desktop too but rarely
+                                    needed there since the map column is
+                                    already tall. */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setMapFullscreen((v) => !v)}
+                                        aria-label={mapFullscreen ? 'Exit fullscreen map' : 'Open fullscreen map'}
+                                        title={mapFullscreen ? 'Exit fullscreen' : 'Fullscreen map'}
+                                        className="absolute top-2 right-2 z-[702] inline-flex h-8 w-8 items-center justify-center border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm transition"
+                                        data-testid="map-fullscreen-toggle"
+                                    >
+                                        {mapFullscreen ? '×' : '⤢'}
+                                    </button>
                                 </div>
                                 {/* Default-area bar: ONE bordered pill that
                                 visually groups the chip label + worldwide /
@@ -1226,7 +1431,10 @@ export default function Home() {
                                     )}
                                 </div>
                             </div>
-                            {/* Event list on mobile: order-3, hidden on desktop */}
+                            {/* Event list on mobile: order-3, hidden on desktop.
+                            No SummaryBar here — the mobile filter strip
+                            above the map already shows the applied filters
+                            and result count. */}
                             <div className="order-3 lg:hidden">
                                 <EventListPanel
                                     events={explorerMatchingEvents}
@@ -1243,6 +1451,9 @@ export default function Home() {
                                     newEnabled={unseenStateEnabled}
                                     newEventIds={newEventIds}
                                     scrollHighlightedIntoView={false}
+                                    onExtendPeriod={handleExtendPeriod}
+                                    onClearFilters={handleClearAllFilters}
+                                    extendingPeriod={extendingPeriod}
                                 />
                             </div>
                         </div>
@@ -1375,6 +1586,15 @@ export default function Home() {
             {showSuggestModal && (
                 <SuggestEventModal onClose={() => setShowSuggestModal(false)} />
             )}
+            <FilterSheet
+                open={filterSheetOpen}
+                onClose={() => setFilterSheetOpen(false)}
+                onClearAll={handleClearAllFilters}
+                activeFilterCount={activeFilterCount}
+                matchingEventCount={explorerMatchingEvents.length}
+            >
+                {renderFilterControls()}
+            </FilterSheet>
         </div>
     );
 }
@@ -1447,7 +1667,7 @@ function InterestFilterChips({
                     <circle cx="14" cy="6" r="2.4" />
                     <path d="M13 12c2.8 0 5 2 5 5" />
                 </svg>
-                <span className="hidden sm:inline">Following</span>
+                <span>Following</span>
             </button>
             {/* Quick shortcut to the dedicated "From people I follow" calendar
             view. Revealed only when the Following filter is active so it

@@ -590,7 +590,7 @@ function MarkerClusterLayer({
             chunkedLoading: true,
             disableClusteringAtZoom: 16,
             iconCreateFunction: makeClusterIcon,
-            maxClusterRadius: 60,
+            maxClusterRadius: 40,
             showCoverageOnHover: false,
             spiderfyOnMaxZoom: true,
             zoomToBoundsOnClick: true,

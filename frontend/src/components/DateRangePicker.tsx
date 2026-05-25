@@ -49,6 +49,11 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
         const nextMonth = new Date(today);
         nextMonth.setMonth(nextMonth.getMonth() + 1);
 
+        // ── Next 3 months (explorer default — keep aligned with
+        // ``defaultExplorerDateRange`` in pages/Home.tsx) ─────
+        const next3Months = new Date(today);
+        next3Months.setMonth(next3Months.getMonth() + 3);
+
         // ── Next 6 months ─────────────────────────────────────
         const next6Months = new Date(today);
         next6Months.setMonth(next6Months.getMonth() + 6);
@@ -116,6 +121,7 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
             { label: weekendLabel, mobileLabel: 'Wknd', start: formatDate(weekendStart), end: formatDate(weekendEnd) },
             { label: 'Next Week', mobileLabel: 'Next 7d', start: formatDate(today), end: formatDate(nextWeek) },
             { label: 'Next Month', mobileLabel: 'Next 30d', start: formatDate(today), end: formatDate(nextMonth) },
+            { label: 'Next 3 months', mobileLabel: 'Next 3mo', start: formatDate(today), end: formatDate(next3Months) },
             { label: 'Next 6 months', mobileLabel: 'Next 6mo', start: formatDate(today), end: formatDate(next6Months) },
             ...seasonPresets,
         ];
