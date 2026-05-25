@@ -219,120 +219,120 @@ export function EventListCard({
 
     return (
         <>
-        <div
-            ref={cardRef}
-            role="button"
-            tabIndex={0}
-            className={`event-card${onMap ? '' : ' event-card-offmap'}${isHighlighted ? ' event-card-highlighted' : ''}`}
-            onClick={() => onEventClick(event)}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onEventClick(event); } }}
-            onMouseEnter={() => onEventHover?.(event.event_id)}
-            onMouseLeave={() => onEventHover?.(null)}
-        >
-            <div className="event-card-color event-tag-stripes" aria-hidden="true">
-                {(() => {
-                    const colors = getTagColors(event);
-                    if (colors.length === 0) {
-                        return <span className="event-tag-stripe" style={{ backgroundColor: '#6b7280' }} />;
-                    }
-                    return colors.map((c, i) => (
-                        <span
-                            key={i}
-                            className="event-tag-stripe"
-                            style={{ backgroundColor: c }}
-                        />
-                    ));
-                })()}
-            </div>
-            <div className="event-card-content relative">
-                <h4
-                    className={`event-card-title${isNew ? ' font-semibold' : ''}`}
-                    data-new={isNew ? 'true' : undefined}
-                >
-                    {isNew && (
-                        <span
-                            className="inline-block h-1.5 w-1.5 bg-blue-500 mr-1.5 align-middle"
-                            style={{ borderRadius: '9999px' }}
-                            aria-label="New"
-                            data-testid="new-event-dot"
-                        />
-                    )}
-                    {event.title}
-                </h4>
-                <p className="event-card-date">
-                    {event.all_day ? formatCardDate(start) : `${formatCardDate(start)} · ${formatCardTime(start)}`}
-                </p>
-                {event.location && (
-                    <p className="event-card-location">
-                        {offMapBadge}
-                        <span className="event-card-location-text">📍 {event.location}</span>
-                    </p>
-                )}
-                {!onMap && !event.location && (
-                    <span className="event-card-offmap-badge event-card-offmap-badge-standalone" role="img" aria-label="Off map" title="Off map">
-                        <img src="/location-off.png" alt="" aria-hidden="true" className="event-card-offmap-icon" />
-                    </span>
-                )}
-                {((showPrices && (event.price_is_free || (event.price_min != null && event.price_currency)))) && (
-                    <div className="event-card-badges">
-                        {showPrices && <PriceBadge event={event} />}
-                    </div>
-                )}
-                {event.tags?.length > 0 && (
-                    <div className="mt-1">
-                        <TagBadges tags={event.tags} maxVisible={3} />
-                    </div>
-                )}
-                <div className="mt-1 flex items-center gap-2">
-                    <AttendeeAvatarStack
-                        eventId={event.event_id}
-                        friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
-                    />
-                    {event.has_active_promo_codes && (
-                        <img
-                            src="/promo-code.png"
-                            alt=""
-                            aria-hidden="true"
-                            title="Has promo codes"
-                            className="w-4 h-4 object-contain"
-                            data-testid="event-card-promo-icon"
-                        />
-                    )}
-                    {showPopularity && (
-                        <PopularityBadge
-                            score={event.popularity_score ?? 0}
-                            allScores={allViewCounts}
-                            threshold={popularityThreshold}
-                            topN={trendingTopN}
-                            topPercent={trendingTopPercent}
-                        />
-                    )}
-                </div>
-                <div className={`event-card-actions absolute top-0 right-0 flex items-center gap-1.5${coachMark ? ' animate-pulse' : ''}`}>
-                    <ActionCountCluster eventId={event.event_id} showRatings={!!showRatings} isSavedFlag={isSavedFlag} />
-                </div>
-            </div>
-        </div>
-        {coachMark && (
             <div
-                className="flex items-start justify-between gap-2 border border-blue-100 bg-blue-50 px-3 py-1.5 text-[11px] text-blue-800"
-                data-testid="event-card-coachmark"
-                onClick={(e) => e.stopPropagation()}
-                onKeyDown={(e) => e.stopPropagation()}
+                ref={cardRef}
+                role="button"
+                tabIndex={0}
+                className={`event-card${onMap ? '' : ' event-card-offmap'}${isHighlighted ? ' event-card-highlighted' : ''}`}
+                onClick={() => onEventClick(event)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onEventClick(event); } }}
+                onMouseEnter={() => onEventHover?.(event.event_id)}
+                onMouseLeave={() => onEventHover?.(null)}
             >
-                <span>
-                    Tap the bookmark to save events to your calendar, or the check to mark you’re going.
-                </span>
-                <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); onDismissCoachMark?.(); }}
-                    aria-label="Dismiss hint"
-                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-blue-500 hover:text-blue-800 hover:bg-blue-100"
-                >
-                    ×
-                </button>
+                <div className="event-card-color event-tag-stripes" aria-hidden="true">
+                    {(() => {
+                        const colors = getTagColors(event);
+                        if (colors.length === 0) {
+                            return <span className="event-tag-stripe" style={{ backgroundColor: '#6b7280' }} />;
+                        }
+                        return colors.map((c, i) => (
+                            <span
+                                key={i}
+                                className="event-tag-stripe"
+                                style={{ backgroundColor: c }}
+                            />
+                        ));
+                    })()}
+                </div>
+                <div className="event-card-content relative">
+                    <h4
+                        className={`event-card-title${isNew ? ' font-semibold' : ''}`}
+                        data-new={isNew ? 'true' : undefined}
+                    >
+                        {isNew && (
+                            <span
+                                className="inline-block h-1.5 w-1.5 bg-blue-500 mr-1.5 align-middle"
+                                style={{ borderRadius: '9999px' }}
+                                aria-label="New"
+                                data-testid="new-event-dot"
+                            />
+                        )}
+                        {event.title}
+                    </h4>
+                    <p className="event-card-date">
+                        {event.all_day ? formatCardDate(start) : `${formatCardDate(start)} · ${formatCardTime(start)}`}
+                    </p>
+                    {event.location && (
+                        <p className="event-card-location">
+                            {offMapBadge}
+                            <span className="event-card-location-text">📍 {event.location}</span>
+                        </p>
+                    )}
+                    {!onMap && !event.location && (
+                        <span className="event-card-offmap-badge event-card-offmap-badge-standalone" role="img" aria-label="Off map" title="Off map">
+                            <img src="/location-off.png" alt="" aria-hidden="true" className="event-card-offmap-icon" />
+                        </span>
+                    )}
+                    {((showPrices && (event.price_is_free || (event.price_min != null && event.price_currency)))) && (
+                        <div className="event-card-badges">
+                            {showPrices && <PriceBadge event={event} />}
+                        </div>
+                    )}
+                    {event.tags?.length > 0 && (
+                        <div className="mt-1">
+                            <TagBadges tags={event.tags} maxVisible={3} />
+                        </div>
+                    )}
+                    <div className="mt-1 flex items-center gap-2">
+                        <AttendeeAvatarStack
+                            eventId={event.event_id}
+                            friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
+                        />
+                        {event.has_active_promo_codes && (
+                            <img
+                                src="/promo-code.png"
+                                alt=""
+                                aria-hidden="true"
+                                title="Has promo codes"
+                                className="w-4 h-4 object-contain"
+                                data-testid="event-card-promo-icon"
+                            />
+                        )}
+                        {showPopularity && (
+                            <PopularityBadge
+                                score={event.popularity_score ?? 0}
+                                allScores={allViewCounts}
+                                threshold={popularityThreshold}
+                                topN={trendingTopN}
+                                topPercent={trendingTopPercent}
+                            />
+                        )}
+                    </div>
+                    <div className={`event-card-actions absolute top-0 right-0 flex items-center gap-1.5${coachMark ? ' animate-pulse' : ''}`}>
+                        <ActionCountCluster eventId={event.event_id} showRatings={!!showRatings} isSavedFlag={isSavedFlag} />
+                    </div>
+                </div>
             </div>
-        )}
+            {coachMark && (
+                <div
+                    className="flex items-start justify-between gap-2 border border-blue-100 bg-blue-50 px-3 py-1.5 text-[11px] text-blue-800"
+                    data-testid="event-card-coachmark"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                >
+                    <span>
+                        Tap the bookmark to save events to your calendar, or the check to mark you’re going.
+                    </span>
+                    <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onDismissCoachMark?.(); }}
+                        aria-label="Dismiss hint"
+                        className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-blue-500 hover:text-blue-800 hover:bg-blue-100"
+                    >
+                        ×
+                    </button>
+                </div>
+            )}
         </>
     );
 }
