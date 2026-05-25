@@ -29,12 +29,125 @@ import EventAnchoredDetailPanel from '../components/EventAnchoredDetailPanel';
 import { useSeenEvents } from '../hooks/useSeenEvents';
 
 type ViewMode = 'explorer' | 'calendar';
+type InterestSource = 'follows' | 'friends';
+type InterestKind = 'any' | 'going' | 'saved';
+type ExplorerSort = 'date' | 'popularity';
+
+interface InitialExplorerState {
+    startDate: string;
+    endDate: string;
+    interestSource: InterestSource | null;
+    interestKind: InterestKind;
+    interestUserHandle: string | null;
+    sortBy: ExplorerSort;
+}
+
+const DATE_PARAM_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function formatDate(date: Date): string {
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const d = String(date.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
+}
+
+function defaultExplorerDateRange(): { startDate: string; endDate: string } {
+    const startDate = formatDate(new Date());
+    const defaultEndDate = new Date();
+    defaultEndDate.setMonth(defaultEndDate.getMonth() + 6);
+    return { startDate, endDate: formatDate(defaultEndDate) };
+}
+
+function parseDateParam(value: string | null): string | null {
+    if (!value || !DATE_PARAM_RE.test(value)) return null;
+    const [year, month, day] = value.split('-').map(Number);
+    const parsed = new Date(year, month - 1, day);
+    if (
+        parsed.getFullYear() !== year ||
+        parsed.getMonth() !== month - 1 ||
+        parsed.getDate() !== day
+    ) {
+        return null;
+    }
+    return value;
+}
+
+function parseTagIdsParam(value: string | null): number[] {
+    if (value == null) return [];
+    return Array.from(new Set(
+        value
+            .split(',')
+            .map((s) => Number(s.trim()))
+            .filter((n) => Number.isFinite(n) && n > 0),
+    ));
+}
+
+function parseInterestSource(value: string | null): InterestSource | null {
+    return value === 'follows' || value === 'friends' ? value : null;
+}
+
+function parseInterestKind(value: string | null): InterestKind | null {
+    return value === 'any' || value === 'going' || value === 'saved' ? value : null;
+}
+
+function parseExplorerSort(value: string | null): ExplorerSort | null {
+    return value === 'date' || value === 'popularity' ? value : null;
+}
+
+function normalizeUserHandleParam(value: string | null): string | null {
+    const trimmed = value?.trim().replace(/^@/, '') ?? '';
+    return trimmed.length ? trimmed : null;
+}
+
+function readInitialExplorerState(searchParams: URLSearchParams): InitialExplorerState {
+    const defaults = defaultExplorerDateRange();
+    const interestUserHandle = normalizeUserHandleParam(searchParams.get('interest_user_handle'));
+    const interestSource = parseInterestSource(searchParams.get('interest_source')) ?? (interestUserHandle ? 'follows' : null);
+    return {
+        startDate: parseDateParam(searchParams.get('start_date')) ?? defaults.startDate,
+        endDate: parseDateParam(searchParams.get('end_date')) ?? defaults.endDate,
+        interestSource,
+        interestKind: parseInterestKind(searchParams.get('interest_kind')) ?? 'any',
+        interestUserHandle,
+        sortBy: parseExplorerSort(searchParams.get('sort_by')) ?? 'date',
+    };
+}
+
+function writeExplorerStateToSearchParams(
+    next: URLSearchParams,
+    state: {
+        startDate: string;
+        endDate: string;
+        activeTagIds: Set<number>;
+        shouldPersistEmptyTags: boolean;
+        interestSource: InterestSource | null;
+        interestKind: InterestKind;
+        interestUserHandle: string | null;
+        sortBy: ExplorerSort;
+    },
+) {
+    next.set('start_date', state.startDate);
+    next.set('end_date', state.endDate);
+
+    const tagIds = [...state.activeTagIds].sort((a, b) => a - b);
+    if (tagIds.length > 0) next.set('tag_ids', tagIds.join(','));
+    else if (state.shouldPersistEmptyTags) next.set('tag_ids', '');
+    else next.delete('tag_ids');
+
+    const interestActive = state.interestSource !== null || !!state.interestUserHandle;
+    if (interestActive) {
+        next.set('interest_source', state.interestSource ?? 'follows');
+        next.set('interest_kind', state.interestKind);
+        if (state.interestUserHandle) next.set('interest_user_handle', state.interestUserHandle);
+        else next.delete('interest_user_handle');
+    } else {
+        next.delete('interest_source');
+        next.delete('interest_kind');
+        next.delete('interest_user_handle');
+    }
+
+    if (state.sortBy === 'popularity') next.set('sort_by', state.sortBy);
+    else next.delete('sort_by');
 }
 
 function areaToMapBounds(area: PreferredAreaPayload): MapBounds {
@@ -98,6 +211,7 @@ export default function Home() {
     const mapTrendingOverlay = true;
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
+    const [initialExplorerState] = useState(() => readInitialExplorerState(searchParams));
 
     // Allow opening the suggest modal from anywhere via ?submit=1 (e.g. mobile header link).
     useEffect(() => {
@@ -120,15 +234,15 @@ export default function Home() {
     const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
     const [selectedEventSource, setSelectedEventSource] = useState<string | null>(null);
     const [editingEventId, setEditingEventId] = useState<string | null>(null);
-    const [sortBy, setSortBy] = useState<'date' | 'popularity'>('date');
+    const [sortBy, setSortBy] = useState<ExplorerSort>(initialExplorerState.sortBy);
     const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
-    const [activeTagIds, setActiveTagIds] = useState<Set<number>>(new Set());
+    const [activeTagIds, setActiveTagIds] = useState<Set<number>>(() => new Set(parseTagIdsParam(searchParams.get('tag_ids'))));
     // Tracks whether the user has manually toggled a tag in this session.
     // While false, we still mirror late-arriving pref changes (e.g. after
     // sign-in hydrates server prefs) into ``activeTagIds`` so the explorer
     // immediately reflects the user's saved defaults. After a manual toggle
     // we stop syncing so the user keeps control.
-    const userTouchedTagsRef = useRef(false);
+    const userTouchedTagsRef = useRef(searchParams.has('tag_ids'));
 
     // ── Preferred map area ("Europe & nearby" by default) ────────────────
     // Map bounds (live viewport from EventMap). Declared up here so the
@@ -208,20 +322,10 @@ export default function Home() {
                 // upstream. Skipping override write to keep state minimal.
             }
         }
-        // Hydrate tag filter from URL on mount; if absent, fall back to saved
+        // If no explicit tag filter is present in the URL, fall back to saved
         // prefs. URL takes precedence so shared links always render exactly
-        // as the sender intended.
-        const urlTags = searchParams.get('tag_ids');
-        if (urlTags) {
-            const ids = urlTags
-                .split(',')
-                .map((s) => Number(s.trim()))
-                .filter((n) => Number.isFinite(n) && n > 0);
-            if (ids.length) {
-                setActiveTagIds(new Set(ids));
-                userTouchedTagsRef.current = true; // URL is an explicit choice
-            }
-        } else if (prefs.tagIds.length) {
+        // as the sender intended, including the explicit empty `tag_ids=` case.
+        if (!searchParams.has('tag_ids') && prefs.tagIds.length) {
             setActiveTagIds(new Set(prefs.tagIds));
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -395,11 +499,8 @@ export default function Home() {
     }, []);
 
     // Explorer state
-    const today = formatDate(new Date());
-    const defaultEndDate = new Date();
-    defaultEndDate.setMonth(defaultEndDate.getMonth() + 6);
-    const [startDate, setStartDate] = useState(today);
-    const [endDate, setEndDate] = useState(formatDate(defaultEndDate));
+    const [startDate, setStartDate] = useState(initialExplorerState.startDate);
+    const [endDate, setEndDate] = useState(initialExplorerState.endDate);
 
     // Interest filter (Phase: following-interest). Restricts the explorer
     // feed to events at least one user in the chosen graph has marked
@@ -415,9 +516,9 @@ export default function Home() {
     //     is on.
     // Backend enforces per-row audience visibility; non-mutual followers
     // never see `friends`-audience rows.
-    const [interestSource, setInterestSource] = useState<'follows' | 'friends' | null>(null);
-    const [interestKind, setInterestKind] = useState<'any' | 'going' | 'saved'>('any');
-    const [interestUserHandle, setInterestUserHandle] = useState<string | null>(null);
+    const [interestSource, setInterestSource] = useState<InterestSource | null>(initialExplorerState.interestSource);
+    const [interestKind, setInterestKind] = useState<InterestKind>(initialExplorerState.interestKind);
+    const [interestUserHandle, setInterestUserHandle] = useState<string | null>(initialExplorerState.interestUserHandle);
     const [selectedExplorerMapEventId, setSelectedExplorerMapEventId] = useState<string | null>(null);
 
     // Calendar mode map bounds (for off-map styling in the calendar grid)
@@ -430,6 +531,25 @@ export default function Home() {
     const handleEventHover = useCallback((eventId: string | null) => {
         setHoveredEventId(eventId);
     }, []);
+
+    useEffect(() => {
+        if (viewMode !== 'explorer') return;
+        if (searchParams.get('submit') === '1') return;
+        const next = new URLSearchParams(searchParams);
+        writeExplorerStateToSearchParams(next, {
+            startDate,
+            endDate,
+            activeTagIds,
+            shouldPersistEmptyTags: userTouchedTagsRef.current || searchParams.has('tag_ids'),
+            interestSource,
+            interestKind,
+            interestUserHandle,
+            sortBy,
+        });
+        if (next.toString() !== searchParams.toString()) {
+            setSearchParams(next, { replace: true });
+        }
+    }, [activeTagIds, endDate, interestKind, interestSource, interestUserHandle, searchParams, setSearchParams, sortBy, startDate, viewMode]);
 
     // Events query source: Explorer pulls the date/interest-filtered set once
     // and applies the active area + tag filters client-side. The live map

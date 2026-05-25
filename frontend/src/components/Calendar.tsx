@@ -71,7 +71,6 @@ const Calendar = forwardRef<FullCalendar, Props>(
 
         const renderEventContent = useCallback((arg: EventContentArg) => {
             const ev = arg.event.extendedProps as CalendarEvent;
-            const isOffMap = offMapEventIds?.has(ev.event_id);
             const colors = getTagColors(ev);
             return (
                 <div className="fc-event-inner">
@@ -81,7 +80,7 @@ const Calendar = forwardRef<FullCalendar, Props>(
                                 <span
                                     key={i}
                                     className="event-tag-stripe"
-                                    style={{ backgroundColor: isOffMap ? '#d1d5db' : c }}
+                                    style={{ backgroundColor: c }}
                                 />
                             ))}
                         </div>
