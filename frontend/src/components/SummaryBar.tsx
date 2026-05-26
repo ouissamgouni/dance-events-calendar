@@ -100,6 +100,11 @@ interface ChipProps {
     testId?: string;
 }
 
+function isInteractiveTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof Element)) return false;
+    return target.closest('button, a, input, select, textarea, [role="button"]') !== null;
+}
+
 function Chip({ label, title, tone = 'neutral', icon, style, onClick, onRemove, removeAriaLabel, testId }: ChipProps) {
     // Square, no rounded corners. Accent tone bumps the border + bg to make
     // the period/count chips slightly more prominent than tag chips.
@@ -194,12 +199,17 @@ export default function SummaryBar(props: SummaryBarProps) {
             <path d="M3 8h14M7 2.8v2.8M13 2.8v2.8" />
         </svg>
     );
+    const handleSummaryBarClick = (event: React.MouseEvent<HTMLDivElement>) => {
+        if (!onOpenFilters || isInteractiveTarget(event.target)) return;
+        onOpenFilters();
+    };
 
     return (
         <div
-            className={`summary-bar w-full bg-white border-y border-slate-200 px-2 py-1.5 overflow-hidden ${className}`}
+            className={`summary-bar w-full bg-white border-y border-slate-200 px-2 py-1.5 overflow-hidden ${onOpenFilters ? 'cursor-pointer' : ''} ${className}`}
             data-testid="summary-bar"
             aria-label="Active filters and result count"
+            onClick={handleSummaryBarClick}
         >
             <div className="flex items-center min-w-0">
                 <div className="flex flex-wrap items-center gap-1 min-w-0">
