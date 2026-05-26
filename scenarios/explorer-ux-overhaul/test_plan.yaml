@@ -1,0 +1,228 @@
+test_plan:
+  name: "Explorer UX overhaul — mobile-first landing page"
+  description: >
+    Verify the Explorer (landing page) UX overhaul. The overhaul is
+    delivered as five coordinated phases on top of the existing
+    Home → Explorer surface and MUST satisfy:
+      1. Default date window is "next 3 months" (NOT "this weekend").
+      2. The EventListPanel groups events under sticky day headers
+         with a per-day count tail, shows the first 10 events, and
+         paginates the rest via a "Show 10 more" CTA. When the
+         current period is exhausted, the CTA becomes
+         "Show X next available events" and skips empty future
+         windows. If filters empty the list, a blue-50 panel offers
+         Find next events / Clear / Suggest CTAs.
+      3. A compact SummaryBar above the map/list shows the active
+        period chip, removable colored tag chips, the active
+        interest chip, and a "Clear all" link. Counts live in the
+        EventListPanel header so the strip stays compact.
+      4. On mobile (< lg), a "Filters" trigger opens a bottom-sheet
+         FilterSheet hosting the DateRange / Tags / Interest
+         controls. The trigger badges the active-filter count and
+         the sheet footer shows "Show N events" tied to the live
+         count. Desktop (≥ lg) keeps the inline filter stack.
+      5. The map has a fullscreen toggle (⤢ / ×) that promotes the
+         map to a fixed full-viewport surface, and a "Search this
+         area" pill appears at the top of the map whenever the
+         viewer pans / zooms to a custom bounds — clicking it
+         applies that bounds as a session override (cleared via
+         the SummaryBar area chip × or "Clear all").
+      6. The first non-past event card shows a subtle pulse on its
+         Save/Going action cluster plus a dismissible blue-50 hint
+         panel ("Tap the bookmark to save events to your calendar,
+         or the check to mark you're going."). Dismissal persists
+         in localStorage under `explorer.coachmark.saveGoing.shown`.
+
+    All UI MUST honor frontend.instructions.md:
+      • Square corners (no `rounded-*` except avatars / status dots /
+        circular icon toggles).
+      • Primary CTAs `bg-blue-500 text-white hover:bg-blue-600`.
+      • Secondary `border border-slate-200 bg-white text-slate-700
+        hover:bg-slate-50`.
+      • No `window.alert/confirm/prompt`, no raw `fetch`/`axios`,
+        no new top-level dependencies or icon sets.
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=explorer-ux-overhaul"
+    - >
+      Seed (db-events.yaml) has 28 events distributed across Europe,
+      nearby regions, and a few global outliers, plus attendance,
+      saves, follows, and tracking data borrowed from the
+      map-clustering fixture style. ≥ 21 events sit inside the
+      default 3-month window so the Show-more CTA appears immediately;
+      weeks 14–20 include both in-scope European events and global
+      outliers for next-available-events / show-all testing.
+    - >
+      First run on a clean browser profile — localStorage key
+      `explorer.coachmark.saveGoing.shown` MUST be unset so the
+      coachmark renders on the first non-past card.
+
+  steps:
+    - id: 1
+      title: "Default landing: 3-month window, day grouping, Show-more CTA"
+      description: >
+        Open / (Home) as an anonymous visitor on a desktop viewport
+        (≥ lg, 1280×800). Do not change any filter.
+      expected: >
+        • The DateRangePicker reads roughly "Today → Today + 3 months".
+        • The SummaryBar above the event list shows:
+            - a period chip with the same range,
+            - no tag chips, no location chip, no interest chip, no "Clear all" link
+              (no removable filters yet),
+            - no result-count tail; counts live in the list header.
+        • The EventListPanel renders sticky day headers
+          (data-testid="event-list-day-header") with a count tail
+          "(N)" — e.g. the Friday cluster shows "(3)".
+        • Exactly 10 cards render; below them a centered
+          "Show 10 more" button (data-testid="event-list-show-more")
+          is visible. No next-available-events CTA yet.
+        • The first non-past card pulses (animate-pulse on the
+          action cluster) and a blue-50 hint panel under it reads
+          "Tap the bookmark to save events to your calendar, or
+          the check to mark you're going." with a × button
+          (aria-label="Dismiss hint"), data-testid="event-card-coachmark".
+
+    - id: 2
+      title: "Show-more → next available events progression"
+      description: >
+        Click "Show 10 more" until no in-window
+        events remain.
+      expected: >
+        • After the first click, 10 → up to 20 cards render.
+        • Count in the EventListPanel header stays truthful to the
+          filtered result set.
+        • Once all in-window events are listed, the CTA flips to
+          "Show X next available events"
+          (data-testid="event-list-extend-period"). Clicking it
+          advances `end_date` to the end of the first future
+          3-month batch with matching events (URL `end_date` query
+          param updates), skipping empty windows if needed. The
+          weeks 14–20 events (evt-ux-024…027) appear at the bottom
+          and the period chip label updates.
+
+    - id: 3
+      title: "Empty state → blue-50 panel with Find / Clear / Suggest"
+      description: >
+        Open the FilterSheet (or desktop tag pills) and apply a
+        tag filter that no in-window event matches — e.g. select
+        only "level:advanced".
+      expected: >
+        • The EventListPanel renders a blue-50 empty-state panel
+          (data-testid="event-list-empty") with three buttons:
+          "Find next events"
+          (data-testid="event-list-empty-extend"), "Clear filters"
+          (data-testid="event-list-empty-clear"), and "Suggest an
+          event". The EventListPanel header reads "0 / 0".
+        • Clicking "Find next events" advances `end_date` only when a
+          later batch has matching events. If none exists within the
+          lookup horizon, the CTA reads "No future events found" and
+          is disabled.
+        • Clicking "Clear filters" removes the tag chip from the
+          SummaryBar, the cards return, and the panel disappears.
+
+    - id: 4
+      title: "SummaryBar chips are interactive + truthful"
+      description: >
+        Apply two tag filters (e.g. "dance-style:salsa" +
+        "format:social") and one interest filter (Following @alice).
+      expected: >
+        • Two tag chips render in the SummaryBar with × removers
+          (data-testid="summary-chip-tag-{id}"); clicking × removes
+          only that tag (URL `tag_ids` updates, others stay).
+        • An interest chip renders
+          (data-testid="summary-chip-interest") with × clearing the
+          `interest_source`/`interest_kind`/handle URL params.
+        • A "Clear all" link appears
+          (data-testid="summary-clear-all") and removes ALL
+          removable filters (tags + interest + area override +
+          non-default date range) in one click; the count returns
+          to the full default result set.
+        • Whenever the list is capped, the EventListPanel header reads
+          "Displayed 10 / N" (or the current rendered count), and when
+          filters narrow the set the denominator narrows too.
+
+    - id: 5
+      title: "Mobile FilterSheet"
+      description: >
+        Switch to a 390×844 viewport (iPhone 14 Pro). Reload /.
+      expected: >
+        • The inline desktop filter stack is hidden (CSS, via
+          `hidden lg:flex`).
+        • A "Filters" trigger button is visible above the list
+          (square, secondary style) showing the active filter
+          content compact enough to sit above the map/list.
+        • Tapping it opens a bottom-sheet
+          (data-testid="filter-sheet") with header "Filters" and a
+          close × (aria-label="Close filters").
+        • Inside, the same DateRange / TagFilterPills / Interest
+          controls render. State is shared with the SummaryBar in
+          real time (changing a filter inside the sheet updates
+          the count in the footer Apply CTA AND the SummaryBar
+          underneath the backdrop).
+        • Footer has "Clear all"
+          (data-testid="filter-sheet-clear-all", disabled when 0
+          active) and a primary Apply CTA
+          (data-testid="filter-sheet-apply") reading
+          "Show N events" (bg-blue-500) or
+          "No matches — close" when N=0.
+        • Pressing Escape OR tapping the backdrop closes the sheet.
+          Body scroll is locked while open.
+
+    - id: 6
+      title: "Map fullscreen toggle + Search-this-area pill"
+      description: >
+        Back on desktop. Locate the map shell
+        (data-testid="explorer-map-shell").
+      expected: >
+        • A ⤢ toggle (data-testid="explorer-map-fullscreen-toggle"
+          OR "map-fullscreen-toggle", secondary square 8×8) sits
+          top-right of the map. Clicking it sets
+          `data-fullscreen="true"` and the shell becomes
+          `fixed inset-0 z-[8000] bg-white`. Toggle icon flips to
+          ×. Clicking × restores the embedded shell.
+        • Pan the map (drag) to New York (lat ~40.76, lng ~-73.99),
+          or any city away from the current effective area.
+          A "Search this area" pill
+          (data-testid="map-search-this-area", bg-blue-500, top
+          center, z-702) becomes visible.
+        • Click it. The area chip in the SummaryBar updates to
+          something like "Custom area" / "Map view" with a × that,
+          when clicked, restores the default area AND removes the
+          chip. evt-ux-028 (New York Salsa Rooftop Social) appears
+          when the map area is committed or the user switches to
+          worldwide/show-all browsing.
+
+    - id: 7
+      title: "Coachmark dismissal persists"
+      description: >
+        Still on desktop, click the × in the blue-50 hint panel on
+        the first non-past card.
+      expected: >
+        • The hint panel disappears AND the animate-pulse class is
+          removed from the action cluster on the first card.
+        • Reload the page. The coachmark MUST NOT re-render. Inspect
+          localStorage: `explorer.coachmark.saveGoing.shown === "1"`.
+        • Past events MUST never receive the coachmark even on a
+          fresh profile (the guard is `idx === 0 && !isPast`).
+
+    - id: 8
+      title: "Frontend rules compliance spot-check"
+      description: >
+        Inspect the new surfaces in DevTools (Elements).
+      expected: >
+        • No `rounded-*` class on SummaryBar chips, FilterSheet
+          panel/header/footer, map overlays, the Show-more or
+          Extend-period buttons, or the coachmark hint panel.
+          Avatars / status dots may still use `rounded-full`.
+        • Primary CTAs ("Show N events", "Search this area",
+          active-count badges) use `bg-blue-500 text-white
+          hover:bg-blue-600`.
+        • Secondary CTAs ("Filters" trigger, fullscreen toggle,
+          "Clear all" links) use the
+          `border border-slate-200 bg-white text-slate-700
+          hover:bg-slate-50` family.
+        • No `window.alert/confirm/prompt` is invoked by any of
+          the new components.
+        • No new top-level dependency was added (check
+          `frontend/package.json` diff is empty for `dependencies`
+          and `devDependencies`).

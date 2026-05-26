@@ -1,0 +1,156 @@
+# Explorer UX overhaul scenario — richer cast for the Explorer social
+# surfaces. Bob is the signed-in viewer used to exercise following / friends
+# filters, attendance overlays, save counts, and popularity alongside the
+# mobile-first Explorer UI.
+users:
+  - email: viewer@example.com
+    name: Viewer Explorer
+    handle: viewer
+    account_visibility: public
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+    account_visibility: public
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    role: admin
+    account_visibility: public
+  - {
+      email: alice@example.com,
+      name: Alice Rivera,
+      handle: alice,
+      account_visibility: public,
+    }
+  - {
+      email: emma@example.com,
+      name: Emma Larsen,
+      handle: emma,
+      account_visibility: public,
+    }
+  - {
+      email: frank@example.com,
+      name: Frank Dubois,
+      handle: frank,
+      account_visibility: public,
+    }
+  - {
+      email: gina@example.com,
+      name: Gina Costa,
+      handle: gina,
+      account_visibility: public,
+    }
+  - {
+      email: hugo@example.com,
+      name: Hugo Schmidt,
+      handle: hugo,
+      account_visibility: public,
+    }
+  - {
+      email: nia@example.com,
+      name: Nia Okafor,
+      handle: nia,
+      account_visibility: public,
+    }
+  - {
+      email: omar@example.com,
+      name: Omar Haddad,
+      handle: omar,
+      account_visibility: public,
+    }
+  - {
+      email: pablo@example.com,
+      name: Pablo Ortega,
+      handle: pablo,
+      account_visibility: public,
+    }
+  - {
+      email: quinn@example.com,
+      name: Quinn Walsh,
+      handle: quinn,
+      account_visibility: public,
+    }
+  - {
+      email: rita@example.com,
+      name: Rita Falk,
+      handle: rita,
+      account_visibility: public,
+    }
+  - {
+      email: samir@example.com,
+      name: Samir Patel,
+      handle: samir,
+      account_visibility: public,
+    }
+  - {
+      email: tara@example.com,
+      name: Tara Lindqvist,
+      handle: tara,
+      account_visibility: public,
+    }
+  - {
+      email: ulysses@example.com,
+      name: Ulysses Moreau,
+      handle: ulysses,
+      account_visibility: public,
+    }
+  - {
+      email: s01@example.com,
+      name: Stranger 01,
+      handle: s01,
+      account_visibility: public,
+    }
+  - {
+      email: s02@example.com,
+      name: Stranger 02,
+      handle: s02,
+      account_visibility: public,
+    }
+  - {
+      email: s03@example.com,
+      name: Stranger 03,
+      handle: s03,
+      account_visibility: public,
+    }
+  - {
+      email: s04@example.com,
+      name: Stranger 04,
+      handle: s04,
+      account_visibility: public,
+    }
+  - {
+      email: s05@example.com,
+      name: Stranger 05,
+      handle: s05,
+      account_visibility: public,
+    }
+  - {
+      email: t01@example.com,
+      name: Saver 01,
+      handle: t01,
+      account_visibility: public,
+    }
+  - {
+      email: t02@example.com,
+      name: Saver 02,
+      handle: t02,
+      account_visibility: public,
+    }
+  - {
+      email: t03@example.com,
+      name: Saver 03,
+      handle: t03,
+      account_visibility: public,
+    }
+  - {
+      email: t04@example.com,
+      name: Saver 04,
+      handle: t04,
+      account_visibility: public,
+    }
+  - {
+      email: t05@example.com,
+      name: Saver 05,
+      handle: t05,
+      account_visibility: public,
+    }

@@ -15,6 +15,8 @@ import EventModal from '../components/EventModal';
 import AdminEventDetailPanel from '../components/AdminEventDetailPanel';
 import DateRangePicker from '../components/DateRangePicker';
 import EventListPanel, { EventListCard } from '../components/EventListPanel';
+import SummaryBar from '../components/SummaryBar';
+import FilterSheet from '../components/FilterSheet';
 import TagFilterPills from '../components/TagFilterPills';
 import AreaFilterChip from '../components/AreaFilterChip';
 import { usePreferences } from '../context/PreferencesContext';
@@ -32,6 +34,11 @@ type ViewMode = 'explorer' | 'calendar';
 type InterestSource = 'follows' | 'friends';
 type InterestKind = 'any' | 'going' | 'saved';
 type ExplorerSort = 'date' | 'popularity';
+
+interface FutureEventBatch {
+    endDate: string;
+    matchingCount: number;
+}
 
 interface InitialExplorerState {
     startDate: string;
@@ -51,10 +58,14 @@ function formatDate(date: Date): string {
     return `${y}-${m}-${d}`;
 }
 
+// Explorer default window. Shortened from 6 months → 3 months so the landing
+// page doesn't dump the full year onto first-time mobile users. Users can
+// extend via the "Show next available events" CTA in the list, or pick the
+// longer "Next 6 months" preset.
 function defaultExplorerDateRange(): { startDate: string; endDate: string } {
     const startDate = formatDate(new Date());
     const defaultEndDate = new Date();
-    defaultEndDate.setMonth(defaultEndDate.getMonth() + 6);
+    defaultEndDate.setMonth(defaultEndDate.getMonth() + 3);
     return { startDate, endDate: formatDate(defaultEndDate) };
 }
 
@@ -560,12 +571,12 @@ export default function Home() {
     useEffect(() => {
         if (!initialLoadDone.current) setLoading(true);
         let params: { startDate?: string; endDate?: string; area?: PreferredAreaPayload | null; interestSource?: 'follows' | 'friends'; interestKind?: 'any' | 'going' | 'saved'; interestUserHandle?: string } | undefined;
+        const interestActive = interestSource !== null || !!interestUserHandle;
         if (viewMode === 'explorer') {
             // No ``area`` here on purpose — we pull the full date/interest set
             // and apply the active area locally. That keeps panning instant,
             // while semantic filters (tags/following) can still refit to all
             // matching events in the active/default area.
-            const interestActive = interestSource !== null || !!interestUserHandle;
             params = {
                 startDate,
                 endDate,
@@ -577,10 +588,19 @@ export default function Home() {
             params = {
                 startDate: formatDate(visibleRange.start),
                 endDate: formatDate(visibleRange.end),
+                interestSource: interestActive ? (interestSource ?? 'follows') : undefined,
+                interestKind: interestActive ? interestKind : undefined,
+                interestUserHandle: interestUserHandle ?? undefined,
             };
         } else {
             // Calendar mode initial load: use same default as explorer
-            params = { startDate, endDate };
+            params = {
+                startDate,
+                endDate,
+                interestSource: interestActive ? (interestSource ?? 'follows') : undefined,
+                interestKind: interestActive ? interestKind : undefined,
+                interestUserHandle: interestUserHandle ?? undefined,
+            };
         }
         const tagParams = params?.startDate || params?.endDate ? params : undefined;
         Promise.all([fetchEvents(params), fetchSettings(), fetchTagGroups(tagParams)])
@@ -636,6 +656,147 @@ export default function Home() {
         setActiveTagIds(new Set());
     }, [bumpAutoFit]);
 
+    // Extend the explorer's end date through the next future batch that has
+    // matches under the current filters. Wired into ``EventListPanel`` so
+    // users hitting the end of the current period can pull in the next useful
+    // chunk without manually guessing date presets. Cleared by any subsequent
+    // preset/date change.
+    const [nextAvailableEventBatch, setNextAvailableEventBatch] = useState<FutureEventBatch | null | undefined>(undefined);
+    const [extendingPeriod, setExtendingPeriod] = useState(false);
+    const handleExtendPeriod = useCallback(() => {
+        if (!nextAvailableEventBatch) return;
+        setExtendingPeriod(true);
+        setEndDate(nextAvailableEventBatch.endDate);
+        bumpAutoFit();
+        // ``loading`` flips back to false in the events fetch effect; mirror
+        // it onto ``extendingPeriod`` via a microtask so the button shows a
+        // brief "Loading…" state. A dedicated flag avoids leaking the
+        // global loading state into the list-only CTA.
+        setTimeout(() => setExtendingPeriod(false), 0);
+    }, [bumpAutoFit, nextAvailableEventBatch]);
+
+    // Clear every active filter back to the explorer's defaults. Wired into
+    // the empty-state CTA so a user who over-filtered into "0 events" can
+    // recover in one tap without hunting down individual chips.
+    const handleClearAllFilters = useCallback(() => {
+        const defaults = defaultExplorerDateRange();
+        userTouchedTagsRef.current = true;
+        setActiveTagIds(new Set());
+        setInterestSource(null);
+        setInterestKind('any');
+        setInterestUserHandle(null);
+        setStartDate(defaults.startDate);
+        setEndDate(defaults.endDate);
+        setAreaSessionOverride(null);
+        bumpAutoFit();
+    }, [bumpAutoFit]);
+
+    // Remove a single tag from the active set (wired into SummaryBar chip ×).
+    const handleRemoveTag = useCallback((tagId: number) => {
+        userTouchedTagsRef.current = true;
+        bumpAutoFit();
+        setActiveTagIds((prev) => {
+            if (!prev.has(tagId)) return prev;
+            const next = new Set(prev);
+            next.delete(tagId);
+            return next;
+        });
+    }, [bumpAutoFit]);
+
+    // Clear the follows/friends interest filter from the SummaryBar chip ×.
+    const handleClearInterest = useCallback(() => {
+        setInterestSource(null);
+        setInterestKind('any');
+        setInterestUserHandle(null);
+    }, []);
+
+    const handleClearCalendarFilters = useCallback(() => {
+        userTouchedTagsRef.current = true;
+        setActiveTagIds(new Set());
+        setInterestSource(null);
+        setInterestKind('any');
+        setInterestUserHandle(null);
+        bumpAutoFit();
+    }, [bumpAutoFit]);
+
+    // Reset any area session override (returns to saved prefs / default).
+    const handleClearAreaOverride = useCallback(() => {
+        setAreaSessionOverride(null);
+        bumpAutoFit();
+    }, [bumpAutoFit]);
+
+    // Mobile-only FilterSheet open state. The sheet wraps the same controls
+    // rendered inline on desktop so the landing page isn't crushed by a
+    // tall filter stack on phones. State stays lifted in this component so
+    // closing/opening the sheet doesn't reset anything.
+    const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+    const defaultDateRange = useMemo(() => defaultExplorerDateRange(), []);
+    const dateRangeDiffers =
+        startDate !== defaultDateRange.startDate || endDate !== defaultDateRange.endDate;
+    const activeFilterCount =
+        activeTagIds.size
+        + (interestSource ? 1 : 0)
+        + (interestUserHandle ? 1 : 0)
+        + (areaSessionOverride ? 1 : 0)
+        + (dateRangeDiffers ? 1 : 0);
+    const calendarActiveFilterCount = activeTagIds.size
+        + (interestSource ? 1 : 0)
+        + (interestUserHandle ? 1 : 0);
+
+    // Map fullscreen toggle (mobile only — desktop layout already gives the
+    // map a tall column). The map container picks up ``fixed inset-0`` when
+    // active so users can scan markers without the URL bar / filters
+    // eating screen height. Leaflet's existing ResizeObserver handles
+    // invalidateSize after the class flip.
+    const [mapFullscreen, setMapFullscreen] = useState(false);
+    const mobileExplorerTopSummaryRef = useRef<HTMLDivElement | null>(null);
+    const [showFloatingMobileExplorerSummary, setShowFloatingMobileExplorerSummary] = useState(false);
+
+    useEffect(() => {
+        if (isDesktop || viewMode !== 'explorer') {
+            setShowFloatingMobileExplorerSummary(false);
+            return;
+        }
+        const summaryEl = mobileExplorerTopSummaryRef.current;
+        const scrollRoot = summaryEl?.closest('main');
+        if (!summaryEl || !scrollRoot) {
+            setShowFloatingMobileExplorerSummary(false);
+            return;
+        }
+
+        const update = () => {
+            const summaryRect = summaryEl.getBoundingClientRect();
+            const rootRect = scrollRoot.getBoundingClientRect();
+            setShowFloatingMobileExplorerSummary(summaryRect.bottom <= rootRect.top + 1);
+        };
+
+        update();
+        scrollRoot.addEventListener('scroll', update, { passive: true });
+        window.addEventListener('resize', update);
+        return () => {
+            scrollRoot.removeEventListener('scroll', update);
+            window.removeEventListener('resize', update);
+        };
+    }, [isDesktop, viewMode]);
+
+    // Commit the current map viewport as the effective area filter. Paired
+    // with the "Search this area" pill that appears after the user pans
+    // the map; the pill disappears once committed because ``userMapBounds``
+    // is cleared below.
+    const handleSearchThisArea = useCallback(() => {
+        if (!userMapBounds) return;
+        const area: PreferredAreaPayload = {
+            label: 'Map view',
+            min_lat: userMapBounds.south,
+            max_lat: userMapBounds.north,
+            min_lng: userMapBounds.west,
+            max_lng: userMapBounds.east,
+        };
+        setAreaSessionOverride({ kind: 'preset', area: clampArea(area) });
+        setUserMapBounds(null);
+        bumpAutoFit();
+    }, [userMapBounds, bumpAutoFit]);
+
     const areaScopedEvents = useMemo(() => {
         if (viewMode !== 'explorer' || !effectiveArea) return events;
         const bounds = areaToMapBounds(effectiveArea);
@@ -651,6 +812,57 @@ export default function Home() {
         () => filterEventsByTags(areaScopedEvents, activeTagIds, tagGroups),
         [areaScopedEvents, activeTagIds, tagGroups],
     );
+
+    useEffect(() => {
+        if (viewMode !== 'explorer') {
+            return;
+        }
+        const currentEnd = new Date(endDate);
+        if (Number.isNaN(currentEnd.getTime())) {
+            setNextAvailableEventBatch(null);
+            return;
+        }
+        const interestActive = interestSource !== null || !!interestUserHandle;
+        let cancelled = false;
+        setNextAvailableEventBatch(undefined);
+        const findNextBatch = async () => {
+            let cursor = new Date(currentEnd);
+            cursor.setDate(cursor.getDate() + 1);
+            for (let i = 0; i < 8; i += 1) {
+                const windowStart = new Date(cursor);
+                const windowEnd = new Date(windowStart);
+                windowEnd.setMonth(windowEnd.getMonth() + 3);
+                const evts = await fetchEvents({
+                    startDate: formatDate(windowStart),
+                    endDate: formatDate(windowEnd),
+                    interestSource: interestActive ? (interestSource ?? 'follows') : undefined,
+                    interestKind: interestActive ? interestKind : undefined,
+                    interestUserHandle: interestUserHandle ?? undefined,
+                });
+                if (cancelled) return;
+                const areaFiltered = effectiveArea
+                    ? evts.filter((event) => eventMatchesBounds(event, areaToMapBounds(effectiveArea)))
+                    : evts;
+                const matching = filterEventsByTags(areaFiltered, activeTagIds, tagGroups);
+                if (matching.length > 0) {
+                    setNextAvailableEventBatch({
+                        endDate: formatDate(windowEnd),
+                        matchingCount: matching.length,
+                    });
+                    return;
+                }
+                cursor = new Date(windowEnd);
+                cursor.setDate(cursor.getDate() + 1);
+            }
+            setNextAvailableEventBatch(null);
+        };
+        findNextBatch().catch(() => {
+            if (!cancelled) setNextAvailableEventBatch(null);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [viewMode, endDate, interestSource, interestKind, interestUserHandle, effectiveArea, activeTagIds, tagGroups]);
 
     const selectedExplorerMapEvent = useMemo(
         () => explorerMatchingEvents.find((event) => event.event_id === selectedExplorerMapEventId) ?? null,
@@ -744,6 +956,15 @@ export default function Home() {
         });
     }, [filteredEvents, visibleRange]);
 
+    const calendarSummaryRange = useMemo(() => {
+        if (!visibleRange) return { startDate, endDate };
+        const endInclusive = new Date(visibleRange.end.getTime() - 24 * 60 * 60 * 1000);
+        return {
+            startDate: formatDate(visibleRange.start),
+            endDate: formatDate(endInclusive),
+        };
+    }, [endDate, startDate, visibleRange]);
+
     const handleEventClick = useCallback((evt: CalendarEvent, clickRect?: DOMRect) => {
         if (viewMode === 'explorer') {
             // Navigate to the event detail page
@@ -799,13 +1020,19 @@ export default function Home() {
     const handleCloseEdit = useCallback(() => {
         setEditingEventId(null);
         // Refresh events list so any admin edits propagate to other surfaces.
-        const params = viewMode === 'explorer'
-            ? { startDate, endDate }
-            : visibleRange
-                ? { startDate: formatDate(visibleRange.start), endDate: formatDate(visibleRange.end) }
-                : { startDate, endDate };
+        const interestActive = interestSource !== null || !!interestUserHandle;
+        const params = {
+            ...(viewMode === 'explorer'
+                ? { startDate, endDate }
+                : visibleRange
+                    ? { startDate: formatDate(visibleRange.start), endDate: formatDate(visibleRange.end) }
+                    : { startDate, endDate }),
+            interestSource: interestActive ? (interestSource ?? 'follows') : undefined,
+            interestKind: interestActive ? interestKind : undefined,
+            interestUserHandle: interestUserHandle ?? undefined,
+        };
         fetchEvents(params).then(setEvents).catch(() => { });
-    }, [viewMode, startDate, endDate, visibleRange]);
+    }, [viewMode, startDate, endDate, visibleRange, interestKind, interestSource, interestUserHandle]);
 
     const handleBoundsChange = useCallback((bounds: MapBounds, userDriven: boolean) => {
         setMapBounds(bounds);
@@ -899,8 +1126,178 @@ export default function Home() {
             return `${startStr} – ${endStr}${yearSuffix}`;
         }
         const mid = new Date((visibleRange.start.getTime() + visibleRange.end.getTime()) / 2);
-        return mid.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+        return mid.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
     }, [visibleRange]);
+
+    // Shared filter controls JSX. Rendered inline in the desktop left
+    // column AND inside the mobile FilterSheet. The components are all
+    // controlled (state lives in this component) so mounting twice is safe;
+    // the desktop instance is CSS-hidden on mobile while the sheet is
+    // closed.
+    const tagFilters = tagGroups.length > 0 ? (
+        <TagFilterPills
+            tagGroups={tagGroups}
+            activeTagIds={activeTagIds}
+            onToggle={handleToggleTag}
+            onClear={handleClearTags}
+            countOverrides={tagCountMap}
+            sortMode={tagSortMode}
+            trailingSlot={tagsDifferFromPrefs ? (
+                <button
+                    type="button"
+                    onClick={handleSaveTagsAsDefault}
+                    disabled={savingDefaults}
+                    className="ml-1 inline-flex items-center whitespace-nowrap text-[11px] text-slate-500 underline hover:text-slate-700 hover:no-underline disabled:opacity-50 disabled:cursor-not-allowed"
+                    data-testid="save-tags-as-default"
+                >
+                    {savingDefaults ? 'Saving…' : 'current as default'}
+                </button>
+            ) : undefined}
+        />
+    ) : null;
+
+    const renderInterestFilters = (surface: 'inline' | 'sheet' = 'inline') => (
+        <InterestFilterChips
+            signedIn={!!user}
+            surface={surface}
+            interestSource={interestSource}
+            interestKind={interestKind}
+            interestUserHandle={interestUserHandle}
+            onChange={(next) => {
+                bumpAutoFit();
+                if (Object.prototype.hasOwnProperty.call(next, 'source')) {
+                    setInterestSource(next.source ?? null);
+                    if (next.source === null) setInterestUserHandle(null);
+                }
+                if (Object.prototype.hasOwnProperty.call(next, 'kind')) {
+                    setInterestKind(next.kind!);
+                }
+                if (Object.prototype.hasOwnProperty.call(next, 'userHandle')) {
+                    setInterestUserHandle(next.userHandle ?? null);
+                    if (next.userHandle && interestSource === null) {
+                        setInterestSource('follows');
+                    }
+                }
+            }}
+        />
+    );
+
+    const renderFilterControls = (surface: 'inline' | 'sheet' = 'inline') => {
+        if (surface === 'sheet') {
+            return (
+                <>
+                    <section className="filter-sheet-section" aria-labelledby="filter-sheet-period-heading">
+                        <h3 id="filter-sheet-period-heading" className="filter-sheet-section-title">Period</h3>
+                        <DateRangePicker
+                            startDate={startDate}
+                            endDate={endDate}
+                            onChange={handleDateRangeChange}
+                        />
+                    </section>
+                    {tagFilters && (
+                        <section className="filter-sheet-section" aria-labelledby="filter-sheet-tags-heading">
+                            <h3 id="filter-sheet-tags-heading" className="filter-sheet-section-title">Tags</h3>
+                            {tagFilters}
+                        </section>
+                    )}
+                    <section className="filter-sheet-section" aria-labelledby="filter-sheet-following-heading">
+                        <h3 id="filter-sheet-following-heading" className="filter-sheet-section-title">Following</h3>
+                        {renderInterestFilters(surface)}
+                    </section>
+                </>
+            );
+        }
+
+        return (
+            <>
+                <DateRangePicker
+                    startDate={startDate}
+                    endDate={endDate}
+                    onChange={handleDateRangeChange}
+                />
+                {tagFilters}
+                {renderInterestFilters(surface)}
+            </>
+        );
+    };
+
+    const renderCalendarFilterControls = () => (
+        <>
+            {tagGroups.length > 0 && (
+                <TagFilterPills
+                    tagGroups={tagGroups}
+                    activeTagIds={activeTagIds}
+                    onToggle={handleToggleTag}
+                    onClear={handleClearTags}
+                    countOverrides={tagCountMap}
+                    sortMode={tagSortMode}
+                    trailingSlot={tagsDifferFromPrefs ? (
+                        <button
+                            type="button"
+                            onClick={handleSaveTagsAsDefault}
+                            disabled={savingDefaults}
+                            className="ml-1 inline-flex items-center whitespace-nowrap text-[11px] text-slate-500 underline hover:text-slate-700 hover:no-underline disabled:opacity-50 disabled:cursor-not-allowed"
+                            data-testid="save-tags-as-default-calendar"
+                        >
+                            {savingDefaults ? 'Saving…' : 'current as default'}
+                        </button>
+                    ) : undefined}
+                />
+            )}
+            <InterestFilterChips
+                signedIn={!!user}
+                surface="sheet"
+                interestSource={interestSource}
+                interestKind={interestKind}
+                interestUserHandle={interestUserHandle}
+                onChange={(next) => {
+                    bumpAutoFit();
+                    if (Object.prototype.hasOwnProperty.call(next, 'source')) {
+                        setInterestSource(next.source ?? null);
+                        if (next.source === null) setInterestUserHandle(null);
+                    }
+                    if (Object.prototype.hasOwnProperty.call(next, 'kind')) {
+                        setInterestKind(next.kind!);
+                    }
+                    if (Object.prototype.hasOwnProperty.call(next, 'userHandle')) {
+                        setInterestUserHandle(next.userHandle ?? null);
+                        if (next.userHandle && interestSource === null) {
+                            setInterestSource('follows');
+                        }
+                    }
+                }}
+            />
+        </>
+    );
+
+    const renderExplorerMobileSummaryBar = (className?: string) => (
+        <SummaryBar
+            className={className}
+            totalCount={explorerMatchingEvents.length}
+            visibleCount={explorerMatchingEvents.length}
+            startDate={startDate}
+            endDate={endDate}
+            areaLabel={
+                areaChipState.kind === 'map-view' ? 'Current map view'
+                    : areaChipState.kind === 'show-all' ? 'Worldwide'
+                        : areaChipState.label
+            }
+            areaKind={areaChipState.kind}
+            areaIsDefault={areaChipState.kind === 'default' && !areaSessionOverride}
+            onClearArea={handleClearAreaOverride}
+            activeTagIds={activeTagIds}
+            tagGroups={tagGroups}
+            onRemoveTag={handleRemoveTag}
+            interestSource={interestSource}
+            interestKind={interestKind}
+            interestUserHandle={interestUserHandle}
+            onClearInterest={handleClearInterest}
+            onClearAll={handleClearAllFilters}
+            loading={loading}
+            onOpenFilters={() => setFilterSheetOpen(true)}
+            activeFilterCount={activeFilterCount}
+        />
+    );
 
     return (
         <div className="min-h-screen bg-[#f8fafc]">
@@ -944,89 +1341,74 @@ export default function Home() {
                 )}
                 {!loading && !error && viewMode === 'explorer' && (
                     <>
+                        {showFloatingMobileExplorerSummary && (
+                            <div className="fixed left-4 right-4 top-10 z-[7000] lg:hidden">
+                                {renderExplorerMobileSummaryBar('shadow-md')}
+                            </div>
+                        )}
                         <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 lg:items-start">
                             {/* Left column: filters + list */}
                             <div className="order-1 lg:order-1 lg:w-[350px] lg:shrink-0 flex flex-col gap-3 lg:gap-4 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
-                                <DateRangePicker
-                                    startDate={startDate}
-                                    endDate={endDate}
-                                    onChange={handleDateRangeChange}
-                                />
-                                {tagGroups.length > 0 && (
-                                    <TagFilterPills
-                                        tagGroups={tagGroups}
-                                        activeTagIds={activeTagIds}
-                                        onToggle={handleToggleTag}
-                                        onClear={handleClearTags}
-                                        countOverrides={tagCountMap}
-                                        sortMode={tagSortMode}
-                                        trailingSlot={tagsDifferFromPrefs ? (
-                                            <button
-                                                type="button"
-                                                onClick={handleSaveTagsAsDefault}
-                                                disabled={savingDefaults}
-                                                className="ml-1 inline-flex items-center whitespace-nowrap text-[11px] text-slate-500 underline hover:text-slate-700 hover:no-underline disabled:opacity-50 disabled:cursor-not-allowed"
-                                                data-testid="save-tags-as-default"
-                                            >
-                                                {savingDefaults ? 'Saving…' : 'current as default'}
-                                            </button>
-                                        ) : undefined}
-                                    />
-                                )}
-                                {/* Interest filter chips (Phase:
-                                following-interest). Restricts the feed to
-                                activity from people the viewer follows
-                                (one-way OK) or just mutual friends, with
-                                going/saved/any sub-filter and an optional
-                                single-user narrow. Per-row audience is
-                                still enforced server-side. */}
-                                <InterestFilterChips
-                                    signedIn={!!user}
-                                    interestSource={interestSource}
-                                    interestKind={interestKind}
-                                    interestUserHandle={interestUserHandle}
-                                    onChange={(next) => {
-                                        bumpAutoFit();
-                                        if (Object.prototype.hasOwnProperty.call(next, 'source')) {
-                                            setInterestSource(next.source ?? null);
-                                            // Clearing the source also clears the
-                                            // single-user narrow so we never show
-                                            // a "filter is on" pill while the user
-                                            // picker is hidden.
-                                            if (next.source === null) setInterestUserHandle(null);
-                                        }
-                                        if (Object.prototype.hasOwnProperty.call(next, 'kind')) {
-                                            setInterestKind(next.kind!);
-                                        }
-                                        if (Object.prototype.hasOwnProperty.call(next, 'userHandle')) {
-                                            setInterestUserHandle(next.userHandle ?? null);
-                                            // Selecting a user implicitly turns
-                                            // the filter on (source defaults to
-                                            // follows so the picker scope matches
-                                            // what's just been picked).
-                                            if (next.userHandle && interestSource === null) {
-                                                setInterestSource('follows');
-                                            }
-                                        }
-                                    }}
-                                />
+                                {/* Mobile-only filter strip. Doubles as the
+                                "open FilterSheet" affordance AND the
+                                applied-filters summary so users see what's
+                                narrowing the result set without an extra
+                                stacked block. */}
+                                <div ref={mobileExplorerTopSummaryRef} className="lg:hidden">
+                                    {renderExplorerMobileSummaryBar()}
+                                </div>
+                                {/* Desktop inline filter stack. Hidden on
+                                mobile (rendered inside FilterSheet instead). */}
+                                <div className="hidden lg:flex lg:flex-col lg:gap-4">
+                                    {renderFilterControls()}
+                                </div>
                                 {/* Event list: hidden on mobile until after map, fills remaining height on desktop */}
-                                <div className="hidden lg:block lg:flex-1 lg:min-h-0 lg:overflow-hidden">
-                                    <EventListPanel
-                                        events={explorerMatchingEvents}
-                                        mapBounds={mapBounds}
-                                        onEventClick={handleExplorerListEventClick}
-                                        showPrices={showPrices}
-                                        showPopularity={showPopularity}
-                                        popularityThreshold={popularityThreshold}
-                                        sortBy={sortBy}
-                                        onSortChange={setSortBy}
-                                        hoveredEventId={hoveredEventId}
-                                        onEventHover={handleEventHover}
-                                        onSuggestEvent={() => setShowSuggestModal(true)}
-                                        newEnabled={unseenStateEnabled}
-                                        newEventIds={newEventIds}
+                                <div className="hidden lg:flex lg:flex-col lg:flex-1 lg:min-h-0 lg:overflow-hidden">
+                                    <SummaryBar
+                                        totalCount={explorerMatchingEvents.length}
+                                        visibleCount={explorerMatchingEvents.length}
+                                        startDate={startDate}
+                                        endDate={endDate}
+                                        areaLabel={
+                                            areaChipState.kind === 'map-view' ? 'Current map view'
+                                                : areaChipState.kind === 'show-all' ? 'Worldwide'
+                                                    : areaChipState.label
+                                        }
+                                        areaKind={areaChipState.kind}
+                                        areaIsDefault={areaChipState.kind === 'default' && !areaSessionOverride}
+                                        onClearArea={handleClearAreaOverride}
+                                        activeTagIds={activeTagIds}
+                                        tagGroups={tagGroups}
+                                        onRemoveTag={handleRemoveTag}
+                                        interestSource={interestSource}
+                                        interestKind={interestKind}
+                                        interestUserHandle={interestUserHandle}
+                                        onClearInterest={handleClearInterest}
+                                        onClearAll={handleClearAllFilters}
+                                        loading={loading}
                                     />
+                                    <div className="flex-1 min-h-0 overflow-hidden">
+                                        <EventListPanel
+                                            events={explorerMatchingEvents}
+                                            mapBounds={mapBounds}
+                                            onEventClick={handleExplorerListEventClick}
+                                            showPrices={showPrices}
+                                            showPopularity={showPopularity}
+                                            popularityThreshold={popularityThreshold}
+                                            sortBy={sortBy}
+                                            onSortChange={setSortBy}
+                                            hoveredEventId={hoveredEventId}
+                                            onEventHover={handleEventHover}
+                                            onSuggestEvent={() => setShowSuggestModal(true)}
+                                            newEnabled={unseenStateEnabled}
+                                            newEventIds={newEventIds}
+                                            onExtendPeriod={handleExtendPeriod}
+                                            onClearFilters={handleClearAllFilters}
+                                            extendingPeriod={extendingPeriod}
+                                            scopeTotalCount={explorerMatchingEvents.length}
+                                            nextPeriodEventCount={nextAvailableEventBatch === undefined ? undefined : nextAvailableEventBatch?.matchingCount ?? 0}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                             {/* Map column: map + default-location bar stacked.
@@ -1035,7 +1417,15 @@ export default function Home() {
                             and fills available height; the bar is shrink-0
                             so it doesn't get clipped. */}
                             <div className="order-2 lg:order-2 lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6 flex flex-col gap-1.5 sm:gap-2 min-w-0">
-                                <div className="explorer-map-shell relative h-[270px] sm:h-[331px] lg:h-auto lg:flex-1 lg:min-h-0 overflow-hidden">
+                                <div
+                                    className={
+                                        mapFullscreen
+                                            ? 'explorer-map-shell fixed inset-0 z-[8000] bg-white overflow-hidden'
+                                            : 'explorer-map-shell relative h-[270px] sm:h-[331px] lg:h-auto lg:flex-1 lg:min-h-0 overflow-hidden'
+                                    }
+                                    data-testid="explorer-map-shell"
+                                    data-fullscreen={mapFullscreen ? 'true' : 'false'}
+                                >
                                     <EventMap
                                         events={explorerMatchingEvents}
                                         onEventClick={handleExplorerMapEventClick}
@@ -1089,6 +1479,36 @@ export default function Home() {
                                             </Link>
                                         </div>
                                     )}
+                                    {/* Search-this-area pill. Appears when
+                                    the user has panned/zoomed away from the
+                                    current effective area filter; tapping it
+                                    commits the live viewport as the area
+                                    filter and clears the userMapBounds flag
+                                    so the pill disappears. */}
+                                    {userMapBounds && (
+                                        <button
+                                            type="button"
+                                            onClick={handleSearchThisArea}
+                                            className="absolute top-2 left-1/2 -translate-x-1/2 z-[702] inline-flex items-center gap-1 border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold px-3 py-1.5 shadow-md transition"
+                                            data-testid="map-search-this-area"
+                                        >
+                                            Search this area
+                                        </button>
+                                    )}
+                                    {/* Fullscreen toggle. Mobile-first;
+                                    rendered on desktop too but rarely
+                                    needed there since the map column is
+                                    already tall. */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setMapFullscreen((v) => !v)}
+                                        aria-label={mapFullscreen ? 'Exit fullscreen map' : 'Open fullscreen map'}
+                                        title={mapFullscreen ? 'Exit fullscreen' : 'Fullscreen map'}
+                                        className="absolute top-2 right-2 z-[702] inline-flex h-8 w-8 items-center justify-center border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm transition"
+                                        data-testid="map-fullscreen-toggle"
+                                    >
+                                        {mapFullscreen ? '×' : '⤢'}
+                                    </button>
                                 </div>
                                 {/* Default-area bar: ONE bordered pill that
                                 visually groups the chip label + worldwide /
@@ -1226,7 +1646,9 @@ export default function Home() {
                                     )}
                                 </div>
                             </div>
-                            {/* Event list on mobile: order-3, hidden on desktop */}
+                            {/* Event list on mobile: order-3, hidden on desktop.
+                            The top-of-map SummaryBar floats once it scrolls
+                            away, so this section does not render a duplicate. */}
                             <div className="order-3 lg:hidden">
                                 <EventListPanel
                                     events={explorerMatchingEvents}
@@ -1243,6 +1665,11 @@ export default function Home() {
                                     newEnabled={unseenStateEnabled}
                                     newEventIds={newEventIds}
                                     scrollHighlightedIntoView={false}
+                                    onExtendPeriod={handleExtendPeriod}
+                                    onClearFilters={handleClearAllFilters}
+                                    extendingPeriod={extendingPeriod}
+                                    scopeTotalCount={explorerMatchingEvents.length}
+                                    nextPeriodEventCount={nextAvailableEventBatch === undefined ? undefined : nextAvailableEventBatch?.matchingCount ?? 0}
                                 />
                             </div>
                         </div>
@@ -1266,13 +1693,13 @@ export default function Home() {
                                     📍 Map
                                 </button>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5 sm:gap-2">
                                 <div className="flex">
                                     <button className="px-2 py-1 text-sm border border-slate-300 bg-white hover:bg-slate-50" onClick={handleCalPrev}>‹</button>
                                     <button className="px-2.5 py-1 text-sm border-y border-slate-300 bg-white hover:bg-slate-50" onClick={handleCalToday}>today</button>
                                     <button className="px-2 py-1 text-sm border border-slate-300 bg-white hover:bg-slate-50" onClick={handleCalNext}>›</button>
                                 </div>
-                                <h2 className="text-sm sm:text-lg font-semibold text-slate-800 whitespace-nowrap">{calendarTitle}</h2>
+                                <h2 className="text-xs sm:text-sm font-semibold tracking-tight text-slate-800 whitespace-nowrap leading-none">{calendarTitle}</h2>
                             </div>
                             {isMobileViewport && (
                                 <div className="flex gap-1 bg-slate-200 p-1 shrink-0 sm:hidden">
@@ -1293,18 +1720,28 @@ export default function Home() {
                                 </div>
                             )}
                         </div>
-                        {tagGroups.length > 0 && (
-                            <div className="mb-4">
-                                <TagFilterPills
-                                    tagGroups={tagGroups}
-                                    activeTagIds={activeTagIds}
-                                    onToggle={handleToggleTag}
-                                    onClear={handleClearTags}
-                                    countOverrides={tagCountMap}
-                                    sortMode={tagSortMode}
-                                />
-                            </div>
-                        )}
+                        <div className="mb-4 sticky top-0 z-[20] shadow-sm">
+                            <SummaryBar
+                                totalCount={calendarVisibleEvents.length}
+                                visibleCount={calendarVisibleEvents.length}
+                                startDate={calendarSummaryRange.startDate}
+                                endDate={calendarSummaryRange.endDate}
+                                areaLabel={DEFAULT_AREA_LABEL}
+                                areaKind="default"
+                                areaIsDefault
+                                activeTagIds={activeTagIds}
+                                tagGroups={tagGroups}
+                                onRemoveTag={handleRemoveTag}
+                                interestSource={interestSource}
+                                interestKind={interestKind}
+                                interestUserHandle={interestUserHandle}
+                                onClearInterest={handleClearInterest}
+                                onClearAll={handleClearCalendarFilters}
+                                loading={loading}
+                                onOpenFilters={() => setFilterSheetOpen(true)}
+                                activeFilterCount={calendarActiveFilterCount}
+                            />
+                        </div>
                         <div className="flex flex-col lg:flex-row gap-6">
                             {/* Calendar always mounted — CSS-hidden when toggled off */}
                             <div className={showCalendarGrid ? 'min-w-0 flex-1' : 'calendar-hide-grid h-0 overflow-hidden'}>
@@ -1375,6 +1812,15 @@ export default function Home() {
             {showSuggestModal && (
                 <SuggestEventModal onClose={() => setShowSuggestModal(false)} />
             )}
+            <FilterSheet
+                open={filterSheetOpen}
+                onClose={() => setFilterSheetOpen(false)}
+                onClearAll={viewMode === 'calendar' ? handleClearCalendarFilters : handleClearAllFilters}
+                activeFilterCount={viewMode === 'calendar' ? calendarActiveFilterCount : activeFilterCount}
+                matchingEventCount={viewMode === 'calendar' ? calendarVisibleEvents.length : explorerMatchingEvents.length}
+            >
+                {viewMode === 'calendar' ? renderCalendarFilterControls() : renderFilterControls('sheet')}
+            </FilterSheet>
         </div>
     );
 }
@@ -1387,12 +1833,14 @@ interface InterestFilterChange {
 
 function InterestFilterChips({
     signedIn,
+    surface = 'inline',
     interestSource,
     interestKind,
     interestUserHandle,
     onChange,
 }: {
     signedIn: boolean;
+    surface?: 'inline' | 'sheet';
     interestSource: 'follows' | 'friends' | null;
     interestKind: 'any' | 'going' | 'saved';
     interestUserHandle: string | null;
@@ -1415,6 +1863,9 @@ function InterestFilterChips({
         ? interestSource !== null || !!interestUserHandle
         : showAnonHint;
     const [pickerOpen, setPickerOpen] = useState(false);
+    const followingLabel = surface === 'sheet'
+        ? (pickerActive ? null : 'Filter by following')
+        : 'Following';
     return (
         <div className="flex flex-wrap items-center gap-1 sm:gap-2">
 
@@ -1447,7 +1898,7 @@ function InterestFilterChips({
                     <circle cx="14" cy="6" r="2.4" />
                     <path d="M13 12c2.8 0 5 2 5 5" />
                 </svg>
-                <span className="hidden sm:inline">Following</span>
+                {followingLabel && <span>{followingLabel}</span>}
             </button>
             {/* Quick shortcut to the dedicated "From people I follow" calendar
             view. Revealed only when the Following filter is active so it

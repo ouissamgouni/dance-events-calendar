@@ -1,5 +1,5 @@
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { ConsentProvider } from './context/ConsentContext';
 import { FeatureFlagsProvider } from './context/FeatureFlagsContext';
@@ -71,10 +71,16 @@ function AppShell() {
   const { analyticsConsent } = useConsent();
   const location = useLocation();
   const qaPinnedWidth = useQaPinnedWidth();
+  const mainRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (analyticsConsent) umamiPageView();
   }, [location.pathname, analyticsConsent]);
+
+  useLayoutEffect(() => {
+    mainRef.current?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [location.pathname]);
 
   return (
     <NotificationsProvider>
@@ -85,10 +91,10 @@ function AppShell() {
         >
           <div className="flex items-center justify-between bg-slate-900 px-4 py-1.5">
             <div className="flex items-center gap-1.5">
-              <Link to="/">
+              <Link to="/" reloadDocument>
                 <img src="/movida.png" alt="Movida" className="h-6 w-6" />
               </Link>
-              <Link to="/" className="text-sm font-bold text-white tracking-tight hover:text-gray-200 transition">Movida</Link>
+              <Link to="/" reloadDocument className="text-sm font-bold text-white tracking-tight hover:text-gray-200 transition">Movida</Link>
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
               <Link
@@ -106,7 +112,7 @@ function AppShell() {
           <SignUpBanner />
           <ShareReferralBanner />
           <OnboardingGate />
-          <main className="flex-1 overflow-auto">
+          <main ref={mainRef} className="flex-1 overflow-auto">
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/onboarding/preferences" element={<OnboardingPreferences />} />

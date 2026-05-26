@@ -1,0 +1,454 @@
+# Seeded events for the Explorer UX overhaul scenario.
+#
+# Goals of this seed (one event ID per row, kept dense on purpose):
+#
+#   • ≥ 21 events fall inside the default explorer window (next 3 months
+#     from base_week) so the EventListPanel ShowMore CTA appears (cap is
+#     20). They span ~10 distinct days so the sticky day-group header
+#     (Phase 2) actually has multiple sections to render.
+#
+#   • A second cluster of events sits in months 4–6 so when the user
+#     clicks "Show next available events" / "Find next events" the list
+#     grows visibly. These also feed the empty-state recovery path when
+#     the user narrows tags hard enough to empty the first window.
+#
+#   • A handful of events all share the same day so day-grouping with
+#     count tail "(N)" can be eyeballed.
+#
+# All events are price-free and tagged with the default explorer tags
+# so the default landing (no tag filter applied) shows them all.
+base_week: 0
+events:
+  # ── Week 0 — same-day cluster for day-grouping QA ─────────────────
+  - id: evt-ux-001
+    calendar_id: salsa-cal-001
+    title: Salsa Social Friday
+    description: |
+      Kick off the weekend with a friendly Paris social featuring a short warm-up set, mixed salsa floors, and enough room for both casual dancers and regulars.
+      Expect a relaxed crowd, easy partner rotation, and a final DJ block that keeps the energy high through the last hour.
+    location: Studio A, 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w0 Fri 20:00
+    end: w0 Fri 23:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:salsa", "level:all-levels"]
+  - id: evt-ux-002
+    calendar_id: bachata-cal-002
+    title: Berlin Bachata Sensual Night
+    description: |
+      A late-start Berlin bachata night with sensual-focused music, dim studio lighting, and a progressive build from mellow warm-up tracks into a packed social floor.
+      Organizers usually keep a welcoming host at the door, so solo attendees can settle in quickly before the main set begins.
+    location: Hackescher Markt, Berlin, Germany
+    latitude: 52.5226
+    longitude: 13.4019
+    start: w0 Fri 21:00
+    end: w0 Sat 01:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:bachata", "level:all-levels"]
+  - id: evt-ux-003
+    calendar_id: salsa-cal-001
+    title: Madrid Salsa Beginner Class
+    description: |
+      Beginner-friendly partnerwork class covering basic timing, right turns, and simple social-floor transitions in a small central Madrid studio.
+      The pace is intentionally gentle, with recap time built in so first-timers can stay comfortable through the full session.
+    location: Calle de Atocha 34, Madrid, Spain
+    latitude: 40.4140
+    longitude: -3.7035
+    start: w0 Fri 19:00
+    end: w0 Fri 20:30
+    price_is_free: true
+    tags: ["format:class", "dance-style:salsa", "level:beginner"]
+
+  # ── Week 0 — Saturday + Sunday ────────────────────────────────────
+  - id: evt-ux-004
+    calendar_id: salsa-cal-001
+    title: Lisbon Salsa Saturday Workshop
+    description: |
+      Afternoon workshop in Lisbon focused on body movement, timing drills, and clean lead-follow connection before moving into short partnered combinations.
+      The venue stays bright and airy during the day, making it feel more like a training lab than a club-style social.
+    location: Cais do Sodre, Lisbon, Portugal
+    latitude: 38.7077
+    longitude: -9.1493
+    start: w0 Sat 14:00
+    end: w0 Sat 17:00
+    price_is_free: true
+    tags: ["format:workshop", "dance-style:salsa", "level:intermediate"]
+  - id: evt-ux-005
+    calendar_id: bachata-cal-002
+    title: Rome Bachata Sunday Social
+    description: |
+      Sunday evening bachata social in Trastevere with a mellow start, a social-heavy playlist, and a crowd that tends to stay until closing.
+      It is the kind of end-of-weekend event where people come to dance a lot, catch up, and wind down without a formal class block.
+    location: Trastevere, Rome, Italy
+    latitude: 41.8896
+    longitude: 12.4695
+    start: w0 Sun 19:00
+    end: w0 Sun 23:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:bachata", "level:all-levels"]
+
+  # ── Week 1 ───────────────────────────────────────────────────────
+  - id: evt-ux-006
+    calendar_id: salsa-cal-001
+    title: Amsterdam Salsa Monday Practice
+    description: |
+      A low-pressure Monday practice session built around repetition, musical timing, and plenty of open-floor time between guided rounds.
+      Dancers usually arrive with specific patterns they want to clean up, so the room has a focused but still social atmosphere.
+    location: Weteringschans, Amsterdam, Netherlands
+    latitude: 52.3625
+    longitude: 4.8836
+    start: w1 Mon 20:00
+    end: w1 Mon 22:00
+    price_is_free: true
+    tags: ["format:practice", "dance-style:salsa"]
+  - id: evt-ux-007
+    calendar_id: bachata-cal-002
+    title: Vienna Bachata Wednesday Class
+    description: |
+      Midweek beginner bachata class introducing foundational footwork, basic partner connection, and a short combination for social use.
+      Teachers keep the explanations detailed and calm, which makes this a strong option for newer dancers returning after a break.
+    location: Volksgarten, Vienna, Austria
+    latitude: 48.2082
+    longitude: 16.3669
+    start: w1 Wed 19:30
+    end: w1 Wed 21:00
+    price_is_free: true
+    tags: ["format:class", "dance-style:bachata", "level:beginner"]
+  - id: evt-ux-008
+    calendar_id: salsa-cal-001
+    title: Prague Salsa Friday Social
+    description: |
+      Popular Friday social in Prague with a strong salsa-first playlist, a busy main floor, and enough cross-body energy to keep the room lively all night.
+      The crowd mixes locals and travelers, so it tends to generate lots of partner rotation and visible social proof around the event.
+    location: Dlouha, Prague, Czechia
+    latitude: 50.0894
+    longitude: 14.4256
+    start: w1 Fri 21:00
+    end: w1 Sat 01:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:salsa"]
+
+  # ── Week 2 ───────────────────────────────────────────────────────
+  - id: evt-ux-009
+    calendar_id: salsa-cal-001
+    title: Brussels Salsa Tuesday Drop-in
+    description: |
+      Flexible Tuesday drop-in designed for people who want a useful class without committing to a longer course block.
+      Expect a quick fundamentals recap, one compact pattern, and practice rounds that let improvers sharpen timing and confidence.
+    location: Grand Place, Brussels, Belgium
+    latitude: 50.8467
+    longitude: 4.3525
+    start: w2 Tue 19:00
+    end: w2 Tue 21:00
+    price_is_free: true
+    tags: ["format:class", "dance-style:salsa"]
+  - id: evt-ux-010
+    calendar_id: bachata-cal-002
+    title: Copenhagen Bachata Thursday Workshop
+    description: |
+      Evening workshop centered on musical phrasing, clean transitions, and a few longer bachata combinations that reward controlled movement.
+      The format feels structured but approachable, with enough recap time for dancers who are comfortable at the improver level.
+    location: Norrebro, Copenhagen, Denmark
+    latitude: 55.6867
+    longitude: 12.5701
+    start: w2 Thu 19:00
+    end: w2 Thu 22:00
+    price_is_free: true
+    tags: ["format:workshop", "dance-style:bachata"]
+  - id: evt-ux-011
+    calendar_id: salsa-cal-001
+    title: London Salsa Saturday Festival Preview
+    description: |
+      Large Saturday preview social with guest DJs, a fuller crowd than a regular weekly night, and a program that hints at festival-weekend energy.
+      Expect a busier entrance, stronger social buzz, and long stretches of uninterrupted dancing once the room fills up.
+    location: King's Cross, London, UK
+    latitude: 51.5320
+    longitude: -0.1233
+    start: w2 Sat 20:00
+    end: w2 Sun 02:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:salsa", "scale:large"]
+
+  # ── Week 4 ───────────────────────────────────────────────────────
+  - id: evt-ux-012
+    calendar_id: salsa-cal-001
+    title: Barcelona Salsa Monday Practice
+    description: |
+      Compact Monday practice for dancers who want floor time without a loud party atmosphere or a full workshop commitment.
+      Organizers usually keep the format simple: warm-up music, partner rotation, and room to drill timing or lead-follow technique.
+    location: El Born, Barcelona, Spain
+    latitude: 41.3851
+    longitude: 2.1734
+    start: w4 Mon 20:00
+    end: w4 Mon 22:00
+    price_is_free: true
+    tags: ["format:practice", "dance-style:salsa"]
+  - id: evt-ux-013
+    calendar_id: bachata-cal-002
+    title: Zurich Bachata Friday Social
+    description: |
+      Friday-night bachata social with a polished crowd, balanced music selection, and enough space for both close connection and more open styling.
+      The event normally builds slowly, then turns into a steady late-night floor once the after-work crowd arrives.
+    location: Langstrasse, Zurich, Switzerland
+    latitude: 47.3769
+    longitude: 8.5417
+    start: w4 Fri 21:00
+    end: w4 Sat 01:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:bachata"]
+  - id: evt-ux-014
+    calendar_id: salsa-cal-001
+    title: Milan Salsa Workshop Weekend
+    description: |
+      Weekend salsa workshop block covering shines, partnerwork layering, and musical interpretation in longer teaching segments.
+      It is aimed at dancers who want a concentrated training afternoon before heading out to social dance later in the evening.
+    location: Porta Romana, Milan, Italy
+    latitude: 45.4642
+    longitude: 9.1900
+    start: w4 Sat 14:00
+    end: w4 Sat 18:00
+    price_is_free: true
+    tags: ["format:workshop", "dance-style:salsa"]
+
+  # ── Week 6 ───────────────────────────────────────────────────────
+  - id: evt-ux-015
+    calendar_id: salsa-cal-001
+    title: Warsaw Salsa Open Floor
+    description: |
+      Open-floor social in Warsaw with no formal class, just a clean setup for dancing, meeting people, and staying out for a few solid hours midweek.
+      The vibe is straightforward and dance-first, which makes it useful for people who mainly care about floor time and partner variety.
+    location: Praga, Warsaw, Poland
+    latitude: 52.2297
+    longitude: 21.0122
+    start: w6 Wed 20:00
+    end: w6 Wed 23:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:salsa"]
+  - id: evt-ux-016
+    calendar_id: bachata-cal-002
+    title: Stockholm Bachata Sensual Workshop
+    description: |
+      Sensual bachata workshop with close attention to frame, weight transfer, and smooth transitions rather than flashy moves for their own sake.
+      Teachers usually break the material into small pieces, making the session feel technical but still accessible for steady improvers.
+    location: Sodermalm, Stockholm, Sweden
+    latitude: 59.3293
+    longitude: 18.0686
+    start: w6 Sat 15:00
+    end: w6 Sat 18:00
+    price_is_free: true
+    tags: ["format:workshop", "dance-style:bachata"]
+  - id: evt-ux-017
+    calendar_id: salsa-cal-001
+    title: Athens Salsa Late Night Social
+    description: |
+      Late-night Athens salsa social that really gets going after 23:00, with a louder room, committed dancers, and a more club-like energy.
+      People tend to stay for long sets, so it works well for anyone looking for a fuller night out instead of a quick weekday practice.
+    location: Psirri, Athens, Greece
+    latitude: 37.9838
+    longitude: 23.7275
+    start: w6 Sat 22:00
+    end: w6 Sun 03:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:salsa"]
+
+  # ── Week 8 ───────────────────────────────────────────────────────
+  - id: evt-ux-018
+    calendar_id: salsa-cal-001
+    title: Istanbul Salsa Monday Class
+    description: |
+      Monday class for beginners focusing on rhythm, posture, and the kind of simple partner patterns that translate directly to social dancing.
+      The instructor keeps the structure clear and supportive, which makes the session a good re-entry point for rusty dancers.
+    location: Kadikoy, Istanbul, Turkiye
+    latitude: 41.0082
+    longitude: 28.9784
+    start: w8 Mon 19:00
+    end: w8 Mon 20:30
+    price_is_free: true
+    tags: ["format:class", "dance-style:salsa", "level:beginner"]
+  - id: evt-ux-019
+    calendar_id: bachata-cal-002
+    title: Tel Aviv Bachata Thursday Drop-in
+    description: |
+      Short-format Thursday drop-in built for people who want practical bachata technique without committing an entire evening to classwork.
+      Expect a concise lesson, a few guided repetitions, and just enough social time afterward to test the material on the floor.
+    location: Florentin, Tel Aviv, Israel
+    latitude: 32.0853
+    longitude: 34.7818
+    start: w8 Thu 19:30
+    end: w8 Thu 21:00
+    price_is_free: true
+    tags: ["format:class", "dance-style:bachata"]
+  - id: evt-ux-020
+    calendar_id: salsa-cal-001
+    title: Marrakech Salsa Friday Big Social
+    description: |
+      A larger Friday salsa social with a more festive feel, extended DJ sets, and enough turnout to make the room feel busy from early on.
+      The event is positioned as a headline night for the local week, with strong music momentum and lots of visible crowd energy.
+    location: Gueliz, Marrakech, Morocco
+    latitude: 31.6295
+    longitude: -7.9811
+    start: w8 Fri 21:00
+    end: w8 Sat 02:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:salsa", "scale:large"]
+  - id: evt-ux-021
+    calendar_id: bachata-cal-002
+    title: Dublin Bachata Sunday Brunch
+    description: |
+      Daytime bachata brunch social mixing lighter music, coffee-and-conversation energy, and relaxed partner rotation across the afternoon.
+      It feels intentionally softer than a late-night event, making it easy for newer dancers and friend groups to settle in.
+    location: Temple Bar, Dublin, Ireland
+    latitude: 53.3498
+    longitude: -6.2603
+    start: w8 Sun 12:00
+    end: w8 Sun 15:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:bachata"]
+
+  # ── Week 10 ──────────────────────────────────────────────────────
+  - id: evt-ux-022
+    calendar_id: salsa-cal-001
+    title: Porto Salsa Weekend Intensive
+    description: |
+      Full-day intensive in Porto with several workshop blocks, technical repetition, and enough total hours to justify a dedicated weekend trip.
+      Dancers can expect a more serious training tone, especially in the middle sessions where combinations and drills get longer.
+    location: Ribeira, Porto, Portugal
+    latitude: 41.1579
+    longitude: -8.6291
+    start: w10 Sat 10:00
+    end: w10 Sat 17:00
+    price_is_free: true
+    tags: ["format:workshop", "dance-style:salsa", "level:intermediate"]
+  - id: evt-ux-023
+    calendar_id: bachata-cal-002
+    title: Budapest Bachata Festival Pre-party
+    description: |
+      Festival pre-party designed to feel bigger than a normal social, with guest visitors in town early and a late finish once the crowd locks in.
+      Music leans social and crowd-pleasing, making it a strong warm-up event ahead of a larger weekend program.
+    location: Erzsebetvaros, Budapest, Hungary
+    latitude: 47.4979
+    longitude: 19.0402
+    start: w10 Fri 22:00
+    end: w10 Sat 03:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:bachata", "scale:large"]
+
+  # ── Beyond default 3 months (Extend Period reveals these) ────────
+  - id: evt-ux-024
+    calendar_id: salsa-cal-001
+    title: Barcelona Salsa Spring Festival
+    description: |
+      Spring festival social with a larger crowd profile, extended dancing hours, and enough momentum to feel like a destination event rather than a weekly party.
+      It is meant to surface later in the browsing flow as a clearly worthwhile future batch once the current window is exhausted.
+    location: Poble-sec, Barcelona, Spain
+    latitude: 41.3750
+    longitude: 2.1686
+    start: w14 Sat 19:00
+    end: w14 Sun 04:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:salsa", "scale:large"]
+  - id: evt-ux-025
+    calendar_id: bachata-cal-002
+    title: Copenhagen Bachata Spring Workshop Weekend
+    description: |
+      Two-day bachata workshop weekend with progressive material, multiple teaching blocks, and a schedule aimed at dancers who want a deeper practice cycle.
+      Expect a more serious instructional tone during the day and plenty of conversation around technique between sessions.
+    location: Vesterbro, Copenhagen, Denmark
+    latitude: 55.6680
+    longitude: 12.5425
+    start: w16 Sat 11:00
+    end: w16 Sun 18:00
+    price_is_free: true
+    tags: ["format:workshop", "dance-style:bachata", "scale:large"]
+  - id: evt-ux-026
+    calendar_id: salsa-cal-001
+    title: Montreal Salsa Late Spring Social
+    description: |
+      Late-spring Montreal social with an easy late-night arc, a welcoming local crowd, and enough floor time to justify showing up for the full session.
+      The event sits outside the default region on purpose, giving the scenario a realistic future outlier once users widen their browsing scope.
+    location: Plateau, Montreal, Canada
+    latitude: 45.5017
+    longitude: -73.5673
+    start: w18 Fri 21:00
+    end: w18 Sat 02:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:salsa"]
+  - id: evt-ux-027
+    calendar_id: bachata-cal-002
+    title: Cape Town Bachata Summer Kickoff
+    description: |
+      Seasonal kickoff social built around warm-weather energy, approachable bachata programming, and a crowd that treats the night as a small celebration.
+      It reads like a genuine special event rather than a placeholder, which helps the scenario feel richer when future results appear.
+    location: Sea Point, Cape Town, South Africa
+    latitude: -33.9189
+    longitude: 18.4233
+    start: w20 Sat 20:00
+    end: w20 Sun 01:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:bachata"]
+
+  # ── Far-away event for the "Search this area" pill ───────────────
+  # New York — outside the default Europe & nearby area, visible after
+  # show-all/worldwide browsing or committing the map viewport there.
+  - id: evt-ux-028
+    calendar_id: salsa-cal-001
+    title: New York Salsa Rooftop Social
+    description: |
+      Rooftop salsa night in Midtown with skyline views, a strong social-first playlist, and a polished city-event feel from arrival to close.
+      This out-of-area event is meant to feel obviously compelling once the user commits a far-away map search or switches to wider browsing.
+    location: Midtown, New York, USA
+    latitude: 40.7580
+    longitude: -73.9855
+    start: w2 Sat 21:00
+    end: w2 Sun 02:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:salsa"]
+
+# Social proof seeds. Mirrors the map-clustering fixture style so Explorer
+# cards and pins show saved/going counts, following badges, and popularity.
+attendances:
+  # Hero Paris social: friends + one-way followees + strangers.
+  - { event_id: evt-ux-008, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-008, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-ux-008, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-ux-008, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-ux-008, email: hugo@example.com, share_publicly: true }
+  - { event_id: evt-ux-008, email: pablo@example.com, share_audience: public }
+  - { event_id: evt-ux-008, email: quinn@example.com, share_audience: public }
+  - { event_id: evt-ux-008, email: rita@example.com, share_audience: public }
+  - { event_id: evt-ux-008, email: samir@example.com, share_audience: public }
+  - { event_id: evt-ux-008, email: tara@example.com, share_audience: public }
+  - { event_id: evt-ux-008, email: s01@example.com, share_audience: public }
+  - { event_id: evt-ux-008, email: s02@example.com, share_audience: public }
+  - { event_id: evt-ux-008, email: s03@example.com, share_audience: public }
+
+  # Other in-window events with varied density.
+  - { event_id: evt-ux-001, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-001, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-ux-001, email: s01@example.com, share_audience: public }
+  - { event_id: evt-ux-011, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-ux-011, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-ux-011, email: hugo@example.com, share_publicly: true }
+  - { event_id: evt-ux-011, email: s02@example.com, share_audience: public }
+  - { event_id: evt-ux-011, email: s03@example.com, share_audience: public }
+  - { event_id: evt-ux-020, email: pablo@example.com, share_audience: public }
+  - { event_id: evt-ux-020, email: quinn@example.com, share_audience: public }
+  - { event_id: evt-ux-020, email: s04@example.com, share_audience: public }
+  - { event_id: evt-ux-020, email: s05@example.com, share_audience: public }
+  - { event_id: evt-ux-024, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-024, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-ux-025, email: rita@example.com, share_audience: public }
+  - { event_id: evt-ux-026, email: samir@example.com, share_audience: public }
+  - { event_id: evt-ux-028, email: frank@example.com, share_publicly: true }
+
+saves:
+  - { event_id: evt-ux-008, email: nia@example.com, audience: friends }
+  - { event_id: evt-ux-008, email: omar@example.com, audience: friends }
+  - { event_id: evt-ux-008, email: t01@example.com, audience: public }
+  - { event_id: evt-ux-008, email: t02@example.com, audience: public }
+  - { event_id: evt-ux-008, email: t03@example.com, audience: public }
+  - { event_id: evt-ux-011, email: t04@example.com, audience: public }
+  - { event_id: evt-ux-011, email: t05@example.com, audience: public }
+  - { event_id: evt-ux-020, email: nia@example.com, audience: friends }
+  - { event_id: evt-ux-024, email: omar@example.com, audience: friends }

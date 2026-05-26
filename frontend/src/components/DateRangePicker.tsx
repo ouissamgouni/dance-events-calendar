@@ -13,6 +13,18 @@ function formatDate(date: Date): string {
     return `${y}-${m}-${d}`;
 }
 
+function addDays(date: Date, days: number): Date {
+    const next = new Date(date);
+    next.setDate(next.getDate() + days);
+    return next;
+}
+
+function addMonths(date: Date, months: number): Date {
+    const next = new Date(date);
+    next.setMonth(next.getMonth() + months);
+    return next;
+}
+
 export default function DateRangePicker({ startDate, endDate, onChange }: DateRangePickerProps) {
     const toInputRef = useRef<HTMLInputElement>(null);
 
@@ -21,44 +33,30 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
         const year = today.getFullYear();
         const dayOfWeek = today.getDay(); // 0=Sun, 5=Fri, 6=Sat
 
-        // ── Weekend (contextual "This" / "Next") ─────────────
-        // Weekend is Friday-Sunday.
-        let weekendStart: Date;
-        let weekendLabel: string;
-        if (dayOfWeek >= 5 || dayOfWeek === 0) {
-            // Fri/Sat/Sun -> current weekend.
-            const daysSinceFriday = dayOfWeek === 0 ? 2 : dayOfWeek - 5;
-            weekendStart = new Date(today);
-            weekendStart.setDate(today.getDate() - daysSinceFriday);
-            weekendLabel = 'This weekend';
-        } else {
-            // Mon-Thu -> upcoming Friday-Sunday.
-            const daysUntilFriday = 5 - dayOfWeek;
-            weekendStart = new Date(today);
-            weekendStart.setDate(today.getDate() + daysUntilFriday);
-            weekendLabel = 'Next weekend';
-        }
-        const weekendEnd = new Date(weekendStart);
-        weekendEnd.setDate(weekendStart.getDate() + 2);
+        // Weekend is Friday-Sunday. "This weekend" means the current
+        // week's weekend: upcoming on Mon-Thu, ongoing on Fri-Sun.
+        const thisWeekendStart = addDays(today, dayOfWeek === 0 ? -2 : 5 - dayOfWeek);
+        const thisWeekendEnd = addDays(thisWeekendStart, 2);
+        const nextWeekendStart = addDays(thisWeekendStart, 7);
+        const nextWeekendEnd = addDays(nextWeekendStart, 2);
 
-        // ── Next week ─────────────────────────────────────────
-        const nextWeek = new Date(today);
-        nextWeek.setDate(today.getDate() + 7);
+        // ── Rolling windows ───────────────────────────────────
+        const next7Days = addDays(today, 7);
+        const next30Days = addMonths(today, 1);
 
-        // ── Next month ────────────────────────────────────────
-        const nextMonth = new Date(today);
-        nextMonth.setMonth(nextMonth.getMonth() + 1);
+        // ── Next 3 months (explorer default — keep aligned with
+        // ``defaultExplorerDateRange`` in pages/Home.tsx) ─────
+        const next3Months = addMonths(today, 3);
 
         // ── Next 6 months ─────────────────────────────────────
-        const next6Months = new Date(today);
-        next6Months.setMonth(next6Months.getMonth() + 6);
+        const next6Months = addMonths(today, 6);
 
         // ── Seasons (meteorological) ──────────────────────────
         const seasons = [
-            { icon: '🌸', startMonth: 2, endMonth: 4 },   // Spring: Mar–May
-            { icon: '☀️', startMonth: 5, endMonth: 7 },   // Summer: Jun–Aug
-            { icon: '🍂', startMonth: 8, endMonth: 10 },  // Fall:   Sep–Nov
-            { icon: '❄️', startMonth: 11, endMonth: 1 },  // Winter: Dec–Feb
+            { name: 'Spring', icon: '🌸', startMonth: 2, endMonth: 4 },
+            { name: 'Summer', icon: '☀️', startMonth: 5, endMonth: 7 },
+            { name: 'Autumn', icon: '🍂', startMonth: 8, endMonth: 10 },
+            { name: 'Winter', icon: '❄️', startMonth: 11, endMonth: 1 },
         ];
 
         function seasonRange(idx: number, baseYear: number) {
@@ -95,13 +93,9 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
 
             const label =
                 offset === 0
-                    ? `This ${seasons[seasonIdx].icon}`
-                    : `Next ${seasons[seasonIdx].icon}`;
-            // Mobile (Option D): icon only; current season prefixed with a small dot.
-            const mobileLabel =
-                offset === 0
-                    ? `•${seasons[seasonIdx].icon}`
-                    : seasons[seasonIdx].icon;
+                    ? `This ${seasons[seasonIdx].name}`
+                    : `Next ${seasons[seasonIdx].name}`;
+            const mobileLabel = seasons[seasonIdx].icon;
 
             return {
                 label,
@@ -111,15 +105,38 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
             };
         });
 
-        // ── Build in fixed display order ─────────────────────
-        return [
-            { label: weekendLabel, mobileLabel: 'Wknd', start: formatDate(weekendStart), end: formatDate(weekendEnd) },
-            { label: 'Next Week', mobileLabel: 'Next 7d', start: formatDate(today), end: formatDate(nextWeek) },
-            { label: 'Next Month', mobileLabel: 'Next 30d', start: formatDate(today), end: formatDate(nextMonth) },
-            { label: 'Next 6 months', mobileLabel: 'Next 6mo', start: formatDate(today), end: formatDate(next6Months) },
-            ...seasonPresets,
-        ];
+        const allPresets = [
+            { label: 'This weekend', mobileLabel: 'Wknd', start: formatDate(thisWeekendStart), end: formatDate(thisWeekendEnd), group: 'this' },
+            { label: 'Next weekend', mobileLabel: 'Wknd', start: formatDate(nextWeekendStart), end: formatDate(nextWeekendEnd), group: 'next' },
+            { label: 'Next 7 days', mobileLabel: '7d', start: formatDate(today), end: formatDate(next7Days), group: 'next' },
+            { label: 'Next 30 days', mobileLabel: '30d', start: formatDate(today), end: formatDate(next30Days), group: 'next' },
+            { label: 'Next 3 months', mobileLabel: '3mo', start: formatDate(today), end: formatDate(next3Months), group: 'next' },
+            { label: 'Next 6 months', mobileLabel: '6mo', start: formatDate(today), end: formatDate(next6Months), group: 'next' },
+            ...seasonPresets.map((preset, index) => ({ ...preset, group: index === 0 ? 'this' : 'next' })),
+        ] as const;
+
+        return {
+            thisPresets: allPresets.filter((preset) => preset.group === 'this'),
+            nextPresets: allPresets.filter((preset) => preset.group === 'next'),
+        };
     }, []);
+
+    const renderPreset = (preset: { label: string; mobileLabel: string; start: string; end: string }) => {
+        const active = startDate === preset.start && endDate === preset.end;
+        return (
+            <button
+                key={preset.label}
+                type="button"
+                className={`preset-btn ${active ? 'active' : ''}`}
+                onClick={() => onChange(preset.start, preset.end)}
+                aria-label={preset.label}
+                title={preset.label}
+            >
+                <span className="sm:hidden">{preset.mobileLabel}</span>
+                <span className="hidden sm:inline">{preset.label}</span>
+            </button>
+        );
+    };
 
     return (
         <div className="date-range-picker">
@@ -150,24 +167,21 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
                     />
                 </label>
             </div>
-            <div className="date-range-presets">
-                {presets.map((p) => {
-                    const active = startDate === p.start && endDate === p.end;
-                    return (
-                        <button
-                            key={p.label}
-                            type="button"
-                            className={`preset-btn ${active ? 'active' : ''}`}
-                            onClick={() => onChange(p.start, p.end)}
-                            aria-label={p.label}
-                            title={p.label}
-                        >
-                            {/* Short label on mobile, full label on sm+ */}
-                            <span className="sm:hidden">{p.mobileLabel}</span>
-                            <span className="hidden sm:inline">{p.label}</span>
-                        </button>
-                    );
-                })}
+            <div className="date-range-presets" aria-label="Date presets">
+                {presets.thisPresets.length > 0 && (
+                    <div className="date-range-preset-section date-range-preset-section--this">
+                        <span className="date-range-preset-label">This</span>
+                        <div className="date-range-preset-buttons">
+                            {presets.thisPresets.map(renderPreset)}
+                        </div>
+                    </div>
+                )}
+                <div className="date-range-preset-section date-range-preset-section--next">
+                    <span className="date-range-preset-label">Next</span>
+                    <div className="date-range-preset-buttons">
+                        {presets.nextPresets.map(renderPreset)}
+                    </div>
+                </div>
             </div>
         </div>
     );
