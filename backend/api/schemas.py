@@ -1788,9 +1788,9 @@ class RedeemShareFollowRequest(BaseModel):
 class RedeemShareFollowResponse(BaseModel):
     """Result of a successful share-follow redemption.
 
-    ``sharer_handle`` lets the post-redemption toast render
-    "@alice is now your friend" without an extra round trip.
+    ``sharer_handle`` lets the post-redemption toast render the followed
+    user without an extra round trip.
     """
 
     sharer_handle: Optional[str] = None
-    mutual_follow_created: bool = False
+    follow_created: bool = False

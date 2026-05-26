@@ -812,10 +812,10 @@ export async function fetchShareSource(
 
 export interface RedeemShareFollowResponse {
     sharer_handle: string | null;
-    mutual_follow_created: boolean;
+    follow_created: boolean;
 }
 
-/** Trigger the mutual-follow on a share-link redemption. Mirrors
+/** Trigger the one-way follow on a share-link redemption. Mirrors
  *  `redeemReferral` but on its own backend bucket; does NOT count
  *  toward the E7 invite leaderboard. */
 export async function redeemShareFollow(

@@ -101,6 +101,10 @@ from backend.services.notifications import (
     notify_new_follower,
     notify_new_friend,
 )
+from backend.services.follows import (
+    ensure_approved_follow_with_subscription,
+    ensure_calendar_subscription,
+)
 from backend.api.deps import get_admin_user_id, is_admin_user
 
 router = APIRouter(prefix="/api/social", tags=["social"])
@@ -719,7 +723,9 @@ def follow_user(
         is_new_follow = True  # treat as a fresh approved follow for side effects
     if is_new_follow:
         new_status = "pending" if requires_approval else "approved"
-        if existing is None:
+        if new_status == "approved":
+            ensure_approved_follow_with_subscription(session, viewer.id, target.id)
+        elif existing is None:
             session.add(
                 UserFollow(
                     follower_id=viewer.id,
@@ -762,31 +768,20 @@ def follow_user(
     # subscriber sees content on the target's profile and in their feed;
     # the relationship itself is unconditional so a follow back can
     # promote both sides to mutual-friend status without manual fixup.
-    sub = _get_subscription(session, viewer.id, target.id)
-    if sub is None:
-        sub = CalendarSubscription(
-            subscriber_id=viewer.id,
-            target_user_id=target.id,
-            notify_new_events=True,
-        )
-        session.add(sub)
+    sub, _ = ensure_calendar_subscription(session, viewer.id, target.id)
     session.commit()
     is_friend = is_mutual_follow(session, viewer.id, target.id)
     # Mutual-follow promotion: when the follow that just landed produced a
     # mutual-friendship, also create the reverse subscription so both
     # sides immediately see each other in their subscribed-events feed.
     if is_friend:
-        reverse_sub = _get_subscription(session, target.id, viewer.id)
         needs_commit = False
-        if reverse_sub is None:
-            session.add(
-                CalendarSubscription(
-                    subscriber_id=target.id,
-                    target_user_id=viewer.id,
-                    notify_new_events=True,
-                )
-            )
-            needs_commit = True
+        _, reverse_sub_created = ensure_calendar_subscription(
+            session,
+            target.id,
+            viewer.id,
+        )
+        needs_commit = reverse_sub_created
         if is_new_follow:
             notify_new_friend(session, user_a=target, user_b=viewer)
             needs_commit = True
@@ -888,12 +883,12 @@ def set_follow_notify(
         # Re-create the implied subscription if it was somehow lost (e.g.
         # legacy follow row predating the merge). Always allowed since
         # the underlying follow already exists.
-        sub = CalendarSubscription(
-            subscriber_id=viewer.id,
-            target_user_id=target.id,
+        sub, _ = ensure_calendar_subscription(
+            session,
+            viewer.id,
+            target.id,
             notify_new_events=payload.notify_new_events,
         )
-        session.add(sub)
     else:
         sub.notify_new_events = payload.notify_new_events
         session.add(sub)
@@ -978,28 +973,12 @@ def approve_follow_request(
     follow.status = "approved"
     session.add(follow)
     session.flush()  # make status visible to is_mutual_follow
-    # Implied calendar subscription for the requester (mirrors the
-    # follow_user flow which creates this on the approved path).
-    sub = _get_subscription(session, requester.id, viewer.id)
-    if sub is None:
-        session.add(
-            CalendarSubscription(
-                subscriber_id=requester.id,
-                target_user_id=viewer.id,
-                notify_new_events=True,
-            )
-        )
+    ensure_calendar_subscription(session, requester.id, viewer.id)
+    ensure_approved_follow_with_subscription(session, viewer.id, requester.id)
+    session.flush()
     is_friend = is_mutual_follow(session, requester.id, viewer.id)
     if is_friend:
-        reverse_sub = _get_subscription(session, viewer.id, requester.id)
-        if reverse_sub is None:
-            session.add(
-                CalendarSubscription(
-                    subscriber_id=viewer.id,
-                    target_user_id=requester.id,
-                    notify_new_events=True,
-                )
-            )
+        ensure_calendar_subscription(session, viewer.id, requester.id)
         notify_new_friend(session, user_a=viewer, user_b=requester)
     # Notify the requester that their request was approved (not the approver).
     notify_follow_request_approved(session, requester=requester, approver=viewer)
@@ -1009,11 +988,11 @@ def approve_follow_request(
     session.commit()
     return FollowActionResponse(
         handle=requester.handle or "",
-        is_following=False,  # the viewer doesn't auto-follow back
+        is_following=True,
         is_friend=is_friend,
         followers_count=_followers_count(session, viewer.id),
-        is_subscribed=False,
-        notify_new_events=False,
+        is_subscribed=True,
+        notify_new_events=True,
         follow_status="approved",
     )
 
@@ -3178,7 +3157,7 @@ def onboarding_complete(
         for target in targets:
             if target.id == viewer.id or target.id in already:
                 continue
-            session.add(UserFollow(follower_id=viewer.id, followee_id=target.id))
+            ensure_approved_follow_with_subscription(session, viewer.id, target.id)
             try:
                 notify_new_follower(session, followee=target, follower=viewer)
             except Exception:
@@ -3188,6 +3167,7 @@ def onboarding_complete(
             # Detect mutual completion (the inviter may already follow
             # the new user back via an earlier referral redemption).
             if is_mutual_follow(session, viewer.id, target.id):
+                ensure_calendar_subscription(session, target.id, viewer.id)
                 try:
                     notify_new_friend(session, viewer, target)
                 except Exception:

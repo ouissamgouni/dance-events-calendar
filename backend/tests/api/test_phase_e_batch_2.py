@@ -29,6 +29,7 @@ from backend.api.routes import auth as auth_module  # noqa: E402
 from backend.api.routes import social as social_module  # noqa: E402
 from backend.db.database import get_session  # noqa: E402
 from backend.db.models import (  # noqa: E402
+    CalendarSubscription,
     User,
     UserFollow,
     UserReferral,
@@ -221,6 +222,12 @@ def test_e3_onboarding_complete_creates_follows_and_stamps(client, session):
     ).all()
     target_ids = {f.followee_id for f in follows}
     assert {a.id, b.id} <= target_ids
+    subs = session.exec(
+        select(CalendarSubscription).where(
+            CalendarSubscription.subscriber_id == viewer.id
+        )
+    ).all()
+    assert {s.target_user_id for s in subs} == {a.id, b.id}
 
     # /auth/me now reports onboarded_at.
     r2 = client.get("/api/auth/me")
@@ -253,6 +260,7 @@ def test_e3_onboarding_complete_idempotent_on_duplicate_handles(client, session)
         select(UserFollow).where(UserFollow.follower_id == viewer.id)
     ).all()
     assert len(follows) == 1
+    assert len(session.exec(select(CalendarSubscription)).all()) == 1
 
 
 def test_e3_onboarding_complete_drops_unknown_and_self_handles(client, session):
@@ -456,6 +464,13 @@ def test_e7_redeem_creates_mutual_follow_pair(client, session):
     assert fwd is not None
     assert rev is not None
 
+    subs = session.exec(select(CalendarSubscription)).all()
+    assert {(s.subscriber_id, s.target_user_id) for s in subs} == {
+        (newbie.id, inviter.id),
+        (inviter.id, newbie.id),
+    }
+    assert all(s.notify_new_events for s in subs)
+
     # used_count incremented.
     referral = session.exec(
         select(UserReferral).where(UserReferral.inviter_user_id == inviter.id)
@@ -515,6 +530,7 @@ def test_e7_redeem_double_redemption_idempotent(client, session):
         .where(UserFollow.followee_id == inviter.id)
     ).all()
     assert len(fwd) == 1
+    assert len(session.exec(select(CalendarSubscription)).all()) == 2
 
 
 # --- D2: share-link doubles as referral -------------------------------------
@@ -611,6 +627,13 @@ def test_d2_redeem_share_follow_creates_one_way(client, session):
     # One-way: sharer is NOT auto-followed back. Sharing a link is not
     # strong enough consent for the sharer to befriend a stranger.
     assert rev is None
+    sub = session.exec(
+        select(CalendarSubscription)
+        .where(CalendarSubscription.subscriber_id == viewer.id)
+        .where(CalendarSubscription.target_user_id == sharer.id)
+    ).first()
+    assert sub is not None
+    assert sub.notify_new_events is True
 
 
 def test_d2_redeem_share_follow_does_not_bump_referral_used_count(client, session):

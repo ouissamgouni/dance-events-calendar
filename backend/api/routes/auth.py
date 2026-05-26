@@ -56,6 +56,7 @@ from backend.db.models import (
     UserSavedEvent,
 )
 from backend.services.email import send_new_user_notification
+from backend.services.follows import ensure_approved_follow_with_subscription
 
 logger = logging.getLogger(__name__)
 
@@ -1130,8 +1131,9 @@ def redeem_referral(
       2. Insert ``UserFollow(follower=inviter, target=viewer)``.
          The pair makes them friends immediately so the per-event
          ``friends`` audience starts working for both.
-      3. Increment ``user_referrals.used_count`` (best-effort).
-      4. Fire ``notify_new_follower`` for the inviter (so they see
+            3. Subscribe both users to each other's calendars.
+            4. Increment ``user_referrals.used_count`` (best-effort).
+            5. Fire ``notify_new_follower`` for the inviter (so they see
          "@viewer joined via your link") AND ``notify_new_friend``
          on both sides via the same notification side-effect path
          used by the regular follow flow.
@@ -1177,13 +1179,12 @@ def redeem_referral(
         (viewer.id, inviter.id),
         (inviter.id, viewer.id),
     ):
-        existing = session.exec(
-            select(UserFollow)
-            .where(UserFollow.follower_id == follower_id)
-            .where(UserFollow.followee_id == target_id)
-        ).first()
-        if existing is None:
-            session.add(UserFollow(follower_id=follower_id, followee_id=target_id))
+        _, follow_created, _, _ = ensure_approved_follow_with_subscription(
+            session,
+            follower_id,
+            target_id,
+        )
+        if follow_created:
             created_edges += 1
 
     # Bump the counter even for re-redemptions so the inviter can see
@@ -1263,15 +1264,11 @@ def redeem_share_follow(
         notify_new_follower as _notify_new_follower,
     )
 
-    existing = session.exec(
-        select(UserFollow)
-        .where(UserFollow.follower_id == viewer.id)
-        .where(UserFollow.followee_id == sharer.id)
-    ).first()
-    follow_created = False
-    if existing is None:
-        session.add(UserFollow(follower_id=viewer.id, followee_id=sharer.id))
-        follow_created = True
+    _, follow_created, _, _ = ensure_approved_follow_with_subscription(
+        session,
+        viewer.id,
+        sharer.id,
+    )
 
     session.commit()
 
