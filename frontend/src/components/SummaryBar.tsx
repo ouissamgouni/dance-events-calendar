@@ -11,6 +11,8 @@ export type InterestSource = 'follows' | 'friends' | null;
 export type InterestKind = 'any' | 'going' | 'saved';
 
 export interface SummaryBarProps {
+    className?: string;
+
     // Counts: ``totalCount`` is the size of the full filtered set;
     // ``visibleCount`` is what's currently rendered in the list. Equal
     // values render as a single number ("87 events"); otherwise renders
@@ -69,10 +71,11 @@ function formatPeriodLabel(startDate: string, endDate: string): string {
     };
     const start = parse(startDate);
     const end = parse(endDate);
-    if (!start || !end) return `${startDate} → ${endDate}`;
+    if (!start || !end) return `${startDate}-${endDate}`;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const sameYear = start.getFullYear() === end.getFullYear();
+    const currentYear = today.getFullYear();
     const fmt = (d: Date, withYear: boolean) =>
         d.toLocaleDateString(undefined, {
             month: 'short',
@@ -82,20 +85,22 @@ function formatPeriodLabel(startDate: string, endDate: string): string {
     const startLabel = start.getTime() === today.getTime()
         ? 'Today'
         : fmt(start, !sameYear);
-    return `${startLabel} → ${fmt(end, true)}`;
+    return `${startLabel}-${fmt(end, end.getFullYear() !== currentYear || !sameYear)}`;
 }
 
 interface ChipProps {
     label: string;
     title?: string;
     tone?: 'neutral' | 'accent';
+    icon?: React.ReactNode;
+    style?: React.CSSProperties;
     onClick?: () => void;
     onRemove?: () => void;
     removeAriaLabel?: string;
     testId?: string;
 }
 
-function Chip({ label, title, tone = 'neutral', onClick, onRemove, removeAriaLabel, testId }: ChipProps) {
+function Chip({ label, title, tone = 'neutral', icon, style, onClick, onRemove, removeAriaLabel, testId }: ChipProps) {
     // Square, no rounded corners. Accent tone bumps the border + bg to make
     // the period/count chips slightly more prominent than tag chips.
     const base = 'inline-flex items-center gap-1 max-w-full text-xs font-medium border transition';
@@ -103,7 +108,7 @@ function Chip({ label, title, tone = 'neutral', onClick, onRemove, removeAriaLab
         ? 'border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100'
         : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50';
     const clickable = onClick ? 'cursor-pointer' : '';
-    const padding = onRemove ? 'pl-2 pr-1 py-0.5' : 'px-2 py-0.5';
+    const padding = onRemove ? 'pl-1.5 pr-1 py-px' : 'px-1.5 py-px';
     return (
         <span
             className={`${base} ${toneClasses} ${clickable} ${padding}`}
@@ -119,7 +124,9 @@ function Chip({ label, title, tone = 'neutral', onClick, onRemove, removeAriaLab
                     onClick();
                 }
             }}
+            style={style}
         >
+            {icon}
             <span className="truncate">{label}</span>
             {onRemove && (
                 <button
@@ -140,16 +147,10 @@ function Chip({ label, title, tone = 'neutral', onClick, onRemove, removeAriaLab
 
 export default function SummaryBar(props: SummaryBarProps) {
     const {
-        totalCount,
-        visibleCount,
+        className = '',
         startDate,
         endDate,
         onEditPeriod,
-        areaLabel,
-        areaKind,
-        onEditArea,
-        onClearArea,
-        areaIsDefault,
         activeTagIds,
         tagGroups,
         onRemoveTag,
@@ -158,21 +159,20 @@ export default function SummaryBar(props: SummaryBarProps) {
         interestUserHandle,
         onClearInterest,
         onClearAll,
-        loading,
         onOpenFilters,
         activeFilterCount = 0,
     } = props;
 
     const tagChips = useMemo(() => {
         if (activeTagIds.size === 0) return [];
-        const lookup = new Map<number, { label: string; groupLabel: string }>();
+        const lookup = new Map<number, { label: string; groupLabel: string; color: string }>();
         for (const g of tagGroups) {
             for (const t of g.tags) {
-                lookup.set(t.id, { label: t.label, groupLabel: g.label });
+                lookup.set(t.id, { label: t.label, groupLabel: g.label, color: g.color ?? t.color ?? '#6b7280' });
             }
         }
         return Array.from(activeTagIds)
-            .map((id) => ({ id, ...(lookup.get(id) ?? { label: `#${id}`, groupLabel: '' }) }))
+            .map((id) => ({ id, ...(lookup.get(id) ?? { label: `#${id}`, groupLabel: '', color: '#6b7280' }) }))
             .sort((a, b) => a.label.localeCompare(b.label));
     }, [activeTagIds, tagGroups]);
 
@@ -187,65 +187,46 @@ export default function SummaryBar(props: SummaryBarProps) {
         return parts.join(' · ');
     }, [interestSource, interestKind, interestUserHandle]);
 
-    const hasAnyNonDefault =
-        tagChips.length > 0
-        || interestChip !== null
-        || !areaIsDefault;
-
-    const showShowing = visibleCount > 0 && visibleCount < totalCount;
-    const countLabel = totalCount === 0
-        ? 'No events'
-        : showShowing
-            ? `Showing ${visibleCount} of ${totalCount}`
-            : `${totalCount} event${totalCount === 1 ? '' : 's'}`;
+    const hasAnyNonDefault = tagChips.length > 0 || interestChip !== null;
+    const periodIcon = (
+        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="14" height="13" />
+            <path d="M3 8h14M7 2.8v2.8M13 2.8v2.8" />
+        </svg>
+    );
 
     return (
         <div
-            className="summary-bar w-full bg-white border-y border-slate-200 px-3 py-2"
+            className={`summary-bar w-full bg-white border-y border-slate-200 px-2 py-1.5 overflow-hidden ${className}`}
             data-testid="summary-bar"
             aria-label="Active filters and result count"
         >
-            <div className="flex items-start justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+            <div className="flex items-center min-w-0">
+                <div className="flex flex-wrap items-center gap-1 min-w-0">
                     {onOpenFilters && (
                         <button
                             type="button"
                             onClick={onOpenFilters}
-                            className="inline-flex items-center gap-1.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold px-2 py-0.5 transition"
+                            className="inline-flex shrink-0 items-center gap-1 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold px-1.5 py-px transition"
                             data-testid="summary-open-filters"
                             aria-label={`Open filters${activeFilterCount > 0 ? ` (${activeFilterCount} active)` : ''}`}
                         >
                             <span>Filters</span>
-                            {activeFilterCount > 0 && (
-                                <span className="inline-flex items-center justify-center min-w-[1rem] h-4 px-1 text-[10px] font-semibold bg-blue-500 text-white">
-                                    {activeFilterCount}
-                                </span>
-                            )}
                         </button>
                     )}
                     <Chip
                         label={formatPeriodLabel(startDate, endDate)}
                         tone="accent"
+                        icon={periodIcon}
                         onClick={onEditPeriod}
                         testId="summary-chip-period"
-                    />
-                    <Chip
-                        label={areaLabel}
-                        title={
-                            areaKind === 'map-view' ? 'Current map view'
-                                : areaKind === 'show-all' ? 'Worldwide'
-                                    : areaLabel
-                        }
-                        onClick={onEditArea}
-                        onRemove={!areaIsDefault && onClearArea ? onClearArea : undefined}
-                        removeAriaLabel="Reset area to default"
-                        testId="summary-chip-area"
                     />
                     {tagChips.map((t) => (
                         <Chip
                             key={t.id}
                             label={t.label}
                             title={t.groupLabel ? `${t.groupLabel}: ${t.label}` : t.label}
+                            style={{ backgroundColor: `${t.color}30`, borderColor: `${t.color}70`, color: '#334155' }}
                             onRemove={() => onRemoveTag(t.id)}
                             removeAriaLabel={`Remove ${t.label} tag`}
                             testId={`summary-chip-tag-${t.id}`}
@@ -269,13 +250,6 @@ export default function SummaryBar(props: SummaryBarProps) {
                             Clear all
                         </button>
                     )}
-                </div>
-                <div
-                    className={`shrink-0 text-xs font-semibold tabular-nums ${loading ? 'text-slate-400' : 'text-slate-700'}`}
-                    data-testid="summary-count"
-                    aria-live="polite"
-                >
-                    {countLabel}
                 </div>
             </div>
         </div>

@@ -40,11 +40,11 @@ interface EventListPanelProps {
     /** Scroll highlighted cards into view when the highlight comes from the map/calendar. */
     scrollHighlightedIntoView?: boolean;
     /**
-     * Optional CTA invoked when the user has rendered every event in the
-     * current period and asks for more. Parent extends the explorer's
-     * ``endDate`` by 3 months and refetches. When undefined, the
-     * "Show events from the next 3 months" button is hidden and only the
-     * paginate-within-period CTA is shown.
+        * Optional CTA invoked when the user has rendered every event in the
+        * current period and asks for more. Parent extends the explorer's
+        * ``endDate`` through the next future window that has matches. When
+        * undefined, the future-events button is hidden and only the
+        * paginate-within-period CTA is shown.
      */
     onExtendPeriod?: () => void;
     /**
@@ -54,6 +54,10 @@ interface EventListPanelProps {
     onClearFilters?: () => void;
     /** True while ``onExtendPeriod`` is in flight (disables the CTA). */
     extendingPeriod?: boolean;
+    /** Count before tag filters, used for "displayed / scope" header copy. */
+    scopeTotalCount?: number;
+    /** Count for the next available future batch, if already known by the parent. */
+    nextPeriodEventCount?: number | null;
 }
 
 export interface EventListCardProps {
@@ -161,9 +165,9 @@ const formatCardTime = (d: Date) =>
     d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 
 /** Initial number of events to render before the user taps Show more. */
-const INITIAL_VISIBLE = 20;
+const INITIAL_VISIBLE = 10;
 /** How many additional events each Show more click reveals. */
-const SHOW_MORE_INCREMENT = 20;
+const SHOW_MORE_INCREMENT = 10;
 
 /** Local YYYY-MM-DD key used to bucket events into day groups. */
 function localDayKey(d: Date): string {
@@ -357,11 +361,14 @@ export default function EventListPanel({
     onExtendPeriod,
     onClearFilters,
     extendingPeriod = false,
+    scopeTotalCount,
+    nextPeriodEventCount,
 }: EventListPanelProps) {
     const { isSaved } = useSavedEvents();
     const { showRatings, trendingEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled } = useFeatureFlags();
     const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const scrollRef = useRef<HTMLDivElement>(null);
+    const pendingExtendVisibleCountRef = useRef(0);
     const [showBottomFade, setShowBottomFade] = useState(false);
     // Client-side only filter: hide events that are not new for this viewer.
     // Per the scenario, no network call is made when toggled.
@@ -371,6 +378,12 @@ export default function EventListPanel({
     // array identity changes (new filter / period / refetch).
     const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
     useEffect(() => {
+        if (pendingExtendVisibleCountRef.current > 0) {
+            const increment = pendingExtendVisibleCountRef.current;
+            pendingExtendVisibleCountRef.current = 0;
+            setVisibleCount((current) => current + increment);
+            return;
+        }
         setVisibleCount(INITIAL_VISIBLE);
     }, [events]);
 
@@ -466,22 +479,28 @@ export default function EventListPanel({
     // sees what they explicitly asked for. The full count drives the
     // "Showing X of Y" counter and the Show more remaining count.
     const totalCount = sortedEvents.length;
+    const totalInScope = scopeTotalCount ?? totalCount;
     const cappedVisible = Math.min(visibleCount, totalCount);
     const renderedEvents = sortedEvents.slice(0, cappedVisible);
     const remainingInPeriod = Math.max(0, totalCount - cappedVisible);
     const periodExhausted = remainingInPeriod === 0;
+    const futureLookupPending = !!onExtendPeriod && nextPeriodEventCount == null;
 
     const allViewCounts = renderedEvents.map((e) => e.popularity_score ?? 0);
+
+    const handleExtendPeriodClick = useCallback(() => {
+        if (!onExtendPeriod) return;
+        pendingExtendVisibleCountRef.current = Math.max(nextPeriodEventCount ?? 0, 0);
+        onExtendPeriod();
+    }, [onExtendPeriod, nextPeriodEventCount]);
 
     return (
         <div className="event-list-panel">
             <div className="event-list-header">
                 <span className="event-list-count">
                     {totalCount === 0
-                        ? '0 events'
-                        : cappedVisible < totalCount
-                            ? `Showing ${cappedVisible} of ${totalCount}`
-                            : `${totalCount} event${totalCount !== 1 ? 's' : ''}`}
+                        ? `0 / ${totalInScope}`
+                        : `Displayed ${cappedVisible} / ${totalInScope}`}
                     {mapBounds && onMapCount < totalCount && (
                         <span className="text-slate-400 font-normal"> · {totalCount - onMapCount} off map</span>
                     )}
@@ -540,18 +559,24 @@ export default function EventListPanel({
                                 No events match your filters
                             </p>
                             <p className="text-xs text-slate-600 mt-1">
-                                Try extending the period or clearing filters.
+                                Try finding the next matching events or clearing filters.
                             </p>
                             <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
                                 {onExtendPeriod && (
                                     <button
                                         type="button"
-                                        onClick={onExtendPeriod}
-                                        disabled={extendingPeriod}
+                                        onClick={handleExtendPeriodClick}
+                                        disabled={extendingPeriod || futureLookupPending || nextPeriodEventCount === 0}
                                         className="inline-flex items-center bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
                                         data-testid="event-list-empty-extend"
                                     >
-                                        {extendingPeriod ? 'Loading…' : 'Extend +3 months'}
+                                        {extendingPeriod
+                                            ? 'Loading…'
+                                            : futureLookupPending
+                                                ? 'Looking ahead…'
+                                                : nextPeriodEventCount === 0
+                                                    ? 'No future events found'
+                                                    : 'Find next events'}
                                     </button>
                                 )}
                                 {onClearFilters && (
@@ -676,9 +701,9 @@ export default function EventListPanel({
                                 });
                             })()}
                             {/* Progressive disclosure CTAs. Within the
-                                current period we paginate in 20-event
+                                current period we paginate in 10-event
                                 increments; once exhausted we offer to
-                                extend the explorer window by 3 months
+                                append the next future batch with matches
                                 (handled by the parent). Both buttons are
                                 square and use the secondary chrome from
                                 .github/instructions/frontend.instructions.md. */}
@@ -701,12 +726,18 @@ export default function EventListPanel({
                                 <div className="px-3 py-3 text-center">
                                     <button
                                         type="button"
-                                        onClick={onExtendPeriod}
-                                        disabled={extendingPeriod}
+                                        onClick={handleExtendPeriodClick}
+                                        disabled={extendingPeriod || futureLookupPending || nextPeriodEventCount === 0}
                                         className="inline-flex items-center justify-center border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-2 transition disabled:opacity-50 disabled:cursor-not-allowed"
                                         data-testid="event-list-extend-period"
                                     >
-                                        {extendingPeriod ? 'Loading…' : 'Show events from the next 3 months'}
+                                        {extendingPeriod
+                                            ? 'Loading…'
+                                            : futureLookupPending
+                                                ? 'Looking ahead…'
+                                                : nextPeriodEventCount === 0
+                                                    ? 'No future events found'
+                                                    : `Show ${nextPeriodEventCount} next available events`}
                                     </button>
                                 </div>
                             )}

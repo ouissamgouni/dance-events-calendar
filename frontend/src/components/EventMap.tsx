@@ -12,6 +12,7 @@ import RateEventButton from './RateEventButton';
 import TagBadges from './TagBadges';
 import AttendeeAvatarStack from './AttendeeAvatarStack';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
+import { DEFAULT_AREA_BBOX } from '../constants/area';
 
 export interface MapBounds {
     north: number;
@@ -20,7 +21,10 @@ export interface MapBounds {
     west: number;
 }
 
-const EUROPE_CENTER: [number, number] = [48.5, 10.0];
+const DEFAULT_AREA_CENTER: [number, number] = [
+    (DEFAULT_AREA_BBOX.min_lat + DEFAULT_AREA_BBOX.max_lat) / 2,
+    (DEFAULT_AREA_BBOX.min_lng + DEFAULT_AREA_BBOX.max_lng) / 2,
+];
 const DEFAULT_ZOOM = 5;
 const CITY_ZOOM = 13;
 
@@ -357,7 +361,7 @@ function MapController({
         if (prevFocused.current !== null) {
             prevFocused.current = null;
             if (positions.length === 0) {
-                map.flyTo(EUROPE_CENTER, DEFAULT_ZOOM, { duration: 0.8 });
+                map.flyTo(DEFAULT_AREA_CENTER, DEFAULT_ZOOM, { duration: 0.8 });
             } else if (positions.length === 1) {
                 map.flyTo(positions[0], CITY_ZOOM, { duration: 0.8 });
             } else {
@@ -481,7 +485,7 @@ function MapController({
         if (!shouldFit) return;
 
         // No events: don't move the map. Auto-fitting to a hardcoded
-        // EUROPE_CENTER + DEFAULT_ZOOM here would overwrite the viewport
+        // DEFAULT_AREA_CENTER + DEFAULT_ZOOM here would overwrite the viewport
         // the user is already looking at (e.g. the configured default-area
         // bbox is wider than DEFAULT_ZOOM, so the user would see an
         // unexpected zoom-in just because the period filter happened to
@@ -590,7 +594,7 @@ function MarkerClusterLayer({
             chunkedLoading: true,
             disableClusteringAtZoom: 16,
             iconCreateFunction: makeClusterIcon,
-            maxClusterRadius: 40,
+            maxClusterRadius: 30,
             showCoverageOnHover: false,
             spiderfyOnMaxZoom: true,
             zoomToBoundsOnClick: true,
@@ -738,7 +742,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
         <MapContainer
             {...(initialArea
                 ? { bounds: [[initialArea.min_lat, initialArea.min_lng], [initialArea.max_lat, initialArea.max_lng]] as L.LatLngBoundsExpression }
-                : { center: EUROPE_CENTER, zoom: DEFAULT_ZOOM })}
+                : { center: DEFAULT_AREA_CENTER, zoom: DEFAULT_ZOOM })}
             className="h-full w-full shadow-sm"
             scrollWheelZoom={true}
             zoomSnap={0.5}

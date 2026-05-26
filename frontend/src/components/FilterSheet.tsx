@@ -61,18 +61,10 @@ export default function FilterSheet({
                 onClick={onClose}
                 className="flex-1 bg-slate-900/60"
             />
-            <div className="bg-white border-t border-slate-200 shadow-xl max-h-[70vh] flex flex-col">
+            <div className="filter-sheet-panel bg-white border-t border-slate-200 shadow-xl flex flex-col">
                 <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
                     <div className="flex items-center gap-2">
                         <h2 className="text-sm font-semibold text-slate-800">Filters</h2>
-                        {activeFilterCount > 0 && (
-                            <span
-                                className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[11px] font-semibold bg-blue-500 text-white"
-                                data-testid="filter-sheet-active-count"
-                            >
-                                {activeFilterCount}
-                            </span>
-                        )}
                     </div>
                     <button
                         type="button"
@@ -83,7 +75,7 @@ export default function FilterSheet({
                         ×
                     </button>
                 </div>
-                <div className="filter-sheet-body flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-2">
+                <div className="filter-sheet-body flex-1 overflow-y-auto bg-slate-50 px-3 py-2 flex flex-col gap-2">
                     {children}
                 </div>
                 <div className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-3 py-2">

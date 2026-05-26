@@ -15,10 +15,10 @@ export interface AreaBbox {
 }
 
 export const DEFAULT_AREA_BBOX: AreaBbox = {
-    min_lat: 20,
-    min_lng: -25,
-    max_lat: 71,
-    max_lng: 60,
+    min_lat: 24,
+    min_lng: -18,
+    max_lat: 69,
+    max_lng: 50,
     label: 'Europe & nearby',
 };
 

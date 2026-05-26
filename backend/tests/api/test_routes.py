@@ -105,6 +105,48 @@ class TestEventsEndpoint:
         finally:
             app.dependency_overrides.clear()
 
+    def test_get_events_start_date_uses_overlap_filter(
+        self, sample_calendar, sample_events
+    ):
+        captured_sql = {}
+        mock_session = MagicMock(spec=Session)
+
+        def mock_exec(stmt):
+            result = MagicMock()
+            sql_text = str(stmt)
+            if "calendar_settings" in sql_text:
+                result.all.return_value = [sample_calendar]
+            elif "cached_events" in sql_text:
+                captured_sql["value"] = sql_text
+                result.all.return_value = sample_events
+            elif "event_views" in sql_text and "GROUP BY" in sql_text:
+                result.all.return_value = []
+            else:
+                result.all.return_value = []
+            return result
+
+        mock_session.exec = mock_exec
+        app.dependency_overrides[get_session] = lambda: mock_session
+        try:
+            client = TestClient(app)
+            with patch(
+                "backend.api.routes.events._get_since_date",
+                return_value="2020-01-01T00:00:00",
+            ):
+                resp = client.get("/api/events?start_date=2026-04-20")
+            assert resp.status_code == 200
+            sql_text = captured_sql["value"]
+            assert (
+                'cached_events."end" >=' in sql_text
+                or "cached_events.end >=" in sql_text
+            )
+            assert (
+                "cached_events.start >=" not in sql_text
+                and 'cached_events."start" >=' not in sql_text
+            )
+        finally:
+            app.dependency_overrides.clear()
+
 
 @pytest.mark.unit
 class TestTrackingEndpoint:

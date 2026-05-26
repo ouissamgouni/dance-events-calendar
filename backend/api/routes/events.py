@@ -353,10 +353,10 @@ def get_events(
     request: Request,
     session: Session = Depends(get_session),
     start_date: Optional[str] = Query(
-        None, description="Filter events starting from this date (YYYY-MM-DD)"
+        None, description="Filter events overlapping on/after this date (YYYY-MM-DD)"
     ),
     end_date: Optional[str] = Query(
-        None, description="Filter events up to this date (YYYY-MM-DD)"
+        None, description="Filter events overlapping on/before this date (YYYY-MM-DD)"
     ),
     tag_ids: Optional[str] = Query(
         None, description="Comma-separated tag IDs to filter by (AND logic)"
@@ -449,7 +449,7 @@ def get_events(
         CachedEvent.calendar_id.in_(calendar_ids),
         CachedEvent.deleted_at == None,
         CachedEvent.is_hidden == False,
-        CachedEvent.start >= effective_start,
+        CachedEvent.end >= effective_start,
     )
     if end_date:
         end_dt = datetime.fromisoformat(end_date)

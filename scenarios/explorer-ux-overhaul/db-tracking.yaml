@@ -1,0 +1,244 @@
+# Seeded EventView rows for Explorer UX. These make the Popular sort and
+# map/list trending overlays meaningful without needing manual clicking.
+views:
+  # Hero event: broad interest and social proof.
+  - {
+      event_id: evt-ux-008,
+      device_id: seed-ux-view-001,
+      source: explorer-list,
+      country: France,
+      city: Paris,
+    }
+  - {
+      event_id: evt-ux-008,
+      device_id: seed-ux-view-002,
+      source: explorer-list,
+      country: Germany,
+      city: Berlin,
+    }
+  - {
+      event_id: evt-ux-008,
+      device_id: seed-ux-view-003,
+      source: explorer-map,
+      country: Spain,
+      city: Madrid,
+    }
+  - {
+      event_id: evt-ux-008,
+      device_id: seed-ux-view-004,
+      source: explorer-map,
+      country: Italy,
+      city: Rome,
+    }
+  - {
+      event_id: evt-ux-008,
+      device_id: seed-ux-view-005,
+      source: shared-link,
+      country: Portugal,
+      city: Lisbon,
+    }
+  - {
+      event_id: evt-ux-008,
+      device_id: seed-ux-view-006,
+      source: shared-link,
+      country: Netherlands,
+      city: Amsterdam,
+    }
+  - {
+      event_id: evt-ux-008,
+      device_id: seed-ux-view-007,
+      source: explorer-list,
+      country: Austria,
+      city: Vienna,
+    }
+  - {
+      event_id: evt-ux-008,
+      device_id: seed-ux-view-008,
+      source: explorer-map,
+      country: Czechia,
+      city: Prague,
+    }
+  - {
+      event_id: evt-ux-008,
+      device_id: seed-ux-view-009,
+      source: explorer-list,
+      country: UK,
+      city: London,
+    }
+  - {
+      event_id: evt-ux-008,
+      device_id: seed-ux-view-010,
+      source: shared-link,
+      country: Denmark,
+      city: Copenhagen,
+    }
+  - {
+      event_id: evt-ux-008,
+      device_id: seed-ux-view-011,
+      source: explorer-map,
+      country: Sweden,
+      city: Stockholm,
+    }
+  - {
+      event_id: evt-ux-008,
+      device_id: seed-ux-view-012,
+      source: shared-link,
+      country: Morocco,
+      city: Marrakesh,
+    }
+
+  - {
+      event_id: evt-ux-011,
+      device_id: seed-ux-view-013,
+      source: explorer-list,
+      country: France,
+      city: Paris,
+    }
+  - {
+      event_id: evt-ux-011,
+      device_id: seed-ux-view-014,
+      source: explorer-list,
+      country: France,
+      city: Lyon,
+    }
+  - {
+      event_id: evt-ux-011,
+      device_id: seed-ux-view-015,
+      source: explorer-map,
+      country: Spain,
+      city: Barcelona,
+    }
+  - {
+      event_id: evt-ux-011,
+      device_id: seed-ux-view-016,
+      source: shared-link,
+      country: Germany,
+      city: Hamburg,
+    }
+  - {
+      event_id: evt-ux-011,
+      device_id: seed-ux-view-017,
+      source: explorer-map,
+      country: Italy,
+      city: Milan,
+    }
+  - {
+      event_id: evt-ux-011,
+      device_id: seed-ux-view-018,
+      source: shared-link,
+      country: Netherlands,
+    }
+  - {
+      event_id: evt-ux-011,
+      device_id: seed-ux-view-019,
+      source: explorer-list,
+      country: Portugal,
+    }
+  - {
+      event_id: evt-ux-011,
+      device_id: seed-ux-view-020,
+      source: explorer-map,
+      country: Belgium,
+    }
+
+  - {
+      event_id: evt-ux-020,
+      device_id: seed-ux-view-021,
+      source: explorer-list,
+      country: Spain,
+      city: Madrid,
+    }
+  - {
+      event_id: evt-ux-020,
+      device_id: seed-ux-view-022,
+      source: explorer-map,
+      country: Italy,
+      city: Rome,
+    }
+  - {
+      event_id: evt-ux-020,
+      device_id: seed-ux-view-023,
+      source: explorer-map,
+      country: Germany,
+      city: Berlin,
+    }
+  - {
+      event_id: evt-ux-020,
+      device_id: seed-ux-view-024,
+      source: shared-link,
+      country: France,
+      city: Paris,
+    }
+  - {
+      event_id: evt-ux-020,
+      device_id: seed-ux-view-025,
+      source: explorer-list,
+      country: UK,
+      city: London,
+    }
+  - {
+      event_id: evt-ux-020,
+      device_id: seed-ux-view-026,
+      source: shared-link,
+      country: Portugal,
+      city: Porto,
+    }
+
+  # View-bait control: many views but no attendance/saves, useful when
+  # verifying the popularity floor keeps empty hype out of Trending.
+  - {
+      event_id: evt-ux-004,
+      device_id: seed-ux-view-027,
+      source: explorer-list,
+      country: France,
+      city: Paris,
+    }
+  - {
+      event_id: evt-ux-004,
+      device_id: seed-ux-view-028,
+      source: explorer-list,
+      country: Germany,
+      city: Berlin,
+    }
+  - {
+      event_id: evt-ux-004,
+      device_id: seed-ux-view-029,
+      source: explorer-map,
+      country: Spain,
+      city: Madrid,
+    }
+  - {
+      event_id: evt-ux-004,
+      device_id: seed-ux-view-030,
+      source: explorer-map,
+      country: Italy,
+      city: Rome,
+    }
+  - {
+      event_id: evt-ux-004,
+      device_id: seed-ux-view-031,
+      source: shared-link,
+      country: Portugal,
+      city: Lisbon,
+    }
+  - {
+      event_id: evt-ux-004,
+      device_id: seed-ux-view-032,
+      source: shared-link,
+      country: Austria,
+      city: Vienna,
+    }
+  - {
+      event_id: evt-ux-004,
+      device_id: seed-ux-view-033,
+      source: explorer-list,
+      country: Czechia,
+      city: Prague,
+    }
+  - {
+      event_id: evt-ux-004,
+      device_id: seed-ux-view-034,
+      source: explorer-map,
+      country: Netherlands,
+      city: Amsterdam,
+    }

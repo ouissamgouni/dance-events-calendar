@@ -1,0 +1,24 @@
+# Follow graph for Explorer UX social filtering.
+# Bob has mutual friends plus one-way followees so the "Following" and
+# "Friends" filters produce visibly different event sets.
+follows:
+  - { follower: alice, followee: bob }
+  - { follower: bob, followee: alice }
+  - { follower: emma, followee: bob }
+  - { follower: bob, followee: emma }
+  - { follower: frank, followee: bob }
+  - { follower: bob, followee: frank }
+  - { follower: gina, followee: bob }
+  - { follower: bob, followee: gina }
+  - { follower: hugo, followee: bob }
+  - { follower: bob, followee: hugo }
+  - { follower: nia, followee: bob }
+  - { follower: bob, followee: nia }
+  - { follower: omar, followee: bob }
+  - { follower: bob, followee: omar }
+  - { follower: bob, followee: pablo }
+  - { follower: bob, followee: quinn }
+  - { follower: bob, followee: rita }
+  - { follower: bob, followee: samir }
+  - { follower: bob, followee: tara }
+  - { follower: bob, followee: ulysses }
