@@ -5,11 +5,14 @@
 #   alice -> pop1, pop2, pop3      (3 candidates)
 #   bob   -> pop1, pop2            (2 candidates)
 #   carol -> pop1                  (1 candidate)
+#   alice -> privatepop            (friends-only but suggestable)
+#   alice/bob -> hiddenpop         (opted out; must be excluded)
 #
 # Expected suggestions for `viewer` (ordered by mutual count desc):
 #   pop1 (3 mutuals: alice + bob + carol)
 #   pop2 (2 mutuals: alice + bob)
 #   pop3 (1 mutual:  alice)
+#   privatepop (1 mutual: alice; account_visibility does not hide suggestions)
 #
 # `loner` has no follow edges → response must be empty.
 follows:
@@ -31,9 +34,15 @@ follows:
     followee: pop2
   - follower: alice
     followee: pop3
+  - follower: alice
+    followee: privatepop
+  - follower: alice
+    followee: hiddenpop
   - follower: bob
     followee: pop1
   - follower: bob
     followee: pop2
+  - follower: bob
+    followee: hiddenpop
   - follower: carol
     followee: pop1

@@ -7,7 +7,8 @@
 #
 # The popular tail is deterministic:
 #   pop1 has 3 followers,
-#   pop2 and pop3 each have 2 followers, so handle ascending breaks the tie.
+#   pop2 and pop3 each have 2 followers, but pop3 opted out of suggestions,
+#   so only pop1 and friends-only pop2 remain visible in onboarding.
 follows:
   - follower: newbie
     followee: alreadyfollowed

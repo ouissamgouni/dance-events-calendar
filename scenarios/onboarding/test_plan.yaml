@@ -13,8 +13,8 @@ test_plan:
       Cast: `newbie` (fresh, no onboarded_at), three verified organizers
       (`salsahub`, `bachataco`, `verifiedcurator`), two admin-managed
       curators (`curatoralpha`, `curatorbeta`), three popular accounts
-      (`pop1`, `pop2`, `pop3`), plus exclusion probes for already-followed,
-      pending-follow, and no-handle users.
+      (`pop1`, friends-only `pop2`, opted-out `pop3`), plus exclusion probes
+      for already-followed, pending-follow, and no-handle users.
 
     - >
       The API also excludes soft-deleted users. This scenario documents that
@@ -76,14 +76,16 @@ test_plan:
         All verified organizers appear before any curator-only account;
         `verifiedcurator` appears once, not repeated in the curator section;
         curator-only accounts appear as
-        `curatoralpha`, then `curatorbeta`; the popular tail appears as
-        `pop1`, `pop2`, `pop3` because `pop1` has the highest follower count
-        and `pop2`/`pop3` tie-break by handle.
+        `curatoralpha`, then `curatorbeta`; the visible popular tail appears
+        as `pop1`, then friends-only `pop2` because `pop1` has the highest
+        follower count and account visibility does not control suggestion
+        eligibility.
         The list does not include `newbie` (self), `alreadyfollowed` (existing
         approved follow), `pendingtarget` (existing pending outgoing request),
-        or `nohandle@example.com` (candidate without a handle). Soft-deleted
-        users are also excluded by the endpoint, but are not represented in
-        this scenario fixture because the seeder does not support `deleted_at`.
+        `pop3` (explicit `show_in_suggestions: false`), or
+        `nohandle@example.com` (candidate without a handle). Soft-deleted users
+        are also excluded by the endpoint, but are not represented in this
+        scenario fixture because the seeder does not support `deleted_at`.
 
     - id: 4
       title: "Limit truncates after higher-ranked groups"
@@ -94,8 +96,8 @@ test_plan:
       expected: >
         The response contains exactly five suggestions: the three verified
         organizers plus `curatoralpha` and `curatorbeta`. It does not include
-        `pop1`, `pop2`, or `pop3` until a higher limit leaves room for the
-        most-followed tail.
+        `pop1` or `pop2` until a higher limit leaves room for the most-followed
+        tail. `pop3` never appears because it opted out of suggestions.
 
     - id: 5
       title: "Follow from cards and complete"

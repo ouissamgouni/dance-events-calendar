@@ -1644,8 +1644,8 @@ class UserSearchResponse(BaseModel):
 class SuggestedUsersResponse(BaseModel):
     """Friends-of-friends discovery payload (D.2.b).
 
-    Empty for anonymous viewers and for users with no social graph yet —
-    that's an acceptable cold-start; the UI falls back to the search box.
+    Empty for anonymous viewers. Signed-in viewers receive graph suggestions
+    when available, with curator fallback/top-up for cold-start discovery.
     """
 
     items: list[UserSearchResult]

@@ -6,8 +6,10 @@
 # - Dave is a stranger used to verify private/friends-only gating from the outside
 # Admin is included to verify the verified-organizer toggle endpoint.
 #
-# Account visibility defaults to "public" (signed-up users are discoverable
-# by default). Alice, Bob and Carol are set to "friends" so the test plan
+# Account visibility defaults to "public" and suggestion discoverability
+# defaults to true. They are separate settings: friends-only accounts can
+# still appear in Suggestions unless `show_in_suggestions` is false.
+# Alice, Bob and Carol are set to "friends" so the test plan
 # can exercise the friends-only gating (mutual follow required to view /
 # subscribe). Dave stays "public" so the test plan can exercise the second
 # subscribe path: subscribing to a stranger whose account is public, no

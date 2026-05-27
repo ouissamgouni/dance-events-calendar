@@ -105,6 +105,9 @@ test_plan:
         The "Anyone" card becomes selected (blue border). Network request:
         PATCH /api/social/me/visibility with {"account_visibility":"public"}
         returns 200 and the response includes account_visibility="public".
+        The separate "Suggest my profile to others" checkbox remains visible
+        and explains that suggestion eligibility is controlled independently
+        from account visibility.
         Reload the page — "Anyone" is still selected (state survived).
 
     - id: 7

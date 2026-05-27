@@ -5,6 +5,8 @@
 #   - loner: zero graph; should see curator fallback only.
 #   - alice/bob/carol: viewer's mutual friends, used as suggestion witnesses.
 #   - pop1/pop2/pop3: FoF candidates ranked by mutual-friend count.
+#   - privatepop: friends-only profile that remains suggestable.
+#   - hiddenpop: explicit suggestion opt-out; must never be shown.
 #   - curator-paris/curator-bachata: admin-managed fallback candidates.
 #   - admin: site admin control, excluded by backend discovery helpers.
 users:
@@ -40,6 +42,15 @@ users:
     name: Popular Three
     handle: pop3
     account_visibility: public
+  - email: privatepop@example.com
+    name: Private Popular
+    handle: privatepop
+    account_visibility: friends
+  - email: hiddenpop@example.com
+    name: Hidden Popular
+    handle: hiddenpop
+    account_visibility: public
+    show_in_suggestions: false
   - email: curator-paris@example.com
     name: Paris Salsa Curator
     handle: curator-paris

@@ -2075,11 +2075,10 @@ def discover_suggested(
 ):
     """Friends-of-friends discovery (Phase D, D.2.b).
 
-    Surfaces users that the people **you** are subscribed to (or follow)
-    are themselves subscribed to, excluding self and people you already
-    follow/subscribe to. Ranked by count of distinct intermediaries
-    ("subscribed to by N of your people") then by absolute subscribers
-    count as a tiebreak.
+    Surfaces users that the people **you** follow or subscribe to are
+    themselves following or subscribed to, excluding self and people you
+    already follow/subscribe to. Ranked by count of distinct intermediaries
+    then by absolute subscribers count as a tiebreak.
 
     Anonymous viewers receive an empty list — discovery is intentionally
     a logged-in surface; anon users use ``/users/search`` instead.
@@ -2123,48 +2122,64 @@ def discover_suggested(
             ]
         )
 
-    # People that the viewer's network is subscribed to. Exclude users
-    # the viewer already follows or subscribes to, self, and the site
-    # admin (hidden from public discovery).
+    # People followed or subscribed to by the viewer's network. Exclude users
+    # the viewer already follows or subscribes to, self, and the site admin
+    # (hidden from public discovery).
     excluded: set[UUID] = set(network_ids)
     excluded.add(viewer.id)
     admin_id = get_admin_user_id(session)
     if admin_id is not None:
         excluded.add(admin_id)
-    rows = session.exec(
+    candidate_intermediaries: dict[UUID, set[UUID]] = {}
+    follow_rows = session.exec(
+        select(
+            UserFollow.followee_id,
+            UserFollow.follower_id,
+        )
+        .where(col(UserFollow.follower_id).in_(network_ids))
+        .where(~col(UserFollow.followee_id).in_(excluded))
+    ).all()
+    for user_id, intermediary_id in follow_rows:
+        candidate_intermediaries.setdefault(user_id, set()).add(intermediary_id)
+    subscription_rows = session.exec(
         select(
             CalendarSubscription.target_user_id,
-            func.count(CalendarSubscription.subscriber_id).label("intermediaries"),
+            CalendarSubscription.subscriber_id,
         )
         .where(CalendarSubscription.subscriber_id.in_(network_ids))
         .where(~CalendarSubscription.target_user_id.in_(excluded))
-        .group_by(CalendarSubscription.target_user_id)
     ).all()
+    for user_id, intermediary_id in subscription_rows:
+        candidate_intermediaries.setdefault(user_id, set()).add(intermediary_id)
+    candidate_scores = {
+        user_id: len(intermediary_ids)
+        for user_id, intermediary_ids in candidate_intermediaries.items()
+    }
     # Rank by intermediary count desc, then by absolute subscriber count
     # desc as a tiebreak. ``_subscribers_count`` is cheap (one query per
     # candidate) and the result set is bounded by ``limit`` * a small
     # multiplier.
-    ranked = sorted(rows, key=lambda r: (-int(r[1]), str(r[0])))[
-        : max(limit * 3, limit)
-    ]
-    candidate_ids = [r[0] for r in ranked]
+    ranked_ids = sorted(
+        candidate_scores,
+        key=lambda user_id: (-candidate_scores[user_id], str(user_id)),
+    )[: max(limit * 3, limit)]
 
     candidates = (
         list(
             session.exec(
                 select(User)
-                .where(User.id.in_(candidate_ids))
+                .where(User.id.in_(ranked_ids))
                 .where(_suggestable_user_clause())
                 .where(User.deleted_at.is_(None))
+                .where(User.handle.is_not(None))
             ).all()
         )
-        if candidate_ids
+        if ranked_ids
         else []
     )
-    intermediary_count = {r[0]: int(r[1]) for r in ranked}
     candidates.sort(
         key=lambda u: (
-            -intermediary_count.get(u.id, 0),
+            -candidate_scores.get(u.id, 0),
             -_subscribers_count(session, u.id),
             (u.handle or ""),
         )

@@ -5,9 +5,11 @@
 #   pop1: followed by alice + bob + carol (3 mutual witnesses)
 #   pop2: followed by alice + bob (2 mutual witnesses)
 #   pop3: followed by alice (1 mutual witness)
+#   privatepop: followed by alice (1 mutual witness; friends-only but suggestable)
+#   hiddenpop: followed by alice + bob (opted out; must be excluded)
 #
-# The expected ordered suggestion set for viewer is:
-#   pop1, pop2, pop3, curator-bachata, curator-paris
+# The expected ordered Discover suggestion set for viewer is:
+#   pop1, pop2, pop3, privatepop, curator-bachata, curator-paris
 # where curators are the zero-score fallback/top-up candidates.
 follows:
   - follower: viewer
@@ -28,9 +30,15 @@ follows:
     followee: pop2
   - follower: alice
     followee: pop3
+  - follower: alice
+    followee: privatepop
+  - follower: alice
+    followee: hiddenpop
   - follower: bob
     followee: pop1
   - follower: bob
     followee: pop2
+  - follower: bob
+    followee: hiddenpop
   - follower: carol
     followee: pop1
