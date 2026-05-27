@@ -693,6 +693,7 @@ class DatabaseSeeder:
                 "account_visibility",
                 "is_verified_organizer",
                 "is_admin_managed",
+                "show_in_suggestions",
                 "managed_label",
                 "share_attendance_default",
                 "share_attendance_default_audience",

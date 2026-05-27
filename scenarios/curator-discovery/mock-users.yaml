@@ -4,6 +4,7 @@
 #   - viewer: signed-in user with zero follows/subscriptions at start.
 #   - subscriber: spare public user for manual subscription experiments.
 #   - curator-paris / curator-bachata: admin-managed public curator accounts.
+#   - curator-hidden: admin-managed but opted out of suggestions.
 #   - ordinary: non-curator control that must not appear in curator suggestions.
 #   - admin: site admin account.
 users:
@@ -29,6 +30,14 @@ users:
     is_admin_managed: true
     managed_label: Bachata Curator
     bio: Editorial bachata calendar for social dancers.
+  - email: curator-hidden@example.com
+    name: Hidden Curator
+    handle: curator-hidden
+    account_visibility: public
+    is_admin_managed: true
+    show_in_suggestions: false
+    managed_label: Hidden Curator
+    bio: Opted out of suggestion surfaces.
   - email: ordinary@example.com
     name: Ordinary Organizer
     handle: ordinary

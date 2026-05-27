@@ -7,11 +7,13 @@ test_plan:
     when there are no suggestions (e.g. viewer has no friends).
 
   preconditions:
-    - "Run with: task start:scenario SCENARIO=phase-e-fof-suggestions"
+    - "Run with: task start:scenario SCENARIO=fof-suggestions"
     - >
       Pre-seeded graph: `viewer` is mutual friends with alice, bob,
-      carol. alice follows pop1+pop2+pop3, bob follows pop1+pop2,
-      carol follows pop1. `loner` has no friends.
+      carol. alice follows pop1+pop2+pop3+privatepop+hiddenpop, bob follows
+      pop1+pop2+hiddenpop, carol follows pop1. `privatepop` is friends-only
+      but suggestable; `hiddenpop` opted out of suggestions. `loner` has no
+      friends.
     - "Both viewers have already gone through onboarding (no gate)."
 
   steps:
@@ -22,12 +24,14 @@ test_plan:
         scroll to "People you may know" (sits ABOVE the My network
         section).
       expected: >
-        Network: GET /api/social/me/suggestions → 200 with three
-        items in this order: pop1, pop2, pop3.
+        Network: GET /api/social/me/suggestions → 200 with four
+        items in this order: pop1, pop2, pop3, privatepop. hiddenpop is absent
+        even though it has two mutual witnesses.
         Row text:
           • pop1 — "Followed by @alice + 2 more"
           • pop2 — "Followed by @alice + 1 more"
           • pop3 — "Followed by @alice"
+          • privatepop — "Followed by @alice"
         Each row has a blue "Follow" button.
 
     - id: 2

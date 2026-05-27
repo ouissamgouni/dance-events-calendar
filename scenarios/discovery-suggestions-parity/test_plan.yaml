@@ -1,17 +1,20 @@
 test_plan:
   name: "Discovery Suggestions Parity"
   description: >
-    Defines the product rule for people discovery suggestions: the
-    Suggestions tab in Account -> My network and the default suggestions
-    shown on /discover should use the same candidate set, ordering, and
-    exclusions for a signed-in viewer. The scenario catches drift between
-    the account-network surface and the broader Discover people page.
+    Defines the product rule for people discovery suggestions: Account ->
+    My network -> Suggestions is the pure friend-of-friend graph, while the
+    default /discover Suggestions section starts with that same graph and may
+    top up with curated accounts. The scenario catches the prod-like drift
+    where /discover showed only curators even when follow-graph candidates
+    existed.
 
   preconditions:
     - "Run with: task start:scenario SCENARIO=discovery-suggestions-parity"
     - >
       Cast: viewer has mutual friends alice, bob, and carol. Their follow
-      overlap creates FoF candidates pop1, pop2, and pop3. Two admin-managed
+      overlap creates FoF candidates pop1, pop2, pop3, and friends-only
+      privatepop. hiddenpop is followed by the same network but has
+      `show_in_suggestions: false` and must be excluded. Two admin-managed
       curators provide fallback/top-up suggestions. loner has no graph.
     - >
       If the onboarding gate appears after signing in as viewer or loner,
@@ -29,25 +32,24 @@ test_plan:
         Suggestions tab.
       expected: >
         The UI calls GET /api/social/me/suggestions. The rendered suggestion
-        handles, in order, are pop1, pop2, pop3, curator-bachata,
-        curator-paris. pop1 shows "Followed by @alice + 2 more", pop2 shows
-        "Followed by @alice + 1 more", and pop3 shows "Followed by @alice".
-        Curator rows carry the curator badge and show no mutual-friend
-        preview. viewer, alice, bob, carol, and admin are not suggested.
+        handles, in order, are pop1, pop2, pop3, privatepop. pop1 shows
+        "Followed by @alice + 2 more", pop2 shows "Followed by @alice + 1
+        more", and pop3/privatepop each show "Followed by @alice".
+        viewer, alice, bob, carol, admin, and hiddenpop are not suggested.
 
     - id: 2
-      title: "/discover default Suggestions matches My network"
+      title: "/discover default Suggestions starts with the network graph"
       description: >
         With Vera Viewer still signed in, open /discover with an empty search
         box.
       expected: >
-        The default suggestions shown on /discover match the canonical set
-        from step 1: pop1, pop2, pop3, curator-bachata, curator-paris, with
-        the same ordering and exclusions. It is acceptable for /discover to
-        group curator rows under a separate "Curated calendars" heading, but
-        the combined candidate set must be identical to Account -> My network
-        -> Suggestions. /discover must not show only curators when FoF
-        candidates exist.
+        The page renders a default section titled "Suggestions" backed by
+        GET /api/social/discover/suggested?limit=12. The first rows are the
+        network candidates from step 1 in the same order: pop1, pop2, pop3,
+        privatepop. Curator top-up rows may follow as curator-bachata and
+        curator-paris. Every row has a blue Follow button. /discover must not
+        show only curators when FoF candidates exist, and hiddenpop must not
+        appear.
 
     - id: 3
       title: "Following a suggestion removes it from both surfaces"
@@ -56,22 +58,23 @@ test_plan:
         Then reload /account#network and /discover.
       expected: >
         POST /api/social/users/pop1/follow succeeds. Both surfaces remove
-        pop1 from suggestions and now show pop2, pop3, curator-bachata,
-        curator-paris. This proves both surfaces share the same
+        pop1 from suggestions. Account -> My network now shows pop2, pop3,
+        privatepop; /discover now starts with pop2, pop3, privatepop and then
+        any curator top-up rows. This proves both surfaces share the same
         already-followed exclusion semantics.
 
     - id: 4
-      title: "Zero-graph viewer gets the same curator fallback on both surfaces"
+      title: "Zero-graph viewer gets Discover curator fallback"
       description: >
         Sign out, then sign in as Leo Loner. Open /account#network ->
         Suggestions, then /discover with an empty search box.
       expected: >
-        Because loner has no mutual friends and no outgoing follows, both
-        surfaces show the same curator fallback set: curator-bachata and
-        curator-paris. They do not show pop1, pop2, pop3, ordinary users, or
-        admin. If product later chooses to hide empty-network account
-        suggestions, /discover should follow the same rule instead of
-        diverging.
+        Because loner has no mutual friends and no outgoing follows, Account
+        -> My network -> Suggestions is empty. /discover still renders the
+        default "Suggestions" section with the curator fallback set:
+        curator-bachata and curator-paris, each with a Follow button. It does
+        not show pop1, pop2, pop3, privatepop, hiddenpop, ordinary users, or
+        admin.
 
     - id: 5
       title: "Search results remain separate from suggestions parity"

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
     fetchCurators,
     fetchSuggestedUsers,
+    followUser,
     searchUsers,
     type UserSearchResult,
 } from '../api';
@@ -15,7 +16,7 @@ import {
  * 1. Search — controlled input synced to ``?q=…`` so links from the header
  *    search box land in a stable, shareable URL. 25-result cap matches the
  *    backend's ``limit`` ceiling.
- * 2. Suggested for you — friends-of-friends ranking from
+ * 2. Suggestions — friends-of-friends ranking with curator fallback from
  *    ``GET /social/discover/suggested``. Hidden for anon viewers (the
  *    endpoint returns an empty list anyway).
  *
@@ -164,6 +165,7 @@ function AnonDiscoverHint() {
 
 function DefaultDiscoverSections() {
     const [suggestedUsers, setSuggestedUsers] = useState<UserSearchResult[] | null>(null);
+    const [pendingFollow, setPendingFollow] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -184,14 +186,26 @@ function DefaultDiscoverSections() {
         };
     }, []);
 
-    const networkUsers = (suggestedUsers ?? []).filter((u) => u.source === 'network');
-    const curatedUsers = (suggestedUsers ?? []).filter((u) => u.source === 'curator');
+    async function handleFollow(handle: string) {
+        setPendingFollow(handle);
+        try {
+            await followUser(handle);
+            setSuggestedUsers((prev) =>
+                prev ? prev.filter((u) => u.handle !== handle) : prev,
+            );
+            window.dispatchEvent(new CustomEvent('network:changed'));
+        } finally {
+            setPendingFollow(null);
+        }
+    }
+
+    const suggestions = suggestedUsers ?? [];
 
     if (loading) {
         return <p className="text-sm text-slate-500">Loading suggestions…</p>;
     }
 
-    if (networkUsers.length === 0 && curatedUsers.length === 0) {
+    if (suggestions.length === 0) {
         return (
             <section className="border border-slate-200 bg-slate-50 p-3">
                 <p className="text-sm text-slate-600">
@@ -210,14 +224,11 @@ function DefaultDiscoverSections() {
     return (
         <div className="space-y-6">
             <UserSection
-                title="Suggested for you"
-                description="People followed by your network and accounts you may want to follow."
-                users={networkUsers}
-            />
-            <UserSection
-                title="Curated calendars"
-                description="Editorial calendars and organizers worth subscribing to."
-                users={curatedUsers}
+                title="Suggestions"
+                description="People followed by your network and curated accounts you may want to follow."
+                users={suggestions}
+                onFollow={(handle) => void handleFollow(handle)}
+                pendingFollow={pendingFollow}
             />
         </div>
     );
@@ -227,10 +238,14 @@ function UserSection({
     title,
     description,
     users,
+    onFollow,
+    pendingFollow,
 }: {
     title: string;
     description: string;
     users: DiscoverUser[];
+    onFollow?: (handle: string) => void;
+    pendingFollow?: string | null;
 }) {
     if (users.length === 0) return null;
     return (
@@ -239,14 +254,22 @@ function UserSection({
                 {title}
             </h2>
             <p className="text-xs text-slate-500 mb-3">{description}</p>
-            <UserGrid users={users} />
+            <UserGrid users={users} onFollow={onFollow} pendingFollow={pendingFollow} />
         </section>
     );
 }
 
 type DiscoverUser = UserSearchResult;
 
-function UserGrid({ users }: { users: DiscoverUser[] }) {
+function UserGrid({
+    users,
+    onFollow,
+    pendingFollow,
+}: {
+    users: DiscoverUser[];
+    onFollow?: (handle: string) => void;
+    pendingFollow?: string | null;
+}) {
     return (
         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {users.map((u) => (
@@ -282,6 +305,17 @@ function UserGrid({ users }: { users: DiscoverUser[] }) {
                         </Link>
                         <UserMeta user={u} />
                     </div>
+                    {onFollow && !u.is_followed_by_viewer && (
+                        <button
+                            type="button"
+                            onClick={() => onFollow(u.handle)}
+                            disabled={pendingFollow === u.handle}
+                            aria-label={`Follow ${u.handle}`}
+                            className="bg-blue-500 px-3 py-1 text-xs font-medium text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                        >
+                            {pendingFollow === u.handle ? '…' : 'Follow'}
+                        </button>
+                    )}
                 </li>
             ))}
         </ul>

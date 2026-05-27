@@ -182,6 +182,7 @@ class TestDatabaseSeeder:
             "    name: Curator\n"
             "    handle: curator\n"
             "    is_admin_managed: true\n"
+            "    show_in_suggestions: false\n"
             "    share_attendance_default_audience: private\n"
         )
         monkeypatch.setattr(seed_module, "SCENARIOS_DIR", scenarios_dir)
@@ -200,6 +201,7 @@ class TestDatabaseSeeder:
 
         assert user is not None
         assert user.is_admin_managed is True
+        assert user.show_in_suggestions is False
         assert user.share_attendance_default is True
         assert user.share_attendance_default_audience == "public"
 
@@ -220,9 +222,7 @@ class TestDatabaseSeeder:
             "    is_admin_managed: true\n"
         )
         (scenario_dir / "db-follows.yaml").write_text(
-            "follows:\n"
-            "  - follower: alice\n"
-            "    followee: curator\n"
+            "follows:\n  - follower: alice\n    followee: curator\n"
         )
         monkeypatch.setattr(seed_module, "SCENARIOS_DIR", scenarios_dir)
         monkeypatch.setattr(

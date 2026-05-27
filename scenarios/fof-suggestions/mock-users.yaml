@@ -5,8 +5,8 @@
 #   • `loner` — has no friends; the FoF card must NOT render for them.
 #
 # Reachable-through-friends candidates: pop1 (3 mutuals), pop2 (2),
-# pop3 (1). One already-followed candidate `pop1-followed` is used to
-# prove the exclusion path.
+# pop3 (1), and privatepop (1, friends-only but suggestable). hiddenpop
+# is followed by the same graph but opted out of suggestions.
 users:
   - email: viewer@example.com
     name: View Erfof
@@ -32,6 +32,14 @@ users:
   - email: popular3@example.com
     name: Popular Three
     handle: pop3
+  - email: privatepop@example.com
+    name: Private Popular
+    handle: privatepop
+    account_visibility: friends
+  - email: hiddenpop@example.com
+    name: Hidden Popular
+    handle: hiddenpop
+    show_in_suggestions: false
   - email: admin@example.com
     name: Dev Admin
     handle: admin

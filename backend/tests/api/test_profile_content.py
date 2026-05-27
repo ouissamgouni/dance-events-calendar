@@ -610,13 +610,13 @@ def test_discover_suggested_without_network_excludes_opted_out_curators(
 
 
 def test_discover_suggested_friends_of_friends(client, session):
-    # viewer follows alice; alice subscribes to charlie. Charlie should
+    # viewer follows alice; alice follows charlie. Charlie should
     # surface for viewer (FoF), but alice should NOT (already in network).
     viewer = _make_user(session, "viewer@example.com", "viewer")
     alice = _make_user(session, "alice@example.com", "alice")
     charlie = _make_user(session, "charlie@example.com", "charlie")
     _follow(session, viewer, alice)
-    _subscribe(session, alice, charlie)
+    _follow(session, alice, charlie)
 
     _login(client, "viewer@example.com")
     body = client.get("/api/social/discover/suggested").json()
@@ -632,8 +632,8 @@ def test_discover_suggested_excludes_already_subscribed(client, session):
     viewer = _make_user(session, "viewer@example.com", "viewer")
     alice = _make_user(session, "alice@example.com", "alice")
     charlie = _make_user(session, "charlie@example.com", "charlie")
-    _subscribe(session, viewer, alice)
-    _subscribe(session, alice, charlie)
+    _follow(session, viewer, alice)
+    _follow(session, alice, charlie)
     _subscribe(session, viewer, charlie)  # already subscribed
 
     _login(client, "viewer@example.com")
@@ -653,8 +653,8 @@ def test_discover_suggested_excludes_opted_out_network_candidates(client, sessio
     )
     visible = _make_user(session, "visible@example.com", "visible")
     _follow(session, viewer, alice)
-    _subscribe(session, alice, hidden)
-    _subscribe(session, alice, visible)
+    _follow(session, alice, hidden)
+    _follow(session, alice, visible)
 
     _login(client, "viewer@example.com")
     body = client.get("/api/social/discover/suggested").json()

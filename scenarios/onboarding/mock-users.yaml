@@ -5,6 +5,10 @@
 #   2. admin-managed curators next, sorted by handle,
 #   3. most-followed accounts last, sorted by follower count desc then handle.
 #
+# `account_visibility` and `show_in_suggestions` are deliberately separate:
+# friends-only profiles may still be suggested, while an explicit suggestion
+# opt-out must be hidden from onboarding, Discover, and network suggestions.
+#
 # It also includes representable exclusions: self, already-followed targets,
 # pending follow requests, and users without handles. Soft-deleted users are
 # excluded by the API too, but the scenario user seeder does not support
@@ -43,9 +47,11 @@ users:
   - email: popular2@example.com
     name: Popular Two
     handle: pop2
+    account_visibility: friends
   - email: popular3@example.com
     name: Popular Three
     handle: pop3
+    show_in_suggestions: false
   - email: already-followed@example.com
     name: Already Followed
     handle: alreadyfollowed

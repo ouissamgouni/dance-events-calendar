@@ -12,7 +12,8 @@ test_plan:
     - "Run with: task start:scenario SCENARIO=curator-discovery"
     - >
       Cast: viewer (zero follows/subscriptions), curator-paris and
-      curator-bachata (admin-managed curator accounts), ordinary (verified
+      curator-bachata (admin-managed curator accounts), curator-hidden
+      (admin-managed but `show_in_suggestions: false`), ordinary (verified
       organizer but not a curator), admin.
     - >
       If the onboarding gate appears after signing in as viewer, click
@@ -46,7 +47,8 @@ test_plan:
         Rows include curator-bachata and curator-paris with the curator
         badge; there is no "Curated calendars" helper line. The "See more
         on Discover" row is still visible while suggestions are shown. The
-        ordinary verified organizer is NOT in this Suggestions section.
+        ordinary verified organizer and curator-hidden are NOT in this
+        Suggestions section.
         Clicking a curator row navigates to /u/{handle}, and the public
         profile renders normally.
 
@@ -61,7 +63,8 @@ test_plan:
         "Sign in to see more people from your network." Searching first
         calls GET /api/social/search/users?q=zzzz. If the normal search
         returns no users, the page renders a "Suggestions" subsection backed
-        by GET /api/social/curators?limit=12. This mirrors the header
+        by GET /api/social/curators?limit=12. It includes curator-bachata and
+        curator-paris, but not curator-hidden. This mirrors the header
         no-result fallback while keeping personalized graph suggestions
         auth-only.
 
@@ -79,12 +82,11 @@ test_plan:
       description: >
         With Val Zero signed in, open /discover with an empty search box.
       expected: >
-        Network calls GET /api/social/me/suggestions?limit=12, the same
-        suggestion source used by Account -> My network -> Suggestions.
-        Because viewer has no mutual-friend suggestions, the page does not
-        render an empty "Suggested for you" block. It renders "Curated
-        calendars" with curator-bachata and curator-paris, each carrying
-        the curator badge. The ordinary verified organizer is NOT listed.
+        Network calls GET /api/social/discover/suggested?limit=12. Because
+        viewer has no mutual-friend suggestions, the page renders a default
+        "Suggestions" section with curator-bachata and curator-paris, each
+        carrying the curator badge and a blue Follow button. The ordinary
+        verified organizer and curator-hidden are NOT listed.
 
     - id: 6
       title: "Following picker falls back to curator Suggestions"
@@ -98,7 +100,7 @@ test_plan:
         then calls GET
         /api/social/curators?limit=12&exclude_followed=true. Curator rows
         show the curator badge and a blue Follow button. The ordinary
-        organizer is not listed in the Suggestions section.
+        organizer and curator-hidden are not listed in the Suggestions section.
 
     - id: 7
       title: "Following a curator unlocks their exposed events"
@@ -126,7 +128,8 @@ test_plan:
         followed row with the Following badge. The fallback Suggestions
         section is not shown because the primary followees list is no longer
         empty. If calling /api/social/curators?exclude_followed=true
-        directly, curator-paris is excluded while curator-bachata remains.
+        directly, curator-paris is excluded while curator-bachata remains and
+        curator-hidden stays excluded.
 
     - id: 9
       title: "Direct endpoint sanity checks"
@@ -138,4 +141,6 @@ test_plan:
         (`is_admin_managed: true`, `source: "curator"`). GET
         /api/social/curators?q=ordinary returns `items: []` even though
         ordinary is searchable through /api/social/search/users?q=ordinary.
+        /api/social/curators?q=hidden returns `items: []` because
+        curator-hidden opted out of suggestions.
         GET /api/social/discover/suggested as anonymous returns `items: []`.
