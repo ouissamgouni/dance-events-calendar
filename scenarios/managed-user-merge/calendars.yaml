@@ -1,0 +1,4 @@
+calendars:
+  - id: "merge-cal-001"
+    name: "Managed Merge Fixtures"
+    color: "#3b82f6"

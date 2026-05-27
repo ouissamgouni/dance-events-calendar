@@ -78,6 +78,7 @@ export default function Privacy() {
                         <li>L’identifiant unique de votre compte Google (claim <code>sub</code>)</li>
                         <li>Vos événements favoris et « J’y vais » associés à votre compte</li>
                         <li>Votre lien de partage de calendrier personnel</li>
+                        <li>Votre profil public, votre visibilité de compte et votre choix d’apparaître ou non dans les suggestions</li>
                     </ul>
                     <p className="mb-2">
                         <strong>Base légale</strong> : votre consentement, donné lors de la création du compte.
@@ -198,6 +199,7 @@ export default function Privacy() {
                         <li>Your Google account’s unique identifier (the <code>sub</code> claim)</li>
                         <li>Your bookmarked and “I’m going” events linked to your account</li>
                         <li>Your personal share-my-calendar link</li>
+                        <li>Your public profile, account visibility, and whether your profile may appear in suggestions</li>
                     </ul>
                     <p className="mb-2">
                         <strong>Legal basis</strong>: your consent, given at sign-up.

@@ -546,6 +546,7 @@ class SiteSettingsResponse(BaseModel):
     # view-count signal to a commitment-weighted, time-decayed score
     # (going + saved + tiny view term, decayed by event age).
     trending_enabled: bool = False
+    trending_banner_enabled: bool = False
     # Trending-only knobs. ``trending_window_days`` is how far back the
     # going/saved/view counts are aggregated. ``trending_floor_going``
     # is the absolute floor of going RSVPs an event must clear to even
@@ -587,6 +588,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     following_badge_enabled: Optional[bool] = None
     unseen_state_enabled: Optional[bool] = None
     trending_enabled: Optional[bool] = None
+    trending_banner_enabled: Optional[bool] = None
     trending_window_days: Optional[int] = Field(default=None, ge=1, le=365)
     trending_floor_going: Optional[int] = Field(default=None, ge=0, le=1000)
     trending_top_n: Optional[int] = Field(default=None, ge=1, le=50)
@@ -1138,6 +1140,7 @@ class PublicProfileResponse(BaseModel):
     # Single account-level visibility gate ("public" | "friends"). Echoed
     # so the client can render "Friends-only" hint banners.
     account_visibility: str = "public"
+    show_in_suggestions: bool = True
     # Friend / mutual-friend counts. ``friend_count`` is the total mutual
     # follows of the owner. ``mutual_friend_count`` is the count of mutual
     # follows the *viewer* shares with the profile owner (always 0 for
@@ -1262,6 +1265,7 @@ class UpdateVisibilityRequest(BaseModel):
     share_attendance_default_audience: Optional[str] = Field(
         default=None, pattern="^(public|friends|private)$"
     )
+    show_in_suggestions: Optional[bool] = None
 
 
 class UpdateSocialLinksRequest(BaseModel):
@@ -1446,6 +1450,19 @@ class AdminUser(BaseModel):
 class AdminUserListResponse(BaseModel):
     items: list[AdminUser]
     total: int
+
+
+class AdminUserMergeRequest(BaseModel):
+    source_user_id: UUID
+    destination_user_id: UUID
+    reason: Optional[str] = Field(default=None, max_length=500)
+
+
+class AdminUserMergeResponse(BaseModel):
+    status: str
+    source_user_id: str
+    destination_user_id: str
+    summary: dict[str, int] = {}
 
 
 class AdminBlockUserRequest(BaseModel):

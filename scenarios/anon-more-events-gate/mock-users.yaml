@@ -1,0 +1,9 @@
+users:
+  - email: viewer@example.com
+    name: Gate Viewer
+    handle: viewer
+    account_visibility: public
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public

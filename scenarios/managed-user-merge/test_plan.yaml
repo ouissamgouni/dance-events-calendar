@@ -1,0 +1,120 @@
+test_plan:
+  name: "Managed User Merge — old curator into replacement Google account"
+  description: >
+    Verify the support workflow for merging an old admin-managed user into a
+    replacement user account. This covers the blocked-Google-account recovery
+    case where the replacement email/Google identity already signed in and
+    created its own user row. The destination user must keep their identity and
+    profile while the old managed user's followers, subscriptions, saved events,
+    going rows, reviews, and managed status are transferred or deduped.
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=managed-user-merge"
+    - "Run migrations first if needed: task db:migrate"
+    - >
+      Seeded users: admin, old-curator (admin-managed source), new-curator
+      (destination replacement account), alice, bruno.
+    - >
+      Seeded graph: Alice follows both old-curator and new-curator, Bruno
+      follows old-curator, and old-curator follows Bruno. This should produce
+      one deduped follow and two moved follow edges after merge.
+    - >
+      Seeded events include one old-only event and one duplicate event already
+      saved/attended/rated by both source and destination.
+    - "Use a fresh browser profile or incognito window per signed-in user."
+    - >
+      Cookie banner: accept Personalization so /api/auth/* and /api/social/*
+      requests are not blocked by the consent gate.
+
+  steps:
+    - id: 1
+      title: "Inspect the source and destination accounts before merge"
+      description: >
+        Sign in as Dev Admin and open /admin/users. Search for "curator".
+        Inspect old-curator and new-curator rows.
+      expected: >
+        old-curator@example.com has a managed badge labelled "Blocked Google
+        Account" and exposes the Merge action. new-curator@example.com is an
+        active non-admin user with no managed badge. Alice and Bruno follower
+        counts give old-curator visible social activity before the merge.
+
+    - id: 2
+      title: "Confirm public profiles show distinct pre-merge data"
+      description: >
+        In anonymous or signed-out tabs, open /u/old-curator and /u/new-curator.
+        Compare the Calendar tabs and profile headers.
+      expected: >
+        /u/old-curator shows the managed curator identity and seeded public
+        activity for evt-merge-001 and evt-merge-002. /u/new-curator keeps its
+        own handle/name and already has duplicate activity for evt-merge-002.
+        The two profiles are still separate accounts before the support action.
+
+    - id: 3
+      title: "Merge old-curator into new-curator from the Admin Users tab"
+      description: >
+        Back in /admin/users as Dev Admin, click Merge on the old-curator row.
+        Choose New Paris Curator / new-curator@example.com as the destination.
+        Enter reason "Blocked Google account recovery" and confirm.
+      expected: >
+        POST /api/social/admin/users/merge returns 200 with status="merged",
+        source_user_id for old-curator, destination_user_id for new-curator,
+        and a summary containing moved/deduped/anonymized counts. The UI shows
+        a blue success banner. old-curator disappears from the default active
+        users list; new-curator reloads with the managed badge.
+
+    - id: 4
+      title: "Destination identity/profile wins"
+      description: >
+        Search for new-curator in /admin/users and inspect the row. Then sign
+        out and sign in as New Paris Curator from /login.
+      expected: >
+        new-curator keeps email new-curator@example.com, handle @new-curator,
+        display name New Paris Curator, and can still sign in via Dev Auth.
+        It now has managed status and, if it had no label before, inherited the
+        old source label. No login path uses old-curator@example.com for the
+        merged data.
+
+    - id: 5
+      title: "Source account is soft-deleted/anonymized"
+      description: >
+        In /admin/users, toggle Include deleted and search for "merged-" or
+        "old-curator".
+      expected: >
+        The source row is visible only when deleted users are included. It has
+        a Deleted badge, anonymized email merged-<uuid>@example.invalid, no
+        handle, no provider subject, and no managed badge. Its Verify/Delete/
+        Merge actions are unavailable because it is deleted.
+
+    - id: 6
+      title: "Follower and subscription graph moved without duplicates"
+      description: >
+        Open /u/new-curator and inspect follower/following counts. Optionally
+        compare network responses for GET /api/social/admin/users?q=curator.
+      expected: >
+        Alice follows new-curator only once even though she followed both old
+        and new before the merge. Bruno's old follow to old-curator now points
+        to new-curator. old-curator's follow of Bruno now belongs to
+        new-curator. No self-follow appears.
+
+    - id: 7
+      title: "Saved, Going, and ratings moved or deduped"
+      description: >
+        Open /u/new-curator/calendar and the relevant event modals for
+        evt-merge-001 and evt-merge-002. Inspect attendee/saved state and
+        reviews where visible.
+      expected: >
+        evt-merge-001 moved from old-curator to new-curator. evt-merge-002 is
+        present once for new-curator even though both accounts had saved/going
+        state before merge. The destination rating for evt-merge-002 remains
+        attached to new-curator; the duplicate old-source rating is preserved
+        as anonymous rather than creating a second new-curator rating.
+
+    - id: 8
+      title: "Old Google identity is not automatically blocked"
+      description: >
+        In /admin/users, check the source row with Include deleted enabled and
+        the destination row. If support wants to prevent old-curator from ever
+        signing in again, use the separate Block action before or after merge.
+      expected: >
+        The merge itself does not create a blocked identity. This is intentional:
+        blocking remains a separate explicit admin action, while merge focuses
+        on moving the old managed account's data into the replacement account.

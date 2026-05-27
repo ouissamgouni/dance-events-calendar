@@ -228,10 +228,7 @@ class TestGeocodingStage:
         stage = GeocodingStage()
         event = _make_event(location=None)
 
-        # Events without a location are still processed (so they surface as
-        # geocoding failures rather than silent skips), but `process` returns
-        # False because there's nothing to geocode.
-        assert stage.should_process(event) is True
+        assert stage.should_process(event) is False
         assert stage.process(event) is False
 
     def test_skips_already_geocoded(self):

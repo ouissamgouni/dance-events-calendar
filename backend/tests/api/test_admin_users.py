@@ -24,9 +24,15 @@ from backend.api.routes import auth as auth_module  # noqa: E402
 from backend.api.routes import social as social_module  # noqa: E402
 from backend.db.database import get_session  # noqa: E402
 from backend.db.models import (  # noqa: E402
+    CalendarCurationRule,
+    CalendarSetting,
     CalendarSubscription,
+    EventRating,
     User,
+    UserAccountMerge,
+    UserEventAttendance,
     UserFollow,
+    UserSavedEvent,
 )
 
 
@@ -297,3 +303,241 @@ def test_admin_delete_user_purges_social_edges(client, session):
     # Subsequent admin lookup by id returns 404 (deleted users are excluded).
     r2 = client.delete(f"/api/social/admin/users/id/{users['carol'].id}")
     assert r2.status_code == 404
+
+
+# --- POST /admin/users/merge ------------------------------------------------
+
+
+@pytest.mark.unit
+def test_admin_merge_users_requires_admin(client, session):
+    users = _seed_users(session)
+    users["carol"].is_admin_managed = True
+    session.add(users["carol"])
+    session.commit()
+
+    _login(client, "alice@example.com")
+    r = client.post(
+        "/api/social/admin/users/merge",
+        json={
+            "source_user_id": str(users["carol"].id),
+            "destination_user_id": str(users["bob"].id),
+        },
+    )
+    assert r.status_code == 403
+
+
+@pytest.mark.unit
+def test_admin_merge_users_requires_managed_source(client, session):
+    users = _seed_users(session)
+
+    _login(client, "admin@example.com")
+    r = client.post(
+        "/api/social/admin/users/merge",
+        json={
+            "source_user_id": str(users["carol"].id),
+            "destination_user_id": str(users["bob"].id),
+        },
+    )
+    assert r.status_code == 400
+    assert r.json()["detail"] == "Source user must be admin-managed"
+
+
+@pytest.mark.unit
+def test_admin_merge_users_moves_managed_data_and_anonymizes_source(client, session):
+    users = _seed_users(session)
+    users["carol"].is_admin_managed = True
+    users["carol"].managed_label = "Old curator"
+    session.add(users["carol"])
+    session.add(CalendarSetting(calendar_id="cal-merge", name="Merge Calendar"))
+    session.add(
+        CalendarCurationRule(
+            calendar_id="cal-merge",
+            target_user_id=users["carol"].id,
+            kind="save",
+            audience="public",
+        )
+    )
+    session.add(
+        UserFollow(follower_id=users["alice"].id, followee_id=users["carol"].id)
+    )
+    session.add(
+        UserFollow(follower_id=users["carol"].id, followee_id=users["alice"].id)
+    )
+    session.add(
+        CalendarSubscription(
+            subscriber_id=users["alice"].id,
+            target_user_id=users["carol"].id,
+        )
+    )
+    session.add(
+        UserSavedEvent(
+            device_id="carol-save-device",
+            event_id="event-1",
+            user_id=users["carol"].id,
+            audience="public",
+        )
+    )
+    session.add(
+        UserEventAttendance(
+            device_id="carol-going-device",
+            event_id="event-1",
+            user_id=users["carol"].id,
+            share_audience="public",
+            share_publicly=True,
+        )
+    )
+    session.add(
+        EventRating(
+            event_id="event-1",
+            user_id=users["carol"].id,
+            stars=5,
+            status="approved",
+        )
+    )
+    session.commit()
+
+    _login(client, "admin@example.com")
+    r = client.post(
+        "/api/social/admin/users/merge",
+        json={
+            "source_user_id": str(users["carol"].id),
+            "destination_user_id": str(users["bob"].id),
+            "reason": "Google account recovery",
+        },
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["status"] == "merged"
+    assert body["summary"]["follows_moved"] == 2
+    assert body["summary"]["saved_events_moved"] == 1
+    assert body["summary"]["attendance_moved"] == 1
+
+    session.expire_all()
+    bob = session.get(User, users["bob"].id)
+    carol = session.get(User, users["carol"].id)
+    assert bob is not None
+    assert carol is not None
+    assert bob.email == "bob@example.com"
+    assert bob.provider_subject == "mock|bob@example.com"
+    assert bob.is_admin_managed is True
+    assert bob.managed_label == "Old curator"
+    assert carol.deleted_at is not None
+    assert carol.email == f"merged-{carol.id}@example.invalid"
+    assert carol.provider_subject is None
+    assert carol.handle is None
+    assert carol.is_admin_managed is False
+
+    follows = session.exec(select(UserFollow)).all()
+    assert {(f.follower_id, f.followee_id) for f in follows} == {
+        (users["alice"].id, users["bob"].id),
+        (users["bob"].id, users["alice"].id),
+    }
+    sub = session.exec(select(CalendarSubscription)).one()
+    assert sub.subscriber_id == users["alice"].id
+    assert sub.target_user_id == users["bob"].id
+    saved = session.exec(select(UserSavedEvent)).one()
+    assert saved.user_id == users["bob"].id
+    attendance = session.exec(select(UserEventAttendance)).one()
+    assert attendance.user_id == users["bob"].id
+    rule = session.exec(select(CalendarCurationRule)).one()
+    assert rule.target_user_id == users["bob"].id
+    rating = session.exec(select(EventRating)).one()
+    assert rating.user_id == users["bob"].id
+    merge = session.exec(select(UserAccountMerge)).one()
+    assert merge.source_user_id == users["carol"].id
+    assert merge.destination_user_id == users["bob"].id
+    assert merge.reason == "Google account recovery"
+
+
+@pytest.mark.unit
+def test_admin_merge_users_dedupes_existing_destination_rows(client, session):
+    users = _seed_users(session)
+    users["carol"].is_admin_managed = True
+    session.add(users["carol"])
+    session.add(CalendarSetting(calendar_id="cal-merge", name="Merge Calendar"))
+    session.add(
+        CalendarCurationRule(
+            calendar_id="cal-merge",
+            target_user_id=users["carol"].id,
+            kind="going",
+        )
+    )
+    session.add(
+        CalendarCurationRule(
+            calendar_id="cal-merge",
+            target_user_id=users["bob"].id,
+            kind="going",
+        )
+    )
+    session.add(
+        UserFollow(follower_id=users["alice"].id, followee_id=users["carol"].id)
+    )
+    session.add(UserFollow(follower_id=users["alice"].id, followee_id=users["bob"].id))
+    session.add(
+        CalendarSubscription(
+            subscriber_id=users["alice"].id,
+            target_user_id=users["carol"].id,
+            notify_new_events=False,
+        )
+    )
+    session.add(
+        CalendarSubscription(
+            subscriber_id=users["alice"].id,
+            target_user_id=users["bob"].id,
+            notify_new_events=True,
+        )
+    )
+    session.add(
+        UserSavedEvent(
+            device_id="source-save", event_id="event-1", user_id=users["carol"].id
+        )
+    )
+    session.add(
+        UserSavedEvent(
+            device_id="dest-save", event_id="event-1", user_id=users["bob"].id
+        )
+    )
+    session.add(
+        UserEventAttendance(
+            device_id="source-going", event_id="event-1", user_id=users["carol"].id
+        )
+    )
+    session.add(
+        UserEventAttendance(
+            device_id="dest-going", event_id="event-1", user_id=users["bob"].id
+        )
+    )
+    session.add(EventRating(event_id="event-1", user_id=users["carol"].id, stars=4))
+    session.add(EventRating(event_id="event-1", user_id=users["bob"].id, stars=2))
+    session.commit()
+
+    _login(client, "admin@example.com")
+    r = client.post(
+        "/api/social/admin/users/merge",
+        json={
+            "source_user_id": str(users["carol"].id),
+            "destination_user_id": str(users["bob"].id),
+        },
+    )
+    assert r.status_code == 200, r.text
+    summary = r.json()["summary"]
+    assert summary["follows_deduped"] == 1
+    assert summary["subscriptions_deduped"] == 1
+    assert summary["saved_events_deduped"] == 1
+    assert summary["attendance_deduped"] == 1
+    assert summary["curation_rules_deduped"] == 1
+    assert summary["ratings_anonymized"] == 1
+
+    session.expire_all()
+    assert len(session.exec(select(UserFollow)).all()) == 1
+    assert len(session.exec(select(CalendarSubscription)).all()) == 1
+    assert len(session.exec(select(UserSavedEvent)).all()) == 1
+    assert len(session.exec(select(UserEventAttendance)).all()) == 1
+    assert len(session.exec(select(CalendarCurationRule)).all()) == 1
+    ratings = session.exec(select(EventRating)).all()
+    assert len(ratings) == 2
+    assert sum(1 for rating in ratings if rating.user_id == users["bob"].id) == 1
+    assert (
+        sum(1 for rating in ratings if rating.user_id is None and rating.is_anonymous)
+        == 1
+    )

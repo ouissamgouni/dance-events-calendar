@@ -94,6 +94,7 @@ def _make_user(
     *,
     is_verified_organizer: bool = False,
     is_admin_managed: bool = False,
+    show_in_suggestions: bool = True,
     deleted: bool = False,
 ) -> User:
     u = User(
@@ -105,6 +106,7 @@ def _make_user(
         account_visibility="public",
         is_verified_organizer=is_verified_organizer,
         is_admin_managed=is_admin_managed,
+        show_in_suggestions=show_in_suggestions,
     )
     if deleted:
         from datetime import datetime
@@ -185,6 +187,23 @@ def test_e3_onboarding_suggestions_excludes_self_and_already_followed(client, se
     handles = [item["handle"] for item in r.json()["items"]]
     assert "org" not in handles
     assert "viewer" not in handles  # never recommend self
+
+
+def test_e3_onboarding_suggestions_excludes_opted_out_users(client, session):
+    _make_user(session, "viewer@example.com", "viewer")
+    _make_user(
+        session,
+        "hidden@example.com",
+        "hiddenorg",
+        is_verified_organizer=True,
+        show_in_suggestions=False,
+    )
+
+    _login(client, "viewer@example.com")
+    r = client.get("/api/social/onboarding/suggestions")
+    assert r.status_code == 200
+    handles = [item["handle"] for item in r.json()["items"]]
+    assert "hiddenorg" not in handles
 
 
 def test_e3_onboarding_suggestions_include_admin_managed_curators(client, session):
@@ -361,17 +380,36 @@ def test_e4_fof_suggestions_empty_when_viewer_has_no_friends(client, session):
     assert r.json() == {"items": [], "total": 0}
 
 
-def test_e4_suggestions_include_admin_managed_curators_without_mutuals(client, session):
+def test_e4_suggestions_exclude_admin_managed_curators_without_mutuals(client, session):
     _make_user(session, "viewer@example.com", "viewer")
     _make_user(session, "curator@example.com", "curator", is_admin_managed=True)
 
     _login(client, "viewer@example.com")
     r = client.get("/api/social/me/suggestions")
     assert r.status_code == 200
-    items = r.json()["items"]
-    assert [item["handle"] for item in items] == ["curator"]
-    assert items[0]["is_admin_managed"] is True
-    assert items[0]["mutual_friend_count"] == 0
+    assert r.json() == {"items": [], "total": 0}
+
+
+def test_e4_fof_suggestions_exclude_opted_out_users(client, session):
+    viewer = _make_user(session, "viewer@example.com", "viewer")
+    friend = _make_user(session, "friend@example.com", "friend")
+    hidden = _make_user(
+        session,
+        "hidden@example.com",
+        "hidden",
+        show_in_suggestions=False,
+    )
+    visible = _make_user(session, "visible@example.com", "visible")
+    _mutual(session, viewer, friend)
+    _follow(session, friend, hidden)
+    _follow(session, friend, visible)
+
+    _login(client, "viewer@example.com")
+    r = client.get("/api/social/me/suggestions")
+    assert r.status_code == 200
+    handles = [item["handle"] for item in r.json()["items"]]
+    assert "hidden" not in handles
+    assert "visible" in handles
 
 
 # --- E7: referrals ----------------------------------------------------------
@@ -935,7 +973,7 @@ def test_e8_follow_public_target_is_immediately_approved(client, session):
 
 
 def test_e8_follow_friends_only_target_creates_pending(client, session):
-    """Friends-visibility target → pending; no visibility granted."""
+    """Friends-visibility target → pending; no follower visibility granted."""
     os.environ["FEATURE_FRIEND_REQUESTS"] = "true"
     _make_user(session, "viewer@example.com", "viewer")
     _make_friends_user(session, "secret@example.com", "secret")
@@ -946,7 +984,7 @@ def test_e8_follow_friends_only_target_creates_pending(client, session):
     assert body["follow_status"] == "pending"
     assert body["is_following"] is False
     assert body["is_friend"] is False
-    assert body["is_subscribed"] is False
+    assert body["is_subscribed"] is True
     # Followers count must NOT include pending requesters.
     assert body["followers_count"] == 0
 

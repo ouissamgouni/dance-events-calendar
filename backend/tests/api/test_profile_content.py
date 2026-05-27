@@ -104,6 +104,7 @@ def _make_user(
     account_visibility: str = "public",
     is_admin_managed: bool = False,
     managed_label: str | None = None,
+    show_in_suggestions: bool = True,
     # Back-compat shims for the pre-refactor three-scope kwargs. Any
     # non-"public" value collapses to ``account_visibility="friends"``
     # (the new model's single tightened gate). Callers that explicitly
@@ -127,6 +128,7 @@ def _make_user(
         account_visibility=account_visibility,
         is_admin_managed=is_admin_managed,
         managed_label=managed_label,
+        show_in_suggestions=show_in_suggestions,
     )
     session.add(u)
     session.commit()
@@ -590,6 +592,23 @@ def test_discover_suggested_without_network_returns_curators(client, session):
     ]
 
 
+def test_discover_suggested_without_network_excludes_opted_out_curators(
+    client, session
+):
+    _make_user(session, "viewer@example.com", "viewer")
+    _make_user(
+        session,
+        "curator@example.com",
+        "curator",
+        is_admin_managed=True,
+        show_in_suggestions=False,
+    )
+
+    _login(client, "viewer@example.com")
+    body = client.get("/api/social/discover/suggested").json()
+    assert body["items"] == []
+
+
 def test_discover_suggested_friends_of_friends(client, session):
     # viewer follows alice; alice subscribes to charlie. Charlie should
     # surface for viewer (FoF), but alice should NOT (already in network).
@@ -621,3 +640,24 @@ def test_discover_suggested_excludes_already_subscribed(client, session):
     body = client.get("/api/social/discover/suggested").json()
     handles = [u["handle"] for u in body["items"]]
     assert "charlie" not in handles
+
+
+def test_discover_suggested_excludes_opted_out_network_candidates(client, session):
+    viewer = _make_user(session, "viewer@example.com", "viewer")
+    alice = _make_user(session, "alice@example.com", "alice")
+    hidden = _make_user(
+        session,
+        "hidden@example.com",
+        "hidden",
+        show_in_suggestions=False,
+    )
+    visible = _make_user(session, "visible@example.com", "visible")
+    _follow(session, viewer, alice)
+    _subscribe(session, alice, hidden)
+    _subscribe(session, alice, visible)
+
+    _login(client, "viewer@example.com")
+    body = client.get("/api/social/discover/suggested").json()
+    handles = [u["handle"] for u in body["items"]]
+    assert "hidden" not in handles
+    assert "visible" in handles

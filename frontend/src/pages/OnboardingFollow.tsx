@@ -24,10 +24,9 @@ import {
 import { useAuth } from '../context/AuthContext';
 
 /** Hard cap on how many seed suggestions we request from the backend.
- *  The endpoint accepts up to 25; we pick a middle value so the screen
- *  isn't an overwhelming wall of strangers but still gives enough choice
- *  to bootstrap a useful feed. */
-const SUGGESTION_LIMIT = 12;
+ *  The endpoint accepts up to 25; keep first-run suggestions short so
+ *  new users get a focused set plus search instead of a wall of accounts. */
+const SUGGESTION_LIMIT = 7;
 
 type FollowStatus = 'idle' | 'following' | 'unfollowing' | 'followed' | 'requested' | 'error';
 

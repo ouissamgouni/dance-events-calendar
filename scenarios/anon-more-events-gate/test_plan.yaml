@@ -1,0 +1,81 @@
+test_plan:
+  name: "Anonymous explorer more-events gate"
+  description: >
+    Verify the anonymous explorer growth gate that shows only the first
+    10 events in the current list and replaces deeper pagination with a
+    persistent sign-in boundary. The date picker and event API remain
+    unchanged: anonymous visitors can still change the timeframe, but they
+    cannot reveal more than 10 results from any one list without signing in.
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=anon-more-events-gate BROWSER=isolated RESET_BROWSER=1"
+    - >
+      Use a fresh isolated browser profile and stay signed out until the step
+      explicitly says to sign in.
+    - >
+      Seed data contains 13 public events inside the default explorer window
+      (evt-gate-001..013) and 5 more events in weeks 6–11
+      (evt-gate-014..018) so later presets still expose different results.
+
+  steps:
+    - id: 1
+      title: "Anonymous landing keeps the normal date picker and shows a locked boundary after 10 events"
+      description: >
+        Open / on a desktop viewport as an anonymous visitor. Do not change any
+        filters.
+      expected: >
+        • The date picker keeps the normal explorer behavior and still offers
+          the usual long presets such as "Next 3 months" and "Next 6 months".
+        • The event list renders exactly 10 cards, then a blue locked panel
+          (data-testid="event-list-more-events-gate") appears instead of a
+          "Show more" button.
+        • The lock copy says more events are available and the CTA reads
+          "Sign in to see more".
+
+    - id: 2
+      title: "Anonymous can change the timeframe, but each list still stops at 10"
+      description: >
+        Choose the "Next 3 months" preset or load a later range directly from
+        the URL.
+      expected: >
+        • The date picker accepts the wider range normally.
+        • The result set changes, and later fixtures such as
+          "Prague Salsa Marathon Preview" (evt-gate-014) can enter the list.
+        • Even on the wider range, the list still renders only 10 cards before
+          the locked panel appears.
+
+    - id: 3
+      title: "Anonymous API responses stay unchanged"
+      description: >
+        In the same anonymous browser session, inspect the network call for
+        GET /api/events on the wider range from step 2.
+      expected: >
+        • The response still returns the full matching dataset for that range,
+          including later fixtures such as evt-gate-014..018.
+        • The 10-event limit is a list-surface rule, not an API truncation.
+
+    - id: 4
+      title: "Sign in from the locked boundary returns to the same explorer state"
+      description: >
+        Click "Sign in to see more" from the locked panel and use the dev-auth
+        button for "Gate Viewer".
+      expected: >
+        • After sign-in, the app returns to the same explorer route and query
+          string.
+        • The locked boundary is gone.
+        • The list now shows the standard secondary CTA for deeper pagination
+          within the current window.
+
+    - id: 5
+      title: "Signed-in viewer can page past 10 items in the same list"
+      description: >
+        Still signed in as Gate Viewer, continue paging through the current
+        list and, if needed, switch to a wider preset such as "Next 3 months".
+      expected: >
+        • The list uses the normal signed-in pagination flow, not the locked
+          boundary.
+        • After paging, later fixtures appear: "Prague Salsa Marathon Preview"
+          (evt-gate-014), "Vienna Bachata Exchange" (evt-gate-015),
+          "Zurich Sunday Social" (evt-gate-016), "Copenhagen Salsa Boat Party"
+          (evt-gate-017), and "Dublin Bachata Weekender Kickoff"
+          (evt-gate-018).

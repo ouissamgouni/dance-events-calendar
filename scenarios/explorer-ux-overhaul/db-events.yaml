@@ -58,7 +58,7 @@ events:
     start: w0 Fri 19:00
     end: w0 Fri 20:30
     price_is_free: true
-    tags: ["format:class", "dance-style:salsa", "level:beginner"]
+    tags: ["format:class", "dance-style:salsa", "level:beginner-friendly"]
 
   # ── Week 0 — Saturday + Sunday ────────────────────────────────────
   - id: evt-ux-004
@@ -114,7 +114,7 @@ events:
     start: w1 Wed 19:30
     end: w1 Wed 21:00
     price_is_free: true
-    tags: ["format:class", "dance-style:bachata", "level:beginner"]
+    tags: ["format:class", "dance-style:bachata", "level:beginner-friendly"]
   - id: evt-ux-008
     calendar_id: salsa-cal-001
     title: Prague Salsa Friday Social
@@ -265,7 +265,7 @@ events:
     start: w8 Mon 19:00
     end: w8 Mon 20:30
     price_is_free: true
-    tags: ["format:class", "dance-style:salsa", "level:beginner"]
+    tags: ["format:class", "dance-style:salsa", "level:beginner-friendly"]
   - id: evt-ux-019
     calendar_id: bachata-cal-002
     title: Tel Aviv Bachata Thursday Drop-in

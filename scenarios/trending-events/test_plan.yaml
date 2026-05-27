@@ -1,210 +1,171 @@
 test_plan:
-  name: "Trending Events — popularity score (Track 3)"
+  name: "Trending Events — filtered compact banner"
   description: >
-    Verify the new commitment-weighted popularity score end-to-end. The
-    score is `raw / (hours_age + 24)^0.4` where
-    `raw = 5*going + 1*saved + 0.05*view`, gated by `trending_floor_going`
-    (events with fewer than N going RSVPs are floored to 0) and
-    unconditionally 0 for past events. The seed below produces a
-    deterministic ordering on first boot:
-
-      Sort by Popular ↓ MUST be:
-        1. Headliner Salsa Saturday      (evt-trend-001) — going-heavy
-        2. Bachata Workshop with Carlos  (evt-trend-002) — saved-heavy
-        3. Cuban Night (boundary case)   (evt-trend-003) — at floor
-
-      And MUST NOT contain:
-        * View-Bait Free Bachata Crash Course (evt-trend-004) — under floor
-        * Last Week's Salsa Tuesday           (evt-trend-005) — past
+    Verify the commitment-weighted popularity score end-to-end and the
+    Explorer compact trending banner. The score is
+    `raw / (hours_age + 24)^0.4`, where
+    `raw = 5*going + 1*saved + 0.05*view`, gated by
+    `trending_floor_going` and suppressed for past events. This scenario
+    seeds enough eligible events for more than one banner card, and it
+    verifies that the banner is scoped to the user's active filters.
 
   preconditions:
     - "Run with: task start:scenario SCENARIO=trending-events"
     - >
-      The scenario pre-seeds 5 candidate events plus 5 mock users with
-      attendances (going), saves, and views calibrated so the ranking is
-      deterministic — see the comment block at the top of db-events.yaml.
-    - "settings.yaml flips on `trending_enabled` and `show_popularity` so the badge renders without admin intervention."
+      settings.yaml enables `show_popularity`, `trending_enabled`, and
+      `trending_banner_enabled`, with `trending_top_n: 5` and
+      `trending_top_percent: 100` so the banner starts with multiple
+      horizontal cards.
+    - >
+      The scenario pre-seeds future events, attendances, saves, and views
+      calibrated so the expected global ranking starts with:
+      evt-trend-001 Headliner Salsa Saturday, evt-trend-002 Bachata
+      Workshop with Carlos & Maria, then the next eligible lower-scoring
+      events.
 
   steps:
     - id: 1
-      title: "Sort-by-Popular surfaces the going-heaviest event first"
+      title: "Compact trending banner renders before the map and collapses"
       description: >
-        Open / (Home, signed out is fine — the score is global and does
-        not depend on the viewer). In the event list panel, click the
-        "Popular" sort chip.
+        Open / in Explorer with the default scenario settings. The viewer
+        may be signed out; popularity is global.
       expected: >
-        Network: GET /api/events returns each event with a non-zero
-        `popularity_score` for evt-trend-001/002/003 and `popularity_score=0`
-        for evt-trend-004 (under floor) and evt-trend-005 (past). The list
-        re-renders sorted by popularity descending; the first card is
-        evt-trend-001 (Headliner Salsa Saturday) carrying a 🔥 Trending
-        badge (it is the top of the visible top-3).
+        A compact horizontal banner appears directly above the Explorer map.
+        Its only header is a small clickable "Trending" row with the same
+        `/trending.png` icon used by trending map pins and compact blue text. There is no "scoped" count and no
+        explanatory subtext. Clicking the Trending header collapses the
+        event rail; clicking it again expands the rail.
+        Each card shows a title truncated to 20 characters max, date,
+        right-aligned attendance stats on the date row as icons plus counts
+        (the same raised-hand icon used by Going, and the same bookmark icon
+        used by Save), and an address truncated to 20 characters max. Tag
+        pills do not render inside the banner cards.
+
+    - id: 1a
+      title: "Hovering a banner card highlights the matching map pin"
+      description: >
+        Hover the first card in the compact Trending banner, then move the
+        pointer away. Repeat with keyboard focus by tabbing onto the card.
+      expected: >
+        While hovered or focused, the matching map pin switches to the same
+        highlighted pin treatment used when hovering that event from the main
+        event list. Moving away or blurring the card clears the pin highlight.
 
     - id: 2
-      title: "Saved-heavy event ranks second, not first"
+      title: "Scenario starts with more than one trending banner card"
       description: >
-        Still on / with sort=Popular, look at the second card.
+        With the default filters unchanged, inspect the banner and the
+        GET /api/events response.
       expected: >
-        evt-trend-002 (Bachata Workshop) is the second card, also
-        decorated with 🔥 Trending. This proves the 5x weighting on going
-        beats a +3 saves advantage (4*5+3 = 23 vs 2*5+5 = 15).
+        The banner shows multiple horizontally scrollable cards. The first
+        card is evt-trend-001 (Headliner Salsa Saturday), and evt-trend-002
+        (Bachata Workshop with Carlos & Maria) is also present. Both events
+        have non-zero `popularity_score`, visible `going_count`, and visible
+        `saved_count` values in the API payload. evt-trend-004
+        (View-Bait — Free Bachata Crash Course) is absent from the banner
+        because its score is 0 under the going floor.
 
     - id: 3
-      title: "Anti-view-bait floor blocks evt-trend-004 from trending"
+      title: "Popular sort still ranks by the same score"
       description: >
-        Scroll the list. Locate evt-trend-004 (View-Bait — Free Bachata
-        Crash Course). Inspect the response payload for the event in the
-        network tab.
+        In the event list panel, click the "Popular" sort chip.
       expected: >
-        evt-trend-004 has `popularity_score == 0.0` despite having ~5x
-        more views than the runner-up. No 🔥 badge appears on the card.
-        Demonstrates `trending_floor_going` correctly suppresses
-        zero-commitment events from trending. (The legacy 👁 view-count
-        chip is also hidden in trending mode.)
+        The list sorts by `popularity_score` descending. evt-trend-001 is
+        first and evt-trend-002 is above lower-scoring events. The banner
+        keeps the same top scoped events, proving the card rail and list
+        sort use the same server-provided score.
 
     - id: 4
-      title: "Past-event guard suppresses evt-trend-005 from trending"
+      title: "Bachata filter scopes the banner away from the salsa headliner"
       description: >
-        Locate evt-trend-005 (Last Week's Salsa Tuesday). It already
-        ended — by default the explorer hides past events, so toggle the
-        date range to include "last week" before it shows up.
+        Open Filters and select the Bachata dance-style tag. Leave the date
+        and area filters unchanged.
       expected: >
-        Even with 3 going + 2 saved (more than evt-trend-003), the past
-        event has `popularity_score == 0.0` and no 🔥 badge. Proves the
-        `e.end < now` guard is unconditional.
+        The banner recomputes from the filtered Explorer result set. The
+        salsa-only Headliner Salsa Saturday (evt-trend-001) disappears from
+        the banner. Bachata candidates such as evt-trend-002 (Bachata
+        Workshop with Carlos & Maria), evt-trend-011 (Rome Bachata Rooftop),
+        evt-trend-013 (Lisbon Kizomba & Bachata Night), evt-trend-016
+        (Copenhagen Latin Friday), evt-trend-019 (Warsaw Bachata Sensual
+        Festival kickoff night), or evt-trend-022 (Berlin Sensual Bachata
+        Pop-up) can appear depending on the effective cap. This proves the
+        rail is trending within the active filters, not globally trending.
 
     - id: 5
-      title: "Admin UI exposes Trending toggle + window + floor controls"
+      title: "Salsa filter restores the salsa trend set"
       description: >
-        Sign in as admin (admin@example.com). Navigate to /admin and pick
-        the Configuration tab. In the right-hand feature-flag panel
-        verify that the following controls are present in this order
-        (under "Show popularity"):
-          - "Trending" toggle (currently ON because settings.yaml seeded
-            `trending_enabled: true`)
-          - "Trending window (days)" numeric input (seeded value: 30)
-          - "Trending floor (going)" numeric input (seeded value: 1)
-          - "Trending top N" numeric input (seeded value: 5)
-          - "Trending top %" numeric input (seeded value: 10)
-          - "Following badge" toggle (independent — should be OFF here)
-          - "Unseen state" toggle (independent — should be OFF here)
+        Clear the Bachata filter and select the Salsa dance-style tag.
       expected: >
-        All controls render and reflect the seeded values. The four
-        Trending sub-inputs are only visible when the Trending toggle is
-        ON (toggle it off and back on to verify they collapse / expand).
-        Each control's helper text is visible explaining its effect on
-        the score.
+        The banner updates again. evt-trend-001 returns because it matches
+        the Salsa filter. Bachata-only events such as evt-trend-002 are no
+        longer shown. Multi-style events that include Salsa may still appear
+        if their score is high enough for the scoped cap.
 
     - id: 6
-      title: "Raising trending_floor_going via the UI suppresses the boundary event"
+      title: "Committed area filter scopes the banner; casual map pan does not"
       description: >
-        Still on /admin/configuration, change "Trending floor (going)"
-        from 1 to 2 (Tab or Enter to commit). Reload / in another tab.
+        Pan the map without clicking "Search this area," then inspect the
+        banner. Next, pan/zoom to Berlin and click "Search this area."
       expected: >
-        Network: PUT /api/settings → 200 with `trending_floor_going: 2`.
-        On reload, evt-trend-003 (Cuban Night, only 1 going) now has
-        `popularity_score == 0` and loses the 🔥 badge — proves the
-        floor input is wired to the live algorithm. Lower it back to 1
-        and the badge returns.
+        Casual panning alone does not change the banner contents. After
+        clicking "Search this area," the area becomes an active Explorer
+        filter and the banner recomputes from that area-scoped result set.
+        Berlin events such as evt-trend-002 or evt-trend-022 can remain;
+        Paris-only events such as evt-trend-001 disappear if outside the
+        committed area.
 
     - id: 7
-      title: "Shrinking trending_window_days excludes older signals"
+      title: "Admin toggle controls the banner independently"
       description: >
-        Set "Trending window (days)" to 1 (Tab to commit). Reload /.
+        Sign in as admin@example.com, open /admin/configuration, and inspect
+        the Trending section.
       expected: >
-        Network: PUT /api/settings → 200 with `trending_window_days: 1`.
-        Going / saved / view counts older than 24h are dropped from the
-        score. In a fresh seed run all signals were just inserted (so
-        nothing changes); to fully demonstrate, advance system clock or
-        wait > 24h. Reset the window to 30 before continuing.
+        The main Trending toggle is ON. A separate "Trending banner" toggle
+        is visible under the Trending section and is ON from settings.yaml.
+        Turning "Trending banner" OFF hides the Explorer banner after reload
+        while the list/map Trending chips and rings remain enabled. Turning
+        the main Trending toggle OFF hides the banner and the other trending
+        surfaces.
 
     - id: 8
-      title: "Toggling Trending OFF hides the popularity badge entirely"
+      title: "Cap controls change banner card count"
       description: >
-        On /admin/configuration flip the "Trending" toggle off. The
-        sub-inputs (window / floor) collapse. Reload /.
+        In /admin/configuration, change Trending top N from 5 to 1 and reload
+        /. Then restore top N to 5 and change Trending top % from 100 to 10.
       expected: >
-        No event card shows a Trending chip. The legacy view-count
-        fallback ("🔥 Popular" / "👁 N") has been removed — the
-        commitment-weighted score is now the only popularity signal in
-        the product. Sort-by-Popular still ranks by `popularity_score`
-        (so evt-trend-004 with 200 views + 0 going stays near the
-        bottom, proving view-bait can never win even with the badge
-        hidden). Re-enable Trending and the orange chips return.
+        With top N = 1, the banner shows exactly one card: evt-trend-001 in
+        the unfiltered scope. Restoring top N to 5 and setting top % to 10
+        reduces the effective cap, so the banner shows fewer cards than the
+        seeded baseline. Restore top N = 5 and top % = 100 before continuing.
 
     - id: 9
-      title: "Trending pins get an orange ring overlay"
+      title: "Anti-view-bait floor blocks evt-trend-004"
       description: >
-        Re-enable Trending. Reload / and confirm the explorer map is
-        visible. Locate the pins for the top-3 events by
-        `popularity_score` (those whose card shows the orange "🔥
-        Trending" chip).
+        Locate evt-trend-004 (View-Bait — Free Bachata Crash Course) in the
+        list or API response.
       expected: >
-        Each of those pins renders a thin orange ring (#f97316) drawn
-        just inside its colored disc. Non-trending pins render the
-        standard disc with no ring. Toggling Trending OFF removes the
-        ring from all pins on the next reload. Proves the pin and the
-        card use the same top-3 + above-threshold rule.
+        evt-trend-004 has `popularity_score == 0.0` despite its seeded views.
+        It does not appear in the compact banner, does not get the card
+        Trending chip, and does not get a map ring. This proves views alone
+        cannot trend.
 
     - id: 10
-      title: "Top-3 cap holds across an expanded European dataset"
+      title: "Raising trending_floor_going suppresses boundary events"
       description: >
-        The seed includes 15 additional "spread" events (evt-trend-010
-        through evt-trend-023) scattered across Amsterdam, Rome,
-        Barcelona, Lisbon, Prague, Vienna, Copenhagen, Dublin,
-        Stockholm, Warsaw, Zurich, Paris, Berlin and Brussels, with
-        each carrying 1-2 going RSVPs (above the floor, but well below
-        evt-trend-001/002). Pan the map across Europe so multiple
-        cities are visible.
+        In /admin/configuration, change Trending floor (going) from 1 to 2
+        and reload /.
       expected: >
-        Even with 20+ "trending-eligible" events visible, only the
-        top-3 by `popularity_score` — evt-trend-001 (Paris),
-        evt-trend-002 (Berlin) and evt-trend-003 (Brussels) — wear the
-        orange ring and the orange Trending chip. Proves the cap
-        prevents the badge from inflating into noise as the candidate
-        pool grows. Card layout uses the compact bottom-left "🔥 Top
-        N" chip (text-[10px], square corners), matching the frontend
-        instructions.
+        PUT /api/settings returns 200 with `trending_floor_going: 2`.
+        One-going events such as evt-trend-003 lose their non-zero score and
+        drop out of the banner/chip/ring surfaces. Lower the floor back to 1
+        and reload to restore the seeded baseline.
 
     - id: 11
-      title: "Admin UI exposes Trending top N + Trending top %; effective cap is min(N, ceil(visible × %/100))"
+      title: "Past-event guard suppresses evt-trend-005"
       description: >
-        Settings seed `trending_top_n: 5` and `trending_top_percent: 10`.
-        With ~23 trending-eligible events visible, the percent gate
-        (ceil(23 × 0.10) = 3) wins over the absolute cap (5), so on
-        first boot exactly 3 events get the ring + chip — the same
-        three asserted in step 10.
-
-        Sign in as admin, open /admin → Configuration. Under the
-        Trending toggle confirm two new inputs are rendered in this
-        order after "Trending floor (going)":
-          - "Trending top N" (seeded value: 5, range 1-50)
-          - "Trending top %" (seeded value: 10, range 1-100)
-
-        Run each of the following knob changes (commit each with Tab
-        or Enter, reload / between changes, and verify on BOTH the
-        list cards AND the map pin rings):
-
-          (a) Change top N from 5 → 1. PUT /api/settings → 200
-              `{trending_top_n: 1}`. Effective cap = min(1, 3) = 1.
-              Exactly one event keeps its 🔥 chip + ring (the highest
-              `popularity_score`, evt-trend-001).
-          (b) Reset top N to 5. Effective cap returns to 3.
-          (c) Change top % from 10 → 5. PUT /api/settings → 200
-              `{trending_top_percent: 5}`. Effective cap =
-              min(5, ceil(23 × 0.05) = 2) = 2. Exactly two events
-              keep their chip + ring.
-          (d) Reset top % to 100. Effective cap = min(5, 23) = 5.
-              Five events now wear the chip + ring, proving the
-              percent ceiling was the gate (not top N).
-          (e) Restore the seeded values (top N = 5, top % = 10) so
-              subsequent runs/steps see the documented baseline.
-
+        Expand the date range to include last week and locate evt-trend-005
+        (Last Week's Salsa Tuesday).
       expected: >
-        Both inputs render with helper text explaining the
-        min(N, ceil(visible × %/100)) formula. Each PUT round-trips
-        through /api/settings and the count of orange rings on the
-        map matches the count of orange chips in the list at every
-        intermediate state — proving the cap is shared end-to-end
-        between PopularityBadge (list) and EventMap (pins) and that
-        both knobs are individually wired.
+        Even with seeded going and saved signals, the past event has
+        `popularity_score == 0.0` and never appears in the banner or receives
+        a Trending chip/ring.

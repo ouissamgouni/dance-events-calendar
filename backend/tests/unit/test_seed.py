@@ -6,7 +6,7 @@ from pathlib import Path
 
 from sqlmodel import SQLModel, Session, create_engine, select
 
-from backend.db.models import Tag, TagGroup, User
+from backend.db.models import CalendarSubscription, Tag, TagGroup, User
 from backend.db.seed import DatabaseSeeder, resolve_relative_dt
 from backend.db import seed as seed_module
 
@@ -202,6 +202,49 @@ class TestDatabaseSeeder:
         assert user.is_admin_managed is True
         assert user.share_attendance_default is True
         assert user.share_attendance_default_audience == "public"
+
+    def test_seed_approved_follows_create_calendar_subscriptions(
+        self, tmp_path, monkeypatch
+    ):
+        scenarios_dir = tmp_path / "scenarios"
+        scenario_dir = scenarios_dir / "follows"
+        scenario_dir.mkdir(parents=True)
+        (scenario_dir / "mock-users.yaml").write_text(
+            "users:\n"
+            "  - email: alice@example.com\n"
+            "    name: Alice\n"
+            "    handle: alice\n"
+            "  - email: curator@example.com\n"
+            "    name: Curator\n"
+            "    handle: curator\n"
+            "    is_admin_managed: true\n"
+        )
+        (scenario_dir / "db-follows.yaml").write_text(
+            "follows:\n"
+            "  - follower: alice\n"
+            "    followee: curator\n"
+        )
+        monkeypatch.setattr(seed_module, "SCENARIOS_DIR", scenarios_dir)
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            DatabaseSeeder(session).seed(scenario_dir)
+
+            alice = session.exec(select(User).where(User.handle == "alice")).one()
+            curator = session.exec(select(User).where(User.handle == "curator")).one()
+            sub = session.exec(
+                select(CalendarSubscription).where(
+                    CalendarSubscription.subscriber_id == alice.id,
+                    CalendarSubscription.target_user_id == curator.id,
+                )
+            ).first()
+
+        assert sub is not None
+        assert sub.notify_new_events is True
 
     def test_all_scenarios_have_tag_and_user_coverage(self):
         import yaml

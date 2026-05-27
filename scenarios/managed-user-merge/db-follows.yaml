@@ -1,0 +1,12 @@
+# Seed graph intentionally includes duplicates after merge:
+# - Alice follows both old-curator and new-curator, so merge must dedupe.
+# - old-curator follows Bruno, so destination should inherit that following edge.
+follows:
+  - follower: alice
+    followee: old-curator
+  - follower: alice
+    followee: new-curator
+  - follower: bruno
+    followee: old-curator
+  - follower: old-curator
+    followee: bruno

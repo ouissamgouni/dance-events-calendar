@@ -5,12 +5,19 @@ from unittest.mock import MagicMock, patch
 from datetime import datetime
 
 from fastapi.testclient import TestClient
-from sqlmodel import Session
+from sqlalchemy.pool import StaticPool
+from sqlmodel import Session, SQLModel, create_engine
 
 from backend.api.main import app
 from backend.api.deps import require_admin
 from backend.db.database import get_session
-from backend.db.models import BlockedEvent, CachedEvent, CalendarSetting, EventView
+from backend.db.models import (
+    BlockedEvent,
+    CachedEvent,
+    CalendarSetting,
+    EventView,
+    SiteSetting,
+)
 
 
 def _fake_admin():
@@ -36,6 +43,28 @@ def make_session_with_data(calendars=None, events=None):
 
     session.exec = mock_exec
     return session
+
+
+@pytest.fixture
+def sqlite_client():
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    SQLModel.metadata.create_all(engine)
+
+    def _override():
+        with Session(engine) as session:
+            yield session
+
+    app.dependency_overrides[get_session] = _override
+    app.dependency_overrides[require_admin] = _fake_admin
+    try:
+        yield TestClient(app), engine
+    finally:
+        app.dependency_overrides.clear()
+        SQLModel.metadata.drop_all(engine)
 
 
 @pytest.fixture
@@ -72,6 +101,31 @@ class TestHealthEndpoint:
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "ok"
+
+
+@pytest.mark.unit
+class TestSettingsEndpoint:
+    def test_settings_returns_trending_banner_default_false(self, sqlite_client):
+        client, _engine = sqlite_client
+        resp = client.get("/api/settings")
+        assert resp.status_code == 200
+        assert resp.json()["trending_banner_enabled"] is False
+
+    def test_admin_can_update_trending_banner_flag(self, sqlite_client):
+        client, engine = sqlite_client
+
+        resp = client.put("/api/settings", json={"trending_banner_enabled": True})
+        assert resp.status_code == 200
+        assert resp.json()["trending_banner_enabled"] is True
+
+        with Session(engine) as session:
+            row = session.get(SiteSetting, "trending_banner_enabled")
+            assert row is not None
+            assert row.value == "true"
+
+        resp = client.get("/api/settings")
+        assert resp.status_code == 200
+        assert resp.json()["trending_banner_enabled"] is True
 
 
 @pytest.mark.unit
@@ -384,13 +438,16 @@ class TestGeocodeEndpoint:
     def test_geocode_search_returns_results(self):
         app.dependency_overrides[require_admin] = _fake_admin
         try:
-            with patch("geopy.geocoders.Nominatim") as MockNom:
-                mock_result = MagicMock()
-                mock_result.address = "Paris, France"
-                mock_result.latitude = 48.8566
-                mock_result.longitude = 2.3522
-                MockNom.return_value.geocode.return_value = [mock_result]
-
+            with patch(
+                "backend.api.routes.admin.search_locations",
+                return_value=[
+                    {
+                        "display_name": "Paris, France",
+                        "latitude": 48.8566,
+                        "longitude": 2.3522,
+                    }
+                ],
+            ):
                 client = TestClient(app)
                 resp = client.get("/api/admin/geocode?q=Paris")
                 assert resp.status_code == 200

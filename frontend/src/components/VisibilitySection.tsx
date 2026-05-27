@@ -20,7 +20,7 @@ const ACCOUNT_VISIBILITY_OPTIONS: { value: AccountVisibility; label: string; hel
     {
         value: 'friends',
         label: 'Friends only',
-        help: 'Only mutual followers (friends) can see your profile, calendar, and activity.',
+        help: 'Only mutual followers (friends) can see your profile, calendar, and activity. People can still find you by search to request access.',
     },
 ];
 
@@ -83,9 +83,25 @@ export default function VisibilitySection({ handle }: { handle: string | null })
         }
     };
 
+    const setSuggestionVisibility = async (value: boolean) => {
+        if (!profile) return;
+        const prev = profile;
+        setProfile({ ...profile, show_in_suggestions: value });
+        setSavingScope('show_in_suggestions');
+        try {
+            const next = await updateMyVisibility({ show_in_suggestions: value });
+            setProfile(next);
+        } catch (err) {
+            setProfile(prev);
+            setError(err instanceof Error ? err.message : 'Failed to save');
+        } finally {
+            setSavingScope(null);
+        }
+    };
+
     if (!handle) {
         return (
-            <section className="rounded-lg border border-slate-200 bg-white p-4 mb-3">
+            <section className="border border-slate-200 bg-white p-4 mb-3">
                 <h2 className="text-sm font-semibold text-slate-900 mb-2">Privacy &amp; visibility</h2>
                 <p className="text-xs text-slate-600">
                     Pick a handle above to enable your public profile and visibility settings.
@@ -95,7 +111,7 @@ export default function VisibilitySection({ handle }: { handle: string | null })
     }
 
     return (
-        <section className="rounded-lg border border-slate-200 bg-white p-4 mb-3">
+        <section className="border border-slate-200 bg-white p-4 mb-3">
             <div className="flex items-start justify-between gap-3 mb-3">
                 <div>
                     <h2 className="text-sm font-semibold text-slate-900">Privacy &amp; visibility</h2>
@@ -161,6 +177,30 @@ export default function VisibilitySection({ handle }: { handle: string | null })
                                 );
                             })}
                         </div>
+                    </div>
+                    <div className="border-t border-slate-100 pt-4">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                            Discoverability
+                        </div>
+                        <label className="flex items-start gap-3 border border-slate-200 bg-white px-4 py-3">
+                            <input
+                                type="checkbox"
+                                checked={profile.show_in_suggestions}
+                                disabled={savingScope === 'show_in_suggestions'}
+                                onChange={(e) => void setSuggestionVisibility(e.target.checked)}
+                                className="mt-0.5 h-4 w-4 border-slate-300 text-blue-500 focus:ring-blue-500 disabled:opacity-50"
+                            />
+                            <span>
+                                <span className="block text-xs font-medium text-slate-900">
+                                    Suggest my profile to others
+                                </span>
+                                <span className="mt-1 block text-xs text-slate-500">
+                                    When enabled, your profile can appear in onboarding, Discover,
+                                    and network suggestions. Search by handle is controlled separately
+                                    by account visibility.
+                                </span>
+                            </span>
+                        </label>
                     </div>
                     <div className="border-t border-slate-100 pt-4">
                         <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">

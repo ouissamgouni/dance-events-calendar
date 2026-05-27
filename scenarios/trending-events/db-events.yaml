@@ -49,14 +49,14 @@ events:
     price_min: 15
     price_currency: EUR
     tags:
-    - format:social
-    - dance-style:salsa
-    - level:all-levels
-    - venue:indoor
-    - scale:medium
-    - scope:local
-    - vibe:good-music
-    - vibe:social-atmosphere
+      - format:social
+      - dance-style:salsa
+      - level:all-levels
+      - venue:indoor
+      - scale:medium
+      - scope:local
+      - vibe:good-music
+      - vibe:social-atmosphere
   - id: evt-trend-002
     calendar_id: bachata-cal-002
     title: Bachata Workshop with Carlos & Maria
@@ -71,12 +71,12 @@ events:
     price_min: 30
     price_currency: EUR
     tags:
-    - format:workshop
-    - dance-style:bachata
-    - level:all-levels
-    - venue:indoor
-    - scale:small
-    - scope:local
+      - format:workshop
+      - dance-style:bachata
+      - level:all-levels
+      - venue:indoor
+      - scale:small
+      - scope:local
   - id: evt-trend-003
     calendar_id: salsa-cal-001
     title: Cuban Night (boundary case)
@@ -89,13 +89,13 @@ events:
     end: w1 Sat 00:00
     price_is_free: true
     tags:
-    - format:social
-    - dance-style:salsa
-    - level:all-levels
-    - venue:indoor
-    - scale:medium
-    - scope:local
-    - vibe:social-atmosphere
+      - format:social
+      - dance-style:salsa
+      - level:all-levels
+      - venue:indoor
+      - scale:medium
+      - scope:local
+      - vibe:social-atmosphere
   - id: evt-trend-004
     calendar_id: bachata-cal-002
     title: View-Bait — Free Bachata Crash Course
@@ -110,12 +110,12 @@ events:
     end: w1 Sun 18:00
     price_is_free: true
     tags:
-    - format:social
-    - dance-style:bachata
-    - level:all-levels
-    - venue:indoor
-    - scale:medium
-    - scope:local
+      - format:social
+      - dance-style:bachata
+      - level:all-levels
+      - venue:indoor
+      - scale:medium
+      - scope:local
   - id: evt-trend-005
     calendar_id: salsa-cal-001
     title: Last Week's Salsa Tuesday (past)
@@ -129,18 +129,18 @@ events:
     end: w-1 Wed 00:00
     price_is_free: true
 
-  # --- Geographic + temporal spread (proves top-3 cap with many
-  # candidates, and incidentally feeds the explorer map with a healthy
-  # multi-city dataset). Engineered going/saved counts keep these BELOW
-  # the top-3 of evt-trend-001/002/003 so the trending chip distribution
-  # stays predictable, while still exercising the threshold gate. ---
+    # --- Geographic + temporal spread (proves the cap with many
+    # candidates, and incidentally feeds the explorer map with a healthy
+    # multi-city dataset). Engineered going/saved counts keep these BELOW
+    # evt-trend-001/002 and below the configured top-N banner/ring cap,
+    # while still exercising the threshold gate. ---
     tags:
-    - format:social
-    - dance-style:salsa
-    - level:all-levels
-    - venue:indoor
-    - scale:medium
-    - scope:local
+      - format:social
+      - dance-style:salsa
+      - level:all-levels
+      - venue:indoor
+      - scale:medium
+      - scope:local
   - id: evt-trend-010
     calendar_id: salsa-cal-001
     title: Amsterdam Salsa Sunday
@@ -154,13 +154,13 @@ events:
     price_min: 10
     price_currency: EUR
     tags:
-    - format:social
-    - dance-style:salsa
-    - level:all-levels
-    - venue:indoor
-    - scale:medium
-    - scope:local
-    - vibe:social-atmosphere
+      - format:social
+      - dance-style:salsa
+      - level:all-levels
+      - venue:indoor
+      - scale:medium
+      - scope:local
+      - vibe:social-atmosphere
   - id: evt-trend-011
     calendar_id: bachata-cal-002
     title: Rome Bachata Rooftop
@@ -174,12 +174,12 @@ events:
     price_min: 12
     price_currency: EUR
     tags:
-    - format:social
-    - dance-style:bachata
-    - level:all-levels
-    - venue:rooftop
-    - scale:medium
-    - scope:local
+      - format:social
+      - dance-style:bachata
+      - level:all-levels
+      - venue:rooftop
+      - scale:medium
+      - scope:local
   - id: evt-trend-012
     calendar_id: salsa-cal-001
     title: Barcelona Salsa Open Air
@@ -191,13 +191,13 @@ events:
     end: w3 Sat 01:00
     price_is_free: true
     tags:
-    - format:social
-    - dance-style:salsa
-    - level:all-levels
-    - venue:outdoor
-    - scale:medium
-    - scope:local
-    - vibe:social-atmosphere
+      - format:social
+      - dance-style:salsa
+      - level:all-levels
+      - venue:outdoor
+      - scale:medium
+      - scope:local
+      - vibe:social-atmosphere
   - id: evt-trend-013
     calendar_id: bachata-cal-002
     title: Lisbon Kizomba & Bachata Night
@@ -211,14 +211,14 @@ events:
     price_min: 8
     price_currency: EUR
     tags:
-    - format:social
-    - dance-style:bachata
-    - dance-style:kizomba
-    - level:all-levels
-    - venue:indoor
-    - scale:medium
-    - scope:local
-    - vibe:social-atmosphere
+      - format:social
+      - dance-style:bachata
+      - dance-style:kizomba
+      - level:all-levels
+      - venue:indoor
+      - scale:medium
+      - scope:local
+      - vibe:social-atmosphere
   - id: evt-trend-014
     calendar_id: salsa-cal-001
     title: Prague Salsa Tuesday
@@ -230,13 +230,13 @@ events:
     end: w4 Wed 00:30
     price_is_free: true
     tags:
-    - format:social
-    - dance-style:salsa
-    - level:all-levels
-    - venue:indoor
-    - scale:medium
-    - scope:local
-    - vibe:social-atmosphere
+      - format:social
+      - dance-style:salsa
+      - level:all-levels
+      - venue:indoor
+      - scale:medium
+      - scope:local
+      - vibe:social-atmosphere
   - id: evt-trend-015
     calendar_id: bachata-cal-002
     title: Vienna Bachata Brunch
@@ -250,13 +250,13 @@ events:
     price_min: 18
     price_currency: EUR
     tags:
-    - format:social
-    - dance-style:bachata
-    - level:all-levels
-    - venue:indoor
-    - scale:medium
-    - scope:local
-    - vibe:social-atmosphere
+      - format:social
+      - dance-style:bachata
+      - level:all-levels
+      - venue:indoor
+      - scale:medium
+      - scope:local
+      - vibe:social-atmosphere
   - id: evt-trend-016
     calendar_id: salsa-cal-001
     title: Copenhagen Latin Friday
@@ -270,14 +270,14 @@ events:
     price_min: 14
     price_currency: EUR
     tags:
-    - format:social
-    - dance-style:salsa
-    - dance-style:bachata
-    - dance-style:kizomba
-    - level:all-levels
-    - venue:indoor
-    - scale:medium
-    - scope:local
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - level:all-levels
+      - venue:indoor
+      - scale:medium
+      - scope:local
   - id: evt-trend-017
     calendar_id: bachata-cal-002
     title: Dublin Salsa Tuesday
@@ -289,14 +289,14 @@ events:
     end: w4 Tue 23:30
     price_is_free: true
     tags:
-    - format:social
-    - dance-style:salsa
-    - dance-style:bachata
-    - level:beginner-friendly
-    - venue:indoor
-    - scale:medium
-    - scope:local
-    - vibe:social-atmosphere
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - level:beginner-friendly
+      - venue:indoor
+      - scale:medium
+      - scope:local
+      - vibe:social-atmosphere
   - id: evt-trend-018
     calendar_id: salsa-cal-001
     title: Stockholm Salsa Open Stage
@@ -310,13 +310,13 @@ events:
     price_min: 16
     price_currency: SEK
     tags:
-    - format:social
-    - dance-style:salsa
-    - level:all-levels
-    - venue:indoor
-    - scale:medium
-    - scope:local
-    - vibe:good-music
+      - format:social
+      - dance-style:salsa
+      - level:all-levels
+      - venue:indoor
+      - scale:medium
+      - scope:local
+      - vibe:good-music
   - id: evt-trend-019
     calendar_id: bachata-cal-002
     title: Warsaw Bachata Sensual Festival (kickoff night)
@@ -330,13 +330,13 @@ events:
     price_min: 35
     price_currency: EUR
     tags:
-    - format:festival
-    - dance-style:bachata
-    - level:all-levels
-    - venue:indoor
-    - scale:large
-    - scope:international
-    - vibe:social-atmosphere
+      - format:festival
+      - dance-style:bachata
+      - level:all-levels
+      - venue:indoor
+      - scale:large
+      - scope:international
+      - vibe:social-atmosphere
   - id: evt-trend-020
     calendar_id: salsa-cal-001
     title: Zurich Salsa Lake Cruise
@@ -350,13 +350,13 @@ events:
     price_min: 40
     price_currency: CHF
     tags:
-    - format:social
-    - dance-style:salsa
-    - level:all-levels
-    - venue:outdoor
-    - scale:medium
-    - scope:local
-    - vibe:social-atmosphere
+      - format:social
+      - dance-style:salsa
+      - level:all-levels
+      - venue:outdoor
+      - scale:medium
+      - scope:local
+      - vibe:social-atmosphere
   - id: evt-trend-021
     calendar_id: salsa-cal-001
     title: Paris Salsa Riverside Picnic
@@ -368,13 +368,13 @@ events:
     end: w2 Sat 18:00
     price_is_free: true
     tags:
-    - format:social
-    - dance-style:salsa
-    - level:all-levels
-    - venue:outdoor
-    - scale:medium
-    - scope:local
-    - vibe:social-atmosphere
+      - format:social
+      - dance-style:salsa
+      - level:all-levels
+      - venue:outdoor
+      - scale:medium
+      - scope:local
+      - vibe:social-atmosphere
   - id: evt-trend-022
     calendar_id: bachata-cal-002
     title: Berlin Sensual Bachata Pop-up
@@ -388,12 +388,12 @@ events:
     price_min: 15
     price_currency: EUR
     tags:
-    - format:social
-    - dance-style:bachata
-    - level:all-levels
-    - venue:indoor
-    - scale:medium
-    - scope:local
+      - format:social
+      - dance-style:bachata
+      - level:all-levels
+      - venue:indoor
+      - scale:medium
+      - scope:local
   - id: evt-trend-023
     calendar_id: salsa-cal-001
     title: Brussels Mojito Salsa Night
@@ -407,13 +407,13 @@ events:
     price_min: 8
     price_currency: EUR
     tags:
-    - format:class
-    - dance-style:salsa
-    - level:all-levels
-    - venue:indoor
-    - scale:small
-    - scope:local
-    - vibe:social-atmosphere
+      - format:class
+      - dance-style:salsa
+      - level:all-levels
+      - venue:indoor
+      - scale:small
+      - scope:local
+      - vibe:social-atmosphere
 
 # Going RSVPs — primary signal for the trending score.
 attendances:
@@ -455,8 +455,8 @@ attendances:
 
   # --- Spread events: 1-2 going apiece so they're above the
   # `trending_floor_going=1` gate but well below evt-trend-001/002.
-  # Their job is to populate the top-3 cap: only the 3 highest scoring
-  # candidates ever get a trending chip, even when many events qualify.
+  # Their job is to populate the cap: only the configured highest-scoring
+  # candidates get the banner card / chip / ring, even when many events qualify.
   - event_id: evt-trend-010
     email: alice@example.com
     share_publicly: true

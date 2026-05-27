@@ -29,6 +29,7 @@ import FollowsButton from '../components/FollowsButton';
 import SuggestEventModal from '../components/SuggestEventModal';
 import EventAnchoredDetailPanel from '../components/EventAnchoredDetailPanel';
 import { useSeenEvents } from '../hooks/useSeenEvents';
+import TrendingEventsBanner from '../components/TrendingEventsBanner';
 
 type ViewMode = 'explorer' | 'calendar';
 type InterestSource = 'follows' | 'friends';
@@ -215,7 +216,7 @@ function filterEventsByTags(events: CalendarEvent[], activeTagIds: Set<number>, 
 
 export default function Home() {
     const { user } = useAuth();
-    const { showPrices, showPopularity, showRatings, popularityThreshold, tagSortMode, unseenStateEnabled, trendingEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled } = useFeatureFlags();
+    const { showPrices, showPopularity, showRatings, popularityThreshold, tagSortMode, unseenStateEnabled, trendingEnabled, trendingBannerEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled } = useFeatureFlags();
     const { isSaved } = useSavedEvents();
     const [showSuggestModal, setShowSuggestModal] = useState(false);
     const mapFollowingBadgeOverlay = true;
@@ -873,6 +874,11 @@ export default function Home() {
         () => explorerMatchingEvents.map((event) => event.popularity_score ?? 0),
         [explorerMatchingEvents],
     );
+    const showTrendingBanner = viewMode === 'explorer'
+        && trendingEnabled
+        && trendingBannerEnabled
+        && showPopularity
+        && !mapFullscreen;
 
     useEffect(() => {
         if (!selectedExplorerMapEventId) return;
@@ -1346,183 +1352,198 @@ export default function Home() {
                                 {renderExplorerMobileSummaryBar('shadow-md')}
                             </div>
                         )}
-                        <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 lg:items-start">
-                            {/* Left column: filters + list */}
-                            <div className="order-1 lg:order-1 lg:w-[350px] lg:shrink-0 flex flex-col gap-3 lg:gap-4 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
-                                {/* Mobile-only filter strip. Doubles as the
-                                "open FilterSheet" affordance AND the
-                                applied-filters summary so users see what's
-                                narrowing the result set without an extra
-                                stacked block. */}
-                                <div ref={mobileExplorerTopSummaryRef} className="lg:hidden">
-                                    {renderExplorerMobileSummaryBar()}
+                        <div className="flex flex-col gap-4">
+                            {/* Desktop inline filter stack. Hidden on
+                            mobile (rendered inside FilterSheet instead). */}
+                            <div className="hidden lg:flex lg:flex-col lg:gap-4">
+                                {renderFilterControls()}
+                            </div>
+                            <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 lg:items-start">
+                                {/* Left column: mobile summary + desktop list */}
+                                <div className="order-1 lg:order-1 lg:w-[350px] lg:shrink-0 flex flex-col gap-3 lg:gap-4 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
+                                    {/* Mobile-only filter strip. Doubles as the
+                                    "open FilterSheet" affordance AND the
+                                    applied-filters summary so users see what's
+                                    narrowing the result set without an extra
+                                    stacked block. */}
+                                    <div ref={mobileExplorerTopSummaryRef} className="lg:hidden">
+                                        {renderExplorerMobileSummaryBar()}
+                                    </div>
+                                    {/* Event list: hidden on mobile until after map, fills remaining height on desktop */}
+                                    <div className="hidden lg:flex lg:flex-col lg:flex-1 lg:min-h-0 lg:overflow-hidden">
+                                        <SummaryBar
+                                            totalCount={explorerMatchingEvents.length}
+                                            visibleCount={explorerMatchingEvents.length}
+                                            startDate={startDate}
+                                            endDate={endDate}
+                                            areaLabel={
+                                                areaChipState.kind === 'map-view' ? 'Current map view'
+                                                    : areaChipState.kind === 'show-all' ? 'Worldwide'
+                                                        : areaChipState.label
+                                            }
+                                            areaKind={areaChipState.kind}
+                                            areaIsDefault={areaChipState.kind === 'default' && !areaSessionOverride}
+                                            onClearArea={handleClearAreaOverride}
+                                            activeTagIds={activeTagIds}
+                                            tagGroups={tagGroups}
+                                            onRemoveTag={handleRemoveTag}
+                                            interestSource={interestSource}
+                                            interestKind={interestKind}
+                                            interestUserHandle={interestUserHandle}
+                                            onClearInterest={handleClearInterest}
+                                            onClearAll={handleClearAllFilters}
+                                            loading={loading}
+                                        />
+                                        <div className="flex-1 min-h-0 overflow-hidden">
+                                            <EventListPanel
+                                                events={explorerMatchingEvents}
+                                                mapBounds={mapBounds}
+                                                onEventClick={handleExplorerListEventClick}
+                                                showPrices={showPrices}
+                                                showPopularity={showPopularity}
+                                                popularityThreshold={popularityThreshold}
+                                                sortBy={sortBy}
+                                                onSortChange={setSortBy}
+                                                hoveredEventId={hoveredEventId}
+                                                onEventHover={handleEventHover}
+                                                onSuggestEvent={() => setShowSuggestModal(true)}
+                                                newEnabled={unseenStateEnabled}
+                                                newEventIds={newEventIds}
+                                                onExtendPeriod={handleExtendPeriod}
+                                                onClearFilters={handleClearAllFilters}
+                                                extendingPeriod={extendingPeriod}
+                                                scopeTotalCount={explorerMatchingEvents.length}
+                                                nextPeriodEventCount={nextAvailableEventBatch === undefined ? undefined : nextAvailableEventBatch?.matchingCount ?? 0}
+                                                gateMoreEventsForAnonymous
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
-                                {/* Desktop inline filter stack. Hidden on
-                                mobile (rendered inside FilterSheet instead). */}
-                                <div className="hidden lg:flex lg:flex-col lg:gap-4">
-                                    {renderFilterControls()}
-                                </div>
-                                {/* Event list: hidden on mobile until after map, fills remaining height on desktop */}
-                                <div className="hidden lg:flex lg:flex-col lg:flex-1 lg:min-h-0 lg:overflow-hidden">
-                                    <SummaryBar
-                                        totalCount={explorerMatchingEvents.length}
-                                        visibleCount={explorerMatchingEvents.length}
-                                        startDate={startDate}
-                                        endDate={endDate}
-                                        areaLabel={
-                                            areaChipState.kind === 'map-view' ? 'Current map view'
-                                                : areaChipState.kind === 'show-all' ? 'Worldwide'
-                                                    : areaChipState.label
-                                        }
-                                        areaKind={areaChipState.kind}
-                                        areaIsDefault={areaChipState.kind === 'default' && !areaSessionOverride}
-                                        onClearArea={handleClearAreaOverride}
-                                        activeTagIds={activeTagIds}
-                                        tagGroups={tagGroups}
-                                        onRemoveTag={handleRemoveTag}
-                                        interestSource={interestSource}
-                                        interestKind={interestKind}
-                                        interestUserHandle={interestUserHandle}
-                                        onClearInterest={handleClearInterest}
-                                        onClearAll={handleClearAllFilters}
-                                        loading={loading}
-                                    />
-                                    <div className="flex-1 min-h-0 overflow-hidden">
-                                        <EventListPanel
+                                {/* Map column: map + default-location bar stacked.
+                                On mobile this is order-2 (between left filters
+                                and event list). On desktop the column is sticky
+                                and fills available height; the bar is shrink-0
+                                so it doesn't get clipped. */}
+                                <div className="order-2 lg:order-2 lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6 flex flex-col gap-1.5 sm:gap-2 min-w-0">
+                                    {showTrendingBanner && (
+                                        <TrendingEventsBanner
                                             events={explorerMatchingEvents}
                                             mapBounds={mapBounds}
                                             onEventClick={handleExplorerListEventClick}
-                                            showPrices={showPrices}
-                                            showPopularity={showPopularity}
+                                            showPopularity={showPopularity && trendingEnabled}
                                             popularityThreshold={popularityThreshold}
-                                            sortBy={sortBy}
-                                            onSortChange={setSortBy}
+                                            trendingTopN={trendingTopN}
+                                            trendingTopPercent={trendingTopPercent}
                                             hoveredEventId={hoveredEventId}
                                             onEventHover={handleEventHover}
-                                            onSuggestEvent={() => setShowSuggestModal(true)}
-                                            newEnabled={unseenStateEnabled}
-                                            newEventIds={newEventIds}
-                                            onExtendPeriod={handleExtendPeriod}
-                                            onClearFilters={handleClearAllFilters}
-                                            extendingPeriod={extendingPeriod}
-                                            scopeTotalCount={explorerMatchingEvents.length}
-                                            nextPeriodEventCount={nextAvailableEventBatch === undefined ? undefined : nextAvailableEventBatch?.matchingCount ?? 0}
                                         />
-                                    </div>
-                                </div>
-                            </div>
-                            {/* Map column: map + default-location bar stacked.
-                            On mobile this is order-2 (between left filters
-                            and event list). On desktop the column is sticky
-                            and fills available height; the bar is shrink-0
-                            so it doesn't get clipped. */}
-                            <div className="order-2 lg:order-2 lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6 flex flex-col gap-1.5 sm:gap-2 min-w-0">
-                                <div
-                                    className={
-                                        mapFullscreen
-                                            ? 'explorer-map-shell fixed inset-0 z-[8000] bg-white overflow-hidden'
-                                            : 'explorer-map-shell relative h-[270px] sm:h-[331px] lg:h-auto lg:flex-1 lg:min-h-0 overflow-hidden'
-                                    }
-                                    data-testid="explorer-map-shell"
-                                    data-fullscreen={mapFullscreen ? 'true' : 'false'}
-                                >
-                                    <EventMap
-                                        events={explorerMatchingEvents}
-                                        onEventClick={handleExplorerMapEventClick}
-                                        onBoundsChange={handleBoundsChange}
-                                        hoveredEventId={hoveredEventId}
-                                        onEventHover={handleEventHover}
-                                        detailLinkSource="explorer-map"
-                                        autoFitToken={mapAutoFitToken}
-                                        flyToArea={flyToAreaBbox}
-                                        flyToAreaToken={flyToAreaToken}
-                                        initialArea={initialAreaRef.current}
-                                        newEventIds={newEventIds}
-                                        popularityThreshold={popularityThreshold}
-                                        onMarkSeen={markSeen}
-                                        disablePopups={!isDesktop}
-                                        onMarkerSelect={!isDesktop ? handleExplorerMapMarkerSelect : undefined}
-                                        showFollowingBadgeOverlay={mapFollowingBadgeOverlay}
-                                        showTrendingOverlay={mapTrendingOverlay}
-                                    />
-                                    {selectedExplorerMapEvent && !isDesktop && (
-                                        <div className="map-selected-event-card absolute inset-x-2 bottom-2 z-[700] lg:hidden border border-blue-100 bg-white shadow-lg" data-testid="explorer-map-selected-event">
-                                            <button
-                                                type="button"
-                                                onClick={handleCloseExplorerMapSelection}
-                                                className="absolute -top-7 right-0 z-[701] inline-flex h-6 w-6 items-center justify-center border border-blue-100 bg-white text-slate-500 shadow-sm hover:text-slate-700"
-                                                aria-label="Close selected event"
-                                            >
-                                                ×
-                                            </button>
-                                            <EventListCard
-                                                event={selectedExplorerMapEvent}
-                                                mapBounds={mapBounds}
-                                                onEventClick={handleExplorerMapEventClick}
-                                                showPrices={showPrices}
-                                                showPopularity={showPopularity && trendingEnabled}
-                                                popularityThreshold={popularityThreshold}
-                                                trendingTopN={trendingTopN}
-                                                trendingTopPercent={trendingTopPercent}
-                                                allViewCounts={explorerAllViewCounts}
-                                                followingBadgeEnabled={followingBadgeEnabled}
-                                                showRatings={!!showRatings}
-                                                isSavedFlag={isSaved(selectedExplorerMapEvent.event_id)}
-                                                isNew={unseenStateEnabled && newEventIds.has(selectedExplorerMapEvent.event_id)}
-                                                onEventHover={handleEventHover}
-                                            />
-                                            <Link
-                                                to={`/event/${selectedExplorerMapEvent.event_id}?src=explorer-map`}
-                                                className="absolute bottom-2 right-2 z-[701] text-[11px] font-semibold text-blue-500 underline underline-offset-2 hover:text-blue-600 hover:no-underline"
-                                            >
-                                                Details
-                                            </Link>
-                                        </div>
                                     )}
-                                    {/* Search-this-area pill. Appears when
+                                    <div
+                                        className={
+                                            mapFullscreen
+                                                ? 'explorer-map-shell fixed inset-0 z-[8000] bg-white overflow-hidden'
+                                                : 'explorer-map-shell relative h-[270px] sm:h-[331px] lg:h-auto lg:flex-1 lg:min-h-0 overflow-hidden'
+                                        }
+                                        data-testid="explorer-map-shell"
+                                        data-fullscreen={mapFullscreen ? 'true' : 'false'}
+                                    >
+                                        <EventMap
+                                            events={explorerMatchingEvents}
+                                            onEventClick={handleExplorerMapEventClick}
+                                            onBoundsChange={handleBoundsChange}
+                                            hoveredEventId={hoveredEventId}
+                                            onEventHover={handleEventHover}
+                                            detailLinkSource="explorer-map"
+                                            autoFitToken={mapAutoFitToken}
+                                            flyToArea={flyToAreaBbox}
+                                            flyToAreaToken={flyToAreaToken}
+                                            initialArea={initialAreaRef.current}
+                                            newEventIds={newEventIds}
+                                            popularityThreshold={popularityThreshold}
+                                            onMarkSeen={markSeen}
+                                            disablePopups={!isDesktop}
+                                            onMarkerSelect={!isDesktop ? handleExplorerMapMarkerSelect : undefined}
+                                            showFollowingBadgeOverlay={mapFollowingBadgeOverlay}
+                                            showTrendingOverlay={mapTrendingOverlay}
+                                        />
+                                        {selectedExplorerMapEvent && !isDesktop && (
+                                            <div className="map-selected-event-card absolute inset-x-2 bottom-2 z-[700] lg:hidden border border-blue-100 bg-white shadow-lg" data-testid="explorer-map-selected-event">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleCloseExplorerMapSelection}
+                                                    className="absolute -top-7 right-0 z-[701] inline-flex h-6 w-6 items-center justify-center border border-blue-100 bg-white text-slate-500 shadow-sm hover:text-slate-700"
+                                                    aria-label="Close selected event"
+                                                >
+                                                    ×
+                                                </button>
+                                                <EventListCard
+                                                    event={selectedExplorerMapEvent}
+                                                    mapBounds={mapBounds}
+                                                    onEventClick={handleExplorerMapEventClick}
+                                                    showPrices={showPrices}
+                                                    showPopularity={showPopularity && trendingEnabled}
+                                                    popularityThreshold={popularityThreshold}
+                                                    trendingTopN={trendingTopN}
+                                                    trendingTopPercent={trendingTopPercent}
+                                                    allViewCounts={explorerAllViewCounts}
+                                                    followingBadgeEnabled={followingBadgeEnabled}
+                                                    showRatings={!!showRatings}
+                                                    isSavedFlag={isSaved(selectedExplorerMapEvent.event_id)}
+                                                    isNew={unseenStateEnabled && newEventIds.has(selectedExplorerMapEvent.event_id)}
+                                                    onEventHover={handleEventHover}
+                                                />
+                                                <Link
+                                                    to={`/event/${selectedExplorerMapEvent.event_id}?src=explorer-map`}
+                                                    className="absolute bottom-2 right-2 z-[701] text-[11px] font-semibold text-blue-500 underline underline-offset-2 hover:text-blue-600 hover:no-underline"
+                                                >
+                                                    Details
+                                                </Link>
+                                            </div>
+                                        )}
+                                        {/* Search-this-area pill. Appears when
                                     the user has panned/zoomed away from the
                                     current effective area filter; tapping it
                                     commits the live viewport as the area
                                     filter and clears the userMapBounds flag
                                     so the pill disappears. */}
-                                    {userMapBounds && (
-                                        <button
-                                            type="button"
-                                            onClick={handleSearchThisArea}
-                                            className="absolute top-2 left-1/2 -translate-x-1/2 z-[702] inline-flex items-center gap-1 border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold px-3 py-1.5 shadow-md transition"
-                                            data-testid="map-search-this-area"
-                                        >
-                                            Search this area
-                                        </button>
-                                    )}
-                                    {/* Fullscreen toggle. Mobile-first;
+                                        {userMapBounds && (
+                                            <button
+                                                type="button"
+                                                onClick={handleSearchThisArea}
+                                                className="absolute top-2 left-1/2 -translate-x-1/2 z-[702] inline-flex items-center gap-1 border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold px-3 py-1.5 shadow-md transition"
+                                                data-testid="map-search-this-area"
+                                            >
+                                                Search this area
+                                            </button>
+                                        )}
+                                        {/* Fullscreen toggle. Mobile-first;
                                     rendered on desktop too but rarely
                                     needed there since the map column is
                                     already tall. */}
-                                    <button
-                                        type="button"
-                                        onClick={() => setMapFullscreen((v) => !v)}
-                                        aria-label={mapFullscreen ? 'Exit fullscreen map' : 'Open fullscreen map'}
-                                        title={mapFullscreen ? 'Exit fullscreen' : 'Fullscreen map'}
-                                        className="absolute top-2 right-2 z-[702] inline-flex h-8 w-8 items-center justify-center border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm transition"
-                                        data-testid="map-fullscreen-toggle"
-                                    >
-                                        {mapFullscreen ? '×' : '⤢'}
-                                    </button>
-                                </div>
-                                {/* Default-area bar: ONE bordered pill that
+                                        <button
+                                            type="button"
+                                            onClick={() => setMapFullscreen((v) => !v)}
+                                            aria-label={mapFullscreen ? 'Exit fullscreen map' : 'Open fullscreen map'}
+                                            title={mapFullscreen ? 'Exit fullscreen' : 'Fullscreen map'}
+                                            className="absolute top-2 right-2 z-[702] inline-flex h-8 w-8 items-center justify-center border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm transition"
+                                            data-testid="map-fullscreen-toggle"
+                                        >
+                                            {mapFullscreen ? '×' : '⤢'}
+                                        </button>
+                                    </div>
+                                    {/* Default-area bar: ONE bordered pill that
                                 visually groups the chip label + worldwide /
                                 reset toggle + save-as-default link, so the
                                 user reads it as a single "this is the area
                                 being applied, here's what you can do with
                                 it" unit. */}
-                                <div
-                                    className="shrink-0 flex flex-col gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 border bg-slate-100 border-slate-200 text-slate-700 text-xs min-w-0"
-                                    data-testid="area-default-bar"
-                                >
-                                    <div className="flex flex-wrap items-center gap-1 sm:gap-2 min-w-0">
-                                        <AreaFilterChip state={areaChipState} />
-                                        {/* Snap-back pill: fly the map to
+                                    <div
+                                        className="shrink-0 flex flex-col gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 border bg-slate-100 border-slate-200 text-slate-700 text-xs min-w-0"
+                                        data-testid="area-default-bar"
+                                    >
+                                        <div className="flex flex-wrap items-center gap-1 sm:gap-2 min-w-0">
+                                            <AreaFilterChip state={areaChipState} />
+                                            {/* Snap-back pill: fly the map to
                                             the configured default area
                                             (prefs.area when set, else the
                                             hardcoded Europe preset). Visible
@@ -1534,143 +1555,145 @@ export default function Home() {
                                             about". Hidden when the chip
                                             already shows the default area
                                             and the map is on it (no drift). */}
-                                        {(mapDriftsFromArea || areaChipState.kind === 'show-all') && (
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    const target = prefs.area ?? DEFAULT_AREA_BBOX;
-                                                    setAreaSessionOverride(null);
-                                                    flyToArea(target);
-                                                }}
-                                                className="shrink-0 whitespace-nowrap px-1.5 py-px border border-slate-300 bg-white text-[11px] opacity-80 hover:opacity-100"
-                                                title="Snap map back to your default area"
-                                                data-testid="area-snap-default"
-                                            >
-                                                Default
-                                            </button>
-                                        )}
-                                        {/* Quick-pick: switch to the hardcoded
+                                            {(mapDriftsFromArea || areaChipState.kind === 'show-all') && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const target = prefs.area ?? DEFAULT_AREA_BBOX;
+                                                        setAreaSessionOverride(null);
+                                                        flyToArea(target);
+                                                    }}
+                                                    className="shrink-0 whitespace-nowrap px-1.5 py-px border border-slate-300 bg-white text-[11px] opacity-80 hover:opacity-100"
+                                                    title="Snap map back to your default area"
+                                                    data-testid="area-snap-default"
+                                                >
+                                                    Default
+                                                </button>
+                                            )}
+                                            {/* Quick-pick: switch to the hardcoded
                                         "Europe & nearby" preset. Hidden when
                                         the preset is already what's being
                                         applied AND the map is on it. */}
-                                        {!(effectiveArea && isDefaultArea(effectiveArea) && !mapDriftsFromArea) && (
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setAreaSessionOverride({ kind: 'preset', area: DEFAULT_AREA_BBOX });
-                                                    flyToArea(DEFAULT_AREA_BBOX);
-                                                }}
-                                                className="shrink-0 whitespace-nowrap px-1.5 py-px border border-slate-300 bg-white text-[11px] opacity-80 hover:opacity-100"
-                                                title="Apply the Europe & nearby preset"
-                                                data-testid="area-preset-europe"
-                                            >
-                                                Europe
-                                            </button>
-                                        )}
-                                        {areaChipState.kind !== 'show-all' && (
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setAreaSessionOverride({ kind: 'show-all' });
-                                                    flyToArea({ min_lat: -60, min_lng: -170, max_lat: 75, max_lng: 170, label: 'World' });
-                                                }}
-                                                className="shrink-0 whitespace-nowrap px-1.5 py-px border border-slate-300 bg-white text-[11px] opacity-80 hover:opacity-100"
-                                                title="Show events worldwide"
-                                                aria-label="Show events worldwide"
-                                                data-testid="area-show-all"
-                                            >
-                                                🌐
-                                            </button>
-                                        )}
-                                        {mapDriftsFromArea && !namingArea && (
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setAreaNameDraft(effectiveArea?.label ?? '');
-                                                    setNamingArea(true);
-                                                }}
-                                                disabled={savingDefaults}
-                                                className="shrink-0 whitespace-nowrap underline opacity-70 hover:opacity-100 hover:no-underline disabled:opacity-50 disabled:cursor-not-allowed"
-                                                data-testid="save-location-as-default"
-                                            >
-                                                current as default
-                                            </button>
-                                        )}
-                                        {savedDefaultsToast && (
-                                            <span className="shrink-0" role="status">
-                                                Saved.
-                                            </span>
-                                        )}
+                                            {!(effectiveArea && isDefaultArea(effectiveArea) && !mapDriftsFromArea) && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setAreaSessionOverride({ kind: 'preset', area: DEFAULT_AREA_BBOX });
+                                                        flyToArea(DEFAULT_AREA_BBOX);
+                                                    }}
+                                                    className="shrink-0 whitespace-nowrap px-1.5 py-px border border-slate-300 bg-white text-[11px] opacity-80 hover:opacity-100"
+                                                    title="Apply the Europe & nearby preset"
+                                                    data-testid="area-preset-europe"
+                                                >
+                                                    Europe
+                                                </button>
+                                            )}
+                                            {areaChipState.kind !== 'show-all' && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setAreaSessionOverride({ kind: 'show-all' });
+                                                        flyToArea({ min_lat: -60, min_lng: -170, max_lat: 75, max_lng: 170, label: 'World' });
+                                                    }}
+                                                    className="shrink-0 whitespace-nowrap px-1.5 py-px border border-slate-300 bg-white text-[11px] opacity-80 hover:opacity-100"
+                                                    title="Show events worldwide"
+                                                    aria-label="Show events worldwide"
+                                                    data-testid="area-show-all"
+                                                >
+                                                    🌐
+                                                </button>
+                                            )}
+                                            {mapDriftsFromArea && !namingArea && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setAreaNameDraft(effectiveArea?.label ?? '');
+                                                        setNamingArea(true);
+                                                    }}
+                                                    disabled={savingDefaults}
+                                                    className="shrink-0 whitespace-nowrap underline opacity-70 hover:opacity-100 hover:no-underline disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    data-testid="save-location-as-default"
+                                                >
+                                                    current as default
+                                                </button>
+                                            )}
+                                            {savedDefaultsToast && (
+                                                <span className="shrink-0" role="status">
+                                                    Saved.
+                                                </span>
+                                            )}
 
-                                    </div>
-                                    {/* Inline name-this-area form. Submitting
+                                        </div>
+                                        {/* Inline name-this-area form. Submitting
                                     persists prefs.area with the typed label;
                                     cancelling closes without saving. */}
-                                    {namingArea && (
-                                        <form
-                                            className="flex flex-wrap items-center gap-2 min-w-0"
-                                            data-testid="area-name-form"
-                                            onSubmit={async (e) => {
-                                                e.preventDefault();
-                                                await handleSaveLocationAsDefault(areaNameDraft);
-                                                setNamingArea(false);
-                                            }}
-                                        >
-                                            <input
-                                                type="text"
-                                                value={areaNameDraft}
-                                                onChange={(e) => setAreaNameDraft(e.target.value)}
-                                                placeholder="Name this area (e.g. Berlin & around)"
-                                                autoFocus
-                                                maxLength={60}
-                                                className="flex-1 min-w-0 px-2 py-1 border border-slate-300 bg-white text-xs"
-                                                data-testid="area-name-input"
-                                            />
-                                            <button
-                                                type="submit"
-                                                disabled={savingDefaults}
-                                                className="shrink-0 whitespace-nowrap px-2 py-1 bg-blue-500 text-white text-xs hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                data-testid="area-name-save"
+                                        {namingArea && (
+                                            <form
+                                                className="flex flex-wrap items-center gap-2 min-w-0"
+                                                data-testid="area-name-form"
+                                                onSubmit={async (e) => {
+                                                    e.preventDefault();
+                                                    await handleSaveLocationAsDefault(areaNameDraft);
+                                                    setNamingArea(false);
+                                                }}
                                             >
-                                                {savingDefaults ? 'Saving…' : 'Save'}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setNamingArea(false)}
-                                                className="shrink-0 whitespace-nowrap underline opacity-70 hover:opacity-100 hover:no-underline"
-                                                data-testid="area-name-cancel"
-                                            >
-                                                cancel
-                                            </button>
-                                        </form>
-                                    )}
+                                                <input
+                                                    type="text"
+                                                    value={areaNameDraft}
+                                                    onChange={(e) => setAreaNameDraft(e.target.value)}
+                                                    placeholder="Name this area (e.g. Berlin & around)"
+                                                    autoFocus
+                                                    maxLength={60}
+                                                    className="flex-1 min-w-0 px-2 py-1 border border-slate-300 bg-white text-xs"
+                                                    data-testid="area-name-input"
+                                                />
+                                                <button
+                                                    type="submit"
+                                                    disabled={savingDefaults}
+                                                    className="shrink-0 whitespace-nowrap px-2 py-1 bg-blue-500 text-white text-xs hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    data-testid="area-name-save"
+                                                >
+                                                    {savingDefaults ? 'Saving…' : 'Save'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setNamingArea(false)}
+                                                    className="shrink-0 whitespace-nowrap underline opacity-70 hover:opacity-100 hover:no-underline"
+                                                    data-testid="area-name-cancel"
+                                                >
+                                                    cancel
+                                                </button>
+                                            </form>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                            {/* Event list on mobile: order-3, hidden on desktop.
+                                {/* Event list on mobile: order-3, hidden on desktop.
                             The top-of-map SummaryBar floats once it scrolls
                             away, so this section does not render a duplicate. */}
-                            <div className="order-3 lg:hidden">
-                                <EventListPanel
-                                    events={explorerMatchingEvents}
-                                    mapBounds={mapBounds}
-                                    onEventClick={handleExplorerListEventClick}
-                                    showPrices={showPrices}
-                                    showPopularity={showPopularity}
-                                    popularityThreshold={popularityThreshold}
-                                    sortBy={sortBy}
-                                    onSortChange={setSortBy}
-                                    hoveredEventId={hoveredEventId}
-                                    onEventHover={handleEventHover}
-                                    onSuggestEvent={() => setShowSuggestModal(true)}
-                                    newEnabled={unseenStateEnabled}
-                                    newEventIds={newEventIds}
-                                    scrollHighlightedIntoView={false}
-                                    onExtendPeriod={handleExtendPeriod}
-                                    onClearFilters={handleClearAllFilters}
-                                    extendingPeriod={extendingPeriod}
-                                    scopeTotalCount={explorerMatchingEvents.length}
-                                    nextPeriodEventCount={nextAvailableEventBatch === undefined ? undefined : nextAvailableEventBatch?.matchingCount ?? 0}
-                                />
+                                <div className="order-3 lg:hidden">
+                                    <EventListPanel
+                                        events={explorerMatchingEvents}
+                                        mapBounds={mapBounds}
+                                        onEventClick={handleExplorerListEventClick}
+                                        showPrices={showPrices}
+                                        showPopularity={showPopularity}
+                                        popularityThreshold={popularityThreshold}
+                                        sortBy={sortBy}
+                                        onSortChange={setSortBy}
+                                        hoveredEventId={hoveredEventId}
+                                        onEventHover={handleEventHover}
+                                        onSuggestEvent={() => setShowSuggestModal(true)}
+                                        newEnabled={unseenStateEnabled}
+                                        newEventIds={newEventIds}
+                                        scrollHighlightedIntoView={false}
+                                        onExtendPeriod={handleExtendPeriod}
+                                        onClearFilters={handleClearAllFilters}
+                                        extendingPeriod={extendingPeriod}
+                                        scopeTotalCount={explorerMatchingEvents.length}
+                                        nextPeriodEventCount={nextAvailableEventBatch === undefined ? undefined : nextAvailableEventBatch?.matchingCount ?? 0}
+                                        gateMoreEventsForAnonymous
+                                    />
+                                </div>
                             </div>
                         </div>
                     </>
@@ -1865,7 +1888,7 @@ function InterestFilterChips({
     const [pickerOpen, setPickerOpen] = useState(false);
     const followingLabel = surface === 'sheet'
         ? (pickerActive ? null : 'Filter by following')
-        : 'Following';
+        : 'Filter by following';
     return (
         <div className="flex flex-wrap items-center gap-1 sm:gap-2">
 

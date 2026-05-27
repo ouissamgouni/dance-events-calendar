@@ -6,8 +6,9 @@ import {
     adminRevokeUserBlock,
     adminSetVerifiedOrganizer,
     adminSetAdminManaged,
+    adminMergeUsers,
 } from '../api';
-import type { AdminUserRow } from '../api';
+import type { AdminUserMergeResponse, AdminUserRow } from '../api';
 import { ConfirmDialog, PromptDialog } from './AppDialog';
 
 const PAGE_SIZE = 50;
@@ -32,7 +33,6 @@ export default function AdminUsersTab() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [q, setQ] = useState('');
-    const [appliedQ, setAppliedQ] = useState('');
     const [includeDeleted, setIncludeDeleted] = useState(false);
     const [verifiedOnly, setVerifiedOnly] = useState(false);
     const [offset, setOffset] = useState(0);
@@ -41,13 +41,15 @@ export default function AdminUsersTab() {
     const [deleteTarget, setDeleteTarget] = useState<AdminUserRow | null>(null);
     const [blockPrompt, setBlockPrompt] = useState<AdminUserRow | null>(null);
     const [unblockTarget, setUnblockTarget] = useState<AdminUserRow | null>(null);
+    const [mergeTarget, setMergeTarget] = useState<AdminUserRow | null>(null);
+    const [notice, setNotice] = useState<string | null>(null);
 
     const load = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
             const res = await fetchAdminUsers({
-                q: appliedQ || undefined,
+                q: q.trim() || undefined,
                 includeDeleted,
                 verifiedOnly,
                 limit: PAGE_SIZE,
@@ -60,18 +62,13 @@ export default function AdminUsersTab() {
         } finally {
             setLoading(false);
         }
-    }, [appliedQ, includeDeleted, verifiedOnly, offset]);
+    }, [q, includeDeleted, verifiedOnly, offset]);
 
     useEffect(() => { load(); }, [load]);
 
     // Reset pagination whenever a filter changes — avoids landing on an
     // empty page after narrowing the result set.
-    useEffect(() => { setOffset(0); }, [appliedQ, includeDeleted, verifiedOnly]);
-
-    const onSearchSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        setAppliedQ(q.trim());
-    };
+    useEffect(() => { setOffset(0); }, [includeDeleted, verifiedOnly]);
 
     const onToggleVerified = async (row: AdminUserRow) => {
         setBusyUserId(row.user_id);
@@ -125,6 +122,20 @@ export default function AdminUsersTab() {
 
     const onDelete = async (row: AdminUserRow) => {
         setDeleteTarget(row);
+    };
+
+    const onMerge = async (source: AdminUserRow, destinationUserId: string, reason: string | null) => {
+        setMergeTarget(null);
+        setBusyUserId(source.user_id);
+        try {
+            const res = await adminMergeUsers(source.user_id, destinationUserId, reason);
+            setNotice(mergeNotice(source, rows, res));
+            await load();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Failed to merge users');
+        } finally {
+            setBusyUserId(null);
+        }
     };
 
     const confirmDelete = async () => {
@@ -189,28 +200,25 @@ export default function AdminUsersTab() {
         <section className="space-y-4">
             <header className="flex flex-wrap items-center gap-3">
                 <h2 className="text-lg font-semibold">Users</h2>
-                <span className="text-sm text-slate-500">
+                <span className="text-xs text-slate-500">
                     {loading ? 'Loading…' : `${total.toLocaleString()} total`}
                 </span>
-                <form onSubmit={onSearchSubmit} className="flex items-center gap-2 ml-auto">
+                <div className="ml-auto">
                     <input
                         type="search"
                         value={q}
-                        onChange={(e) => setQ(e.target.value)}
+                        onChange={(e) => {
+                            setQ(e.target.value);
+                            setOffset(0);
+                        }}
                         placeholder="Search handle, name, email"
-                        className="px-2 py-1 border border-slate-300 text-sm w-64"
+                        className="w-64 border border-slate-300 px-2 py-1 text-xs"
                         aria-label="Search users"
                     />
-                    <button
-                        type="submit"
-                        className="px-2 py-1 border border-slate-300 bg-white text-sm hover:bg-slate-50"
-                    >
-                        Search
-                    </button>
-                </form>
+                </div>
             </header>
 
-            <div className="flex flex-wrap items-center gap-4 text-sm">
+            <div className="flex flex-wrap items-center gap-4 text-xs">
                 <label className="flex items-center gap-1.5">
                     <input
                         type="checkbox"
@@ -230,13 +238,18 @@ export default function AdminUsersTab() {
             </div>
 
             {error && (
-                <div className="text-sm text-red-700 bg-red-50 border border-red-200 px-3 py-2">
+                <div className="border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
                     {error}
+                </div>
+            )}
+            {notice && !error && (
+                <div className="border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                    {notice}
                 </div>
             )}
 
             <div className="overflow-x-auto border border-slate-200">
-                <table className="w-full text-sm">
+                <table className="w-full text-xs">
                     <thead className="bg-slate-50 text-left text-xs uppercase text-slate-600">
                         <tr>
                             <th className="px-3 py-2">User</th>
@@ -356,6 +369,17 @@ export default function AdminUsersTab() {
                                                     Label
                                                 </button>
                                             )}
+                                            {row.is_admin_managed && (
+                                                <button
+                                                    type="button"
+                                                    disabled={isDeleted || row.is_admin || busyUserId === row.user_id}
+                                                    onClick={() => setMergeTarget(row)}
+                                                    className="px-2 py-1 text-xs border border-red-300 text-red-700 bg-white hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    title="Merge this managed account into another user"
+                                                >
+                                                    Merge
+                                                </button>
+                                            )}
                                             <button
                                                 type="button"
                                                 disabled={isDeleted || row.is_admin || busyUserId === row.user_id}
@@ -396,7 +420,7 @@ export default function AdminUsersTab() {
             </div>
 
             {total > PAGE_SIZE && (
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center justify-between text-xs">
                     <button
                         type="button"
                         disabled={offset === 0 || loading}
@@ -461,6 +485,206 @@ export default function AdminUsersTab() {
                 onCancel={() => setUnblockTarget(null)}
                 onConfirm={() => void confirmUnblock()}
             />
+            <MergeUsersDialog
+                open={mergeTarget !== null}
+                source={mergeTarget}
+                onCancel={() => setMergeTarget(null)}
+                onConfirm={(destinationUserId, reason) => {
+                    if (mergeTarget) void onMerge(mergeTarget, destinationUserId, reason);
+                }}
+            />
         </section>
+    );
+}
+
+function mergeNotice(source: AdminUserRow, rows: AdminUserRow[], res: AdminUserMergeResponse): string {
+    const destination = rows.find((row) => row.user_id === res.destination_user_id);
+    const count = Object.values(res.summary).reduce((total, value) => total + value, 0);
+    return `Merged ${userDisplay(source)} into ${userDisplay(destination ?? null)}. ${count} rows updated, deduped, or anonymized.`;
+}
+
+function userDisplay(row: AdminUserRow | null): string {
+    if (!row) return 'the destination user';
+    if (row.display_name && row.handle) return `${row.display_name} (@${row.handle})`;
+    if (row.display_name) return row.display_name;
+    if (row.handle) return `@${row.handle}`;
+    return row.email;
+}
+
+function MergeUsersDialog({
+    open,
+    source,
+    onCancel,
+    onConfirm,
+}: {
+    open: boolean;
+    source: AdminUserRow | null;
+    onCancel: () => void;
+    onConfirm: (destinationUserId: string, reason: string | null) => void;
+}) {
+    const [query, setQuery] = useState('');
+    const [candidates, setCandidates] = useState<AdminUserRow[]>([]);
+    const [destinationUserId, setDestinationUserId] = useState('');
+    const [reason, setReason] = useState('');
+    const [fieldError, setFieldError] = useState<string | null>(null);
+    const [searching, setSearching] = useState(false);
+    const [searchError, setSearchError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!open) return;
+        setQuery('');
+        setCandidates([]);
+        setDestinationUserId('');
+        setReason('');
+        setFieldError(null);
+        setSearchError(null);
+    }, [open, source?.user_id]);
+
+    useEffect(() => {
+        if (!open || !source) return;
+        let cancelled = false;
+        const timer = window.setTimeout(() => {
+            setSearching(true);
+            setSearchError(null);
+            void fetchAdminUsers({
+                q: query.trim() || undefined,
+                limit: 20,
+                offset: 0,
+            })
+                .then((res) => {
+                    if (cancelled) return;
+                    const next = res.items.filter((row) => row.user_id !== source.user_id && !row.is_admin && row.deleted_at === null);
+                    setCandidates(next);
+                    if (destinationUserId && !next.some((row) => row.user_id === destinationUserId)) {
+                        setDestinationUserId('');
+                    }
+                })
+                .catch((e) => {
+                    if (cancelled) return;
+                    setSearchError(e instanceof Error ? e.message : 'Failed to search users');
+                })
+                .finally(() => {
+                    if (!cancelled) setSearching(false);
+                });
+        }, 250);
+        return () => {
+            cancelled = true;
+            window.clearTimeout(timer);
+        };
+    }, [destinationUserId, open, query, source]);
+
+    if (!open || !source) return null;
+    const destination = candidates.find((row) => row.user_id === destinationUserId) ?? null;
+
+    return (
+        <div className="fixed inset-0 z-[11000] flex items-center justify-center bg-slate-900/40 p-4" onClick={onCancel}>
+            <form
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="admin-merge-title"
+                className="w-full max-w-lg border border-slate-200 bg-white shadow-xl"
+                onClick={(e) => e.stopPropagation()}
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!destinationUserId) {
+                        setFieldError('Choose a destination user.');
+                        return;
+                    }
+                    onConfirm(destinationUserId, reason.trim() || null);
+                }}
+            >
+                <div className="border-b border-slate-100 px-4 py-3">
+                    <h2 id="admin-merge-title" className="text-sm font-semibold text-slate-900">Merge Managed User</h2>
+                </div>
+                <div className="space-y-4 px-4 py-3 text-sm text-slate-700">
+                    <div className="border border-red-200 bg-red-50 px-3 py-2 text-red-800">
+                        {userDisplay(source)} will be soft-deleted after its data is moved. The destination user keeps their email, Google sign-in, handle, name, and avatar.
+                    </div>
+                    <div className="space-y-1.5">
+                        <label htmlFor="merge-destination-search" className="block font-medium text-slate-800">Search destination user</label>
+                        <input
+                            id="merge-destination-search"
+                            type="search"
+                            value={query}
+                            onChange={(e) => {
+                                setQuery(e.target.value);
+                                setFieldError(null);
+                            }}
+                            className="w-full border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            placeholder="Search email, handle, or name"
+                            autoFocus
+                        />
+                        <div className="max-h-44 overflow-y-auto border border-slate-200 bg-white">
+                            {searching && (
+                                <div className="px-3 py-2 text-xs text-slate-500">Searching…</div>
+                            )}
+                            {!searching && candidates.length === 0 && (
+                                <div className="px-3 py-2 text-xs text-slate-500">No active non-admin users found.</div>
+                            )}
+                            {!searching && candidates.map((row) => {
+                                const selected = row.user_id === destinationUserId;
+                                return (
+                                    <button
+                                        key={row.user_id}
+                                        type="button"
+                                        onClick={() => {
+                                            setDestinationUserId(row.user_id);
+                                            setFieldError(null);
+                                        }}
+                                        className={selected
+                                            ? 'block w-full border-b border-slate-100 bg-blue-500 px-3 py-2 text-left text-xs text-white last:border-b-0'
+                                            : 'block w-full border-b border-slate-100 bg-white px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 last:border-b-0'}
+                                    >
+                                        <span className="block font-medium">{userDisplay(row)}</span>
+                                        <span className={selected ? 'block text-blue-50' : 'block text-slate-500'}>{row.email}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        {fieldError && <p className="text-xs text-red-700">{fieldError}</p>}
+                        {searchError && <p className="text-xs text-red-700">{searchError}</p>}
+                    </div>
+                    <div className="grid gap-2 border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 sm:grid-cols-2">
+                        <div>
+                            <div className="font-medium text-slate-800">Source</div>
+                            <div>{userDisplay(source)}</div>
+                            <div>{source.email}</div>
+                        </div>
+                        <div>
+                            <div className="font-medium text-slate-800">Destination</div>
+                            <div>{userDisplay(destination)}</div>
+                            <div>{destination?.email ?? 'Choose a user'}</div>
+                        </div>
+                    </div>
+                    <div className="space-y-1.5">
+                        <label htmlFor="merge-reason" className="block font-medium text-slate-800">Internal reason</label>
+                        <textarea
+                            id="merge-reason"
+                            value={reason}
+                            maxLength={500}
+                            onChange={(e) => setReason(e.target.value)}
+                            className="min-h-20 w-full border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            placeholder="Blocked Google account recovery"
+                        />
+                    </div>
+                </div>
+                <div className="flex justify-end gap-2 border-t border-slate-100 px-4 py-3">
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        className="border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={!destinationUserId}
+                        className="bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        Merge
+                    </button>
+                </div>
+            </form>
+        </div>
     );
 }

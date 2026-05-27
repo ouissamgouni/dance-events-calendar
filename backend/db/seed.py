@@ -32,6 +32,10 @@ from backend.db.models import (
     UserFollow,
     UserSavedEvent,
 )
+from backend.services.follows import (
+    ensure_approved_follow_with_subscription,
+    ensure_calendar_subscription,
+)
 
 WEEKDAYS = {"Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4, "Sat": 5, "Sun": 6}
 RELATIVE_RE = re.compile(
@@ -757,14 +761,22 @@ class DatabaseSeeder:
                 )
             ).first()
             if existing:
+                if existing.status == "approved":
+                    ensure_calendar_subscription(self.session, follower.id, followee.id)
                 continue
-            self.session.add(
-                UserFollow(
-                    follower_id=follower.id,
-                    followee_id=followee.id,
-                    status=status,
+            if status == "approved":
+                ensure_approved_follow_with_subscription(
+                    self.session, follower.id, followee.id
                 )
-            )
+            else:
+                self.session.add(
+                    UserFollow(
+                        follower_id=follower.id,
+                        followee_id=followee.id,
+                        status=status,
+                    )
+                )
+                ensure_calendar_subscription(self.session, follower.id, followee.id)
             logger.info(
                 "Created mock follow: %s -> %s (%s)",
                 follower.email,
