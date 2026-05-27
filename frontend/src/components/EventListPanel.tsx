@@ -1,5 +1,7 @@
 import { Fragment, useEffect, useRef, useState, useCallback } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import type { CalendarEvent } from '../types';
+import { useAuth } from '../context/AuthContext';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useAttendanceSummary } from '../context/AttendanceSummariesContext';
@@ -58,6 +60,8 @@ interface EventListPanelProps {
     scopeTotalCount?: number;
     /** Count for the next available future batch, if already known by the parent. */
     nextPeriodEventCount?: number | null;
+    /** When true, anonymous viewers hit a persistent lock before deeper pagination. */
+    gateMoreEventsForAnonymous?: boolean;
 }
 
 export interface EventListCardProps {
@@ -363,9 +367,12 @@ export default function EventListPanel({
     extendingPeriod = false,
     scopeTotalCount,
     nextPeriodEventCount,
+    gateMoreEventsForAnonymous = false,
 }: EventListPanelProps) {
+    const { user } = useAuth();
     const { isSaved } = useSavedEvents();
     const { showRatings, trendingEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled } = useFeatureFlags();
+    const location = useLocation();
     const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const scrollRef = useRef<HTMLDivElement>(null);
     const pendingExtendVisibleCountRef = useRef(0);
@@ -485,6 +492,15 @@ export default function EventListPanel({
     const remainingInPeriod = Math.max(0, totalCount - cappedVisible);
     const periodExhausted = remainingInPeriod === 0;
     const futureLookupPending = !!onExtendPeriod && nextPeriodEventCount == null;
+    const canRevealFutureEvents = !!onExtendPeriod && (nextPeriodEventCount ?? 0) > 0;
+    const showAnonymousMoreEventsGate = gateMoreEventsForAnonymous
+        && !user
+        && cappedVisible >= Math.min(INITIAL_VISIBLE, totalCount)
+        && (remainingInPeriod > 0 || canRevealFutureEvents);
+    const hiddenEventCount = remainingInPeriod > 0
+        ? remainingInPeriod
+        : Math.max(nextPeriodEventCount ?? 0, 0);
+    const next = encodeURIComponent(location.pathname + location.search);
 
     const allViewCounts = renderedEvents.map((e) => e.popularity_score ?? 0);
 
@@ -707,7 +723,33 @@ export default function EventListPanel({
                                 (handled by the parent). Both buttons are
                                 square and use the secondary chrome from
                                 .github/instructions/frontend.instructions.md. */}
-                            {!periodExhausted && (
+                            {showAnonymousMoreEventsGate && (
+                                <div className="m-3 border border-blue-100 bg-blue-50 p-4" data-testid="event-list-more-events-gate">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
+                                        More events available
+                                    </p>
+                                    <p className="mt-1 text-sm font-medium text-slate-800">
+                                        Sign in to unlock {hiddenEventCount} more {hiddenEventCount === 1 ? 'event' : 'events'}.
+                                    </p>
+                                    <p className="mt-1 text-xs text-slate-600">
+                                        You are viewing the anonymous preview. Sign in to keep exploring from this point.
+                                    </p>
+                                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                                        <Link
+                                            to={`/login?next=${next}`}
+                                            className="inline-flex items-center justify-center bg-blue-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-600"
+                                        >
+                                            Sign in to see more
+                                        </Link>
+                                        <span className="text-[11px] text-slate-500">
+                                            {remainingInPeriod > 0
+                                                ? `${remainingInPeriod} more in this view`
+                                                : `${hiddenEventCount} more in the next available window`}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                            {!showAnonymousMoreEventsGate && !periodExhausted && (
                                 <div className="px-3 py-3 text-center">
                                     <button
                                         type="button"
@@ -722,7 +764,7 @@ export default function EventListPanel({
                                     </button>
                                 </div>
                             )}
-                            {periodExhausted && onExtendPeriod && (
+                            {!showAnonymousMoreEventsGate && periodExhausted && onExtendPeriod && (
                                 <div className="px-3 py-3 text-center">
                                     <button
                                         type="button"

@@ -1407,6 +1407,7 @@ export default function Home() {
                                             extendingPeriod={extendingPeriod}
                                             scopeTotalCount={explorerMatchingEvents.length}
                                             nextPeriodEventCount={nextAvailableEventBatch === undefined ? undefined : nextAvailableEventBatch?.matchingCount ?? 0}
+                                            gateMoreEventsForAnonymous
                                         />
                                     </div>
                                 </div>
@@ -1670,6 +1671,7 @@ export default function Home() {
                                     extendingPeriod={extendingPeriod}
                                     scopeTotalCount={explorerMatchingEvents.length}
                                     nextPeriodEventCount={nextAvailableEventBatch === undefined ? undefined : nextAvailableEventBatch?.matchingCount ?? 0}
+                                    gateMoreEventsForAnonymous
                                 />
                             </div>
                         </div>
