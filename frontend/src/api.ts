@@ -143,6 +143,7 @@ export interface SiteSettings {
     following_badge_enabled?: boolean;
     unseen_state_enabled?: boolean;
     trending_enabled?: boolean;
+    trending_banner_enabled?: boolean;
     trending_window_days?: number;
     trending_floor_going?: number;
     trending_top_n?: number;
@@ -493,6 +494,7 @@ export interface PublicProfile {
     // outstanding follow-request awaits the target's approval.
     follow_status?: 'approved' | 'pending';
     account_visibility: AccountVisibility;
+    show_in_suggestions: boolean;
     friend_count: number;
     mutual_friend_count: number;
     // Default audience pre-selected in the GoingButton audience picker
@@ -1170,6 +1172,13 @@ export interface AdminUserList {
     total: number;
 }
 
+export interface AdminUserMergeResponse {
+    status: string;
+    source_user_id: string;
+    destination_user_id: string;
+    summary: Record<string, number>;
+}
+
 export interface AdminBlockedUserRow {
     id: number;
     provider: string;
@@ -1288,10 +1297,29 @@ export async function adminSetAdminManaged(
     return parseJsonResponse<AdminUserRow>(res, 'Failed to update managed flag');
 }
 
+export async function adminMergeUsers(
+    sourceUserId: string,
+    destinationUserId: string,
+    reason?: string | null,
+): Promise<AdminUserMergeResponse> {
+    const res = await fetch(`${BASE}/social/admin/users/merge`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            source_user_id: sourceUserId,
+            destination_user_id: destinationUserId,
+            reason: reason ?? null,
+        }),
+    });
+    return parseJsonResponse<AdminUserMergeResponse>(res, 'Failed to merge users');
+}
+
 export async function updateMyVisibility(
     visibility: Partial<{
         account_visibility: AccountVisibility;
         share_attendance_default_audience: ShareAudience;
+        show_in_suggestions: boolean;
     }>,
 ): Promise<PublicProfile> {
     const res = await fetch(`${BASE}/social/me/visibility`, {

@@ -57,6 +57,7 @@ export default function Admin() {
     const [followingBadgeEnabled, setFollowingBadgeEnabled] = useState(false);
     const [unseenStateEnabled, setUnseenStateEnabled] = useState(false);
     const [trendingEnabled, setTrendingEnabled] = useState(false);
+    const [trendingBannerEnabled, setTrendingBannerEnabled] = useState(false);
     const [trendingWindowDays, setTrendingWindowDays] = useState(30);
     const [trendingFloorGoing, setTrendingFloorGoing] = useState(3);
     const [trendingTopN, setTrendingTopN] = useState(3);
@@ -164,6 +165,7 @@ export default function Admin() {
             setFollowingBadgeEnabled(s.following_badge_enabled ?? false);
             setUnseenStateEnabled(s.unseen_state_enabled ?? false);
             setTrendingEnabled(s.trending_enabled ?? false);
+            setTrendingBannerEnabled(s.trending_banner_enabled ?? false);
             setTrendingWindowDays(s.trending_window_days ?? 30);
             setTrendingFloorGoing(s.trending_floor_going ?? 3);
             setTrendingTopN(s.trending_top_n ?? 3);
@@ -454,6 +456,18 @@ export default function Admin() {
             setTrendingEnabled(!newVal);
             setShowPopularity(!newVal);
             setMessage('Failed to update trending toggle.');
+        }
+    };
+
+    const handleToggleTrendingBanner = async () => {
+        const newVal = !trendingBannerEnabled;
+        setTrendingBannerEnabled(newVal);
+        try {
+            await updateSettings({ trending_banner_enabled: newVal });
+            setMessage(`Trending banner ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setTrendingBannerEnabled(!newVal);
+            setMessage('Failed to update trending banner toggle.');
         }
     };
 
@@ -1084,6 +1098,18 @@ export default function Admin() {
                                 </div>
                                 {trendingEnabled && (
                                     <>
+                                        <div className="flex items-center justify-between mt-1 pl-1">
+                                            <div>
+                                                <span className="text-[11px] font-medium text-gray-600">Trending banner</span>
+                                                <p className="text-[10px] text-gray-400">Highlights top trending events in the filtered Explorer scope.</p>
+                                            </div>
+                                            <button
+                                                onClick={handleToggleTrendingBanner}
+                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${trendingBannerEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                            >
+                                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${trendingBannerEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                            </button>
+                                        </div>
                                         <div className="flex items-center justify-between mt-1 pl-1">
                                             <div>
                                                 <span className="text-[11px] font-medium text-gray-600">🔥 Popular threshold</span>

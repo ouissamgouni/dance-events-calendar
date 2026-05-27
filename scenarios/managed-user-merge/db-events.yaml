@@ -1,0 +1,96 @@
+base_week: 0
+events:
+  - id: evt-merge-001
+    calendar_id: merge-cal-001
+    title: Old Curator Saved Salsa Social
+    description: |
+      Seed event used to verify that saved and going rows owned by the old
+      managed account move to the replacement account during an admin merge.
+    location: Studio Merge, 15 Rue de la Roquette, Paris, France
+    latitude: 48.8534
+    longitude: 2.3741
+    start: w0 Fri 21:00
+    end: w0 Sat 01:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:salsa
+  - id: evt-merge-002
+    calendar_id: merge-cal-001
+    title: Duplicate Destination Bachata Night
+    description: |
+      Both old-curator and new-curator are seeded against this event so the
+      merge exercises dedupe paths for saved, going, and rating rows.
+    location: Le Merge, 4 Rue Oberkampf, Paris, France
+    latitude: 48.8644
+    longitude: 2.3703
+    start: w1 Sat 20:30
+    end: w1 Sun 00:30
+    price_is_free: false
+    price_min: 12
+    price_currency: EUR
+    tags:
+      - format:social
+      - dance-style:bachata
+  - id: evt-merge-003
+    calendar_id: merge-cal-001
+    title: Bruno Fan Workshop
+    description: |
+      Extra event used by followers/fans to make profile counts and event lists
+      easier to inspect after the merge.
+    location: Salle Merge, 22 Avenue Parmentier, Paris, France
+    latitude: 48.8656
+    longitude: 2.3792
+    start: w2 Sun 14:00
+    end: w2 Sun 17:00
+    price_is_free: false
+    price_min: 25
+    price_currency: EUR
+    tags:
+      - format:workshop
+      - dance-style:salsa
+
+saves:
+  - event_id: evt-merge-001
+    email: old-curator@example.com
+    audience: public
+  - event_id: evt-merge-002
+    email: old-curator@example.com
+    audience: public
+  - event_id: evt-merge-002
+    email: new-curator@example.com
+    audience: public
+  - event_id: evt-merge-003
+    email: bruno@example.com
+    audience: public
+
+attendances:
+  - event_id: evt-merge-001
+    email: old-curator@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-merge-002
+    email: old-curator@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-merge-002
+    email: new-curator@example.com
+    share_publicly: true
+    share_audience: public
+
+ratings:
+  - event_id: evt-merge-001
+    email: old-curator@example.com
+    stars: 5
+    comment: Curated favorite from the blocked account.
+    status: approved
+  - event_id: evt-merge-002
+    email: old-curator@example.com
+    stars: 4
+    comment: Old account duplicate review that should anonymize after merge.
+    status: approved
+  - event_id: evt-merge-002
+    email: new-curator@example.com
+    stars: 3
+    comment: Destination review should remain attached to new-curator.
+    status: approved

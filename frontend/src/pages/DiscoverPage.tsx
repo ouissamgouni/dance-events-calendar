@@ -3,9 +3,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
     fetchCurators,
-    fetchMySuggestions,
+    fetchSuggestedUsers,
     searchUsers,
-    type FoFSuggestionItem,
     type UserSearchResult,
 } from '../api';
 
@@ -164,12 +163,12 @@ function AnonDiscoverHint() {
 }
 
 function DefaultDiscoverSections() {
-    const [suggestedUsers, setSuggestedUsers] = useState<FoFSuggestionItem[] | null>(null);
+    const [suggestedUsers, setSuggestedUsers] = useState<UserSearchResult[] | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         let cancelled = false;
-        fetchMySuggestions({ limit: 12 })
+        fetchSuggestedUsers({ limit: 12 })
             .then((suggested) => {
                 if (cancelled) return;
                 setSuggestedUsers(suggested.items);
@@ -185,8 +184,8 @@ function DefaultDiscoverSections() {
         };
     }, []);
 
-    const networkUsers = (suggestedUsers ?? []).filter((u) => !u.is_admin_managed);
-    const curatedUsers = (suggestedUsers ?? []).filter((u) => u.is_admin_managed);
+    const networkUsers = (suggestedUsers ?? []).filter((u) => u.source === 'network');
+    const curatedUsers = (suggestedUsers ?? []).filter((u) => u.source === 'curator');
 
     if (loading) {
         return <p className="text-sm text-slate-500">Loading suggestions…</p>;
@@ -245,7 +244,7 @@ function UserSection({
     );
 }
 
-type DiscoverUser = UserSearchResult | FoFSuggestionItem;
+type DiscoverUser = UserSearchResult;
 
 function UserGrid({ users }: { users: DiscoverUser[] }) {
     return (
@@ -290,30 +289,17 @@ function UserGrid({ users }: { users: DiscoverUser[] }) {
 }
 
 function UserMeta({ user }: { user: DiscoverUser }) {
-    if ('mutual_friends_preview' in user && user.mutual_friends_preview.length > 0) {
-        const first = user.mutual_friends_preview[0];
-        const hiddenCount = user.mutual_friend_count - 1;
-        return (
-            <div className="text-xs text-slate-500 truncate">
-                Followed by @{first}
-                {hiddenCount > 0 && ` + ${hiddenCount} more`}
-            </div>
-        );
-    }
-    if ('subscribers_count' in user) {
-        return (
-            <div className="text-xs text-slate-500 truncate">
-                @{user.handle} · {user.subscribers_count} subscriber
-                {user.subscribers_count === 1 ? '' : 's'}
-                {user.is_subscribed && (
-                    <span className="ml-1 text-emerald-600">
-                        · subscribed
-                    </span>
-                )}
-            </div>
-        );
-    }
-    return <div className="text-xs text-slate-500 truncate">@{user.handle}</div>;
+    return (
+        <div className="text-xs text-slate-500 truncate">
+            @{user.handle} · {user.subscribers_count} subscriber
+            {user.subscribers_count === 1 ? '' : 's'}
+            {user.is_subscribed && (
+                <span className="ml-1 text-emerald-600">
+                    · subscribed
+                </span>
+            )}
+        </div>
+    );
 }
 
 function Avatar({ url, name }: { url: string | null; name: string }) {

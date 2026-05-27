@@ -12,6 +12,7 @@ interface FeatureFlags {
     followingBadgeEnabled: boolean;
     unseenStateEnabled: boolean;
     trendingEnabled: boolean;
+    trendingBannerEnabled: boolean;
     trendingFloorGoing: number;
     /** Absolute upper bound on number of events that get a Trending
      * decoration in the visible list/map. */
@@ -33,6 +34,7 @@ const defaultFlags: FeatureFlags = {
     followingBadgeEnabled: false,
     unseenStateEnabled: false,
     trendingEnabled: false,
+    trendingBannerEnabled: false,
     trendingFloorGoing: 3,
     trendingTopN: 3,
     trendingTopPercent: 100,
@@ -58,6 +60,7 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     followingBadgeEnabled: s.following_badge_enabled ?? false,
                     unseenStateEnabled: s.unseen_state_enabled ?? false,
                     trendingEnabled: s.trending_enabled ?? false,
+                    trendingBannerEnabled: s.trending_banner_enabled ?? false,
                     trendingFloorGoing: s.trending_floor_going ?? 3,
                     trendingTopN: s.trending_top_n ?? 3,
                     trendingTopPercent: s.trending_top_percent ?? 100,

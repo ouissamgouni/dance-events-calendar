@@ -91,27 +91,25 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
             const seasonBaseYear = currentBaseYear + Math.floor((currentIdx + offset) / 4);
             const range = seasonRange(seasonIdx, seasonBaseYear);
 
-            const label =
-                offset === 0
-                    ? `This ${seasons[seasonIdx].name}`
-                    : `Next ${seasons[seasonIdx].name}`;
+            const label = seasons[seasonIdx].name;
             const mobileLabel = seasons[seasonIdx].icon;
 
             return {
                 label,
                 mobileLabel,
+                icon: seasons[seasonIdx].icon,
                 start: formatDate(offset === 0 ? thisSeasonStart : range.start),
                 end: formatDate(range.end),
             };
         });
 
         const allPresets = [
-            { label: 'This weekend', mobileLabel: 'Wknd', start: formatDate(thisWeekendStart), end: formatDate(thisWeekendEnd), group: 'this' },
-            { label: 'Next weekend', mobileLabel: 'Wknd', start: formatDate(nextWeekendStart), end: formatDate(nextWeekendEnd), group: 'next' },
-            { label: 'Next 7 days', mobileLabel: '7d', start: formatDate(today), end: formatDate(next7Days), group: 'next' },
-            { label: 'Next 30 days', mobileLabel: '30d', start: formatDate(today), end: formatDate(next30Days), group: 'next' },
-            { label: 'Next 3 months', mobileLabel: '3mo', start: formatDate(today), end: formatDate(next3Months), group: 'next' },
-            { label: 'Next 6 months', mobileLabel: '6mo', start: formatDate(today), end: formatDate(next6Months), group: 'next' },
+            { label: 'Weekend', mobileLabel: 'Wknd', start: formatDate(thisWeekendStart), end: formatDate(thisWeekendEnd), group: 'this' },
+            { label: 'Weekend', mobileLabel: 'Wknd', start: formatDate(nextWeekendStart), end: formatDate(nextWeekendEnd), group: 'next' },
+            { label: '7 days', mobileLabel: '7d', start: formatDate(today), end: formatDate(next7Days), group: 'next' },
+            { label: '30 days', mobileLabel: '30d', start: formatDate(today), end: formatDate(next30Days), group: 'next' },
+            { label: '3 months', mobileLabel: '3mo', start: formatDate(today), end: formatDate(next3Months), group: 'next' },
+            { label: '6 months', mobileLabel: '6mo', start: formatDate(today), end: formatDate(next6Months), group: 'next' },
             ...seasonPresets.map((preset, index) => ({ ...preset, group: index === 0 ? 'this' : 'next' })),
         ] as const;
 
@@ -121,7 +119,7 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
         };
     }, []);
 
-    const renderPreset = (preset: { label: string; mobileLabel: string; start: string; end: string }) => {
+    const renderPreset = (preset: { label: string; mobileLabel: string; start: string; end: string; icon?: string }) => {
         const active = startDate === preset.start && endDate === preset.end;
         return (
             <button
@@ -133,7 +131,7 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
                 title={preset.label}
             >
                 <span className="sm:hidden">{preset.mobileLabel}</span>
-                <span className="hidden sm:inline">{preset.label}</span>
+                <span className="hidden sm:inline">{preset.icon ? `${preset.icon} ${preset.label}` : preset.label}</span>
             </button>
         );
     };

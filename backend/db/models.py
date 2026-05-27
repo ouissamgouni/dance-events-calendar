@@ -77,6 +77,7 @@ class User(SQLModel, table=True):
     # is independent and lives on the per-event rows
     # (``UserEventAttendance.share_audience`` / ``UserSavedEvent.audience``).
     account_visibility: str = Field(default="public", max_length=16, nullable=False)
+    show_in_suggestions: bool = Field(default=True, nullable=False)
     # Admin-granted credibility badge surfaced on the public profile.
     is_verified_organizer: bool = Field(default=False, nullable=False)
     # Phase: admin-curated lists. When True the account is operated by
@@ -142,6 +143,22 @@ class BlockedUserIdentity(SQLModel, table=True):
     revoked_by_admin_user_id: Optional[UUID] = Field(
         default=None, foreign_key="users.id", index=True
     )
+
+
+class UserAccountMerge(SQLModel, table=True):
+    """Admin audit trail for one managed account merged into another."""
+
+    __tablename__ = "user_account_merges"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    source_user_id: UUID = Field(foreign_key="users.id", index=True)
+    destination_user_id: UUID = Field(foreign_key="users.id", index=True)
+    created_by_admin_user_id: Optional[UUID] = Field(
+        default=None, foreign_key="users.id", index=True
+    )
+    reason: Optional[str] = Field(default=None, sa_column=Column(Text))
+    summary: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
 class CalendarSetting(SQLModel, table=True):

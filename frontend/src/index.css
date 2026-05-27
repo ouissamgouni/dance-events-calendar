@@ -315,6 +315,33 @@ body {
   min-width: 0;
 }
 
+@media (min-width: 1024px) {
+  .date-range-picker {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .date-range-inputs {
+    flex: 0 0 auto;
+    gap: 0.5rem;
+  }
+
+  .date-range-inputs label {
+    flex: 0 0 auto;
+  }
+
+  .date-range-inputs input[type="date"] {
+    flex: 0 0 auto;
+    width: 8.5rem;
+  }
+
+  .date-range-presets {
+    flex: 1 1 auto;
+    margin-top: 0;
+  }
+}
+
 .filter-sheet-panel {
   max-height: min(70dvh, calc(100dvh - 2.75rem));
   padding-bottom: env(safe-area-inset-bottom);

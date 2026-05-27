@@ -1,0 +1,33 @@
+# Managed user merge scenario.
+#
+# Source/old account:
+#   old-curator@example.com is admin-managed and simulates the account whose
+#   Google identity is no longer usable.
+# Destination/new account:
+#   new-curator@example.com simulates the replacement Google account. The merge
+#   should preserve this user's email/provider_subject/handle/profile.
+users:
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin
+    account_visibility: public
+  - email: old-curator@example.com
+    name: Old Paris Curator
+    handle: old-curator
+    account_visibility: public
+    is_admin_managed: true
+    managed_label: Blocked Google Account
+    share_attendance_default: true
+    share_attendance_default_audience: public
+  - email: new-curator@example.com
+    name: New Paris Curator
+    handle: new-curator
+    account_visibility: public
+  - email: alice@example.com
+    name: Alice Follower
+    handle: alice
+    account_visibility: public
+  - email: bruno@example.com
+    name: Bruno Fan
+    handle: bruno
+    account_visibility: public

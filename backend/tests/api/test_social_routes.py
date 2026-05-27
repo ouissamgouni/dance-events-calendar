@@ -348,6 +348,19 @@ def test_update_visibility_persists_and_returns_profile(client, session):
     assert body["account_visibility"] == "friends"
 
 
+def test_update_visibility_persists_suggestion_opt_out(client, session):
+    user = _make_user(session, "alice@example.com", "alice")
+    _login(client, "alice@example.com")
+    r = client.patch(
+        "/api/social/me/visibility",
+        json={"show_in_suggestions": False},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["show_in_suggestions"] is False
+    session.refresh(user)
+    assert user.show_in_suggestions is False
+
+
 def test_update_visibility_rejects_unknown_value(client, session):
     _make_user(session, "alice@example.com", "alice")
     _login(client, "alice@example.com")

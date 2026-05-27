@@ -1,0 +1,369 @@
+# Seed for the anonymous more-events gate scenario.
+#
+# Layout:
+# - 13 events in weeks 1-4 so anonymous users hit the 10-card list cap and the
+#   locked "see more" boundary inside the enforced 30-day window.
+# - 5 more events in weeks 6-11 so signed-in users can verify that the longer
+#   range presets unlock genuinely new inventory beyond the anonymous cap.
+base_week: 0
+events:
+  - id: evt-gate-001
+    calendar_id: salsa-cal-001
+    title: Paris Salsa Monday Social
+    description: |
+      Friendly Monday social used as an in-window anonymous discovery result.
+      The floor stays open for casual dancers and regulars alike.
+    location: 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w1 Mon 20:00
+    end: w1 Mon 23:00
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "level:all-levels",
+        "venue:indoor",
+        "scope:local",
+      ]
+  - id: evt-gate-002
+    calendar_id: bachata-cal-002
+    title: Berlin Bachata Tuesday Class
+    description: |
+      Compact partnerwork class used to fill the anonymous 30-day window.
+      Newcomers and improvers can join without a partner.
+    location: Friedrichstrasse 120, Berlin, Germany
+    latitude: 52.5200
+    longitude: 13.4050
+    start: w1 Tue 19:30
+    end: w1 Tue 21:00
+    price_is_free: true
+    tags:
+      [
+        "format:class",
+        "dance-style:bachata",
+        "level:beginner-friendly",
+        "venue:indoor",
+        "scope:local",
+      ]
+  - id: evt-gate-003
+    calendar_id: salsa-cal-001
+    title: Madrid Salsa Friday Party
+    description: |
+      Late Friday social with a broad salsa playlist and a central venue.
+      It is part of the anonymous preview batch.
+    location: Calle de Atocha 34, Madrid, Spain
+    latitude: 40.4140
+    longitude: -3.7035
+    start: w1 Fri 21:00
+    end: w2 Sat 00:30
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "level:all-levels",
+        "venue:indoor",
+        "scope:local",
+      ]
+  - id: evt-gate-004
+    calendar_id: bachata-cal-002
+    title: Lisbon Bachata Saturday Social
+    description: |
+      Weekend bachata social with a relaxed crowd and short warm-up block.
+      Used to keep the first month dense enough for the list lock.
+    location: Cais do Sodre, Lisbon, Portugal
+    latitude: 38.7077
+    longitude: -9.1493
+    start: w1 Sat 22:00
+    end: w2 Sun 01:00
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "dance-style:bachata",
+        "level:all-levels",
+        "venue:indoor",
+        "scope:local",
+      ]
+  - id: evt-gate-005
+    calendar_id: salsa-cal-001
+    title: Rome Sunday Salsa Matinee
+    description: |
+      Afternoon salsa social meant to give the first month another distinct day cluster.
+      The venue is central and easy to spot on the map.
+    location: Via del Corso 100, Rome, Italy
+    latitude: 41.9028
+    longitude: 12.4964
+    start: w1 Sun 17:00
+    end: w1 Sun 20:30
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "level:all-levels",
+        "venue:indoor",
+        "scope:local",
+      ]
+  - id: evt-gate-006
+    calendar_id: salsa-cal-001
+    title: Brussels Salsa Lab
+    description: |
+      Midweek training social with short guided drills before open dancing.
+      This keeps the anonymous month above the lock threshold.
+    location: Boulevard Anspach 50, Brussels, Belgium
+    latitude: 50.8503
+    longitude: 4.3517
+    start: w2 Wed 19:00
+    end: w2 Wed 22:00
+    price_is_free: true
+    tags:
+      [
+        "format:practice",
+        "dance-style:salsa",
+        "level:intermediate",
+        "venue:indoor",
+        "scope:local",
+      ]
+  - id: evt-gate-007
+    calendar_id: bachata-cal-002
+    title: Amsterdam Bachata Thursday Night
+    description: |
+      Thursday-night bachata social with a long DJ set and easy tram access.
+      It belongs to the anonymous preview window.
+    location: Dam Square, Amsterdam, Netherlands
+    latitude: 52.3676
+    longitude: 4.9041
+    start: w2 Thu 21:00
+    end: w2 Thu 23:59
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "dance-style:bachata",
+        "level:all-levels",
+        "venue:indoor",
+        "scope:local",
+      ]
+  - id: evt-gate-008
+    calendar_id: salsa-cal-001
+    title: Barcelona Salsa Rooftop
+    description: |
+      Open-air salsa night that still falls within the anonymous 30-day cap.
+      It helps verify that the gate is about discovery depth, not a single tag.
+    location: Carrer de Bergara 8, Barcelona, Spain
+    latitude: 41.3879
+    longitude: 2.1699
+    start: w2 Sat 20:30
+    end: w2 Sat 23:59
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "level:beginner-friendly",
+        "venue:rooftop",
+        "scope:local",
+      ]
+  - id: evt-gate-009
+    calendar_id: bachata-cal-002
+    title: Milan Bachata Social
+    description: |
+      Sunday bachata evening with a compact central-city footprint.
+      Another in-window event for the anonymous preview count.
+    location: Via Torino 20, Milan, Italy
+    latitude: 45.4642
+    longitude: 9.1900
+    start: w2 Sun 18:00
+    end: w2 Sun 22:00
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "dance-style:bachata",
+        "level:all-levels",
+        "venue:indoor",
+        "scope:local",
+      ]
+  - id: evt-gate-010
+    calendar_id: salsa-cal-001
+    title: Lyon Salsa Tuesday Practice
+    description: |
+      Practice-led salsa evening used to keep the first month above ten total events.
+      The crowd is smaller but still public and searchable.
+    location: Place Bellecour, Lyon, France
+    latitude: 45.7578
+    longitude: 4.8320
+    start: w3 Tue 19:30
+    end: w3 Tue 21:30
+    price_is_free: true
+    tags:
+      [
+        "format:practice",
+        "dance-style:salsa",
+        "level:all-levels",
+        "venue:indoor",
+        "scope:local",
+      ]
+  - id: evt-gate-011
+    calendar_id: bachata-cal-002
+    title: Hamburg Bachata Friday Social
+    description: |
+      Friday social in Hamburg with a straightforward bachata-heavy playlist.
+      Used to ensure the locked panel reports hidden in-window events.
+    location: Reeperbahn 1, Hamburg, Germany
+    latitude: 53.5511
+    longitude: 9.9937
+    start: w3 Fri 21:00
+    end: w4 Sat 00:00
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "dance-style:bachata",
+        "level:all-levels",
+        "venue:indoor",
+        "scope:local",
+      ]
+  - id: evt-gate-012
+    calendar_id: salsa-cal-001
+    title: Valencia Salsa Saturday Social
+    description: |
+      Saturday salsa social with an easy-to-recognize city-center location.
+      It is one of the final anonymous-window fixtures.
+    location: Carrer de Colon 1, Valencia, Spain
+    latitude: 39.4699
+    longitude: -0.3763
+    start: w4 Sat 21:00
+    end: w5 Sun 00:30
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "level:all-levels",
+        "venue:indoor",
+        "scope:local",
+      ]
+  - id: evt-gate-013
+    calendar_id: bachata-cal-002
+    title: Porto Bachata Sunday Social
+    description: |
+      Sunday-night bachata social that closes out the anonymous 30-day batch.
+      This is the thirteenth in-window event for the seed.
+    location: Rua de Santa Catarina 10, Porto, Portugal
+    latitude: 41.1579
+    longitude: -8.6291
+    start: w4 Sun 18:00
+    end: w4 Sun 22:00
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "dance-style:bachata",
+        "level:all-levels",
+        "venue:indoor",
+        "scope:local",
+      ]
+  - id: evt-gate-014
+    calendar_id: salsa-cal-001
+    title: Prague Salsa Marathon Preview
+    description: |
+      First post-cap fixture used to confirm that authenticated browsing reveals later inventory.
+      Anonymous requests must not surface it.
+    location: Wenceslas Square, Prague, Czechia
+    latitude: 50.0755
+    longitude: 14.4378
+    start: w6 Fri 20:00
+    end: w6 Fri 23:30
+    price_is_free: true
+    tags:
+      [
+        "format:festival",
+        "dance-style:salsa",
+        "level:all-levels",
+        "venue:indoor",
+        "scope:regional",
+      ]
+  - id: evt-gate-015
+    calendar_id: bachata-cal-002
+    title: Vienna Bachata Exchange
+    description: |
+      Bachata exchange social seeded beyond the anonymous limit.
+      It should appear only after sign-in or an authenticated API call.
+    location: Mariahilfer Strasse 1, Vienna, Austria
+    latitude: 48.2082
+    longitude: 16.3738
+    start: w7 Sat 21:00
+    end: w8 Sun 01:00
+    price_is_free: true
+    tags:
+      [
+        "format:festival",
+        "dance-style:bachata",
+        "level:all-levels",
+        "venue:indoor",
+        "scope:regional",
+      ]
+  - id: evt-gate-016
+    calendar_id: salsa-cal-001
+    title: Zurich Sunday Social
+    description: |
+      Later-window Sunday social used to verify that the signed-in range really expands.
+      It should remain invisible anonymously.
+    location: Bahnhofstrasse 1, Zurich, Switzerland
+    latitude: 47.3769
+    longitude: 8.5417
+    start: w8 Sun 17:00
+    end: w8 Sun 21:00
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "level:all-levels",
+        "venue:indoor",
+        "scope:local",
+      ]
+  - id: evt-gate-017
+    calendar_id: salsa-cal-001
+    title: Copenhagen Salsa Boat Party
+    description: |
+      Boat-party social seeded well beyond the anonymous cap.
+      Its title is distinctive enough to spot quickly in QA.
+    location: Nyhavn 1, Copenhagen, Denmark
+    latitude: 55.6761
+    longitude: 12.5683
+    start: w9 Fri 20:30
+    end: w10 Sat 00:30
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "level:all-levels",
+        "venue:outdoor",
+        "scope:regional",
+      ]
+  - id: evt-gate-018
+    calendar_id: bachata-cal-002
+    title: Dublin Bachata Weekender Kickoff
+    description: |
+      Final later-window fixture used to confirm the authenticated three-month batch.
+      It should be absent from anonymous 30-day results.
+    location: Dame Street, Dublin, Ireland
+    latitude: 53.3498
+    longitude: -6.2603
+    start: w11 Sat 19:00
+    end: w11 Sat 23:59
+    price_is_free: true
+    tags:
+      [
+        "format:festival",
+        "dance-style:bachata",
+        "level:all-levels",
+        "venue:indoor",
+        "scope:international",
+      ]

@@ -136,6 +136,7 @@ def get_settings(session: Session = Depends(get_session)):
         following_badge_enabled=_get_bool_setting(session, "following_badge_enabled"),
         unseen_state_enabled=_get_bool_setting(session, "unseen_state_enabled"),
         trending_enabled=_get_bool_setting(session, "trending_enabled"),
+        trending_banner_enabled=_get_bool_setting(session, "trending_banner_enabled"),
         trending_window_days=_get_int_setting(session, "trending_window_days", 30),
         trending_floor_going=_get_int_setting(session, "trending_floor_going", 3),
         trending_top_n=_get_int_setting(session, "trending_top_n", 3),
@@ -226,6 +227,11 @@ def update_settings(
     if body.trending_enabled is not None:
         _set_bool_setting(session, "trending_enabled", body.trending_enabled)
 
+    if body.trending_banner_enabled is not None:
+        _set_bool_setting(
+            session, "trending_banner_enabled", body.trending_banner_enabled
+        )
+
     if body.trending_window_days is not None:
         row = session.get(SiteSetting, "trending_window_days")
         if row:
@@ -305,6 +311,7 @@ def update_settings(
         following_badge_enabled=_get_bool_setting(session, "following_badge_enabled"),
         unseen_state_enabled=_get_bool_setting(session, "unseen_state_enabled"),
         trending_enabled=_get_bool_setting(session, "trending_enabled"),
+        trending_banner_enabled=_get_bool_setting(session, "trending_banner_enabled"),
         trending_window_days=_get_int_setting(session, "trending_window_days", 30),
         trending_floor_going=_get_int_setting(session, "trending_floor_going", 3),
         trending_top_n=_get_int_setting(session, "trending_top_n", 3),

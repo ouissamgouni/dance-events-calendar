@@ -42,6 +42,8 @@ from backend.api.schemas import (
     AdminBlockUserRequest,
     AdminUser,
     AdminUserListResponse,
+    AdminUserMergeRequest,
+    AdminUserMergeResponse,
     CalendarSubscriptionRequest,
     CompleteOnboardingRequest,
     CompleteOnboardingResponse,
@@ -85,12 +87,19 @@ from backend.db.database import get_session
 from backend.db.models import (
     BlockedUserIdentity,
     CachedEvent,
+    CalendarCurationRule,
     CalendarSetting,
     CalendarSubscription,
+    EventPromoCode,
+    EventRating,
     EventSuggestion,
+    OrganizerClaim,
+    ShareToken,
     User,
+    UserAccountMerge,
     UserEventAttendance,
     UserFollow,
+    UserPreferredTag,
     UserReferral,
     UserSavedEvent,
 )
@@ -648,6 +657,7 @@ def get_public_profile(
         is_friend=is_friend,
         follow_status=follow_status,
         account_visibility=target.account_visibility,
+        show_in_suggestions=bool(target.show_in_suggestions),
         friend_count=_friend_count(session, target.id),
         mutual_friend_count=(
             _mutual_friends_count(session, viewer.id, target.id)
@@ -734,6 +744,7 @@ def follow_user(
                 )
             )
         if new_status == "pending":
+            sub, _ = ensure_calendar_subscription(session, viewer.id, target.id)
             notify_follow_request(session, target=target, requester=viewer)
             session.commit()
             return FollowActionResponse(
@@ -741,8 +752,8 @@ def follow_user(
                 is_following=False,
                 is_friend=False,
                 followers_count=_followers_count(session, target.id),
-                is_subscribed=False,
-                notify_new_events=False,
+                is_subscribed=True,
+                notify_new_events=bool(sub.notify_new_events),
                 follow_status="pending",
             )
         notify_new_follower(session, followee=target, follower=viewer)
@@ -1382,6 +1393,8 @@ def update_visibility(
     """Update the single account-visibility setting."""
     if payload.account_visibility is not None:
         viewer.account_visibility = payload.account_visibility
+    if payload.show_in_suggestions is not None:
+        viewer.show_in_suggestions = payload.show_in_suggestions
     if payload.share_attendance_default_audience is not None:
         viewer.share_attendance_default_audience = (
             payload.share_attendance_default_audience
@@ -1907,6 +1920,10 @@ def _viewer_follow_edge_ids(session: Session, viewer: User) -> set[UUID]:
     return {UUID(str(r)) if not isinstance(r, UUID) else r for r in rows}
 
 
+def _suggestable_user_clause():
+    return User.show_in_suggestions == True  # noqa: E712
+
+
 def _curator_users(
     session: Session,
     viewer: Optional[User],
@@ -1929,6 +1946,7 @@ def _curator_users(
         select(User)
         .outerjoin(CalendarSubscription, CalendarSubscription.target_user_id == User.id)
         .where(User.is_admin_managed == True)  # noqa: E712
+        .where(_suggestable_user_clause())
         .where(User.deleted_at.is_(None))
         .where(User.handle.is_not(None))
         .group_by(User.id)
@@ -2136,6 +2154,7 @@ def discover_suggested(
             session.exec(
                 select(User)
                 .where(User.id.in_(candidate_ids))
+                .where(_suggestable_user_clause())
                 .where(User.deleted_at.is_(None))
             ).all()
         )
@@ -2248,11 +2267,379 @@ def _set_admin_managed(
         user.share_attendance_default = True
         user.share_attendance_default_audience = "public"
         user.share_attendance_default_set_by_user = True
+        user.show_in_suggestions = True
     raw_label = (managed_label or "").strip()
     user.managed_label = raw_label[:120] if raw_label else None
     session.add(user)
     session.commit()
     session.refresh(user)
+
+
+def _bump(summary: dict[str, int], key: str, amount: int = 1) -> None:
+    summary[key] = summary.get(key, 0) + amount
+
+
+def _merge_preferred_tags(
+    session: Session,
+    source_user_id: UUID,
+    destination_user_id: UUID,
+    summary: dict[str, int],
+) -> None:
+    rows = session.exec(
+        select(UserPreferredTag).where(UserPreferredTag.user_id == source_user_id)
+    ).all()
+    for row in rows:
+        existing = session.exec(
+            select(UserPreferredTag).where(
+                (UserPreferredTag.user_id == destination_user_id)
+                & (UserPreferredTag.tag_id == row.tag_id)
+            )
+        ).first()
+        if existing:
+            session.delete(row)
+            _bump(summary, "preferred_tags_deduped")
+        else:
+            row.user_id = destination_user_id
+            session.add(row)
+            _bump(summary, "preferred_tags_moved")
+
+
+def _merge_curation_rules(
+    session: Session,
+    source_user_id: UUID,
+    destination_user_id: UUID,
+    summary: dict[str, int],
+) -> None:
+    rows = session.exec(
+        select(CalendarCurationRule).where(
+            CalendarCurationRule.target_user_id == source_user_id
+        )
+    ).all()
+    for row in rows:
+        existing = session.exec(
+            select(CalendarCurationRule).where(
+                (CalendarCurationRule.target_user_id == destination_user_id)
+                & (CalendarCurationRule.calendar_id == row.calendar_id)
+                & (CalendarCurationRule.kind == row.kind)
+            )
+        ).first()
+        if existing:
+            existing.enabled = bool(existing.enabled or row.enabled)
+            if existing.audience is None:
+                existing.audience = row.audience
+            session.add(existing)
+            session.delete(row)
+            _bump(summary, "curation_rules_deduped")
+        else:
+            row.target_user_id = destination_user_id
+            session.add(row)
+            _bump(summary, "curation_rules_moved")
+
+
+def _merge_event_rows_by_event(
+    session: Session,
+    model,
+    source_user_id: UUID,
+    destination_user_id: UUID,
+    summary: dict[str, int],
+    moved_key: str,
+    deduped_key: str,
+) -> None:
+    rows = session.exec(select(model).where(model.user_id == source_user_id)).all()
+    for row in rows:
+        existing = session.exec(
+            select(model).where(
+                (model.user_id == destination_user_id)
+                & (model.event_id == row.event_id)
+            )
+        ).first()
+        if existing:
+            session.delete(row)
+            _bump(summary, deduped_key)
+        else:
+            row.user_id = destination_user_id
+            session.add(row)
+            _bump(summary, moved_key)
+
+
+def _merge_ratings(
+    session: Session,
+    source_user_id: UUID,
+    destination_user_id: UUID,
+    summary: dict[str, int],
+) -> None:
+    ratings = session.exec(
+        select(EventRating).where(EventRating.user_id == source_user_id)
+    ).all()
+    for rating in ratings:
+        existing = session.exec(
+            select(EventRating).where(
+                (EventRating.user_id == destination_user_id)
+                & (EventRating.event_id == rating.event_id)
+            )
+        ).first()
+        if existing:
+            rating.user_id = None
+            rating.is_anonymous = True
+            session.add(rating)
+            _bump(summary, "ratings_anonymized")
+        else:
+            rating.user_id = destination_user_id
+            session.add(rating)
+            _bump(summary, "ratings_moved")
+
+
+def _merge_follows(
+    session: Session,
+    source_user_id: UUID,
+    destination_user_id: UUID,
+    summary: dict[str, int],
+) -> None:
+    rows = session.exec(
+        select(UserFollow).where(
+            (UserFollow.follower_id == source_user_id)
+            | (UserFollow.followee_id == source_user_id)
+        )
+    ).all()
+    for row in rows:
+        next_follower_id = (
+            destination_user_id
+            if row.follower_id == source_user_id
+            else row.follower_id
+        )
+        next_followee_id = (
+            destination_user_id
+            if row.followee_id == source_user_id
+            else row.followee_id
+        )
+        if next_follower_id == next_followee_id:
+            session.delete(row)
+            _bump(summary, "follows_removed_self")
+            continue
+        existing = session.exec(
+            select(UserFollow).where(
+                (UserFollow.follower_id == next_follower_id)
+                & (UserFollow.followee_id == next_followee_id)
+                & (UserFollow.id != row.id)
+            )
+        ).first()
+        if existing:
+            if row.status == "approved" and existing.status != "approved":
+                existing.status = "approved"
+                session.add(existing)
+            session.delete(row)
+            _bump(summary, "follows_deduped")
+        else:
+            row.follower_id = next_follower_id
+            row.followee_id = next_followee_id
+            session.add(row)
+            _bump(summary, "follows_moved")
+
+
+def _merge_subscriptions(
+    session: Session,
+    source_user_id: UUID,
+    destination_user_id: UUID,
+    summary: dict[str, int],
+) -> None:
+    rows = session.exec(
+        select(CalendarSubscription).where(
+            (CalendarSubscription.subscriber_id == source_user_id)
+            | (CalendarSubscription.target_user_id == source_user_id)
+        )
+    ).all()
+    for row in rows:
+        next_subscriber_id = (
+            destination_user_id
+            if row.subscriber_id == source_user_id
+            else row.subscriber_id
+        )
+        next_target_user_id = (
+            destination_user_id
+            if row.target_user_id == source_user_id
+            else row.target_user_id
+        )
+        if next_subscriber_id == next_target_user_id:
+            session.delete(row)
+            _bump(summary, "subscriptions_removed_self")
+            continue
+        existing = session.exec(
+            select(CalendarSubscription).where(
+                (CalendarSubscription.subscriber_id == next_subscriber_id)
+                & (CalendarSubscription.target_user_id == next_target_user_id)
+                & (CalendarSubscription.id != row.id)
+            )
+        ).first()
+        if existing:
+            existing.notify_new_events = bool(
+                existing.notify_new_events or row.notify_new_events
+            )
+            session.add(existing)
+            session.delete(row)
+            _bump(summary, "subscriptions_deduped")
+        else:
+            row.subscriber_id = next_subscriber_id
+            row.target_user_id = next_target_user_id
+            session.add(row)
+            _bump(summary, "subscriptions_moved")
+
+
+def _move_simple_user_fk(
+    session: Session,
+    model,
+    field_name: str,
+    source_user_id: UUID,
+    destination_user_id: UUID,
+    summary: dict[str, int],
+    key: str,
+) -> None:
+    field = getattr(model, field_name)
+    rows = session.exec(select(model).where(field == source_user_id)).all()
+    for row in rows:
+        setattr(row, field_name, destination_user_id)
+        session.add(row)
+    if rows:
+        _bump(summary, key, len(rows))
+
+
+def _merge_unique_user_rows(
+    session: Session,
+    source_user_id: UUID,
+    destination_user_id: UUID,
+    summary: dict[str, int],
+) -> None:
+    source_token = session.exec(
+        select(ShareToken).where(ShareToken.user_id == source_user_id)
+    ).first()
+    destination_token = session.exec(
+        select(ShareToken).where(ShareToken.user_id == destination_user_id)
+    ).first()
+    if source_token and destination_token:
+        session.delete(source_token)
+        _bump(summary, "share_tokens_deduped")
+    elif source_token:
+        source_token.user_id = destination_user_id
+        session.add(source_token)
+        _bump(summary, "share_tokens_moved")
+
+    source_referral = session.exec(
+        select(UserReferral).where(UserReferral.inviter_user_id == source_user_id)
+    ).first()
+    destination_referral = session.exec(
+        select(UserReferral).where(UserReferral.inviter_user_id == destination_user_id)
+    ).first()
+    if source_referral and destination_referral:
+        destination_referral.used_count += source_referral.used_count
+        session.add(destination_referral)
+        session.delete(source_referral)
+        _bump(summary, "referrals_deduped")
+    elif source_referral:
+        source_referral.inviter_user_id = destination_user_id
+        session.add(source_referral)
+        _bump(summary, "referrals_moved")
+
+
+def _merge_managed_user_account(
+    session: Session,
+    source: User,
+    destination: User,
+    admin_user_id: UUID | None,
+    reason: str | None,
+) -> dict[str, int]:
+    summary: dict[str, int] = {}
+    source_user_id = source.id
+    destination_user_id = destination.id
+
+    _merge_preferred_tags(session, source_user_id, destination_user_id, summary)
+    _merge_curation_rules(session, source_user_id, destination_user_id, summary)
+    _merge_event_rows_by_event(
+        session,
+        UserSavedEvent,
+        source_user_id,
+        destination_user_id,
+        summary,
+        "saved_events_moved",
+        "saved_events_deduped",
+    )
+    _merge_event_rows_by_event(
+        session,
+        UserEventAttendance,
+        source_user_id,
+        destination_user_id,
+        summary,
+        "attendance_moved",
+        "attendance_deduped",
+    )
+    _merge_ratings(session, source_user_id, destination_user_id, summary)
+    _merge_follows(session, source_user_id, destination_user_id, summary)
+    _merge_subscriptions(session, source_user_id, destination_user_id, summary)
+    _merge_unique_user_rows(session, source_user_id, destination_user_id, summary)
+    _move_simple_user_fk(
+        session,
+        CachedEvent,
+        "organizer_user_id",
+        source_user_id,
+        destination_user_id,
+        summary,
+        "organized_events_moved",
+    )
+    _move_simple_user_fk(
+        session,
+        EventSuggestion,
+        "submitter_user_id",
+        source_user_id,
+        destination_user_id,
+        summary,
+        "event_suggestions_moved",
+    )
+    _move_simple_user_fk(
+        session,
+        EventPromoCode,
+        "submitter_user_id",
+        source_user_id,
+        destination_user_id,
+        summary,
+        "promo_codes_moved",
+    )
+    _move_simple_user_fk(
+        session,
+        OrganizerClaim,
+        "user_id",
+        source_user_id,
+        destination_user_id,
+        summary,
+        "organizer_claims_moved",
+    )
+
+    destination.is_admin_managed = True
+    destination.managed_label = destination.managed_label or source.managed_label
+    destination.share_attendance_default = True
+    destination.share_attendance_default_audience = "public"
+    destination.share_attendance_default_set_by_user = True
+    destination.show_in_suggestions = True
+    session.add(destination)
+
+    source.email = f"merged-{source.id}@example.invalid"
+    source.provider_subject = None
+    source.display_name = None
+    source.avatar_url = None
+    source.handle = None
+    source.share_code = None
+    source.is_admin_managed = False
+    source.managed_label = None
+    source.deleted_at = datetime.utcnow()
+    session.add(source)
+    _bump(summary, "source_users_anonymized")
+
+    merge = UserAccountMerge(
+        source_user_id=source_user_id,
+        destination_user_id=destination_user_id,
+        created_by_admin_user_id=admin_user_id,
+        reason=(reason or "").strip() or None,
+        summary=summary,
+    )
+    session.add(merge)
+    return summary
 
 
 @router.patch("/admin/users/id/{user_id}/managed", response_model=AdminUser)
@@ -2288,6 +2675,41 @@ def admin_set_admin_managed(
 
 
 # --- Admin: users management (list + hard-delete) ---------------------------
+
+
+@router.post("/admin/users/merge", response_model=AdminUserMergeResponse)
+def admin_merge_users(
+    payload: AdminUserMergeRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    source = _resolve_admin_user_id(session, payload.source_user_id)
+    destination = _resolve_admin_user_id(session, payload.destination_user_id)
+    if source.id == destination.id:
+        raise HTTPException(
+            status_code=400, detail="Source and destination must differ"
+        )
+    if is_admin_user(source) or is_admin_user(destination):
+        raise HTTPException(
+            status_code=400, detail="Refusing to merge an admin account"
+        )
+    if not source.is_admin_managed:
+        raise HTTPException(status_code=400, detail="Source user must be admin-managed")
+
+    summary = _merge_managed_user_account(
+        session,
+        source,
+        destination,
+        get_admin_user_id(session),
+        payload.reason,
+    )
+    session.commit()
+    return AdminUserMergeResponse(
+        status="merged",
+        source_user_id=str(source.id),
+        destination_user_id=str(destination.id),
+        summary=summary,
+    )
 
 
 @router.get("/admin/users", response_model=AdminUserListResponse)
@@ -2786,10 +3208,11 @@ def list_subscribed_events(
     # Re-apply account-visibility at read time.
     visible_ids = [t.id for t in target_by_id.values() if can_view(session, viewer, t)]
 
-    # Phase E (E8): pending-follow targets are not in CalendarSubscription, so
-    # they never appear via the subscription path. Include their public-audience
-    # going-events directly so the feed reflects activity from people the viewer
-    # has expressed interest in following (but hasn't been approved yet).
+    # Phase E (E8): pending-follow targets may have a CalendarSubscription row,
+    # but account visibility can still keep them out of the regular visible
+    # target set. Include their public-audience going-events directly so the
+    # feed reflects activity from people the viewer has expressed interest in
+    # following (but hasn't been approved yet).
     # Only "subscription_going" with share_audience=public is allowed — saved
     # events and suggested events require an approved relationship.
     pending_going_rows: list[tuple] = []
@@ -2799,11 +3222,7 @@ def list_subscribed_events(
             .where(UserFollow.follower_id == viewer.id)
             .where(UserFollow.status == "pending")
         ).all()
-        pending_ids = [
-            r
-            for r in pending_followee_rows
-            if r not in target_by_id  # skip if already subscribed (approved follow)
-        ]
+        pending_ids = list(pending_followee_rows)
         if pending_ids:
             pending_users: list[User] = list(
                 session.exec(
@@ -3038,6 +3457,7 @@ def onboarding_suggestions(
         session.exec(
             select(User)
             .where(User.is_verified_organizer == True)  # noqa: E712
+            .where(_suggestable_user_clause())
             .where(User.deleted_at.is_(None))
             .where(User.handle.is_not(None))
             .where(~col(User.id).in_(excluded))
@@ -3060,6 +3480,7 @@ def onboarding_suggestions(
             session.exec(
                 select(User)
                 .where(User.is_admin_managed == True)  # noqa: E712
+                .where(_suggestable_user_clause())
                 .where(User.deleted_at.is_(None))
                 .where(User.handle.is_not(None))
                 .where(~col(User.id).in_(skip_ids))
@@ -3095,6 +3516,7 @@ def onboarding_suggestions(
                 session.exec(
                     select(User)
                     .where(col(User.id).in_(candidate_ids))
+                    .where(_suggestable_user_clause())
                     .where(User.deleted_at.is_(None))
                     .where(User.handle.is_not(None))
                 ).all()
@@ -3233,30 +3655,21 @@ def friend_of_friend_suggestions(
         ).all()
         candidate_scores.update({r[0]: int(r[1]) for r in rows})
 
-    curator_ids = session.exec(
-        select(User.id)
-        .where(User.is_admin_managed == True)  # noqa: E712
-        .where(User.deleted_at.is_(None))
-        .where(User.handle.is_not(None))
-        .where(~col(User.id).in_(excluded))
-    ).all()
-    for curator_id in curator_ids:
-        candidate_scores.setdefault(curator_id, 0)
-
     if not candidate_scores:
         return FoFSuggestionsResponse(items=[], total=0)
 
-    total = len(candidate_scores)
     candidate_ids = list(candidate_scores.keys())
 
     candidates = list(
         session.exec(
             select(User)
             .where(col(User.id).in_(candidate_ids))
+            .where(_suggestable_user_clause())
             .where(User.deleted_at.is_(None))
             .where(User.handle.is_not(None))
         ).all()
     )
+    total = len(candidates)
     candidates.sort(
         key=lambda u: (
             -candidate_scores.get(u.id, 0),
