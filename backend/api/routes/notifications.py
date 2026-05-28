@@ -11,7 +11,7 @@ Notifications are produced by the fan-out helpers in
 write paths.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -39,6 +39,12 @@ VALID_KINDS = {
     "follow_request",
     "follow_request_approved",
 }
+
+
+def _as_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    if dt is None or dt.tzinfo is not None:
+        return dt
+    return dt.replace(tzinfo=UTC)
 
 
 def _hydrate(
@@ -89,7 +95,7 @@ def _hydrate(
                 kind=r.kind,
                 event_id=r.event_id,
                 event_title=e.title if e else None,
-                event_start=e.start if e else None,
+                event_start=_as_utc(e.start if e else None),
                 actor=NotificationActor(
                     handle=(a.handle if a and a.handle else ""),
                     display_name=(
@@ -101,8 +107,8 @@ def _hydrate(
                     is_verified_organizer=bool(a.is_verified_organizer if a else False),
                     is_following=bool(a and a.id in following_ids),
                 ),
-                created_at=r.created_at,
-                read_at=r.read_at,
+                created_at=_as_utc(r.created_at),
+                read_at=_as_utc(r.read_at),
             )
         )
     return items

@@ -1,0 +1,89 @@
+test_plan:
+  name: "Search event - Explorer event-title finder"
+  description: >
+    Verify the explorer-local event-title search. The scenario is built to
+    validate that the finder is separate from the global people search, works
+    for signed-out visitors, returns only upcoming visible events, shows useful
+    row metadata, and can find matching future events outside the default
+    explorer date range.
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=search-event"
+    - >
+      The seeded data includes three visible upcoming "Moonrise" matches,
+      including one at week 16 outside the default next-3-month explorer
+      window, plus one hidden and one past Moonrise control row that must stay
+      out of search results.
+    - >
+      The seeded data also includes nine visible upcoming "Rooftop" matches so
+      the dropdown limit can be checked without changing code or browser state.
+
+  steps:
+    - id: 1
+      title: "Desktop trigger lives in the explorer controls, not the global header"
+      description: >
+        Open / on a desktop viewport as an anonymous visitor.
+      expected: >
+        The global top header still contains the people search, while a
+        separate "Search events" trigger appears in the explorer controls row.
+        The main event list, map, and SummaryBar counts render normally before
+        any event search is opened.
+
+    - id: 2
+      title: "Moonrise query returns only visible upcoming matches"
+      description: >
+        Open the explorer event search and type "moonrise".
+      expected: >
+        Exactly three results appear: evt-se-001, evt-se-002, and evt-se-003.
+        Each row shows the title plus a secondary line containing date/time and
+        location. Hidden Moonrise (evt-se-004) and Past Moonrise (evt-se-005)
+        do not appear.
+
+    - id: 3
+      title: "Search is global across future events, not limited to current explorer window"
+      description: >
+        Keep the Moonrise results open and compare them with the visible
+        explorer list beneath the popover.
+      expected: >
+        The far-future row evt-se-003 (week 16) appears in search even though
+        it is outside the explorer's default next-3-month list. The underlying
+        event list and map do not change while the search popover is open.
+
+    - id: 4
+      title: "Selecting a search result opens the event detail page"
+      description: >
+        Click the far-future Moonrise result.
+      expected: >
+        The app navigates to /event/evt-se-003 with the source marker
+        `src=explorer-search`. The event detail page loads the Lisbon fixture
+        and shows the same title as the result row.
+
+    - id: 5
+      title: "Rooftop query respects the dropdown limit and keyboard controls"
+      description: >
+        Return to /, reopen the event search, and type "rooftop". Use ArrowDown
+        and Enter at least once.
+      expected: >
+        The popover shows at most 8 results even though the scenario seeds 9
+        visible upcoming rooftop matches. Arrow keys move the active row
+        highlight, Enter opens the active event detail page, and Escape closes
+        the popover.
+
+    - id: 6
+      title: "Mobile trigger stays discoverable from the summary strip"
+      description: >
+        Switch to a mobile viewport around 390x844 and reload /.
+      expected: >
+        The mobile SummaryBar above the map/list includes a compact event
+        search trigger next to the Filters affordance. Tapping it opens the
+        same search popover with identical results and selection behavior.
+
+    - id: 7
+      title: "Signed-in behavior matches signed-out behavior"
+      description: >
+        Optionally sign in as Dev User from /login and repeat the Moonrise
+        query.
+      expected: >
+        The same three visible Moonrise results appear in the same order. Event
+        search availability and matching are not restricted to authenticated
+        users.

@@ -1,15 +1,22 @@
-# Suggestions parity scenario.
+# Suggestions surfaces scenario.
 #
 # Cast:
+#   - newbie: fresh user for onboarding follow suggestions.
 #   - viewer: mutual friends with alice/bob/carol; should see FoF suggestions.
-#   - loner: zero graph; should see curator fallback only.
+#   - loner: zero graph; should see Discover curator fallback only.
 #   - alice/bob/carol: viewer's mutual friends, used as suggestion witnesses.
 #   - pop1/pop2/pop3: FoF candidates ranked by mutual-friend count.
 #   - privatepop: friends-only profile that remains suggestable.
 #   - hiddenpop: explicit suggestion opt-out; must never be shown.
-#   - curator-paris/curator-bachata: admin-managed fallback candidates.
+#   - salsa-hub: verified organizer for onboarding ranking.
+#   - curator-paris/curator-bachata: admin-managed fallback/top-up candidates.
+#   - curator-hidden: admin-managed but opted out of suggestions.
 #   - admin: site admin control, excluded by backend discovery helpers.
 users:
+  - email: newbie@example.com
+    name: Nora Newbie
+    handle: newbie
+    account_visibility: public
   - email: viewer@example.com
     name: Vera Viewer
     handle: viewer
@@ -51,6 +58,11 @@ users:
     handle: hiddenpop
     account_visibility: public
     show_in_suggestions: false
+  - email: salsa-hub@example.com
+    name: Salsa Hub
+    handle: salsahub
+    account_visibility: public
+    is_verified_organizer: true
   - email: curator-paris@example.com
     name: Paris Salsa Curator
     handle: curator-paris
@@ -65,6 +77,14 @@ users:
     is_admin_managed: true
     managed_label: Bachata Curator
     bio: Editorial bachata calendar for social dancers.
+  - email: curator-hidden@example.com
+    name: Hidden Curator
+    handle: curator-hidden
+    account_visibility: public
+    is_admin_managed: true
+    show_in_suggestions: false
+    managed_label: Hidden Curator
+    bio: Opted out of suggestion surfaces.
   - email: admin@example.com
     name: Dev Admin
     handle: admin

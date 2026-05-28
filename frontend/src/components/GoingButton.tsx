@@ -361,7 +361,7 @@ export default function GoingButton({
             role="dialog"
             aria-label="Attendance visibility"
             style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left, width: POPOVER_WIDTH }}
-            className="z-[1000] border border-slate-200 bg-white p-3 shadow-xl text-left"
+            className="z-[9000] border border-slate-200 bg-white p-3 shadow-xl text-left"
         >
             <p className="text-xs font-medium text-slate-800 mb-2">
                 {popoverKind === 'confirm' ? "You're going!" : 'Edit visibility'}

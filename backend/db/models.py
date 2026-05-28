@@ -215,6 +215,16 @@ class CalendarCurationRule(SQLModel, table=True):
 
 class CachedEvent(SQLModel, table=True):
     __tablename__ = "cached_events"
+    __table_args__ = (
+        Index(
+            "ix_cached_events_explorer_window",
+            "calendar_id",
+            "deleted_at",
+            "is_hidden",
+            "end",
+            "start",
+        ),
+    )
 
     event_id: str = Field(primary_key=True)
     calendar_id: str = Field(index=True)
@@ -275,6 +285,9 @@ class EventCalendarSource(SQLModel, table=True):
 
 class EventView(SQLModel, table=True):
     __tablename__ = "event_views"
+    __table_args__ = (
+        Index("ix_event_views_event_created_at", "event_id", "created_at"),
+    )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     event_id: str = Field(index=True)
@@ -297,7 +310,10 @@ class EventSave(SQLModel, table=True):
 
 class UserSavedEvent(SQLModel, table=True):
     __tablename__ = "user_saved_events"
-    __table_args__ = (UniqueConstraint("device_id", "event_id"),)
+    __table_args__ = (
+        UniqueConstraint("device_id", "event_id"),
+        Index("ix_user_saved_events_event_saved_at", "event_id", "saved_at"),
+    )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     device_id: str = Field(index=True, max_length=64)
@@ -630,7 +646,10 @@ class TagSynonym(SQLModel, table=True):
 
 class EventTag(SQLModel, table=True):
     __tablename__ = "event_tags"
-    __table_args__ = (UniqueConstraint("event_id", "tag_id", name="uq_event_tag"),)
+    __table_args__ = (
+        UniqueConstraint("event_id", "tag_id", name="uq_event_tag"),
+        Index("ix_event_tags_tag_event", "tag_id", "event_id"),
+    )
 
     event_id: str = Field(foreign_key="cached_events.event_id", primary_key=True)
     tag_id: int = Field(foreign_key="tags.id", primary_key=True)
@@ -737,6 +756,11 @@ class UserEventAttendance(SQLModel, table=True):
     __tablename__ = "user_event_attendances"
     __table_args__ = (
         UniqueConstraint("device_id", "event_id"),
+        Index(
+            "ix_user_event_attendances_event_attending_since",
+            "event_id",
+            "attending_since",
+        ),
         Index(
             "ux_user_event_attendances_user_event_authed",
             "user_id",

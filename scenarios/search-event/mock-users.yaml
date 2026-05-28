@@ -1,0 +1,5 @@
+users:
+  - email: dev-user@example.com
+    name: Dev User
+  - email: admin@example.com
+    name: Dev Admin

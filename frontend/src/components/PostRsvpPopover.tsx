@@ -119,7 +119,7 @@ export default function PostRsvpPopover({
             role="dialog"
             aria-label="You're going"
             style={{ position: 'fixed', top: pos.top, left: pos.left, width: POPOVER_WIDTH }}
-            className="z-[1100] border border-slate-200 bg-white p-2 shadow-xl text-left"
+            className="z-[9000] border border-slate-200 bg-white p-2 shadow-xl text-left"
         >
             <div className="flex items-center gap-1.5 pr-4">
                 <span aria-hidden className="text-sm leading-none">🎉</span>

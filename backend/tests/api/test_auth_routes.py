@@ -7,6 +7,7 @@ share-token claim, etc.).
 
 import os
 import time
+from datetime import datetime
 from uuid import UUID
 
 import pytest
@@ -345,6 +346,12 @@ def test_delete_me_reactivates_same_user_on_repeat_signup(client, session, monke
     user_id = UUID(first_login.json()["user_id"])
     provider_subject = "mock|alice@example.com"
 
+    db_user = session.get(User, user_id)
+    assert db_user is not None
+    db_user.onboarded_at = datetime.utcnow()
+    session.add(db_user)
+    session.commit()
+
     first_delete = client.delete("/api/auth/me")
     assert first_delete.status_code == 200
 
@@ -353,6 +360,12 @@ def test_delete_me_reactivates_same_user_on_repeat_signup(client, session, monke
     assert second_login.json()["user_id"] == str(user_id)
     assert second_login.json()["email"] == "alice@example.com"
     assert second_login.json()["is_new_user"] is False
+    assert second_login.json()["onboarded_at"] is None
+
+    session.expire_all()
+    reactivated_user = session.get(User, user_id)
+    assert reactivated_user is not None
+    assert reactivated_user.onboarded_at is None
 
     second_delete = client.delete("/api/auth/me")
     assert second_delete.status_code == 200

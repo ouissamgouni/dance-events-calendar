@@ -79,7 +79,7 @@ export function useAnchoredToast(anchorRef: RefObject<HTMLElement | null>) {
             role="status"
             aria-live="polite"
             style={{ position: 'fixed', top: pos.top, left: pos.left, maxWidth: MAX_WIDTH }}
-            className={`pointer-events-none z-[1100] text-center text-[11px] font-medium leading-snug text-slate-700 bg-white/75 backdrop-blur-sm px-2.5 py-1 shadow-md ring-1 ring-slate-200/70 transition-opacity duration-200 ${fading ? 'opacity-0' : 'opacity-100'}`}
+            className={`pointer-events-none z-[9000] text-center text-[11px] font-medium leading-snug text-slate-700 bg-white/75 backdrop-blur-sm px-2.5 py-1 shadow-md ring-1 ring-slate-200/70 transition-opacity duration-200 ${fading ? 'opacity-0' : 'opacity-100'}`}
         >
             {message}
         </div>,

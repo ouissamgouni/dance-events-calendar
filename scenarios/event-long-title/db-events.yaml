@@ -1,0 +1,96 @@
+# Seeded events for verifying long title wrapping in the Explorer event list.
+# The first two titles are intentionally long enough to wrap past two lines on
+# mobile-width explorer cards while the save/going action cluster is visible.
+base_week: 0
+events:
+  - id: evt-lt-001
+    calendar_id: salsa-cal-001
+    title: "Berlin Salsa Marathon Weekender Opening Night With Live Orchestra, Rooftop Social, International Guest DJs, Beginner Crash Course, Community Potluck, and Sunrise Afterparty"
+    description: |
+      Purpose-built long-title fixture for the Explorer list.
+      Use this row to verify the title wraps naturally, remains fully readable,
+      and never disappears underneath the save, going, or rating controls.
+    location: Kulturhaus Kreuzberg, Berlin, Germany
+    latitude: 52.4986
+    longitude: 13.4033
+    start: w0 Thu 18:30
+    end: w0 Thu 23:45
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "level:all-levels",
+        "scope:international",
+      ]
+  - id: evt-lt-002
+    calendar_id: bachata-cal-002
+    title: "London Bachata Bootcamp and Social for Improvers Who Want Musicality Drills, Styling Lab Rotations, Footwork Intensives, Partner Connection Clinics, and a Late-Night Guest DJ Showcase"
+    description: |
+      Secondary long-title fixture. Keeps a wide action cluster on the right so
+      wrapping can be checked on another card and another calendar color.
+    location: Porchester Hall, London, UK
+    latitude: 51.5121
+    longitude: -0.1886
+    start: w0 Fri 19:00
+    end: w0 Fri 23:30
+    price_is_free: false
+    price_min: 22
+    price_max: 35
+    price_currency: GBP
+    tags:
+      [
+        "format:bootcamp",
+        "dance-style:bachata",
+        "level:intermediate",
+        "scope:local",
+      ]
+  - id: evt-lt-003
+    calendar_id: salsa-cal-001
+    title: "Paris Salsa Social"
+    description: |
+      Short control title to compare against the long-title rows.
+    location: Studio A, 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w0 Sat 20:00
+    end: w0 Sat 23:00
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "level:beginner-friendly",
+        "scope:local",
+      ]
+
+attendances:
+  - event_id: evt-lt-001
+    device_id: seed-going-lt-001-a
+    share_audience: public
+  - event_id: evt-lt-001
+    device_id: seed-going-lt-001-b
+    share_audience: public
+  - event_id: evt-lt-002
+    device_id: seed-going-lt-002-a
+    share_audience: public
+  - event_id: evt-lt-002
+    device_id: seed-going-lt-002-b
+    share_audience: public
+  - event_id: evt-lt-002
+    device_id: seed-going-lt-002-c
+    share_audience: public
+
+saves:
+  - event_id: evt-lt-001
+    device_id: seed-save-lt-001-a
+    audience: friends
+  - event_id: evt-lt-001
+    device_id: seed-save-lt-001-b
+    audience: public
+  - event_id: evt-lt-001
+    device_id: seed-save-lt-001-c
+    audience: private
+  - event_id: evt-lt-002
+    device_id: seed-save-lt-002-a
+    audience: friends

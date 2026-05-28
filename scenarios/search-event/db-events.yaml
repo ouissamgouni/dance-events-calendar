@@ -1,0 +1,205 @@
+# Seeded events for validating the explorer event-title search.
+#
+# The fixture is designed to prove three things:
+#   1. Search matches upcoming event titles only.
+#   2. Hidden and past title matches are excluded.
+#   3. Search is global across future events, not limited to the current
+#      explorer date window, so one matching result sits well beyond the
+#      default next-3-month range.
+base_week: 0
+events:
+  - id: evt-se-001
+    calendar_id: salsa-cal-001
+    title: Moonrise Salsa Social Paris
+    description: |
+      Primary visible match for the Moonrise query. Use this event to verify
+      the search dropdown shows title, date, and location, then navigates to
+      the event detail page from the explorer finder.
+    location: Studio Lumiere, 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w0 Fri 20:00
+    end: w0 Fri 23:30
+    price_is_free: true
+    tags: ["format:social", "dance-style:salsa", "level:all-levels"]
+
+  - id: evt-se-002
+    calendar_id: bachata-cal-002
+    title: Moonrise Bachata Workshop Berlin
+    description: |
+      Second visible Moonrise result. Provides another city and another dance
+      style so the dropdown rows are easy to distinguish.
+    location: Kulturbrauerei, Berlin, Germany
+    latitude: 52.5424
+    longitude: 13.4131
+    start: w2 Sat 14:00
+    end: w2 Sat 17:00
+    price_is_free: false
+    price_min: 20
+    price_max: 30
+    price_currency: EUR
+    tags: ["format:workshop", "dance-style:bachata", "level:intermediate"]
+
+  - id: evt-se-003
+    calendar_id: salsa-cal-001
+    title: Moonrise Rooftop Salsa Marathon Lisbon
+    description: |
+      Far-future visible match. This event sits beyond the default explorer
+      next-3-month window so the scenario can verify search is not constrained
+      by the current explorer filters or visible list.
+    location: Miradouro de Santa Catarina, Lisbon, Portugal
+    latitude: 38.7091
+    longitude: -9.1486
+    start: w16 Sat 18:00
+    end: w16 Sat 23:30
+    price_is_free: true
+    tags: ["format:social", "dance-style:salsa", "level:all-levels"]
+
+  - id: evt-se-004
+    calendar_id: salsa-cal-001
+    title: Hidden Moonrise Salsa Social
+    description: |
+      Hidden control row. It should never appear in the public search results.
+    location: Secret Loft, Brussels, Belgium
+    latitude: 50.8503
+    longitude: 4.3517
+    start: w1 Thu 20:00
+    end: w1 Thu 23:00
+    price_is_free: true
+    is_hidden: true
+    tags: ["format:social", "dance-style:salsa", "level:all-levels"]
+
+  - id: evt-se-005
+    calendar_id: salsa-cal-001
+    title: Past Moonrise Salsa Social
+    description: |
+      Past control row. It should never appear in the upcoming-only search
+      results even though the title matches.
+    location: Plaza Mayor, Madrid, Spain
+    latitude: 40.4155
+    longitude: -3.7074
+    start: w-1 Sat 20:00
+    end: w-1 Sat 23:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:salsa", "level:all-levels"]
+
+  - id: evt-se-006
+    calendar_id: salsa-cal-001
+    title: Rooftop Salsa Sunset Madrid
+    description: |
+      Visible rooftop match used to exercise multi-result typeahead behavior.
+    location: Circulo de Bellas Artes, Madrid, Spain
+    latitude: 40.4187
+    longitude: -3.6973
+    start: w0 Sat 19:00
+    end: w0 Sat 23:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:salsa", "level:all-levels"]
+
+  - id: evt-se-007
+    calendar_id: bachata-cal-002
+    title: Rooftop Bachata Social Rome
+    description: |
+      Visible rooftop match.
+    location: Trastevere, Rome, Italy
+    latitude: 41.8896
+    longitude: 12.4695
+    start: w1 Fri 21:00
+    end: w2 Sat 00:30
+    price_is_free: true
+    tags: ["format:social", "dance-style:bachata", "level:all-levels"]
+
+  - id: evt-se-008
+    calendar_id: salsa-cal-001
+    title: Rooftop Salsa Practice Vienna
+    description: |
+      Visible rooftop match.
+    location: MuseumsQuartier, Vienna, Austria
+    latitude: 48.2038
+    longitude: 16.3616
+    start: w3 Wed 19:30
+    end: w3 Wed 21:30
+    price_is_free: true
+    tags: ["format:practice", "dance-style:salsa", "level:beginner-friendly"]
+
+  - id: evt-se-009
+    calendar_id: salsa-cal-001
+    title: Rooftop Latin Social Amsterdam
+    description: |
+      Visible rooftop match.
+    location: A'DAM Tower, Amsterdam, Netherlands
+    latitude: 52.3840
+    longitude: 4.9004
+    start: w4 Thu 20:00
+    end: w4 Thu 23:30
+    price_is_free: false
+    price_min: 15
+    price_currency: EUR
+    tags: ["format:social", "dance-style:salsa", "level:all-levels"]
+
+  - id: evt-se-010
+    calendar_id: bachata-cal-002
+    title: Rooftop Bachata Social Prague
+    description: |
+      Visible rooftop match.
+    location: Letna, Prague, Czechia
+    latitude: 50.0969
+    longitude: 14.4179
+    start: w5 Fri 20:30
+    end: w5 Fri 23:59
+    price_is_free: true
+    tags: ["format:social", "dance-style:bachata", "level:all-levels"]
+
+  - id: evt-se-011
+    calendar_id: salsa-cal-001
+    title: Rooftop Salsa Matinee Copenhagen
+    description: |
+      Visible rooftop match.
+    location: Norrebro, Copenhagen, Denmark
+    latitude: 55.6867
+    longitude: 12.5701
+    start: w6 Sun 15:00
+    end: w6 Sun 18:00
+    price_is_free: true
+    tags: ["format:practice", "dance-style:salsa", "level:all-levels"]
+
+  - id: evt-se-012
+    calendar_id: salsa-cal-001
+    title: Rooftop Salsa Night Zurich
+    description: |
+      Visible rooftop match.
+    location: Langstrasse, Zurich, Switzerland
+    latitude: 47.3769
+    longitude: 8.5417
+    start: w7 Sat 20:00
+    end: w7 Sat 23:30
+    price_is_free: true
+    tags: ["format:social", "dance-style:salsa", "level:intermediate"]
+
+  - id: evt-se-013
+    calendar_id: bachata-cal-002
+    title: Rooftop Fusion Social Brussels
+    description: |
+      Visible rooftop match that pushes the rooftop query above the dropdown
+      result limit.
+    location: Grand Place, Brussels, Belgium
+    latitude: 50.8467
+    longitude: 4.3525
+    start: w8 Fri 20:00
+    end: w8 Fri 23:30
+    price_is_free: true
+    tags: ["format:social", "dance-style:bachata", "level:all-levels"]
+
+  - id: evt-se-014
+    calendar_id: salsa-cal-001
+    title: Basement Salsa Social Paris
+    description: |
+      Non-matching control row. Keeps the explorer list populated without
+      polluting the Moonrise or Rooftop queries.
+    location: Bastille, Paris, France
+    latitude: 48.8530
+    longitude: 2.3692
+    start: w0 Sun 18:00
+    end: w0 Sun 22:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:salsa", "level:all-levels"]

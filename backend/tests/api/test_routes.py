@@ -1,22 +1,23 @@
 """API route tests using FastAPI TestClient (no real DB)."""
 
-import pytest
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
-from datetime import datetime
+
+import pytest
 
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
 from backend.api.main import app
-from backend.api.deps import require_admin
+from backend.api.deps import get_current_user_optional, require_admin
 from backend.db.database import get_session
 from backend.db.models import (
     BlockedEvent,
     CachedEvent,
     CalendarSetting,
-    EventView,
     SiteSetting,
+    User,
 )
 
 
@@ -148,6 +149,62 @@ class TestEventsEndpoint:
         finally:
             app.dependency_overrides.clear()
 
+    def test_get_events_sets_public_cache_for_anonymous_list(
+        self, sample_calendar, sample_events
+    ):
+        mock_session = make_session_with_data(
+            calendars=[sample_calendar],
+            events=sample_events,
+        )
+        app.dependency_overrides[get_session] = lambda: mock_session
+        try:
+            client = TestClient(app)
+            resp = client.get("/api/events")
+
+            assert resp.status_code == 200
+            assert resp.headers["cache-control"] == "public, max-age=60"
+            assert "vary" not in resp.headers
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_get_events_sets_private_cache_for_signed_in_list(
+        self, sample_calendar, sample_events
+    ):
+        mock_session = make_session_with_data(
+            calendars=[sample_calendar],
+            events=sample_events,
+        )
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[get_current_user_optional] = lambda: User(
+            email="viewer@example.com"
+        )
+        try:
+            client = TestClient(app)
+            resp = client.get("/api/events")
+
+            assert resp.status_code == 200
+            assert resp.headers["cache-control"] == "private, max-age=0"
+            assert resp.headers["vary"] == "Cookie"
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_get_events_sets_private_cache_for_interest_filter(self, sample_calendar):
+        mock_session = make_session_with_data(
+            calendars=[sample_calendar],
+            events=[],
+        )
+        app.dependency_overrides[get_session] = lambda: mock_session
+        try:
+            client = TestClient(app)
+            resp = client.get("/api/events?interest_source=follows")
+
+            assert resp.status_code == 200
+            assert resp.json() == []
+            assert resp.headers["cache-control"] == "private, max-age=0"
+            assert resp.headers["vary"] == "Cookie"
+        finally:
+            app.dependency_overrides.clear()
+
     def test_get_events_empty_when_no_enabled_calendars(self):
         mock_session = make_session_with_data(calendars=[], events=[])
         app.dependency_overrides[get_session] = lambda: mock_session
@@ -200,6 +257,92 @@ class TestEventsEndpoint:
             )
         finally:
             app.dependency_overrides.clear()
+
+    def test_search_events_allows_anonymous_and_filters_hidden_deleted_and_past(
+        self, sqlite_client
+    ):
+        client, engine = sqlite_client
+        now = datetime.now(UTC).replace(tzinfo=None)
+
+        with Session(engine) as session:
+            session.add(
+                CalendarSetting(
+                    calendar_id="cal-1",
+                    name="Test Calendar",
+                    enabled=True,
+                    color="#ff0000",
+                )
+            )
+            session.add_all(
+                [
+                    CachedEvent(
+                        event_id="evt-future-1",
+                        calendar_id="cal-1",
+                        title="Salsa Social Night",
+                        location="Studio One",
+                        start=now + timedelta(days=2),
+                        end=now + timedelta(days=2, hours=3),
+                        all_day=False,
+                        is_hidden=False,
+                    ),
+                    CachedEvent(
+                        event_id="evt-future-2",
+                        calendar_id="cal-1",
+                        title="Late Salsa Social",
+                        location="Studio Two",
+                        start=now + timedelta(days=7),
+                        end=now + timedelta(days=7, hours=3),
+                        all_day=False,
+                        is_hidden=False,
+                    ),
+                    CachedEvent(
+                        event_id="evt-hidden",
+                        calendar_id="cal-1",
+                        title="Hidden Salsa Social",
+                        location="Hidden Venue",
+                        start=now + timedelta(days=3),
+                        end=now + timedelta(days=3, hours=3),
+                        all_day=False,
+                        is_hidden=True,
+                    ),
+                    CachedEvent(
+                        event_id="evt-deleted",
+                        calendar_id="cal-1",
+                        title="Deleted Salsa Social",
+                        location="Deleted Venue",
+                        start=now + timedelta(days=4),
+                        end=now + timedelta(days=4, hours=3),
+                        all_day=False,
+                        is_hidden=False,
+                        deleted_at=now,
+                    ),
+                    CachedEvent(
+                        event_id="evt-past",
+                        calendar_id="cal-1",
+                        title="Past Salsa Social",
+                        location="Old Venue",
+                        start=now - timedelta(days=2),
+                        end=now - timedelta(days=2, hours=-3),
+                        all_day=False,
+                        is_hidden=False,
+                    ),
+                ]
+            )
+            session.commit()
+
+        resp = client.get("/api/events/search?q=salsa&limit=10")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert [row["event_id"] for row in data] == ["evt-future-1", "evt-future-2"]
+        assert data[0]["location"] == "Studio One"
+
+    def test_search_events_rejects_too_short_query(self, sqlite_client):
+        client, _engine = sqlite_client
+
+        resp = client.get("/api/events/search?q=s")
+
+        assert resp.status_code == 422
 
 
 @pytest.mark.unit

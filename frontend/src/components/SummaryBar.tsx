@@ -12,6 +12,7 @@ export type InterestKind = 'any' | 'going' | 'saved';
 
 export interface SummaryBarProps {
     className?: string;
+    eventSearchTrigger?: React.ReactNode;
 
     // Counts: ``totalCount`` is the size of the full filtered set;
     // ``visibleCount`` is what's currently rendered in the list. Equal
@@ -166,6 +167,7 @@ export default function SummaryBar(props: SummaryBarProps) {
         onClearAll,
         onOpenFilters,
         activeFilterCount = 0,
+        eventSearchTrigger,
     } = props;
 
     const tagChips = useMemo(() => {
@@ -206,7 +208,7 @@ export default function SummaryBar(props: SummaryBarProps) {
 
     return (
         <div
-            className={`summary-bar w-full bg-white border-y border-slate-200 px-2 py-1.5 overflow-hidden ${onOpenFilters ? 'cursor-pointer' : ''} ${className}`}
+            className={`summary-bar w-full bg-white border-y border-slate-200 px-2 py-1.5 overflow-visible ${onOpenFilters ? 'cursor-pointer' : ''} ${className}`}
             data-testid="summary-bar"
             aria-label="Active filters and result count"
             onClick={handleSummaryBarClick}
@@ -224,6 +226,7 @@ export default function SummaryBar(props: SummaryBarProps) {
                             <span>Filters</span>
                         </button>
                     )}
+                    {eventSearchTrigger}
                     <Chip
                         label={formatPeriodLabel(startDate, endDate)}
                         tone="accent"

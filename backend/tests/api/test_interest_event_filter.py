@@ -236,6 +236,8 @@ def test_friends_any_unions_going_and_saved(client, world):
         params={"interest_source": "friends", "interest_kind": "any"},
     )
     assert r.status_code == 200
+    assert r.headers["cache-control"] == "private, max-age=0"
+    assert r.headers["vary"] == "Cookie"
     ids = {e["event_id"] for e in r.json()}
     assert ids == {"evt-going", "evt-saved"}
 

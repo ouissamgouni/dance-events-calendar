@@ -1,12 +1,16 @@
-# Follow graph for the suggestions parity scenario.
+# Follow graph for the suggestions surfaces scenario.
 #
-# viewer is mutual friends with alice/bob/carol. Those friends follow
-# pop1/pop2/pop3 with descending overlap:
+# viewer is mutual friends with alice/bob/carol. Those friends follow the
+# candidate accounts with descending overlap:
 #   pop1: followed by alice + bob + carol (3 mutual witnesses)
 #   pop2: followed by alice + bob (2 mutual witnesses)
 #   pop3: followed by alice (1 mutual witness)
 #   privatepop: followed by alice (1 mutual witness; friends-only but suggestable)
 #   hiddenpop: followed by alice + bob (opted out; must be excluded)
+#
+# newbie has no graph. The popular tail below also gives onboarding a
+# deterministic most-followed fallback after the verified organizer and
+# admin-managed curator candidates.
 #
 # The expected ordered Discover suggestion set for viewer is:
 #   pop1, pop2, pop3, privatepop, curator-bachata, curator-paris
@@ -42,3 +46,7 @@ follows:
     followee: hiddenpop
   - follower: carol
     followee: pop1
+  - follower: admin
+    followee: salsahub
+  - follower: admin
+    followee: curator-bachata
