@@ -34,6 +34,27 @@ import { useAdminCounters, notifyAdminDataChanged } from '../hooks/useAdminCount
 type AdminTab = 'data' | 'configuration' | 'analytics' | 'users';
 type SyncMode = 'incremental' | 'reseed';
 
+function AdminInfoTooltip({ label }: { label: string }) {
+    return (
+        <span className="group relative inline-flex align-middle">
+            <button
+                type="button"
+                aria-label={label}
+                title={label}
+                className="inline-flex h-4 w-4 items-center justify-center border border-gray-300 bg-white text-[10px] font-semibold leading-none text-gray-500 hover:border-blue-300 hover:text-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-300"
+            >
+                ?
+            </button>
+            <span className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 hidden w-72 -translate-y-1/2 border border-gray-200 bg-white px-2 py-1.5 text-[10px] font-normal leading-snug text-gray-600 shadow-lg group-hover:block group-focus-within:block">
+                {label}
+            </span>
+        </span>
+    );
+}
+
+const TRENDING_TOOLTIP = 'Final score = (5 x going + 1 x saved + 0.05 x views) / (hours since event row update + 24)^0.4. Going, saved, and views count only inside the trending window; ended events and events below the Going floor score 0. Example: 8 going, 2 saved, 4 views has raw 42.2, then time decay can reduce it to about 3.8.';
+const TRENDING_TOP_PERCENT_TOOLTIP = 'Relative cap for how many eligible visible events get Trending decoration. Effective count = min(Trending top N, ceil(eligible visible events x top % / 100)). Example: with 40 eligible events, top N 5, and top % 10, only min(5, ceil(4)) = 4 events are decorated.';
+
 export default function Admin() {
     const [calendars, setCalendars] = useState<CalendarSetting[]>([]);
     const [loading, setLoading] = useState(true);
@@ -1083,9 +1104,11 @@ export default function Admin() {
                             <div className="border border-gray-200 bg-gray-50/40 p-3 space-y-2">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <span className="text-[11px] font-semibold text-gray-700">Trending</span>
+                                        <div className="inline-flex items-center gap-1">
+                                            <span className="text-[11px] font-semibold text-gray-700">Trending</span>
+                                            <AdminInfoTooltip label={TRENDING_TOOLTIP} />
+                                        </div>
                                         <p className="text-[10px] text-gray-400">
-                                            Weighted score (5×going + 1×saved + 0.05×view) with time decay.
                                             Drives the 🔥 chip, the orange map ring, and the "Popular" sort.
                                         </p>
                                     </div>
@@ -1182,7 +1205,10 @@ export default function Admin() {
                                         </div>
                                         <div className="flex items-center justify-between mt-1 pl-1">
                                             <div>
-                                                <span className="text-[11px] font-medium text-gray-600">Trending top %</span>
+                                                <div className="inline-flex items-center gap-1">
+                                                    <span className="text-[11px] font-medium text-gray-600">Trending top %</span>
+                                                    <AdminInfoTooltip label={TRENDING_TOP_PERCENT_TOOLTIP} />
+                                                </div>
                                                 <p className="text-[10px] text-gray-400">
                                                     Relative cap (1-100). Effective decoration count is
                                                     min(top N, ceil(visible × %  ⁄ 100)). Keeps the chip rare

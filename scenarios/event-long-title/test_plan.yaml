@@ -1,0 +1,41 @@
+test_plan:
+  name: "Event long title — Explorer title wrapping"
+  description: >
+    Verify that long event titles in the Explorer event list are not truncated
+    after two lines and do not render underneath the save / going / rating
+    action cluster. The scenario intentionally seeds two very long titles and
+    preloaded engagement counts so the right-side action area stays wide.
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=event-long-title"
+    - >
+      Open the Explorer landing page. The first two cards should be the seeded
+      long-title fixtures `evt-lt-001` and `evt-lt-002`.
+
+  steps:
+    - id: 1
+      title: "Desktop explorer card keeps the full title visible"
+      description: >
+        Open / on a desktop viewport and inspect the first event card.
+      expected: >
+        The first event title wraps naturally across multiple lines with no
+        ellipsis, no line clamp, and no overlap with the bookmark / going /
+        rating controls on the top-right of the card.
+
+    - id: 2
+      title: "Mobile explorer card wraps beyond two lines"
+      description: >
+        Switch to a narrow mobile viewport around 390x844 and reload the page.
+      expected: >
+        The first long title occupies more than two visual lines and remains
+        readable in full. The action cluster stays separate from the text and
+        does not cover any characters.
+
+    - id: 3
+      title: "Control row stays compact"
+      description: >
+        Compare the third card with the short title against the first two cards.
+      expected: >
+        The short title remains compact while only the long-title fixtures grow
+        taller, confirming the card height expands with content instead of
+        truncating the title.

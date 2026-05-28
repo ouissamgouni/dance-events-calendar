@@ -173,18 +173,12 @@ export default function UserSearchBox() {
                     title="Search users"
                     className="sm:hidden inline-flex items-center justify-center w-7 h-7 text-white hover:text-gray-200 transition"
                 >
-                    <svg
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                        className="w-4 h-4"
+                    <img
+                        src="/find-user.png"
+                        alt=""
                         aria-hidden="true"
-                    >
-                        <path
-                            fillRule="evenodd"
-                            clipRule="evenodd"
-                            d="M9 3a6 6 0 1 0 3.873 10.59l3.768 3.768a1 1 0 0 0 1.415-1.415l-3.769-3.768A6 6 0 0 0 9 3Zm-4 6a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z"
-                        />
-                    </svg>
+                        className="h-4 w-4 invert"
+                    />
                 </button>
             )}
 

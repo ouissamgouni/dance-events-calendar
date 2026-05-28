@@ -88,6 +88,7 @@ export async function fetchEvents(
         interestKind?: 'any' | 'going' | 'saved';
         interestUserHandle?: string;
     },
+    opts?: { fresh?: boolean },
 ): Promise<CalendarEvent[]> {
     const searchParams = new URLSearchParams();
     if (params?.startDate) searchParams.set('start_date', params.startDate);
@@ -109,10 +110,11 @@ export async function fetchEvents(
     // Friend-filter params require the session cookie to identify the viewer
     // and apply mutual-follower checks; sending credentials is harmless for
     // anonymous reads (the backend treats them as no viewer).
-    const res = await fetch(`${BASE}/events${qs ? `?${qs}` : ''}`, {
-        cache: 'no-cache',
+    const init: RequestInit = {
         credentials: 'include',
-    });
+    };
+    if (opts?.fresh) init.cache = 'no-store';
+    const res = await fetch(`${BASE}/events${qs ? `?${qs}` : ''}`, init);
     return parseJsonResponse<CalendarEvent[]>(res, 'Failed to fetch events');
 }
 
@@ -1066,6 +1068,23 @@ export interface NotificationListResponse {
     offset: number;
 }
 
+const ISO_TIMESTAMP_WITHOUT_TZ_RE =
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/;
+
+function normalizeNotificationTimestamp(value: string | null): string | null {
+    if (!value) return value;
+    return ISO_TIMESTAMP_WITHOUT_TZ_RE.test(value) ? `${value}Z` : value;
+}
+
+function normalizeNotificationItem(item: NotificationItem): NotificationItem {
+    return {
+        ...item,
+        created_at: normalizeNotificationTimestamp(item.created_at) ?? item.created_at,
+        read_at: normalizeNotificationTimestamp(item.read_at),
+        event_start: normalizeNotificationTimestamp(item.event_start),
+    };
+}
+
 export async function fetchNotifications(
     opts?: { kind?: NotificationKind; unreadOnly?: boolean; limit?: number; offset?: number },
 ): Promise<NotificationListResponse> {
@@ -1079,7 +1098,11 @@ export async function fetchNotifications(
         `${BASE}/notifications${qs ? `?${qs}` : ''}`,
         { credentials: 'include' },
     );
-    return parseJsonResponse<NotificationListResponse>(res, 'Failed to fetch notifications');
+    const data = await parseJsonResponse<NotificationListResponse>(res, 'Failed to fetch notifications');
+    return {
+        ...data,
+        items: data.items.map(normalizeNotificationItem),
+    };
 }
 
 export async function fetchNotificationsUnreadCount(): Promise<{ count: number }> {
@@ -1094,7 +1117,8 @@ export async function markNotificationRead(id: number): Promise<NotificationItem
         method: 'POST',
         credentials: 'include',
     });
-    return parseJsonResponse<NotificationItem>(res, 'Failed to mark notification read');
+    const data = await parseJsonResponse<NotificationItem>(res, 'Failed to mark notification read');
+    return normalizeNotificationItem(data);
 }
 
 export async function markAllNotificationsRead(): Promise<{ count: number }> {
@@ -2409,14 +2433,18 @@ export async function deleteUserData(deviceId: string): Promise<{ deleted: Recor
 
 // --- Tags ---
 
-export async function fetchTagGroups(params?: { startDate?: string; endDate?: string; scope?: 'event' | 'review'; onboarding?: boolean }): Promise<TagGroup[]> {
+export async function fetchTagGroups(
+    params?: { startDate?: string; endDate?: string; scope?: 'event' | 'review'; onboarding?: boolean },
+    opts?: { fresh?: boolean },
+): Promise<TagGroup[]> {
     const qs = new URLSearchParams();
     if (params?.startDate) qs.set('start_date', params.startDate);
     if (params?.endDate) qs.set('end_date', params.endDate);
     if (params?.scope) qs.set('scope', params.scope);
     if (params?.onboarding) qs.set('onboarding', 'true');
     const url = qs.toString() ? `${BASE}/tags?${qs}` : `${BASE}/tags`;
-    const res = await fetch(url, { cache: 'no-cache' });
+    const init: RequestInit = opts?.fresh ? { cache: 'no-store' } : {};
+    const res = await fetch(url, init);
     return parseJsonResponse<TagGroup[]>(res, 'Failed to fetch tags');
 }
 
@@ -2938,6 +2966,7 @@ export interface EventSearchResult {
     event_id: string;
     title: string;
     start: string | null;
+    location: string | null;
 }
 
 export async function searchEvents(

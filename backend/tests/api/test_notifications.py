@@ -445,6 +445,7 @@ def test_list_returns_only_own_notifications(client, session):
     assert item["kind"] == "subscription_going"
     assert item["actor"]["handle"] == "alice"
     assert item["event_title"] == "Salsa Night"
+    assert item["created_at"].endswith("Z")
 
 
 def test_filter_by_kind(client, session):
@@ -492,6 +493,7 @@ def test_mark_read_single(client, session):
     r = client.post(f"/api/notifications/{n.id}/read")
     assert r.status_code == 200
     assert r.json()["read_at"] is not None
+    assert r.json()["read_at"].endswith("Z")
 
     session.expire_all()
     refreshed = session.get(Notification, n.id)

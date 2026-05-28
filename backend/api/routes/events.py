@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -11,7 +11,6 @@ from backend.api.deps import (
     _audience_passes,
     can_view,
     get_current_user_optional,
-    require_user,
 )
 from backend.api.rate_limit import client_ip
 from backend.api.routes.settings import _get_since_date
@@ -88,6 +87,24 @@ def _promo_codes_enabled(session: Session) -> bool:
         return bool(row and row.value.lower() == "true")
     except Exception:
         return False
+
+
+def _set_event_list_cache_headers(
+    response: JSONResponse,
+    *,
+    current_user: Optional[User],
+    interest_source: Optional[str],
+    interest_user_handle: Optional[str],
+) -> None:
+    if (
+        current_user is not None
+        or interest_source is not None
+        or interest_user_handle is not None
+    ):
+        response.headers["Cache-Control"] = "private, max-age=0"
+        response.headers["Vary"] = "Cookie"
+    else:
+        response.headers["Cache-Control"] = "public, max-age=60"
 
 
 def _following_friend_signals(
@@ -513,7 +530,12 @@ def get_events(
             # downstream batch queries (and so anonymous viewers get a
             # consistently empty list).
             response = JSONResponse(content=[])
-            response.headers["Cache-Control"] = "private, max-age=0"
+            _set_event_list_cache_headers(
+                response,
+                current_user=current_user,
+                interest_source=interest_source,
+                interest_user_handle=interest_user_handle,
+            )
             return response
         query = query.where(CachedEvent.event_id.in_(interest_event_ids))
 
@@ -613,7 +635,12 @@ def get_events(
     ]
 
     response = JSONResponse(content=[d.model_dump(mode="json") for d in data])
-    response.headers["Cache-Control"] = "public, max-age=60"
+    _set_event_list_cache_headers(
+        response,
+        current_user=current_user,
+        interest_source=interest_source,
+        interest_user_handle=interest_user_handle,
+    )
     return response
 
 
@@ -624,25 +651,25 @@ def search_events(
     q: str = Query(..., min_length=2, max_length=120),
     limit: int = Query(default=10, ge=1, le=25),
     session: Session = Depends(get_session),
-    _current_user: User = Depends(require_user),
 ):
-    """Lightweight title typeahead for authenticated users.
+    """Lightweight public title typeahead for upcoming events.
 
     Returns up to ``limit`` upcoming (non-deleted, non-hidden) events
     matching ``q`` against ``title`` (case-insensitive substring).
-    Backs the organizer event-claim picker — verified organizers need
-    to find arbitrary events they organize without first saving / going.
-    Payload is intentionally minimal: ``{event_id, title, start}``.
+    Backs both the organizer event-claim picker and the public explorer
+    event finder. Payload is intentionally minimal:
+    ``{event_id, title, start, location}``.
     """
     needle = q.strip()
     if not needle:
         return []
     like = f"%{needle}%"
+    now = datetime.now(UTC).replace(tzinfo=None)
     rows = session.exec(
         select(CachedEvent)
         .where(CachedEvent.deleted_at.is_(None))  # type: ignore[union-attr]
         .where(CachedEvent.is_hidden.is_(False))  # type: ignore[union-attr]
-        .where(CachedEvent.start >= datetime.utcnow())
+        .where(CachedEvent.start >= now)
         .where(col(CachedEvent.title).ilike(like))
         .order_by(col(CachedEvent.start).asc())
         .limit(limit)
@@ -652,6 +679,7 @@ def search_events(
             "event_id": e.event_id,
             "title": e.title,
             "start": e.start.isoformat() if e.start else None,
+            "location": e.location,
         }
         for e in rows
     ]

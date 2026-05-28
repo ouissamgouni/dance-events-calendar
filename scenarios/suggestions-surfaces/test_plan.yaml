@@ -1,0 +1,120 @@
+test_plan:
+  name: "Suggestions Surfaces"
+  description: >
+    Canonical product scenario for people suggestions across onboarding,
+    Account -> My network, and /discover. It documents the intended
+    differences between surfaces: onboarding is a small beginner-friendly
+    list, My network is the pure friend-of-friend graph, /discover starts
+    with graph suggestions and may top up with curators, and search remains
+    separate from ranked suggestions.
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=suggestions-surfaces"
+    - >
+      Cast: newbie is fresh for onboarding. viewer has mutual friends alice,
+      bob, and carol. Their follow overlap creates FoF candidates pop1, pop2,
+      pop3, and friends-only privatepop. hiddenpop is followed by the same
+      network but has `show_in_suggestions: false` and must be excluded.
+      salsahub is a verified organizer. curator-bachata and curator-paris are
+      admin-managed fallback/top-up suggestions. curator-hidden is
+      admin-managed but opted out. loner has no graph.
+    - >
+      For viewer and loner, if the onboarding gate appears, click Skip/Done
+      once before testing My network or /discover. For newbie, keep the gate
+      so the onboarding surface can be tested.
+    - >
+      Cookie banner: accept Personalization so /api/auth/* and /api/social/*
+      calls are not blocked by consent.
+
+  steps:
+    - id: 1
+      title: "Onboarding shows a small relevant first-follow list"
+      description: >
+        Sign in as Nora Newbie. Continue or skip preferences to reach
+        /onboarding/follow.
+      expected: >
+        The page calls GET /api/social/onboarding/suggestions?limit=7. The
+        list is capped to a focused beginner-friendly set. Verified organizer
+        salsahub appears before curator-only accounts. Admin-managed curators
+        such as curator-bachata and curator-paris can appear before the
+        popular tail. Private/friends-only privatepop may appear if ranking
+        and the limit leave room. hiddenpop and curator-hidden never appear
+        because `show_in_suggestions` is false. Every card has a Follow CTA,
+        and Done/Skip completes onboarding without forcing a large selection.
+
+    - id: 2
+      title: "My network Suggestions is the pure friend graph"
+      description: >
+        Sign in as Vera Viewer. Open /account#network and select the
+        Suggestions tab.
+      expected: >
+        The UI calls GET /api/social/me/suggestions. The rendered suggestion
+        handles, in order, are pop1, pop2, pop3, privatepop. pop1 shows
+        "Followed by @alice + 2 more", pop2 shows "Followed by @alice + 1
+        more", and pop3/privatepop each show "Followed by @alice".
+        Curator fallback rows are not injected into My network when the friend
+        graph has candidates. viewer, alice, bob, carol, admin, hiddenpop, and
+        curator-hidden are not suggested.
+
+    - id: 3
+      title: "/discover default Suggestions starts with the graph"
+      description: >
+        With Vera Viewer still signed in, open /discover with an empty search
+        box.
+      expected: >
+        The page renders a default section titled "Suggestions" backed by
+        GET /api/social/discover/suggested?limit=12. The first rows are the
+        network candidates from step 2 in the same order: pop1, pop2, pop3,
+        privatepop. Curator top-up rows may follow as curator-bachata and
+        curator-paris. Every row has a blue Follow button. /discover must not
+        show only curators when graph candidates exist. hiddenpop and
+        curator-hidden must not appear.
+
+    - id: 4
+      title: "Follow action removes rows consistently"
+      description: >
+        From /discover, click Follow on pop1. Then reload /discover and
+        /account#network.
+      expected: >
+        POST /api/social/users/pop1/follow succeeds. /discover removes the row
+        immediately after the click. After reload, both surfaces exclude pop1.
+        Account -> My network now shows pop2, pop3, privatepop; /discover now
+        starts with pop2, pop3, privatepop and then any curator top-up rows.
+        This proves both surfaces share the same already-followed exclusion
+        semantics.
+
+    - id: 5
+      title: "Cold-start viewer gets Discover curator fallback"
+      description: >
+        Sign out, then sign in as Leo Loner. Open /account#network ->
+        Suggestions, then /discover with an empty search box.
+      expected: >
+        Because loner has no mutual friends and no outgoing follows, Account
+        -> My network -> Suggestions is empty. /discover still renders the
+        default "Suggestions" section with the curator fallback set:
+        curator-bachata and curator-paris, each with a Follow button. It does
+        not show pop1, pop2, pop3, privatepop, hiddenpop, curator-hidden, or
+        admin.
+
+    - id: 6
+      title: "Search results remain separate from ranked suggestions"
+      description: >
+        On /discover as Vera Viewer, type "pop" in the search box.
+      expected: >
+        The page switches from default suggestions to explicit search results
+        backed by GET /api/social/search/users?q=pop. Search may return pop1,
+        pop2, and pop3 by name/handle, independent of the suggestions ranking.
+        Clearing the query returns to the ranked default Suggestions section.
+
+    - id: 7
+      title: "Privacy setting and suggestion opt-out stay separate"
+      description: >
+        Inspect privatepop and hiddenpop across onboarding, My network, and
+        /discover.
+      expected: >
+        privatepop can appear in ranked suggestion surfaces even though its
+        account_visibility is friends. hiddenpop and curator-hidden never
+        appear in onboarding, My network, /discover defaults, or curator
+        fallback/top-up results because `show_in_suggestions` is false. This
+        proves account visibility controls profile/content access, while
+        show_in_suggestions controls algorithmic suggestion surfaces.

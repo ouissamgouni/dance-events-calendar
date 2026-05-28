@@ -175,7 +175,7 @@ export default function SaveEventButton({
             role="dialog"
             aria-label="Saved event visibility"
             style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left, width: POPOVER_WIDTH }}
-            className="z-[1000] border border-slate-200 bg-white p-3 shadow-xl text-left"
+            className="z-[9000] border border-slate-200 bg-white p-3 shadow-xl text-left"
         >
             <p className="text-xs font-medium text-slate-800 mb-2">Edit visibility</p>
             <p className="text-[11px] text-slate-600 mb-2">

@@ -165,7 +165,10 @@ def _upsert_user_from_claims(
         _ensure_share_code(session, user)
     else:
         # Reactivate a soft-deleted account on re-login.
+        was_deleted = user.deleted_at is not None
         user.deleted_at = None
+        if was_deleted:
+            user.onboarded_at = None
         if email and user.email != email:
             user.email = email
         if provider_subject and not user.provider_subject:

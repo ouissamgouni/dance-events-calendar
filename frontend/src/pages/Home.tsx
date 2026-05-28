@@ -30,6 +30,7 @@ import SuggestEventModal from '../components/SuggestEventModal';
 import EventAnchoredDetailPanel from '../components/EventAnchoredDetailPanel';
 import { useSeenEvents } from '../hooks/useSeenEvents';
 import TrendingEventsBanner from '../components/TrendingEventsBanner';
+import ExplorerEventSearch from '../components/ExplorerEventSearch';
 
 type ViewMode = 'explorer' | 'calendar';
 type InterestSource = 'follows' | 'friends';
@@ -1002,6 +1003,11 @@ export default function Home() {
         navigate(`/event/${evt.event_id}?src=explorer-map`);
     }, [navigate, markSeen]);
 
+    const handleExplorerSearchEventClick = useCallback((eventId: string) => {
+        markSeen(eventId);
+        navigate(`/event/${eventId}?src=explorer-search`);
+    }, [navigate, markSeen]);
+
     const handleExplorerMapMarkerSelect = useCallback((evt: CalendarEvent) => {
         setSelectedExplorerMapEventId(evt.event_id);
         setHoveredEventId(evt.event_id);
@@ -1302,6 +1308,13 @@ export default function Home() {
             loading={loading}
             onOpenFilters={() => setFilterSheetOpen(true)}
             activeFilterCount={activeFilterCount}
+            eventSearchTrigger={(
+                <ExplorerEventSearch
+                    onSelectEvent={handleExplorerSearchEventClick}
+                    triggerLabel="Search events"
+                    compact
+                />
+            )}
         />
     );
 
@@ -1310,32 +1323,41 @@ export default function Home() {
             <main className="mx-auto max-w-7xl px-4 py-2 sm:py-4">
                 {!loading && !error && (
                     <div className="mb-3 sm:mb-4 flex flex-col gap-2">
-                        <div className="flex items-center gap-3">
-                            <div className="flex gap-1 bg-slate-200 p-1 shrink-0 w-fit">
-                                <Link
-                                    to="/"
-                                    className={`px-3 py-1 text-sm transition ${viewMode === 'explorer' ? 'bg-white text-slate-900 font-medium shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                >
-                                    Explorer
-                                </Link>
-                                <Link
-                                    to="/calendar"
-                                    className={`px-3 py-1 text-sm transition ${viewMode === 'calendar' ? 'bg-white text-slate-900 font-medium shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                >
-                                    Calendar
-                                </Link>
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex flex-wrap items-center gap-3">
+                                <div className="flex gap-1 bg-slate-200 p-1 shrink-0 w-fit">
+                                    <Link
+                                        to="/"
+                                        className={`px-3 py-1 text-sm transition ${viewMode === 'explorer' ? 'bg-white text-slate-900 font-medium shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                    >
+                                        Explorer
+                                    </Link>
+                                    <Link
+                                        to="/calendar"
+                                        className={`px-3 py-1 text-sm transition ${viewMode === 'calendar' ? 'bg-white text-slate-900 font-medium shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                    >
+                                        Calendar
+                                    </Link>
+                                </div>
+                                <div className="flex gap-1 bg-slate-200 p-1 shrink-0 w-fit">
+                                    <MineButton />
+                                    <FollowsButton />
+                                    <button
+                                        onClick={() => setShowSuggestModal(true)}
+                                        className="hidden sm:inline-flex px-3 py-1 text-sm transition bg-white text-slate-900 font-medium shadow-sm hover:bg-slate-50"
+                                    >
+                                        <span className="sm:hidden">Submit</span>
+                                        <span className="hidden sm:inline">Submit Event</span>
+                                    </button>
+                                </div>
                             </div>
-                            <div className="flex gap-1 bg-slate-200 p-1 shrink-0 w-fit">
-                                <MineButton />
-                                <FollowsButton />
-                                <button
-                                    onClick={() => setShowSuggestModal(true)}
-                                    className="hidden sm:inline-flex px-3 py-1 text-sm transition bg-white text-slate-900 font-medium shadow-sm hover:bg-slate-50"
-                                >
-                                    <span className="sm:hidden">Submit</span>
-                                    <span className="hidden sm:inline">Submit Event</span>
-                                </button>
-                            </div>
+                            {viewMode === 'explorer' && (
+                                <ExplorerEventSearch
+                                    className="hidden lg:block"
+                                    onSelectEvent={handleExplorerSearchEventClick}
+                                    triggerLabel="Search events"
+                                />
+                            )}
                         </div>
                     </div>
                 )}
