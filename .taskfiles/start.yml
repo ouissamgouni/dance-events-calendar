@@ -223,6 +223,22 @@ tasks:
         [ -n "{{.WEB_PORT}}" ] && SC_WEB_PORT="{{.WEB_PORT}}"
         [ -n "{{.API_PORT}}" ] && SC_API_PORT="{{.API_PORT}}"
 
+        SCENARIO_DIR="{{.ROOT_DIR}}/scenarios/{{.SCENARIO}}"
+        if [ "{{.SCENARIO}}" != "default" ] && [ ! -d "$SCENARIO_DIR" ]; then
+          echo "⚠️  Scenario '{{.SCENARIO}}' does not exist: $SCENARIO_DIR"
+          printf "Continue without scenario-specific files? [y/N] "
+          read -r CONTINUE_WITHOUT_SCENARIO
+          case "$CONTINUE_WITHOUT_SCENARIO" in
+            y|Y|yes|YES|Yes)
+              echo "Continuing without scenario-specific files."
+              ;;
+            *)
+              echo "Aborted. Create $SCENARIO_DIR or choose an existing scenario."
+              exit 1
+              ;;
+          esac
+        fi
+
         # ── RESET cleanup ──
         if [ "{{.RESET}}" = "1" ]; then
           echo "🔄 Restarting: stopping existing scenario environment ($ENV_NAME) first..."
@@ -233,7 +249,6 @@ tasks:
         fi
 
         # Load scenario-specific config.env (CALENDAR_SERVICE, AUTO_SYNC_ENABLED, etc.)
-        SCENARIO_DIR="{{.ROOT_DIR}}/scenarios/{{.SCENARIO}}"
         CALENDAR_SVC="mock"
         if [ -f "$SCENARIO_DIR/config.env" ]; then
           set -a

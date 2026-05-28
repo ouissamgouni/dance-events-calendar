@@ -3170,6 +3170,15 @@ def list_subscribed_events(
             "their handle. Must be a current subscription target."
         ),
     ),
+    from_handles: Optional[str] = Query(
+        default=None,
+        description="Comma-separated subscribed handles for multi-select filtering.",
+    ),
+    kind: str = Query(
+        default="all",
+        pattern="^(all|going|saved)$",
+        description="Restrict attribution to going or saved rows.",
+    ),
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     session: Session = Depends(get_session),
@@ -3189,7 +3198,6 @@ def list_subscribed_events(
     row so a target can revoke access by tightening account visibility
     or per-event audience without explicit unsubscribe.
     """
-    # Resolve target set: all current subscriptions, optionally narrowed.
     sub_rows = session.exec(
         select(CalendarSubscription).where(
             CalendarSubscription.subscriber_id == viewer.id
@@ -3206,22 +3214,48 @@ def list_subscribed_events(
     )
     target_by_id: dict = {t.id: t for t in targets if t.deleted_at is None}
 
+    requested_handles: set[str] = set()
+    if from_handles:
+        requested_handles.update(
+            h.strip().lower() for h in from_handles.split(",") if h.strip()
+        )
     if from_handle is not None:
-        h = (from_handle or "").strip().lower()
-        if not h:
+        handle = (from_handle or "").strip().lower()
+        if handle:
+            requested_handles.add(handle)
+        elif not requested_handles:
             return SubscribedEventListResponse(
                 items=[], total=0, limit=limit, offset=offset
             )
-        scoped = [t for t in target_by_id.values() if (t.handle or "").lower() == h]
+    if requested_handles:
+        scoped = [
+            t
+            for t in target_by_id.values()
+            if (t.handle or "").lower() in requested_handles
+        ]
         if not scoped:
-            # Not actually subscribed to this handle.
             return SubscribedEventListResponse(
                 items=[], total=0, limit=limit, offset=offset
             )
         target_by_id = {t.id: t for t in scoped}
 
-    # Re-apply account-visibility at read time.
-    visible_ids = [t.id for t in target_by_id.values() if can_view(session, viewer, t)]
+    outgoing_rows = session.exec(
+        select(UserFollow.followee_id)
+        .where(UserFollow.follower_id == viewer.id)
+        .where(UserFollow.status == "approved")
+    ).all()
+    incoming_rows = session.exec(
+        select(UserFollow.follower_id)
+        .where(UserFollow.followee_id == viewer.id)
+        .where(UserFollow.status == "approved")
+    ).all()
+    mutual_ids = set(outgoing_rows) & set(incoming_rows)
+    visible_ids = [
+        t.id
+        for t in target_by_id.values()
+        if t.id == viewer.id or t.account_visibility == "public" or t.id in mutual_ids
+    ]
+    friend_audience_ids = set(visible_ids) & (mutual_ids | {viewer.id})
 
     # Phase E (E8): pending-follow targets may have a CalendarSubscription row,
     # but account visibility can still keep them out of the regular visible
@@ -3231,7 +3265,7 @@ def list_subscribed_events(
     # Only "subscription_going" with share_audience=public is allowed — saved
     # events and suggested events require an approved relationship.
     pending_going_rows: list[tuple] = []
-    if from_handle is None:
+    if not requested_handles and kind in ("all", "going"):
         pending_followee_rows = session.exec(
             select(UserFollow.followee_id)
             .where(UserFollow.follower_id == viewer.id)
@@ -3273,53 +3307,49 @@ def list_subscribed_events(
             items=[], total=0, limit=limit, offset=offset
         )
 
-    # Going attribution: visible targets' attendances whose share_audience
-    # admits the viewer (public always; friends iff mutual follow).
-    going_attendances = session.exec(
-        select(
-            UserEventAttendance.event_id,
-            UserEventAttendance.user_id,
-            UserEventAttendance.share_audience,
-        ).where(UserEventAttendance.user_id.in_(visible_ids))
-    ).all()
     going_rows: list[tuple] = []
-    for ev_id, uid, audience in going_attendances:
-        if not ev_id:
-            continue
-        owner = target_by_id.get(uid)
-        if owner is None:
-            continue
-        if not _audience_passes(session, viewer, owner, audience or "private"):
-            continue
-        going_rows.append((ev_id, uid))
+    if visible_ids and kind in ("all", "going"):
+        going_rows = list(
+            session.exec(
+                select(UserEventAttendance.event_id, UserEventAttendance.user_id)
+                .where(UserEventAttendance.user_id.in_(visible_ids))
+                .where(
+                    or_(
+                        UserEventAttendance.share_audience == "public",
+                        (UserEventAttendance.share_audience == "friends")
+                        & UserEventAttendance.user_id.in_(friend_audience_ids),
+                    )
+                )
+            ).all()
+        )
 
     # Saved attribution: visible targets' saves whose audience admits the
     # viewer. Closes the bug where saved events never surfaced in the feed.
-    saved_rows_raw = session.exec(
-        select(
-            UserSavedEvent.event_id,
-            UserSavedEvent.user_id,
-            UserSavedEvent.audience,
-        ).where(UserSavedEvent.user_id.in_(visible_ids))
-    ).all()
     saved_rows: list[tuple] = []
-    for ev_id, uid, audience in saved_rows_raw:
-        if not ev_id or uid is None:
-            continue
-        owner = target_by_id.get(uid)
-        if owner is None:
-            continue
-        if not _audience_passes(session, viewer, owner, audience or "private"):
-            continue
-        saved_rows.append((ev_id, uid))
+    if visible_ids and kind in ("all", "saved"):
+        saved_rows = list(
+            session.exec(
+                select(UserSavedEvent.event_id, UserSavedEvent.user_id)
+                .where(UserSavedEvent.user_id.in_(visible_ids))
+                .where(
+                    or_(
+                        UserSavedEvent.audience == "public",
+                        (UserSavedEvent.audience == "friends")
+                        & UserSavedEvent.user_id.in_(friend_audience_ids),
+                    )
+                )
+            ).all()
+        )
 
     # Suggested attribution: approved EventSuggestion rows authored by visible targets.
-    suggested_rows = session.exec(
-        select(EventSuggestion.created_event_id, EventSuggestion.submitter_user_id)
-        .where(EventSuggestion.submitter_user_id.in_(visible_ids))
-        .where(EventSuggestion.status == "approved")
-        .where(EventSuggestion.created_event_id.is_not(None))
-    ).all()
+    suggested_rows = []
+    if visible_ids and kind == "all":
+        suggested_rows = session.exec(
+            select(EventSuggestion.created_event_id, EventSuggestion.submitter_user_id)
+            .where(EventSuggestion.submitter_user_id.in_(visible_ids))
+            .where(EventSuggestion.status == "approved")
+            .where(EventSuggestion.created_event_id.is_not(None))
+        ).all()
 
     # Group attribution per event_id.
     via_map: dict[str, list[tuple]] = {}  # event_id -> list of (actor_id, kind)
@@ -3348,7 +3378,7 @@ def list_subscribed_events(
             items=[], total=0, limit=limit, offset=offset
         )
 
-    # Hydrate cached events; only include rows whose calendar is enabled
+    # Hydrate upcoming cached events; only include rows whose calendar is enabled
     # (matches the public /api/events visibility contract).
     enabled_calendar_ids = {
         c.calendar_id
@@ -3356,21 +3386,21 @@ def list_subscribed_events(
             select(CalendarSetting).where(CalendarSetting.enabled == True)  # noqa: E712
         ).all()
     }
-    color_map: dict = {
-        c.calendar_id: c.color for c in session.exec(select(CalendarSetting)).all()
-    }
+    now = datetime.utcnow()
     events = list(
         session.exec(
             select(CachedEvent)
             .where(col(CachedEvent.event_id).in_(list(via_map.keys())))
+            .where(CachedEvent.end >= now)
             .where(CachedEvent.deleted_at.is_(None))
             .where(CachedEvent.is_hidden == False)  # noqa: E712
+            .where(CachedEvent.calendar_id.in_(enabled_calendar_ids))
         ).all()
     )
-    events = [e for e in events if e.calendar_id in enabled_calendar_ids]
     events.sort(key=lambda e: e.start, reverse=True)
     total = len(events)
     page = events[offset : offset + limit]
+    serialized_by_id = {e.event_id: e for e in serialize_events(session, page)}
 
     items: list[SubscribedEventItem] = []
     for e in page:
@@ -3381,22 +3411,9 @@ def list_subscribed_events(
             if actor is None:
                 continue
             via.append(SubscribedEventVia(actor=_actor_payload(actor), kind=kind))
-        items.append(
-            SubscribedEventItem(
-                event_id=e.event_id,
-                calendar_id=e.calendar_id,
-                title=e.title,
-                description=e.description,
-                location=e.location,
-                start=e.start,
-                end=e.end,
-                all_day=bool(e.all_day),
-                latitude=e.latitude,
-                longitude=e.longitude,
-                color=color_map.get(e.calendar_id),
-                via=via,
-            )
-        )
+        serialized = serialized_by_id.get(e.event_id)
+        if serialized is not None:
+            items.append(SubscribedEventItem(**serialized.model_dump(), via=via))
 
     return SubscribedEventListResponse(
         items=items, total=total, limit=limit, offset=offset

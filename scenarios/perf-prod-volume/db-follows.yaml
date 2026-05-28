@@ -1,0 +1,11 @@
+# Viewer follows four active accounts so /my-calendar/subscriptions has
+# enough data to exercise Everyone and scoped user filters.
+follows:
+  - follower: viewer
+    followee: alice
+  - follower: viewer
+    followee: bob
+  - follower: viewer
+    followee: carol
+  - follower: viewer
+    followee: dave

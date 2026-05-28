@@ -1,4 +1,5 @@
 import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide } from './types';
+import type { DateRangePresetKey } from './utils/dateRangePresets';
 
 declare const __VITE_API_URL__: string;
 
@@ -152,6 +153,7 @@ export interface SiteSettings {
     trending_top_percent?: number;
     event_color_bar_color: string;
     tag_sort_mode: 'group' | 'event_count';
+    default_explorer_period?: DateRangePresetKey;
     promo_codes_enabled?: boolean;
     organizer_claims_enabled?: boolean;
 }
@@ -1134,18 +1136,7 @@ export interface SubscribedEventVia {
     kind: NotificationKind;
 }
 
-export interface SubscribedEventItem {
-    event_id: string;
-    calendar_id: string;
-    title: string;
-    description: string | null;
-    location: string | null;
-    start: string;
-    end: string;
-    all_day: boolean;
-    latitude: number | null;
-    longitude: number | null;
-    color: string | null;
+export interface SubscribedEventItem extends CalendarEvent {
     via: SubscribedEventVia[];
 }
 
@@ -1157,10 +1148,12 @@ export interface SubscribedEventListResponse {
 }
 
 export async function fetchSubscribedEvents(
-    opts?: { fromHandle?: string; limit?: number; offset?: number },
+    opts?: { fromHandle?: string; fromHandles?: string[]; kind?: 'all' | 'going' | 'saved'; limit?: number; offset?: number },
 ): Promise<SubscribedEventListResponse> {
     const sp = new URLSearchParams();
     if (opts?.fromHandle) sp.set('from_handle', opts.fromHandle);
+    if (opts?.fromHandles?.length) sp.set('from_handles', opts.fromHandles.join(','));
+    if (opts?.kind && opts.kind !== 'all') sp.set('kind', opts.kind);
     if (opts?.limit) sp.set('limit', String(opts.limit));
     if (opts?.offset) sp.set('offset', String(opts.offset));
     const qs = sp.toString();
@@ -1554,7 +1547,7 @@ export async function fetchAttendanceSummaryBatch(eventIds: string[]): Promise<A
     return res.json();
 }
 
-// --- Interest filter picker (Phase: following-interest) ---
+// --- Interest filter picker (Phase: interest-filter-following) ---
 
 export interface InterestSummaryItem {
     handle: string;

@@ -2,6 +2,7 @@ import json
 import logging
 import re
 from datetime import date, datetime, timedelta
+from itertools import cycle
 from pathlib import Path
 from typing import Any, Optional
 from uuid import uuid4
@@ -118,6 +119,7 @@ class DatabaseSeeder:
         self._seed_tag_suggestions(scenario_dir / "db-events.yaml")
         self._seed_tracking(scenario_dir / "db-tracking.yaml")
         self._seed_users(scenario_file_with_default(scenario_dir, "mock-users.yaml"))
+        self._seed_generated_events(scenario_dir / "generated-events.yaml")
         # Follows must come AFTER users (FK on follower_id/followee_id).
         self._seed_follows(scenario_dir / "db-follows.yaml")
         # Attendances must come AFTER users (FK on user_id) and after events.
@@ -699,6 +701,7 @@ class DatabaseSeeder:
                 "share_attendance_default_audience",
                 "instagram_url",
                 "facebook_url",
+                "avatar_url",
                 "bio",
             ):
                 if key in entry and entry[key] is not None:
@@ -708,6 +711,253 @@ class DatabaseSeeder:
                 user_kwargs["share_attendance_default_audience"] = "public"
             self.session.add(User(**user_kwargs))
             logger.info("Created mock user: %s", email)
+
+    def _seed_generated_events(self, path: Path) -> None:
+        if not path.exists():
+            return
+
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+
+        cfg = data.get("generated_events") or {}
+        count = int(cfg.get("count") or 0)
+        if count <= 0:
+            return
+
+        calendars = cfg.get("calendar_ids") or [
+            cal.calendar_id for cal in self.session.exec(select(CalendarSetting)).all()
+        ]
+        calendars = [str(cal) for cal in calendars if cal]
+        if not calendars:
+            logger.warning("Skipping generated events: no calendars available")
+            return
+
+        prefix = str(cfg.get("id_prefix") or "perf-gen")
+        start_week = int(cfg.get("start_week", -8))
+        weeks = max(1, int(cfg.get("weeks", 32)))
+        views_per_event = max(0, int(cfg.get("views_per_event", 0)))
+        saves_per_event = max(0, int(cfg.get("saves_per_event", 0)))
+        attendances_per_event = max(0, int(cfg.get("attendances_per_event", 0)))
+        save_handles = [
+            str(handle).strip()
+            for handle in (cfg.get("user_save_handles") or [])
+            if str(handle).strip()
+        ]
+        attendance_handles = [
+            str(handle).strip()
+            for handle in (cfg.get("user_attendance_handles") or [])
+            if str(handle).strip()
+        ]
+        user_by_handle = {
+            user.handle: user
+            for user in self.session.exec(select(User)).all()
+            if user.handle
+        }
+
+        today = date.today()
+        reference_monday = today - timedelta(days=today.weekday())
+        window_start = datetime.combine(
+            reference_monday, datetime.min.time()
+        ) + timedelta(weeks=start_week)
+        tag_lookup = self._build_tag_lookup()
+
+        locations = [
+            ("Le Balajo, Paris, France", 48.8533, 2.3716),
+            ("Bar Salsa, London, UK", 51.5142, -0.13),
+            ("Mojito Club, Barcelona, Spain", 41.3925, 2.1568),
+            ("Tanzhaus Berlin, Germany", 52.5244, 13.3884),
+            ("Akvarium Klub, Budapest, Hungary", 47.4979, 19.051),
+            ("Centro Cultural de Belem, Lisbon, Portugal", 38.696, -9.2092),
+        ]
+        formats = ["social", "class", "workshop", "festival", "congress", "practice"]
+        scales = ["small", "medium", "large"]
+        scopes = ["local", "regional", "international"]
+        venues = ["indoor", "outdoor", "rooftop"]
+        styles = ["salsa", "bachata", "kizomba", "zouk", "rueda"]
+        levels = ["beginner-friendly", "intermediate", "advanced", "all-levels"]
+        calendar_cycle = cycle(calendars)
+
+        events_seeded = 0
+        tags_seeded = 0
+        views_seeded = 0
+        saves_seeded = 0
+        attendances_seeded = 0
+
+        for idx in range(count):
+            event_id = f"{prefix}-{idx + 1:05d}"
+            calendar_id = next(calendar_cycle)
+            day_offset = (idx * 3) % (weeks * 7)
+            hour = 18 + (idx % 5)
+            start = window_start + timedelta(days=day_offset, hours=hour)
+            duration_hours = 3 + (idx % 4)
+            if formats[idx % len(formats)] in ("festival", "congress"):
+                duration_hours = 48 + (idx % 3) * 12
+            end = start + timedelta(hours=duration_hours)
+            location, latitude, longitude = locations[idx % len(locations)]
+            style = styles[idx % len(styles)]
+            event_format = formats[idx % len(formats)]
+            title = f"{style.title()} {event_format.title()} #{idx + 1}"
+
+            existing = self.session.get(CachedEvent, event_id)
+            if existing:
+                existing.calendar_id = calendar_id
+                existing.title = title
+                existing.description = "Generated production-volume perf fixture event."
+                existing.location = location
+                existing.latitude = latitude
+                existing.longitude = longitude
+                existing.start = start
+                existing.end = end
+                existing.price_is_free = idx % 4 == 0
+                existing.review_status = "reviewed"
+                existing.deleted_at = None
+                existing.is_hidden = False
+                existing.updated_at = datetime.utcnow()
+                self.session.add(existing)
+            else:
+                self.session.add(
+                    CachedEvent(
+                        event_id=event_id,
+                        calendar_id=calendar_id,
+                        title=title,
+                        description="Generated production-volume perf fixture event.",
+                        location=location,
+                        latitude=latitude,
+                        longitude=longitude,
+                        start=start,
+                        end=end,
+                        price_is_free=idx % 4 == 0,
+                        review_status="reviewed",
+                    )
+                )
+                events_seeded += 1
+
+            tag_slugs = [
+                f"format:{event_format}",
+                f"scale:{scales[idx % len(scales)]}",
+                f"scope:{scopes[idx % len(scopes)]}",
+                f"venue:{venues[idx % len(venues)]}",
+                f"dance-style:{style}",
+                f"level:{levels[idx % len(levels)]}",
+            ]
+            for slug in tag_slugs:
+                tag_id = tag_lookup.get(slug)
+                if not tag_id:
+                    continue
+                existing_tag = self.session.exec(
+                    select(EventTag).where(
+                        EventTag.event_id == event_id, EventTag.tag_id == tag_id
+                    )
+                ).first()
+                if not existing_tag:
+                    self.session.add(EventTag(event_id=event_id, tag_id=tag_id))
+                    tags_seeded += 1
+
+            for view_idx in range(views_per_event):
+                device_id = f"seed-view-{idx % 250:03d}-{view_idx}"
+                source = "explorer-list" if view_idx % 2 == 0 else "calendar"
+                existing_view = self.session.exec(
+                    select(EventView).where(
+                        EventView.event_id == event_id,
+                        EventView.device_id == device_id,
+                        EventView.source == source,
+                    )
+                ).first()
+                if not existing_view:
+                    self.session.add(
+                        EventView(
+                            event_id=event_id,
+                            device_id=device_id,
+                            source=source,
+                            country="France" if idx % 2 == 0 else "Germany",
+                            city="Paris" if idx % 2 == 0 else "Berlin",
+                        )
+                    )
+                    views_seeded += 1
+
+            for save_idx in range(saves_per_event):
+                save_user = (
+                    user_by_handle.get(
+                        save_handles[(idx + save_idx) % len(save_handles)]
+                    )
+                    if save_handles
+                    else None
+                )
+                device_id = (
+                    f"seed-save-user-{save_user.handle}-{idx % 300:03d}-{save_idx}"
+                    if save_user
+                    else f"seed-save-{idx % 300:03d}-{save_idx}"
+                )
+                save_identity_filter = (
+                    UserSavedEvent.user_id == save_user.id
+                    if save_user
+                    else UserSavedEvent.device_id == device_id
+                )
+                existing_save = self.session.exec(
+                    select(UserSavedEvent).where(
+                        UserSavedEvent.event_id == event_id,
+                        save_identity_filter,
+                    )
+                ).first()
+                if not existing_save:
+                    self.session.add(
+                        UserSavedEvent(
+                            event_id=event_id,
+                            device_id=device_id,
+                            user_id=save_user.id if save_user else None,
+                            audience="public" if save_idx % 2 == 0 else "friends",
+                        )
+                    )
+                    saves_seeded += 1
+
+            for attendance_idx in range(attendances_per_event):
+                attendance_user = (
+                    user_by_handle.get(
+                        attendance_handles[
+                            (idx + attendance_idx) % len(attendance_handles)
+                        ]
+                    )
+                    if attendance_handles
+                    else None
+                )
+                device_id = (
+                    f"seed-attend-user-{attendance_user.handle}-{idx % 350:03d}-{attendance_idx}"
+                    if attendance_user
+                    else f"seed-attend-{idx % 350:03d}-{attendance_idx}"
+                )
+                attendance_identity_filter = (
+                    UserEventAttendance.user_id == attendance_user.id
+                    if attendance_user
+                    else UserEventAttendance.device_id == device_id
+                )
+                existing_attendance = self.session.exec(
+                    select(UserEventAttendance).where(
+                        UserEventAttendance.event_id == event_id,
+                        attendance_identity_filter,
+                    )
+                ).first()
+                if not existing_attendance:
+                    self.session.add(
+                        UserEventAttendance(
+                            event_id=event_id,
+                            device_id=device_id,
+                            user_id=attendance_user.id if attendance_user else None,
+                            share_publicly=attendance_idx % 2 == 0,
+                            share_audience="public"
+                            if attendance_idx % 2 == 0
+                            else "friends",
+                        )
+                    )
+                    attendances_seeded += 1
+
+        logger.info(
+            "Generated perf fixture: %d events, %d tags, %d views, %d saves, %d attendances",
+            events_seeded,
+            tags_seeded,
+            views_seeded,
+            saves_seeded,
+            attendances_seeded,
+        )
 
     def _seed_follows(self, path: Path) -> None:
         """Seed UserFollow rows from scenarios/<name>/db-follows.yaml.

@@ -14,12 +14,21 @@ test_plan:
   preconditions:
     - "Run with: task start:scenario SCENARIO=subscribed-events-feed"
     - >
+      Current subscriptions UX seed: Bob starts with approved follows for
+      alice, carol, erin, and frank. Those follows create calendar
+      subscriptions automatically, so /my-calendar/subscriptions can be
+      tested immediately after signing in as Bob: the selector should show
+      four avatar+handle pills, Everyone should return more than ten
+      upcoming subscribed events, and saved/going filtering has both kinds
+      of attribution available.
+    - >
       Pre-seed: bob (subscriber-to-be), alice + carol (public-calendar
-      targets), dave (negative control, never subscribed), admin (for
-      suggestion approval). Four events evt-sef-001..004 are seeded;
-      alice already has a Going+share_publicly attendance on
-      evt-sef-001 BEFORE the test starts so the read-time backfill
-      contract can be verified independently of fan-out.
+      targets), erin + frank (extra subscribed targets for multi-select),
+      dave (negative control, never subscribed), admin (for suggestion
+      approval). Sixteen upcoming events evt-sef-001..016 are seeded;
+      alice already has a Going+share_publicly attendance on evt-sef-001
+      BEFORE the test starts so the read-time backfill contract can be
+      verified independently of fan-out.
     - "Use a fresh browser profile or incognito window per signed-in user."
     - >
       Cookie banner: accept "Personalization" so /api/auth/* and

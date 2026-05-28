@@ -1,4 +1,4 @@
-# Mock users pre-seeded for the following-interest scenario.
+# Mock users pre-seeded for the interest-filter-following scenario.
 #
 # The graph is deliberately one-way heavy so the assertions can prove the
 # new `interest_source=follows` semantic (any followee counts, not just

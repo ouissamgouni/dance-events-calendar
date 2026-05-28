@@ -6,12 +6,17 @@ export const errors = new Counter('errors');
 
 // Per-route latency trends (visible in summary, not threshold-gated).
 export const trends = {
+    authLogin: new Trend('auth_login_duration', true),
     calendars: new Trend('events_calendars_duration', true),
     list: new Trend('events_list_duration', true),
     byIds: new Trend('events_by_ids_duration', true),
     detail: new Trend('event_detail_duration', true),
     attendance: new Trend('attendance_summary_duration', true),
     sitemap: new Trend('sitemap_duration', true),
+    subscriptionsList: new Trend('subscriptions_list_duration', true),
+    subscribedEventsEveryone: new Trend('subscribed_events_everyone_duration', true),
+    subscribedEventsScoped: new Trend('subscribed_events_scoped_duration', true),
+    subscriptionsByIds: new Trend('subscriptions_by_ids_duration', true),
 };
 
 // Wrap an http response with a status check + record the per-route trend.

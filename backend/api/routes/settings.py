@@ -12,6 +12,19 @@ from backend.db.models import SiteSetting
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 DEFAULT_SINCE_DAYS = 183  # ~6 months
+DEFAULT_EXPLORER_PERIOD = "next_3_months"
+ALLOWED_DEFAULT_EXPLORER_PERIODS = {
+    "this_weekend",
+    "next_weekend",
+    "next_7_days",
+    "next_30_days",
+    "next_3_months",
+    "next_6_months",
+    "this_season",
+    "next_season_1",
+    "next_season_2",
+    "next_season_3",
+}
 
 
 def _default_since_date() -> str:
@@ -110,6 +123,15 @@ def _get_str_setting(session: Session, key: str, default: str) -> str:
     return default
 
 
+def _get_default_explorer_period(session: Session) -> str:
+    value = _get_str_setting(
+        session, "default_explorer_period", DEFAULT_EXPLORER_PERIOD
+    )
+    if value in ALLOWED_DEFAULT_EXPLORER_PERIODS:
+        return value
+    return DEFAULT_EXPLORER_PERIOD
+
+
 def _set_bool_setting(session: Session, key: str, value: bool) -> None:
     """Set a boolean setting in the DB."""
     row = session.get(SiteSetting, key)
@@ -145,6 +167,7 @@ def get_settings(session: Session = Depends(get_session)):
             session, "event_color_bar_color", "#64748b"
         ),
         tag_sort_mode=_get_str_setting(session, "tag_sort_mode", "group"),
+        default_explorer_period=_get_default_explorer_period(session),
         promo_codes_enabled=_get_bool_setting(session, "promo_codes_enabled"),
         organizer_claims_enabled=_get_bool_setting(session, "organizer_claims_enabled"),
     )
@@ -288,6 +311,16 @@ def update_settings(
             row = SiteSetting(key="tag_sort_mode", value=body.tag_sort_mode)
         session.add(row)
 
+    if body.default_explorer_period is not None:
+        row = session.get(SiteSetting, "default_explorer_period")
+        if row:
+            row.value = body.default_explorer_period
+        else:
+            row = SiteSetting(
+                key="default_explorer_period", value=body.default_explorer_period
+            )
+        session.add(row)
+
     if body.promo_codes_enabled is not None:
         _set_bool_setting(session, "promo_codes_enabled", body.promo_codes_enabled)
 
@@ -320,6 +353,7 @@ def update_settings(
             session, "event_color_bar_color", "#64748b"
         ),
         tag_sort_mode=_get_str_setting(session, "tag_sort_mode", "group"),
+        default_explorer_period=_get_default_explorer_period(session),
         promo_codes_enabled=_get_bool_setting(session, "promo_codes_enabled"),
         organizer_claims_enabled=_get_bool_setting(session, "organizer_claims_enabled"),
     )

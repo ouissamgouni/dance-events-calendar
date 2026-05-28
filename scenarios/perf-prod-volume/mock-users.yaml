@@ -1,0 +1,25 @@
+# Authenticated users for subscription-feed perf coverage.
+# `viewer` follows the performer accounts below; generated perf events seed
+# public/friends saved and going rows for those accounts.
+users:
+  - email: viewer@example.com
+    name: Vera Viewer
+    handle: viewer
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    avatar_url: https://example.com/avatar-alice.jpg
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+    avatar_url: https://example.com/avatar-bob.jpg
+  - email: carol@example.com
+    name: Carol Nguyen
+    handle: carol
+    avatar_url: https://example.com/avatar-carol.jpg
+  - email: dave@example.com
+    name: Dave Smith
+    handle: dave
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

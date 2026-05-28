@@ -1,5 +1,5 @@
 test_plan:
-  name: "Friends Events — Explorer interest filter, friends-only scope"
+  name: "Interest Filter — Friends scope"
   description: >
     Verify the explorer interest filter restricted to the FRIENDS scope
     (?interest_source=friends, optional ?interest_kind, ?interest_user_handle
@@ -10,9 +10,9 @@ test_plan:
     and the viewer's own attendance is excluded (the filter is "events at
     least one of my friends is involved with", not "events I am involved
     with"). The broader `follows` scope (one-way followees) is covered by
-    scenarios/following-interest.
+    scenarios/interest-filter-following.
   preconditions:
-    - "Run with: task start:scenario SCENARIO=friends-events"
+    - "Run with: task start:scenario SCENARIO=interest-filter-friends"
     - >
       The scenario pre-seeds five users (alice, bob, carol, dave, admin)
       and the same follow graph as friends-graph: alice<->bob mutual,

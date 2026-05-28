@@ -308,6 +308,44 @@ function BoundsReporter({ onBoundsChange }: { onBoundsChange?: (bounds: MapBound
     return null;
 }
 
+function MapResizeController() {
+    const map = useMap();
+
+    useEffect(() => {
+        const container = map.getContainer();
+        let frame: number | null = null;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+
+        const invalidate = () => {
+            if (frame !== null) cancelAnimationFrame(frame);
+            if (timer !== null) clearTimeout(timer);
+
+            frame = requestAnimationFrame(() => {
+                map.invalidateSize({ pan: false, debounceMoveend: true });
+                frame = null;
+            });
+            timer = setTimeout(() => {
+                map.invalidateSize({ pan: false, debounceMoveend: true });
+                timer = null;
+            }, 250);
+        };
+
+        const observer = new ResizeObserver(invalidate);
+        observer.observe(container);
+        window.addEventListener('orientationchange', invalidate);
+        invalidate();
+
+        return () => {
+            observer.disconnect();
+            window.removeEventListener('orientationchange', invalidate);
+            if (frame !== null) cancelAnimationFrame(frame);
+            if (timer !== null) clearTimeout(timer);
+        };
+    }, [map]);
+
+    return null;
+}
+
 function MapController({
     positions,
     focusedEventId,
@@ -808,6 +846,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                 flyToAreaToken={flyToAreaToken}
                 skipInitialFit={!!initialArea}
             />
+            <MapResizeController />
             <FlyToAreaController flyToArea={flyToArea} flyToAreaToken={flyToAreaToken} />
             <BoundsReporter onBoundsChange={onBoundsChange} />
             <MarkerClusterLayer

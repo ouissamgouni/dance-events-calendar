@@ -1,5 +1,5 @@
 test_plan:
-  name: "Following Interest — Explorer filter, follows scope (one-way OK)"
+  name: "Interest Filter — Following scope (one-way OK)"
   description: >
     Verify the explorer interest filter at `interest_source=follows` —
     the broader scope that surfaces activity from anyone the viewer
@@ -12,10 +12,10 @@ test_plan:
     Privacy invariants still apply per-row: an audience='friends'
     attendance is hidden from one-way followers (mutual-only), and the
     viewer's own attendance is excluded. The friends-only sub-scope
-    (`interest_source=friends`) is covered by scenarios/friends-events.
+    (`interest_source=friends`) is covered by scenarios/interest-filter-friends.
 
   preconditions:
-    - "Run with: task start:scenario SCENARIO=following-interest"
+    - "Run with: task start:scenario SCENARIO=interest-filter-following"
     - >
       Pre-seeded users: viewer, alice, bob, carol, dave, eve, admin.
       Follow graph (all one-way): viewer → alice, viewer → bob, viewer

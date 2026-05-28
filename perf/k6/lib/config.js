@@ -7,6 +7,8 @@
 //   RAMP       ramp-up duration (default 30s)
 //   THINK_MIN  min think time seconds between steps (default 4)
 //   THINK_MAX  max think time seconds between steps (default 10)
+//   SUBSCRIPTIONS_ENABLED  true to include authenticated subscriptions journey
+//   SUBSCRIPTION_USER_EMAIL mock dev-auth user for subscriptions journey
 //
 // All requests carry a synthetic-traffic marker so analytics can filter them out.
 
@@ -19,6 +21,8 @@ export const DURATION = _env.DURATION || '5m';
 export const RAMP = _env.RAMP || '30s';
 export const THINK_MIN = parseFloat(_env.THINK_MIN || '4');
 export const THINK_MAX = parseFloat(_env.THINK_MAX || '10');
+export const SUBSCRIPTIONS_ENABLED = (_env.SUBSCRIPTIONS_ENABLED || 'false') === 'true';
+export const SUBSCRIPTION_USER_EMAIL = _env.SUBSCRIPTION_USER_EMAIL || 'viewer@example.com';
 
 export const DEFAULT_HEADERS = {
     'User-Agent': 'salsa-perf-k6/1.0',

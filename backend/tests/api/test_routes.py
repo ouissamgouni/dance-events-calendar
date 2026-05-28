@@ -111,6 +111,7 @@ class TestSettingsEndpoint:
         resp = client.get("/api/settings")
         assert resp.status_code == 200
         assert resp.json()["trending_banner_enabled"] is False
+        assert resp.json()["default_explorer_period"] == "next_3_months"
 
     def test_admin_can_update_trending_banner_flag(self, sqlite_client):
         client, engine = sqlite_client
@@ -127,6 +128,32 @@ class TestSettingsEndpoint:
         resp = client.get("/api/settings")
         assert resp.status_code == 200
         assert resp.json()["trending_banner_enabled"] is True
+
+    def test_admin_can_update_default_explorer_period(self, sqlite_client):
+        client, engine = sqlite_client
+
+        resp = client.put(
+            "/api/settings", json={"default_explorer_period": "next_30_days"}
+        )
+        assert resp.status_code == 200
+        assert resp.json()["default_explorer_period"] == "next_30_days"
+
+        with Session(engine) as session:
+            row = session.get(SiteSetting, "default_explorer_period")
+            assert row is not None
+            assert row.value == "next_30_days"
+
+        resp = client.get("/api/settings")
+        assert resp.status_code == 200
+        assert resp.json()["default_explorer_period"] == "next_30_days"
+
+    def test_admin_cannot_update_invalid_default_explorer_period(self, sqlite_client):
+        client, _engine = sqlite_client
+
+        resp = client.put(
+            "/api/settings", json={"default_explorer_period": "next_12_months"}
+        )
+        assert resp.status_code == 422
 
 
 @pytest.mark.unit

@@ -56,7 +56,8 @@ export default function MyCalendar() {
     const [subsEvents, setSubsEvents] = useState<CalendarEvent[]>([]);
     const [subsLoading, setSubsLoading] = useState(false);
     const [subsCalendars, setSubsCalendars] = useState<SubscribedUser[]>([]);
-    const [subsHandleFilter, setSubsHandleFilter] = useState<string | null>(null);
+    const [subsHandleFilters, setSubsHandleFilters] = useState<string[]>([]);
+    const [subsFilter, setSubsFilter] = useState<Filter>('all');
     const [signInNudgeDismissed, setSignInNudgeDismissed] = useState<boolean>(() => {
         if (typeof window === 'undefined') return false;
         return window.localStorage.getItem('myCalendar.signInNudge.dismissed') === '1';
@@ -83,6 +84,10 @@ export default function MyCalendar() {
     }, [authLoading, isSubscriptionsRoute, navigate, user]);
 
     useEffect(() => {
+        if (activeView !== 'mine') {
+            setLoading(false);
+            return;
+        }
         if (allEventIds.length === 0) {
             setEvents([]);
             setLoading(false);
@@ -93,7 +98,7 @@ export default function MyCalendar() {
             .then(setEvents)
             .catch(() => setEvents([]))
             .finally(() => setLoading(false));
-    }, [allEventIds]);
+    }, [activeView, allEventIds]);
 
     useEffect(() => {
         if (!user) {
@@ -115,27 +120,24 @@ export default function MyCalendar() {
         let cancelled = false;
         setSubsLoading(true);
         fetchSubscribedEvents({
-            fromHandle: subsHandleFilter ?? undefined,
+            fromHandles: subsHandleFilters,
+            kind: subsFilter,
             limit: 100,
         })
-            .then(async (res) => {
+            .then((res) => {
                 if (cancelled) return;
-                const ids = res.items.map((it) => it.event_id);
-                if (ids.length === 0) {
-                    setSubsEvents([]);
-                    return;
-                }
-                try {
-                    const full = await fetchEventsByIds(ids);
-                    if (!cancelled) setSubsEvents(full);
-                } catch {
-                    if (!cancelled) setSubsEvents([]);
-                }
+                setSubsEvents(res.items);
             })
             .catch(() => { if (!cancelled) setSubsEvents([]); })
             .finally(() => { if (!cancelled) setSubsLoading(false); });
         return () => { cancelled = true; };
-    }, [isSubscriptionsRoute, user, subsHandleFilter]);
+    }, [isSubscriptionsRoute, user, subsHandleFilters, subsFilter]);
+
+    const toggleSubsHandle = useCallback((handle: string) => {
+        setSubsHandleFilters((current) => current.includes(handle)
+            ? current.filter((h) => h !== handle)
+            : [...current, handle]);
+    }, []);
 
     const handleEventClick = useCallback((evt: CalendarEvent) => {
         trackView(evt.event_id, 'my-calendar');
@@ -240,6 +242,7 @@ export default function MyCalendar() {
 
     const eventsForList = showPastEvents ? displayedEvents : upcomingDisplayed;
     const mapEvents = eventsForList.length > 0 ? eventsForList : stableEmptyEvents;
+    const activeLoading = activeView === 'subs' ? subsLoading && subsEvents.length === 0 : loading;
 
     return (
         <div className="min-h-screen bg-[#f8fafc]">
@@ -376,31 +379,67 @@ export default function MyCalendar() {
                 )}
 
                 {activeView === 'subs' && subsCalendars.length > 0 && (
-                    <div className="mb-4 flex items-center gap-1.5 overflow-x-auto pb-1">
-                        <button
-                            type="button"
-                            onClick={() => setSubsHandleFilter(null)}
-                            className={`shrink-0 px-2.5 py-1 text-xs font-medium border transition ${subsHandleFilter === null
-                                ? 'bg-blue-500 border-blue-500 text-white'
-                                : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500'
-                                }`}
-                        >
-                            Everyone
-                        </button>
-                        {subsCalendars.map((s) => (
+                    <div className="mb-4 flex flex-col gap-2">
+                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
                             <button
-                                key={s.handle}
                                 type="button"
-                                onClick={() => setSubsHandleFilter(s.handle)}
-                                className={`shrink-0 px-2.5 py-1 text-xs font-medium border transition inline-flex items-center gap-1 ${subsHandleFilter === s.handle
+                                onClick={() => setSubsHandleFilters([])}
+                                className={`shrink-0 px-2.5 py-1 text-xs font-medium border transition ${subsHandleFilters.length === 0
                                     ? 'bg-blue-500 border-blue-500 text-white'
                                     : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500'
                                     }`}
-                                title={`Show only events from @${s.handle}`}
                             >
-                                @{s.handle}
+                                Everyone
                             </button>
-                        ))}
+                            {subsCalendars.map((s) => {
+                                const selected = subsHandleFilters.includes(s.handle);
+                                return (
+                                    <button
+                                        key={s.handle}
+                                        type="button"
+                                        onClick={() => toggleSubsHandle(s.handle)}
+                                        aria-pressed={selected}
+                                        className={`shrink-0 px-2.5 py-1 text-xs font-medium border transition inline-flex items-center gap-1.5 ${selected
+                                            ? 'bg-blue-500 border-blue-500 text-white'
+                                            : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500'
+                                            }`}
+                                        title={`Toggle events from @${s.handle}`}
+                                    >
+                                        {s.avatar_url ? (
+                                            <img
+                                                src={s.avatar_url}
+                                                alt=""
+                                                className="h-4 w-4 rounded-full object-cover"
+                                                loading="lazy"
+                                            />
+                                        ) : (
+                                            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-slate-200 text-[9px] font-semibold text-slate-600">
+                                                {(s.display_name || s.handle).slice(0, 1).toUpperCase()}
+                                            </span>
+                                        )}
+                                        <span>@{s.handle}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div className="flex items-center gap-1">
+                            {(['all', 'saved', 'going'] as Filter[]).map((f) => (
+                                <button
+                                    key={f}
+                                    type="button"
+                                    onClick={() => setSubsFilter(f)}
+                                    className={`px-2 py-0.5 text-[11px] font-medium leading-5 border transition ${subsFilter === f
+                                        ? 'bg-blue-500 border-blue-500 text-white'
+                                        : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500'
+                                        }`}
+                                >
+                                    {f === 'all' ? 'All' : f === 'saved' ? 'Saved' : 'Going'}
+                                </button>
+                            ))}
+                            {subsLoading && subsEvents.length > 0 && (
+                                <span className="ml-2 text-[11px] text-slate-400">Updating…</span>
+                            )}
+                        </div>
                     </div>
                 )}
 
@@ -428,7 +467,7 @@ export default function MyCalendar() {
                     </div>
                 )}
 
-                {!loading && pastEventIds.size > 0 && (
+                {!activeLoading && activeView === 'mine' && pastEventIds.size > 0 && (
                     <div className="mb-3">
                         <button
                             onClick={() => setShowPastEvents((v) => !v)}
@@ -441,11 +480,11 @@ export default function MyCalendar() {
                     </div>
                 )}
 
-                {(loading || (activeView === 'subs' && subsLoading)) && (
+                {activeLoading && (
                     <p className="text-center text-slate-400 py-12">Loading your events…</p>
                 )}
 
-                {!loading && activeView === 'mine' && allEventIds.length === 0 && (
+                {!activeLoading && activeView === 'mine' && allEventIds.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-20 text-center">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-10 h-10 text-slate-300 mb-4">
                             <path d="M5 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14l-5-2.5L5 18V4Z" />
@@ -463,20 +502,20 @@ export default function MyCalendar() {
                     </div>
                 )}
 
-                {!loading && activeView === 'subs' && !subsLoading && subsEvents.length === 0 && (
+                {!activeLoading && activeView === 'subs' && !subsLoading && subsEvents.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-20 text-center">
                         <p className="text-slate-600 text-lg font-medium">
                             No upcoming events from your subscriptions
                         </p>
                         <p className="text-slate-400 text-sm mt-1">
-                            {subsHandleFilter
-                                ? `@${subsHandleFilter} hasn't published anything new yet.`
+                            {subsHandleFilters.length > 0
+                                ? 'Those people have no matching upcoming events yet.'
                                 : 'When the calendars you subscribe to publish events, they’ll show up here.'}
                         </p>
-                        {subsHandleFilter && (
+                        {subsHandleFilters.length > 0 && (
                             <button
                                 type="button"
-                                onClick={() => setSubsHandleFilter(null)}
+                                onClick={() => setSubsHandleFilters([])}
                                 className="mt-4 text-xs text-blue-600 hover:underline"
                             >
                                 Show all subscriptions
@@ -485,7 +524,7 @@ export default function MyCalendar() {
                     </div>
                 )}
 
-                {!loading && (
+                {!activeLoading && (
                     (activeView === 'mine' && allEventIds.length > 0) ||
                     (activeView === 'subs' && subsEvents.length > 0)
                 ) && (

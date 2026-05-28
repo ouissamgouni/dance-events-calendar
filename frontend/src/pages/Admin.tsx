@@ -30,6 +30,8 @@ import AdminUsersTab from '../components/AdminUsersTab';
 import CalendarCurationRulesPanel from '../components/CalendarCurationRulesPanel';
 import { ConfirmDialog } from '../components/AppDialog';
 import { useAdminCounters, notifyAdminDataChanged } from '../hooks/useAdminCounters';
+import { DATE_RANGE_PRESET_CHOICES, DEFAULT_EXPLORER_PERIOD } from '../utils/dateRangePresets';
+import type { DateRangePresetKey } from '../utils/dateRangePresets';
 
 type AdminTab = 'data' | 'configuration' | 'analytics' | 'users';
 type SyncMode = 'incremental' | 'reseed';
@@ -87,6 +89,7 @@ export default function Admin() {
     const [organizerClaimsEnabled, setOrganizerClaimsEnabled] = useState(false);
     const [eventColorBarColor, setEventColorBarColor] = useState('#64748b');
     const [tagSortMode, setTagSortMode] = useState<'group' | 'event_count'>('group');
+    const [defaultExplorerPeriod, setDefaultExplorerPeriod] = useState<DateRangePresetKey>(DEFAULT_EXPLORER_PERIOD);
     const [editingCalId, setEditingCalId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
     const [showSyncProgress, setShowSyncProgress] = useState(false);
@@ -195,6 +198,7 @@ export default function Admin() {
             setOrganizerClaimsEnabled(s.organizer_claims_enabled ?? false);
             setEventColorBarColor(s.event_color_bar_color || '#64748b');
             setTagSortMode(s.tag_sort_mode === 'event_count' ? 'event_count' : 'group');
+            setDefaultExplorerPeriod(s.default_explorer_period ?? DEFAULT_EXPLORER_PERIOD);
         }).catch(() => { });
         fetchSuggestions().then(setSuggestions).catch(() => { });
         fetchMostSavedEvents().then(setMostSaved).catch(() => { });
@@ -565,6 +569,19 @@ export default function Admin() {
         } catch {
             setTagSortMode(prev);
             setMessage('Failed to update tag sort order.');
+        }
+    };
+
+    const handleDefaultExplorerPeriodChange = async (period: DateRangePresetKey) => {
+        const prev = defaultExplorerPeriod;
+        setDefaultExplorerPeriod(period);
+        try {
+            await updateSettings({ default_explorer_period: period });
+            const label = DATE_RANGE_PRESET_CHOICES.find((choice) => choice.key === period)?.label ?? 'selected period';
+            setMessage(`Explorer default period: ${label}.`);
+        } catch {
+            setDefaultExplorerPeriod(prev);
+            setMessage('Failed to update Explorer default period.');
         }
     };
 
@@ -1061,6 +1078,21 @@ export default function Admin() {
                                 >
                                     <option value="group">By group</option>
                                     <option value="event_count">By event count</option>
+                                </select>
+                            </div>
+                            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                                <div>
+                                    <span className="text-[11px] font-medium text-gray-700">Explorer default period</span>
+                                    <p className="text-[10px] text-gray-400">Used for fresh visits and Clear all</p>
+                                </div>
+                                <select
+                                    value={defaultExplorerPeriod}
+                                    onChange={(e) => handleDefaultExplorerPeriodChange(e.target.value as DateRangePresetKey)}
+                                    className="text-[11px] border border-gray-200 px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                >
+                                    {DATE_RANGE_PRESET_CHOICES.map((choice) => (
+                                        <option key={choice.key} value={choice.key}>{choice.label}</option>
+                                    ))}
                                 </select>
                             </div>
                         </div>
