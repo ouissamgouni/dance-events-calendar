@@ -39,6 +39,7 @@ from backend.db.models import (  # noqa: E402
     Notification,
     User,
     UserEventAttendance,
+    UserSavedEvent,
 )
 
 
@@ -607,6 +608,68 @@ def test_subscribed_events_from_handle_filter(client, session):
     items = r.json()["items"]
     assert len(items) == 1
     assert items[0]["event_id"] == "ev-1"
+
+
+def test_subscribed_events_multi_handle_kind_and_upcoming_filters(client, session):
+    _make_calendar(session)
+    _make_event(session, "ev-going", title="Going Event")
+    _make_event(session, "ev-saved", title="Saved Event")
+    past = _make_event(session, "ev-past", title="Past Event")
+    past.start = datetime.utcnow() - timedelta(days=2)
+    past.end = datetime.utcnow() - timedelta(days=1)
+    session.add(past)
+
+    alice = _make_user(session, "alice@example.com", "alice")
+    carol = _make_user(session, "carol@example.com", "carol")
+    bob = _make_user(session, "bob@example.com", "bob")
+    _subscribe(session, bob, alice)
+    _subscribe(session, bob, carol)
+
+    session.add(
+        UserEventAttendance(
+            device_id="da-going",
+            event_id="ev-going",
+            user_id=alice.id,
+            share_audience="public",
+            share_publicly=True,
+        )
+    )
+    session.add(
+        UserEventAttendance(
+            device_id="da-past",
+            event_id="ev-past",
+            user_id=alice.id,
+            share_audience="public",
+            share_publicly=True,
+        )
+    )
+    session.add(
+        UserSavedEvent(
+            device_id="dc-saved",
+            event_id="ev-saved",
+            user_id=carol.id,
+            audience="public",
+        )
+    )
+    session.commit()
+
+    _login(client, "bob@example.com")
+    r = client.get(
+        "/api/social/me/subscribed-events?from_handles=alice,carol&kind=saved"
+    )
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["total"] == 1
+    assert data["items"][0]["event_id"] == "ev-saved"
+    assert data["items"][0]["via"][0]["kind"] == "subscription_saved"
+    assert "tags" in data["items"][0]
+    assert "view_count" in data["items"][0]
+
+    r = client.get("/api/social/me/subscribed-events?from_handles=alice&kind=going")
+    assert r.status_code == 200, r.text
+    event_ids = [item["event_id"] for item in r.json()["items"]]
+    assert event_ids == ["ev-going"]
+    assert "ev-past" not in event_ids
 
 
 def test_subscribed_events_unknown_handle_returns_empty(client, session):

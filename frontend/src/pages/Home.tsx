@@ -31,6 +31,8 @@ import EventAnchoredDetailPanel from '../components/EventAnchoredDetailPanel';
 import { useSeenEvents } from '../hooks/useSeenEvents';
 import TrendingEventsBanner from '../components/TrendingEventsBanner';
 import ExplorerEventSearch from '../components/ExplorerEventSearch';
+import { DEFAULT_EXPLORER_PERIOD, getDateRangeForPreset } from '../utils/dateRangePresets';
+import type { DateRangePresetKey } from '../utils/dateRangePresets';
 
 type ViewMode = 'explorer' | 'calendar';
 type InterestSource = 'follows' | 'friends';
@@ -60,15 +62,8 @@ function formatDate(date: Date): string {
     return `${y}-${m}-${d}`;
 }
 
-// Explorer default window. Shortened from 6 months → 3 months so the landing
-// page doesn't dump the full year onto first-time mobile users. Users can
-// extend via the "Show next available events" CTA in the list, or pick the
-// longer "Next 6 months" preset.
-function defaultExplorerDateRange(): { startDate: string; endDate: string } {
-    const startDate = formatDate(new Date());
-    const defaultEndDate = new Date();
-    defaultEndDate.setMonth(defaultEndDate.getMonth() + 3);
-    return { startDate, endDate: formatDate(defaultEndDate) };
+function defaultExplorerDateRange(period: DateRangePresetKey = DEFAULT_EXPLORER_PERIOD): { startDate: string; endDate: string } {
+    return getDateRangeForPreset(period);
 }
 
 function parseDateParam(value: string | null): string | null {
@@ -225,6 +220,7 @@ export default function Home() {
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
     const [initialExplorerState] = useState(() => readInitialExplorerState(searchParams));
+    const [initialUrlHadDateRange] = useState(() => searchParams.has('start_date') || searchParams.has('end_date'));
 
     // Allow opening the suggest modal from anywhere via ?submit=1 (e.g. mobile header link).
     useEffect(() => {
@@ -514,8 +510,10 @@ export default function Home() {
     // Explorer state
     const [startDate, setStartDate] = useState(initialExplorerState.startDate);
     const [endDate, setEndDate] = useState(initialExplorerState.endDate);
+    const [defaultExplorerPeriod, setDefaultExplorerPeriod] = useState<DateRangePresetKey>(DEFAULT_EXPLORER_PERIOD);
+    const userTouchedDateRangeRef = useRef(initialUrlHadDateRange);
 
-    // Interest filter (Phase: following-interest). Restricts the explorer
+    // Interest filter (Phase: interest-filter-following). Restricts the explorer
     // feed to events at least one user in the chosen graph has marked
     // going / saved.
     //   • `interestSource` = which graph: `follows` (anyone the viewer
@@ -571,7 +569,8 @@ export default function Home() {
     const initialLoadDone = useRef(false);
     const [visibleRange, setVisibleRange] = useState<{ start: Date; end: Date } | null>(null);
     useEffect(() => {
-        if (!initialLoadDone.current) setLoading(true);
+        setLoading(true);
+        setError(null);
         let params: { startDate?: string; endDate?: string; area?: PreferredAreaPayload | null; interestSource?: 'follows' | 'friends'; interestKind?: 'any' | 'going' | 'saved'; interestUserHandle?: string } | undefined;
         const interestActive = interestSource !== null || !!interestUserHandle;
         if (viewMode === 'explorer') {
@@ -614,6 +613,13 @@ export default function Home() {
                 invalidateAttendanceSummaries(evts.map((e) => e.event_id));
                 setEvents(evts);
                 setSinceDate(settings.since_date);
+                const nextDefaultPeriod = settings.default_explorer_period ?? DEFAULT_EXPLORER_PERIOD;
+                setDefaultExplorerPeriod(nextDefaultPeriod);
+                if (viewMode === 'explorer' && !initialUrlHadDateRange && !userTouchedDateRangeRef.current) {
+                    const defaults = defaultExplorerDateRange(nextDefaultPeriod);
+                    setStartDate(defaults.startDate);
+                    setEndDate(defaults.endDate);
+                }
                 setTagGroups(groups);
             })
             .catch((e) => setError(e.message))
@@ -621,9 +627,10 @@ export default function Home() {
                 setLoading(false);
                 initialLoadDone.current = true;
             });
-    }, [viewMode, startDate, endDate, visibleRange, interestSource, interestKind, interestUserHandle]);
+    }, [viewMode, startDate, endDate, visibleRange, interestSource, interestKind, interestUserHandle, initialUrlHadDateRange]);
 
     const handleDateRangeChange = useCallback((start: string, end: string) => {
+        userTouchedDateRangeRef.current = true;
         setStartDate(start);
         setEndDate(end);
         bumpAutoFit();
@@ -667,6 +674,7 @@ export default function Home() {
     const [extendingPeriod, setExtendingPeriod] = useState(false);
     const handleExtendPeriod = useCallback(() => {
         if (!nextAvailableEventBatch) return;
+        userTouchedDateRangeRef.current = true;
         setExtendingPeriod(true);
         setEndDate(nextAvailableEventBatch.endDate);
         bumpAutoFit();
@@ -681,7 +689,8 @@ export default function Home() {
     // the empty-state CTA so a user who over-filtered into "0 events" can
     // recover in one tap without hunting down individual chips.
     const handleClearAllFilters = useCallback(() => {
-        const defaults = defaultExplorerDateRange();
+        const defaults = defaultExplorerDateRange(defaultExplorerPeriod);
+        userTouchedDateRangeRef.current = false;
         userTouchedTagsRef.current = true;
         setActiveTagIds(new Set());
         setInterestSource(null);
@@ -691,7 +700,7 @@ export default function Home() {
         setEndDate(defaults.endDate);
         setAreaSessionOverride(null);
         bumpAutoFit();
-    }, [bumpAutoFit]);
+    }, [bumpAutoFit, defaultExplorerPeriod]);
 
     // Remove a single tag from the active set (wired into SummaryBar chip ×).
     const handleRemoveTag = useCallback((tagId: number) => {
@@ -732,7 +741,7 @@ export default function Home() {
     // tall filter stack on phones. State stays lifted in this component so
     // closing/opening the sheet doesn't reset anything.
     const [filterSheetOpen, setFilterSheetOpen] = useState(false);
-    const defaultDateRange = useMemo(() => defaultExplorerDateRange(), []);
+    const defaultDateRange = useMemo(() => defaultExplorerDateRange(defaultExplorerPeriod), [defaultExplorerPeriod]);
     const dateRangeDiffers =
         startDate !== defaultDateRange.startDate || endDate !== defaultDateRange.endDate;
     const activeFilterCount =
@@ -748,8 +757,7 @@ export default function Home() {
     // Map fullscreen toggle (mobile only — desktop layout already gives the
     // map a tall column). The map container picks up ``fixed inset-0`` when
     // active so users can scan markers without the URL bar / filters
-    // eating screen height. Leaflet's existing ResizeObserver handles
-    // invalidateSize after the class flip.
+    // eating screen height.
     const [mapFullscreen, setMapFullscreen] = useState(false);
     const mobileExplorerTopSummaryRef = useRef<HTMLDivElement | null>(null);
     const [showFloatingMobileExplorerSummary, setShowFloatingMobileExplorerSummary] = useState(false);
@@ -1362,7 +1370,10 @@ export default function Home() {
                     </div>
                 )}
                 {loading && (
-                    <p className="text-center text-slate-400">Loading events…</p>
+                    <div className="flex flex-col items-center justify-center gap-2 py-10 text-slate-400" role="status" aria-live="polite">
+                        <div className="h-6 w-6 border-2 border-slate-200 border-t-blue-500 animate-spin" aria-hidden="true" />
+                        <span className="text-sm">Loading events…</span>
+                    </div>
                 )}
                 {error && (
                     <p className="text-center text-red-500">Error: {error}</p>

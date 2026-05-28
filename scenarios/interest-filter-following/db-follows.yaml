@@ -1,4 +1,4 @@
-# Follow graph for the following-interest scenario.
+# Follow graph for the interest-filter-following scenario.
 #
 # Resulting graph (one-way unless noted):
 #   viewer -> alice          (one-way: alice does NOT follow back)

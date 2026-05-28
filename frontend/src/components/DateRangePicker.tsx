@@ -1,4 +1,6 @@
 import { useMemo, useRef } from 'react';
+import { getDateRangePresetGroups } from '../utils/dateRangePresets';
+import type { DateRangePresetOption } from '../utils/dateRangePresets';
 
 interface DateRangePickerProps {
     startDate: string;
@@ -6,124 +8,16 @@ interface DateRangePickerProps {
     onChange: (start: string, end: string) => void;
 }
 
-function formatDate(date: Date): string {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-}
-
-function addDays(date: Date, days: number): Date {
-    const next = new Date(date);
-    next.setDate(next.getDate() + days);
-    return next;
-}
-
-function addMonths(date: Date, months: number): Date {
-    const next = new Date(date);
-    next.setMonth(next.getMonth() + months);
-    return next;
-}
-
 export default function DateRangePicker({ startDate, endDate, onChange }: DateRangePickerProps) {
     const toInputRef = useRef<HTMLInputElement>(null);
 
-    const presets = useMemo(() => {
-        const today = new Date();
-        const year = today.getFullYear();
-        const dayOfWeek = today.getDay(); // 0=Sun, 5=Fri, 6=Sat
+    const presets = useMemo(() => getDateRangePresetGroups(), []);
 
-        // Weekend is Friday-Sunday. "This weekend" means the current
-        // week's weekend: upcoming on Mon-Thu, ongoing on Fri-Sun.
-        const thisWeekendStart = addDays(today, dayOfWeek === 0 ? -2 : 5 - dayOfWeek);
-        const thisWeekendEnd = addDays(thisWeekendStart, 2);
-        const nextWeekendStart = addDays(thisWeekendStart, 7);
-        const nextWeekendEnd = addDays(nextWeekendStart, 2);
-
-        // ── Rolling windows ───────────────────────────────────
-        const next7Days = addDays(today, 7);
-        const next30Days = addMonths(today, 1);
-
-        // ── Next 3 months (explorer default — keep aligned with
-        // ``defaultExplorerDateRange`` in pages/Home.tsx) ─────
-        const next3Months = addMonths(today, 3);
-
-        // ── Next 6 months ─────────────────────────────────────
-        const next6Months = addMonths(today, 6);
-
-        // ── Seasons (meteorological) ──────────────────────────
-        const seasons = [
-            { name: 'Spring', icon: '🌸', startMonth: 2, endMonth: 4 },
-            { name: 'Summer', icon: '☀️', startMonth: 5, endMonth: 7 },
-            { name: 'Autumn', icon: '🍂', startMonth: 8, endMonth: 10 },
-            { name: 'Winter', icon: '❄️', startMonth: 11, endMonth: 1 },
-        ];
-
-        function seasonRange(idx: number, baseYear: number) {
-            const s = seasons[idx];
-            if (s.startMonth > s.endMonth) {
-                // Winter crosses year boundary
-                const start = new Date(baseYear, s.startMonth, 1);
-                const end = new Date(baseYear + 1, s.endMonth + 1, 0); // last day of Feb
-                return { start, end };
-            }
-            const start = new Date(baseYear, s.startMonth, 1);
-            const end = new Date(baseYear, s.endMonth + 1, 0); // last day of end month
-            return { start, end };
-        }
-
-        // Determine current season index
-        const month = today.getMonth();
-        let currentIdx: number;
-        if (month >= 2 && month <= 4) currentIdx = 0;       // Spring
-        else if (month >= 5 && month <= 7) currentIdx = 1;   // Summer
-        else if (month >= 8 && month <= 10) currentIdx = 2;  // Fall
-        else currentIdx = 3;                                   // Winter
-
-        // "This {season}" — remainder of current season
-        const currentBaseYear = (currentIdx === 3 && month <= 1) ? year - 1 : year;
-        const currentRange = seasonRange(currentIdx, currentBaseYear);
-        const thisSeasonStart = today > currentRange.start ? today : currentRange.start;
-
-        // Generate current season + next 3 seasons
-        const seasonPresets = Array.from({ length: 4 }, (_, offset) => {
-            const seasonIdx = (currentIdx + offset) % 4;
-            const seasonBaseYear = currentBaseYear + Math.floor((currentIdx + offset) / 4);
-            const range = seasonRange(seasonIdx, seasonBaseYear);
-
-            const label = seasons[seasonIdx].name;
-            const mobileLabel = seasons[seasonIdx].icon;
-
-            return {
-                label,
-                mobileLabel,
-                icon: seasons[seasonIdx].icon,
-                start: formatDate(offset === 0 ? thisSeasonStart : range.start),
-                end: formatDate(range.end),
-            };
-        });
-
-        const allPresets = [
-            { label: 'Weekend', mobileLabel: 'Wknd', start: formatDate(thisWeekendStart), end: formatDate(thisWeekendEnd), group: 'this' },
-            { label: 'Weekend', mobileLabel: 'Wknd', start: formatDate(nextWeekendStart), end: formatDate(nextWeekendEnd), group: 'next' },
-            { label: '7 days', mobileLabel: '7d', start: formatDate(today), end: formatDate(next7Days), group: 'next' },
-            { label: '30 days', mobileLabel: '30d', start: formatDate(today), end: formatDate(next30Days), group: 'next' },
-            { label: '3 months', mobileLabel: '3mo', start: formatDate(today), end: formatDate(next3Months), group: 'next' },
-            { label: '6 months', mobileLabel: '6mo', start: formatDate(today), end: formatDate(next6Months), group: 'next' },
-            ...seasonPresets.map((preset, index) => ({ ...preset, group: index === 0 ? 'this' : 'next' })),
-        ] as const;
-
-        return {
-            thisPresets: allPresets.filter((preset) => preset.group === 'this'),
-            nextPresets: allPresets.filter((preset) => preset.group === 'next'),
-        };
-    }, []);
-
-    const renderPreset = (preset: { label: string; mobileLabel: string; start: string; end: string; icon?: string }) => {
+    const renderPreset = (preset: DateRangePresetOption) => {
         const active = startDate === preset.start && endDate === preset.end;
         return (
             <button
-                key={preset.label}
+                key={preset.key}
                 type="button"
                 className={`preset-btn ${active ? 'active' : ''}`}
                 onClick={() => onChange(preset.start, preset.end)}

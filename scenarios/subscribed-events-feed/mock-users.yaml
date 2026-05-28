@@ -15,17 +15,32 @@ users:
     name: Alice Rivera
     handle: alice
     account_visibility: public
+    avatar_url: "https://api.dicebear.com/9.x/initials/svg?seed=Alice%20Rivera"
   - email: bob@example.com
     name: Bob Martin
     handle: bob
+    avatar_url: "https://api.dicebear.com/9.x/initials/svg?seed=Bob%20Martin"
   - email: carol@example.com
     name: Carol Nguyen
     handle: carol
     account_visibility: public
+    avatar_url: "https://api.dicebear.com/9.x/initials/svg?seed=Carol%20Nguyen"
+  - email: erin@example.com
+    name: Erin Costa
+    handle: erin
+    account_visibility: public
+    avatar_url: "https://api.dicebear.com/9.x/initials/svg?seed=Erin%20Costa"
+  - email: frank@example.com
+    name: Frank Silva
+    handle: frank
+    account_visibility: public
+    avatar_url: "https://api.dicebear.com/9.x/initials/svg?seed=Frank%20Silva"
   - email: dave@example.com
     name: Dave Smith
     handle: dave
     account_visibility: public
+    avatar_url: "https://api.dicebear.com/9.x/initials/svg?seed=Dave%20Smith"
   - email: admin@example.com # matches ADMIN_EMAIL → admin badge
     name: Dev Admin
     handle: admin
+    avatar_url: "https://api.dicebear.com/9.x/initials/svg?seed=Dev%20Admin"

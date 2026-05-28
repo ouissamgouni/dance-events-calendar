@@ -1,0 +1,11 @@
+# Pre-seeded subscriptions for /my-calendar/subscriptions UX testing.
+# Approved follows automatically create CalendarSubscription rows.
+follows:
+  - follower: bob
+    followee: alice
+  - follower: bob
+    followee: carol
+  - follower: bob
+    followee: erin
+  - follower: bob
+    followee: frank

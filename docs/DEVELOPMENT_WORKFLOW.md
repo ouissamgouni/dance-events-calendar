@@ -180,9 +180,12 @@ Isolated full stack with per-scenario seeded data. Useful for manual QA, demos, 
 
 ```
 scenarios/<name>/
-├── config.yaml           # Required: calendar_service (google|mock)
-├── calendars.yaml        # Optional
-├── events.yaml           # Optional: events pre-seeded into DB
+├── config.env            # Optional: per-scenario env, e.g. CALENDAR_SERVICE=mock
+├── calendars.yaml        # Optional: calendar settings and defaults
+├── db-events.yaml        # Optional: events pre-seeded directly into DB
+├── mock-sync-events.yaml # Optional: mock calendar events ingested by sync
+├── generated-events.yaml # Optional: deterministic bulk event fixture
+├── mock-users.yaml       # Optional: scenario users
 └── secrets.env           # Optional: per-scenario secret overrides (gitignored)
 ```
 
@@ -268,6 +271,29 @@ task perf:report           # open the HTML summary in your browser
 task perf:scenario:down
 ```
 
+Use the production-volume variant when validating Explorer/listing performance
+against a data shape closer to production. It uses the same scenario harness,
+but [scenarios/perf-prod-volume/generated-events.yaml](scenarios/perf-prod-volume/generated-events.yaml)
+generates 1,500 cached events plus tags, views, saves, and attendances during
+seeding. The generator is deterministic and idempotent, so re-seeding does not
+duplicate rows.
+
+```bash
+# terminal 1 — boot the production-volume perf scenario (foreground, blocking)
+task perf:scenario:up:prod-volume
+
+# terminal 2 — run k6 against its auto-derived API port
+task perf:run:prod-volume
+task perf:report
+
+# terminal 1 — Ctrl-C, then stop/drop the prod-volume scenario DB:
+task stop:scenario SCENARIO=perf-prod-volume
+```
+
+Use `task perf:run` for quick local regression checks and
+`task perf:run:prod-volume` before changing Explorer hot paths such as event
+list queries, tag hydration, save/attendance enrichment, or cache behaviour.
+
 ### Other targets
 
 | Command | Description |
@@ -276,6 +302,7 @@ task perf:scenario:down
 | `task perf:staging` | Run against remote staging (`https://api-develop.joinmovida.com`, 15 VUs × 5m). Staging is rate-limited unless `RATE_LIMIT_ENABLED=false` is set on the Fly app, so expect 429s in default profile. |
 | `task perf:prod:smoke` | Read-only smoke against production (5 VUs × 2m). |
 | `task perf:scenario:logs` | Tail the perf scenario backend logs. |
+| `task perf:scenario:logs:prod-volume` | Tail the production-volume perf scenario backend logs. |
 | `task perf:report` | Open `perf/results/summary-latest.html`. |
 | `task perf:clean` | Remove old summary files. |
 
@@ -878,9 +905,11 @@ Scenario stop tasks (`stop:scenario`, `stop:scenario:all`) close their isolated 
 |---------|-------------|
 | `task perf:check` | Verify k6 is installed |
 | `task perf:scenario:up` | Start the perf scenario (delegates to `start:scenario SCENARIO=perf`) |
+| `task perf:scenario:up:prod-volume` | Start the production-volume perf scenario (1,500 generated events + engagement rows) |
 | `task perf:scenario:down` | Stop perf scenario, drop DB |
 | `task perf:scenario:logs` | Tail perf scenario logs |
 | `task perf:run` | Run k6 against the running perf scenario (auto-port) |
+| `task perf:run:prod-volume` | Run k6 against the running production-volume perf scenario (auto-port) |
 | `task perf:dev` | Run k6 against `localhost:8001` |
 | `task perf:staging` | Run k6 against remote staging |
 | `task perf:prod:smoke` | Read-only smoke against prod (5 VUs × 2m) |

@@ -7,11 +7,55 @@
 
 import browseEvents from './scenarios/browse_events.js';
 import sitemapScenario from './scenarios/sitemap_seo.js';
-import { DURATION, ENV, RAMP, VUS } from './lib/config.js';
+import subscriptionsFeed from './scenarios/subscriptions_feed.js';
+import { DURATION, ENV, RAMP, SUBSCRIPTIONS_ENABLED, VUS } from './lib/config.js';
 
 // Sitemap gets ~15% of the headcount, capped to stay safely under 10/min IP limit.
 const SITEMAP_VUS = Math.max(1, Math.round(VUS * 0.15));
-const BROWSE_VUS = Math.max(1, VUS - SITEMAP_VUS);
+const SUBSCRIPTIONS_VUS = SUBSCRIPTIONS_ENABLED ? Math.max(1, Math.round(VUS * 0.2)) : 0;
+const BROWSE_VUS = Math.max(1, VUS - SITEMAP_VUS - SUBSCRIPTIONS_VUS);
+
+const scenarios = {
+    browse_events: {
+        executor: 'ramping-vus',
+        exec: 'browse',
+        startVUs: 0,
+        stages: [
+            { duration: RAMP, target: BROWSE_VUS },
+            { duration: DURATION, target: BROWSE_VUS },
+            { duration: '30s', target: 0 },
+        ],
+        gracefulRampDown: '15s',
+        tags: { scenario: 'browse_events' },
+    },
+    sitemap_seo: {
+        executor: 'constant-arrival-rate',
+        exec: 'sitemap',
+        // 6 requests / minute total -- well under the 10/min per-IP limit.
+        rate: 6,
+        timeUnit: '1m',
+        duration: DURATION,
+        preAllocatedVUs: SITEMAP_VUS,
+        maxVUs: SITEMAP_VUS,
+        startTime: RAMP, // wait for browse ramp-up before crawling
+        tags: { scenario: 'sitemap_seo' },
+    },
+};
+
+if (SUBSCRIPTIONS_ENABLED) {
+    scenarios.subscriptions_feed = {
+        executor: 'ramping-vus',
+        exec: 'subscriptions',
+        startVUs: 0,
+        stages: [
+            { duration: RAMP, target: SUBSCRIPTIONS_VUS },
+            { duration: DURATION, target: SUBSCRIPTIONS_VUS },
+            { duration: '30s', target: 0 },
+        ],
+        gracefulRampDown: '15s',
+        tags: { scenario: 'subscriptions_feed' },
+    };
+}
 
 export const options = {
     // Tag every request/metric with the target env for downstream filtering.
@@ -19,32 +63,7 @@ export const options = {
     // Higher-fidelity HTTP timings; small tradeoff in run-time CPU.
     discardResponseBodies: false,
     noConnectionReuse: false,
-    scenarios: {
-        browse_events: {
-            executor: 'ramping-vus',
-            exec: 'browse',
-            startVUs: 0,
-            stages: [
-                { duration: RAMP, target: BROWSE_VUS },
-                { duration: DURATION, target: BROWSE_VUS },
-                { duration: '30s', target: 0 },
-            ],
-            gracefulRampDown: '15s',
-            tags: { scenario: 'browse_events' },
-        },
-        sitemap_seo: {
-            executor: 'constant-arrival-rate',
-            exec: 'sitemap',
-            // 6 requests / minute total — well under the 10/min per-IP limit.
-            rate: 6,
-            timeUnit: '1m',
-            duration: DURATION,
-            preAllocatedVUs: SITEMAP_VUS,
-            maxVUs: SITEMAP_VUS,
-            startTime: RAMP, // wait for browse ramp-up before crawling
-            tags: { scenario: 'sitemap_seo' },
-        },
-    },
+    scenarios,
     thresholds: {
         // Pass/fail gates (CI-actionable):
         'http_req_failed{group:reads}': ['rate<0.01'],
@@ -64,6 +83,7 @@ export const options = {
 // k6 looks up scenario `exec` names as exported functions on this module.
 export const browse = browseEvents;
 export const sitemap = sitemapScenario;
+export const subscriptions = subscriptionsFeed;
 
 export function setup() {
     return {
@@ -99,6 +119,7 @@ function textSummary(data) {
     lines.push('');
     lines.push('═══ k6 perf summary ═══');
     lines.push(`env=${ENV}  vus=${VUS}  duration=${DURATION}`);
+    if (SUBSCRIPTIONS_ENABLED) lines.push(`subscriptions_vus=${SUBSCRIPTIONS_VUS}`);
     lines.push('');
     const m = data.metrics || {};
     const fmt = (v) => (typeof v === 'number' ? v.toFixed(2) : String(v));
@@ -111,6 +132,10 @@ function textSummary(data) {
         'events_calendars_duration',
         'events_list_duration',
         'events_by_ids_duration',
+        'subscriptions_list_duration',
+        'subscribed_events_everyone_duration',
+        'subscribed_events_scoped_duration',
+        'subscriptions_by_ids_duration',
         'event_detail_duration',
         'attendance_summary_duration',
         'sitemap_duration',

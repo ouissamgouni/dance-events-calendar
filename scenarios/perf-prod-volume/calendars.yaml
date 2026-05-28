@@ -1,0 +1,13 @@
+calendars:
+  - id: "salsa-cal-001"
+    name: "Movida"
+    color: "#e11d48"
+  - id: "bachata-cal-002"
+    name: "Bachata Events"
+    color: "#7c3aed"
+  - id: "kizomba-cal-003"
+    name: "Kizomba Nights"
+    color: "#0f766e"
+  - id: "zouk-cal-004"
+    name: "Zouk Europe"
+    color: "#2563eb"

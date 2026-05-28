@@ -1,5 +1,5 @@
 # Mock users for the following-badge scenario. Same shape as
-# friends-events for consistency.
+# interest-filter-friends for consistency.
 #
 # Cast layout (designed for the European-spread events in db-events.yaml):
 #   * bob          — the viewer

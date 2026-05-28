@@ -15,6 +15,10 @@ version: "3"
 #   #              perf scenario's state file at .taskfiles/.scenario-state/perf.env)
 #   task perf:run
 #
+#   # production-volume local variant (1,500 generated events + engagement rows)
+#   task perf:scenario:up:prod-volume
+#   task perf:run:prod-volume
+#
 #   # terminal 1 — Ctrl-C, then:
 #   task perf:scenario:down
 #
@@ -28,6 +32,7 @@ vars:
   PROFILES_DIR: "{{.ROOT_DIR}}/perf/k6/profiles"
   RESULTS_DIR: "{{.ROOT_DIR}}/perf/results"
   PERF_STATE_FILE: "{{.ROOT_DIR}}/.taskfiles/.scenario-state/perf.env"
+  PERF_PROD_VOLUME_STATE_FILE: "{{.ROOT_DIR}}/.taskfiles/.scenario-state/perf-prod-volume.env"
 
 tasks:
   default:
@@ -36,9 +41,11 @@ tasks:
       - |
         echo "Perf load tests (k6, read-only browse-events):"
         echo "  task perf:scenario:up    - start the perf scenario (foreground; wraps start:scenario SCENARIO=perf)"
+        echo "  task perf:scenario:up:prod-volume - start prod-volume local perf scenario"
         echo "  task perf:scenario:down  - stop the perf scenario (drops its DB)"
         echo "  task perf:scenario:logs  - tail perf scenario logs"
         echo "  task perf:run            - run k6 against the running perf scenario (auto port)"
+        echo "  task perf:run:prod-volume - run k6 against prod-volume local scenario"
         echo "  task perf:check          - verify k6 is installed"
         echo "  task perf:dev            - run against ad-hoc http://localhost:8001"
         echo "  task perf:staging        - run against remote staging"
@@ -65,11 +72,18 @@ tasks:
   # Perf scenario lifecycle (delegates to the standard scenario harness)
   # ---------------------------------------------------------------------------
   scenario:up:
-    desc: Start the perf scenario (isolated stack, seeded mock events, rate limit
+    desc:
+      Start the perf scenario (isolated stack, seeded mock events, rate limit
       disabled)
     dir: "{{.ROOT_DIR}}"
     cmds:
       - task start:scenario SCENARIO=perf
+
+  scenario:up:prod-volume:
+    desc: Start the production-volume perf scenario (1,500 generated events)
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - task start:scenario SCENARIO=perf-prod-volume
 
   scenario:down:
     desc: Stop the perf scenario and drop its database
@@ -83,12 +97,18 @@ tasks:
     cmds:
       - task logs:scenario SCENARIO=perf
 
+  scenario:logs:prod-volume:
+    desc: Tail the production-volume perf scenario logs
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - task logs:scenario SCENARIO=perf-prod-volume
+
   # ---------------------------------------------------------------------------
   # k6 run targets
   # ---------------------------------------------------------------------------
   run:
     desc: Run k6 against the running perf scenario (auto-detects its API port)
-    deps: [ check, _ensure-results-dir ]
+    deps: [check, _ensure-results-dir]
     dir: "{{.ROOT_DIR}}"
     cmds:
       - |
@@ -113,12 +133,42 @@ tasks:
       - task: _run
         vars:
           PROFILE: perf
-          BASE_URL_OVERRIDE_CMD: ". \"{{.PERF_STATE_FILE}}\" && echo
-            \"http://localhost:$SC_API_PORT\""
+          BASE_URL_OVERRIDE_CMD: '. "{{.PERF_STATE_FILE}}" && echo
+            "http://localhost:$SC_API_PORT"'
+
+  run:prod-volume:
+    desc: Run k6 against the production-volume local perf scenario
+    deps: [check, _ensure-results-dir]
+    dir: "{{.ROOT_DIR}}"
+    cmds:
+      - |
+        set -euo pipefail
+        if [ ! -f "{{.PERF_PROD_VOLUME_STATE_FILE}}" ]; then
+          echo "✗ Prod-volume perf scenario not running. Start it first:" >&2
+          echo "    task perf:scenario:up:prod-volume" >&2
+          exit 1
+        fi
+        # shellcheck disable=SC1090
+        . "{{.PERF_PROD_VOLUME_STATE_FILE}}"
+        if [ -z "${SC_API_PORT:-}" ]; then
+          echo "✗ SC_API_PORT missing from {{.PERF_PROD_VOLUME_STATE_FILE}}" >&2
+          exit 1
+        fi
+        BASE="http://localhost:${SC_API_PORT}"
+        if ! curl -fsS "${BASE}/health" >/dev/null 2>&1; then
+          echo "✗ Prod-volume perf backend not reachable at ${BASE}/health" >&2
+          exit 1
+        fi
+        echo "→ prod-volume perf API: ${BASE}"
+      - task: _run
+        vars:
+          PROFILE: perf
+          BASE_URL_OVERRIDE_CMD: '. "{{.PERF_PROD_VOLUME_STATE_FILE}}" && echo
+            "http://localhost:$SC_API_PORT"'
 
   dev:
     desc: Run perf tests against ad-hoc local dev (localhost:8001)
-    deps: [ check, _ensure-results-dir ]
+    deps: [check, _ensure-results-dir]
     dir: "{{.ROOT_DIR}}"
     cmds:
       - task: _run
@@ -134,11 +184,11 @@ tasks:
       FLY_APP=movida-staging (override only if your Fly app name differs).
       Ad-hoc overrides: VUS=N DURATION=Xm RAMP=Xs THINK_MIN=N THINK_MAX=N BASE_URL=…
         e.g. VUS=15 DURATION=2m KILL_LIMITER=1 task perf:staging
-    deps: [ check, _ensure-results-dir ]
+    deps: [check, _ensure-results-dir]
     dir: "{{.ROOT_DIR}}"
     vars:
-      KILL_LIMITER: "{{.KILL_LIMITER | default \"0\"}}"
-      FLY_APP: "{{.FLY_APP | default \"movida-staging\"}}"
+      KILL_LIMITER: '{{.KILL_LIMITER | default "0"}}'
+      FLY_APP: '{{.FLY_APP | default "movida-staging"}}'
     cmds:
       - |
         set -euo pipefail
@@ -174,7 +224,7 @@ tasks:
 
   prod:smoke:
     desc: Read-only smoke against production (low VUs, short duration)
-    deps: [ check, _ensure-results-dir ]
+    deps: [check, _ensure-results-dir]
     dir: "{{.ROOT_DIR}}"
     cmds:
       - task: _run

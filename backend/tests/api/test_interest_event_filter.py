@@ -1,4 +1,4 @@
-"""Tests for the explorer interest filter (Phase: following-interest).
+"""Tests for the explorer interest filter (Phase: interest-filter-following).
 
 Exercises the ``interest_source``, ``interest_kind``, and
 ``interest_user_handle`` query params on ``GET /api/events`` plus the

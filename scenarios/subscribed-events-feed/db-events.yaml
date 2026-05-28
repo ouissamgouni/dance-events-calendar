@@ -48,14 +48,14 @@ events:
     end: w0 Sat 01:00
     price_is_free: true
     tags:
-    - format:social
-    - dance-style:salsa
-    - level:beginner-friendly
-    - venue:indoor
-    - scale:medium
-    - scope:local
-    - vibe:good-music
-    - vibe:social-atmosphere
+      - format:social
+      - dance-style:salsa
+      - level:beginner-friendly
+      - venue:indoor
+      - scale:medium
+      - scope:local
+      - vibe:good-music
+      - vibe:social-atmosphere
   - id: evt-sef-002
     calendar_id: bachata-cal-002
     title: Bachata Workshop
@@ -67,12 +67,12 @@ events:
     start: w0 Sat 14:00
     end: w0 Sat 17:00
     tags:
-    - format:workshop
-    - dance-style:bachata
-    - level:intermediate
-    - venue:indoor
-    - scale:small
-    - scope:local
+      - format:workshop
+      - dance-style:bachata
+      - level:intermediate
+      - venue:indoor
+      - scale:small
+      - scope:local
   - id: evt-sef-003
     calendar_id: salsa-cal-001
     title: Cuban Night
@@ -84,13 +84,13 @@ events:
     start: w0 Sun 20:00
     end: w1 Mon 00:00
     tags:
-    - format:workshop
-    - dance-style:salsa
-    - level:all-levels
-    - venue:indoor
-    - scale:small
-    - scope:local
-    - vibe:social-atmosphere
+      - format:workshop
+      - dance-style:salsa
+      - level:all-levels
+      - venue:indoor
+      - scale:small
+      - scope:local
+      - vibe:social-atmosphere
   - id: evt-sef-004
     calendar_id: bachata-cal-002
     title: Reggaeton Block Party
@@ -103,13 +103,254 @@ events:
     end: w0 Sun 02:00
     price_is_free: true
     tags:
-    - format:social
-    - dance-style:bachata
-    - level:all-levels
-    - venue:outdoor
-    - scale:medium
-    - scope:local
-    - vibe:social-atmosphere
+      - format:social
+      - dance-style:bachata
+      - level:all-levels
+      - venue:outdoor
+      - scale:medium
+      - scope:local
+      - vibe:social-atmosphere
+  - id: evt-sef-005
+    calendar_id: salsa-cal-001
+    title: Mambo Matinee Social
+    description: |
+      Afternoon salsa social with relaxed pacing and plenty of room for new dancers.
+    location: Studio Azul, 22 Rue Oberkampf, Paris, France
+    latitude: 48.8662
+    longitude: 2.3744
+    start: w1 Tue 19:00
+    end: w1 Tue 22:00
+    price_is_free: false
+    price_min: 8
+    price_currency: EUR
+    tags:
+      - format:social
+      - dance-style:salsa
+      - level:beginner-friendly
+      - venue:indoor
+      - scale:small
+      - scope:local
+      - vibe:social-atmosphere
+  - id: evt-sef-006
+    calendar_id: bachata-cal-002
+    title: Bachata Practica Club
+    description: |
+      Guided practica with partner rotation, feedback corners, and a short social after class.
+    location: La Clave, 18 Calle Atocha, Madrid, Spain
+    latitude: 40.4138
+    longitude: -3.6996
+    start: w1 Wed 20:00
+    end: w1 Wed 23:00
+    price_is_free: false
+    price_min: 12
+    price_currency: EUR
+    tags:
+      - format:practice
+      - dance-style:bachata
+      - level:intermediate
+      - venue:indoor
+      - scale:small
+      - scope:local
+  - id: evt-sef-007
+    calendar_id: salsa-cal-001
+    title: Rooftop Salsa Sunset
+    description: |
+      Outdoor salsa session with golden-hour DJ set and beginner-friendly animations.
+    location: Skybar Lisboa, Lisbon, Portugal
+    latitude: 38.7139
+    longitude: -9.1394
+    start: w1 Thu 19:30
+    end: w1 Thu 23:30
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+    tags:
+      - format:social
+      - dance-style:salsa
+      - level:all-levels
+      - venue:rooftop
+      - scale:medium
+      - scope:local
+      - vibe:good-music
+  - id: evt-sef-008
+    calendar_id: bachata-cal-002
+    title: Fusion Bachata Lab
+    description: |
+      Technique lab focused on musicality, turns, and smooth transitions for social dancing.
+    location: Tanzraum Mitte, Berlin, Germany
+    latitude: 52.5208
+    longitude: 13.4095
+    start: w1 Fri 18:30
+    end: w1 Fri 21:30
+    tags:
+      - format:workshop
+      - dance-style:bachata
+      - level:intermediate
+      - venue:indoor
+      - scale:small
+      - scope:local
+  - id: evt-sef-009
+    calendar_id: salsa-cal-001
+    title: Timba Late Night
+    description: |
+      Cuban salsa party with timba classics, rueda breaks, and a late social floor.
+    location: La Bodega, Barcelona, Spain
+    latitude: 41.3851
+    longitude: 2.1734
+    start: w1 Fri 22:00
+    end: w1 Sat 03:00
+    price_is_free: false
+    price_min: 14
+    price_currency: EUR
+    tags:
+      - format:social
+      - dance-style:salsa
+      - level:all-levels
+      - venue:indoor
+      - scale:medium
+      - scope:regional
+      - vibe:good-music
+  - id: evt-sef-010
+    calendar_id: bachata-cal-002
+    title: Bachata Sensual Intensive
+    description: |
+      Two-day intensive for dancers polishing connection, footwork, and styling fundamentals.
+    location: Dance Loft, Amsterdam, Netherlands
+    latitude: 52.3676
+    longitude: 4.9041
+    start: w2 Sat 12:00
+    end: w2 Sun 18:00
+    price_is_free: false
+    price_min: 75
+    price_max: 110
+    price_currency: EUR
+    tags:
+      - format:workshop
+      - dance-style:bachata
+      - level:intermediate
+      - venue:indoor
+      - scale:medium
+      - scope:regional
+  - id: evt-sef-011
+    calendar_id: salsa-cal-001
+    title: Rueda in the Park
+    description: |
+      Open-air rueda session with caller-led circles and a casual picnic after dancing.
+    location: Parc de la Ciutadella, Barcelona, Spain
+    latitude: 41.3881
+    longitude: 2.1875
+    start: w2 Sun 17:00
+    end: w2 Sun 20:00
+    price_is_free: true
+    tags:
+      - format:practice
+      - dance-style:rueda
+      - level:all-levels
+      - venue:outdoor
+      - scale:medium
+      - scope:local
+      - vibe:social-atmosphere
+  - id: evt-sef-012
+    calendar_id: bachata-cal-002
+    title: Bachata Rooftop Party
+    description: |
+      DJ-led bachata party with sunset warm-up, open level animations, and city views.
+    location: Terraza Norte, Madrid, Spain
+    latitude: 40.4237
+    longitude: -3.6922
+    start: w2 Sat 21:00
+    end: w2 Sun 02:00
+    price_is_free: false
+    price_min: 16
+    price_currency: EUR
+    tags:
+      - format:social
+      - dance-style:bachata
+      - level:all-levels
+      - venue:rooftop
+      - scale:medium
+      - scope:local
+      - vibe:social-atmosphere
+  - id: evt-sef-013
+    calendar_id: salsa-cal-001
+    title: Salsa Technique Bootcamp
+    description: |
+      Focused bootcamp covering timing, spins, shines, and partnerwork precision.
+    location: Tempo Studio, London, UK
+    latitude: 51.5142
+    longitude: -0.1323
+    start: w3 Mon 19:00
+    end: w3 Mon 22:00
+    price_is_free: false
+    price_min: 24
+    price_currency: GBP
+    tags:
+      - format:class
+      - dance-style:salsa
+      - level:intermediate
+      - venue:indoor
+      - scale:small
+      - scope:local
+  - id: evt-sef-014
+    calendar_id: bachata-cal-002
+    title: Bachata Beginner Crash Course
+    description: |
+      Friendly crash course for new bachata dancers with a small social practice afterward.
+    location: Community Hall, Brussels, Belgium
+    latitude: 50.8503
+    longitude: 4.3517
+    start: w3 Tue 19:30
+    end: w3 Tue 22:00
+    price_is_free: true
+    tags:
+      - format:class
+      - dance-style:bachata
+      - level:beginner-friendly
+      - venue:indoor
+      - scale:small
+      - scope:local
+  - id: evt-sef-015
+    calendar_id: salsa-cal-001
+    title: Live Salsa Orchestra Night
+    description: |
+      Full live orchestra salsa night with shows, social dancing, and late-night DJ support.
+    location: Palais des Congres, Paris, France
+    latitude: 48.8788
+    longitude: 2.2835
+    start: w3 Fri 20:30
+    end: w3 Sat 03:00
+    price_is_free: false
+    price_min: 28
+    price_currency: EUR
+    tags:
+      - format:social
+      - dance-style:salsa
+      - level:all-levels
+      - venue:indoor
+      - scale:large
+      - scope:regional
+      - vibe:live-band
+  - id: evt-sef-016
+    calendar_id: bachata-cal-002
+    title: Bachata Congress Warm-up
+    description: |
+      Congress warm-up party with guest DJs, artist meetups, and workshop tasters.
+    location: Congress Center, Amsterdam, Netherlands
+    latitude: 52.3702
+    longitude: 4.8952
+    start: w3 Sat 18:00
+    end: w3 Sun 02:00
+    price_is_free: false
+    price_min: 30
+    price_currency: EUR
+    tags:
+      - format:congress
+      - dance-style:bachata
+      - level:all-levels
+      - venue:indoor
+      - scale:large
+      - scope:international
+      - vibe:good-music
 
 attendances:
   # Pre-existing share_publicly Going from alice. Used to verify that
@@ -119,3 +360,57 @@ attendances:
   - event_id: evt-sef-001
     email: alice@example.com
     share_publicly: true
+    share_audience: public
+  - event_id: evt-sef-004
+    email: dave@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-sef-005
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-sef-006
+    email: carol@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-sef-007
+    email: erin@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-sef-008
+    email: frank@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-sef-009
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-sef-010
+    email: carol@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-sef-011
+    email: erin@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-sef-012
+    email: frank@example.com
+    share_publicly: true
+    share_audience: public
+
+saves:
+  - event_id: evt-sef-013
+    email: alice@example.com
+    audience: public
+  - event_id: evt-sef-014
+    email: carol@example.com
+    audience: public
+  - event_id: evt-sef-015
+    email: erin@example.com
+    audience: public
+  - event_id: evt-sef-016
+    email: frank@example.com
+    audience: public
+  - event_id: evt-sef-010
+    email: alice@example.com
+    audience: public

@@ -182,7 +182,7 @@ class AttendanceSummaryBatchRequest(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Phase: following-interest — per-user upcoming counts used by the
+# Phase: interest-filter-following — per-user upcoming counts used by the
 # explorer's interest filter picker.
 # ---------------------------------------------------------------------------
 
@@ -525,6 +525,20 @@ class ExportStat(BaseModel):
     total_events_exported: int
 
 
+DefaultExplorerPeriod = Literal[
+    "this_weekend",
+    "next_weekend",
+    "next_7_days",
+    "next_30_days",
+    "next_3_months",
+    "next_6_months",
+    "this_season",
+    "next_season_1",
+    "next_season_2",
+    "next_season_3",
+]
+
+
 class SiteSettingsResponse(BaseModel):
     since_date: str
     sync_since_date: str
@@ -563,6 +577,7 @@ class SiteSettingsResponse(BaseModel):
     trending_top_percent: int = 100
     event_color_bar_color: str = "#64748b"
     tag_sort_mode: str = "group"  # "group" | "event_count"
+    default_explorer_period: DefaultExplorerPeriod = "next_3_months"
     # User-submitted promo codes per event (admin-moderated). When False,
     # public + user-facing promo endpoints return 404 and the event
     # section / card badge are hidden.
@@ -597,6 +612,7 @@ class SiteSettingsUpdateRequest(BaseModel):
         default=None, pattern="^#[0-9a-fA-F]{6}$"
     )
     tag_sort_mode: Optional[str] = Field(default=None, pattern="^(group|event_count)$")
+    default_explorer_period: Optional[DefaultExplorerPeriod] = None
     promo_codes_enabled: Optional[bool] = None
     organizer_claims_enabled: Optional[bool] = None
 
@@ -1386,7 +1402,7 @@ class SubscribedEventVia(BaseModel):
     kind: str  # subscription_going | subscription_saved | subscription_suggested
 
 
-class SubscribedEventItem(BaseModel):
+class SubscribedEventItem(EventResponse):
     """An event surfaced via one or more of the viewer's subscriptions.
 
     ``via`` lists every (subscribed_user, reason) pair that surfaces this
@@ -1394,17 +1410,6 @@ class SubscribedEventItem(BaseModel):
     @bob" attribution and for the per-subscription chip filter.
     """
 
-    event_id: str
-    calendar_id: str
-    title: str
-    description: Optional[str] = None
-    location: Optional[str] = None
-    start: datetime
-    end: datetime
-    all_day: bool = False
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    color: Optional[str] = None
     via: list[SubscribedEventVia]
 
 

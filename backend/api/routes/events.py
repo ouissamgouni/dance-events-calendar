@@ -513,7 +513,7 @@ def get_events(
             CachedEvent.longitude <= max_lng,
         )
 
-    # Interest filter (Phase: following-interest): restrict to events the
+    # Interest filter (Phase: interest-filter-following): restrict to events the
     # viewer's followees / friends are going to or have saved. Per-row
     # ``_audience_passes`` enforces share_audience independently, so
     # broadening to one-way followees never leaks friends-only activity.

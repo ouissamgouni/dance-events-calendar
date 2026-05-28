@@ -313,6 +313,12 @@ class UserSavedEvent(SQLModel, table=True):
     __table_args__ = (
         UniqueConstraint("device_id", "event_id"),
         Index("ix_user_saved_events_event_saved_at", "event_id", "saved_at"),
+        Index(
+            "ix_user_saved_events_user_audience_event",
+            "user_id",
+            "audience",
+            "event_id",
+        ),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -768,6 +774,12 @@ class UserEventAttendance(SQLModel, table=True):
             unique=True,
             postgresql_where=text("user_id IS NOT NULL"),
             sqlite_where=text("user_id IS NOT NULL"),
+        ),
+        Index(
+            "ix_user_event_attendances_user_audience_event",
+            "user_id",
+            "share_audience",
+            "event_id",
         ),
     )
 

@@ -1,4 +1,4 @@
-# Pre-seeded follow graph for the friends-events scenario.
+# Pre-seeded follow graph for the interest-filter-friends scenario.
 #
 # Resulting graph:
 #   alice <-> bob          (mutual = "friends" — primary filter pair)

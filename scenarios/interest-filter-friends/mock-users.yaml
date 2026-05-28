@@ -1,4 +1,4 @@
-# Mock users pre-seeded for the friends-events scenario.
+# Mock users pre-seeded for the interest-filter-friends scenario.
 #
 # Same shape as friends-graph but focused on the explorer friend filter:
 # - Alice & Bob become mutual (friends) — primary filter pair

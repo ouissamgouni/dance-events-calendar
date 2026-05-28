@@ -6,7 +6,17 @@ from pathlib import Path
 
 from sqlmodel import SQLModel, Session, create_engine, select
 
-from backend.db.models import CalendarSubscription, Tag, TagGroup, User
+from backend.db.models import (
+    CalendarSubscription,
+    CachedEvent,
+    EventTag,
+    EventView,
+    Tag,
+    TagGroup,
+    User,
+    UserEventAttendance,
+    UserSavedEvent,
+)
 from backend.db.seed import DatabaseSeeder, resolve_relative_dt
 from backend.db import seed as seed_module
 
@@ -181,6 +191,7 @@ class TestDatabaseSeeder:
             "  - email: curator@example.com\n"
             "    name: Curator\n"
             "    handle: curator\n"
+            "    avatar_url: https://example.com/avatar-curator.jpg\n"
             "    is_admin_managed: true\n"
             "    show_in_suggestions: false\n"
             "    share_attendance_default_audience: private\n"
@@ -200,6 +211,7 @@ class TestDatabaseSeeder:
             ).first()
 
         assert user is not None
+        assert user.avatar_url == "https://example.com/avatar-curator.jpg"
         assert user.is_admin_managed is True
         assert user.show_in_suggestions is False
         assert user.share_attendance_default is True
@@ -245,6 +257,48 @@ class TestDatabaseSeeder:
 
         assert sub is not None
         assert sub.notify_new_events is True
+
+    def test_seed_generated_events_fixture(self, tmp_path, monkeypatch):
+        scenario_dir = tmp_path / "generated"
+        scenario_dir.mkdir(parents=True)
+        (scenario_dir / "calendars.yaml").write_text(
+            "calendars:\n"
+            "  - id: salsa-cal-001\n"
+            "    name: Movida\n"
+            "  - id: bachata-cal-002\n"
+            "    name: Bachata Events\n"
+        )
+        (scenario_dir / "generated-events.yaml").write_text(
+            "generated_events:\n"
+            "  id_prefix: test-perf\n"
+            "  count: 12\n"
+            "  start_week: -1\n"
+            "  weeks: 4\n"
+            "  calendar_ids: [salsa-cal-001, bachata-cal-002]\n"
+            "  views_per_event: 2\n"
+            "  saves_per_event: 1\n"
+            "  attendances_per_event: 1\n"
+        )
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            DatabaseSeeder(session).seed(scenario_dir)
+
+            events = session.exec(select(CachedEvent)).all()
+            event_tags = session.exec(select(EventTag)).all()
+            views = session.exec(select(EventView)).all()
+            saves = session.exec(select(UserSavedEvent)).all()
+            attendances = session.exec(select(UserEventAttendance)).all()
+
+        assert len(events) == 12
+        assert len(event_tags) == 72
+        assert len(views) == 24
+        assert len(saves) == 12
+        assert len(attendances) == 12
 
     def test_all_scenarios_have_tag_and_user_coverage(self):
         import yaml
