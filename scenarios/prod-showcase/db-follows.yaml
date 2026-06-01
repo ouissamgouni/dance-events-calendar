@@ -1,0 +1,44 @@
+follows:
+  - follower: viewer@example.com
+    followee: showcase-dancer-01@example.com
+  - follower: showcase-dancer-01@example.com
+    followee: viewer@example.com
+  - follower: viewer@example.com
+    followee: showcase-dancer-02@example.com
+  - follower: showcase-dancer-02@example.com
+    followee: viewer@example.com
+  - follower: viewer@example.com
+    followee: showcase-dancer-03@example.com
+  - follower: showcase-dancer-03@example.com
+    followee: viewer@example.com
+  - follower: viewer@example.com
+    followee: showcase-dancer-04@example.com
+  - follower: showcase-dancer-04@example.com
+    followee: viewer@example.com
+  - follower: viewer@example.com
+    followee: showcase-dancer-05@example.com
+  - follower: showcase-dancer-05@example.com
+    followee: viewer@example.com
+  - follower: showcase-dancer-06@example.com
+    followee: viewer@example.com
+  - follower: viewer@example.com
+    followee: showcase-dancer-07@example.com
+    status: pending
+  - follower: curator-showcase@example.com
+    followee: organizer-one@example.com
+  - follower: curator-showcase@example.com
+    followee: organizer-two@example.com
+  - follower: showcase-dancer-01@example.com
+    followee: organizer-one@example.com
+  - follower: showcase-dancer-02@example.com
+    followee: organizer-one@example.com
+  - follower: showcase-dancer-03@example.com
+    followee: organizer-two@example.com
+  - follower: showcase-dancer-04@example.com
+    followee: organizer-two@example.com
+  - follower: showcase-dancer-08@example.com
+    followee: showcase-dancer-09@example.com
+  - follower: showcase-dancer-09@example.com
+    followee: showcase-dancer-08@example.com
+  - follower: showcase-dancer-10@example.com
+    followee: showcase-dancer-11@example.com

@@ -1,0 +1,28 @@
+promo_codes:
+- event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+  submitter_email: promo-scout@example.com
+  code: Sanja
+  description: Production discount code, seeded with a fake submitter for showcase.
+  expires_at: '2030-06-30T00:00:00'
+  status: approved
+- event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+  submitter_email: promo-scout@example.com
+  code: Sanja
+  description: Production discount code, seeded with a fake submitter for showcase.
+  status: approved
+- event_id: chhjacpp71gj8bb660rm4b9kc4s6cb9pckom6bb3ccs3ep9m6kpm4opo70
+  submitter_email: promo-scout@example.com
+  code: SARAWRAVER26
+  description: Discount on pass and venue hotel accommodation.
+  source_url: https://www.goandance.com/en/event/8717/salsarave-2026?promoter=SARAWRAVER26
+  status: approved
+- event_id: cpgj8dr475j30b9ocgq66b9k6pi34b9o6krj4bb360oj8ohk74pm4dpo6s
+  submitter_email: promo-scout@example.com
+  code: Sanja1
+  description: Production discount code valid on passes, seeded with a fake submitter.
+  status: approved
+- event_id: 71h68e3370pjab9lcos66b9kchj6cb9o64qmab9ocoo64c9lckoj6dhlc4
+  submitter_email: promo-scout@example.com
+  code: PENDINGDEMO
+  description: Pending showcase code for admin review flow.
+  status: pending

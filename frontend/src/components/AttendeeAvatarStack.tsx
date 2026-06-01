@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAttendanceSummary } from '../context/AttendanceSummariesContext';
 import { useAuth } from '../context/AuthContext';
 import type { Attendee, FriendMini } from '../types';
@@ -76,11 +76,12 @@ function PeopleIcon() {
  * friends are rendered first with a blue ring; the rest of the slots
  * are filled with public attendees (deduplicated against friends).
  *
- * Anonymous viewers without a friends preview render nothing (the
- * count chip on the CTA already conveys signal).
+ * Anonymous viewers see only aggregate social proof, with identities
+ * gated behind sign-in.
  */
 export default function AttendeeAvatarStack({ eventId, max = 5, friendsPreview }: Props) {
     const { user } = useAuth();
+    const location = useLocation();
     const summary = useAttendanceSummary(eventId);
 
     const friends = friendsPreview ?? [];
@@ -96,10 +97,28 @@ export default function AttendeeAvatarStack({ eventId, max = 5, friendsPreview }
     const shown = combined.slice(0, max);
 
     if (shown.length === 0) {
-        // Backwards-compat with the original signed-in-only behaviour:
-        // anonymous viewers see nothing, and signed-in viewers see
-        // nothing when there are no faces to show.
-        if (!user) return null;
+        if (!user) {
+            const totalGoing = summary?.total_going ?? 0;
+            if (totalGoing === 0) return null;
+            const goingCopy = totalGoing === 1 ? '1 is going' : `${totalGoing} are going`;
+            const next = encodeURIComponent(location.pathname + location.search);
+            return (
+                <span
+                    className="inline-flex items-center gap-1 text-[11px] text-slate-500"
+                    data-testid="anonymous-attendee-prompt"
+                >
+                    <span>{goingCopy}</span>
+                    <Link
+                        to={`/login?next=${next}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-blue-600 hover:underline"
+                    >
+                        Sign in
+                    </Link>
+                    <span>to see who</span>
+                </span>
+            );
+        }
         if (!summary || summary.total_going === 0) return null;
         return null;
     }

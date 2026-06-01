@@ -17,7 +17,7 @@ from backend.db.models import (
     UserEventAttendance,
     UserSavedEvent,
 )
-from backend.db.seed import DatabaseSeeder, resolve_relative_dt
+from backend.db.seed import DatabaseSeeder, _seed_device_id, resolve_relative_dt
 from backend.db import seed as seed_module
 
 
@@ -104,6 +104,15 @@ class TestResolveRelativeDt:
 
 @pytest.mark.unit
 class TestDatabaseSeeder:
+    def test_seed_device_id_stays_within_column_limit(self):
+        event_id = "6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74"
+        identity = "viewer@example.com"
+
+        device_id = _seed_device_id("seed-attend", event_id, identity)
+
+        assert len(device_id) <= 64
+        assert device_id == _seed_device_id("seed-attend", event_id, identity)
+
     def test_seed_default_scenario_path_exists(self):
         from backend.db.seed import SCENARIOS_DIR
 

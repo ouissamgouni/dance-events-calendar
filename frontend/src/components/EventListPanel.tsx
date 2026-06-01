@@ -291,30 +291,34 @@ export function EventListCard({
                             <TagBadges tags={event.tags} maxVisible={3} />
                         </div>
                     )}
-                    <div className="mt-1 flex items-center gap-2">
-                        <AttendeeAvatarStack
-                            eventId={event.event_id}
-                            friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
-                        />
-                        {event.has_active_promo_codes && (
-                            <img
-                                src="/promo-code.png"
-                                alt=""
-                                aria-hidden="true"
-                                title="Has promo codes"
-                                className="w-4 h-4 object-contain"
-                                data-testid="event-card-promo-icon"
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <div className="min-w-0 flex-1">
+                            <AttendeeAvatarStack
+                                eventId={event.event_id}
+                                friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
                             />
-                        )}
-                        {showPopularity && (
-                            <PopularityBadge
-                                score={event.popularity_score ?? 0}
-                                allScores={allViewCounts}
-                                threshold={popularityThreshold}
-                                topN={trendingTopN}
-                                topPercent={trendingTopPercent}
-                            />
-                        )}
+                        </div>
+                        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                            {event.has_active_promo_codes && (
+                                <img
+                                    src="/promo-code.png"
+                                    alt=""
+                                    aria-hidden="true"
+                                    title="Has promo codes"
+                                    className="w-4 h-4 object-contain"
+                                    data-testid="event-card-promo-icon"
+                                />
+                            )}
+                            {showPopularity && (
+                                <PopularityBadge
+                                    score={event.popularity_score ?? 0}
+                                    allScores={allViewCounts}
+                                    threshold={popularityThreshold}
+                                    topN={trendingTopN}
+                                    topPercent={trendingTopPercent}
+                                />
+                            )}
+                        </div>
                     </div>
                     <div className={`event-card-actions absolute top-0 right-0 flex items-center gap-1.5${coachMark ? ' animate-pulse' : ''}`}>
                         <ActionCountCluster eventId={event.event_id} showRatings={!!showRatings} isSavedFlag={isSavedFlag} />
