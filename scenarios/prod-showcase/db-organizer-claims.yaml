@@ -1,0 +1,29 @@
+organizer_claims:
+- submitter_email: organizer-one@example.com
+  kind: badge
+  grant_badge: true
+  status: approved
+  admin_notes: Fake showcase organizer.
+- submitter_email: organizer-one@example.com
+  kind: events
+  status: approved
+  admin_notes: Showcase attribution for production-derived events.
+  events:
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    decision: approved
+  - event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
+    decision: approved
+- submitter_email: organizer-two@example.com
+  kind: badge
+  grant_badge: true
+  status: approved
+  admin_notes: Fake showcase organizer.
+- submitter_email: organizer-two@example.com
+  kind: events
+  status: approved
+  admin_notes: Showcase attribution for production-derived events.
+  events:
+  - event_id: chhjacpp71gj8bb660rm4b9kc4s6cb9pckom6bb3ccs3ep9m6kpm4opo70
+    decision: approved
+  - event_id: 71h68e3370pjab9lcos66b9kchj6cb9o64qmab9ocoo64c9lckoj6dhlc4
+    decision: approved

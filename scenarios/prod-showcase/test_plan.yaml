@@ -1,0 +1,74 @@
+test_plan:
+  name: "Production Showcase — demo walkthrough"
+  description: |
+    Demo production-derived events, production tags, promo-code badges, fake
+    social graph, fake curator activity, and fake organizer attribution without
+    seeding production users.
+
+    Personas: sign in as Lina Showcase (@lina) for the mixed friends graph,
+    open @movida-picks for curator activity, and open @sea-sun-salsa /
+    @rave-republic for verified organizer profiles.
+
+  steps:
+    - id: 1
+      title: "Production events render with tags"
+      description: |
+        Open the Explorer in the prod-showcase scenario and search/filter for
+        Rovinj, SALSARAVE, Salsa Grand, or elSol.
+      expected: |
+        Production-derived events are present with production calendar colors,
+        production tag chips, dates, locations, prices, and event links.
+      verification: "Cards and event details load without console errors."
+
+    - id: 2
+      title: "Rovinj has 25 fake attendees"
+      description: |
+        Open "Rovinj Croatian Summer Salsa Festival - CSSF 2026" and inspect
+        the Going / attendee UI.
+      expected: |
+        The event shows 25 Going rows. Attendees are fake scenario users with a
+        mix of public, friends-only, and private sharing audiences.
+      verification: "The attendee count is 25 and no production user identity appears."
+
+    - id: 3
+      title: "SALSARAVE has 10 fake attendees"
+      description: |
+        Open "SALSARAVE 2026 - 5 YEARS ANNIVERSARY" and inspect the Going /
+        attendee UI.
+      expected: |
+        The event shows 10 Going rows seeded from fake users. The promo-code
+        badge is visible because an approved code is attached to this event.
+      verification: "The attendee count is 10 and the promo-code section opens."
+
+    - id: 4
+      title: "Curator activity is visible"
+      description: |
+        Open @movida-picks, or sign in as Lina Showcase and use following /
+        interest surfaces that show curator activity.
+      expected: |
+        The fake curator has public Going / Saved activity on selected
+        production-derived events. It is marked as an admin-managed curator
+        account, not a real production user.
+      verification: "Curator profile and following surfaces show seeded fake activity."
+
+    - id: 5
+      title: "Verified organizers are attributed"
+      description: |
+        Open @sea-sun-salsa and @rave-republic, then open their attributed
+        events from the profile or event detail organizer block.
+      expected: |
+        Both fake organizers are verified. Sea Sun Salsa is attributed to
+        Rovinj and Salsa Grand; Rave Republic is attributed to SALSARAVE and
+        Grupo Alafia Halloween Costume Salsa Night.
+      verification: "Organizer profile/event links navigate correctly."
+
+    - id: 6
+      title: "Promo codes use fake submitters"
+      description: |
+        Open Rovinj, Salsa Grand, SALSARAVE, or elSol and inspect promo codes.
+        Then sign in as Dev Admin and open the admin Promo Codes panel.
+      expected: |
+        Production promo-code values are present, but submitters are fake
+        scenario accounts such as Penny Promo. The pending demo code appears
+        in the admin review flow.
+      verification: "No production user email, id, handle, or avatar is displayed."

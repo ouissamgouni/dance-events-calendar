@@ -1,4 +1,5 @@
 import json
+import hashlib
 import logging
 import re
 from datetime import date, datetime, timedelta
@@ -68,6 +69,11 @@ logger = logging.getLogger(__name__)
 
 # Top-level scenarios/ directory (project root)
 SCENARIOS_DIR = Path(__file__).parents[2] / "scenarios"
+
+
+def _seed_device_id(prefix: str, event_id: str, identity: str) -> str:
+    digest = hashlib.sha1(f"{event_id}:{identity}".encode("utf-8")).hexdigest()[:16]
+    return f"{prefix}-{digest}"
 
 
 def scenario_file_with_default(scenario_dir: Path, filename: str) -> Path:
@@ -1181,7 +1187,8 @@ class DatabaseSeeder:
                 UserEventAttendance(
                     event_id=event_id,
                     user_id=user_id,
-                    device_id=device_id or f"seed-attend-{event_id}-{email or 'anon'}",
+                    device_id=device_id
+                    or _seed_device_id("seed-attend", event_id, email or "anon"),
                     share_publicly=share_publicly,
                     share_audience=share_audience,
                 )
@@ -1253,7 +1260,9 @@ class DatabaseSeeder:
                 )
                 continue
 
-            effective_device_id = device_id or f"seed-save-{event_id}-{email or 'anon'}"
+            effective_device_id = device_id or _seed_device_id(
+                "seed-save", event_id, email or "anon"
+            )
 
             # Idempotency check on the unique (device_id, event_id) constraint.
             existing = self.session.exec(

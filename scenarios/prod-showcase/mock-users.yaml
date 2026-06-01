@@ -1,0 +1,188 @@
+users:
+- email: admin@example.com
+  name: Dev Admin
+  handle: admin
+  account_visibility: public
+- email: viewer@example.com
+  name: Lina Showcase
+  handle: lina
+  account_visibility: public
+  bio: Demo viewer with a mixed friends graph.
+  share_attendance_default: true
+  share_attendance_default_audience: friends
+- email: curator-showcase@example.com
+  name: Movida Picks
+  handle: movida-picks
+  account_visibility: public
+  is_admin_managed: true
+  managed_label: Showcase curator
+  bio: Fake curator account for demoing public Going and Saved activity.
+  share_attendance_default: true
+  share_attendance_default_audience: public
+- email: organizer-one@example.com
+  name: Sea Sun Salsa Team
+  handle: sea-sun-salsa
+  account_visibility: public
+  is_verified_organizer: true
+  bio: Fake verified organizer profile for festival-scale events.
+- email: organizer-two@example.com
+  name: Rave Republic
+  handle: rave-republic
+  account_visibility: public
+  is_verified_organizer: true
+  bio: Fake verified organizer profile for high-energy socials.
+- email: promo-scout@example.com
+  name: Penny Promo
+  handle: promo-penny
+  account_visibility: public
+  bio: Fake promo-code submitter used by the showcase scenario.
+- email: showcase-dancer-01@example.com
+  name: Maya Rivera
+  handle: dancer01
+  account_visibility: public
+  share_attendance_default: true
+  share_attendance_default_audience: public
+- email: showcase-dancer-02@example.com
+  name: Leo Martin
+  handle: dancer02
+  account_visibility: friends
+  share_attendance_default: true
+  share_attendance_default_audience: friends
+- email: showcase-dancer-03@example.com
+  name: Ines Lopez
+  handle: dancer03
+  account_visibility: private
+  share_attendance_default: true
+  share_attendance_default_audience: private
+- email: showcase-dancer-04@example.com
+  name: Noah Kim
+  handle: dancer04
+  account_visibility: public
+  share_attendance_default: true
+  share_attendance_default_audience: public
+- email: showcase-dancer-05@example.com
+  name: Zara Benali
+  handle: dancer05
+  account_visibility: friends
+  share_attendance_default: true
+  share_attendance_default_audience: friends
+- email: showcase-dancer-06@example.com
+  name: Omar Costa
+  handle: dancer06
+  account_visibility: public
+  share_attendance_default: true
+  share_attendance_default_audience: private
+- email: showcase-dancer-07@example.com
+  name: Clara Dubois
+  handle: dancer07
+  account_visibility: friends
+  share_attendance_default: true
+  share_attendance_default_audience: public
+- email: showcase-dancer-08@example.com
+  name: Jonas Meyer
+  handle: dancer08
+  account_visibility: private
+  share_attendance_default: true
+  share_attendance_default_audience: friends
+- email: showcase-dancer-09@example.com
+  name: Mina Silva
+  handle: dancer09
+  account_visibility: public
+  share_attendance_default: true
+  share_attendance_default_audience: private
+- email: showcase-dancer-10@example.com
+  name: Theo Novak
+  handle: dancer10
+  account_visibility: friends
+  share_attendance_default: true
+  share_attendance_default_audience: public
+- email: showcase-dancer-11@example.com
+  name: Ana Garcia
+  handle: dancer11
+  account_visibility: public
+  share_attendance_default: true
+  share_attendance_default_audience: friends
+- email: showcase-dancer-12@example.com
+  name: Pablo Rossi
+  handle: dancer12
+  account_visibility: friends
+  share_attendance_default: true
+  share_attendance_default_audience: private
+- email: showcase-dancer-13@example.com
+  name: Nina Khan
+  handle: dancer13
+  account_visibility: private
+  share_attendance_default: true
+  share_attendance_default_audience: public
+- email: showcase-dancer-14@example.com
+  name: Samir Ivanov
+  handle: dancer14
+  account_visibility: public
+  share_attendance_default: true
+  share_attendance_default_audience: friends
+- email: showcase-dancer-15@example.com
+  name: Elena Moreau
+  handle: dancer15
+  account_visibility: friends
+  share_attendance_default: true
+  share_attendance_default_audience: private
+- email: showcase-dancer-16@example.com
+  name: Victor Schmidt
+  handle: dancer16
+  account_visibility: public
+  share_attendance_default: true
+  share_attendance_default_audience: public
+- email: showcase-dancer-17@example.com
+  name: Sofia Torres
+  handle: dancer17
+  account_visibility: friends
+  share_attendance_default: true
+  share_attendance_default_audience: friends
+- email: showcase-dancer-18@example.com
+  name: Milan Horvat
+  handle: dancer18
+  account_visibility: private
+  share_attendance_default: true
+  share_attendance_default_audience: private
+- email: showcase-dancer-19@example.com
+  name: Rita Petrov
+  handle: dancer19
+  account_visibility: public
+  share_attendance_default: true
+  share_attendance_default_audience: public
+- email: showcase-dancer-20@example.com
+  name: Ivo Diallo
+  handle: dancer20
+  account_visibility: friends
+  share_attendance_default: true
+  share_attendance_default_audience: friends
+- email: showcase-dancer-21@example.com
+  name: Nadia Fischer
+  handle: dancer21
+  account_visibility: public
+  share_attendance_default: true
+  share_attendance_default_audience: private
+- email: showcase-dancer-22@example.com
+  name: Bruno Santos
+  handle: dancer22
+  account_visibility: friends
+  share_attendance_default: true
+  share_attendance_default_audience: public
+- email: showcase-dancer-23@example.com
+  name: Camille Laurent
+  handle: dancer23
+  account_visibility: private
+  share_attendance_default: true
+  share_attendance_default_audience: friends
+- email: showcase-dancer-24@example.com
+  name: Mateo Vega
+  handle: dancer24
+  account_visibility: public
+  share_attendance_default: true
+  share_attendance_default_audience: private
+- email: showcase-dancer-25@example.com
+  name: Leila Bauer
+  handle: dancer25
+  account_visibility: friends
+  share_attendance_default: true
+  share_attendance_default_audience: public

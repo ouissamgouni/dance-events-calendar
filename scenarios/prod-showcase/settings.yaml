@@ -1,0 +1,12 @@
+settings:
+  promo_codes_enabled: true
+  organizer_claims_enabled: true
+  following_badge_enabled: true
+  show_popularity: true
+  popularity_threshold: 1
+  trending_enabled: true
+  trending_banner_enabled: true
+  trending_window_days: 365
+  trending_floor_going: 1
+  trending_top_n: 8
+  trending_top_percent: 100
