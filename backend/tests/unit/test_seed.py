@@ -226,6 +226,42 @@ class TestDatabaseSeeder:
         assert user.share_attendance_default is True
         assert user.share_attendance_default_audience == "public"
 
+    def test_seed_existing_mock_user_backfills_missing_avatar(
+        self, tmp_path, monkeypatch
+    ):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir(parents=True)
+        users_path = scenario_dir / "mock-users.yaml"
+        users_path.write_text(
+            "users:\n"
+            "  - email: viewer@example.com\n"
+            "    name: Viewer\n"
+            "    handle: viewer\n"
+        )
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            DatabaseSeeder(session).seed(scenario_dir)
+            users_path.write_text(
+                "users:\n"
+                "  - email: viewer@example.com\n"
+                "    name: Viewer\n"
+                "    handle: viewer\n"
+                "    avatar_url: https://example.com/avatar-viewer.jpg\n"
+            )
+            DatabaseSeeder(session).seed(scenario_dir)
+
+            user = session.exec(
+                select(User).where(User.email == "viewer@example.com")
+            ).first()
+
+        assert user is not None
+        assert user.avatar_url == "https://example.com/avatar-viewer.jpg"
+
     def test_seed_approved_follows_create_calendar_subscriptions(
         self, tmp_path, monkeypatch
     ):

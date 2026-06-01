@@ -2,24 +2,27 @@ promo_codes:
 - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
   submitter_email: promo-scout@example.com
   code: Sanja
-  description: Production discount code, seeded with a fake submitter for showcase.
+  description: 'Code is 5% off, when you message me you get higher discount:)) so do it (fb: Sara Wagner)'
+  source_url: https://www.instagram.com/magicsanja?igsh=MTBmbHI4am5hZXF3dQ%3D%3D&utm_source=qr
   expires_at: '2030-06-30T00:00:00'
   status: approved
 - event_id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
   submitter_email: promo-scout@example.com
   code: Sanja
-  description: Production discount code, seeded with a fake submitter for showcase.
+  description: 'Code is 5% off, if you message me you get higher discount (fb: Sara Wagner, ig in link)'
+  source_url: https://www.instagram.com/magicsanja?utm_source=qr
   status: approved
 - event_id: chhjacpp71gj8bb660rm4b9kc4s6cb9pckom6bb3ccs3ep9m6kpm4opo70
   submitter_email: promo-scout@example.com
   code: SARAWRAVER26
-  description: Discount on pass and venue hotel accommodation.
+  description: Discount is on pass and venue hotel accommodation. Direct link with code already included below
   source_url: https://www.goandance.com/en/event/8717/salsarave-2026?promoter=SARAWRAVER26
   status: approved
 - event_id: cpgj8dr475j30b9ocgq66b9k6pi34b9o6krj4bb360oj8ohk74pm4dpo6s
   submitter_email: promo-scout@example.com
   code: Sanja1
-  description: Production discount code valid on passes, seeded with a fake submitter.
+  description: 'Code is 10% off and valid on all passes. For early birds and special offers use group name: Sanja'
+  source_url: https://www.instagram.com/magicsanja?igsh=MTBmbHI4am5hZXF3dQ%3D%3D&utm_source=qr
   status: approved
 - event_id: 71h68e3370pjab9lcos66b9kchj6cb9o64qmab9ocoo64c9lckoj6dhlc4
   submitter_email: promo-scout@example.com

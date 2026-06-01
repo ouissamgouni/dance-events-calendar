@@ -685,6 +685,11 @@ class DatabaseSeeder:
                 select(User).where(User.provider_subject == provider_subject)
             ).first()
             if existing:
+                avatar_url = entry.get("avatar_url")
+                if avatar_url and not existing.avatar_url:
+                    existing.avatar_url = avatar_url
+                    self.session.add(existing)
+                    logger.info("Updated mock user avatar: %s", email)
                 continue
             user_kwargs: dict = dict(
                 email=email,
