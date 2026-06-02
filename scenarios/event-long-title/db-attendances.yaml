@@ -1,0 +1,16 @@
+attendances:
+  - event_id: evt-lt-001
+    device_id: seed-going-lt-001-a
+    share_audience: public
+  - event_id: evt-lt-001
+    device_id: seed-going-lt-001-b
+    share_audience: public
+  - event_id: evt-lt-002
+    device_id: seed-going-lt-002-a
+    share_audience: public
+  - event_id: evt-lt-002
+    device_id: seed-going-lt-002-b
+    share_audience: public
+  - event_id: evt-lt-002
+    device_id: seed-going-lt-002-c
+    share_audience: public

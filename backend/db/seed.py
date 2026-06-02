@@ -128,9 +128,11 @@ class DatabaseSeeder:
         self._seed_generated_events(scenario_dir / "generated-events.yaml")
         # Follows must come AFTER users (FK on follower_id/followee_id).
         self._seed_follows(scenario_dir / "db-follows.yaml")
-        # Attendances must come AFTER users (FK on user_id) and after events.
+        # Attendances/saves must come AFTER users (FK on user_id) and after events.
         self._seed_attendances(scenario_dir / "db-events.yaml")
+        self._seed_attendances(scenario_dir / "db-attendances.yaml")
         self._seed_user_saved_events(scenario_dir / "db-events.yaml")
+        self._seed_user_saved_events(scenario_dir / "db-saves.yaml")
         self._seed_ratings(scenario_dir / "db-events.yaml")
         self._seed_promo_codes(scenario_dir / "db-promo-codes.yaml")
         self._seed_organizer_claims(scenario_dir / "db-organizer-claims.yaml")
@@ -1113,13 +1115,13 @@ class DatabaseSeeder:
             logger.info("Seeded %d EventExport rows", exports_count)
 
     def _seed_attendances(self, path: Path) -> None:
-        """Pre-seed UserEventAttendance rows from db-events.yaml.
+        """Pre-seed UserEventAttendance rows from db-events.yaml or db-attendances.yaml.
 
         Lets scenarios test "Who's going" UI states (e.g. large attendee
         lists, mixed public/private breakdowns) without driving the UI.
         Idempotent: existing (event_id, user_id, device_id) rows are skipped.
 
-        Expected structure (under db-events.yaml):
+        Expected structure:
           attendances:
             - event_id: evt-share-003
               email: alice@example.com   # required if no device_id
@@ -1203,14 +1205,14 @@ class DatabaseSeeder:
             logger.info("Seeded %d UserEventAttendance rows", seeded)
 
     def _seed_user_saved_events(self, path: Path) -> None:
-        """Pre-seed ``UserSavedEvent`` rows from db-events.yaml ``saves:`` list.
+        """Pre-seed ``UserSavedEvent`` rows from db-events.yaml or db-saves.yaml.
 
         Lets scenarios test the trending / popularity score and the
         Following-badge "soft saved" fallback without driving the UI.
         Idempotent on ``(device_id, event_id)`` (the table's unique
         constraint).
 
-        Expected structure (under db-events.yaml)::
+        Expected structure::
 
             saves:
               - event_id: evt-trend-001

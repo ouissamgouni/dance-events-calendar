@@ -1,0 +1,60 @@
+saves:
+  # evt-trend-001 (3 saves)
+  - event_id: evt-trend-001
+    email: eve@example.com
+    audience: friends
+  - event_id: evt-trend-001
+    device_id: seed-trend-anon-1
+    audience: friends
+  - event_id: evt-trend-001
+    device_id: seed-trend-anon-2
+    audience: friends
+  # evt-trend-002 (5 saves — the "saved-heavy" event)
+  - event_id: evt-trend-002
+    email: carol@example.com
+    audience: friends
+  - event_id: evt-trend-002
+    email: dave@example.com
+    audience: friends
+  - event_id: evt-trend-002
+    email: eve@example.com
+    audience: friends
+  - event_id: evt-trend-002
+    device_id: seed-trend-anon-3
+    audience: friends
+  - event_id: evt-trend-002
+    device_id: seed-trend-anon-4
+    audience: friends
+  # evt-trend-005 (2 saves on past event)
+  - event_id: evt-trend-005
+    email: dave@example.com
+    audience: friends
+  - event_id: evt-trend-005
+    email: eve@example.com
+    audience: friends
+
+  # --- Spread events: one save each, secondary signal only. ---
+  - event_id: evt-trend-010
+    email: alice@example.com
+    audience: friends
+  - event_id: evt-trend-011
+    email: bob@example.com
+    audience: friends
+  - event_id: evt-trend-012
+    email: carol@example.com
+    audience: friends
+  - event_id: evt-trend-013
+    email: dave@example.com
+    audience: friends
+  - event_id: evt-trend-016
+    email: eve@example.com
+    audience: friends
+  - event_id: evt-trend-019
+    email: alice@example.com
+    audience: friends
+  - event_id: evt-trend-020
+    email: bob@example.com
+    audience: friends
+  - event_id: evt-trend-022
+    email: carol@example.com
+    audience: friends

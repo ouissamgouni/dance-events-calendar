@@ -1,0 +1,13 @@
+attendances:
+  - event_id: evt-merge-001
+    email: old-curator@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-merge-002
+    email: old-curator@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-merge-002
+    email: new-curator@example.com
+    share_publicly: true
+    share_audience: public

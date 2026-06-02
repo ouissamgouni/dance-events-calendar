@@ -1,0 +1,70 @@
+attendances:
+  # --- original minimal events ---
+  - event_id: evt-fb-001
+    email: alice@example.com
+    share_publicly: true
+  - event_id: evt-fb-003
+    email: carol@example.com
+    share_publicly: true
+
+  # --- evt-fb-100 (Madrid hero): 5 friends going, 6 followed-not-
+  #     friends going (public), 10 strangers going (public) ---
+  - { event_id: evt-fb-100, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-fb-100, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-fb-100, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-fb-100, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-fb-100, email: hugo@example.com, share_publicly: true }
+  - { event_id: evt-fb-100, email: pablo@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: quinn@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: rita@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: samir@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: tara@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: ulysses@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: s01@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: s02@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: s03@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: s04@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: s05@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: s06@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: s07@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: s08@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: s09@example.com, share_audience: public }
+  - { event_id: evt-fb-100, email: s10@example.com, share_audience: public }
+
+  # --- evt-fb-101 (Amsterdam): 3 friends going public + 2 strangers ---
+  - { event_id: evt-fb-101, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-fb-101, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-fb-101, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-fb-101, email: s01@example.com, share_audience: public }
+  - { event_id: evt-fb-101, email: s02@example.com, share_audience: public }
+
+  # --- evt-fb-102 (Rome): 2 friends going public ---
+  - { event_id: evt-fb-102, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-fb-102, email: hugo@example.com, share_publicly: true }
+
+  # --- evt-fb-103 (Prague): 1 friend going + 4 strangers ---
+  - { event_id: evt-fb-103, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-fb-103, email: s03@example.com, share_audience: public }
+  - { event_id: evt-fb-103, email: s04@example.com, share_audience: public }
+  - { event_id: evt-fb-103, email: s05@example.com, share_audience: public }
+  - { event_id: evt-fb-103, email: s06@example.com, share_audience: public }
+
+  # --- evt-fb-104 (Vienna): only followed-not-friends (3, public) ---
+  - { event_id: evt-fb-104, email: pablo@example.com, share_audience: public }
+  - { event_id: evt-fb-104, email: quinn@example.com, share_audience: public }
+  - { event_id: evt-fb-104, email: rita@example.com, share_audience: public }
+
+  # --- evt-fb-105 (Lisbon): only strangers (5 going, public) ---
+  - { event_id: evt-fb-105, email: s06@example.com, share_audience: public }
+  - { event_id: evt-fb-105, email: s07@example.com, share_audience: public }
+  - { event_id: evt-fb-105, email: s08@example.com, share_audience: public }
+  - { event_id: evt-fb-105, email: s09@example.com, share_audience: public }
+  - { event_id: evt-fb-105, email: s10@example.com, share_audience: public }
+
+  # --- evt-fb-106 (Barcelona): 4 friends going public + 2 strangers ---
+  - { event_id: evt-fb-106, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-fb-106, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-fb-106, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-fb-106, email: hugo@example.com, share_publicly: true }
+  - { event_id: evt-fb-106, email: s01@example.com, share_audience: public }
+  - { event_id: evt-fb-106, email: s02@example.com, share_audience: public }

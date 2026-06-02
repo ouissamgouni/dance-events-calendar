@@ -1,0 +1,16 @@
+attendances:
+  - event_id: evt-fg-001
+    email: alice@example.com
+    share_publicly: true
+  - event_id: evt-fg-002
+    email: alice@example.com
+    share_publicly: true
+  - event_id: evt-fg-003
+    email: bob@example.com
+    share_publicly: true
+  - event_id: evt-fg-004
+    email: dave@example.com
+    share_publicly: true
+  - event_id: evt-fg-005
+    email: dave@example.com
+    share_publicly: true

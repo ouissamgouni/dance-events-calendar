@@ -1,0 +1,16 @@
+saves:
+  # --- Paris hero ---
+  - { event_id: evt-cluster-par-08, email: nia@example.com, audience: friends }
+  - { event_id: evt-cluster-par-08, email: omar@example.com, audience: friends }
+  - { event_id: evt-cluster-par-08, email: t01@example.com, audience: public }
+  - { event_id: evt-cluster-par-08, email: t02@example.com, audience: public }
+  - { event_id: evt-cluster-par-08, email: t03@example.com, audience: public }
+  - { event_id: evt-cluster-par-08, email: t04@example.com, audience: public }
+  - { event_id: evt-cluster-par-08, email: t05@example.com, audience: public }
+  - { event_id: evt-cluster-par-08, email: t06@example.com, audience: public }
+  - { event_id: evt-cluster-par-08, email: t07@example.com, audience: public }
+  - { event_id: evt-cluster-par-08, email: t08@example.com, audience: public }
+  - { event_id: evt-cluster-par-08, email: t09@example.com, audience: public }
+  - { event_id: evt-cluster-par-08, email: t10@example.com, audience: public }
+  # --- evt-cluster-ber-08 (Holzmarkt festival): 1 friend saving with audience=friends ---
+  - { event_id: evt-cluster-ber-08, email: nia@example.com, audience: friends }

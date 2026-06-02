@@ -1,0 +1,10 @@
+saves:
+  - { event_id: evt-ux-008, email: nia@example.com, audience: friends }
+  - { event_id: evt-ux-008, email: omar@example.com, audience: friends }
+  - { event_id: evt-ux-008, email: t01@example.com, audience: public }
+  - { event_id: evt-ux-008, email: t02@example.com, audience: public }
+  - { event_id: evt-ux-008, email: t03@example.com, audience: public }
+  - { event_id: evt-ux-011, email: t04@example.com, audience: public }
+  - { event_id: evt-ux-011, email: t05@example.com, audience: public }
+  - { event_id: evt-ux-020, email: nia@example.com, audience: friends }
+  - { event_id: evt-ux-024, email: omar@example.com, audience: friends }

@@ -262,6 +262,57 @@ class TestDatabaseSeeder:
         assert user is not None
         assert user.avatar_url == "https://example.com/avatar-viewer.jpg"
 
+    def test_seed_attendances_and_saves_from_separate_files(
+        self, tmp_path, monkeypatch
+    ):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir(parents=True)
+        (scenario_dir / "mock-users.yaml").write_text(
+            "users:\n"
+            "  - email: viewer@example.com\n"
+            "    name: Viewer\n"
+            "    handle: viewer\n"
+        )
+        (scenario_dir / "db-events.yaml").write_text(
+            "events:\n"
+            "  - id: event-1\n"
+            "    calendar_id: cal-1\n"
+            "    title: Event One\n"
+            "    start: '2026-06-01T20:00:00'\n"
+            "    end: '2026-06-01T22:00:00'\n"
+        )
+        (scenario_dir / "db-attendances.yaml").write_text(
+            "attendances:\n"
+            "  - event_id: event-1\n"
+            "    email: viewer@example.com\n"
+            "    share_publicly: true\n"
+            "    share_audience: public\n"
+        )
+        (scenario_dir / "db-saves.yaml").write_text(
+            "saves:\n"
+            "  - event_id: event-1\n"
+            "    email: viewer@example.com\n"
+            "    audience: friends\n"
+        )
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            DatabaseSeeder(session).seed(scenario_dir)
+
+            attendances = session.exec(select(UserEventAttendance)).all()
+            saves = session.exec(select(UserSavedEvent)).all()
+
+        assert len(attendances) == 1
+        assert attendances[0].event_id == "event-1"
+        assert attendances[0].share_audience == "public"
+        assert len(saves) == 1
+        assert saves[0].event_id == "event-1"
+        assert saves[0].audience == "friends"
+
     def test_seed_approved_follows_create_calendar_subscriptions(
         self, tmp_path, monkeypatch
     ):

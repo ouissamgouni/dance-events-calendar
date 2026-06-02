@@ -3,7 +3,7 @@
 # Cast mirrors the following-badge scenario so the cluster fixture
 # also exercises the friend / followed-not-friends pin overlays at
 # realistic densities. See db-follows.yaml for the relationships and
-# db-events.yaml `attendances:` / `saves:` for the per-event mix.
+# db-attendances.yaml / db-saves.yaml for the per-event mix.
 users:
   - email: alice@example.com
     name: Alice Rivera
