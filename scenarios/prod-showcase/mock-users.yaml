@@ -6,12 +6,20 @@ users:
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Dev%20Admin
   - email: viewer@example.com
     name: Dancer Showcase
-    handle: lina
+    handle: dancer
     account_visibility: public
     bio: Demo viewer with a mixed friends graph.
     share_attendance_default: true
     share_attendance_default_audience: friends
-    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Lina%20Showcase
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Dancer%20Showcase
+  - email: new@example.com
+    name: Dancer New Showcase
+    handle: dancer-new
+    account_visibility: public
+    bio: Demo viewer new.
+    share_attendance_default: true
+    share_attendance_default_audience: friends
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Dancer%20New%20Showcase
   - email: curator-showcase@example.com
     name: Movida Picks
     handle: movida-picks

@@ -113,3 +113,44 @@ async def run_sync_loop(calendar_service: BaseCalendarService) -> None:
             interval = get_sync_interval_minutes() * 60
 
         await asyncio.sleep(interval)
+
+
+def run_notification_dispatch_once() -> dict:
+    """Run one pass of user-facing notification delivery.
+
+    Generates due event reminders and sends batched activity digest emails.
+    Safe to call from the in-app loop (executor thread) or the external
+    scheduler endpoint. Each sub-task owns its own DB session/transaction
+    and never raises into the caller.
+    """
+    # Imported lazily to keep scheduler import-light and avoid any import
+    # cycle with the email/notification services.
+    from backend.services import activity_email, reminder_service
+
+    stats: dict = {}
+    try:
+        stats["reminders"] = reminder_service.run_once()
+    except Exception:
+        logger.exception("Reminder generation failed")
+        stats["reminders"] = {"error": True}
+    try:
+        stats["activity"] = activity_email.run_once()
+    except Exception:
+        logger.exception("Activity digest failed")
+        stats["activity"] = {"error": True}
+    return stats
+
+
+async def run_notification_dispatch_loop() -> None:
+    """Background loop that delivers reminders + activity digests."""
+    from backend.config.loader import get_notification_interval_minutes
+
+    loop = asyncio.get_running_loop()
+    while True:
+        interval = get_notification_interval_minutes() * 60
+        try:
+            stats = await loop.run_in_executor(None, run_notification_dispatch_once)
+            logger.info("Notification dispatch tick: %s", stats)
+        except Exception:
+            logger.exception("Notification dispatch loop iteration failed")
+        await asyncio.sleep(interval)

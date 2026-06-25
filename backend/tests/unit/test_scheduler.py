@@ -5,7 +5,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.services.scheduler import _trigger_scheduled_sync, run_sync_loop
+from backend.services.scheduler import (
+    _trigger_scheduled_sync,
+    run_notification_dispatch_once,
+    run_sync_loop,
+)
 
 
 @pytest.mark.unit
@@ -127,3 +131,37 @@ class TestScheduler:
             assert stats["skipped"] == 1
             assert stats["reason"] == "job_already_running"
             assert interval == 5 * 60
+
+    def test_notification_dispatch_merges_subtask_stats(self):
+        with (
+            patch(
+                "backend.services.reminder_service.run_once",
+                return_value={"reminders": 2, "emailed": 1, "pushed": 1},
+            ),
+            patch(
+                "backend.services.activity_email.run_once",
+                return_value={"digests": 3, "pushed": 2},
+            ),
+        ):
+            stats = run_notification_dispatch_once()
+
+        assert stats == {
+            "reminders": {"reminders": 2, "emailed": 1, "pushed": 1},
+            "activity": {"digests": 3, "pushed": 2},
+        }
+
+    def test_notification_dispatch_is_resilient_when_subtask_raises(self):
+        with (
+            patch(
+                "backend.services.reminder_service.run_once",
+                side_effect=RuntimeError("reminders blew up"),
+            ),
+            patch(
+                "backend.services.activity_email.run_once",
+                return_value={"digests": 1},
+            ),
+        ):
+            stats = run_notification_dispatch_once()
+
+        assert stats["reminders"] == {"error": True}
+        assert stats["activity"] == {"digests": 1}

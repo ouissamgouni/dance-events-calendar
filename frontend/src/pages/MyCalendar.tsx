@@ -543,7 +543,7 @@ export default function MyCalendar() {
                                     />
                                 </div>
                             </div>
-                            <div className="order-2 lg:order-2 h-[194px] lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
+                            <div className="order-2 lg:order-2 h-[194px] lg:flex-1 lg:h-[calc(100vh-220px)] lg:sticky lg:top-6">
                                 <EventMap
                                     events={mapEvents}
                                     focusedEvent={selectedEvent}

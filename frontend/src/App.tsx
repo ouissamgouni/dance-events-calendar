@@ -20,6 +20,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import SignUpBanner from './components/SignUpBanner';
 import ShareReferralBanner from './components/ShareReferralBanner';
 import FloatingMineButton from './components/FloatingMineButton';
+import InstallPrompt from './components/InstallPrompt';
 import Home from './pages/Home';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
@@ -169,6 +170,7 @@ function AppShell() {
           <StatusBar />
           <FloatingMineButton />
         </div>
+        <InstallPrompt />
       </>
     </NotificationsProvider>
   );

@@ -12,6 +12,7 @@ import {
 import type { MyRating } from '../types';
 import PreferencesSection from '../components/PreferencesSection';
 import VisibilitySection, { ProfileLinksEditor } from '../components/VisibilitySection';
+import NotificationSettings from '../components/NotificationSettings';
 import BioEditor from '../components/BioEditor';
 import NetworkPanel from '../components/NetworkPanel';
 import ReferralCard from '../components/ReferralCard';
@@ -399,6 +400,10 @@ export default function Account() {
 
             <div id="preferences" className="scroll-mt-4">
                 <PreferencesSection />
+            </div>
+
+            <div id="notifications" className="scroll-mt-4">
+                <NotificationSettings />
             </div>
 
             <div id="privacy" className="scroll-mt-4">

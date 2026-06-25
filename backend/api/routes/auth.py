@@ -627,6 +627,11 @@ def get_me(
         # Phase E (E3): see /auth/google for shape; ``None`` triggers the
         # onboarding redirect on first signed-in navigation.
         "onboarded_at": (user.onboarded_at.isoformat() if user.onboarded_at else None),
+        # Re-engagement / notification preferences (see /auth/notification-preferences).
+        "timezone": user.timezone,
+        "reminder_email_enabled": user.reminder_email_enabled,
+        "activity_email_enabled": user.activity_email_enabled,
+        "push_enabled": user.push_enabled,
     }
 
 
@@ -693,6 +698,98 @@ def update_preferences(
     session.commit()
     session.refresh(user)
     return _serialize_preferences(session, user)
+
+
+class UpdateNotificationPreferencesRequest(BaseModel):
+    """Partial update of the user's notification/email preferences.
+
+    All fields optional; omitted fields are left untouched.
+    """
+
+    timezone: Optional[str] = None
+    reminder_email_enabled: Optional[bool] = None
+    activity_email_enabled: Optional[bool] = None
+    push_enabled: Optional[bool] = None
+
+
+def _is_valid_timezone(name: str) -> bool:
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+    try:
+        ZoneInfo(name)
+        return True
+    except (ZoneInfoNotFoundError, ValueError):
+        return False
+
+
+@router.patch("/notification-preferences")
+def update_notification_preferences(
+    payload: UpdateNotificationPreferencesRequest,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+):
+    """Update reminder/activity email toggles, web-push toggle, and timezone."""
+    fields_set = payload.model_fields_set
+    if "timezone" in fields_set and payload.timezone is not None:
+        tz = payload.timezone.strip()
+        if len(tz) > 64 or not _is_valid_timezone(tz):
+            raise HTTPException(status_code=400, detail="Invalid timezone")
+        user.timezone = tz
+    if (
+        "reminder_email_enabled" in fields_set
+        and payload.reminder_email_enabled is not None
+    ):
+        user.reminder_email_enabled = payload.reminder_email_enabled
+    if (
+        "activity_email_enabled" in fields_set
+        and payload.activity_email_enabled is not None
+    ):
+        user.activity_email_enabled = payload.activity_email_enabled
+    if "push_enabled" in fields_set and payload.push_enabled is not None:
+        user.push_enabled = payload.push_enabled
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return {
+        "timezone": user.timezone,
+        "reminder_email_enabled": user.reminder_email_enabled,
+        "activity_email_enabled": user.activity_email_enabled,
+        "push_enabled": user.push_enabled,
+    }
+
+
+@router.get("/unsubscribe")
+def unsubscribe(
+    token: str = Query(...),
+    session: Session = Depends(get_session),
+):
+    """One-click email unsubscribe via a signed token (no auth required).
+
+    Flips the matching email preference off. Always returns 200 with a
+    generic result so the link can't be used to probe account existence.
+    """
+    from uuid import UUID
+
+    from backend.services.email_tokens import (
+        UNSUBSCRIBE_CATEGORIES,
+        verify_unsubscribe_token,
+    )
+
+    result = verify_unsubscribe_token(token)
+    if result is None:
+        return {"status": "invalid"}
+    user_id, category = result
+    column = UNSUBSCRIBE_CATEGORIES[category]
+    try:
+        uid = UUID(user_id)
+    except (ValueError, AttributeError):
+        return {"status": "invalid"}
+    user = session.get(User, uid)
+    if user is not None and user.deleted_at is None:
+        setattr(user, column, False)
+        session.add(user)
+        session.commit()
+    return {"status": "unsubscribed", "category": category}
 
 
 # --- Profile (display_name + handle) -----------------------------------------

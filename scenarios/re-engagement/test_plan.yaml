@@ -1,0 +1,51 @@
+test_plan:
+  name: "Re-engagement pack: reminders + activity email + PWA/web-push"
+  description: >
+    Manual validation scenario for the three adoption features: event reminders
+    (in-app + email), friend/event activity digest emails, and PWA web-push
+    enrollment and delivery.
+  preconditions:
+    - "Run with: SCENARIO=re-engagement RESET=1 task start:scenario"
+    - "Use local SMTP sink (mailpit/mailhog) on 127.0.0.1:1025"
+    - "Sign in with DEV_AUTH users: admin, alice, bob"
+  steps:
+    - id: 1
+      title: "Reminder appears in-app for Alice"
+      description: >
+        Sign in as Alice, then wait one scheduler tick (or POST
+        /api/admin/trigger-notifications as admin). Open /notifications.
+      expected: >
+        A reminder row appears for ev-remind with copy
+        "Reminder — you're going to Rooftop Salsa Social" and a Starts timestamp.
+
+    - id: 2
+      title: "Reminder email is sent"
+      description: >
+        Check mailpit/mailhog inbox for alice@example.com after the dispatch run.
+      expected: >
+        One reminder email exists with event title/time and unsubscribe footer.
+
+    - id: 3
+      title: "Activity digest email sent to Bob"
+      description: >
+        Bob follows Alice in seed data; Alice is marked Going on ev-friend.
+        Trigger notification dispatch and check bob@example.com inbox.
+      expected: >
+        Bob receives one digest email summarizing Alice's activity.
+
+    - id: 4
+      title: "Notification settings toggles + timezone update"
+      description: >
+        Open /account#notifications as Alice. Toggle Event reminders and
+        Activity emails, then click "Use my detected timezone" when shown.
+      expected: >
+        PATCH /api/auth/notification-preferences succeeds and saved state persists.
+
+    - id: 5
+      title: "PWA install prompt and push toggle"
+      description: >
+        In a push-capable browser, trigger beforeinstallprompt and confirm the
+        Install banner appears. In /account#notifications, enable Push notifications.
+      expected: >
+        /api/push/vapid-public-key + /api/push/subscribe succeed. After a
+        notification dispatch, a push notification appears and opens the target URL.
