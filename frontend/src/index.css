@@ -333,11 +333,12 @@ body {
 
   .date-range-inputs input[type="date"] {
     flex: 0 0 auto;
-    width: 8.5rem;
+    width: 7rem;
   }
 
   .date-range-presets {
     flex: 1 1 auto;
+    flex-wrap: nowrap;
     margin-top: 0;
   }
 }

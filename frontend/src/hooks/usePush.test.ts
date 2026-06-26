@@ -124,6 +124,31 @@ describe('usePush', () => {
         await waitFor(() => expect(result.current.status).toBe('on'))
     })
 
+    it('auto-subscribes silently when permission is already granted', async () => {
+        const { pushManager, requestPermissionMock } = setupPush({
+            permission: 'granted',
+            existing: null,
+        })
+        const posted = { current: null as PostedSubscriptionPayload | null }
+        server.use(
+            http.get('*/api/push/vapid-public-key', () =>
+                HttpResponse.json({ public_key: VAPID_KEY }),
+            ),
+            http.post('*/api/push/subscribe', async ({ request }) => {
+                posted.current = (await request.json()) as PostedSubscriptionPayload
+                return new HttpResponse(null, { status: 204 })
+            }),
+        )
+
+        const { result } = renderHook(() => usePush())
+        await waitFor(() => expect(result.current.status).toBe('on'))
+
+        // No permission prompt is shown — the grant already happened.
+        expect(requestPermissionMock).not.toHaveBeenCalled()
+        expect(pushManager.subscribe).toHaveBeenCalledTimes(1)
+        expect(posted.current?.endpoint).toBe('https://push.example/abc')
+    })
+
     it('enable() requests permission, subscribes, and POSTs the subscription', async () => {
         const { pushManager, requestPermissionMock } = setupPush({
             existing: null,

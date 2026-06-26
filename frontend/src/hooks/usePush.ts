@@ -35,13 +35,40 @@ const isSupported = (): boolean =>
     'PushManager' in window &&
     'Notification' in window;
 
+// Subscribe via VAPID (reusing any existing subscription) and register the
+// endpoint with the backend. Shared by silent auto-enable and the explicit
+// ``enable`` action.
+async function subscribeAndRegister(
+    reg: ServiceWorkerRegistration,
+    key: string,
+): Promise<void> {
+    const sub =
+        (await reg.pushManager.getSubscription()) ||
+        (await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(key),
+        }));
+    const json = sub.toJSON();
+    await subscribePush({
+        endpoint: sub.endpoint,
+        keys: {
+            p256dh: json.keys?.p256dh ?? '',
+            auth: json.keys?.auth ?? '',
+        },
+        user_agent: navigator.userAgent,
+    });
+}
+
 export function usePush() {
     const [status, setStatus] = useState<PushStatus>('off');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // Resolve the initial status: feature support → backend enablement →
-    // browser permission → existing subscription.
+    // browser permission → existing subscription. When permission is already
+    // granted but no subscription exists yet, silently subscribe so push is
+    // on-by-default for users who have allowed notifications — no prompt is
+    // shown because the permission grant already happened.
     useEffect(() => {
         let cancelled = false;
         (async () => {
@@ -62,7 +89,16 @@ export function usePush() {
             try {
                 const reg = await navigator.serviceWorker.ready;
                 const existing = await reg.pushManager.getSubscription();
-                if (!cancelled) setStatus(existing ? 'on' : 'off');
+                if (existing) {
+                    if (!cancelled) setStatus('on');
+                    return;
+                }
+                if (Notification.permission === 'granted') {
+                    await subscribeAndRegister(reg, key);
+                    if (!cancelled) setStatus('on');
+                    return;
+                }
+                if (!cancelled) setStatus('off');
             } catch {
                 if (!cancelled) setStatus('off');
             }
@@ -88,21 +124,7 @@ export function usePush() {
                 return;
             }
             const reg = await navigator.serviceWorker.ready;
-            const sub =
-                (await reg.pushManager.getSubscription()) ||
-                (await reg.pushManager.subscribe({
-                    userVisibleOnly: true,
-                    applicationServerKey: urlBase64ToUint8Array(key),
-                }));
-            const json = sub.toJSON();
-            await subscribePush({
-                endpoint: sub.endpoint,
-                keys: {
-                    p256dh: json.keys?.p256dh ?? '',
-                    auth: json.keys?.auth ?? '',
-                },
-                user_agent: navigator.userAgent,
-            });
+            await subscribeAndRegister(reg, key);
             setStatus('on');
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to enable notifications');

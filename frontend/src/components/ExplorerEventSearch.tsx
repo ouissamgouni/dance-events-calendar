@@ -7,6 +7,7 @@ interface ExplorerEventSearchProps {
     onSelectEvent: (eventId: string) => void;
     triggerLabel?: string;
     compact?: boolean;
+    onDark?: boolean;
     className?: string;
 }
 
@@ -49,6 +50,7 @@ export default function ExplorerEventSearch({
     onSelectEvent,
     triggerLabel = 'Search events',
     compact = false,
+    onDark = false,
     className = '',
 }: ExplorerEventSearchProps) {
     const [open, setOpen] = useState(false);
@@ -176,24 +178,15 @@ export default function ExplorerEventSearch({
                 onClick={() => setOpen((value) => !value)}
                 aria-label={triggerLabel}
                 title={triggerLabel}
-                className={compact
-                    ? 'inline-flex h-6 w-6 items-center justify-center border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition'
-                    : 'inline-flex items-center gap-1.5 border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition'}
+                className={onDark
+                    ? 'inline-flex items-center justify-center w-7 h-7 text-white hover:text-gray-200 transition'
+                    : compact
+                        ? 'inline-flex h-6 w-6 items-center justify-center border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition'
+                        : 'inline-flex items-center justify-center gap-1.5 whitespace-nowrap border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition'}
                 data-testid="explorer-event-search-trigger"
             >
-                <svg
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    className="h-4 w-4"
-                    aria-hidden="true"
-                >
-                    <path
-                        fillRule="evenodd"
-                        clipRule="evenodd"
-                        d="M9 3a6 6 0 1 0 3.873 10.59l3.768 3.768a1 1 0 0 0 1.415-1.415l-3.769-3.768A6 6 0 0 0 9 3Zm-4 6a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z"
-                    />
-                </svg>
-                {!compact && <span>{triggerLabel}</span>}
+                <img src="/search.png" alt="" aria-hidden="true" className={onDark ? 'h-4 w-4 invert' : 'h-4 w-4'} />
+                {!compact && !onDark && <span>{triggerLabel}</span>}
             </button>
             {open && (
                 <div className={panelClassName} style={panelStyle}>

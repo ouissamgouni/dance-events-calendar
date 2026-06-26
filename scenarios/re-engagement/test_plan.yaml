@@ -42,7 +42,7 @@ test_plan:
         Filter to bob@example.com.
       expected: >
         One digest email to bob@example.com listing Alice's activity.
-        Subject line: "Movida — activity update" (or similar).
+        Subject line is prefixed with "Movida:".
         Body contains the Going notification line and an unsubscribe link.
 
     - id: 4
@@ -54,10 +54,14 @@ test_plan:
         PATCH /api/auth/notification-preferences succeeds and saved state persists.
 
     - id: 5
-      title: "PWA install prompt and push toggle"
+      title: "Installed PWA push (desktop/mobile)"
       description: >
-        In a push-capable browser, trigger beforeinstallprompt and confirm the
-        Install banner appears. In /account#notifications, enable Push notifications.
+        In Chromium, install the app from the Install banner/menu, then launch
+        the installed app window (not a normal browser tab). Sign in as Alice,
+        open /account#notifications, and enable Push notifications.
+        Trigger dispatch as admin via POST /api/admin/trigger-notifications.
+        Repeat once with the browser/app closed to verify background delivery.
       expected: >
         /api/push/vapid-public-key + /api/push/subscribe succeed. After a
-        notification dispatch, a push notification appears and opens the target URL.
+        notification dispatch, a system push appears, and tapping it opens
+        the installed app to the target event/account URL.

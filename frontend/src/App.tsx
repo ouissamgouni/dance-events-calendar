@@ -1,4 +1,4 @@
-import { Routes, Route, Link, useLocation } from 'react-router-dom';
+import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { ConsentProvider } from './context/ConsentContext';
@@ -37,6 +37,7 @@ import OnboardingFollow from './pages/OnboardingFollow';
 import ReferralLanding from './pages/ReferralLanding';
 import OnboardingGate from './components/OnboardingGate';
 import UserSearchBox from './components/UserSearchBox';
+import ExplorerEventSearch from './components/ExplorerEventSearch';
 import { useConsent } from './context/ConsentContext';
 import { umamiPageView } from './utils/umami';
 
@@ -71,6 +72,7 @@ export default function App() {
 function AppShell() {
   const { analyticsConsent } = useConsent();
   const location = useLocation();
+  const navigate = useNavigate();
   const qaPinnedWidth = useQaPinnedWidth();
   const mainRef = useRef<HTMLElement | null>(null);
 
@@ -104,6 +106,12 @@ function AppShell() {
               >
                 + Submit
               </Link>
+              <ExplorerEventSearch
+                compact
+                onDark
+                onSelectEvent={(eventId) => navigate(`/event/${eventId}`)}
+                triggerLabel="Search events"
+              />
               <UserSearchBox />
               <NotificationBell />
               <HeaderUserMenu />
