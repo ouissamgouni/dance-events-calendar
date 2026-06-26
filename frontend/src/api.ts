@@ -2320,6 +2320,21 @@ export async function createShareToken(deviceId: string): Promise<{ token: strin
     return res.json();
 }
 
+/**
+ * Absolute, subscribable iCalendar feed URL for a share token. Calendar
+ * clients (Apple/Google) poll this directly, so it must be fully-qualified
+ * even when ``BASE`` is the relative ``/api`` used by the Vite dev proxy.
+ */
+export function getCalendarFeedUrl(
+    token: string,
+    scope: 'all' | 'saved' | 'going' = 'all',
+): string {
+    const base = BASE.startsWith('http')
+        ? BASE
+        : `${window.location.origin}${BASE}`;
+    return `${base}/share/calendar/${encodeURIComponent(token)}.ics?scope=${scope}`;
+}
+
 export interface SharedCalendarPayload {
     events: CalendarEvent[];
     owner_display_name: string | null;

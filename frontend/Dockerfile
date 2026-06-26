@@ -8,7 +8,7 @@ ARG VITE_UMAMI_URL=
 ARG VITE_UMAMI_WEBSITE_ID=
 
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm install -g npm@11.6.2 && npm ci
 
 COPY . .
 

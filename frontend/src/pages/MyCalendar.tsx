@@ -5,6 +5,7 @@ import {
     exportIcs,
     exportXlsx,
     createShareToken,
+    getCalendarFeedUrl,
     fetchSubscribedEvents,
     fetchMySubscriptions,
     type SubscribedUser,
@@ -51,6 +52,10 @@ export default function MyCalendar() {
     const [shareStatus, setShareStatus] = useState<'idle' | 'loading' | 'copied'>('idle');
     const [exportMenuOpen, setExportMenuOpen] = useState(false);
     const exportMenuRef = useRef<HTMLDivElement | null>(null);
+    const [exportScope, setExportScope] = useState<Filter>('all');
+    const [subscribeOpen, setSubscribeOpen] = useState(false);
+    const [feedUrl, setFeedUrl] = useState('');
+    const [feedStatus, setFeedStatus] = useState<'idle' | 'loading' | 'copied'>('idle');
     const [activeFilter, setActiveFilter] = useState<Filter>('all');
     const [showPastEvents, setShowPastEvents] = useState(false);
     const [subsEvents, setSubsEvents] = useState<CalendarEvent[]>([]);
@@ -74,6 +79,12 @@ export default function MyCalendar() {
         () => [...new Set([...savedEventIds, ...attendingEventIds])],
         [savedEventIds, attendingEventIds],
     );
+
+    const scopedEventIds = useMemo(() => {
+        if (exportScope === 'saved') return savedEventIds;
+        if (exportScope === 'going') return attendingEventIds;
+        return allEventIds;
+    }, [exportScope, savedEventIds, attendingEventIds, allEventIds]);
 
     const showFilterTabs = savedCount > 0 && attendingCount > 0;
 
@@ -149,26 +160,47 @@ export default function MyCalendar() {
     }, []);
 
     const handleExportIcs = useCallback(async () => {
-        if (allEventIds.length === 0) return;
+        if (scopedEventIds.length === 0) return;
         setExporting('ics');
         try {
-            const blob = await exportIcs(allEventIds);
+            const blob = await exportIcs(scopedEventIds);
             downloadBlob(blob, 'my-movida-events.ics');
-            trackExportAction('ics', allEventIds.length);
+            trackExportAction('ics', scopedEventIds.length);
         } catch { /* ignore */ }
         finally { setExporting(''); }
-    }, [allEventIds]);
+    }, [scopedEventIds]);
 
     const handleExportXlsx = useCallback(async () => {
-        if (allEventIds.length === 0) return;
+        if (scopedEventIds.length === 0) return;
         setExporting('xlsx');
         try {
-            const blob = await exportXlsx(allEventIds);
+            const blob = await exportXlsx(scopedEventIds);
             downloadBlob(blob, 'my-movida-events.xlsx');
-            trackExportAction('xlsx', allEventIds.length);
+            trackExportAction('xlsx', scopedEventIds.length);
         } catch { /* ignore */ }
         finally { setExporting(''); }
-    }, [allEventIds]);
+    }, [scopedEventIds]);
+
+    const handleSubscribe = useCallback(async () => {
+        setFeedStatus('loading');
+        try {
+            const { token } = await createShareToken(getDeviceId());
+            setFeedUrl(getCalendarFeedUrl(token, exportScope));
+            setFeedStatus('idle');
+            setSubscribeOpen(true);
+        } catch {
+            setFeedStatus('idle');
+        }
+    }, [exportScope]);
+
+    const handleCopyFeedUrl = useCallback(async () => {
+        if (!feedUrl) return;
+        try {
+            await navigator.clipboard.writeText(feedUrl);
+            setFeedStatus('copied');
+            setTimeout(() => setFeedStatus('idle'), 2500);
+        } catch { /* ignore */ }
+    }, [feedUrl]);
 
     const handleShare = useCallback(async () => {
         const deviceId = getDeviceId();
@@ -333,21 +365,56 @@ export default function MyCalendar() {
                                 )}
                             </button>
                             {exportMenuOpen && (
-                                <div role="menu" className="absolute left-0 top-full mt-1 w-40 bg-white border border-slate-200 shadow-lg z-[9000]">
+                                <div role="menu" className="absolute left-0 top-full mt-1 w-56 bg-white border border-slate-200 shadow-lg z-[9000]">
+                                    <div className="px-3 pt-2 pb-1.5 border-b border-slate-100">
+                                        <div className="text-[10px] font-medium uppercase tracking-wide text-slate-400 mb-1">Include</div>
+                                        <div className="inline-flex w-full overflow-hidden rounded border border-slate-200">
+                                            {([
+                                                { key: 'all' as Filter, label: 'All', count: allEventIds.length },
+                                                { key: 'saved' as Filter, label: 'Saved', count: savedCount },
+                                                { key: 'going' as Filter, label: 'Going', count: attendingCount },
+                                            ]).map((opt) => (
+                                                <button
+                                                    key={opt.key}
+                                                    type="button"
+                                                    onClick={() => setExportScope(opt.key)}
+                                                    aria-pressed={exportScope === opt.key}
+                                                    className={`flex-1 px-1.5 py-1 text-[11px] transition ${exportScope === opt.key
+                                                        ? 'bg-blue-500 text-white'
+                                                        : 'bg-white text-slate-600 hover:bg-slate-50'
+                                                        }`}
+                                                >
+                                                    {opt.label} ({opt.count})
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
                                     <button
                                         role="menuitem"
+                                        disabled={scopedEventIds.length === 0}
                                         onClick={() => { setExportMenuOpen(false); handleExportIcs(); }}
-                                        className="block w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 transition"
+                                        className="block w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 transition disabled:opacity-40"
                                     >
                                         📅 Export .ics
                                     </button>
                                     <button
                                         role="menuitem"
+                                        disabled={scopedEventIds.length === 0}
                                         onClick={() => { setExportMenuOpen(false); handleExportXlsx(); }}
-                                        className="block w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 transition"
+                                        className="block w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 transition disabled:opacity-40"
                                     >
                                         📊 Export .xlsx
                                     </button>
+                                    {user && (
+                                        <button
+                                            role="menuitem"
+                                            disabled={feedStatus === 'loading'}
+                                            onClick={() => { setExportMenuOpen(false); handleSubscribe(); }}
+                                            className="block w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 transition border-t border-slate-100 disabled:opacity-40"
+                                        >
+                                            📲 Subscribe in calendar app
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -572,6 +639,71 @@ export default function MyCalendar() {
                         event={selectedEvent}
                         onClose={() => setSelectedEvent(null)}
                     />
+                )}
+
+                {subscribeOpen && (
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Subscribe in your calendar app"
+                        className="fixed inset-0 z-[9500] flex items-center justify-center bg-black/40 p-4"
+                        onClick={() => setSubscribeOpen(false)}
+                    >
+                        <div
+                            className="w-full max-w-md bg-white shadow-xl"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                                <h2 className="text-sm font-semibold text-slate-800">Subscribe in your calendar app</h2>
+                                <button
+                                    onClick={() => setSubscribeOpen(false)}
+                                    aria-label="Close"
+                                    className="text-slate-400 hover:text-slate-600"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                            <div className="px-4 py-3 space-y-3">
+                                <p className="text-xs text-slate-500">
+                                    Your {exportScope === 'all' ? 'saved & going' : exportScope} events stay in sync in Apple
+                                    or Google Calendar. The feed updates automatically when you save or join events.
+                                </p>
+                                <div className="flex items-stretch gap-1.5">
+                                    <input
+                                        readOnly
+                                        value={feedUrl}
+                                        onFocus={(e) => e.currentTarget.select()}
+                                        className="min-w-0 flex-1 border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-700"
+                                    />
+                                    <button
+                                        onClick={handleCopyFeedUrl}
+                                        className="shrink-0 bg-blue-500 px-3 py-1.5 text-xs text-white hover:bg-blue-600 transition"
+                                    >
+                                        {feedStatus === 'copied' ? '✓ Copied' : 'Copy'}
+                                    </button>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                    <a
+                                        href={feedUrl.replace(/^https?:/, 'webcal:')}
+                                        className="inline-flex items-center gap-1 border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 hover:bg-slate-50 transition"
+                                    >
+                                        🍎 Add to Apple Calendar
+                                    </a>
+                                    <a
+                                        href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(feedUrl)}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 hover:bg-slate-50 transition"
+                                    >
+                                        📆 Add to Google Calendar
+                                    </a>
+                                </div>
+                                <p className="text-[11px] text-slate-400">
+                                    Anyone with this link can see these events. Keep it private.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                 )}
             </main>
         </div>

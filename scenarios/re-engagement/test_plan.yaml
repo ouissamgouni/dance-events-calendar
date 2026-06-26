@@ -5,9 +5,14 @@ test_plan:
     (in-app + email), friend/event activity digest emails, and PWA web-push
     enrollment and delivery.
   preconditions:
-    - "Run with: SCENARIO=re-engagement RESET=1 task start:scenario"
-    - "Use local SMTP sink (mailpit/mailhog) on 127.0.0.1:1025"
-    - "Sign in with DEV_AUTH users: admin, alice, bob"
+    - "Start Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`"
+    - "Run the scenario: `SCENARIO=re-engagement RESET=1 task start:scenario`"
+    - "Open the Mailpit inbox UI at http://127.0.0.1:8025 and clear any existing messages."
+    - >-
+      The scenario config sets SMTP_HOST=127.0.0.1, SMTP_PORT=1025,
+      NOTIFICATION_SCHEDULER_ENABLED=true, NOTIFICATION_INTERVAL_MINUTES=1,
+      REMINDERS_ENABLED=true, REMINDER_LEAD_HOURS=240, ACTIVITY_EMAIL_ENABLED=true.
+    - "Sign in with DEV_AUTH users: admin (admin@example.com), alice, bob."
   steps:
     - id: 1
       title: "Reminder appears in-app for Alice"
@@ -19,19 +24,26 @@ test_plan:
         "Reminder — you're going to Rooftop Salsa Social" and a Starts timestamp.
 
     - id: 2
-      title: "Reminder email is sent"
+      title: "Reminder email is sent to Alice"
       description: >
-        Check mailpit/mailhog inbox for alice@example.com after the dispatch run.
+        Wait one scheduler tick (≤ 1 min) or trigger manually:
+        sign in as admin@example.com and POST /api/admin/trigger-notifications
+        (or use the API explorer). Then open Mailpit at http://127.0.0.1:8025.
       expected: >
-        One reminder email exists with event title/time and unsubscribe footer.
+        One email to alice@example.com with subject containing "Rooftop Salsa Social".
+        Body includes event date/time in alice's timezone and an unsubscribe link
+        ending in /api/auth/unsubscribe?token=…
 
     - id: 3
       title: "Activity digest email sent to Bob"
       description: >
-        Bob follows Alice in seed data; Alice is marked Going on ev-friend.
-        Trigger notification dispatch and check bob@example.com inbox.
+        Alice is pre-seeded Going on ev-friend and Bob follows Alice.
+        After the dispatch run, open Mailpit at http://127.0.0.1:8025.
+        Filter to bob@example.com.
       expected: >
-        Bob receives one digest email summarizing Alice's activity.
+        One digest email to bob@example.com listing Alice's activity.
+        Subject line: "Movida — activity update" (or similar).
+        Body contains the Going notification line and an unsubscribe link.
 
     - id: 4
       title: "Notification settings toggles + timezone update"

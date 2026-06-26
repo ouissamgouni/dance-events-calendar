@@ -10,6 +10,7 @@ from sqlmodel import Session, select
 from backend.api.schemas import ExportRequest
 from backend.db.database import get_session
 from backend.db.models import CachedEvent
+from backend.services.ics import build_ics, ics_escape
 
 router = APIRouter(prefix="/api/events/export", tags=["export"])
 
@@ -32,41 +33,12 @@ def _fetch_events(session: Session, event_ids: list[str]) -> list[CachedEvent]:
 
 def _build_ics(events: list[CachedEvent]) -> str:
     """Build an iCalendar string from a list of events."""
-    lines = [
-        "BEGIN:VCALENDAR",
-        "VERSION:2.0",
-        "PRODID:-//Movida//EN",
-        "CALSCALE:GREGORIAN",
-        "METHOD:PUBLISH",
-    ]
-    for e in events:
-        lines.append("BEGIN:VEVENT")
-        lines.append(f"UID:{e.event_id}@movida")
-        if e.all_day:
-            lines.append(f"DTSTART;VALUE=DATE:{e.start.strftime('%Y%m%d')}")
-            lines.append(f"DTEND;VALUE=DATE:{e.end.strftime('%Y%m%d')}")
-        else:
-            lines.append(f"DTSTART:{e.start.strftime('%Y%m%dT%H%M%SZ')}")
-            lines.append(f"DTEND:{e.end.strftime('%Y%m%dT%H%M%SZ')}")
-        lines.append(f"SUMMARY:{_ics_escape(e.title)}")
-        if e.location:
-            lines.append(f"LOCATION:{_ics_escape(e.location)}")
-        if e.description:
-            lines.append(f"DESCRIPTION:{_ics_escape(e.description)}")
-        lines.append("END:VEVENT")
-    lines.append("END:VCALENDAR")
-    return "\r\n".join(lines)
+    return build_ics(events)
 
 
 def _ics_escape(text: str) -> str:
     """Escape special characters for iCalendar text values."""
-    return (
-        text.replace("\\", "\\\\")
-        .replace(";", "\\;")
-        .replace(",", "\\,")
-        .replace("\n", "\\n")
-        .replace("\r", "")
-    )
+    return ics_escape(text)
 
 
 @router.post("/ics")

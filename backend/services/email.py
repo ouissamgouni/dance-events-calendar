@@ -8,6 +8,13 @@ from backend.config.loader import get_public_app_url, get_smtp_config
 from backend.services.email_tokens import make_unsubscribe_token
 
 logger = logging.getLogger(__name__)
+APP_NAME = "Movida"
+
+
+def _prefixed_subject(subject: str) -> str:
+    if subject.strip().lower().startswith(APP_NAME.lower()):
+        return subject
+    return f"{APP_NAME}: {subject}"
 
 
 def _send_email(to_addr: str, subject: str, html: str, kind: str) -> bool:
@@ -22,15 +29,18 @@ def _send_email(to_addr: str, subject: str, html: str, kind: str) -> bool:
         return False
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
+    msg["Subject"] = _prefixed_subject(subject)
     msg["From"] = config["from_addr"]
     msg["To"] = to_addr
     msg.attach(MIMEText(html, "html"))
 
     try:
         with smtplib.SMTP(config["host"], config["port"], timeout=10) as server:
-            server.starttls()
-            if config["user"] and config["password"]:
+            server.ehlo()
+            if server.has_extn("starttls"):
+                server.starttls()
+                server.ehlo()
+            if config["user"] and config["password"] and server.has_extn("auth"):
                 server.login(config["user"], config["password"])
             server.send_message(msg)
         logger.info("%s email sent to %s", kind, to_addr)
@@ -51,7 +61,7 @@ def _email_shell(heading: str, body_html: str, footer_html: str = "") -> str:
     return f"""
     <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
                 max-width:560px;margin:0 auto;color:#111827">
-      <h2 style="color:#e11d48;margin:0 0 16px">{heading}</h2>
+            <h2 style="color:#3b82f6;margin:0 0 16px">{heading}</h2>
       {body_html}
       {footer}
     </div>
@@ -168,8 +178,8 @@ def send_event_reminder_email(user, event, when_label: str) -> bool:
     {f'<p style="color:#374151;margin:4px 0">📍 {location}</p>' if location else ""}
     <p style="margin:20px 0">
       <a href="{event_url}"
-         style="background:#e11d48;color:#fff;text-decoration:none;
-                padding:10px 18px;border-radius:8px;display:inline-block">
+                 style="background:#3b82f6;color:#fff;text-decoration:none;
+                                padding:10px 18px;display:inline-block">
         View event
       </a>
     </p>
@@ -202,8 +212,8 @@ def send_activity_digest_email(user, lines: list[str]) -> bool:
     <ul style="padding-left:18px;margin:12px 0">{items}</ul>
     <p style="margin:20px 0">
       <a href="{app}/account#notifications"
-         style="background:#e11d48;color:#fff;text-decoration:none;
-                padding:10px 18px;border-radius:8px;display:inline-block">
+                 style="background:#3b82f6;color:#fff;text-decoration:none;
+                                padding:10px 18px;display:inline-block">
         Open Movida
       </a>
     </p>

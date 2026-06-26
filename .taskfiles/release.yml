@@ -21,7 +21,6 @@ version: "3"
 # ════════════════════════════════════════════════════════════════════════════
 
 tasks:
-
   # ──────────────────────────────────────────────────────────────────────────
   # Internal: suggest next version for a component
   # ──────────────────────────────────────────────────────────────────────────
@@ -63,12 +62,17 @@ tasks:
     vars:
       COMPONENT: "{{.COMPONENT}}"
       VERSION: "{{.VERSION}}"
-      BUMP: "{{.BUMP | default \"patch\"}}"
+      BUMP: '{{.BUMP | default "patch"}}'
     cmds:
       - |
         set -e
         COMPONENT="{{.COMPONENT}}"
         VERSION="{{.VERSION}}"
+        # Forward a Task-var SKIP_CI_CHECK to the deploy subprocess as an env
+        # var (the gate lives in deploy:_prepare-ref-prod). Don't clobber an
+        # already-inherited env value (SKIP_CI_CHECK=1 task release:...).
+        TASK_SKIP="{{.SKIP_CI_CHECK | default ""}}"
+        [ -n "$TASK_SKIP" ] && export SKIP_CI_CHECK="$TASK_SKIP"
         if [ -z "$VERSION" ]; then
           git fetch origin main --tags --quiet 2>/dev/null || true
           LATEST=$(git tag -l "${COMPONENT}-v*" --sort=-version:refname | head -1)
@@ -138,34 +142,39 @@ tasks:
   # ──────────────────────────────────────────────────────────────────────────
 
   prod:db:
-    desc: "Tag db-vX.Y.Z + run prod DB migrations. Without VERSION, suggests next
+    desc:
+      "Tag db-vX.Y.Z + run prod DB migrations. Without VERSION, suggests next
       patch."
     vars:
       VERSION: "{{if .VERSION}}{{.VERSION}}{{else}}{{.CLI_ARGS}}{{end}}"
-      BUMP: "{{.BUMP | default \"patch\"}}"
+      BUMP: '{{.BUMP | default "patch"}}'
     cmds:
       - task: _do-component
         vars: { COMPONENT: "db", VERSION: "{{.VERSION}}", BUMP: "{{.BUMP}}" }
 
   prod:backend:
-    desc: "Tag backend-vX.Y.Z + deploy backend to prod. Without VERSION, suggests
+    desc:
+      "Tag backend-vX.Y.Z + deploy backend to prod. Without VERSION, suggests
       next patch."
     vars:
       VERSION: "{{if .VERSION}}{{.VERSION}}{{else}}{{.CLI_ARGS}}{{end}}"
-      BUMP: "{{.BUMP | default \"patch\"}}"
+      BUMP: '{{.BUMP | default "patch"}}'
     cmds:
       - task: _do-component
-        vars: { COMPONENT: "backend", VERSION: "{{.VERSION}}", BUMP: "{{.BUMP}}" }
+        vars:
+          { COMPONENT: "backend", VERSION: "{{.VERSION}}", BUMP: "{{.BUMP}}" }
 
   prod:frontend:
-    desc: "Tag frontend-vX.Y.Z + deploy frontend to prod. Without VERSION, suggests
+    desc:
+      "Tag frontend-vX.Y.Z + deploy frontend to prod. Without VERSION, suggests
       next patch."
     vars:
       VERSION: "{{if .VERSION}}{{.VERSION}}{{else}}{{.CLI_ARGS}}{{end}}"
-      BUMP: "{{.BUMP | default \"patch\"}}"
+      BUMP: '{{.BUMP | default "patch"}}'
     cmds:
       - task: _do-component
-        vars: { COMPONENT: "frontend", VERSION: "{{.VERSION}}", BUMP: "{{.BUMP}}" }
+        vars:
+          { COMPONENT: "frontend", VERSION: "{{.VERSION}}", BUMP: "{{.BUMP}}" }
 
   # ──────────────────────────────────────────────────────────────────────────
   # Aggregator: release one or more components in sequence
@@ -191,6 +200,8 @@ tasks:
         echo "    task release:prod:db       -- v1.2.0"
         echo "═══════════════════════════════════════════════════════════════"
       - |
+        TASK_SKIP="{{.SKIP_CI_CHECK | default ""}}"
+        [ -n "$TASK_SKIP" ] && export SKIP_CI_CHECK="$TASK_SKIP"
         for COMPONENT in db backend frontend; do
           printf "\nRelease %s? [y/N] " "$COMPONENT"
           read -r ANS
