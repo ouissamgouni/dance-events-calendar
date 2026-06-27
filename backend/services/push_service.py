@@ -71,6 +71,7 @@ def send_push(
                     vapid_private_key=cfg["private_key"],
                     vapid_claims={"sub": cfg["subject"]},
                     timeout=10,
+                    ttl=86400,
                 )
                 delivered += 1
             except WebPushException as exc:
@@ -79,6 +80,7 @@ def send_push(
                     stale.append(sub.id)  # endpoint gone — prune below
                 else:
                     logger.warning("Push failed (status=%s): %s", status, exc)
+                    logger.exception("FULL PUSH ERROR")
             except Exception as exc:  # noqa: BLE001 — never let push break a worker
                 logger.warning("Push error: %s", exc)
 
@@ -89,5 +91,5 @@ def send_push(
                 )
             )
             session.commit()
-
+    logger.info("Push delivered count: %s", delivered)
     return delivered

@@ -61,20 +61,41 @@ self.addEventListener('fetch', (event) => {
 //   { title, body, url, tag }
 self.addEventListener('push', (event) => {
     let data = {};
+
     try {
         data = event.data ? event.data.json() : {};
-    } catch {
-        data = { body: event.data ? event.data.text() : '' };
+    } catch (e) {
+        data = { body: '⚠️ Invalid push payload' };
     }
-    const title = data.title || 'Movida';
+
+    // 🔥 DEBUG OVERRIDE: always make it obvious
+    const title = data.title || '🚀 PUSH RECEIVED';
+
     const options = {
-        body: data.body || '',
+        body: data.body || 'Service worker push event fired successfully',
         icon: '/icons/icon-192.png',
-        badge: '/icons/badge-72.png',
-        tag: data.tag || undefined,
-        data: { url: data.url || '/' },
+        badge: '/icons/icon-192.png',
+        tag: 'debug-push',
+
+        // VERY IMPORTANT: helps confirm payload arrived
+        data: {
+            url: data.url || '/',
+            debug: true,
+            raw: data,
+        },
     };
-    event.waitUntil(self.registration.showNotification(title, options));
+
+    event.waitUntil(
+        self.registration.showNotification(title, options)
+    );
+});
+
+self.addEventListener('push', () => {
+    // second independent confirmation notification
+    self.registration.showNotification('🔥 PUSH DEBUG TRIGGERED', {
+        body: 'If you see this, backend → device delivery works',
+        icon: '/icons/icon-192.png',
+    });
 });
 
 self.addEventListener('notificationclick', (event) => {
