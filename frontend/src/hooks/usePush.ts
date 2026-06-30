@@ -151,6 +151,7 @@ export function usePush() {
     }, []);
 
     const enable = useCallback(async () => {
+        console.log("enable() called");
         if (busy || !isSupported()) return;
         setBusy(true);
         setError(null);
