@@ -60,6 +60,7 @@ self.addEventListener('fetch', (event) => {
 // Payload shape (JSON, sent by push_service.send_push):
 //   { title, body, url, tag }
 self.addEventListener('push', (event) => {
+    console.log('Push event fired', event);
     let data = {};
 
     try {
