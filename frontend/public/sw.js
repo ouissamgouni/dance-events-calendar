@@ -68,7 +68,6 @@ self.addEventListener('push', (event) => {
         data = { body: '⚠️ Invalid push payload' };
     }
 
-    // 🔥 DEBUG OVERRIDE: always make it obvious
     const title = data.title || '🚀 PUSH RECEIVED';
 
     const options = {
@@ -76,8 +75,6 @@ self.addEventListener('push', (event) => {
         icon: '/icons/icon-192.png',
         badge: '/icons/icon-192.png',
         tag: 'debug-push',
-
-        // VERY IMPORTANT: helps confirm payload arrived
         data: {
             url: data.url || '/',
             debug: true,
@@ -88,14 +85,6 @@ self.addEventListener('push', (event) => {
     event.waitUntil(
         self.registration.showNotification(title, options)
     );
-});
-
-self.addEventListener('push', () => {
-    // second independent confirmation notification
-    self.registration.showNotification('🔥 PUSH DEBUG TRIGGERED', {
-        body: 'If you see this, backend → device delivery works',
-        icon: '/icons/icon-192.png',
-    });
 });
 
 self.addEventListener('notificationclick', (event) => {
