@@ -71,6 +71,7 @@ async function subscribeAndRegister(
     console.log("Backend registration complete.");
 }
 
+/*
 const resubscribe = useCallback(async () => {
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') return;
@@ -87,7 +88,7 @@ const resubscribe = useCallback(async () => {
     if (existing) return;
 
     await subscribeAndRegister(reg, key);
-}, []);
+}, []);*/
 
 export function usePush() {
     const [status, setStatus] = useState<PushStatus>('off');
