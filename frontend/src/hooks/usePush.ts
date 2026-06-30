@@ -59,6 +59,24 @@ async function subscribeAndRegister(
     });
 }
 
+const resubscribe = useCallback(async () => {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return;
+
+    const key = await fetchVapidPublicKey();
+    if (!key) {
+        console.error('No VAPID public key available');
+        return;
+    }
+
+    const reg = await navigator.serviceWorker.ready;
+
+    const existing = await reg.pushManager.getSubscription();
+    if (existing) return;
+
+    await subscribeAndRegister(reg, key);
+}, []);
+
 export function usePush() {
     const [status, setStatus] = useState<PushStatus>('off');
     const [busy, setBusy] = useState(false);
@@ -71,38 +89,50 @@ export function usePush() {
     // shown because the permission grant already happened.
     useEffect(() => {
         let cancelled = false;
+
         (async () => {
             if (!isSupported()) {
                 if (!cancelled) setStatus('unsupported');
                 return;
             }
+
             if (Notification.permission === 'denied') {
                 if (!cancelled) setStatus('denied');
                 return;
             }
+
             const key = await fetchVapidPublicKey();
             if (cancelled) return;
+
             if (!key) {
                 setStatus('disabled');
                 return;
             }
-            try {
-                const reg = await navigator.serviceWorker.ready;
-                const existing = await reg.pushManager.getSubscription();
-                if (existing) {
-                    if (!cancelled) setStatus('on');
-                    return;
-                }
-                if (Notification.permission === 'granted') {
+
+            const reg = await navigator.serviceWorker.ready;
+            const existing = await reg.pushManager.getSubscription();
+
+            // ✅ CASE 1: already subscribed
+            if (existing) {
+                if (!cancelled) setStatus('on');
+                return;
+            }
+
+            // ✅ CASE 2: permission already granted → auto recover subscription
+            if (Notification.permission === 'granted') {
+                try {
                     await subscribeAndRegister(reg, key);
                     if (!cancelled) setStatus('on');
-                    return;
+                } catch (e) {
+                    console.error('Auto-subscribe failed', e);
+                    if (!cancelled) setStatus('off');
                 }
-                if (!cancelled) setStatus('off');
-            } catch {
-                if (!cancelled) setStatus('off');
+                return;
             }
+
+            if (!cancelled) setStatus('off');
         })();
+
         return () => {
             cancelled = true;
         };
