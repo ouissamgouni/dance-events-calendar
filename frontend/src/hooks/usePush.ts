@@ -42,13 +42,23 @@ async function subscribeAndRegister(
     reg: ServiceWorkerRegistration,
     key: string,
 ): Promise<void> {
-    const sub =
-        (await reg.pushManager.getSubscription()) ||
-        (await reg.pushManager.subscribe({
+    console.log("Starting subscribe...");
+
+    let sub = await reg.pushManager.getSubscription();
+    console.log("Existing subscription:", sub);
+
+    if (!sub) {
+        console.log("Creating new subscription...");
+        sub = await reg.pushManager.subscribe({
             userVisibleOnly: true,
             applicationServerKey: urlBase64ToUint8Array(key),
-        }));
+        });
+        console.log("Created subscription:", sub);
+    }
+
     const json = sub.toJSON();
+    console.log("Sending subscription to backend...");
+
     await subscribePush({
         endpoint: sub.endpoint,
         keys: {
@@ -57,6 +67,8 @@ async function subscribeAndRegister(
         },
         user_agent: navigator.userAgent,
     });
+
+    console.log("Backend registration complete.");
 }
 
 const resubscribe = useCallback(async () => {
