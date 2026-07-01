@@ -35,8 +35,11 @@ from backend.config.loader import (
     get_auto_sync_scheduler_enabled,
     get_notification_scheduler_enabled,
 )
+from backend.config.logging_config import configure_logging
 from backend.db.database import init_db
 from backend.services.scheduler import run_notification_dispatch_loop, run_sync_loop
+
+configure_logging()
 
 logger = logging.getLogger(__name__)
 

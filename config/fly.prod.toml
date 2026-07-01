@@ -17,6 +17,10 @@ primary_region = "cdg"
   CALENDAR_SERVICE = "google"
   PUBLIC_APP_URL = "https://joinmovida.com"
   CORS_ORIGINS = "https://movida.pages.dev,https://joinmovida.com"
+  # In-app background dispatch loops. Fly has no native cron, so these flags
+  # are the only thing that drives notification delivery and auto-sync.
+  NOTIFICATION_SCHEDULER_ENABLED = "true"
+  AUTO_SYNC_SCHEDULER_ENABLED = "true"
   # SMTP host/port/from (credentials are fly secrets)
   SMTP_HOST = "smtp-relay.brevo.com"
   SMTP_PORT = "587"
@@ -36,11 +40,6 @@ primary_region = "cdg"
     path = "/health"
     protocol = "http"
     timeout = "5s"
-
-[[services.scheduled_jobs]]
-  timeout = "1h"
-  cron = "0 */15 * * * ?"
-  http = { method = "POST", uri = "/admin/trigger-sync" }
 
 [[vm]]
   size = "shared-cpu-1x"

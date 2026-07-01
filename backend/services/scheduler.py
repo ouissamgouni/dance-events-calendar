@@ -12,6 +12,12 @@ from sqlmodel import Session
 
 logger = logging.getLogger(__name__)
 
+# Dedicated Postgres advisory-lock key for the notification dispatch tick, so
+# multi-instance deployments (e.g. staging's min_machines_running = 2) don't
+# double-send pushes in the select→send→stamp race. Distinct from the sync
+# job's key (0x6D6F7669736E6373 / "movisncs").
+_NOTIFY_DISPATCH_ADVISORY_LOCK_KEY = 0x6D6F76696E746679  # "movintfy"
+
 
 def _get_effective_interval(session: Session) -> int:
     """Read sync interval from DB (site_settings), fall back to env/default."""
@@ -115,6 +121,67 @@ async def run_sync_loop(calendar_service: BaseCalendarService) -> None:
         await asyncio.sleep(interval)
 
 
+class _DispatchLockHeld(Exception):
+    """Raised when another instance already holds the dispatch advisory lock."""
+
+
+def _try_acquire_dispatch_lock():
+    """Acquire a Postgres session-level advisory lock on a dedicated
+    connection for the notification dispatch tick.
+
+    Returns the connection on success and ``None`` when advisory locking is
+    not applicable (non-Postgres dialect), the DB is temporarily unreachable,
+    or the lock query fails — in which case the caller proceeds best-effort,
+    mirroring ``sync_job_service``. Raises ``_DispatchLockHeld`` only when
+    another instance genuinely holds the lock, so the loop lets that instance
+    own this tick.
+    """
+    engine = get_engine()
+    if engine.dialect.name != "postgresql":
+        return None
+    try:
+        conn = engine.connect()
+    except Exception:
+        logger.warning(
+            "notification dispatch lock skipped: DB unreachable", exc_info=True
+        )
+        return None
+    try:
+        acquired = conn.exec_driver_sql(
+            f"SELECT pg_try_advisory_lock({_NOTIFY_DISPATCH_ADVISORY_LOCK_KEY})"
+        ).scalar()
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        logger.warning("notification dispatch lock query failed", exc_info=True)
+        return None
+    if not acquired:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        raise _DispatchLockHeld()
+    return conn
+
+
+def _release_dispatch_lock(conn) -> None:
+    if conn is None:
+        return
+    try:
+        conn.exec_driver_sql(
+            f"SELECT pg_advisory_unlock({_NOTIFY_DISPATCH_ADVISORY_LOCK_KEY})"
+        )
+    except Exception:
+        logger.warning("notification dispatch unlock failed", exc_info=True)
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
 def run_notification_dispatch_once() -> dict:
     """Run one pass of user-facing notification delivery.
 
@@ -122,23 +189,36 @@ def run_notification_dispatch_once() -> dict:
     Safe to call from the in-app loop (executor thread) or the external
     scheduler endpoint. Each sub-task owns its own DB session/transaction
     and never raises into the caller.
+
+    Guarded by a Postgres advisory lock so that on multi-instance deployments
+    only one machine sends per tick; instances that don't win the lock skip
+    (return ``{"skipped": "locked"}``) to avoid duplicate pushes/emails.
     """
     # Imported lazily to keep scheduler import-light and avoid any import
     # cycle with the email/notification services.
     from backend.services import activity_email, reminder_service
 
-    stats: dict = {}
     try:
-        stats["reminders"] = reminder_service.run_once()
-    except Exception:
-        logger.exception("Reminder generation failed")
-        stats["reminders"] = {"error": True}
+        lock_conn = _try_acquire_dispatch_lock()
+    except _DispatchLockHeld:
+        # Another instance owns this tick — skip to avoid duplicate sends.
+        return {"skipped": "locked"}
+
     try:
-        stats["activity"] = activity_email.run_once()
-    except Exception:
-        logger.exception("Activity digest failed")
-        stats["activity"] = {"error": True}
-    return stats
+        stats: dict = {}
+        try:
+            stats["reminders"] = reminder_service.run_once()
+        except Exception:
+            logger.exception("Reminder generation failed")
+            stats["reminders"] = {"error": True}
+        try:
+            stats["activity"] = activity_email.run_once()
+        except Exception:
+            logger.exception("Activity digest failed")
+            stats["activity"] = {"error": True}
+        return stats
+    finally:
+        _release_dispatch_lock(lock_conn)
 
 
 async def run_notification_dispatch_loop() -> None:
