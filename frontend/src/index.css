@@ -614,6 +614,10 @@ body {
   background: #f8fafc !important;
 }
 
+.event-card-user-going {
+  box-shadow: inset 3px 0 0 #22c55e;
+}
+
 .event-card-offmap-badge {
   display: inline-flex;
   align-items: center;

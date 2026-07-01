@@ -115,7 +115,9 @@ def _make_event(
     deleted_at: datetime | None = None,
 ) -> CachedEvent:
     if session.get(CalendarSetting, "cal") is None:
-        session.add(CalendarSetting(calendar_id="cal", name="C", color="#abc", enabled=True))
+        session.add(
+            CalendarSetting(calendar_id="cal", name="C", color="#abc", enabled=True)
+        )
     e = CachedEvent(
         event_id=event_id,
         calendar_id="cal",
@@ -172,7 +174,9 @@ def _notif(
 def test_reminder_created_for_due_going_event(session, monkeypatch):
     sent: list = []
     monkeypatch.setattr(
-        reminder_service, "send_event_reminder_email", lambda u, e, w: sent.append(e.event_id) or True
+        reminder_service,
+        "send_event_reminder_email",
+        lambda u, e, w: sent.append(e.event_id) or True,
     )
     monkeypatch.setattr(reminder_service, "send_push", lambda *a, **k: 0)
 
@@ -194,7 +198,9 @@ def test_reminder_created_for_due_going_event(session, monkeypatch):
 
 
 def test_reminder_is_idempotent(session, monkeypatch):
-    monkeypatch.setattr(reminder_service, "send_event_reminder_email", lambda *a, **k: True)
+    monkeypatch.setattr(
+        reminder_service, "send_event_reminder_email", lambda *a, **k: True
+    )
     monkeypatch.setattr(reminder_service, "send_push", lambda *a, **k: 0)
 
     alice = _make_user(session, "alice@example.com", "alice")
@@ -213,7 +219,9 @@ def test_reminder_is_idempotent(session, monkeypatch):
 def test_reminder_email_optout_keeps_inapp(session, monkeypatch):
     sent: list = []
     monkeypatch.setattr(
-        reminder_service, "send_event_reminder_email", lambda u, e, w: sent.append(e) or True
+        reminder_service,
+        "send_event_reminder_email",
+        lambda u, e, w: sent.append(e) or True,
     )
     monkeypatch.setattr(reminder_service, "send_push", lambda *a, **k: 0)
 
@@ -238,12 +246,19 @@ def test_reminder_email_optout_keeps_inapp(session, monkeypatch):
 
 
 def test_reminder_excludes_hidden_deleted_and_out_of_window(session, monkeypatch):
-    monkeypatch.setattr(reminder_service, "send_event_reminder_email", lambda *a, **k: True)
+    monkeypatch.setattr(
+        reminder_service, "send_event_reminder_email", lambda *a, **k: True
+    )
     monkeypatch.setattr(reminder_service, "send_push", lambda *a, **k: 0)
 
     alice = _make_user(session, "alice@example.com", "alice")
     # Hidden event — excluded.
-    _make_event(session, "ev-hidden", start=datetime.utcnow() + timedelta(hours=3), is_hidden=True)
+    _make_event(
+        session,
+        "ev-hidden",
+        start=datetime.utcnow() + timedelta(hours=3),
+        is_hidden=True,
+    )
     _going(session, alice, "ev-hidden")
     # Soft-deleted event — excluded.
     _make_event(
@@ -261,7 +276,9 @@ def test_reminder_excludes_hidden_deleted_and_out_of_window(session, monkeypatch
 
 
 def test_reminder_excludes_deleted_user(session, monkeypatch):
-    monkeypatch.setattr(reminder_service, "send_event_reminder_email", lambda *a, **k: True)
+    monkeypatch.setattr(
+        reminder_service, "send_event_reminder_email", lambda *a, **k: True
+    )
     monkeypatch.setattr(reminder_service, "send_push", lambda *a, **k: 0)
 
     ghost = _make_user(
@@ -328,9 +345,7 @@ def test_activity_digest_optout_skips_email_but_stamps(session, monkeypatch):
     )
     monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
 
-    bob = _make_user(
-        session, "bob@example.com", "bob", activity_email_enabled=False
-    )
+    bob = _make_user(session, "bob@example.com", "bob", activity_email_enabled=False)
     a1 = _make_user(session, "a1@example.com", "a1")
     old = datetime.utcnow() - timedelta(minutes=5)
     n = _notif(session, recipient=bob, actor=a1, kind="new_follower", created_at=old)
@@ -344,13 +359,21 @@ def test_activity_digest_optout_skips_email_but_stamps(session, monkeypatch):
 
 
 def test_activity_digest_skips_recent_and_too_old(session, monkeypatch):
-    monkeypatch.setattr(activity_email, "send_activity_digest_email", lambda *a, **k: None)
+    monkeypatch.setattr(
+        activity_email, "send_activity_digest_email", lambda *a, **k: None
+    )
     monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
 
     bob = _make_user(session, "bob@example.com", "bob")
     a1 = _make_user(session, "a1@example.com", "a1")
     # Too recent (inside the 2-min batch delay) and too old (>24h) are both skipped.
-    _notif(session, recipient=bob, actor=a1, kind="new_follower", created_at=datetime.utcnow())
+    _notif(
+        session,
+        recipient=bob,
+        actor=a1,
+        kind="new_follower",
+        created_at=datetime.utcnow(),
+    )
     _notif(
         session,
         recipient=bob,
@@ -462,7 +485,9 @@ def test_vapid_public_key_404_when_disabled(client, monkeypatch):
 def test_vapid_public_key_returns_key_when_enabled(client, monkeypatch):
     monkeypatch.setattr(push_module, "get_webpush_enabled", lambda: True)
     monkeypatch.setattr(
-        push_module, "get_vapid_config", lambda: {"public_key": "PUBKEY", "private_key": "x", "subject": "mailto:a@b.c"}
+        push_module,
+        "get_vapid_config",
+        lambda: {"public_key": "PUBKEY", "private_key": "x", "subject": "mailto:a@b.c"},
     )
     r = client.get("/api/push/vapid-public-key")
     assert r.status_code == 200
@@ -489,6 +514,27 @@ def test_subscribe_and_unsubscribe_push(client, session):
 
     r = client.post(
         "/api/push/unsubscribe", json={"endpoint": "https://push.example.com/abc"}
+    )
+    assert r.status_code == 200
+    assert session.exec(select(PushSubscription)).all() == []
+
+
+def test_subscribe_and_unsubscribe_push_anonymous(client, session):
+    # No login: web push is per-browser, so anonymous visitors must be able
+    # to subscribe before ever signing in.
+    payload = {
+        "endpoint": "https://push.example.com/anon",
+        "keys": {"p256dh": "key-p256", "auth": "key-auth"},
+        "user_agent": "pytest",
+    }
+    r = client.post("/api/push/subscribe", json=payload)
+    assert r.status_code == 200
+    rows = session.exec(select(PushSubscription)).all()
+    assert len(rows) == 1
+    assert rows[0].user_id is None
+
+    r = client.post(
+        "/api/push/unsubscribe", json={"endpoint": "https://push.example.com/anon"}
     )
     assert r.status_code == 200
     assert session.exec(select(PushSubscription)).all() == []

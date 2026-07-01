@@ -2,6 +2,17 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import InstallPrompt from './InstallPrompt'
+import { PwaInstallProvider } from '../context/PwaInstallContext'
+
+const SNOOZE_KEY = 'movida:install-snooze-until'
+
+function renderPrompt() {
+  return render(
+    <PwaInstallProvider>
+      <InstallPrompt />
+    </PwaInstallProvider>,
+  )
+}
 
 class FakeBeforeInstallPromptEvent extends Event {
   prompt: ReturnType<typeof vi.fn>
@@ -35,7 +46,7 @@ beforeEach(() => {
 describe('InstallPrompt', () => {
   it('shows after beforeinstallprompt and hides when dismissed', async () => {
     const user = userEvent.setup()
-    render(<InstallPrompt />)
+    renderPrompt()
 
     const ev = new FakeBeforeInstallPromptEvent('dismissed')
     let prevented = false
@@ -50,12 +61,12 @@ describe('InstallPrompt', () => {
     await waitFor(() =>
       expect(screen.queryByText(/install movida/i)).not.toBeInTheDocument(),
     )
-    expect(localStorage.getItem('movida:install-dismissed')).toBe('1')
+    expect(Number(localStorage.getItem(SNOOZE_KEY))).toBeGreaterThan(Date.now())
   })
 
   it('replays deferred prompt on install and remembers the choice', async () => {
     const user = userEvent.setup()
-    render(<InstallPrompt />)
+    renderPrompt()
 
     const ev = new FakeBeforeInstallPromptEvent('accepted')
     await act(async () => {
@@ -69,18 +80,28 @@ describe('InstallPrompt', () => {
     await waitFor(() =>
       expect(screen.queryByText(/install movida/i)).not.toBeInTheDocument(),
     )
-    expect(localStorage.getItem('movida:install-dismissed')).toBe('1')
   })
 
-  it('does not show when already dismissed', async () => {
-    localStorage.setItem('movida:install-dismissed', '1')
-    render(<InstallPrompt />)
+  it('does not show when recently snoozed', async () => {
+    localStorage.setItem(SNOOZE_KEY, String(Date.now() + 24 * 60 * 60 * 1000))
+    renderPrompt()
 
     await act(async () => {
       window.dispatchEvent(new FakeBeforeInstallPromptEvent('accepted'))
     })
 
     expect(screen.queryByText(/install movida/i)).not.toBeInTheDocument()
+  })
+
+  it('shows again once the snooze window has expired', async () => {
+    localStorage.setItem(SNOOZE_KEY, String(Date.now() - 1000))
+    renderPrompt()
+
+    await act(async () => {
+      window.dispatchEvent(new FakeBeforeInstallPromptEvent('accepted'))
+    })
+
+    expect(await screen.findByText(/install movida/i)).toBeInTheDocument()
   })
 
   it('does not show in standalone display mode', async () => {
@@ -98,7 +119,7 @@ describe('InstallPrompt', () => {
       })),
     })
 
-    render(<InstallPrompt />)
+    renderPrompt()
     await act(async () => {
       window.dispatchEvent(new FakeBeforeInstallPromptEvent('accepted'))
     })

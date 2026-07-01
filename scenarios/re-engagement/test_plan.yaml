@@ -1,9 +1,12 @@
 test_plan:
-  name: "Re-engagement pack: reminders + activity email + PWA/web-push"
+  name: "Re-engagement pack: reminders + activity email + PWA/web-push (device-scoped)"
   description: >
     Manual validation scenario for the three adoption features: event reminders
     (in-app + email), friend/event activity digest emails, and PWA web-push
-    enrollment and delivery.
+    enrollment and delivery. Covers device-scoped push (anonymous users can
+    subscribe before sign-in; subscriptions bind to account on sign-in),
+    install prompt snooze (24-hour mute window), and push delivery in both
+    installed PWA and background scenarios.
   preconditions:
     - "Start Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`"
     - "Run the scenario: `SCENARIO=re-engagement RESET=1 task start:scenario`"
@@ -46,22 +49,63 @@ test_plan:
         Body contains the Going notification line and an unsubscribe link.
 
     - id: 4
-      title: "Notification settings toggles + timezone update"
+      title: "Notification settings: email toggles, timezone, and push (signed in)"
       description: >
-        Open /account#notifications as Alice. Toggle Event reminders and
-        Activity emails, then click "Use my detected timezone" when shown.
+        Open /account#notifications as Alice. You'll see two sections:
+        (a) "Email notifications" with Event reminders and Activity emails toggles,
+        and "Use my detected timezone" button; (b) "Push notifications" toggle
+        (available for both anonymous and signed-in visitors). Toggle the email
+        preferences and timezone, then toggle push notifications on/off.
       expected: >
-        PATCH /api/auth/notification-preferences succeeds and saved state persists.
+        PATCH /api/auth/notification-preferences succeeds for email/timezone.
+        Push toggle changes are persisted to user.push_enabled (if signed in)
+        or stored locally (if anonymous). All changes persist on reload.
 
     - id: 5
-      title: "Installed PWA push (desktop/mobile)"
+      title: "Device-scoped push subscription (anonymous, before sign-in)"
       description: >
-        In Chromium, install the app from the Install banner/menu, then launch
-        the installed app window (not a normal browser tab). Sign in as Alice,
-        open /account#notifications, and enable Push notifications.
-        Trigger dispatch as admin via POST /api/admin/trigger-notifications.
-        Repeat once with the browser/app closed to verify background delivery.
+        In Chromium, open the app in a normal browser tab (not installed yet).
+        Without signing in, open /account (you will see the Install banner and
+        Push notifications toggle as an anonymous visitor). Click "Enable push
+        notifications" — this should succeed and return a device-scoped
+        subscription with no user_id.
       expected: >
-        /api/push/vapid-public-key + /api/push/subscribe succeed. After a
-        notification dispatch, a system push appears, and tapping it opens
-        the installed app to the target event/account URL.
+        POST /api/push/subscribe succeeds and returns subscription details.
+        No sign-in required. The subscription is bound to the browser/device
+        only (user_id is NULL in the database).
+
+    - id: 6
+      title: "Sign in and push subscription migrates to account"
+      description: >
+        Still in the same browser from Step 5, sign in as Alice
+        (alice@example.com). Open /account again. The push toggle should
+        still show enabled (subscription persists), and it now associates
+        the device subscription with Alice's user account.
+      expected: >
+        The same push subscription row now has user_id = alice's ID.
+        The toggle remains enabled. No re-subscribe required.
+
+    - id: 7
+      title: "Install PWA and test push delivery (signed in)"
+      description: >
+        From the signed-in Alice state (Step 6), install the app via
+        the Install banner or menu, then launch the installed app window
+        (not a browser tab). Push notifications should still be enabled.
+        Trigger a dispatch as admin via POST /api/admin/trigger-notifications.
+        Repeat once with the installed app closed to verify background delivery.
+      expected: >
+        After dispatch, a system push appears. Tapping it opens the installed
+        app to the target event/account URL. Background delivery works even
+        when the app window is closed.
+
+    - id: 8
+      title: "Install prompt snooze behavior"
+      description: >
+        In a new Chromium incognito session (clean device state), open the app.
+        The Install banner should appear. Click "Dismiss" (or the close button).
+        Reload the page or close/reopen. The banner should NOT reappear for
+        24 hours.
+      expected: >
+        Banner is hidden after dismiss. localStorage contains
+        'movida:install-snooze-until' timestamp set to 24 hours in the future.
+        Banner reappears when the 24-hour window expires.

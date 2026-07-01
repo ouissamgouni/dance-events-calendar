@@ -985,14 +985,17 @@ class Notification(SQLModel, table=True):
 
 
 class PushSubscription(SQLModel, table=True):
-    """A browser Web Push endpoint registered by a signed-in user.
+    """A browser Web Push endpoint registered by a visitor.
 
-    One row per (user, browser) — the ``endpoint`` URL issued by the push
-    service is globally unique, so re-subscribing the same browser upserts on
-    that key rather than creating duplicates. ``p256dh`` + ``auth`` are the
-    client public key + auth secret returned by ``PushManager.subscribe`` and
-    are required to encrypt payloads. Stale endpoints (HTTP 404/410 from the
-    push service) are deleted by ``services/push_service.py``.
+    One row per browser — the ``endpoint`` URL issued by the push service is
+    globally unique, so re-subscribing the same browser upserts on that key
+    rather than creating duplicates. Web Push is a device/browser capability,
+    not an account feature, so ``user_id`` is nullable: anonymous visitors can
+    subscribe, and when they later sign in the same browser re-subscribes and
+    binds the endpoint to their account. ``p256dh`` + ``auth`` are the client
+    public key + auth secret returned by ``PushManager.subscribe`` and are
+    required to encrypt payloads. Stale endpoints (HTTP 404/410 from the push
+    service) are deleted by ``services/push_service.py``.
     """
 
     __tablename__ = "push_subscriptions"
@@ -1001,7 +1004,7 @@ class PushSubscription(SQLModel, table=True):
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: UUID = Field(foreign_key="users.id", index=True)
+    user_id: Optional[UUID] = Field(default=None, foreign_key="users.id", index=True)
     endpoint: str = Field(sa_column=Column(Text, nullable=False))
     p256dh: str = Field(max_length=255)
     auth: str = Field(max_length=255)

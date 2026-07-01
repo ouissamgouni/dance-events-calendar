@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { updateNotificationPreferences } from '../api';
-import { usePush } from '../hooks/usePush';
+import ToggleRow from './ToggleRow';
 
 /**
  * Notification & email settings (Settings page).
@@ -23,7 +23,6 @@ export default function NotificationSettings() {
     const [error, setError] = useState<string | null>(null);
     const [savedToast, setSavedToast] = useState(false);
     const toastTimer = useRef<number | null>(null);
-    const push = usePush();
 
     const detectedTz = (() => {
         try {
@@ -68,11 +67,7 @@ export default function NotificationSettings() {
     };
 
     const patch = async (
-        field:
-            | 'reminder_email_enabled'
-            | 'activity_email_enabled'
-            | 'push_enabled'
-            | 'timezone',
+        field: 'reminder_email_enabled' | 'activity_email_enabled' | 'timezone',
         value: boolean | string,
     ) => {
         setSaving(field);
@@ -87,23 +82,6 @@ export default function NotificationSettings() {
             setSaving(null);
         }
     };
-
-    // The push toggle drives two things at once: this browser's subscription
-    // (via usePush) and the server-side ``push_enabled`` gate. Enabling
-    // subscribes + flips the flag on; disabling unsubscribes + flips it off.
-    const togglePush = async (next: boolean) => {
-        if (next) {
-            await push.enable();
-            await patch('push_enabled', true);
-        } else {
-            await push.disable();
-            await patch('push_enabled', false);
-        }
-    };
-
-    const pushChecked = push.status === 'on';
-    const pushVisible = push.status !== 'unsupported' && push.status !== 'disabled';
-    const pushDenied = push.status === 'denied';
 
     if (!user) return null;
 
@@ -132,21 +110,6 @@ export default function NotificationSettings() {
                     onChange={(v) => patch('activity_email_enabled', v)}
                 />
 
-                {pushVisible && (
-                    <ToggleRow
-                        label="Push notifications"
-                        description={
-                            pushDenied
-                                ? 'Blocked in your browser settings — re-enable notifications for this site to turn on.'
-                                : 'Get reminders and activity alerts on this device, even when Movida is closed.'
-                        }
-                        checked={pushChecked}
-                        busy={push.busy || saving === 'push_enabled'}
-                        disabled={pushDenied}
-                        onChange={togglePush}
-                    />
-                )}
-
                 <div className="pt-1 border-t border-slate-100">
                     <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
                         Timezone
@@ -169,51 +132,6 @@ export default function NotificationSettings() {
             </div>
 
             {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
-            {push.error && <p className="mt-2 text-xs text-red-600">{push.error}</p>}
         </section>
-    );
-}
-
-function ToggleRow({
-    label,
-    description,
-    checked,
-    busy,
-    disabled,
-    onChange,
-}: {
-    label: string;
-    description: string;
-    checked: boolean;
-    busy: boolean;
-    disabled?: boolean;
-    onChange: (value: boolean) => void;
-}) {
-    return (
-        <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-                <div className="text-sm font-medium text-slate-800">{label}</div>
-                <p className="text-xs text-slate-500 mt-0.5">{description}</p>
-            </div>
-            <button
-                type="button"
-                role="switch"
-                aria-checked={checked}
-                aria-label={label}
-                disabled={busy || disabled}
-                onClick={() => onChange(!checked)}
-                className={
-                    'relative shrink-0 inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-60 ' +
-                    (checked ? 'bg-blue-500' : 'bg-slate-300')
-                }
-            >
-                <span
-                    className={
-                        'inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ' +
-                        (checked ? 'translate-x-5' : 'translate-x-0.5')
-                    }
-                />
-            </button>
-        </div>
     );
 }
