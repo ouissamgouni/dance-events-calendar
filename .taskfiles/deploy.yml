@@ -555,7 +555,7 @@ tasks:
     dotenv:
       [
         "config/base.env",
-        "config/staging.remote.env",
+        "config/staging.remote.frontend.env",
         "config/secrets.env",
         "config/secrets.staging.env",
       ]
@@ -646,7 +646,7 @@ tasks:
     dotenv:
       [
         "config/base.env",
-        "config/staging.remote.env",
+        "config/staging.remote.frontend.env",
         "config/secrets.env",
         "config/secrets.staging.env",
       ]
@@ -661,7 +661,7 @@ tasks:
           exit 1
         fi
         if [ -z "$VITE_API_URL" ]; then
-          echo "❌ VITE_API_URL not set in config/staging.remote.env"
+          echo "❌ VITE_API_URL not set in config/staging.remote.frontend.env"
           exit 1
         fi
         echo "Validating Cloudflare token..."
@@ -696,7 +696,7 @@ tasks:
     dotenv:
       [
         "config/base.env",
-        "config/prod.remote.env",
+        "config/prod.remote.frontend.env",
         "config/secrets.env",
         "config/secrets.prod.env",
       ]
@@ -780,7 +780,7 @@ tasks:
     dotenv:
       [
         "config/base.env",
-        "config/prod.remote.env",
+        "config/prod.remote.frontend.env",
         "config/secrets.env",
         "config/secrets.prod.env",
       ]
@@ -795,7 +795,7 @@ tasks:
           exit 1
         fi
         if [ -z "$VITE_API_URL" ]; then
-          echo "❌ VITE_API_URL not set in config/prod.remote.env"
+          echo "❌ VITE_API_URL not set in config/prod.remote.frontend.env"
           exit 1
         fi
         echo "Validating Cloudflare token..."

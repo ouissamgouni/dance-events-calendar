@@ -72,7 +72,7 @@ tasks:
       CONFIRM=WIPE-staging and UMAMI_API_KEY in secrets.staging.env."
     dotenv:
       [
-        "{{.ROOT_DIR}}/config/staging.remote.env",
+        "{{.ROOT_DIR}}/config/staging.remote.frontend.env",
         "{{.ROOT_DIR}}/config/secrets.env",
         "{{.ROOT_DIR}}/config/secrets.staging.env",
       ]
@@ -85,7 +85,7 @@ tasks:
       and UMAMI_API_KEY in secrets.prod.env."
     dotenv:
       [
-        "{{.ROOT_DIR}}/config/prod.remote.env",
+        "{{.ROOT_DIR}}/config/prod.remote.frontend.env",
         "{{.ROOT_DIR}}/config/secrets.env",
         "{{.ROOT_DIR}}/config/secrets.prod.env",
       ]
