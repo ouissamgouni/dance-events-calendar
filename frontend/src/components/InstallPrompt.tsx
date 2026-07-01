@@ -113,7 +113,7 @@ export default function InstallPrompt() {
     if (showPushOptIn) {
         return (
             <div
-                className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pb-3"
+                className="fixed inset-x-0 bottom-0 z-[8500] flex justify-center px-3 pb-3"
                 style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
             >
                 <div className="w-full max-w-md flex items-center gap-3 border border-slate-200 bg-white px-4 py-3 shadow-lg">
@@ -147,7 +147,7 @@ export default function InstallPrompt() {
 
     return (
         <div
-            className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pb-3"
+            className="fixed inset-x-0 bottom-0 z-[8500] flex justify-center px-3 pb-3"
             style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
         >
             <div className="w-full max-w-md flex items-center gap-3 border border-slate-200 bg-white px-4 py-3 shadow-lg">
