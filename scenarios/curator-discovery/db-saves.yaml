@@ -1,0 +1,10 @@
+saves:
+  - event_id: evt-cd-002
+    email: curator-paris@example.com
+    audience: public
+  - event_id: evt-cd-003
+    email: curator-bachata@example.com
+    audience: public
+  - event_id: evt-cd-004
+    email: ordinary@example.com
+    audience: public

@@ -1,4 +1,4 @@
-import { Routes, Route, Link, useLocation } from 'react-router-dom';
+import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { ConsentProvider } from './context/ConsentContext';
@@ -11,6 +11,7 @@ import { AttendanceSummariesProvider } from './context/AttendanceSummariesContex
 import { RatingAggregatesProvider } from './context/RatingAggregatesContext';
 import { MyRatingsProvider } from './context/MyRatingsContext';
 import { AdminPrefsProvider } from './context/AdminPrefsContext';
+import { PwaInstallProvider } from './context/PwaInstallContext';
 import { QaTestPlanProvider, useQaPinnedWidth } from './components/QaTestPlanPanel';
 import { StatusBar } from './components/StatusBar';
 import InstagramBadge from './components/InstagramBadge';
@@ -20,6 +21,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import SignUpBanner from './components/SignUpBanner';
 import ShareReferralBanner from './components/ShareReferralBanner';
 import FloatingMineButton from './components/FloatingMineButton';
+import InstallPrompt from './components/InstallPrompt';
 import Home from './pages/Home';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
@@ -36,6 +38,7 @@ import OnboardingFollow from './pages/OnboardingFollow';
 import ReferralLanding from './pages/ReferralLanding';
 import OnboardingGate from './components/OnboardingGate';
 import UserSearchBox from './components/UserSearchBox';
+import ExplorerEventSearch from './components/ExplorerEventSearch';
 import { useConsent } from './context/ConsentContext';
 import { umamiPageView } from './utils/umami';
 
@@ -51,9 +54,11 @@ export default function App() {
                   <MyRatingsProvider>
                     <AttendingEventsProvider>
                       <AdminPrefsProvider>
-                        <QaTestPlanProvider>
-                          <AppShell />
-                        </QaTestPlanProvider>
+                        <PwaInstallProvider>
+                          <QaTestPlanProvider>
+                            <AppShell />
+                          </QaTestPlanProvider>
+                        </PwaInstallProvider>
                       </AdminPrefsProvider>
                     </AttendingEventsProvider>
                   </MyRatingsProvider>
@@ -70,6 +75,7 @@ export default function App() {
 function AppShell() {
   const { analyticsConsent } = useConsent();
   const location = useLocation();
+  const navigate = useNavigate();
   const qaPinnedWidth = useQaPinnedWidth();
   const mainRef = useRef<HTMLElement | null>(null);
 
@@ -103,6 +109,12 @@ function AppShell() {
               >
                 + Submit
               </Link>
+              <ExplorerEventSearch
+                compact
+                onDark
+                onSelectEvent={(eventId) => navigate(`/event/${eventId}`)}
+                triggerLabel="Search events"
+              />
               <UserSearchBox />
               <NotificationBell />
               <HeaderUserMenu />
@@ -169,6 +181,7 @@ function AppShell() {
           <StatusBar />
           <FloatingMineButton />
         </div>
+        <InstallPrompt />
       </>
     </NotificationsProvider>
   );

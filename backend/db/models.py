@@ -113,6 +113,20 @@ class User(SQLModel, table=True):
     # navigation. Existing pre-E3 accounts also start as NULL and pass
     # through the redirect once on their next sign-in.
     onboarded_at: Optional[datetime] = Field(default=None)
+    # --- Re-engagement / notification preferences ---
+    # IANA timezone (e.g. "Europe/Paris") captured client-side and used to
+    # format reminder/digest email times. Defaults to UTC for legacy
+    # accounts; the frontend PATCHes it on first signed-in load.
+    timezone: str = Field(default="UTC", max_length=64, nullable=False)
+    # Transactional event reminders (sent before events the user is "Going"
+    # to), delivered in-app always and by email when this is True.
+    reminder_email_enabled: bool = Field(default=True, nullable=False)
+    # Batched digest emails for friend/event activity (new followers, friends
+    # going, etc.). Higher opt-out rate, kept separate from reminders so users
+    # can mute social noise while keeping useful event reminders.
+    activity_email_enabled: bool = Field(default=True, nullable=False)
+    # Web-push delivery toggle (gates push for both reminders and activity).
+    push_enabled: bool = Field(default=True, nullable=False)
 
 
 class BlockedUserIdentity(SQLModel, table=True):
@@ -962,3 +976,37 @@ class Notification(SQLModel, table=True):
     event_id: Optional[str] = Field(default=None, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     read_at: Optional[datetime] = Field(default=None, index=True)
+    # Set once this notification has been included in a batched activity
+    # digest email (see ``services/activity_email.py``). NULL means it is
+    # still eligible to be emailed; the digest worker stamps this to keep
+    # delivery idempotent across loop ticks. ``event_reminder`` rows are
+    # emailed inline by the reminder service and are never picked up here.
+    emailed_at: Optional[datetime] = Field(default=None, index=True)
+
+
+class PushSubscription(SQLModel, table=True):
+    """A browser Web Push endpoint registered by a visitor.
+
+    One row per browser — the ``endpoint`` URL issued by the push service is
+    globally unique, so re-subscribing the same browser upserts on that key
+    rather than creating duplicates. Web Push is a device/browser capability,
+    not an account feature, so ``user_id`` is nullable: anonymous visitors can
+    subscribe, and when they later sign in the same browser re-subscribes and
+    binds the endpoint to their account. ``p256dh`` + ``auth`` are the client
+    public key + auth secret returned by ``PushManager.subscribe`` and are
+    required to encrypt payloads. Stale endpoints (HTTP 404/410 from the push
+    service) are deleted by ``services/push_service.py``.
+    """
+
+    __tablename__ = "push_subscriptions"
+    __table_args__ = (
+        UniqueConstraint("endpoint", name="uq_push_subscription_endpoint"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: Optional[UUID] = Field(default=None, foreign_key="users.id", index=True)
+    endpoint: str = Field(sa_column=Column(Text, nullable=False))
+    p256dh: str = Field(max_length=255)
+    auth: str = Field(max_length=255)
+    user_agent: Optional[str] = Field(default=None, max_length=400)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)

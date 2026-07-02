@@ -2,9 +2,9 @@ name: CI
 
 on:
     pull_request:
-        branches: [ develop, main ]
+        branches: [develop, main]
     push:
-        branches: [ develop, main ]
+        branches: [develop, main]
 
 jobs:
     test:
@@ -41,6 +41,9 @@ jobs:
                   cache: npm
                   cache-dependency-path: frontend/package-lock.json
 
+            - name: Pin npm (match lockfile / packageManager)
+              run: npm install -g npm@11.6.2
+
             - name: Install backend dependencies
               run: |
                   python -m pip install --upgrade pip
@@ -71,6 +74,10 @@ jobs:
             - name: Frontend type check
               working-directory: frontend
               run: npx tsc --noEmit
+
+            - name: Frontend unit tests
+              working-directory: frontend
+              run: npm run test
 
             - name: Frontend build
               working-directory: frontend

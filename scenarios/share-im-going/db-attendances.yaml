@@ -1,0 +1,61 @@
+attendances:
+  - event_id: evt-share-003
+    email: dancer01@example.com
+    share_publicly: true
+  - event_id: evt-share-003
+    email: dancer02@example.com
+    share_publicly: true
+  - event_id: evt-share-003
+    email: dancer03@example.com
+    share_publicly: true
+  - event_id: evt-share-003
+    email: dancer04@example.com
+    share_publicly: true
+  - event_id: evt-share-003
+    email: dancer05@example.com
+    share_publicly: true
+  - event_id: evt-share-003
+    email: dancer06@example.com
+    share_publicly: true
+  - event_id: evt-share-003
+    email: dancer07@example.com
+    share_publicly: true
+  - event_id: evt-share-003
+    email: dancer08@example.com
+    share_publicly: true
+  - event_id: evt-share-003
+    email: dancer09@example.com
+    share_publicly: true
+  - event_id: evt-share-003
+    email: dancer10@example.com
+    share_publicly: true
+  - event_id: evt-share-003
+    email: dancer11@example.com
+    share_publicly: true
+  - event_id: evt-share-003
+    email: dancer12@example.com
+    share_publicly: true
+  - event_id: evt-share-005
+    email: dancer01@example.com
+    share_publicly: true
+  - event_id: evt-share-005
+    email: dancer02@example.com
+    share_publicly: true
+  - event_id: evt-share-005
+    email: dancer03@example.com
+    share_publicly: false
+  - event_id: evt-share-005
+    email: dancer04@example.com
+    share_publicly: false
+  - event_id: evt-share-006
+    email: dancer05@example.com
+    share_publicly: true
+  - event_id: evt-share-006
+    email: dancer06@example.com
+    share_publicly: true
+  - event_id: evt-share-006
+    email: dancer07@example.com
+    share_publicly: true
+  - event_id: evt-share-006
+    email: dancer08@example.com
+    share_publicly: false

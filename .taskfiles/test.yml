@@ -20,12 +20,13 @@ tasks:
       - PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/pytest tests/unit/ tests/api/ -m "not integration" -v
 
   unit:frontend:
-    desc: Frontend type check + build validation
+    desc: Frontend type check + unit tests + build validation
     dir: frontend
     cmds:
       - npx tsc --noEmit
+      - npm run test
       - npm run build
-      - echo "✅ Frontend type check and build passed"
+      - echo "✅ Frontend type check, unit tests, and build passed"
 
   int:
     desc: Run integration tests (requires test DB)
@@ -47,12 +48,16 @@ tasks:
       - task: int
 
   e2e:
-    desc: Run end-to-end tests (requires running database)
-    dir: backend
-    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/test.env"]
+    desc: Run end-to-end smoke tests (Playwright)
     cmds:
-      - echo "⚠️  E2E tests not yet implemented"
-      - echo "   Placeholder for future Playwright/Cypress tests"
+      - task: e2e:frontend
+
+  e2e:frontend:
+    desc: Frontend Playwright smoke tests (auth spec needs DEV_AUTH backend running)
+    dir: frontend
+    cmds:
+      - npx playwright install --with-deps chromium
+      - npm run test:e2e
 
   ci:
     desc: Simulate CI pipeline locally (requires act)

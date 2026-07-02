@@ -1,0 +1,73 @@
+attendances:
+  # evt-trend-001 (4 going)
+  - event_id: evt-trend-001
+    email: alice@example.com
+    share_publicly: true
+  - event_id: evt-trend-001
+    email: bob@example.com
+    share_publicly: true
+  - event_id: evt-trend-001
+    email: carol@example.com
+    share_publicly: true
+  - event_id: evt-trend-001
+    email: dave@example.com
+    share_publicly: true
+  # evt-trend-002 (2 going)
+  - event_id: evt-trend-002
+    email: alice@example.com
+    share_publicly: true
+  - event_id: evt-trend-002
+    email: bob@example.com
+    share_publicly: true
+  # evt-trend-003 (1 going — exactly at floor=1)
+  - event_id: evt-trend-003
+    email: eve@example.com
+    share_publicly: true
+  # evt-trend-004 — intentionally NO going (proves view-bait gate)
+  # evt-trend-005 (3 going on a past event — proves past gate)
+  - event_id: evt-trend-005
+    email: alice@example.com
+    share_publicly: true
+  - event_id: evt-trend-005
+    email: bob@example.com
+    share_publicly: true
+  - event_id: evt-trend-005
+    email: carol@example.com
+    share_publicly: true
+
+  # --- Spread events: 1-2 going apiece so they're above the
+  # `trending_floor_going=1` gate but well below evt-trend-001/002.
+  # Their job is to populate the cap: only the configured highest-scoring
+  # candidates get the banner card / chip / ring, even when many events qualify.
+  - event_id: evt-trend-010
+    email: alice@example.com
+    share_publicly: true
+  - event_id: evt-trend-011
+    email: bob@example.com
+    share_publicly: true
+  - event_id: evt-trend-011
+    email: carol@example.com
+    share_publicly: true
+  - event_id: evt-trend-012
+    email: dave@example.com
+    share_publicly: true
+  - event_id: evt-trend-013
+    email: eve@example.com
+    share_publicly: true
+  - event_id: evt-trend-016
+    email: alice@example.com
+    share_publicly: true
+  - event_id: evt-trend-016
+    email: bob@example.com
+    share_publicly: true
+  - event_id: evt-trend-019
+    email: carol@example.com
+    share_publicly: true
+  - event_id: evt-trend-019
+    email: dave@example.com
+    share_publicly: true
+  - event_id: evt-trend-022
+    email: eve@example.com
+    share_publicly: true
+
+# Saved-event signal — secondary contributor to the score.

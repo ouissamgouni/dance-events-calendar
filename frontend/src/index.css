@@ -333,11 +333,12 @@ body {
 
   .date-range-inputs input[type="date"] {
     flex: 0 0 auto;
-    width: 8.5rem;
+    width: 7rem;
   }
 
   .date-range-presets {
     flex: 1 1 auto;
+    flex-wrap: nowrap;
     margin-top: 0;
   }
 }
@@ -611,6 +612,10 @@ body {
 
 .event-card-highlighted:hover {
   background: #f8fafc !important;
+}
+
+.event-card-user-going {
+  box-shadow: inset 3px 0 0 #22c55e;
 }
 
 .event-card-offmap-badge {

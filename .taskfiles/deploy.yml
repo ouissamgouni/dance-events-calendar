@@ -45,6 +45,11 @@ tasks:
   #   • REF must be supplied and resolvable (after `git fetch`)
   #   • staging: REF must be reachable from origin/develop
   #   • prod:    REF must be an annotated tag (vX.Y.Z) reachable from origin/main
+  #   • CI must be green for the resolved commit (verified via `gh run list`).
+  #     Bypass with SKIP_CI_CHECK=1 — works as a Task var
+  #     (`task deploy:staging:remote SKIP_CI_CHECK=1 -- develop`) or as an env
+  #     var (`SKIP_CI_CHECK=1 task release:prod -- v1.2.0`), the latter also
+  #     propagating through the multi-step release flow.
   #
   # Secrets (config/secrets.*, backend/credentials/) live only in the host
   # repo and are read from there explicitly — they are NOT copied into the
@@ -74,6 +79,37 @@ tasks:
           exit 1
         fi
         SHORT=$(git rev-parse --short=7 "$REF_SHA")
+        # ── CI green-check gate (skippable: SKIP_CI_CHECK=1) ─────────────────
+        SKIP_CI="{{.SKIP_CI_CHECK | default ""}}"
+        [ -z "$SKIP_CI" ] && SKIP_CI="${SKIP_CI_CHECK:-0}"
+        case "$SKIP_CI" in
+          1|true|yes)
+            echo "⏭️  SKIP_CI_CHECK=$SKIP_CI — skipping CI green-check for $SHORT (deploying an unverified commit)." ;;
+          *)
+            if ! command -v gh >/dev/null 2>&1; then
+              echo "❌ GitHub CLI 'gh' not found — cannot verify CI passed for $SHORT." >&2
+              echo "   Install it (brew install gh) or bypass with SKIP_CI_CHECK=1." >&2
+              exit 1
+            fi
+            echo "→ Verifying CI passed for $REF ($SHORT)..."
+            CI_RESULT=$(gh run list --workflow=ci.yml --commit "$REF_SHA" --limit 1 --json status,conclusion --jq '.[0] | "\(.status):\(.conclusion)"' 2>/dev/null || echo "error")
+            case "$CI_RESULT" in
+              completed:success)
+                echo "✅ CI green for $SHORT" ;;
+              completed:*)
+                echo "❌ CI for $SHORT did not pass (conclusion: ${CI_RESULT#completed:})." >&2
+                echo "   Fix CI on this commit, or bypass with SKIP_CI_CHECK=1." >&2
+                exit 1 ;;
+              error|:|null:null|"")
+                echo "❌ No CI run found for $SHORT (or 'gh' could not reach GitHub)." >&2
+                echo "   Push the commit and let CI finish, or bypass with SKIP_CI_CHECK=1." >&2
+                exit 1 ;;
+              *)
+                echo "❌ CI for $SHORT has not finished (status: ${CI_RESULT%%:*})." >&2
+                echo "   Wait for CI to complete, or bypass with SKIP_CI_CHECK=1." >&2
+                exit 1 ;;
+            esac ;;
+        esac
         WT=".worktrees/ref-$SHORT"
         if [ -d "$WT" ]; then
           WT_SHA=$(git -C "$WT" rev-parse HEAD 2>/dev/null || echo "")
@@ -126,6 +162,37 @@ tasks:
           exit 1
         fi
         SHORT=$(git rev-parse --short=7 "$REF_SHA")
+        # ── CI green-check gate (skippable: SKIP_CI_CHECK=1) ─────────────────
+        SKIP_CI="{{.SKIP_CI_CHECK | default ""}}"
+        [ -z "$SKIP_CI" ] && SKIP_CI="${SKIP_CI_CHECK:-0}"
+        case "$SKIP_CI" in
+          1|true|yes)
+            echo "⏭️  SKIP_CI_CHECK=$SKIP_CI — skipping CI green-check for $SHORT (deploying an unverified commit)." ;;
+          *)
+            if ! command -v gh >/dev/null 2>&1; then
+              echo "❌ GitHub CLI 'gh' not found — cannot verify CI passed for $SHORT." >&2
+              echo "   Install it (brew install gh) or bypass with SKIP_CI_CHECK=1." >&2
+              exit 1
+            fi
+            echo "→ Verifying CI passed for $REF ($SHORT)..."
+            CI_RESULT=$(gh run list --workflow=ci.yml --commit "$REF_SHA" --limit 1 --json status,conclusion --jq '.[0] | "\(.status):\(.conclusion)"' 2>/dev/null || echo "error")
+            case "$CI_RESULT" in
+              completed:success)
+                echo "✅ CI green for $SHORT" ;;
+              completed:*)
+                echo "❌ CI for $SHORT did not pass (conclusion: ${CI_RESULT#completed:})." >&2
+                echo "   Fix CI on this commit, or bypass with SKIP_CI_CHECK=1." >&2
+                exit 1 ;;
+              error|:|null:null|"")
+                echo "❌ No CI run found for $SHORT (or 'gh' could not reach GitHub)." >&2
+                echo "   Push the commit and let CI finish, or bypass with SKIP_CI_CHECK=1." >&2
+                exit 1 ;;
+              *)
+                echo "❌ CI for $SHORT has not finished (status: ${CI_RESULT%%:*})." >&2
+                echo "   Wait for CI to complete, or bypass with SKIP_CI_CHECK=1." >&2
+                exit 1 ;;
+            esac ;;
+        esac
         WT=".worktrees/ref-$SHORT"
         if [ -d "$WT" ]; then
           WT_SHA=$(git -C "$WT" rev-parse HEAD 2>/dev/null || echo "")
@@ -488,7 +555,7 @@ tasks:
     dotenv:
       [
         "config/base.env",
-        "config/staging.remote.env",
+        "config/staging.remote.frontend.env",
         "config/secrets.env",
         "config/secrets.staging.env",
       ]
@@ -579,7 +646,7 @@ tasks:
     dotenv:
       [
         "config/base.env",
-        "config/staging.remote.env",
+        "config/staging.remote.frontend.env",
         "config/secrets.env",
         "config/secrets.staging.env",
       ]
@@ -594,7 +661,7 @@ tasks:
           exit 1
         fi
         if [ -z "$VITE_API_URL" ]; then
-          echo "❌ VITE_API_URL not set in config/staging.remote.env"
+          echo "❌ VITE_API_URL not set in config/staging.remote.frontend.env"
           exit 1
         fi
         echo "Validating Cloudflare token..."
@@ -629,7 +696,7 @@ tasks:
     dotenv:
       [
         "config/base.env",
-        "config/prod.remote.env",
+        "config/prod.remote.frontend.env",
         "config/secrets.env",
         "config/secrets.prod.env",
       ]
@@ -713,7 +780,7 @@ tasks:
     dotenv:
       [
         "config/base.env",
-        "config/prod.remote.env",
+        "config/prod.remote.frontend.env",
         "config/secrets.env",
         "config/secrets.prod.env",
       ]
@@ -728,7 +795,7 @@ tasks:
           exit 1
         fi
         if [ -z "$VITE_API_URL" ]; then
-          echo "❌ VITE_API_URL not set in config/prod.remote.env"
+          echo "❌ VITE_API_URL not set in config/prod.remote.frontend.env"
           exit 1
         fi
         echo "Validating Cloudflare token..."

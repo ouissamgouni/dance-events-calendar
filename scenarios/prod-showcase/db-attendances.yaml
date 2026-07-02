@@ -1,0 +1,513 @@
+attendances:
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: viewer@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: curator-showcase@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: organizer-one@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: showcase-dancer-01@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: showcase-dancer-02@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: showcase-dancer-03@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: showcase-dancer-04@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: showcase-dancer-05@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: showcase-dancer-06@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: showcase-dancer-07@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: showcase-dancer-08@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: showcase-dancer-09@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: showcase-dancer-10@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: showcase-dancer-11@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: showcase-dancer-12@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: showcase-dancer-13@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: showcase-dancer-14@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: showcase-dancer-15@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: showcase-dancer-16@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: showcase-dancer-17@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: showcase-dancer-18@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: showcase-dancer-19@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: showcase-dancer-20@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: showcase-dancer-21@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
+    email: showcase-dancer-22@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: chhjacpp71gj8bb660rm4b9kc4s6cb9pckom6bb3ccs3ep9m6kpm4opo70
+    email: viewer@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: chhjacpp71gj8bb660rm4b9kc4s6cb9pckom6bb3ccs3ep9m6kpm4opo70
+    email: curator-showcase@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: chhjacpp71gj8bb660rm4b9kc4s6cb9pckom6bb3ccs3ep9m6kpm4opo70
+    email: organizer-two@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: chhjacpp71gj8bb660rm4b9kc4s6cb9pckom6bb3ccs3ep9m6kpm4opo70
+    email: showcase-dancer-01@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: chhjacpp71gj8bb660rm4b9kc4s6cb9pckom6bb3ccs3ep9m6kpm4opo70
+    email: showcase-dancer-02@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: chhjacpp71gj8bb660rm4b9kc4s6cb9pckom6bb3ccs3ep9m6kpm4opo70
+    email: showcase-dancer-03@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: chhjacpp71gj8bb660rm4b9kc4s6cb9pckom6bb3ccs3ep9m6kpm4opo70
+    email: showcase-dancer-04@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: chhjacpp71gj8bb660rm4b9kc4s6cb9pckom6bb3ccs3ep9m6kpm4opo70
+    email: showcase-dancer-05@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: chhjacpp71gj8bb660rm4b9kc4s6cb9pckom6bb3ccs3ep9m6kpm4opo70
+    email: showcase-dancer-06@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: chhjacpp71gj8bb660rm4b9kc4s6cb9pckom6bb3ccs3ep9m6kpm4opo70
+    email: showcase-dancer-07@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    email: organizer-one@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    email: showcase-dancer-18@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    email: showcase-dancer-19@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    email: showcase-dancer-20@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
+    email: showcase-dancer-21@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 74s6aor36kqmabb2c9h3eb9k60p3ib9oc4r3gbb36lgj8e1g6csj4cpi68
+    email: showcase-dancer-24@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 74s6aor36kqmabb2c9h3eb9k60p3ib9oc4r3gbb36lgj8e1g6csj4cpi68
+    email: showcase-dancer-25@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 74s6aor36kqmabb2c9h3eb9k60p3ib9oc4r3gbb36lgj8e1g6csj4cpi68
+    email: viewer@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 74s6aor36kqmabb2c9h3eb9k60p3ib9oc4r3gbb36lgj8e1g6csj4cpi68
+    email: curator-showcase@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 74s6aor36kqmabb2c9h3eb9k60p3ib9oc4r3gbb36lgj8e1g6csj4cpi68
+    email: organizer-one@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 74s6aor36kqmabb2c9h3eb9k60p3ib9oc4r3gbb36lgj8e1g6csj4cpi68
+    email: organizer-two@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 74s6aor36kqmabb2c9h3eb9k60p3ib9oc4r3gbb36lgj8e1g6csj4cpi68
+    email: showcase-dancer-01@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 74s6aor36kqmabb2c9h3eb9k60p3ib9oc4r3gbb36lgj8e1g6csj4cpi68
+    email: showcase-dancer-02@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 74s6aor36kqmabb2c9h3eb9k60p3ib9oc4r3gbb36lgj8e1g6csj4cpi68
+    email: showcase-dancer-03@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 74s6aor36kqmabb2c9h3eb9k60p3ib9oc4r3gbb36lgj8e1g6csj4cpi68
+    email: showcase-dancer-04@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 71h68e3370pjab9lcos66b9kchj6cb9o64qmab9ocoo64c9lckoj6dhlc4
+    email: showcase-dancer-02@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 71h68e3370pjab9lcos66b9kchj6cb9o64qmab9ocoo64c9lckoj6dhlc4
+    email: showcase-dancer-03@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 71h68e3370pjab9lcos66b9kchj6cb9o64qmab9ocoo64c9lckoj6dhlc4
+    email: showcase-dancer-04@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6sp36cpoc9j30b9iccsm6b9kc9h34bb161i6cb9kchi30opp71hm2e9j64
+    email: showcase-dancer-16@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6sp36cpoc9j30b9iccsm6b9kc9h34bb161i6cb9kchi30opp71hm2e9j64
+    email: showcase-dancer-17@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6sp36cpoc9j30b9iccsm6b9kc9h34bb161i6cb9kchi30opp71hm2e9j64
+    email: showcase-dancer-18@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6sp36cpoc9j30b9iccsm6b9kc9h34bb161i6cb9kchi30opp71hm2e9j64
+    email: showcase-dancer-19@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6kojac1mchh64b9nc5hmcb9kc9j36bb268r30bb4c5gj2dpgckq6adj5cg
+    email: showcase-dancer-16@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6kojac1mchh64b9nc5hmcb9kc9j36bb268r30bb4c5gj2dpgckq6adj5cg
+    email: showcase-dancer-17@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6kojac1mchh64b9nc5hmcb9kc9j36bb268r30bb4c5gj2dpgckq6adj5cg
+    email: showcase-dancer-18@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6kojac1mchh64b9nc5hmcb9kc9j36bb268r30bb4c5gj2dpgckq6adj5cg
+    email: showcase-dancer-19@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6dgm8ohlccq6ab9o6dhm6b9k60pm4bb2cpgjebb16dijadj6cdh36e1h60
+    email: organizer-one@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6dgm8ohlccq6ab9o6dhm6b9k60pm4bb2cpgjebb16dijadj6cdh36e1h60
+    email: organizer-two@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6dgm8ohlccq6ab9o6dhm6b9k60pm4bb2cpgjebb16dijadj6cdh36e1h60
+    email: promo-scout@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6dgm8ohlccq6ab9o6dhm6b9k60pm4bb2cpgjebb16dijadj6cdh36e1h60
+    email: showcase-dancer-01@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 69hm6c32chgm8b9mckpm8b9k6di3gb9p6lj64bb1ccqm4c1p6pi38e1kck
+    email: showcase-dancer-18@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 69hm6c32chgm8b9mckpm8b9k6di3gb9p6lj64bb1ccqm4c1p6pi38e1kck
+    email: showcase-dancer-19@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 69hm6c32chgm8b9mckpm8b9k6di3gb9p6lj64bb1ccqm4c1p6pi38e1kck
+    email: showcase-dancer-20@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: cgom8e1j6sp3abb561ijib9kckr32bb2cor34b9j75hj6d9kcgo30opo6s
+    email: showcase-dancer-21@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 74rjgdpmchhj0bb5c8r3gb9k6crjab9p6cr3ebb26hh3ed3368o3aor66c
+    email: showcase-dancer-10@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: ccsm8or6clj38b9i60oj8b9k70rm6bb161hj8b9i6os30p1p6kq30e9lc4
+    email: showcase-dancer-15@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ccsm8or6clj38b9i60oj8b9k70rm6bb161hj8b9i6os30p1p6kq30e9lc4
+    email: showcase-dancer-16@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6dh36chlc8r62bb3cdi32b9k6lh3ab9oc4pmab9p6dim4d316hgm6opk6k
+    email: showcase-dancer-25@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6dh36chlc8r62bb3cdi32b9k6lh3ab9oc4pmab9p6dim4d316hgm6opk6k
+    email: viewer@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6dh36chlc8r62bb3cdi32b9k6lh3ab9oc4pmab9p6dim4d316hgm6opk6k
+    email: curator-showcase@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: ckq32dhi68rmabb564oj6b9k6kr3ib9p70rm6b9i71j3edhpcpim6dr6co
+    email: showcase-dancer-05@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: ckq32dhi68rmabb564oj6b9k6kr3ib9p70rm6b9i71j3edhpcpim6dr6co
+    email: showcase-dancer-06@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: ckq32dhi68rmabb564oj6b9k6kr3ib9p70rm6b9i71j3edhpcpim6dr6co
+    email: showcase-dancer-07@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 68qmcc1icgr3ebb1ckrmcb9k60pj8b9pc4o64b9k61gjedr674pj8dpkcc
+    email: showcase-dancer-20@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 68qmcc1icgr3ebb1ckrmcb9k60pj8b9pc4o64b9k61gjedr674pj8dpkcc
+    email: showcase-dancer-21@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 68qmcc1icgr3ebb1ckrmcb9k60pj8b9pc4o64b9k61gjedr674pj8dpkcc
+    email: showcase-dancer-22@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: c8oj2e9n70s66b9occqm4b9k6os30bb26grj2b9h68q34e1h6lj6acpi68
+    email: showcase-dancer-14@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: c8oj2e9n70s66b9occqm4b9k6os30bb26grj2b9h68q34e1h6lj6acpi68
+    email: showcase-dancer-15@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: c8oj2e9n70s66b9occqm4b9k6os30bb26grj2b9h68q34e1h6lj6acpi68
+    email: showcase-dancer-16@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 71j32p1n61j3ab9mc4qmcb9k6hhm6bb269ijgb9m6gs3copk68sjcphg60
+    email: showcase-dancer-21@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 65j62db36ti30b9nc5j66b9k61i38b9p6cp30bb174qj6dhp70ojid1g6s
+    email: showcase-dancer-10@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 65j62db36ti30b9nc5j66b9k61i38b9p6cp30bb174qj6dhp70ojid1g6s
+    email: showcase-dancer-11@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: cdhj2e9gc5h3gbb4c8smab9k74oj4bb2cgs6cbb2cpimae9l60qjgc1ocg
+    email: showcase-dancer-11@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: cdhj2e9gc5h3gbb4c8smab9k74oj4bb2cgs6cbb2cpimae9l60qjgc1ocg
+    email: showcase-dancer-12@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: cdhj2e9gc5h3gbb4c8smab9k74oj4bb2cgs6cbb2cpimae9l60qjgc1ocg
+    email: showcase-dancer-13@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6sq3acpkchijabb66gq6ab9kclgm8b9ochij2b9h6coj8oj16go6cphi6g
+    email: showcase-dancer-19@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 60om8oj16oqm6bb6cgqm8b9kcks62b9o68rj4bb369h32o9j71h30p1g6s
+    email: showcase-dancer-20@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 60om8oj16oqm6bb6cgqm8b9kcks62b9o68rj4bb369h32o9j71h30p1g6s
+    email: showcase-dancer-21@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 60om8oj16oqm6bb6cgqm8b9kcks62b9o68rj4bb369h32o9j71h30p1g6s
+    email: showcase-dancer-22@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: c4pj0db460rjibb369gjeb9kc5h30bb2cphm8b9hc9im4cph6oojachlck
+    email: showcase-dancer-07@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: c4pj0db460rjibb369gjeb9kc5h30bb2cphm8b9hc9im4cph6oojachlck
+    email: showcase-dancer-08@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: c4pj0db460rjibb369gjeb9kc5h30bb2cphm8b9hc9im4cph6oojachlck
+    email: showcase-dancer-09@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: cdj32cj46hij0b9j61hm4b9kcos3eb9oc4rjabb174r66c1jchj64p1nco
+    email: showcase-dancer-20@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: cdj32cj46hij0b9j61hm4b9kcos3eb9oc4rjabb174r66c1jchj64p1nco
+    email: showcase-dancer-21@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: cdj32cj46hij0b9j61hm4b9kcos3eb9oc4rjabb174r66c1jchj64p1nco
+    email: showcase-dancer-22@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: cdj32cj46hij0b9j61hm4b9kcos3eb9oc4rjabb174r66c1jchj64p1nco
+    email: showcase-dancer-23@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 68o3icj660s6abb6cgrj8b9k68p3abb26gp3gb9m6grm6ohh6co38cb36s
+    email: showcase-dancer-24@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 68o3icj660s6abb6cgrj8b9k68p3abb26gp3gb9m6grm6ohh6co38cb36s
+    email: showcase-dancer-25@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 68o3icj660s6abb6cgrj8b9k68p3abb26gp3gb9m6grm6ohh6co38cb36s
+    email: viewer@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6cojae1ic4r34b9occqmab9k6gpj4bb270q3eb9k6lgm8o9p6kqjgd32cc
+    email: showcase-dancer-03@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6cojae1ic4r34b9occqmab9k6gpj4bb270q3eb9k6lgm8o9p6kqjgd32cc
+    email: showcase-dancer-04@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6cojae1ic4r34b9occqmab9k6gpj4bb270q3eb9k6lgm8o9p6kqjgd32cc
+    email: showcase-dancer-05@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6cojae1ic4r34b9occqmab9k6gpj4bb270q3eb9k6lgm8o9p6kqjgd32cc
+    email: showcase-dancer-06@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: cpgj8dr475j30b9ocgq66b9k6pi34b9o6krj4bb360oj8ohk74pm4dpo6s
+    email: showcase-dancer-10@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: cpgj8dr475j30b9ocgq66b9k6pi34b9o6krj4bb360oj8ohk74pm4dpo6s
+    email: showcase-dancer-11@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: cpgj8dr475j30b9ocgq66b9k6pi34b9o6krj4bb360oj8ohk74pm4dpo6s
+    email: showcase-dancer-12@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: cpgj8dr475j30b9ocgq66b9k6pi34b9o6krj4bb360oj8ohk74pm4dpo6s
+    email: showcase-dancer-13@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: ckrm4c9k6pgj0b9o6sq62b9kclh62bb270o6abb168s3ae1i70s3ce3660
+    email: showcase-dancer-08@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: ckrm4c9k6pgj0b9o6sq62b9kclh62bb270o6abb168s3ae1i70s3ce3660
+    email: showcase-dancer-09@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6dhm4ohk6op38b9k6or30b9kc8r6abb26lh3ibb169h3eob2c8qm6dpn6c
+    email: showcase-dancer-03@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6dhm4ohk6op38b9k6or30b9kc8r6abb26lh3ibb169h3eob2c8qm6dpn6c
+    email: showcase-dancer-04@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6dhm4ohk6op38b9k6or30b9kc8r6abb26lh3ibb169h3eob2c8qm6dpn6c
+    email: showcase-dancer-05@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 65j30d1o6pi62b9n6himab9kcpi66bb26cqj2b9l69ij2dr5chhj6c1h70
+    email: showcase-dancer-23@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 65j30d1o6pi62b9n6himab9kcpi66bb26cqj2b9l69ij2dr5chhj6c1h70
+    email: showcase-dancer-24@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: cco3cohncgrj2bb2coqjeb9k6kqj0b9pchhm2bb565hj2dhi6com4cr66s
+    email: showcase-dancer-09@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6ssjicr171j66bb6c5j36b9k69i6abb26kqj2bb16gq68o9ichh34dphc4
+    email: showcase-dancer-01@example.com
+    share_publicly: false
+    share_audience: private
+  - event_id: 6ssjicr171j66bb6c5j36b9k69i6abb26kqj2bb16gq68o9ichh34dphc4
+    email: showcase-dancer-02@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6ssjicr171j66bb6c5j36b9k69i6abb26kqj2bb16gq68o9ichh34dphc4
+    email: showcase-dancer-03@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: 6ssjicr171j66bb6c5j36b9k69i6abb26kqj2bb16gq68o9ichh34dphc4
+    email: showcase-dancer-04@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: 6ssjicr171j66bb6c5j36b9k69i6abb26kqj2bb16gq68o9ichh34dphc4
+    email: showcase-dancer-05@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    email: showcase-dancer-20@example.com
+    share_publicly: false
+    share_audience: friends
+  - event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    email: showcase-dancer-21@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
+    email: showcase-dancer-22@example.com
+    share_publicly: false
+    share_audience: friends

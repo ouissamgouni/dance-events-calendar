@@ -1,0 +1,20 @@
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    account_visibility: public
+
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+    account_visibility: public
+
+  - email: carol@example.com
+    name: Carol Nguyen
+    handle: carol
+    account_visibility: public

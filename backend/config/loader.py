@@ -147,3 +147,79 @@ def get_smtp_config() -> dict:
         "password": os.getenv("SMTP_PASSWORD", ""),
         "from_addr": os.getenv("SMTP_FROM", ""),
     }
+
+
+def get_public_app_url() -> str:
+    """Return the public frontend base URL (no trailing slash).
+
+    Reads ``PUBLIC_APP_URL`` (set in fly.toml / .env), with environment
+    fallbacks and localhost for local dev. Used to build user-facing links
+    in emails (event pages, unsubscribe, account settings).
+    """
+    configured = os.getenv("PUBLIC_APP_URL")
+    if configured:
+        return configured.rstrip("/")
+    env_name = (os.getenv("ENV_NAME") or "").strip().lower()
+    if env_name == "staging":
+        return "https://develop.joinmovida.com"
+    if env_name in {"prod", "production"}:
+        return "https://joinmovida.com"
+    return "http://localhost:5173"
+
+
+def get_notification_scheduler_enabled() -> bool:
+    """Enable the in-app notification dispatch loop (reminders + digests).
+
+    When True: FastAPI startup runs the background notification loop.
+    When False: expects an external scheduler (e.g. Fly Machines cron) to
+    call ``POST /admin/trigger-notifications``.
+
+    Typical config: dev/staging True, prod False (external cron).
+    """
+    val = os.getenv("NOTIFICATION_SCHEDULER_ENABLED", "false")
+    return val.strip().lower() in ("true", "1")
+
+
+def get_notification_interval_minutes() -> int:
+    """How often the notification dispatch loop runs (minutes)."""
+    raw = os.getenv("NOTIFICATION_INTERVAL_MINUTES", "15")
+    try:
+        return max(1, int(raw))
+    except (TypeError, ValueError):
+        return 15
+
+
+def get_reminders_enabled() -> bool:
+    """Master switch for event-reminder generation + emails. Default True."""
+    parsed = _parse_bool(os.getenv("REMINDERS_ENABLED"))
+    return True if parsed is None else parsed
+
+
+def get_reminder_lead_hours() -> int:
+    """Hours before an event's start to send the reminder. Default 24."""
+    raw = os.getenv("REMINDER_LEAD_HOURS", "24")
+    try:
+        return max(1, int(raw))
+    except (TypeError, ValueError):
+        return 24
+
+
+def get_activity_email_enabled() -> bool:
+    """Master switch for batched activity digest emails. Default True."""
+    parsed = _parse_bool(os.getenv("ACTIVITY_EMAIL_ENABLED"))
+    return True if parsed is None else parsed
+
+
+def get_webpush_enabled() -> bool:
+    """Master switch for web-push delivery. Default False (needs VAPID keys)."""
+    parsed = _parse_bool(os.getenv("WEBPUSH_ENABLED"))
+    return False if parsed is None else parsed
+
+
+def get_vapid_config() -> dict:
+    """VAPID keypair + subject used to sign web-push requests."""
+    return {
+        "public_key": os.getenv("VAPID_PUBLIC_KEY", ""),
+        "private_key": os.getenv("VAPID_PRIVATE_KEY", ""),
+        "subject": os.getenv("VAPID_SUBJECT", "mailto:admin@joinmovida.com"),
+    }

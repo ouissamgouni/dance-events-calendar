@@ -75,16 +75,17 @@ Each environment tier loads exactly its own files — no file appears in two tie
 |------|-----------|-----------|
 | `secrets.env` | no | all tasks (shared base: Cloudflare creds, Google SA file) |
 | `secrets.dev.env` | no | dev tasks |
-| `.env.dev` | yes | dev tasks (non-secret: ports, DB name) |
-| `.env.staging.local` | yes | `staging:local` tasks only — `DATABASE_URL` → localhost:5436 |
-| `secrets.staging.remote.env` | no | `staging:remote` tasks only — `DATABASE_URL` → Neon develop |
-| `secrets.prod.env` | no | `prod:remote` tasks |
-| `.env.prod` | yes | prod tasks (non-secret) |
+| `dev.env` | yes | dev tasks (non-secret: ports, DB name) |
+| `staging.local.env` | yes | `staging:local` tasks only — app config for localhost Docker |
+| `staging.remote.frontend.env` | yes | `staging:remote` frontend build — VITE_API_URL, analytics |
+| `secrets.staging.env` | no | `staging:remote` tasks — `DATABASE_URL` → Neon develop |
+| `secrets.prod.env` | no | `prod:remote` tasks — `DATABASE_URL` → Neon main |
+| `prod.remote.frontend.env` | yes | `prod:remote` frontend build — VITE_API_URL, analytics |
+| `scenario.env` | yes | scenario tasks (non-secret) |
 | `secrets.scenario.env` | no | scenario tasks |
-| `.env.scenario` | yes | scenario tasks |
 
 > **Rule:** `DATABASE_URL` is never shared between local and remote staging.
-> Local tasks read it from `.env.staging.local` (localhost). Remote tasks read it from `secrets.staging.remote.env` (Neon).
+> Local tasks read it from `staging.local.env` (localhost:5436). Remote tasks read it from `secrets.staging.env` (Neon develop).
 
 ---
 
@@ -379,8 +380,8 @@ task deploy:staging:remote:backend  -- develop  # stage Fly secrets + fly deploy
 task deploy:staging:remote:frontend -- develop  # build frontend + wrangler pages deploy --branch=develop
 ```
 
-Env files loaded: `secrets.env` + `secrets.staging.remote.env` (always read
-from your host repo, never from the worktree, since they are gitignored).
+Env files loaded: `secrets.env` + `secrets.staging.env` + `staging.remote.frontend.env` (always read
+from your host repo, never from the worktree, since gitignored files are kept in host).
 
 What `backend:staging:remote` does:
 1. `fly secrets import -c config/fly.staging.toml --stage` (filtered: no `VITE_*`, no `CLOUDFLARE_*`)
@@ -946,8 +947,8 @@ Scenario stop tasks (`stop:scenario`, `stop:scenario:all`) close their isolated 
 ### DATABASE_URL not set
 
 Each remote task reads its `DATABASE_URL` from its own secrets file:
-- `staging:remote` tasks → `secrets.staging.remote.env`
-- `prod:remote` tasks → `secrets.prod.env`
+- `staging:remote` tasks → `secrets.staging.env` (Neon develop branch)
+- `prod:remote` tasks → `secrets.prod.env` (Neon main branch)
 
 Copy the `.example` file and fill in the Neon connection string from the dashboard.
 

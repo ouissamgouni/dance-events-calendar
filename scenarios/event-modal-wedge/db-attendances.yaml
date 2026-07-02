@@ -1,0 +1,47 @@
+attendances:
+  # Bucket 1: friends-going row.
+  - event_id: evt-wedge-001
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+  # Bucket 2: friend-of-friend row (via alice).
+  - event_id: evt-wedge-001
+    email: bob@example.com
+    share_publicly: true
+    share_audience: public
+  # GDPR control: must NEVER surface to viewer.
+  - event_id: evt-wedge-001
+    email: carol@example.com
+    share_publicly: false
+    share_audience: private
+  # Bucket 3: "Also going" — public-audience strangers. Seven rows so
+  # the inline cap (6) is exceeded and the "Show all N" CTA appears,
+  # opening the sectioned modal.
+  - event_id: evt-wedge-001
+    email: dave@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-wedge-001
+    email: eve@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-wedge-001
+    email: frank@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-wedge-001
+    email: gina@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-wedge-001
+    email: hugo@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-wedge-001
+    email: ivy@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-wedge-001
+    email: jack@example.com
+    share_publicly: true
+    share_audience: public

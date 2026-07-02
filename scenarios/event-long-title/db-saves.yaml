@@ -1,0 +1,13 @@
+saves:
+  - event_id: evt-lt-001
+    device_id: seed-save-lt-001-a
+    audience: friends
+  - event_id: evt-lt-001
+    device_id: seed-save-lt-001-b
+    audience: public
+  - event_id: evt-lt-001
+    device_id: seed-save-lt-001-c
+    audience: private
+  - event_id: evt-lt-002
+    device_id: seed-save-lt-002-a
+    audience: friends

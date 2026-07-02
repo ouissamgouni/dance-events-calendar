@@ -209,6 +209,7 @@ function NotificationRow({
 }) {
     const isUnread = !item.read_at;
     const isFollowKind = item.kind === 'new_follower' || item.kind === 'new_friend' || item.kind === 'follow_request';
+    const isReminder = item.kind === 'event_reminder';
     // Phase E (E1): inline Follow-back CTA on new_follower rows when the
     // viewer does not already follow the actor. ``new_friend`` rows mean
     // the relationship is already mutual, so no CTA is needed.
@@ -254,6 +255,50 @@ function NotificationRow({
                                         : 'updated';
     const actorName = item.actor.display_name || `@${item.actor.handle}`;
     const initial = (actorName || '?').trim().charAt(0).toUpperCase();
+    if (isReminder) {
+        const startLabel = item.event_start
+            ? new Date(item.event_start).toLocaleString([], {
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
+            })
+            : null;
+        return (
+            <li>
+                <button
+                    type="button"
+                    onClick={onClick}
+                    className={`w-full text-left flex items-start gap-3 px-4 py-3 sm:px-3 sm:py-2 hover:bg-slate-50 ${isUnread ? 'bg-blue-50/40' : 'bg-white'}`}
+                >
+                    <div className="w-8 h-8 sm:w-7 sm:h-7 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0" aria-hidden="true">
+                        🕒
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-xs text-slate-700 truncate">
+                            <span className="text-slate-500">Reminder — you're going to</span>{' '}
+                            <span className="font-medium text-slate-900">
+                                {item.event_title || 'an event'}
+                            </span>
+                        </p>
+                        {startLabel && (
+                            <p className="text-[11px] text-rose-600 mt-0.5">Starts {startLabel}</p>
+                        )}
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                            {formatRelative(item.created_at)}
+                        </p>
+                    </div>
+                    {isUnread && (
+                        <span
+                            className="mt-1.5 w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"
+                            aria-label="Unread"
+                        />
+                    )}
+                </button>
+            </li>
+        );
+    }
     return (
         <li>
             <button

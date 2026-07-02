@@ -138,6 +138,11 @@ export default function NotificationsPage() {
                     active={filterKind === 'follow_request'}
                     onClick={() => setFilterKind('follow_request')}
                 />
+                <KindChip
+                    label="Reminders"
+                    active={filterKind === 'event_reminder'}
+                    onClick={() => setFilterKind('event_reminder')}
+                />
             </div>
 
             {error && (
@@ -248,6 +253,65 @@ function NotificationRow({
     const actorName = item.actor.display_name || `@${item.actor.handle}`;
     const initial = (actorName || '?').trim().charAt(0).toUpperCase();
     const destination = isFollowKind ? `/u/${item.actor.handle}` : `/event/${item.event_id}`;
+    if (item.kind === 'event_reminder') {
+        const startLabel = item.event_start
+            ? new Date(item.event_start).toLocaleString([], {
+                weekday: 'short',
+                day: 'numeric',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit',
+            })
+            : null;
+        return (
+            <li
+                className={`flex items-start gap-3 px-3 py-3 ${isUnread ? 'bg-blue-50/40' : 'bg-white'}`}
+            >
+                <div className="w-8 h-8 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center" aria-hidden="true">
+                    🕒
+                </div>
+                <button
+                    type="button"
+                    onClick={() => {
+                        if (isUnread) onMarkRead();
+                        navigate(`/event/${item.event_id}`);
+                    }}
+                    className="min-w-0 flex-1 text-left"
+                >
+                    <p className="text-sm text-slate-700">
+                        <span className="text-slate-500">Reminder — you're going to</span>{' '}
+                        <span className="font-medium text-slate-900">
+                            {item.event_title || 'an event'}
+                        </span>
+                    </p>
+                    {startLabel && (
+                        <p className="text-xs text-rose-600 mt-0.5">Starts {startLabel}</p>
+                    )}
+                    <p className="text-xs text-slate-400 mt-0.5">
+                        {formatRelative(item.created_at)}
+                    </p>
+                </button>
+                {isUnread ? (
+                    <button
+                        type="button"
+                        onClick={onMarkRead}
+                        disabled={busy}
+                        className="shrink-0 text-xs text-slate-500 hover:text-blue-600 disabled:opacity-50"
+                    >
+                        {busy ? '…' : 'Mark read'}
+                    </button>
+                ) : (
+                    <span
+                        className="shrink-0 text-xs text-slate-300"
+                        aria-label="Read"
+                        title="Read"
+                    >
+                        ●
+                    </span>
+                )}
+            </li>
+        );
+    }
     return (
         <li
             className={`flex items-start gap-3 px-3 py-3 ${isUnread ? 'bg-blue-50/40' : 'bg-white'}`}

@@ -1316,13 +1316,6 @@ export default function Home() {
             loading={loading}
             onOpenFilters={() => setFilterSheetOpen(true)}
             activeFilterCount={activeFilterCount}
-            eventSearchTrigger={(
-                <ExplorerEventSearch
-                    onSelectEvent={handleExplorerSearchEventClick}
-                    triggerLabel="Search events"
-                    compact
-                />
-            )}
         />
     );
 
@@ -1332,7 +1325,18 @@ export default function Home() {
                 {!loading && !error && (
                     <div className="mb-3 sm:mb-4 flex flex-col gap-2">
                         <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex flex-wrap items-center gap-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <ExplorerEventSearch
+                                    className="hidden lg:flex"
+                                    onSelectEvent={handleExplorerSearchEventClick}
+                                    triggerLabel="Search events"
+                                />
+                                <ExplorerEventSearch
+                                    className="lg:hidden"
+                                    onSelectEvent={handleExplorerSearchEventClick}
+                                    triggerLabel="Search events"
+                                    compact
+                                />
                                 <div className="flex gap-1 bg-slate-200 p-1 shrink-0 w-fit">
                                     <Link
                                         to="/"
@@ -1359,13 +1363,6 @@ export default function Home() {
                                     </button>
                                 </div>
                             </div>
-                            {viewMode === 'explorer' && (
-                                <ExplorerEventSearch
-                                    className="hidden lg:block"
-                                    onSelectEvent={handleExplorerSearchEventClick}
-                                    triggerLabel="Search events"
-                                />
-                            )}
                         </div>
                     </div>
                 )}
@@ -1404,29 +1401,6 @@ export default function Home() {
                                     </div>
                                     {/* Event list: hidden on mobile until after map, fills remaining height on desktop */}
                                     <div className="hidden lg:flex lg:flex-col lg:flex-1 lg:min-h-0 lg:overflow-hidden">
-                                        <SummaryBar
-                                            totalCount={explorerMatchingEvents.length}
-                                            visibleCount={explorerMatchingEvents.length}
-                                            startDate={startDate}
-                                            endDate={endDate}
-                                            areaLabel={
-                                                areaChipState.kind === 'map-view' ? 'Current map view'
-                                                    : areaChipState.kind === 'show-all' ? 'Worldwide'
-                                                        : areaChipState.label
-                                            }
-                                            areaKind={areaChipState.kind}
-                                            areaIsDefault={areaChipState.kind === 'default' && !areaSessionOverride}
-                                            onClearArea={handleClearAreaOverride}
-                                            activeTagIds={activeTagIds}
-                                            tagGroups={tagGroups}
-                                            onRemoveTag={handleRemoveTag}
-                                            interestSource={interestSource}
-                                            interestKind={interestKind}
-                                            interestUserHandle={interestUserHandle}
-                                            onClearInterest={handleClearInterest}
-                                            onClearAll={handleClearAllFilters}
-                                            loading={loading}
-                                        />
                                         <div className="flex-1 min-h-0 overflow-hidden">
                                             <EventListPanel
                                                 events={explorerMatchingEvents}
@@ -1457,7 +1431,7 @@ export default function Home() {
                                 and event list). On desktop the column is sticky
                                 and fills available height; the bar is shrink-0
                                 so it doesn't get clipped. */}
-                                <div className="order-2 lg:order-2 lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6 flex flex-col gap-1.5 sm:gap-2 min-w-0">
+                                <div className="order-2 lg:order-2 lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6 lg:relative flex flex-col gap-1.5 sm:gap-2 min-w-0">
                                     {showTrendingBanner && (
                                         <TrendingEventsBanner
                                             events={explorerMatchingEvents}
@@ -1571,7 +1545,7 @@ export default function Home() {
                                 being applied, here's what you can do with
                                 it" unit. */}
                                     <div
-                                        className="shrink-0 flex flex-col gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 border bg-slate-100 border-slate-200 text-slate-700 text-xs min-w-0"
+                                        className="shrink-0 flex flex-col gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 border bg-slate-100 border-slate-200 text-slate-700 text-xs min-w-0 lg:absolute lg:bottom-0 lg:left-0 lg:right-0 lg:z-[703]"
                                         data-testid="area-default-bar"
                                     >
                                         <div className="flex flex-wrap items-center gap-1 sm:gap-2 min-w-0">

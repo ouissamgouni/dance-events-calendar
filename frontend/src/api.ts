@@ -300,6 +300,15 @@ export interface AuthUser {
      *  skip). When ``null`` the frontend route guard redirects to
      *  ``/onboarding/follow`` after first-load. Absent for anon. */
     onboarded_at?: string | null;
+    /** IANA timezone used to render reminder/event times. Defaults to
+     *  ``"UTC"``; captured from the browser on first signed-in load. */
+    timezone?: string;
+    /** Email-delivery toggles for upcoming-event reminders and friend/
+     *  event activity digests. Default true. */
+    reminder_email_enabled?: boolean;
+    activity_email_enabled?: boolean;
+    /** Web-push delivery toggle (Phase 4). Default true. */
+    push_enabled?: boolean;
 }
 
 export async function loginWithGoogle(
@@ -403,6 +412,66 @@ export async function updateUserPreferences(
     });
     if (!res.ok) throw new Error('Failed to update preferences');
     return res.json();
+}
+
+export interface NotificationPreferences {
+    timezone: string;
+    reminder_email_enabled: boolean;
+    activity_email_enabled: boolean;
+    push_enabled: boolean;
+}
+
+export interface UpdateNotificationPreferencesPayload {
+    timezone?: string;
+    reminder_email_enabled?: boolean;
+    activity_email_enabled?: boolean;
+    push_enabled?: boolean;
+}
+
+export async function updateNotificationPreferences(
+    prefs: UpdateNotificationPreferencesPayload,
+): Promise<NotificationPreferences> {
+    const res = await fetch(`${BASE}/auth/notification-preferences`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(prefs),
+    });
+    if (!res.ok) throw new Error('Failed to update notification preferences');
+    return res.json();
+}
+
+/** Fetch the app's VAPID public key, or null when web-push is disabled. */
+export async function fetchVapidPublicKey(): Promise<string | null> {
+    const res = await fetch(`${BASE}/push/vapid-public-key`, { credentials: 'include' });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { public_key?: string };
+    return data.public_key ?? null;
+}
+
+export interface PushSubscriptionPayload {
+    endpoint: string;
+    keys: { p256dh: string; auth: string };
+    user_agent?: string;
+}
+
+export async function subscribePush(payload: PushSubscriptionPayload): Promise<void> {
+    const res = await fetch(`${BASE}/push/subscribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error('Failed to subscribe to push');
+}
+
+export async function unsubscribePush(endpoint: string): Promise<void> {
+    await fetch(`${BASE}/push/unsubscribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ endpoint }),
+    });
 }
 
 export async function updateUserProfile(
@@ -1039,7 +1108,8 @@ export type NotificationKind =
     | 'follow_request_approved'
     | 'promo_code_approved'
     | 'promo_code_rejected'
-    | 'organizer_claim_decided';
+    | 'organizer_claim_decided'
+    | 'event_reminder';
 
 export interface NotificationActor {
     handle: string;
@@ -2248,6 +2318,21 @@ export async function createShareToken(deviceId: string): Promise<{ token: strin
     });
     if (!res.ok) throw new Error('Failed to create share token');
     return res.json();
+}
+
+/**
+ * Absolute, subscribable iCalendar feed URL for a share token. Calendar
+ * clients (Apple/Google) poll this directly, so it must be fully-qualified
+ * even when ``BASE`` is the relative ``/api`` used by the Vite dev proxy.
+ */
+export function getCalendarFeedUrl(
+    token: string,
+    scope: 'all' | 'saved' | 'going' = 'all',
+): string {
+    const base = BASE.startsWith('http')
+        ? BASE
+        : `${window.location.origin}${BASE}`;
+    return `${base}/share/calendar/${encodeURIComponent(token)}.ics?scope=${scope}`;
 }
 
 export interface SharedCalendarPayload {

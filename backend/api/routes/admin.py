@@ -539,6 +539,20 @@ def trigger_sync(
         return {"status": "skipped", "reason": str(exc)}
 
 
+@router.post("/trigger-notifications")
+def trigger_notifications(_admin: dict = Depends(require_admin)):
+    """Run one notification dispatch pass (reminders + activity digests).
+
+    Called by the external scheduler (Fly Machines cron) in environments
+    where the in-app dispatch loop is disabled. Idempotent: reminders are
+    deduped by unique constraint and digest rows are stamped once emailed.
+    """
+    from backend.services.scheduler import run_notification_dispatch_once
+
+    stats = run_notification_dispatch_once()
+    return {"status": "ok", "stats": stats}
+
+
 @router.get("/sync-jobs/current")
 def get_current_sync_job(_admin: dict = Depends(require_admin)):
     job = get_sync_job_service().get_current_job()

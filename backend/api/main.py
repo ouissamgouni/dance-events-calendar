@@ -18,6 +18,7 @@ from backend.api.routes.config import router as config_router
 from backend.api.routes.events import router as events_router
 from backend.api.routes.export import router as export_router
 from backend.api.routes.notifications import router as notifications_router
+from backend.api.routes.push import router as push_router
 from backend.api.routes.ratings import router as ratings_router
 from backend.api.routes.settings import router as settings_router
 from backend.api.routes.sharing import router as sharing_router
@@ -32,9 +33,13 @@ from backend.config.loader import (
     get_calendar_service_type,
     get_cors_origins,
     get_auto_sync_scheduler_enabled,
+    get_notification_scheduler_enabled,
 )
+from backend.config.logging_config import configure_logging
 from backend.db.database import init_db
-from backend.services.scheduler import run_sync_loop
+from backend.services.scheduler import run_notification_dispatch_loop, run_sync_loop
+
+configure_logging()
 
 logger = logging.getLogger(__name__)
 
@@ -73,14 +78,28 @@ async def lifespan(app: FastAPI):
             "In-app sync scheduler disabled; using external scheduler (call POST /admin/trigger-sync)"
         )
 
+    # Notification dispatch loop (event reminders + activity digests).
+    # Same gating model as sync: in-app loop for dev/staging, external cron
+    # (POST /admin/trigger-notifications) for prod single-source delivery.
+    notif_task = None
+    if get_notification_scheduler_enabled():
+        notif_task = asyncio.create_task(run_notification_dispatch_loop())
+        logger.info("Started in-app notification dispatch scheduler")
+    else:
+        logger.info(
+            "In-app notification scheduler disabled; using external scheduler "
+            "(call POST /admin/trigger-notifications)"
+        )
+
     yield
 
-    if sync_task:
-        sync_task.cancel()
-        try:
-            await sync_task
-        except asyncio.CancelledError:
-            pass
+    for task in (sync_task, notif_task):
+        if task:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
 
 _SECURITY_HEADERS = [
@@ -171,6 +190,7 @@ app.include_router(tags_router)
 app.include_router(ratings_router)
 app.include_router(social_router)
 app.include_router(notifications_router)
+app.include_router(push_router)
 
 
 @app.get("/health", response_model=HealthResponse)

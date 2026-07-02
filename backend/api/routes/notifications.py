@@ -38,6 +38,7 @@ VALID_KINDS = {
     "new_friend",
     "follow_request",
     "follow_request_approved",
+    "event_reminder",
 }
 
 

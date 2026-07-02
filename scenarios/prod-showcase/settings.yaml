@@ -7,6 +7,6 @@ settings:
   trending_enabled: true
   trending_banner_enabled: true
   trending_window_days: 365
-  trending_floor_going: 1
-  trending_top_n: 8
+  trending_floor_going: 5
+  trending_top_n: 4
   trending_top_percent: 100

@@ -1,0 +1,5 @@
+attendances:
+  - event_id: evt-cd-001
+    email: curator-paris@example.com
+    share_publicly: true
+    share_audience: public

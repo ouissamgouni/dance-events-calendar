@@ -14,6 +14,7 @@ from backend.db.models import (
     CalendarSetting,
     ShareToken,
     UserSavedEvent,
+    UserEventAttendance,
 )
 
 
@@ -284,3 +285,133 @@ class TestGetSharedCalendar:
         resp = c.get("/api/share/calendar/test-token-uuid")
         assert resp.status_code == 200
         assert resp.json() == {"events": [], "owner_display_name": None}
+
+
+def _sample_attending_row(device_id="dev-abc", event_id="evt-going-001"):
+    return UserEventAttendance(
+        id=1,
+        device_id=device_id,
+        event_id=event_id,
+        attending_since=datetime(2026, 4, 29, 12, 0),
+    )
+
+
+def _feed_mock(
+    session, *, share, saved=None, attending=None, events=None, calendars=("cal-1",)
+):
+    """Dispatch ``session.exec`` results by table name for the feed endpoint."""
+    saved = list(saved or [])
+    attending = list(attending or [])
+    events = list(events or [])
+
+    def mock_exec(stmt):
+        result = MagicMock()
+        sql = str(stmt).lower()
+        if "share_tokens" in sql:
+            result.first.return_value = share
+        elif "user_saved_events" in sql:
+            result.all.return_value = saved
+        elif "user_event_attendances" in sql:
+            result.all.return_value = attending
+        elif "calendar_settings" in sql:
+            result.all.return_value = list(calendars)
+        elif "cached_events" in sql:
+            result.all.return_value = events
+        else:
+            result.first.return_value = None
+            result.all.return_value = []
+        return result
+
+    session.exec.side_effect = mock_exec
+
+
+# ── GET /api/share/calendar/{token}.ics (live subscription feed) ─────────────
+
+
+@pytest.mark.unit
+class TestCalendarFeed:
+    def test_invalid_token_returns_404(self, client):
+        c, session = client
+        _feed_mock(session, share=None)
+
+        resp = c.get("/api/share/calendar/bad-token.ics")
+        assert resp.status_code == 404
+
+    def test_going_scope_returns_calendar(self, client):
+        c, session = client
+        share = _sample_share_token()
+        going_event = _sample_event(event_id="evt-going-001", title="Bachata Social")
+        _feed_mock(
+            session,
+            share=share,
+            attending=[_sample_attending_row(event_id="evt-going-001")],
+            events=[going_event],
+        )
+
+        resp = c.get("/api/share/calendar/test-token-uuid.ics?scope=going")
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("text/calendar")
+        body = resp.text
+        assert "BEGIN:VCALENDAR" in body
+        assert "REFRESH-INTERVAL;VALUE=DURATION:PT12H" in body
+        assert "X-WR-CALNAME:My Movida — Going" in body
+        assert "SUMMARY:Bachata Social" in body
+        assert "DTSTAMP:" in body
+
+    def test_saved_scope_excludes_going_events(self, client):
+        """scope=saved must ignore 'going' rows entirely (no events queried)."""
+        c, session = client
+        share = _sample_share_token()
+        _feed_mock(
+            session,
+            share=share,
+            saved=[],
+            attending=[_sample_attending_row(event_id="evt-going-001")],
+            events=[_sample_event(event_id="evt-going-001")],
+        )
+
+        resp = c.get("/api/share/calendar/test-token-uuid.ics?scope=saved")
+        assert resp.status_code == 200
+        body = resp.text
+        assert "BEGIN:VEVENT" not in body
+        assert "X-WR-CALNAME:My Movida — Saved" in body
+
+    def test_all_scope_includes_saved_and_going(self, client):
+        c, session = client
+        share = _sample_share_token()
+        saved_event = _sample_event(event_id="evt-saved-001", title="Salsa Night")
+        going_event = _sample_event(event_id="evt-going-001", title="Bachata Social")
+        _feed_mock(
+            session,
+            share=share,
+            saved=[_sample_saved_row(event_id="evt-saved-001")],
+            attending=[_sample_attending_row(event_id="evt-going-001")],
+            events=[saved_event, going_event],
+        )
+
+        resp = c.get("/api/share/calendar/test-token-uuid.ics")
+        assert resp.status_code == 200
+        body = resp.text
+        assert "SUMMARY:Salsa Night" in body
+        assert "SUMMARY:Bachata Social" in body
+        assert "X-WR-CALNAME:My Movida — Saved & Going" in body
+
+    def test_all_day_event_uses_date_value(self, client):
+        c, session = client
+        share = _sample_share_token()
+        all_day = _sample_event(
+            event_id="evt-going-001",
+            all_day=True,
+            start=datetime(2026, 5, 10, 0, 0),
+            end=datetime(2026, 5, 11, 0, 0),
+        )
+        _feed_mock(
+            session,
+            share=share,
+            attending=[_sample_attending_row(event_id="evt-going-001")],
+            events=[all_day],
+        )
+
+        resp = c.get("/api/share/calendar/test-token-uuid.ics?scope=going")
+        assert resp.status_code == 200
+        assert "DTSTART;VALUE=DATE:20260510" in resp.text

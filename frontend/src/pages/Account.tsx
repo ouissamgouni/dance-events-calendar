@@ -12,6 +12,9 @@ import {
 import type { MyRating } from '../types';
 import PreferencesSection from '../components/PreferencesSection';
 import VisibilitySection, { ProfileLinksEditor } from '../components/VisibilitySection';
+import NotificationSettings from '../components/NotificationSettings';
+import PushNotificationSettings from '../components/PushNotificationSettings';
+import InstallAppSection from '../components/InstallAppSection';
 import BioEditor from '../components/BioEditor';
 import NetworkPanel from '../components/NetworkPanel';
 import ReferralCard from '../components/ReferralCard';
@@ -169,6 +172,8 @@ export default function Account() {
             <div className="mx-auto max-w-xl px-4 py-3 text-xs">
                 <h1 className="text-lg font-bold text-slate-900 mb-3">Settings</h1>
                 <PreferencesSection />
+                <PushNotificationSettings />
+                <InstallAppSection />
                 <section className="rounded-lg border border-slate-200 bg-white p-4">
                     <h2 className="text-sm font-semibold text-slate-900 mb-2">Account</h2>
                     <p className="text-xs text-slate-600 mb-3">
@@ -399,6 +404,12 @@ export default function Account() {
 
             <div id="preferences" className="scroll-mt-4">
                 <PreferencesSection />
+            </div>
+
+            <div id="notifications" className="scroll-mt-4">
+                <NotificationSettings />
+                <PushNotificationSettings />
+                <InstallAppSection />
             </div>
 
             <div id="privacy" className="scroll-mt-4">

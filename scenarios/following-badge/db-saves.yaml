@@ -1,0 +1,23 @@
+saves:
+  # --- original minimal events ---
+  - event_id: evt-fb-002
+    email: alice@example.com
+    audience: friends
+
+  # --- evt-fb-100 (Madrid hero):
+  #     2 friends saving (audience=friends) + 10 strangers saving public ---
+  - { event_id: evt-fb-100, email: nia@example.com, audience: friends }
+  - { event_id: evt-fb-100, email: omar@example.com, audience: friends }
+  - { event_id: evt-fb-100, email: t01@example.com, audience: public }
+  - { event_id: evt-fb-100, email: t02@example.com, audience: public }
+  - { event_id: evt-fb-100, email: t03@example.com, audience: public }
+  - { event_id: evt-fb-100, email: t04@example.com, audience: public }
+  - { event_id: evt-fb-100, email: t05@example.com, audience: public }
+  - { event_id: evt-fb-100, email: t06@example.com, audience: public }
+  - { event_id: evt-fb-100, email: t07@example.com, audience: public }
+  - { event_id: evt-fb-100, email: t08@example.com, audience: public }
+  - { event_id: evt-fb-100, email: t09@example.com, audience: public }
+  - { event_id: evt-fb-100, email: t10@example.com, audience: public }
+
+  # --- evt-fb-102 (Rome): 1 friend saving with audience=friends ---
+  - { event_id: evt-fb-102, email: nia@example.com, audience: friends }

@@ -1,0 +1,22 @@
+attendances:
+  # alpha — 3 public
+  - { event_id: evt-e9-001, email: alpha@example.com, share_publicly: true }
+  - { event_id: evt-e9-002, email: alpha@example.com, share_publicly: true }
+  - { event_id: evt-e9-003, email: alpha@example.com, share_publicly: true }
+  # beta — 2 public
+  - { event_id: evt-e9-001, email: beta@example.com, share_publicly: true }
+  - { event_id: evt-e9-002, email: beta@example.com, share_publicly: true }
+  # delta — 1 friends-audience (still counts)
+  - {
+      event_id: evt-e9-003,
+      email: delta@example.com,
+      share_publicly: false,
+      share_audience: friends,
+    }
+  # gamma — 1 private (must NOT count on E9)
+  - {
+      event_id: evt-e9-001,
+      email: gamma@example.com,
+      share_publicly: false,
+      share_audience: private,
+    }

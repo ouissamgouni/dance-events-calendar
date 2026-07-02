@@ -1,0 +1,45 @@
+attendances:
+  # Pre-existing share_publicly Going from alice. Used to verify that
+  # subscribing AFTER the fact backfills the MyCalendar "From
+  # subscriptions" section (read-time aggregation) while NOT generating a
+  # historical notification (notifications only fire at write time).
+  - event_id: evt-sef-001
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-sef-004
+    email: dave@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-sef-005
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-sef-006
+    email: carol@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-sef-007
+    email: erin@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-sef-008
+    email: frank@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-sef-009
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-sef-010
+    email: carol@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-sef-011
+    email: erin@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: evt-sef-012
+    email: frank@example.com
+    share_publicly: true
+    share_audience: public

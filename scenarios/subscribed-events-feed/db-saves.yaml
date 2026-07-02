@@ -1,0 +1,16 @@
+saves:
+  - event_id: evt-sef-013
+    email: alice@example.com
+    audience: public
+  - event_id: evt-sef-014
+    email: carol@example.com
+    audience: public
+  - event_id: evt-sef-015
+    email: erin@example.com
+    audience: public
+  - event_id: evt-sef-016
+    email: frank@example.com
+    audience: public
+  - event_id: evt-sef-010
+    email: alice@example.com
+    audience: public

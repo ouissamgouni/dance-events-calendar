@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useAttendanceSummary } from '../context/AttendanceSummariesContext';
+import { useAttendingEvents } from '../context/AttendingEventsContext';
 import SaveEventButton from './SaveEventButton';
 import GoingButton from './GoingButton';
 import AttendeeAvatarStack from './AttendeeAvatarStack';
@@ -141,7 +142,7 @@ function PopularityBadge({
             className="inline-flex items-center gap-0.5 bg-orange-50 px-1.5 py-0.5 text-[10px] font-medium text-orange-700"
             data-testid="trending-badge"
         >
-            🔥 Trending
+            🔥
         </span>
     );
 }
@@ -217,8 +218,10 @@ export function EventListCard({
     coachMark = false,
     onDismissCoachMark,
 }: EventListCardProps) {
+    const { isAttending } = useAttendingEvents();
     const start = new Date(event.start);
     const onMap = isOnMap(event, mapBounds);
+    const isGoing = isAttending(event.event_id);
     const offMapBadge = !onMap ? (
         <span className="event-card-offmap-badge" role="img" aria-label="Off map" title="Off map">
             <img src="/location-off.png" alt="" aria-hidden="true" className="event-card-offmap-icon" />
@@ -231,7 +234,7 @@ export function EventListCard({
                 ref={cardRef}
                 role="button"
                 tabIndex={0}
-                className={`event-card${onMap ? '' : ' event-card-offmap'}${isHighlighted ? ' event-card-highlighted' : ''}`}
+                className={`event-card${onMap ? '' : ' event-card-offmap'}${isHighlighted ? ' event-card-highlighted' : ''}${isGoing ? ' event-card-user-going' : ''}`}
                 onClick={() => onEventClick(event)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onEventClick(event); } }}
                 onMouseEnter={() => onEventHover?.(event.event_id)}
@@ -267,9 +270,38 @@ export function EventListCard({
                         )}
                         {event.title}
                     </h4>
-                    <p className="event-card-date">
-                        {event.all_day ? formatCardDate(start) : `${formatCardDate(start)} · ${formatCardTime(start)}`}
-                    </p>
+                    <div className="flex items-center gap-4">
+                        <p className="event-card-date shrink-0">
+                            {event.all_day ? formatCardDate(start) : `${formatCardDate(start)} · ${formatCardTime(start)}`}
+                        </p>
+                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                            <AttendeeAvatarStack
+                                eventId={event.event_id}
+                                friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
+                            />
+                            {showPopularity && (
+                                <PopularityBadge
+                                    score={event.popularity_score ?? 0}
+                                    allScores={allViewCounts}
+                                    threshold={popularityThreshold}
+                                    topN={trendingTopN}
+                                    topPercent={trendingTopPercent}
+                                />
+                            )}
+                        </div>
+                        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+                            {event.has_active_promo_codes && (
+                                <img
+                                    src="/promo-code.png"
+                                    alt=""
+                                    aria-hidden="true"
+                                    title="Has promo codes"
+                                    className="w-4 h-4 object-contain"
+                                    data-testid="event-card-promo-icon"
+                                />
+                            )}
+                        </div>
+                    </div>
                     {event.location && (
                         <p className="event-card-location">
                             {offMapBadge}
@@ -288,37 +320,11 @@ export function EventListCard({
                     )}
                     {event.tags?.length > 0 && (
                         <div className="mt-1">
-                            <TagBadges tags={event.tags} maxVisible={3} />
+                            <TagBadges tags={event.tags} maxVisible={5} />
                         </div>
                     )}
                     <div className="mt-1 flex flex-wrap items-center gap-2">
-                        <div className="min-w-0 flex-1">
-                            <AttendeeAvatarStack
-                                eventId={event.event_id}
-                                friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
-                            />
-                        </div>
-                        <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                            {event.has_active_promo_codes && (
-                                <img
-                                    src="/promo-code.png"
-                                    alt=""
-                                    aria-hidden="true"
-                                    title="Has promo codes"
-                                    className="w-4 h-4 object-contain"
-                                    data-testid="event-card-promo-icon"
-                                />
-                            )}
-                            {showPopularity && (
-                                <PopularityBadge
-                                    score={event.popularity_score ?? 0}
-                                    allScores={allViewCounts}
-                                    threshold={popularityThreshold}
-                                    topN={trendingTopN}
-                                    topPercent={trendingTopPercent}
-                                />
-                            )}
-                        </div>
+
                     </div>
                     <div className={`event-card-actions absolute top-0 right-0 flex items-center gap-1.5${coachMark ? ' animate-pulse' : ''}`}>
                         <ActionCountCluster eventId={event.event_id} showRatings={!!showRatings} isSavedFlag={isSavedFlag} />

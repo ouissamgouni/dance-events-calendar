@@ -27,6 +27,11 @@ primary_region = "cdg"
   # (same-site as the frontend), so develop.joinmovida.com is the only origin
   # that needs credentialed CORS. Pages preview URL is kept for ad-hoc testing.
   CORS_ORIGINS = "https://develop.movida.pages.dev,https://develop.joinmovida.com"
+  # In-app background dispatch loops. Fly has no native cron, so these flags
+  # are the only thing that drives notification delivery and auto-sync.
+  NOTIFICATION_SCHEDULER_ENABLED = "true"
+  NOTIFICATION_INTERVAL_MINUTES = "1"
+  AUTO_SYNC_SCHEDULER_ENABLED = "true"
   # SMTP host/port/from (credentials are fly secrets)
   SMTP_HOST = "smtp-relay.brevo.com"
   SMTP_PORT = "587"

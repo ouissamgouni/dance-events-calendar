@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import Response
 from slowapi import Limiter
 from backend.api.rate_limit import client_ip
 from sqlalchemy import func, or_
@@ -24,6 +25,7 @@ from backend.db.models import (
     UserEventAttendance,
     UserSavedEvent,
 )
+from backend.services.ics import build_ics
 
 router = APIRouter(prefix="/api/share", tags=["sharing"])
 
@@ -76,6 +78,95 @@ def create_share_token(
     session.add(ShareToken(token=token, device_id=payload.device_id))
     session.commit()
     return ShareTokenResponse(token=token)
+
+
+def _scoped_event_ids(session: Session, share: ShareToken, scope: str) -> list[str]:
+    """Collect the share owner's event ids for the requested scope.
+
+    ``scope`` is one of ``saved``, ``going`` or ``all``. User-scoped tokens
+    aggregate across all of the user's devices; legacy device-only tokens use
+    the device id alone.
+    """
+    if share.user_id is not None:
+        saved_pred = or_(
+            UserSavedEvent.user_id == share.user_id,
+            UserSavedEvent.device_id == share.device_id,
+        )
+        going_pred = or_(
+            UserEventAttendance.user_id == share.user_id,
+            UserEventAttendance.device_id == share.device_id,
+        )
+    else:
+        saved_pred = UserSavedEvent.device_id == share.device_id
+        going_pred = UserEventAttendance.device_id == share.device_id
+
+    ids: set[str] = set()
+    if scope in ("saved", "all"):
+        ids.update(
+            row.event_id
+            for row in session.exec(select(UserSavedEvent).where(saved_pred)).all()
+        )
+    if scope in ("going", "all"):
+        ids.update(
+            row.event_id
+            for row in session.exec(select(UserEventAttendance).where(going_pred)).all()
+        )
+    return list(ids)
+
+
+@router.get("/calendar/{token}.ics")
+@limiter.limit("120/minute")
+def get_calendar_feed(
+    request: Request,
+    token: str,
+    scope: str = "all",
+    session: Session = Depends(get_session),
+):
+    """Public live iCalendar feed for a share token (subscribable in Apple/Google).
+
+    Unlike the one-shot export, this is polled periodically by calendar clients,
+    so saved/going events stay in sync. ``scope`` selects saved, going or all.
+    """
+    if scope not in ("saved", "going", "all"):
+        scope = "all"
+
+    share = session.exec(select(ShareToken).where(ShareToken.token == token)).first()
+    if not share:
+        raise HTTPException(status_code=404, detail="Share link not found")
+
+    event_ids = _scoped_event_ids(session, share, scope)
+
+    events: list[CachedEvent] = []
+    if event_ids:
+        enabled_calendars = session.exec(
+            select(CalendarSetting.calendar_id).where(CalendarSetting.enabled == True)
+        ).all()
+        if enabled_calendars:
+            events = list(
+                session.exec(
+                    select(CachedEvent).where(
+                        CachedEvent.event_id.in_(event_ids),
+                        CachedEvent.calendar_id.in_(enabled_calendars),
+                        CachedEvent.deleted_at == None,
+                    )
+                ).all()
+            )
+    events.sort(key=lambda e: e.start)
+
+    scope_label = {"saved": "Saved", "going": "Going", "all": "Saved & Going"}[scope]
+    ics_content = build_ics(
+        events,
+        calendar_name=f"My Movida — {scope_label}",
+        refresh_hours=12,
+    )
+    return Response(
+        content=ics_content,
+        media_type="text/calendar; charset=utf-8",
+        headers={
+            "Content-Disposition": "inline; filename=movida.ics",
+            "Cache-Control": "max-age=3600",
+        },
+    )
 
 
 @router.get("/calendar/{token}", response_model=SharedCalendarResponse)

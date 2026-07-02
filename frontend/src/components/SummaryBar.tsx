@@ -215,6 +215,7 @@ export default function SummaryBar(props: SummaryBarProps) {
         >
             <div className="flex items-center min-w-0">
                 <div className="flex flex-wrap items-center gap-1 min-w-0">
+                    {eventSearchTrigger}
                     {onOpenFilters && (
                         <button
                             type="button"
@@ -226,7 +227,6 @@ export default function SummaryBar(props: SummaryBarProps) {
                             <span>Filters</span>
                         </button>
                     )}
-                    {eventSearchTrigger}
                     <Chip
                         label={formatPeriodLabel(startDate, endDate)}
                         tone="accent"

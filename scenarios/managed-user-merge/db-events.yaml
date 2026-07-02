@@ -50,34 +50,6 @@ events:
       - format:workshop
       - dance-style:salsa
 
-saves:
-  - event_id: evt-merge-001
-    email: old-curator@example.com
-    audience: public
-  - event_id: evt-merge-002
-    email: old-curator@example.com
-    audience: public
-  - event_id: evt-merge-002
-    email: new-curator@example.com
-    audience: public
-  - event_id: evt-merge-003
-    email: bruno@example.com
-    audience: public
-
-attendances:
-  - event_id: evt-merge-001
-    email: old-curator@example.com
-    share_publicly: true
-    share_audience: public
-  - event_id: evt-merge-002
-    email: old-curator@example.com
-    share_publicly: true
-    share_audience: public
-  - event_id: evt-merge-002
-    email: new-curator@example.com
-    share_publicly: true
-    share_audience: public
-
 ratings:
   - event_id: evt-merge-001
     email: old-curator@example.com
