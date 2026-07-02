@@ -21,6 +21,7 @@ primary_region = "cdg"
   # In-app background dispatch loops. Fly has no native cron, so these flags
   # are the only thing that drives notification delivery and auto-sync.
   NOTIFICATION_SCHEDULER_ENABLED = "true"
+  NOTIFICATION_INTERVAL_MINUTES = "5"
   AUTO_SYNC_SCHEDULER_ENABLED = "true"
   # SMTP host/port/from (credentials are fly secrets)
   SMTP_HOST = "smtp-relay.brevo.com"
