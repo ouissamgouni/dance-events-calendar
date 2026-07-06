@@ -182,6 +182,41 @@ def _release_dispatch_lock(conn) -> None:
             pass
 
 
+def _log_effective_gates() -> None:
+    """DEBUG-log the resolved (DB-override-or-env) notification gates at
+    the start of each dispatch tick. Enable DEBUG logging to see exactly
+    which gate/schedule value the running instance is using without
+    needing DB access — the #1 cause of "nothing happened" tickets is a
+    gate or schedule the operator didn't realize was already set."""
+    if not logger.isEnabledFor(logging.DEBUG):
+        return
+    try:
+        from backend.services.app_settings import (
+            get_event_reminders_enabled,
+            get_activity_digest_email_enabled,
+            get_interest_match_notifications_enabled,
+            get_web_push_enabled,
+            get_activity_digest_schedule,
+            get_reminder_lead_hours,
+        )
+        from backend.config.loader import get_notification_interval_minutes
+
+        logger.debug(
+            "Effective notification gates: reminders=%s (lead_hours=%s) "
+            "activity_email=%s (schedule=%r) interest=%s web_push=%s "
+            "interval_minutes=%s",
+            get_event_reminders_enabled(),
+            get_reminder_lead_hours(),
+            get_activity_digest_email_enabled(),
+            get_activity_digest_schedule(),
+            get_interest_match_notifications_enabled(),
+            get_web_push_enabled(),
+            get_notification_interval_minutes(),
+        )
+    except Exception:
+        logger.debug("Effective notification gates: failed to resolve", exc_info=True)
+
+
 def run_notification_dispatch_once(force_activity_digest: bool = False) -> dict:
     """Run one pass of user-facing notification delivery.
 
@@ -201,6 +236,8 @@ def run_notification_dispatch_once(force_activity_digest: bool = False) -> dict:
     # Imported lazily to keep scheduler import-light and avoid any import
     # cycle with the email/notification services.
     from backend.services import activity_email, interest_notification_service, reminder_service
+
+    _log_effective_gates()
 
     try:
         lock_conn = _try_acquire_dispatch_lock()

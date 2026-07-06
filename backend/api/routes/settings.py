@@ -8,6 +8,7 @@ from backend.api.schemas import SiteSettingsResponse, SiteSettingsUpdateRequest
 from backend.config.loader import get_auto_sync_enabled, get_sync_interval_minutes
 from backend.db.database import get_session
 from backend.db.models import SiteSetting
+from backend.services import app_settings
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -175,18 +176,20 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         your_next_events_rail_enabled=_get_bool_setting(
             session, "your_next_events_rail_enabled", default=True
         ),
-        event_reminders_enabled=_get_bool_setting(session, "event_reminders_enabled", default=True),
-        activity_digest_email_enabled=_get_bool_setting(
-            session, "activity_digest_email_enabled", default=True
-        ),
-        interest_match_notifications_enabled=_get_bool_setting(
-            session, "interest_match_notifications_enabled", default=True
-        ),
-        web_push_enabled=_get_bool_setting(session, "web_push_enabled", default=False),
-        reminder_lead_hours=_get_int_setting(session, "reminder_lead_hours", 24),
-        activity_digest_schedule=_get_str_setting(
-            session, "activity_digest_schedule", "tue,fri @ 09:00"
-        ),
+        # These 6 gates are DB-first with an env-var fallback (see
+        # backend/services/app_settings.py); read through that module here
+        # so the admin UI always reflects the *effective* value (not just
+        # whatever happens to be in site_settings) — previously this used
+        # the local DB-only `_get_bool_setting` helper above, which ignored
+        # the env fallback entirely and made e.g. web_push_enabled show
+        # "disabled" even when WEB_PUSH_ENABLED=true was set at the env/fly
+        # level with no site_settings override yet.
+        event_reminders_enabled=app_settings.get_event_reminders_enabled(session),
+        activity_digest_email_enabled=app_settings.get_activity_digest_email_enabled(session),
+        interest_match_notifications_enabled=app_settings.get_interest_match_notifications_enabled(session),
+        web_push_enabled=app_settings.get_web_push_enabled(session),
+        reminder_lead_hours=app_settings.get_reminder_lead_hours(session),
+        activity_digest_schedule=app_settings.get_activity_digest_schedule(session),
     )
 
 

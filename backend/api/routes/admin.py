@@ -1,5 +1,6 @@
 import logging
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlmodel import Session, col, func, select
@@ -23,11 +24,16 @@ from backend.api.schemas import (
     CalendarDefaultTagsUpdate,
     CalendarSettingResponse,
     CalendarToggleRequest,
+    DigestSendNowRequest,
+    DigestSendNowResponse,
     EventFilterOptionsResponse,
     EventIdsResponse,
     EventResponse,
     EventUpdateRequest,
     FilterOption,
+    ForceInterestMatchSendRequest,
+    ForceInterestMatchSendResponse,
+    ForceSendUserResult,
     GeocodeSuggestion,
     PaginatedEventsResponse,
     SyncJobListResponse,
@@ -50,6 +56,7 @@ from backend.db.models import (
     EventSave,
     EventTag,
     EventView,
+    PushSubscription,
     SyncLog,
     Tag,
     TagSuggestion,
@@ -551,6 +558,225 @@ def trigger_notifications(_admin: dict = Depends(require_admin)):
 
     stats = run_notification_dispatch_once()
     return {"status": "ok", "stats": stats}
+
+
+@router.get("/notifications/effective-config")
+def notifications_effective_config(
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Resolved (site_settings-override-or-env) notification config.
+
+    For each admin-configurable gate, reports the *effective* value the
+    running instance actually uses right now plus where it came from —
+    ``site_setting`` (an explicit DB override exists) or ``env_or_default``
+    (falling through to the env var / hardcoded default in
+    ``backend.config.loader``). Answers "what is the backend actually
+    using?" without needing direct DB access.
+    """
+    from backend.config import loader
+    from backend.services import app_settings
+
+    def _entry(effective, row_present: bool, env_value):
+        return {
+            "effective": effective,
+            "source": "site_setting" if row_present else "env_or_default",
+            "env_or_default_value": env_value,
+        }
+
+    return {
+        "event_reminders_enabled": _entry(
+            app_settings.get_event_reminders_enabled(session),
+            app_settings._get_bool_row(session, "event_reminders_enabled") is not None,
+            loader.get_event_reminders_enabled(),
+        ),
+        "activity_digest_email_enabled": _entry(
+            app_settings.get_activity_digest_email_enabled(session),
+            app_settings._get_bool_row(session, "activity_digest_email_enabled") is not None,
+            loader.get_activity_digest_email_enabled(),
+        ),
+        "interest_match_notifications_enabled": _entry(
+            app_settings.get_interest_match_notifications_enabled(session),
+            app_settings._get_bool_row(session, "interest_match_notifications_enabled") is not None,
+            loader.get_interest_match_notifications_enabled(),
+        ),
+        "web_push_enabled": _entry(
+            app_settings.get_web_push_enabled(session),
+            app_settings._get_bool_row(session, "web_push_enabled") is not None,
+            loader.get_web_push_enabled(),
+        ),
+        "reminder_lead_hours": _entry(
+            app_settings.get_reminder_lead_hours(session),
+            app_settings._get_int_row(session, "reminder_lead_hours") is not None,
+            loader.get_reminder_lead_hours(),
+        ),
+        "activity_digest_schedule": _entry(
+            app_settings.get_activity_digest_schedule(session),
+            app_settings._get_str_row(session, "activity_digest_schedule") is not None,
+            app_settings.DEFAULT_DIGEST_SCHEDULE,
+        ),
+        # Env-only (no DB override support): the in-app scheduler loop and
+        # its tick cadence, which only take effect on process restart.
+        "notification_scheduler_enabled": {
+            "effective": loader.get_notification_scheduler_enabled(),
+            "source": "env_only",
+        },
+        "notification_interval_minutes": {
+            "effective": loader.get_notification_interval_minutes(),
+            "source": "env_only",
+        },
+        "vapid_configured": bool(
+            loader.get_vapid_config().get("public_key")
+            and loader.get_vapid_config().get("private_key")
+        ),
+    }
+
+
+@router.get("/notifications/webpush/subscriber-count")
+def webpush_subscriber_count(
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Count of distinct signed-in users with at least one registered Web
+    Push browser endpoint. Anonymous (``user_id IS NULL``) subscriptions are
+    excluded since they aren't tied to an account.
+    """
+    count = int(
+        session.exec(
+            select(func.count(func.distinct(PushSubscription.user_id))).where(
+                col(PushSubscription.user_id).is_not(None)
+            )
+        ).one()
+    )
+    return {"subscriber_count": count}
+
+
+@router.post(
+    "/notifications/interest-match/force-send",
+    response_model=ForceInterestMatchSendResponse,
+)
+def force_send_interest_matches(
+    body: ForceInterestMatchSendRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Admin override: scan for interest-profile matches over a custom
+    ``lookback_hours`` window for hand-picked users and deliver them right
+    away (email/push), bypassing the normal digest schedule window and the
+    global scan cursor. For support/debugging — e.g. verifying a user's
+    saved-search alert works, or backfilling a match they say they missed.
+    """
+    from backend.services import activity_email, interest_notification_service
+    from backend.services.interest_notification_service import INTEREST_EVENT
+
+    users = {
+        u.id: u
+        for u in session.exec(
+            select(User).where(User.id.in_(body.user_ids))  # type: ignore[union-attr]
+        ).all()
+    }
+
+    results: list[ForceSendUserResult] = []
+    eligible_ids: set = set()
+    for uid in body.user_ids:
+        user = users.get(uid)
+        if user is None or user.deleted_at is not None:
+            results.append(
+                ForceSendUserResult(user_id=uid, email="", status="skipped_not_found")
+            )
+            continue
+        if not (user.email_interest_matches_enabled or user.push_interest_matches_enabled):
+            results.append(
+                ForceSendUserResult(user_id=uid, email=user.email, status="skipped_disabled")
+            )
+            continue
+        eligible_ids.add(uid)
+
+    if not eligible_ids:
+        return ForceInterestMatchSendResponse(
+            candidates_scanned=0,
+            notifications_created=0,
+            digests_sent=0,
+            pushes_sent=0,
+            results=results,
+        )
+
+    match_stats = interest_notification_service.run_once_for_users(
+        eligible_ids, body.lookback_hours
+    )
+    digest_stats = activity_email.run_once(
+        force=True, user_ids=eligible_ids, kinds=(INTEREST_EVENT,)
+    )
+    delivered = set(digest_stats.get("delivered_recipients") or [])
+    for uid in eligible_ids:
+        status = "sent" if str(uid) in delivered else "no_pending_notifications"
+        results.append(ForceSendUserResult(user_id=uid, email=users[uid].email, status=status))
+
+    return ForceInterestMatchSendResponse(
+        candidates_scanned=match_stats.get("candidates", 0),
+        notifications_created=match_stats.get("created", 0),
+        digests_sent=digest_stats.get("digests", 0),
+        pushes_sent=digest_stats.get("pushed", 0),
+        results=results,
+    )
+
+
+@router.post("/notifications/digest/send-now", response_model=DigestSendNowResponse)
+def digest_send_now(
+    body: DigestSendNowRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Admin override: ship each selected user's pending activity digest
+    (social activity + interest matches) right now, bypassing the digest
+    schedule window and the once-per-day dedup gate for just that user.
+    """
+    from backend.services import activity_email
+
+    users = {
+        u.id: u
+        for u in session.exec(
+            select(User).where(User.id.in_(body.user_ids))  # type: ignore[union-attr]
+        ).all()
+    }
+
+    results: list[ForceSendUserResult] = []
+    eligible_ids: set = set()
+    for uid in body.user_ids:
+        user = users.get(uid)
+        if user is None or user.deleted_at is not None:
+            results.append(
+                ForceSendUserResult(user_id=uid, email="", status="skipped_not_found")
+            )
+            continue
+        has_any_channel = (
+            user.email_social_activity_enabled
+            or user.email_interest_matches_enabled
+            or user.push_social_activity_enabled
+            or user.push_interest_matches_enabled
+        )
+        if not has_any_channel:
+            results.append(
+                ForceSendUserResult(user_id=uid, email=user.email, status="skipped_disabled")
+            )
+            continue
+        eligible_ids.add(uid)
+
+    if not eligible_ids:
+        return DigestSendNowResponse(digests_sent=0, pushes_sent=0, stamped=0, results=results)
+
+    stats = activity_email.run_once(force=True, user_ids=eligible_ids)
+    delivered = set(stats.get("delivered_recipients") or [])
+    for uid in eligible_ids:
+        status = "sent" if str(uid) in delivered else "no_pending_notifications"
+        results.append(ForceSendUserResult(user_id=uid, email=users[uid].email, status=status))
+
+    return DigestSendNowResponse(
+        digests_sent=stats.get("digests", 0),
+        pushes_sent=stats.get("pushed", 0),
+        stamped=stats.get("stamped", 0),
+        results=results,
+    )
 
 
 @router.get("/sync-jobs/current")

@@ -1,0 +1,61 @@
+# Identical Paris salsa/international bbox+tag profile for every user
+# except Carol, whose profile is silenced (`matches_enabled: false`)
+# to prove the admin force-send still honors per-profile opt-out even
+# when the user is hand-picked in the action.
+interest_profiles:
+  - user: nora@example.com
+    label: "Nora: Paris salsa (intl)"
+    min_lat: 48.0
+    min_lng: 1.0
+    max_lat: 49.0
+    max_lng: 4.0
+    dance_tags: ["dance-style:salsa"]
+    reach_tags: ["reach:international"]
+    matches_enabled: true
+    is_active: true
+
+  - user: bob@example.com
+    label: "Bob: Paris salsa (intl)"
+    min_lat: 48.0
+    min_lng: 1.0
+    max_lat: 49.0
+    max_lng: 4.0
+    dance_tags: ["dance-style:salsa"]
+    reach_tags: ["reach:international"]
+    matches_enabled: true
+    is_active: true
+
+  # Silenced profile — proves force-send still honors the per-profile
+  # opt-out even when Carol is selected in the admin action.
+  - user: carol@example.com
+    label: "Carol: silenced salsa"
+    min_lat: 48.0
+    min_lng: 1.0
+    max_lat: 49.0
+    max_lng: 4.0
+    dance_tags: ["dance-style:salsa"]
+    reach_tags: ["reach:international"]
+    matches_enabled: false
+    is_active: true
+
+  - user: dan@example.com
+    label: "Dan: Paris salsa (intl)"
+    min_lat: 48.0
+    min_lng: 1.0
+    max_lat: 49.0
+    max_lng: 4.0
+    dance_tags: ["dance-style:salsa"]
+    reach_tags: ["reach:international"]
+    matches_enabled: true
+    is_active: true
+
+  - user: eve@example.com
+    label: "Eve: Paris salsa (intl)"
+    min_lat: 48.0
+    min_lng: 1.0
+    max_lat: 49.0
+    max_lng: 4.0
+    dance_tags: ["dance-style:salsa"]
+    reach_tags: ["reach:international"]
+    matches_enabled: true
+    is_active: true

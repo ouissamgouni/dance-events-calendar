@@ -259,6 +259,74 @@ export async function updateSettings(settings: Partial<SiteSettings>): Promise<S
     return res.json();
 }
 
+// --- Admin: notification debugging / manual overrides ---
+
+export interface EffectiveConfigEntry {
+    effective: unknown;
+    source: 'site_setting' | 'env_or_default' | 'env_only';
+    env_or_default_value?: unknown;
+}
+
+export type NotificationsEffectiveConfig = Record<string, EffectiveConfigEntry>;
+
+export async function fetchNotificationsEffectiveConfig(): Promise<NotificationsEffectiveConfig> {
+    const res = await fetch(`${BASE}/admin/notifications/effective-config`, { credentials: 'include' });
+    return parseJsonResponse<NotificationsEffectiveConfig>(res, 'Failed to fetch effective notification config');
+}
+
+export interface WebPushSubscriberCount {
+    subscriber_count: number;
+}
+
+export async function fetchWebPushSubscriberCount(): Promise<WebPushSubscriberCount> {
+    const res = await fetch(`${BASE}/admin/notifications/webpush/subscriber-count`, { credentials: 'include' });
+    return parseJsonResponse<WebPushSubscriberCount>(res, 'Failed to fetch web push subscriber count');
+}
+
+export interface ForceSendUserResult {
+    user_id: string;
+    email: string;
+    status: 'sent' | 'no_pending_notifications' | 'skipped_disabled' | 'skipped_not_found';
+}
+
+export interface ForceInterestMatchSendResponse {
+    candidates_scanned: number;
+    notifications_created: number;
+    digests_sent: number;
+    pushes_sent: number;
+    results: ForceSendUserResult[];
+}
+
+export async function forceSendInterestMatches(
+    userIds: string[],
+    lookbackHours: number,
+): Promise<ForceInterestMatchSendResponse> {
+    const res = await fetch(`${BASE}/admin/notifications/interest-match/force-send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ user_ids: userIds, lookback_hours: lookbackHours }),
+    });
+    return parseJsonResponse<ForceInterestMatchSendResponse>(res, 'Failed to force-send interest matches');
+}
+
+export interface DigestSendNowResponse {
+    digests_sent: number;
+    pushes_sent: number;
+    stamped: number;
+    results: ForceSendUserResult[];
+}
+
+export async function sendDigestNow(userIds: string[]): Promise<DigestSendNowResponse> {
+    const res = await fetch(`${BASE}/admin/notifications/digest/send-now`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ user_ids: userIds }),
+    });
+    return parseJsonResponse<DigestSendNowResponse>(res, 'Failed to send digest now');
+}
+
 export async function trackEventView(eventId: string, deviceId?: string, source?: string): Promise<void> {
     const body: Record<string, string> = { event_id: eventId };
     if (deviceId) body.device_id = deviceId;

@@ -1,0 +1,19 @@
+# Focused social-activity fixture. Alice attends ev-friend; Bob, Carol
+# and Dave all follow Alice → each gets a pending social_activity
+# notification row, but only the users selected in the admin's
+# "Send digest now" action should actually be emailed.
+base_week: 0
+events:
+  - id: ev-friend
+    calendar_id: salsa-cal-001
+    title: Bachata Friendly Social
+    description: "Used to validate the 'Send digest now' admin action."
+    location: "Studio Azul, Paris, France"
+    latitude: 48.8662
+    longitude: 2.3744
+    start: w1 Wed 19:30
+    end: w1 Wed 22:30
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local

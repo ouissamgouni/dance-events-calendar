@@ -718,6 +718,45 @@ class SiteSettingsResponse(BaseModel):
     activity_digest_schedule: str = "tue,fri @ 09:00"
 
 
+# ---------------------------------------------------------------------------
+# Admin "force send" notification actions — manual overrides for support /
+# debugging so an operator doesn't have to wait for the schedule/window to
+# naturally roll around for a specific user.
+# ---------------------------------------------------------------------------
+
+
+class ForceInterestMatchSendRequest(BaseModel):
+    user_ids: list[UUID] = Field(..., min_length=1, max_length=50)
+    # Overrides the interest-matcher's normal scan cursor for this run only;
+    # the global automatic-scan watermark is left untouched.
+    lookback_hours: int = Field(default=24, ge=1, le=24 * 30)
+
+
+class DigestSendNowRequest(BaseModel):
+    user_ids: list[UUID] = Field(..., min_length=1, max_length=50)
+
+
+class ForceSendUserResult(BaseModel):
+    user_id: UUID
+    email: str
+    status: str  # "sent" | "no_pending_notifications" | "skipped_disabled" | "skipped_not_found"
+
+
+class ForceInterestMatchSendResponse(BaseModel):
+    candidates_scanned: int
+    notifications_created: int
+    digests_sent: int
+    pushes_sent: int
+    results: list[ForceSendUserResult]
+
+
+class DigestSendNowResponse(BaseModel):
+    digests_sent: int
+    pushes_sent: int
+    stamped: int
+    results: list[ForceSendUserResult]
+
+
 class SiteSettingsUpdateRequest(BaseModel):
     since_date: Optional[str] = None
     sync_since_date: Optional[str] = None

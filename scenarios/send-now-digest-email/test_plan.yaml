@@ -1,0 +1,77 @@
+test_plan:
+  name: "Admin 'Send digest now' — scoped manual override (email channel)"
+  description: >
+    Verifies the admin "Send digest now" action
+    (POST /api/admin/notifications/digest/send-now) delivers a pending
+    activity-digest email immediately to hand-picked users only,
+    bypassing the digest schedule and once-per-day dedup gate. The
+    in-app scheduler loop is disabled for the whole scenario, so the
+    ONLY way any email goes out is via this manual admin action —
+    proving the endpoint itself (not a background tick) is what
+    delivers the message, and that delivery is scoped strictly to the
+    selected user_ids.
+
+  preconditions:
+    - "Start a local SMTP catcher on port 1025 with a web UI, e.g. Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`."
+    - "Run the scenario with: `SCENARIO=send-now-digest-email task start:scenario BROWSER=isolated RESET_BROWSER=1`."
+    - "Open the SMTP catcher UI, e.g. Mailpit at http://127.0.0.1:8025, and clear any existing messages."
+    - "The scenario seeds Alice attending `ev-friend` with `emit_notifications: true`, so Bob, Carol and Dave (her followers) each already have one pending `subscription_going` in-app notification before any admin action runs."
+
+  cast:
+    - "Bob — email_social_activity_enabled=true. Will be selected in the admin action → expects exactly one email."
+    - "Carol — email_social_activity_enabled=true too, but deliberately NOT selected → negative control proving the action is scoped to chosen users, not 'everyone eligible'."
+    - "Dave — every notification channel toggle off → `skipped_disabled` probe even when selected."
+
+  steps:
+    - id: 1
+      title: "No email is sent before any admin action"
+      description: |
+        Sign in as Dev Admin (DEV_AUTH login page). Check the Mailpit
+        inbox immediately after the scenario boots.
+      expected: |
+        `NOTIFICATION_SCHEDULER_ENABLED=false` means no background tick
+        ever runs, so the inbox is empty even though Bob, Carol and Dave
+        all have pending in-app notifications from the seed.
+
+    - id: 2
+      title: "Send digest now to Bob only"
+      description: |
+        Navigate to /admin/configuration → Notifications card → "Send
+        digest now" widget. Use the user picker to add Bob
+        (bob@example.com) only — do not add Carol or Dave. Click
+        "Send now (1)".
+      expected: |
+        The action succeeds; the UI reports one digest sent. Mailpit
+        receives exactly one email addressed to bob@example.com with
+        the activity-digest subject/body referencing Alice's Going
+        event.
+
+    - id: 3
+      title: "Negative control — Carol was not selected"
+      description: |
+        Refresh the Mailpit inbox after step 2.
+      expected: |
+        Carol receives ZERO emails even though her
+        email_social_activity_enabled toggle is on and she has the same
+        pending notification as Bob — the admin action only acted on
+        the selected user_ids.
+
+    - id: 4
+      title: "skipped_disabled probe — Dave"
+      description: |
+        In the same "Send digest now" widget, add Dave
+        (dave@example.com) and click "Send now (1)".
+      expected: |
+        The action reports Dave as skipped (all notification channels
+        disabled for his account) and Mailpit receives zero new
+        messages. The inbox total remains one email (Bob's, from step 2).
+
+    - id: 5
+      title: "Repeating the action for Bob does not re-send unnecessarily"
+      description: |
+        Add Bob again and click "Send now (1)" a second time.
+      expected: |
+        Because the first run already stamped Bob's notification as
+        emailed (`emailed_at` set), there is no pending activity left
+        for him — the action reports no pending notifications for Bob
+        and Mailpit's total stays at one message.

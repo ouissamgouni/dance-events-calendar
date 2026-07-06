@@ -1,0 +1,100 @@
+test_plan:
+  name: "Admin 'Force-send interest matches' — all channels together"
+  description: >
+    Verifies the admin "Force-send interest matches" action
+    (POST /api/admin/notifications/interest-match/force-send) creates
+    the in-app notification row AND delivers both email and web-push
+    for hand-picked users, bypassing the global
+    INTEREST_MATCH_NOTIFICATIONS_ENABLED flag and the shared scan
+    cursor. Unlike the -email/-push channel-isolation scenarios, this
+    one deliberately exercises all three channels together to confirm
+    force-sending interest matches is not email-only.
+
+  preconditions:
+    - "Start a local SMTP catcher on port 1025 with a web UI, e.g. Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`."
+    - "Run the scenario with: `SCENARIO=send-now-event-matches-profile task start:scenario BROWSER=isolated RESET_BROWSER=1`."
+    - "Open the SMTP catcher UI, e.g. Mailpit at http://127.0.0.1:8025, and clear any existing messages."
+    - "In a Chromium browser, sign in as Nora (nora@example.com), open /account#notifications, and click 'Enable push notifications' so a live PushSubscription row is written bound to Nora's user_id."
+    - "The scenario seeds one matching event (ev-m1-paris-salsa-intl) and five interest profiles that all match it geographically/by tag (see db-interest-profiles.yaml). `INTEREST_MATCH_NOTIFICATIONS_ENABLED=false` and `NOTIFICATION_SCHEDULER_ENABLED=false` mean the automatic matcher never runs — the only path to a notification is the admin action below."
+
+  cast:
+    - "Nora — email ON, push ON, real device subscription. Selected. Expects in-app + email + push."
+    - "Bob — email ON, push ON, matching profile. NOT selected → negative control."
+    - "Carol — email ON, push ON, but her profile has matches_enabled=false. Selected → 0 candidates for her even though hand-picked."
+    - "Dan — email_interest_matches_enabled=false, push ON, no subscribed device. Selected → in-app row + push attempted (0 delivered, no device) but no email."
+    - "Eve — every interest-match channel off. Selected → `skipped_disabled`, never scanned."
+
+  steps:
+    - id: 1
+      title: "Nothing fires automatically"
+      description: |
+        Sign in as Dev Admin. Check Mailpit and the notification bell
+        for Nora/Bob/Carol/Dan/Eve immediately after the scenario boots.
+      expected: |
+        No in-app rows, no emails. `INTEREST_MATCH_NOTIFICATIONS_ENABLED
+        =false` and `NOTIFICATION_SCHEDULER_ENABLED=false` mean the
+        automatic matcher never runs, even though every profile above
+        matches the seeded event.
+
+    - id: 2
+      title: "Force-send to Nora, Carol, Dan and Eve (not Bob)"
+      description: |
+        Navigate to /admin/configuration → Notifications card →
+        "Force-send interest matches" widget. Add Nora, Carol, Dan and
+        Eve via the user picker (leave Bob out). Leave "Lookback
+        (hours)" at the default 24. Click "Force send (4)".
+      expected: |
+        The response reports: Eve as `skipped_disabled` (excluded
+        before any scan); Nora and Dan each produce one match
+        (`notifications_created` includes both); Carol produces zero
+        matches because her profile is silenced. `digests_sent` ≥ 1
+        (Nora's email) and `pushes_sent` ≥ 1 (Nora's push).
+
+    - id: 3
+      title: "In-app rows"
+      description: |
+        Check each user's notification bell after the action.
+      expected: |
+        Nora and Dan each have exactly one new interest-match
+        notification row. Carol, Bob and Eve have none.
+
+    - id: 4
+      title: "Email channel"
+      description: |
+        Refresh the Mailpit inbox.
+      expected: |
+        Exactly one email, addressed to nora@example.com, referencing
+        the Paris Salsa International Weekender event. Dan receives no
+        email despite having an in-app row (email_interest_matches_
+        enabled=false). Bob, Carol and Eve receive nothing.
+
+    - id: 5
+      title: "Push channel on Nora's subscribed device"
+      description: |
+        Observe the system notification tray on the browser/device
+        where the precondition step enabled push for Nora.
+      expected: |
+        A system push notification appears referencing the matched
+        event, confirming force-send delivers push alongside email and
+        the in-app row — not email-only.
+
+    - id: 6
+      title: "Dan — push attempted but not delivered (no device)"
+      description: |
+        Confirm Dan has no active PushSubscription (he never visited
+        /account#notifications in this scenario run).
+      expected: |
+        Dan's in-app row exists and he was included in the push group
+        (push_interest_matches_enabled=true), but with zero subscribed
+        devices nothing is actually delivered to him — illustrating
+        that "eligible for push" and "received a push" are different
+        checks.
+
+    - id: 7
+      title: "Negative control — Bob was not selected"
+      description: |
+        Check Bob's notification bell and search Mailpit for his email.
+      expected: |
+        Bob has zero in-app rows and zero emails despite having a
+        fully matching, fully-enabled profile — proving the force-send
+        action only acts on the selected user_ids.

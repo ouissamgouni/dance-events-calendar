@@ -162,8 +162,8 @@ def _bucket_pending_activity(session: Session, user: User | None) -> dict:
         CHANNEL_FLAG,
         FEATURE_BY_KIND,
         _MAX_AGE,
-        _is_user_in_slot,
         _parse_schedule,
+        _slot_status,
     )
     from backend.services.app_settings import get_activity_digest_schedule
 
@@ -189,7 +189,8 @@ def _bucket_pending_activity(session: Session, user: User | None) -> dict:
         ).all()
     }
 
-    ready = off_schedule = too_old = opted_out_social = opted_out_interest = 0
+    ready = too_old = opted_out_social = opted_out_interest = 0
+    wrong_weekday = before_scheduled_time = already_sent_today = 0
     deleted = 0
     for n in pending:
         recipient = recipients.get(n.recipient_user_id)
@@ -211,15 +212,26 @@ def _bucket_pending_activity(session: Session, user: User | None) -> dict:
         if n.created_at < cutoff_old:
             too_old += 1
             continue
-        if not _is_user_in_slot(recipient, now_utc, weekdays, hour, minute):
-            off_schedule += 1
+        status = _slot_status(recipient, now_utc, weekdays, hour, minute)
+        if status == "wrong_weekday":
+            wrong_weekday += 1
+            continue
+        if status == "before_scheduled_time":
+            before_scheduled_time += 1
+            continue
+        if status == "already_sent_today":
+            already_sent_today += 1
             continue
         ready += 1
 
+    off_schedule = wrong_weekday + before_scheduled_time + already_sent_today
     return {
         "total_un_emailed": len(pending),
         "ready_to_send_now": ready,
         "waiting_for_scheduled_slot": off_schedule,
+        "waiting_wrong_weekday": wrong_weekday,
+        "waiting_before_scheduled_time": before_scheduled_time,
+        "waiting_already_sent_today": already_sent_today,
         "older_than_max_age": too_old,
         "opted_out_social": opted_out_social,
         "opted_out_interest": opted_out_interest,
@@ -331,7 +343,9 @@ def _render_terse(report: dict) -> str:
     diag = report.get("activity_diag") or {}
     # Only surface suppression buckets that actually held rows back.
     suppression = {
-        "off-schedule": diag.get("waiting_for_scheduled_slot", 0),
+        "wrong-weekday": diag.get("waiting_wrong_weekday", 0),
+        "before-scheduled-time": diag.get("waiting_before_scheduled_time", 0),
+        "already-sent-today": diag.get("waiting_already_sent_today", 0),
         "too-old": diag.get("older_than_max_age", 0),
         "opted-out-social": diag.get("opted_out_social", 0),
         "opted-out-interest": diag.get("opted_out_interest", 0),
@@ -446,6 +460,16 @@ def _render_text(report: dict) -> str:
             f"  off-schedule (waiting)    : {diag['waiting_for_scheduled_slot']}   "
             f"→ recipient not in their {diag['digest_schedule']!r} local slot; "
             "re-run at their next scheduled time or pass --immediate-emails"
+        )
+        lines.append(
+            f"    - wrong weekday           : {diag['waiting_wrong_weekday']}"
+        )
+        lines.append(
+            f"    - before scheduled time   : {diag['waiting_before_scheduled_time']}"
+        )
+        lines.append(
+            f"    - already sent today      : {diag['waiting_already_sent_today']}   "
+            "→ same-day dedup gate; will send tomorrow (or use admin 'send now')"
         )
         lines.append(
             f"  older than max_age ({diag['max_age_seconds']}s) : "

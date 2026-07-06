@@ -10,8 +10,9 @@ import {
     fetchCalendarDefaultTags, updateCalendarDefaultTags,
     fetchSourceBreakdown, fetchTopCountries, fetchTopLinks, fetchExportStats,
     fetchMostAttendedEvents, getCurrentSyncJob,
+    forceSendInterestMatches, sendDigestNow, fetchWebPushSubscriberCount,
 } from '../api';
-import type { MostSavedEvent, MostViewedEvent, MostAttendedEvent, SourceBreakdown, CountryBreakdown, TopLink, ExportStat } from '../api';
+import type { MostSavedEvent, MostViewedEvent, MostAttendedEvent, SourceBreakdown, CountryBreakdown, TopLink, ExportStat, AdminUserRow } from '../api';
 import { useAuth } from '../context/AuthContext';
 import SyncProgressCard from '../components/SyncProgressCard';
 import SyncJobsHistoryTable from '../components/SyncJobsHistoryTable';
@@ -27,6 +28,7 @@ import FeedbackPanel from '../components/FeedbackPanel';
 import AdminTagCategories from '../components/AdminTagCategories';
 import AdminAnalytics from '../components/AdminAnalytics';
 import AdminUsersTab from '../components/AdminUsersTab';
+import AdminUserMultiPicker from '../components/AdminUserMultiPicker';
 import CalendarCurationRulesPanel from '../components/CalendarCurationRulesPanel';
 import { ConfirmDialog } from '../components/AppDialog';
 import { useAdminCounters, notifyAdminDataChanged } from '../hooks/useAdminCounters';
@@ -99,6 +101,16 @@ export default function Admin() {
     const [webPushEnabled, setWebPushEnabled] = useState(false);
     const [reminderLeadHours, setReminderLeadHours] = useState(24);
     const [digestSchedule, setDigestSchedule] = useState('tue,fri @ 09:00');
+    // Count of distinct signed-in users with a registered Web Push browser
+    // endpoint (`push_subscriptions` table). Informational only.
+    const [webPushSubscriberCount, setWebPushSubscriberCount] = useState<number | null>(null);
+    // Manual override state (force-send interest matches / send digest now)
+    // — support/debugging tools, not part of the persisted site settings.
+    const [forceSendUsers, setForceSendUsers] = useState<AdminUserRow[]>([]);
+    const [forceSendLookbackHours, setForceSendLookbackHours] = useState(24);
+    const [forceSendBusy, setForceSendBusy] = useState(false);
+    const [digestNowUsers, setDigestNowUsers] = useState<AdminUserRow[]>([]);
+    const [digestNowBusy, setDigestNowBusy] = useState(false);
     const [eventColorBarColor, setEventColorBarColor] = useState('#64748b');
     const [tagSortMode, setTagSortMode] = useState<'group' | 'event_count'>('group');
     const [defaultExplorerPeriod, setDefaultExplorerPeriod] = useState<DateRangePresetKey>(DEFAULT_EXPLORER_PERIOD);
@@ -228,6 +240,7 @@ export default function Admin() {
         fetchTopCountries().then(setTopCountries).catch(() => { });
         fetchTopLinks().then(setTopLinks).catch(() => { });
         fetchExportStats().then(setExportStats).catch(() => { });
+        fetchWebPushSubscriberCount().then((r) => setWebPushSubscriberCount(r.subscriber_count)).catch(() => { });
         // Counters (pending review, ungeolocated, tag suggestions, feedback)
         // are loaded & kept fresh by the useAdminCounters hook above — no
         // need to fetch them here.
@@ -722,6 +735,45 @@ export default function Admin() {
         } catch {
             setDigestSchedule(prev);
             setMessage('Failed to update digest schedule.');
+        }
+    };
+
+    const handleForceSendInterestMatches = async () => {
+        if (forceSendUsers.length === 0) return;
+        setForceSendBusy(true);
+        try {
+            const res = await forceSendInterestMatches(
+                forceSendUsers.map((u) => u.user_id),
+                forceSendLookbackHours,
+            );
+            const sent = res.results.filter((r) => r.status === 'sent').length;
+            setMessage(
+                `Interest-match force-send: ${res.notifications_created} match(es) found, `
+                + `${sent} of ${forceSendUsers.length} user(s) delivered (${res.digests_sent} digest email(s), ${res.pushes_sent} push).`,
+            );
+            setForceSendUsers([]);
+        } catch (e) {
+            setMessage(e instanceof Error ? e.message : 'Failed to force-send interest matches.');
+        } finally {
+            setForceSendBusy(false);
+        }
+    };
+
+    const handleSendDigestNow = async () => {
+        if (digestNowUsers.length === 0) return;
+        setDigestNowBusy(true);
+        try {
+            const res = await sendDigestNow(digestNowUsers.map((u) => u.user_id));
+            const sent = res.results.filter((r) => r.status === 'sent').length;
+            setMessage(
+                `Digest send-now: ${sent} of ${digestNowUsers.length} user(s) delivered `
+                + `(${res.digests_sent} digest email(s), ${res.pushes_sent} push).`,
+            );
+            setDigestNowUsers([]);
+        } catch (e) {
+            setMessage(e instanceof Error ? e.message : 'Failed to send digest now.');
+        } finally {
+            setDigestNowBusy(false);
         }
     };
 
@@ -1486,94 +1538,165 @@ export default function Admin() {
                     <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50">
                         <h2 className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Notifications</h2>
                     </div>
-                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <span className="text-[11px] font-medium text-gray-700">Event reminders</span>
-                                <p className="text-[10px] text-gray-400">Pre-event nudge (in-app + email) for saved / going users</p>
+                    <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Interest-match */}
+                        <div className="border border-gray-100 p-3 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Interest-match</span>
+                                <button
+                                    onClick={handleToggleInterestMatchNotifs}
+                                    aria-label="Toggle interest notifications"
+                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${interestMatchNotifsEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                >
+                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${interestMatchNotifsEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                </button>
                             </div>
-                            <button
-                                onClick={handleToggleReminders}
-                                aria-label="Toggle event reminders"
-                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${eventRemindersEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
-                            >
-                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${eventRemindersEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                            </button>
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <span className="text-[11px] font-medium text-gray-700">Activity digest email</span>
-                                <p className="text-[10px] text-gray-400">Batched summary of new friends / follows / saves</p>
+                            <p className="text-[10px] text-gray-400">Alert users when a new event matches their interest profile</p>
+                            <div className="border-t border-gray-100 pt-2.5 space-y-1.5">
+                                <div>
+                                    <span className="text-[11px] font-medium text-gray-700">Force-send interest matches</span>
+                                    <p className="text-[10px] text-gray-400">
+                                        Scan for interest-profile matches over a custom lookback window for selected
+                                        users and deliver immediately, bypassing the 24h scan window and digest schedule.
+                                    </p>
+                                </div>
+                                <AdminUserMultiPicker
+                                    selected={forceSendUsers}
+                                    onChange={setForceSendUsers}
+                                    placeholder="Search email, handle, or name"
+                                />
+                                <div className="flex items-center gap-2">
+                                    <label className="text-[10px] text-gray-500" htmlFor="force-send-lookback">Lookback (hours)</label>
+                                    <input
+                                        id="force-send-lookback"
+                                        type="number"
+                                        min={1}
+                                        max={720}
+                                        value={forceSendLookbackHours}
+                                        onChange={(e) => setForceSendLookbackHours(Number(e.target.value))}
+                                        className="w-20 text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleForceSendInterestMatches}
+                                        disabled={forceSendUsers.length === 0 || forceSendBusy}
+                                        className="ml-auto text-[11px] px-2.5 py-1 rounded bg-emerald-600 text-white disabled:bg-gray-300 hover:bg-emerald-700"
+                                    >
+                                        {forceSendBusy ? 'Sending…' : `Force send${forceSendUsers.length ? ` (${forceSendUsers.length})` : ''}`}
+                                    </button>
+                                </div>
                             </div>
-                            <button
-                                onClick={handleToggleActivityEmail}
-                                aria-label="Toggle activity digest"
-                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${activityDigestEmailEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
-                            >
-                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${activityDigestEmailEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                            </button>
                         </div>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <span className="text-[11px] font-medium text-gray-700">Interest-match notifications</span>
-                                <p className="text-[10px] text-gray-400">Alert users when a new event matches their interest profile</p>
+
+                        {/* Event reminders */}
+                        <div className="border border-gray-100 p-3 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Event reminders</span>
+                                <button
+                                    onClick={handleToggleReminders}
+                                    aria-label="Toggle event reminders"
+                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${eventRemindersEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                >
+                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${eventRemindersEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                </button>
                             </div>
-                            <button
-                                onClick={handleToggleInterestMatchNotifs}
-                                aria-label="Toggle interest notifications"
-                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${interestMatchNotifsEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
-                            >
-                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${interestMatchNotifsEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                            </button>
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <span className="text-[11px] font-medium text-gray-700">Web push</span>
-                                <p className="text-[10px] text-gray-400">Requires VAPID keys configured server-side</p>
+                            <p className="text-[10px] text-gray-400">Pre-event nudge (in-app + email) for saved / going users</p>
+                            <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
+                                <div>
+                                    <span className="text-[11px] font-medium text-gray-700">Reminder lead time (hours)</span>
+                                    <p className="text-[10px] text-gray-400">How far ahead of an event's start to fire the reminder (1–720)</p>
+                                </div>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={720}
+                                    value={reminderLeadHours}
+                                    onChange={(e) => setReminderLeadHours(Number(e.target.value))}
+                                    onBlur={(e) => handleReminderLeadHoursChange(Number(e.target.value))}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleReminderLeadHoursChange(reminderLeadHours)}
+                                    className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                    aria-label="Reminder lead time in hours"
+                                />
                             </div>
-                            <button
-                                onClick={handleToggleWebpush}
-                                aria-label="Toggle web push"
-                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${webPushEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
-                            >
-                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${webPushEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                            </button>
                         </div>
-                        <div className="flex items-center justify-between pt-2 border-t border-gray-100 md:border-t-0 md:pt-0">
-                            <div>
-                                <span className="text-[11px] font-medium text-gray-700">Reminder lead time (hours)</span>
-                                <p className="text-[10px] text-gray-400">How far ahead of an event's start to fire the reminder (1–720)</p>
+
+                        {/* Activity digest */}
+                        <div className="border border-gray-100 p-3 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Activity digest</span>
+                                <button
+                                    onClick={handleToggleActivityEmail}
+                                    aria-label="Toggle activity digest"
+                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${activityDigestEmailEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                >
+                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${activityDigestEmailEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                </button>
                             </div>
-                            <input
-                                type="number"
-                                min={1}
-                                max={720}
-                                value={reminderLeadHours}
-                                onChange={(e) => setReminderLeadHours(Number(e.target.value))}
-                                onBlur={(e) => handleReminderLeadHoursChange(Number(e.target.value))}
-                                onKeyDown={(e) => e.key === 'Enter' && handleReminderLeadHoursChange(reminderLeadHours)}
-                                className="w-20 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                                aria-label="Reminder lead time in hours"
-                            />
-                        </div>
-                        <div className="flex items-center justify-between pt-2 border-t border-gray-100 md:border-t-0 md:pt-0">
-                            <div>
-                                <span className="text-[11px] font-medium text-gray-700">Digest schedule</span>
+                            <p className="text-[10px] text-gray-400">Batched summary of new friends / follows / saves</p>
+                            <div className="border-t border-gray-100 pt-2.5 space-y-1">
+                                <span className="text-[11px] font-medium text-gray-700">Schedule</span>
                                 <p className="text-[10px] text-gray-400">
                                     Format: <code className="font-mono">dow[,dow] @ HH:MM</code> — interpreted in each user's timezone.
-                                    Default twice a week: <code className="font-mono">tue,fri @ 09:00</code>.
                                 </p>
+                                <input
+                                    type="text"
+                                    value={digestSchedule}
+                                    onChange={(e) => setDigestSchedule(e.target.value)}
+                                    onBlur={(e) => handleDigestScheduleChange(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleDigestScheduleChange(digestSchedule)}
+                                    placeholder="tue,fri @ 09:00"
+                                    className="w-full text-[11px] font-mono border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                    aria-label="Digest schedule"
+                                />
                             </div>
-                            <input
-                                type="text"
-                                value={digestSchedule}
-                                onChange={(e) => setDigestSchedule(e.target.value)}
-                                onBlur={(e) => handleDigestScheduleChange(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleDigestScheduleChange(digestSchedule)}
-                                placeholder="tue,fri @ 09:00"
-                                className="w-40 text-right text-[11px] font-mono border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                                aria-label="Digest schedule"
-                            />
+                            <div className="border-t border-gray-100 pt-2.5 space-y-1.5">
+                                <div>
+                                    <span className="text-[11px] font-medium text-gray-700">Send now</span>
+                                    <p className="text-[10px] text-gray-400">
+                                        Ship each selected user's pending activity digest immediately, bypassing the
+                                        schedule and once-per-day dedup gate.
+                                    </p>
+                                </div>
+                                <AdminUserMultiPicker
+                                    selected={digestNowUsers}
+                                    onChange={setDigestNowUsers}
+                                    placeholder="Search email, handle, or name"
+                                />
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleSendDigestNow}
+                                        disabled={digestNowUsers.length === 0 || digestNowBusy}
+                                        className="ml-auto text-[11px] px-2.5 py-1 rounded bg-emerald-600 text-white disabled:bg-gray-300 hover:bg-emerald-700"
+                                    >
+                                        {digestNowBusy ? 'Sending…' : `Send now${digestNowUsers.length ? ` (${digestNowUsers.length})` : ''}`}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Web push */}
+                        <div className="border border-gray-100 p-3 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Web push</span>
+                                <button
+                                    onClick={handleToggleWebpush}
+                                    aria-label="Toggle web push"
+                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${webPushEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                >
+                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${webPushEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                </button>
+                            </div>
+                            <p className="text-[10px] text-gray-400">Requires VAPID keys configured server-side</p>
+                            <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
+                                <div>
+                                    <span className="text-[11px] font-medium text-gray-700">Registered users</span>
+                                    <p className="text-[10px] text-gray-400">Accounts with at least one active push subscription</p>
+                                </div>
+                                <span className="text-[13px] font-semibold text-gray-700">
+                                    {webPushSubscriberCount ?? '—'}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>

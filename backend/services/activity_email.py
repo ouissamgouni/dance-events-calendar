@@ -128,6 +128,35 @@ def _user_local_tz(user: User) -> ZoneInfo:
         return ZoneInfo("UTC")
 
 
+def _slot_status(
+    user: User,
+    now_utc: datetime,
+    weekdays: set[int],
+    hour: int,
+    minute: int,
+) -> str:
+    """Return why ``user`` is or isn't in their digest slot right now.
+
+    One of ``"in_slot"``, ``"wrong_weekday"``, ``"before_scheduled_time"``,
+    ``"already_sent_today"``. Split out from ``_is_user_in_slot`` so callers
+    that need to *explain* a skip (debug logs, the admin trigger CLI's
+    diagnostic breakdown) don't have to re-derive the three gates by hand.
+    """
+    tz = _user_local_tz(user)
+    now_local = now_utc.astimezone(tz)
+    if now_local.weekday() not in weekdays:
+        return "wrong_weekday"
+    if (now_local.hour, now_local.minute) < (hour, minute):
+        return "before_scheduled_time"
+    last = user.last_digest_sent_at
+    if last is not None:
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+        if last.astimezone(tz).date() == now_local.date():
+            return "already_sent_today"
+    return "in_slot"
+
+
 def _is_user_in_slot(
     user: User,
     now_utc: datetime,
@@ -137,19 +166,7 @@ def _is_user_in_slot(
 ) -> bool:
     """True when ``now`` is at or past today's scheduled slot in user TZ
     and we have not already sent within this local calendar day."""
-    tz = _user_local_tz(user)
-    now_local = now_utc.astimezone(tz)
-    if now_local.weekday() not in weekdays:
-        return False
-    if (now_local.hour, now_local.minute) < (hour, minute):
-        return False
-    last = user.last_digest_sent_at
-    if last is not None:
-        if last.tzinfo is None:
-            last = last.replace(tzinfo=timezone.utc)
-        if last.astimezone(tz).date() == now_local.date():
-            return False
-    return True
+    return _slot_status(user, now_utc, weekdays, hour, minute) == "in_slot"
 
 
 def _render_line(
@@ -244,12 +261,23 @@ def _push_tag_for(feature: str) -> str:
     return f"{feature.replace('_', '-')}-digest"
 
 
-def run_once(force: bool = False) -> dict:
+def run_once(
+    force: bool = False,
+    user_ids: set | None = None,
+    kinds: tuple[str, ...] | None = None,
+) -> dict:
     """Send pending activity digests. Returns a stats dict for logging.
 
     ``force=True`` bypasses the per-user schedule window — used by the
     admin ``trigger-notifications`` CLI so operators can flush queued
     digests on demand for debugging.
+
+    ``user_ids`` restricts the pending-notification query to a specific
+    set of recipients; ``kinds`` restricts it to a subset of
+    ``ACTIVITY_KINDS`` (e.g. just ``("interest_event",)``). Both are used
+    by the admin "force send" endpoints (send digest now / force interest
+    match) to act on a hand-picked set of users without disturbing
+    everyone else's pending backlog.
     """
     if not get_activity_digest_email_enabled():
         return {"skipped": "activity_email_disabled"}
@@ -260,14 +288,21 @@ def run_once(force: bool = False) -> dict:
     weekdays, sched_hour, sched_minute = _parse_schedule(get_activity_digest_schedule())
 
     with Session(get_engine()) as session:
-        pending = session.exec(
+        stmt = (
             select(Notification)
             .where(Notification.emailed_at.is_(None))  # type: ignore[union-attr]
-            .where(Notification.kind.in_(ACTIVITY_KINDS))  # type: ignore[union-attr]
+            .where(Notification.kind.in_(kinds or ACTIVITY_KINDS))  # type: ignore[union-attr]
             .where(Notification.created_at >= cutoff_old)
             .order_by(Notification.recipient_user_id, Notification.created_at)
-        ).all()
+        )
+        if user_ids is not None:
+            stmt = stmt.where(Notification.recipient_user_id.in_(user_ids))  # type: ignore[union-attr]
+        pending = session.exec(stmt).all()
         if not pending:
+            logger.debug(
+                "Activity digest run: no pending notifications (user_ids=%s kinds=%s)",
+                user_ids, kinds,
+            )
             return {"digests": 0}
 
         # Hydrate actors + events in bulk.
@@ -292,6 +327,7 @@ def run_once(force: bool = False) -> dict:
         # channel flags independently. Skip recipients whose local TZ is
         # not in a scheduled digest slot right now (unless ``force``).
         skipped_off_schedule = 0
+        skip_reason_counts: dict[str, int] = {}
         email_groups: dict[tuple, list[Notification]] = {}
         push_groups: dict[tuple, list[Notification]] = {}
         delivered_recipients: set = set()
@@ -299,11 +335,19 @@ def run_once(force: bool = False) -> dict:
             recipient = users.get(n.recipient_user_id)
             if not recipient or recipient.deleted_at is not None:
                 continue
-            if not force and not _is_user_in_slot(
-                recipient, now_utc, weekdays, sched_hour, sched_minute
-            ):
-                skipped_off_schedule += 1
-                continue
+            if not force:
+                status = _slot_status(
+                    recipient, now_utc, weekdays, sched_hour, sched_minute
+                )
+                if status != "in_slot":
+                    skipped_off_schedule += 1
+                    skip_reason_counts[status] = skip_reason_counts.get(status, 0) + 1
+                    logger.debug(
+                        "Activity digest: recipient=%s skipped (%s) tz=%s schedule=%r",
+                        recipient.id, status, recipient.timezone,
+                        get_activity_digest_schedule(),
+                    )
+                    continue
             feature = FEATURE_BY_KIND.get(n.kind)
             if feature is None:
                 continue
@@ -368,15 +412,21 @@ def run_once(force: bool = False) -> dict:
         session.commit()
 
     logger.info(
-        "Activity digest run: %d emails, %d pushes, %d stamped, %d off-schedule",
+        "Activity digest run: %d emails, %d pushes, %d stamped, %d off-schedule "
+        "(wrong_weekday=%d before_scheduled_time=%d already_sent_today=%d)",
         digests,
         pushed,
         stamped,
         skipped_off_schedule,
+        skip_reason_counts.get("wrong_weekday", 0),
+        skip_reason_counts.get("before_scheduled_time", 0),
+        skip_reason_counts.get("already_sent_today", 0),
     )
     return {
         "digests": digests,
         "pushed": pushed,
         "stamped": stamped,
         "skipped_off_schedule": skipped_off_schedule,
+        "skip_reasons": skip_reason_counts,
+        "delivered_recipients": [str(rid) for rid in delivered_recipients],
     }

@@ -168,6 +168,86 @@ def _load_profile_tags(
     return out
 
 
+def _scan_and_create(
+    session: Session,
+    since: datetime,
+    now: datetime,
+    user_ids: set | None = None,
+) -> dict:
+    """Match candidate events against active profiles and create
+    ``interest_event`` notification rows. Shared by ``run_once`` (global
+    scan cursor) and ``run_once_for_users`` (admin force-send, scoped to a
+    hand-picked set of users over a configurable lookback window).
+
+    Does not touch the ``_LAST_SCAN_KEY`` watermark — callers own that.
+    """
+    events = _candidate_events(session, since, now)
+    if not events:
+        return {"candidates": 0, "created": 0}
+
+    event_tags = _load_event_tag_ids(session, [e.event_id for e in events])
+
+    profiles_stmt = (
+        select(UserInterestProfile, User)
+        .join(User, User.id == UserInterestProfile.user_id)  # type: ignore[arg-type]
+        .where(UserInterestProfile.matches_enabled == True)  # noqa: E712
+        .where(User.deleted_at.is_(None))  # type: ignore[union-attr]
+    )
+    if user_ids is not None:
+        profiles_stmt = profiles_stmt.where(UserInterestProfile.user_id.in_(user_ids))  # type: ignore[union-attr]
+    profiles = session.exec(profiles_stmt).all()
+    if not profiles:
+        return {"candidates": len(events), "created": 0}
+
+    profile_tags = _load_profile_tags(session, [p.id for p, _ in profiles])
+
+    # (recipient_user_id, event_id) -> [matched profile labels]
+    matches: dict[tuple, list[str]] = {}
+    for profile, user in profiles:
+        dance_ids, reach_ids = profile_tags.get(profile.id, (set(), set()))
+        if not dance_ids:
+            continue
+        for event in events:
+            tags = event_tags.get(event.event_id, set())
+            if not (dance_ids & tags):
+                continue
+            if reach_ids and not (reach_ids & tags):
+                continue
+            if not _geo_match(profile, event.latitude, event.longitude):
+                continue
+            key = (user.id, event.event_id)
+            matches.setdefault(key, []).append(profile.label)
+
+    created = 0
+    if matches:
+        recipient_ids = {uid for uid, _ in matches}
+        event_ids = {eid for _, eid in matches}
+        existing = set(
+            session.exec(
+                select(Notification.recipient_user_id, Notification.event_id)
+                .where(Notification.kind == INTEREST_EVENT)
+                .where(Notification.recipient_user_id.in_(recipient_ids))  # type: ignore[union-attr]
+                .where(Notification.event_id.in_(event_ids))  # type: ignore[union-attr]
+            ).all()
+        )
+        for (user_id, event_id), labels in matches.items():
+            if (user_id, event_id) in existing:
+                continue
+            context = ", ".join(dict.fromkeys(labels))  # dedupe, preserve order
+            session.add(
+                Notification(
+                    recipient_user_id=user_id,
+                    actor_user_id=user_id,  # self: no external actor
+                    kind=INTEREST_EVENT,
+                    event_id=event_id,
+                    context=context[:200],
+                )
+            )
+            created += 1
+
+    return {"candidates": len(events), "created": created}
+
+
 def run_once() -> dict:
     """Create due ``interest_event`` notifications. Returns a stats dict."""
     if not get_interest_match_notifications_enabled():
@@ -177,70 +257,42 @@ def run_once() -> dict:
 
     with Session(get_engine(), expire_on_commit=False) as session:
         since = _get_last_scan(session)
-        events = _candidate_events(session, since, now)
-        if not events:
-            _set_last_scan(session, now)
-            session.commit()
-            return {"candidates": 0, "created": 0}
-
-        event_tags = _load_event_tag_ids(session, [e.event_id for e in events])
-
-        profiles = _load_active_profiles(session)
-        if not profiles:
-            _set_last_scan(session, now)
-            session.commit()
-            return {"candidates": len(events), "created": 0}
-
-        profile_tags = _load_profile_tags(session, [p.id for p, _ in profiles])
-
-        # (recipient_user_id, event_id) -> [matched profile labels]
-        matches: dict[tuple, list[str]] = {}
-        for profile, user in profiles:
-            dance_ids, reach_ids = profile_tags.get(profile.id, (set(), set()))
-            if not dance_ids:
-                continue
-            for event in events:
-                tags = event_tags.get(event.event_id, set())
-                if not (dance_ids & tags):
-                    continue
-                if reach_ids and not (reach_ids & tags):
-                    continue
-                if not _geo_match(profile, event.latitude, event.longitude):
-                    continue
-                key = (user.id, event.event_id)
-                matches.setdefault(key, []).append(profile.label)
-
-        created = 0
-        if matches:
-            recipient_ids = {uid for uid, _ in matches}
-            event_ids = {eid for _, eid in matches}
-            existing = set(
-                session.exec(
-                    select(Notification.recipient_user_id, Notification.event_id)
-                    .where(Notification.kind == INTEREST_EVENT)
-                    .where(Notification.recipient_user_id.in_(recipient_ids))  # type: ignore[union-attr]
-                    .where(Notification.event_id.in_(event_ids))  # type: ignore[union-attr]
-                ).all()
-            )
-            for (user_id, event_id), labels in matches.items():
-                if (user_id, event_id) in existing:
-                    continue
-                context = ", ".join(dict.fromkeys(labels))  # dedupe, preserve order
-                session.add(
-                    Notification(
-                        recipient_user_id=user_id,
-                        actor_user_id=user_id,  # self: no external actor
-                        kind=INTEREST_EVENT,
-                        event_id=event_id,
-                        context=context[:200],
-                    )
-                )
-                created += 1
-
+        logger.debug(
+            "Interest notification scan window: since=%s now=%s (%.0fs)",
+            since, now, (now - since).total_seconds(),
+        )
+        result = _scan_and_create(session, since, now)
         _set_last_scan(session, now)
         session.commit()
 
     logger.info(
-        "Interest notification run: %d candidates, %d created", len(events), created
+        "Interest notification run: %d candidates, %d created",
+        result["candidates"], result["created"],
     )
-    return {"candidates": len(events), "created": created}
+    return result
+
+
+def run_once_for_users(user_ids: set, lookback_hours: int) -> dict:
+    """Admin "force send" override: match candidate events for a specific
+    set of users over a custom ``lookback_hours`` window, bypassing both
+    the global enable/disable gate and the shared last-scan cursor (the
+    global cursor is left untouched so the next automatic tick's window is
+    unaffected by this manual run).
+
+    Existing ``(recipient, event)`` notifications are still respected —
+    this creates new matches within the window, it does not duplicate or
+    resend ones already delivered.
+    """
+    now = _utcnow_naive()
+    since = now - timedelta(hours=lookback_hours)
+
+    with Session(get_engine(), expire_on_commit=False) as session:
+        result = _scan_and_create(session, since, now, user_ids=set(user_ids))
+        session.commit()
+
+    logger.info(
+        "Interest notification FORCE run: users=%d lookback_hours=%d -> "
+        "%d candidates, %d created",
+        len(user_ids), lookback_hours, result["candidates"], result["created"],
+    )
+    return result
