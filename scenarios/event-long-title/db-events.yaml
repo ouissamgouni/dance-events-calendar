@@ -22,6 +22,7 @@ events:
         "dance-style:salsa",
         "level:all-levels",
         "scope:international",
+        "reach:local",
       ]
   - id: evt-lt-002
     calendar_id: bachata-cal-002
@@ -44,6 +45,7 @@ events:
         "dance-style:bachata",
         "level:intermediate",
         "scope:local",
+        "reach:international",
       ]
   - id: evt-lt-003
     calendar_id: salsa-cal-001
@@ -62,4 +64,5 @@ events:
         "dance-style:salsa",
         "level:beginner-friendly",
         "scope:local",
+        "reach:regional",
       ]

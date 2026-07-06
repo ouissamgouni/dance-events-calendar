@@ -22,10 +22,9 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-share-002
   calendar_id: bachata-cal-002
   title: Bachata Sensual Workshop
@@ -55,8 +54,7 @@ events:
   - dance-style:bachata
   - level:intermediate
   - venue:indoor
-  - scale:small
-  - scope:local
+  - reach:international
 - id: evt-share-003
   calendar_id: salsa-cal-001
   title: Salsa on the Rooftop
@@ -81,10 +79,9 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:rooftop
-  - scale:medium
-  - scope:local
   - vibe:live-band
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-share-004
   calendar_id: bachata-cal-002
   title: Bachata Weekender
@@ -124,11 +121,10 @@ events:
   - dance-style:bachata
   - level:beginner-friendly
   - venue:indoor
-  - scale:large
-  - scope:international
   - vibe:good-music
   - vibe:social-atmosphere
   - vibe:crowded
+  - reach:international
 - id: evt-share-005
   calendar_id: salsa-cal-001
   title: Rueda de Casino Night
@@ -148,6 +144,5 @@ events:
   - format:social
   - dance-style:salsa
   - level:beginner-friendly
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:regional

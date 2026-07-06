@@ -142,9 +142,8 @@ def _set_bool_setting(session: Session, key: str, value: bool) -> None:
     session.add(row)
 
 
-@router.get("", response_model=SiteSettingsResponse)
-def get_settings(session: Session = Depends(get_session)):
-    """Public endpoint — returns site settings needed by the frontend."""
+def _build_response(session: Session) -> SiteSettingsResponse:
+    """Assemble the full settings snapshot. Called by both GET and PUT."""
     return SiteSettingsResponse(
         since_date=_get_since_date(session),
         sync_since_date=_get_sync_since_date(session),
@@ -152,13 +151,15 @@ def get_settings(session: Session = Depends(get_session)):
         auto_sync_enabled=_get_auto_sync_enabled(session),
         auto_sync_mode=_get_auto_sync_mode(session),
         show_prices=_get_bool_setting(session, "show_prices"),
-        show_popularity=_get_bool_setting(session, "show_popularity"),
+        show_popularity=_get_bool_setting(session, "show_popularity", default=True),
         show_ratings=_get_bool_setting(session, "show_ratings"),
         popularity_threshold=_get_int_setting(session, "popularity_threshold", 10),
         following_badge_enabled=_get_bool_setting(session, "following_badge_enabled"),
         unseen_state_enabled=_get_bool_setting(session, "unseen_state_enabled"),
-        trending_enabled=_get_bool_setting(session, "trending_enabled"),
-        trending_banner_enabled=_get_bool_setting(session, "trending_banner_enabled"),
+        trending_enabled=_get_bool_setting(session, "trending_enabled", default=True),
+        trending_banner_enabled=_get_bool_setting(
+            session, "trending_banner_enabled", default=True
+        ),
         trending_window_days=_get_int_setting(session, "trending_window_days", 30),
         trending_floor_going=_get_int_setting(session, "trending_floor_going", 3),
         trending_top_n=_get_int_setting(session, "trending_top_n", 3),
@@ -170,7 +171,29 @@ def get_settings(session: Session = Depends(get_session)):
         default_explorer_period=_get_default_explorer_period(session),
         promo_codes_enabled=_get_bool_setting(session, "promo_codes_enabled"),
         organizer_claims_enabled=_get_bool_setting(session, "organizer_claims_enabled"),
+        for_you_rail_enabled=_get_bool_setting(session, "for_you_rail_enabled"),
+        your_next_events_rail_enabled=_get_bool_setting(
+            session, "your_next_events_rail_enabled", default=True
+        ),
+        event_reminders_enabled=_get_bool_setting(session, "event_reminders_enabled", default=True),
+        activity_digest_email_enabled=_get_bool_setting(
+            session, "activity_digest_email_enabled", default=True
+        ),
+        interest_match_notifications_enabled=_get_bool_setting(
+            session, "interest_match_notifications_enabled", default=True
+        ),
+        web_push_enabled=_get_bool_setting(session, "web_push_enabled", default=False),
+        reminder_lead_hours=_get_int_setting(session, "reminder_lead_hours", 24),
+        activity_digest_schedule=_get_str_setting(
+            session, "activity_digest_schedule", "tue,fri @ 09:00"
+        ),
     )
+
+
+@router.get("", response_model=SiteSettingsResponse)
+def get_settings(session: Session = Depends(get_session)):
+    """Public endpoint — returns site settings needed by the frontend."""
+    return _build_response(session)
 
 
 @router.put("", response_model=SiteSettingsResponse)
@@ -329,31 +352,50 @@ def update_settings(
             session, "organizer_claims_enabled", body.organizer_claims_enabled
         )
 
+    if body.for_you_rail_enabled is not None:
+        _set_bool_setting(session, "for_you_rail_enabled", body.for_you_rail_enabled)
+
+    if body.your_next_events_rail_enabled is not None:
+        _set_bool_setting(
+            session,
+            "your_next_events_rail_enabled",
+            body.your_next_events_rail_enabled,
+        )
+
+    # Notification global gates.
+    if body.event_reminders_enabled is not None:
+        _set_bool_setting(session, "event_reminders_enabled", body.event_reminders_enabled)
+    if body.activity_digest_email_enabled is not None:
+        _set_bool_setting(
+            session, "activity_digest_email_enabled", body.activity_digest_email_enabled
+        )
+    if body.interest_match_notifications_enabled is not None:
+        _set_bool_setting(
+            session,
+            "interest_match_notifications_enabled",
+            body.interest_match_notifications_enabled,
+        )
+    if body.web_push_enabled is not None:
+        _set_bool_setting(session, "web_push_enabled", body.web_push_enabled)
+    if body.reminder_lead_hours is not None:
+        row = session.get(SiteSetting, "reminder_lead_hours")
+        if row:
+            row.value = str(body.reminder_lead_hours)
+        else:
+            row = SiteSetting(
+                key="reminder_lead_hours", value=str(body.reminder_lead_hours)
+            )
+        session.add(row)
+    if body.activity_digest_schedule is not None:
+        row = session.get(SiteSetting, "activity_digest_schedule")
+        if row:
+            row.value = body.activity_digest_schedule
+        else:
+            row = SiteSetting(
+                key="activity_digest_schedule", value=body.activity_digest_schedule
+            )
+        session.add(row)
+
     session.commit()
 
-    return SiteSettingsResponse(
-        since_date=_get_since_date(session),
-        sync_since_date=_get_sync_since_date(session),
-        sync_interval_minutes=_get_sync_interval(session),
-        auto_sync_enabled=_get_auto_sync_enabled(session),
-        auto_sync_mode=_get_auto_sync_mode(session),
-        show_prices=_get_bool_setting(session, "show_prices"),
-        show_popularity=_get_bool_setting(session, "show_popularity"),
-        show_ratings=_get_bool_setting(session, "show_ratings"),
-        popularity_threshold=_get_int_setting(session, "popularity_threshold", 10),
-        following_badge_enabled=_get_bool_setting(session, "following_badge_enabled"),
-        unseen_state_enabled=_get_bool_setting(session, "unseen_state_enabled"),
-        trending_enabled=_get_bool_setting(session, "trending_enabled"),
-        trending_banner_enabled=_get_bool_setting(session, "trending_banner_enabled"),
-        trending_window_days=_get_int_setting(session, "trending_window_days", 30),
-        trending_floor_going=_get_int_setting(session, "trending_floor_going", 3),
-        trending_top_n=_get_int_setting(session, "trending_top_n", 3),
-        trending_top_percent=_get_int_setting(session, "trending_top_percent", 100),
-        event_color_bar_color=_get_str_setting(
-            session, "event_color_bar_color", "#64748b"
-        ),
-        tag_sort_mode=_get_str_setting(session, "tag_sort_mode", "group"),
-        default_explorer_period=_get_default_explorer_period(session),
-        promo_codes_enabled=_get_bool_setting(session, "promo_codes_enabled"),
-        organizer_claims_enabled=_get_bool_setting(session, "organizer_claims_enabled"),
-    )
+    return _build_response(session)

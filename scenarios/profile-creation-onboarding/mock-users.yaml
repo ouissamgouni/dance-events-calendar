@@ -1,0 +1,30 @@
+# Interest-profiles PRD onboarding cast.
+#
+#  - newbie: fresh (no onboarded_at) — drives Step 1 international-first
+#    profile creation + Step 2 conditional local profile.
+#  - alice: pre-existing friend of newbie who will mark "going" on
+#    ev-friend-going to prove that friend/social notifications still fire
+#    even when newbie has no interest profiles (see the
+#    interest-skip-no-notifications sibling scenario).
+#  - salsahub: verified organizer so newbie's onboarding follow step has
+#    at least one obvious suggestion.
+#  - admin: required by /api/admin/trigger-notifications so the tester
+#    can force a scheduler tick without waiting for the interval.
+
+# Phase G — Nora walks the onboarding flow; keep her onboarded_at null.
+auto_onboard: false
+
+users:
+  - email: newbie@example.com
+    name: Nora Newbie
+    handle: newbie
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+  - email: salsahub@example.com
+    name: Salsa Hub
+    handle: salsahub
+    is_verified_organizer: true
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

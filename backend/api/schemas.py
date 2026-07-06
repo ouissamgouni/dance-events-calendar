@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class LinkItem(BaseModel):
@@ -258,6 +258,9 @@ class UpdatePreferencesRequest(BaseModel):
     # Preferred dance-style tag IDs (full replacement when provided).
     # Omit to leave untouched; pass [] to clear.
     preferred_tag_ids: Optional[list[int]] = None
+    # Home pin used as the default center for radius-mode interest profiles.
+    # All-or-nothing like preferred_area; pass an explicit ``None`` to clear.
+    home_location: Optional["HomeLocationPayload"] = None
 
 
 class PreferredAreaPayload(BaseModel):
@@ -276,6 +279,31 @@ class PreferredAreaResponse(BaseModel):
     label: str
 
 
+class HomeLocationPayload(BaseModel):
+    lat: float = Field(..., ge=-90, le=90)
+    lng: float = Field(..., ge=-180, le=180)
+    label: str = Field(..., min_length=1, max_length=120)
+
+
+class HomeLocationResponse(BaseModel):
+    lat: float
+    lng: float
+    label: str
+
+
+class IPGeolocationResponse(BaseModel):
+    """Best-effort city-level geo derived from the request IP.
+
+    Returned by ``GET /api/auth/geolocate-ip`` to prefill the home-pin
+    picker in onboarding Step 2. All fields optional — the endpoint
+    returns 204 when nothing usable was resolved.
+    """
+
+    lat: float
+    lng: float
+    label: str
+
+
 class UserPreferencesResponse(BaseModel):
     """Returned by ``/api/auth/me`` and ``PATCH /api/auth/preferences``.
 
@@ -287,6 +315,7 @@ class UserPreferencesResponse(BaseModel):
     share_attendance_default: bool
     preferred_area: Optional[PreferredAreaResponse] = None
     preferred_tag_ids: list[int] = []
+    home_location: Optional[HomeLocationResponse] = None
     set_at: Optional[datetime] = None
 
 
@@ -301,6 +330,7 @@ class AnonPreferencesPayload(BaseModel):
 
     preferred_area: Optional[PreferredAreaPayload] = None
     preferred_tag_ids: list[int] = []
+    home_location: Optional[HomeLocationPayload] = None
 
 
 class UpdateProfileRequest(BaseModel):
@@ -318,6 +348,80 @@ class HandleAvailabilityResponse(BaseModel):
     handle: str
     available: bool
     reason: Optional[str] = None
+
+
+class InterestProfileRequest(BaseModel):
+    """Create/replace payload for a ``UserInterestProfile``.
+
+    Geography is always a bounding box (``min_lat``/``min_lng``/
+    ``max_lat``/``max_lng``). ``dance_tag_ids``/``reach_tag_ids`` are full
+    replacements; empty ``reach_tag_ids`` means "match any scale" (no
+    reach filter).
+
+    Legacy ``notify_enabled`` is accepted as an alias for
+    ``matches_enabled`` for one release (Phase G rollout).
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    label: str = Field(..., min_length=1, max_length=120)
+    min_lat: float = Field(..., ge=-90, le=90)
+    min_lng: float = Field(..., ge=-180, le=180)
+    max_lat: float = Field(..., ge=-90, le=90)
+    max_lng: float = Field(..., ge=-180, le=180)
+    dance_tag_ids: list[int] = []
+    reach_tag_ids: list[int] = []
+    matches_enabled: bool = Field(default=True, validation_alias="matches_enabled")
+    # Legacy alias — remove in the cleanup PR (see PHASE_G §G.9 step 5).
+    notify_enabled: Optional[bool] = None
+    # Optional — default False. If True on create, unsets is_active on any
+    # other profile for the same user. If the user has no profiles yet,
+    # the newly-created one is auto-set to active regardless of this flag.
+    is_active: bool = False
+
+
+class InterestProfileUpdateRequest(BaseModel):
+    """Partial update payload; omitted fields are left untouched.
+
+    Legacy ``notify_enabled`` is accepted as an alias for
+    ``matches_enabled`` for one release.
+    """
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    label: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    min_lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    min_lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    max_lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    max_lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    dance_tag_ids: Optional[list[int]] = None
+    reach_tag_ids: Optional[list[int]] = None
+    matches_enabled: Optional[bool] = None
+    # Legacy alias — remove in the cleanup PR.
+    notify_enabled: Optional[bool] = None
+    # Setting to True unsets is_active on any other profile for the same
+    # user (application-enforced). Setting to False is a no-op if the
+    # profile is already inactive; if the profile is currently active,
+    # the request is rejected — the user must activate a different
+    # profile instead to keep exactly one active per user.
+    is_active: Optional[bool] = None
+
+
+class InterestProfileResponse(BaseModel):
+    id: int
+    label: str
+    min_lat: float
+    min_lng: float
+    max_lat: float
+    max_lng: float
+    dance_tag_ids: list[int] = []
+    reach_tag_ids: list[int] = []
+    matches_enabled: bool = True
+    # Legacy mirror — remove in the cleanup PR. Always equal to
+    # ``matches_enabled``.
+    notify_enabled: bool = True
+    is_active: bool = False
+    created_at: datetime
 
 
 class EventLinkClickRequest(BaseModel):
@@ -546,7 +650,7 @@ class SiteSettingsResponse(BaseModel):
     auto_sync_enabled: bool = False
     auto_sync_mode: str = "incremental"  # "incremental" | "reseed"
     show_prices: bool = False
-    show_popularity: bool = False
+    show_popularity: bool = True
     show_ratings: bool = False
     popularity_threshold: int = 10
     # --- Adoption-boost feature toggles (each track has its own flag so
@@ -559,8 +663,8 @@ class SiteSettingsResponse(BaseModel):
     # Track 3: switches the popularity badge & sort from the legacy
     # view-count signal to a commitment-weighted, time-decayed score
     # (going + saved + tiny view term, decayed by event age).
-    trending_enabled: bool = False
-    trending_banner_enabled: bool = False
+    trending_enabled: bool = True
+    trending_banner_enabled: bool = True
     # Trending-only knobs. ``trending_window_days`` is how far back the
     # going/saved/view counts are aggregated. ``trending_floor_going``
     # is the absolute floor of going RSVPs an event must clear to even
@@ -586,6 +690,32 @@ class SiteSettingsResponse(BaseModel):
     # admin-moderated). When False, the Account application section
     # and event "Organized by" pill are hidden.
     organizer_claims_enabled: bool = False
+    # Explorer "For you" discovery rail (You might like/Friends going/New lenses).
+    # When False, the rail is hidden entirely.
+    for_you_rail_enabled: bool = False
+    # Explorer "Your next events" rail (viewer's own saved/going events).
+    # When False, the rail is hidden entirely.
+    your_next_events_rail_enabled: bool = True
+    # ---------------------------------------------------------------
+    # Notification / re-engagement global gates (admin-configurable).
+    # These override the corresponding env vars in ``config/loader.py``
+    # when present in ``site_settings``.
+    # ---------------------------------------------------------------
+    # Master switch for event-reminder generation + emails.
+    event_reminders_enabled: bool = True
+    # Master switch for batched activity digest emails.
+    activity_digest_email_enabled: bool = True
+    # Master switch for interest-profile match notifications.
+    interest_match_notifications_enabled: bool = True
+    # Master switch for web-push delivery (independent of VAPID config).
+    web_push_enabled: bool = False
+    # Hours before an event's start to fire the reminder.
+    reminder_lead_hours: int = 24
+    # Cadence spec for the activity digest email. Format:
+    #   ``<mon|tue|wed|thu|fri|sat|sun>[,<day>...] @ HH:MM``
+    # Times are interpreted in each recipient's ``User.timezone``.
+    # Default = twice a week on Tuesday + Friday at 09:00 local.
+    activity_digest_schedule: str = "tue,fri @ 09:00"
 
 
 class SiteSettingsUpdateRequest(BaseModel):
@@ -615,6 +745,21 @@ class SiteSettingsUpdateRequest(BaseModel):
     default_explorer_period: Optional[DefaultExplorerPeriod] = None
     promo_codes_enabled: Optional[bool] = None
     organizer_claims_enabled: Optional[bool] = None
+    for_you_rail_enabled: Optional[bool] = None
+    your_next_events_rail_enabled: Optional[bool] = None
+    # Notification / re-engagement global gates.
+    event_reminders_enabled: Optional[bool] = None
+    activity_digest_email_enabled: Optional[bool] = None
+    interest_match_notifications_enabled: Optional[bool] = None
+    web_push_enabled: Optional[bool] = None
+    reminder_lead_hours: Optional[int] = Field(default=None, ge=1, le=720)
+    activity_digest_schedule: Optional[str] = Field(
+        default=None,
+        # Loose validation — parsed strictly server-side. Frontend
+        # provides a builder UI so the raw string is rarely edited.
+        pattern=r"^([a-z]{3})(,[a-z]{3})*\s*@\s*\d{1,2}:\d{2}$",
+        max_length=64,
+    )
 
 
 class EventUpdateRequest(BaseModel):
@@ -971,8 +1116,7 @@ class SyncLogResponse(BaseModel):
     enrichment_progress: Optional[dict] = None
     dedup_log: Optional[list] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # --- Ratings / Feedback ---
@@ -1379,6 +1523,7 @@ class NotificationItem(BaseModel):
     event_title: Optional[str] = None
     event_start: Optional[datetime] = None
     actor: NotificationActor
+    context: Optional[str] = None
     created_at: datetime
     read_at: Optional[datetime] = None
 

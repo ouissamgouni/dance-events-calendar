@@ -1,0 +1,8 @@
+# Newbie follows Alice so the friend-going digest fires on ev-friend-going
+# and proves that skipping interest profiles still yields social alerts
+# (PRD §11 behavior contract: friend-going notifications are independent
+# of the interest_match_notifications_enabled master switch).
+follows:
+  - follower: newbie
+    followee: alice
+    status: approved

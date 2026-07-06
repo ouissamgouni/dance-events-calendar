@@ -182,7 +182,7 @@ def _release_dispatch_lock(conn) -> None:
             pass
 
 
-def run_notification_dispatch_once() -> dict:
+def run_notification_dispatch_once(force_activity_digest: bool = False) -> dict:
     """Run one pass of user-facing notification delivery.
 
     Generates due event reminders and sends batched activity digest emails.
@@ -193,10 +193,14 @@ def run_notification_dispatch_once() -> dict:
     Guarded by a Postgres advisory lock so that on multi-instance deployments
     only one machine sends per tick; instances that don't win the lock skip
     (return ``{"skipped": "locked"}``) to avoid duplicate pushes/emails.
+
+    ``force_activity_digest`` bypasses the per-user schedule window in the
+    activity digest step; used by admin manual triggers so operators can
+    flush queued digests on demand.
     """
     # Imported lazily to keep scheduler import-light and avoid any import
     # cycle with the email/notification services.
-    from backend.services import activity_email, reminder_service
+    from backend.services import activity_email, interest_notification_service, reminder_service
 
     try:
         lock_conn = _try_acquire_dispatch_lock()
@@ -212,7 +216,14 @@ def run_notification_dispatch_once() -> dict:
             logger.exception("Reminder generation failed")
             stats["reminders"] = {"error": True}
         try:
-            stats["activity"] = activity_email.run_once()
+            # Runs before the activity digest so newly created interest_event
+            # rows are picked up by the same tick's digest below.
+            stats["interest"] = interest_notification_service.run_once()
+        except Exception:
+            logger.exception("Interest notification generation failed")
+            stats["interest"] = {"error": True}
+        try:
+            stats["activity"] = activity_email.run_once(force=force_activity_digest)
         except Exception:
             logger.exception("Activity digest failed")
             stats["activity"] = {"error": True}

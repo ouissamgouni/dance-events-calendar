@@ -20,7 +20,8 @@ from pydantic import BaseModel
 from sqlmodel import Session, delete, select
 
 from backend.api.deps import get_current_user_optional
-from backend.config.loader import get_vapid_config, get_webpush_enabled
+from backend.config.loader import get_vapid_config
+from backend.services.app_settings import get_web_push_enabled
 from backend.db.database import get_session
 from backend.db.models import PushSubscription, User
 
@@ -47,7 +48,7 @@ class UnsubscribeRequest(BaseModel):
 def vapid_public_key():
     """Return the VAPID public key clients pass to ``PushManager.subscribe``."""
     cfg = get_vapid_config()
-    if not get_webpush_enabled() or not cfg.get("public_key"):
+    if not get_web_push_enabled() or not cfg.get("public_key"):
         raise HTTPException(status_code=404, detail="Push not enabled")
     return {"public_key": cfg["public_key"]}
 

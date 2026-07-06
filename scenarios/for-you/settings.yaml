@@ -1,0 +1,32 @@
+# `for_you_rail_enabled` turns on the explorer Home page's "For You" rail
+# (Recommended / New / Friends lenses). `unseen_state_enabled` is also
+# enabled so the New lens's badge/marker visual treatment stays consistent
+# with the rest of the explorer UI (the New-lens data itself does not
+# depend on this flag — see test_plan.yaml step 6 for details).
+#
+# Trending badge tuning (mirrors scenarios/trending-events/settings.yaml):
+#   * `trending_enabled: true`, `show_popularity: true`, and
+#     `trending_banner_enabled: true` are set here so the scenario is
+#     self-contained even if the site-level defaults change.
+#   * `trending_floor_going: 1` (production default is 3) lets any event
+#     with ≥1 public "going" contribute a non-zero popularity_score, so
+#     the 🔥 badge decorates several cards in the "You might like" lens
+#     across the seeded weekend spread — not just the one hero event.
+#   * `popularity_threshold: 1` (production default is 10) is needed
+#     because the decayed score of events a few weeks out never crosses
+#     10 even with 5+ goings; lowering the gate makes the badge visible
+#     without inventing unrealistic attendance counts.
+#   * `trending_top_n: 5` (production default is 3) crowns the top 5
+#     scoring events in the lens with the 🔥 badge, matching the
+#     trending-events scenario's cap.
+settings:
+  for_you_rail_enabled: true
+  unseen_state_enabled: true
+  trending_enabled: true
+  show_popularity: true
+  trending_banner_enabled: true
+  following_badge_enabled: true
+  trending_floor_going: 1
+  trending_top_n: 5
+  trending_top_percent: 100
+  popularity_threshold: 1

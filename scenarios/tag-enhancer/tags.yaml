@@ -20,7 +20,8 @@ tag_groups:
         label: Social
         is_hero_filter: true
         hero_ordinal: 0
-        synonyms: [ "social dance", "fiesta", "party", "soirée", "soiree", "noche" ]
+        synonyms:
+          ["social dance", "fiesta", "party", "soirée", "soiree", "noche"]
       - slug: workshop
         label: Workshop
         synonyms:
@@ -38,39 +39,40 @@ tag_groups:
         # NOTE: "marathon" is intentionally NOT a festival synonym — a dance
         # marathon is its own format. "weekender" / "encuentro" / "congress"
         # are commonly multi-day festivals.
-        synonyms: [ "congress", "weekender", "encuentro" ]
+        synonyms: ["congress", "weekender", "encuentro"]
       - slug: bootcamp
         label: Bootcamp
-        synonyms: [ "intensive", "boot camp" ]
+        synonyms: ["intensive", "boot camp"]
       - slug: show
         label: Show
-        synonyms: [ "showcase", "performance", "demo", "exhibition" ]
+        synonyms: ["showcase", "performance", "demo", "exhibition"]
 
   - slug: dance-style
     label: Dance Style
     ordinal: 20
     allow_multiple: true
+    onboarding_eligible: true
     color: "#fb923c"
     tags:
       - slug: salsa
         label: Salsa
         is_hero_filter: true
         hero_ordinal: 1
-        synonyms: [ "salsa cubana", "salsa on1", "salsa on2", "casino", "rueda" ]
+        synonyms: ["salsa cubana", "salsa on1", "salsa on2", "casino", "rueda"]
       - slug: bachata
         label: Bachata
         is_hero_filter: true
         hero_ordinal: 2
-        synonyms: [ "bachata sensual", "bachata moderna", "bachata dominicana" ]
+        synonyms: ["bachata sensual", "bachata moderna", "bachata dominicana"]
       - slug: kizomba
         label: Kizomba
-        synonyms: [ "urban kiz", "kiz", "tarraxo", "tarraxinha", "ghetto zouk" ]
+        synonyms: ["urban kiz", "kiz", "tarraxo", "tarraxinha", "ghetto zouk"]
       - slug: zouk
         label: Zouk
-        synonyms: [ "brazilian zouk", "lambazouk" ]
+        synonyms: ["brazilian zouk", "lambazouk"]
       - slug: cha-cha
         label: Cha-Cha
-        synonyms: [ "chachacha", "cha cha cha", "cha-cha-cha" ]
+        synonyms: ["chachacha", "cha cha cha", "cha-cha-cha"]
 
   - slug: level
     label: Level
@@ -84,16 +86,17 @@ tag_groups:
         label: Beginner
         is_hero_filter: true
         hero_ordinal: 3
-        synonyms: [ "beginners", "absolute beginner", "intro", "introduction", "starter" ]
+        synonyms:
+          ["beginners", "absolute beginner", "intro", "introduction", "starter"]
       - slug: intermediate
         label: Intermediate
-        synonyms: [ "improver", "improvers", "int", "intermediate-advanced" ]
+        synonyms: ["improver", "improvers", "int", "intermediate-advanced"]
       - slug: advanced
         label: Advanced
-        synonyms: [ "advanced level", "adv" ]
+        synonyms: ["advanced level", "adv"]
       - slug: all-levels
         label: All Levels
-        synonyms: [ "all level", "open level", "tous niveaux" ]
+        synonyms: ["all level", "open level", "tous niveaux"]
 
   - slug: venue
     label: Venue
@@ -103,10 +106,11 @@ tag_groups:
     tags:
       - slug: indoor
         label: Indoor
-        synonyms: [ "indoors" ]
+        synonyms: ["indoors"]
       - slug: outdoor
         label: Outdoor
-        synonyms: [ "open air", "open-air", "park", "rooftop", "terrace", "beach" ]
+        synonyms:
+          ["open air", "open-air", "park", "rooftop", "terrace", "beach"]
 
   - slug: vibe
     label: Vibe
@@ -116,10 +120,12 @@ tag_groups:
     tags:
       - slug: live-music
         label: Live Music
-        synonyms: [ "live band", "live orchestra", "live percussion", "live drummers" ]
+        synonyms:
+          ["live band", "live orchestra", "live percussion", "live drummers"]
       - slug: dj
         label: DJ
-        synonyms: [ "dj set", "djs", "live dj set" ]
+        synonyms: ["dj set", "djs", "live dj set"]
       - slug: free
         label: Free Entry
-        synonyms: [ "free entry", "no cover", "gratis", "gratuit", "free admission" ]
+        synonyms:
+          ["free entry", "no cover", "gratis", "gratuit", "free admission"]

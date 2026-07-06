@@ -21,9 +21,8 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-jan-budapest
   calendar_id: bachata-cal-002
   title: Winter Bachata Festival – Budapest
@@ -59,10 +58,9 @@ events:
   - dance-style:bachata
   - level:beginner-friendly
   - venue:indoor
-  - scale:large
-  - scope:international
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-jan-london
   calendar_id: kizomba-cal-003
   title: Kizomba Fuego – London
@@ -85,10 +83,9 @@ events:
   - dance-style:kizomba
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-feb-rome
   calendar_id: salsa-cal-001
   title: Valentine Salsa Night – Rome
@@ -110,9 +107,8 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-feb-berlin
   calendar_id: bachata-cal-002
   title: Berlin Bachata Vibes
@@ -134,9 +130,8 @@ events:
   - dance-style:bachata
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-feb-lisbon
   calendar_id: kizomba-cal-003
   title: Carnaval Kizomba – Lisbon
@@ -158,9 +153,8 @@ events:
   - dance-style:kizomba
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:regional
 - id: evt-mar-athens
   calendar_id: salsa-cal-001
   title: Spring Salsa Workshop – Athens
@@ -186,8 +180,7 @@ events:
   - dance-style:salsa
   - level:all-levels
   - venue:rooftop
-  - scale:small
-  - scope:local
+  - reach:local
 - id: evt-mar-barcelona
   calendar_id: bachata-cal-002
   title: Bachata Cubana Party – Barcelona
@@ -210,10 +203,9 @@ events:
   - dance-style:bachata
   - level:beginner-friendly
   - venue:outdoor
-  - scale:medium
-  - scope:local
   - vibe:live-band
   - vibe:social-atmosphere
+  - reach:regional
 - id: evt-mar-paris
   calendar_id: kizomba-cal-003
   title: Kizomba Bootcamp – Paris
@@ -239,8 +231,7 @@ events:
   - dance-style:kizomba
   - level:all-levels
   - venue:indoor
-  - scale:large
-  - scope:international
+  - reach:international
 - id: evt-mar-amsterdam
   calendar_id: salsa-cal-001
   title: Latin Night Amsterdam
@@ -267,9 +258,8 @@ events:
   - dance-style:bachata
   - level:all-levels
   - venue:indoor
-  - scale:small
-  - scope:local
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-apr-paris
   calendar_id: salsa-cal-001
   title: Salsa Social Night – Paris
@@ -291,10 +281,9 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-apr-vienna
   calendar_id: bachata-cal-002
   title: Wien Bachata Congress
@@ -330,11 +319,10 @@ events:
   - dance-style:bachata
   - level:beginner-friendly
   - venue:indoor
-  - scale:large
-  - scope:international
   - vibe:good-music
   - vibe:social-atmosphere
   - vibe:crowded
+  - reach:regional
 - id: evt-apr-athens
   calendar_id: kizomba-cal-003
   title: Kizomba Under the Acropolis – Athens
@@ -356,10 +344,9 @@ events:
   - dance-style:kizomba
   - level:beginner-friendly
   - venue:rooftop
-  - scale:medium
-  - scope:local
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-may-lisbon
   calendar_id: salsa-cal-001
   title: Salsa & Kizomba Festival – Lisbon
@@ -396,10 +383,9 @@ events:
   - dance-style:kizomba
   - level:beginner-friendly
   - venue:indoor
-  - scale:large
-  - scope:international
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-may-prague
   calendar_id: bachata-cal-002
   title: Bachata en Praga
@@ -425,9 +411,8 @@ events:
   - dance-style:bachata
   - level:all-levels
   - venue:indoor
-  - scale:small
-  - scope:local
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-may-london
   calendar_id: salsa-cal-001
   title: London Salsa Splash
@@ -449,11 +434,10 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:outdoor
-  - scale:medium
-  - scope:local
   - vibe:live-band
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-may-milan
   calendar_id: kizomba-cal-003
   title: Kizomba al Lago – Milan
@@ -475,9 +459,8 @@ events:
   - dance-style:kizomba
   - level:beginner-friendly
   - venue:outdoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-jun-paris
   calendar_id: salsa-cal-001
   title: Fête de la Musique Salsa – Paris
@@ -499,9 +482,8 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:outdoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-jun-dubrovnik
   calendar_id: bachata-cal-002
   title: Bachata Night Dubrovnik
@@ -523,9 +505,8 @@ events:
   - dance-style:bachata
   - level:beginner-friendly
   - venue:rooftop
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:regional
 - id: evt-jun-stockholm
   calendar_id: kizomba-cal-003
   title: Midsommar Kizomba – Stockholm
@@ -547,9 +528,8 @@ events:
   - dance-style:kizomba
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-jun-barcelona
   calendar_id: salsa-cal-001
   title: Salsa on the Beach – Barcelona
@@ -571,9 +551,8 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:outdoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-jul-budapest
   calendar_id: salsa-cal-001
   title: Budapest Summer Salsa Open
@@ -595,9 +574,8 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:outdoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-jul-santorini
   calendar_id: bachata-cal-002
   title: Santorini Bachata Retreat
@@ -633,10 +611,9 @@ events:
   - dance-style:bachata
   - level:beginner-friendly
   - venue:indoor
-  - scale:large
-  - scope:international
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-jul-london
   calendar_id: kizomba-cal-003
   title: Kizomba Summer – London
@@ -658,9 +635,8 @@ events:
   - dance-style:kizomba
   - level:beginner-friendly
   - venue:outdoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-aug-naples
   calendar_id: salsa-cal-001
   title: Salsa al Tramonto – Napoli
@@ -682,9 +658,8 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:outdoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:regional
 - id: evt-aug-porto
   calendar_id: bachata-cal-002
   title: Porto Bachata & Wine Night
@@ -706,9 +681,8 @@ events:
   - dance-style:bachata
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-aug-berlin
   calendar_id: kizomba-cal-003
   title: Berlin Open Air Kizomba
@@ -730,9 +704,8 @@ events:
   - dance-style:kizomba
   - level:beginner-friendly
   - venue:outdoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-aug-lisbon
   calendar_id: kizomba-cal-003
   title: Lisbon Kizomba Festival
@@ -768,10 +741,9 @@ events:
   - dance-style:kizomba
   - level:beginner-friendly
   - venue:indoor
-  - scale:large
-  - scope:international
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:regional
 - id: evt-sep-paris
   calendar_id: salsa-cal-001
   title: Rentrée Salsa – Paris
@@ -793,9 +765,8 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:indoor
-  - scale:large
-  - scope:international
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-sep-barcelona
   calendar_id: bachata-cal-002
   title: Bachata Sensual Intensive – Barcelona
@@ -831,10 +802,9 @@ events:
   - dance-style:bachata
   - level:beginner-friendly
   - venue:indoor
-  - scale:large
-  - scope:international
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-sep-thessaloniki
   calendar_id: kizomba-cal-003
   title: Thessaloniki Kizomba Weekend
@@ -870,11 +840,10 @@ events:
   - dance-style:kizomba
   - level:beginner-friendly
   - venue:indoor
-  - scale:small
-  - scope:local
   - vibe:live-band
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-oct-rome
   calendar_id: salsa-cal-001
   title: Salsa Congress – Rome
@@ -910,11 +879,10 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:indoor
-  - scale:large
-  - scope:international
   - vibe:good-music
   - vibe:social-atmosphere
   - vibe:crowded
+  - reach:regional
 - id: evt-oct-amsterdam
   calendar_id: bachata-cal-002
   title: Amsterdam Bachata Weekender
@@ -951,10 +919,9 @@ events:
   - dance-style:kizomba
   - level:beginner-friendly
   - venue:indoor
-  - scale:large
-  - scope:international
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:regional
 - id: evt-oct-madrid
   calendar_id: kizomba-cal-003
   title: Kizomba Noche – Madrid
@@ -976,9 +943,8 @@ events:
   - dance-style:kizomba
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-nov-paris
   calendar_id: salsa-cal-001
   title: Salsa & Jazz – Paris
@@ -1000,10 +966,9 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:live-band
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-nov-london
   calendar_id: bachata-cal-002
   title: London Bachata Marathon
@@ -1025,10 +990,9 @@ events:
   - dance-style:bachata
   - level:beginner-friendly
   - venue:indoor
-  - scale:large
-  - scope:international
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-nov-budapest
   calendar_id: kizomba-cal-003
   title: Budapest Autumn Kizomba Social
@@ -1050,9 +1014,8 @@ events:
   - dance-style:kizomba
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-dec-vienna
   calendar_id: salsa-cal-001
   title: Christmas Salsa Ball – Vienna
@@ -1088,10 +1051,9 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-dec-seville
   calendar_id: bachata-cal-002
   title: Bachata de Navidad – Seville
@@ -1113,9 +1075,8 @@ events:
   - dance-style:bachata
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-dec-lisbon
   calendar_id: kizomba-cal-003
   title: NYE Kizomba Countdown – Lisbon
@@ -1137,9 +1098,8 @@ events:
   - dance-style:kizomba
   - level:beginner-friendly
   - venue:outdoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:regional
 - id: evt-spring-copenhagen
   calendar_id: salsa-cal-001
   title: Copenhagen Salsa Spring Night
@@ -1165,10 +1125,9 @@ events:
   - dance-style:salsa
   - level:all-levels
   - venue:indoor
-  - scale:small
-  - scope:local
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-spring-warsaw
   calendar_id: bachata-cal-002
   title: Warsaw Bachata Spring Social
@@ -1190,10 +1149,9 @@ events:
   - dance-style:bachata
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:regional
 - id: evt-spring-brussels
   calendar_id: kizomba-cal-003
   title: Brussels Kizomba Garden Social
@@ -1215,9 +1173,8 @@ events:
   - dance-style:kizomba
   - level:beginner-friendly
   - venue:outdoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-sum-nice
   calendar_id: salsa-cal-001
   title: Côte d'Azur Salsa Night – Nice
@@ -1239,9 +1196,8 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-sum-valencia
   calendar_id: bachata-cal-002
   title: Valencia Bachata Nights
@@ -1263,10 +1219,9 @@ events:
   - dance-style:bachata
   - level:beginner-friendly
   - venue:outdoor
-  - scale:medium
-  - scope:local
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-sum-edinburgh
   calendar_id: kizomba-cal-003
   title: Edinburgh Kizomba Fringe Social
@@ -1302,10 +1257,9 @@ events:
   - dance-style:kizomba
   - level:beginner-friendly
   - venue:indoor
-  - scale:large
-  - scope:international
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:regional
 - id: evt-fall-dublin
   calendar_id: salsa-cal-001
   title: Dublin Salsa Autumn Fiesta
@@ -1328,11 +1282,10 @@ events:
   - dance-style:bachata
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:live-band
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-fall-warsaw
   calendar_id: bachata-cal-002
   title: Warsaw Bachata Autumn Congress
@@ -1368,11 +1321,10 @@ events:
   - dance-style:bachata
   - level:beginner-friendly
   - venue:indoor
-  - scale:large
-  - scope:international
   - vibe:good-music
   - vibe:social-atmosphere
   - vibe:crowded
+  - reach:local
 - id: evt-fall-copenhagen
   calendar_id: kizomba-cal-003
   title: Copenhagen Kizomba Autumn Social
@@ -1394,9 +1346,8 @@ events:
   - dance-style:kizomba
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:regional
 - id: evt-online-001
   calendar_id: bachata-cal-002
   title: Online Bachata Styling Workshop
@@ -1418,8 +1369,7 @@ events:
   - format:workshop
   - dance-style:bachata
   - level:all-levels
-  - scale:small
-  - scope:local
+  - reach:local
 - id: evt-vague-001
   calendar_id: salsa-cal-001
   title: Salsa Social @ Dave's Place
@@ -1439,9 +1389,8 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-vague-002
   calendar_id: kizomba-cal-003
   title: Kizomba Jam — TBA
@@ -1461,9 +1410,8 @@ events:
   - dance-style:kizomba
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-vague-003
   calendar_id: bachata-cal-002
   title: Bachata Brunch
@@ -1483,9 +1431,8 @@ events:
   - dance-style:bachata
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-nullisland
   calendar_id: salsa-cal-001
   title: Mystery Salsa Night
@@ -1507,9 +1454,8 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-geocode-me
   calendar_id: kizomba-cal-003
   title: Kizomba by the River
@@ -1529,9 +1475,8 @@ events:
   - dance-style:kizomba
   - level:beginner-friendly
   - venue:outdoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-allday-001
   calendar_id: salsa-cal-001
   title: Lyon Salsa Summer Camp
@@ -1568,10 +1513,9 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:indoor
-  - scale:large
-  - scope:international
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-early-2025
   calendar_id: bachata-cal-002
   title: Marseille Bachata Kick-off
@@ -1593,9 +1537,8 @@ events:
   - dance-style:bachata
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-late-2026
   calendar_id: kizomba-cal-003
   title: New Year Kizomba Gala 2026
@@ -1631,7 +1574,6 @@ events:
   - dance-style:kizomba
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:international

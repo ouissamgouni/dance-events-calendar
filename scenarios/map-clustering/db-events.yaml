@@ -30,9 +30,8 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:outdoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:local
   - id: evt-cluster-par-02
     calendar_id: bachata-cal-002
     title: Tuileries Bachata Brunch
@@ -50,9 +49,8 @@ events:
     - dance-style:bachata
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:regional
   - id: evt-cluster-par-03
     calendar_id: kizomba-cal-003
     title: Châtelet Kizomba Night
@@ -70,9 +68,8 @@ events:
     - dance-style:kizomba
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:local
   - id: evt-cluster-par-04
     calendar_id: salsa-cal-001
     title: Opéra Salsa Tuesday
@@ -88,9 +85,8 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:international
   - id: evt-cluster-par-05
     calendar_id: bachata-cal-002
     title: Palais-Royal Bachata Mixer
@@ -108,9 +104,8 @@ events:
     - dance-style:bachata
     - level:all-levels
     - venue:indoor
-    - scale:small
-    - scope:local
     - vibe:social-atmosphere
+    - reach:regional
   - id: evt-cluster-par-06
     calendar_id: salsa-cal-001
     title: Forum des Halles Salsa Open
@@ -128,9 +123,8 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:international
   - id: evt-cluster-par-07
     calendar_id: kizomba-cal-003
     title: Pont Neuf Kizomba Riverside
@@ -146,8 +140,7 @@ events:
     - dance-style:kizomba
     - level:all-levels
     - venue:outdoor
-    - scale:medium
-    - scope:local
+    - reach:international
   - id: evt-cluster-par-08
     calendar_id: salsa-cal-001
     title: Madeleine Salsa Saturday
@@ -165,9 +158,8 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:local
   - id: evt-cluster-par-09
     calendar_id: bachata-cal-002
     title: Concorde Bachata Picnic
@@ -183,8 +175,7 @@ events:
     - dance-style:bachata
     - level:all-levels
     - venue:outdoor
-    - scale:medium
-    - scope:local
+    - reach:regional
   - id: evt-cluster-par-10
     calendar_id: salsa-cal-001
     title: Vendôme Salsa Late Night
@@ -202,9 +193,8 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:regional
   - id: evt-cluster-par-11
     calendar_id: kizomba-cal-003
     title: Rivoli Kizomba Wednesday
@@ -222,9 +212,8 @@ events:
     - dance-style:kizomba
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:international
   - id: evt-cluster-par-12
     calendar_id: salsa-cal-001
     title: Les Halles Salsa Friday
@@ -242,9 +231,8 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:good-music
+    - reach:local
   - id: evt-cluster-par-13
     calendar_id: bachata-cal-002
     title: Saint-Honoré Bachata Sensual
@@ -262,9 +250,8 @@ events:
     - dance-style:bachata
     - level:all-levels
     - venue:indoor
-    - scale:small
-    - scope:local
     - vibe:social-atmosphere
+    - reach:international
   - id: evt-cluster-par-14
     calendar_id: salsa-cal-001
     title: Châtelet Salsa Sunday Brunch
@@ -282,9 +269,8 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:international
   - id: evt-cluster-par-15
     calendar_id: kizomba-cal-003
     title: Pyramides Kizomba Thursday
@@ -300,8 +286,7 @@ events:
     - dance-style:kizomba
     - level:beginner-friendly
     - venue:indoor
-    - scale:medium
-    - scope:local
+    - reach:international
   - id: evt-cluster-par-16
     calendar_id: bachata-cal-002
     title: Halles Bachata Weekend Festival
@@ -321,8 +306,7 @@ events:
     - dance-style:bachata
     - level:all-levels
     - venue:indoor
-    - scale:large
-    - scope:international
+    - reach:local
   - id: evt-cluster-ber-01
     calendar_id: salsa-cal-001
     title: Alexanderplatz Salsa Open Air
@@ -338,9 +322,8 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:outdoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:local
   - id: evt-cluster-ber-02
     calendar_id: bachata-cal-002
     title: Hackescher Markt Bachata
@@ -358,9 +341,8 @@ events:
     - dance-style:bachata
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:international
   - id: evt-cluster-ber-03
     calendar_id: kizomba-cal-003
     title: Friedrichstraße Kizomba Wednesday
@@ -378,9 +360,8 @@ events:
     - dance-style:kizomba
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:local
   - id: evt-cluster-ber-04
     calendar_id: salsa-cal-001
     title: Museumsinsel Salsa Sunset
@@ -396,9 +377,8 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:outdoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:local
   - id: evt-cluster-ber-05
     calendar_id: bachata-cal-002
     title: Unter den Linden Bachata Mixer
@@ -416,9 +396,8 @@ events:
     - dance-style:bachata
     - level:all-levels
     - venue:indoor
-    - scale:small
-    - scope:local
     - vibe:social-atmosphere
+    - reach:international
   - id: evt-cluster-ber-06
     calendar_id: kizomba-cal-003
     title: Mitte Kizomba Friday
@@ -436,9 +415,8 @@ events:
     - dance-style:kizomba
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:international
   - id: evt-cluster-ber-07
     calendar_id: salsa-cal-001
     title: Rosa-Luxemburg-Platz Salsa
@@ -454,9 +432,8 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:outdoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:local
   - id: evt-cluster-ber-08
     calendar_id: bachata-cal-002
     title: Holzmarkt Bachata Festival
@@ -476,8 +453,7 @@ events:
     - dance-style:bachata
     - level:all-levels
     - venue:outdoor
-    - scale:large
-    - scope:international
+    - reach:regional
   - id: evt-cluster-mad-01
     calendar_id: salsa-cal-001
     title: Madrid Salsa Saturday
@@ -495,9 +471,8 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:regional
   - id: evt-cluster-rom-01
     calendar_id: bachata-cal-002
     title: Rome Bachata Trastevere
@@ -513,9 +488,8 @@ events:
     - dance-style:bachata
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:international
   - id: evt-cluster-lis-01
     calendar_id: kizomba-cal-003
     title: Lisbon Kizomba Cais
@@ -533,8 +507,7 @@ events:
     - dance-style:kizomba
     - level:all-levels
     - venue:outdoor
-    - scale:medium
-    - scope:local
+    - reach:local
   - id: evt-cluster-ams-01
     calendar_id: salsa-cal-001
     title: Amsterdam Salsa Canal
@@ -550,9 +523,8 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:international
   - id: evt-cluster-vie-01
     calendar_id: bachata-cal-002
     title: Vienna Bachata Volksgarten
@@ -570,9 +542,8 @@ events:
     - dance-style:bachata
     - level:all-levels
     - venue:outdoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:local
   - id: evt-cluster-pra-01
     calendar_id: kizomba-cal-003
     title: Prague Kizomba Roxy
@@ -590,9 +561,8 @@ events:
     - dance-style:kizomba
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:local
 
 # --------------------------------------------------------------
 # Attendances + saves — mirrors the following-badge scenario so the

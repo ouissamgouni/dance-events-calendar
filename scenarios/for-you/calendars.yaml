@@ -1,0 +1,15 @@
+calendars:
+  - id: "salsa-cal-001"
+    name: "Salsa"
+    color: "#e11d48"
+    # This scenario uses CALENDAR_SERVICE=mock, so mock-sync-events.yaml
+    # enters the DB via the real sync pipeline (not _seed_event_tags), which
+    # tags new events using CalendarDefaultTag rather than any `tags:` key
+    # in the event YAML. Needed so evt-fy-sync-001 matches the viewer's
+    # Salsa preference once synced (see test_plan.yaml step 6).
+    default_tags:
+      - dance-style:salsa
+      - format:social
+      - level:all-levels
+      - venue:indoor
+      - reach:local

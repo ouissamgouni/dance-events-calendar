@@ -22,9 +22,8 @@ events:
       - dance-style:salsa
       - level:all-levels
       - venue:indoor
-      - scale:medium
-      - scope:local
       - vibe:social-atmosphere
+      - reach:international
   - id: evt-cd-002
     calendar_id: bachata-cal-002
     title: Curated Bachata Workshop
@@ -44,8 +43,7 @@ events:
       - dance-style:bachata
       - level:intermediate
       - venue:indoor
-      - scale:small
-      - scope:local
+      - reach:regional
   - id: evt-cd-003
     calendar_id: bachata-cal-002
     title: Bachata Curator Sunday Pick
@@ -65,8 +63,7 @@ events:
       - dance-style:bachata
       - level:beginner-friendly
       - venue:indoor
-      - scale:medium
-      - scope:international
+      - reach:local
   - id: evt-cd-004
     calendar_id: salsa-cal-001
     title: Ordinary Organizer Control Event
@@ -84,7 +81,6 @@ events:
       - dance-style:salsa
       - level:all-levels
       - venue:indoor
-      - scale:medium
-      - scope:local
       - vibe:good-music
       - vibe:social-atmosphere
+      - reach:regional

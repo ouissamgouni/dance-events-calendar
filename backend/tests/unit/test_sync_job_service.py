@@ -14,6 +14,31 @@ def _wait_until(predicate, timeout=2.0):
     return False
 
 
+@pytest.fixture(autouse=True)
+def _stub_cross_instance_lock(monkeypatch):
+    # These are pure in-process unit tests; the Postgres advisory lock and
+    # SyncJobRun persistence are implementation details covered by
+    # integration tests. Stubbing them prevents leaked locks (from tests that
+    # don't wait for the worker to complete) and noisy "relation does not
+    # exist" DB errors from affecting subsequent tests when CI's real DB is
+    # reachable.
+    monkeypatch.setattr(
+        SyncJobService,
+        "_try_acquire_cross_instance_lock",
+        staticmethod(lambda: None),
+    )
+    monkeypatch.setattr(
+        SyncJobService,
+        "_release_cross_instance_lock",
+        staticmethod(lambda conn: None),
+    )
+    monkeypatch.setattr(
+        SyncJobService,
+        "_persist_record",
+        lambda self, record, *, force=False: None,
+    )
+
+
 @pytest.mark.unit
 class TestSyncJobService:
     def test_start_and_complete_job(self):

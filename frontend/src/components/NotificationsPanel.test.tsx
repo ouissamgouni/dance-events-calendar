@@ -7,10 +7,10 @@ import NotificationsPanel from './NotificationsPanel'
 import { server } from '../test/server'
 
 const navigateMock = vi.fn()
-const markReadMock = vi.fn(async () => {})
-const markAllReadMock = vi.fn(async () => {})
+const markReadMock = vi.fn(async () => { })
+const markAllReadMock = vi.fn(async () => { })
 const markSeenMock = vi.fn()
-const refreshUnreadCountMock = vi.fn(async () => {})
+const refreshUnreadCountMock = vi.fn(async () => { })
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
@@ -82,10 +82,52 @@ describe('NotificationsPanel (event reminders)', () => {
     expect(screen.getByText(/rooftop salsa social/i)).toBeInTheDocument()
     expect(screen.getByText(/^starts /i)).toBeInTheDocument()
 
+    // Opening the panel already marked the row read (view = read), so
+    // clicking it just navigates — markRead is a no-op for already-read rows.
+    await waitFor(() => expect(markAllReadMock).toHaveBeenCalled())
+
     await user.click(screen.getByRole('button', { name: /reminder/i }))
 
-    await waitFor(() => expect(markReadMock).toHaveBeenCalledWith(42))
-    expect(navigateMock).toHaveBeenCalledWith('/event/ev-remind')
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/event/ev-remind'))
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('marks everything read as soon as the panel opens (view = read)', async () => {
+    server.use(
+      http.get('*/api/notifications', () =>
+        HttpResponse.json({
+          items: [
+            {
+              id: 7,
+              kind: 'new_follower',
+              event_id: null,
+              event_title: null,
+              event_start: null,
+              actor: {
+                handle: 'bob',
+                display_name: 'Bob',
+                avatar_url: null,
+                is_verified_organizer: false,
+              },
+              created_at: '2026-06-25T10:00:00Z',
+              read_at: null,
+            },
+          ],
+          total: 1,
+          unread_count: 1,
+          limit: 20,
+          offset: 0,
+        }),
+      ),
+    )
+
+    render(
+      <MemoryRouter>
+        <NotificationsPanel open onClose={vi.fn()} />
+      </MemoryRouter>,
+    )
+
+    await waitFor(() => expect(markAllReadMock).toHaveBeenCalled())
+    expect(markSeenMock).toHaveBeenCalled()
   })
 })

@@ -139,6 +139,10 @@ class TestScheduler:
                 return_value={"reminders": 2, "emailed": 1, "pushed": 1},
             ),
             patch(
+                "backend.services.interest_notification_service.run_once",
+                return_value={"candidates": 4, "created": 1},
+            ),
+            patch(
                 "backend.services.activity_email.run_once",
                 return_value={"digests": 3, "pushed": 2},
             ),
@@ -147,6 +151,7 @@ class TestScheduler:
 
         assert stats == {
             "reminders": {"reminders": 2, "emailed": 1, "pushed": 1},
+            "interest": {"candidates": 4, "created": 1},
             "activity": {"digests": 3, "pushed": 2},
         }
 
@@ -157,6 +162,10 @@ class TestScheduler:
                 side_effect=RuntimeError("reminders blew up"),
             ),
             patch(
+                "backend.services.interest_notification_service.run_once",
+                return_value={"candidates": 0, "created": 0},
+            ),
+            patch(
                 "backend.services.activity_email.run_once",
                 return_value={"digests": 1},
             ),
@@ -164,4 +173,5 @@ class TestScheduler:
             stats = run_notification_dispatch_once()
 
         assert stats["reminders"] == {"error": True}
+        assert stats["interest"] == {"candidates": 0, "created": 0}
         assert stats["activity"] == {"digests": 1}

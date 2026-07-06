@@ -67,6 +67,37 @@ export default function NetworkPanel() {
         return () => window.removeEventListener('network:changed', onChanged);
     }, []);
 
+    // Eagerly fetch counts for all tabs on mount so counts are visible
+    // before user clicks a tab. Fetch with limit: 1 just to get the total.
+    useEffect(() => {
+        let cancelled = false;
+        const fetchCounts = async () => {
+            try {
+                const [friendsRes, followersRes, followingRes] = await Promise.all([
+                    fetchMyFriends({ limit: 1 }),
+                    fetchMyFollowers({ limit: 1 }),
+                    fetchMyFollowing({ limit: 1 }),
+                ]);
+                if (!cancelled) {
+                    setData({
+                        friends: friendsRes,
+                        followers: followersRes,
+                        following: followingRes,
+                    });
+                }
+            } catch (err) {
+                // Errors on initial count fetch are non-fatal
+                if (!cancelled) {
+                    console.error('Failed to fetch network counts:', err);
+                }
+            }
+        };
+        fetchCounts();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
     useEffect(() => {
         if (tab === 'leaderboard') {
             if (leaderboard !== null && leaderboard.period === leaderboardPeriod) return;
@@ -87,7 +118,8 @@ export default function NetworkPanel() {
             };
         }
         if (tab === 'suggestions') return; // PYM card owns its own fetch
-        if (data[tab] !== null) return;
+        // If data already has items (full list), don't re-fetch
+        if (data[tab] !== null && data[tab].items.length > 0) return;
         let cancelled = false;
         const fetcher =
             tab === 'friends'

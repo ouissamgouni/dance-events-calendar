@@ -124,6 +124,34 @@ describe('usePush', () => {
         await waitFor(() => expect(result.current.status).toBe('on'))
     })
 
+    it('re-registers an existing subscription with the backend when userId changes (sign-in rebind)', async () => {
+        setupPush({ existing: makeSub() })
+        server.use(
+            http.get('*/api/push/vapid-public-key', () =>
+                HttpResponse.json({ public_key: VAPID_KEY }),
+            ),
+        )
+        let subscribeCalls = 0
+        server.use(
+            http.post('*/api/push/subscribe', () => {
+                subscribeCalls += 1
+                return new HttpResponse(null, { status: 204 })
+            }),
+        )
+
+        const { result, rerender } = renderHook(
+            ({ userId }: { userId: string | undefined }) => usePush(userId),
+            { initialProps: { userId: undefined as string | undefined } },
+        )
+        await waitFor(() => expect(result.current.status).toBe('on'))
+        await waitFor(() => expect(subscribeCalls).toBe(1))
+
+        rerender({ userId: 'user-123' })
+
+        await waitFor(() => expect(subscribeCalls).toBe(2))
+        expect(result.current.status).toBe('on')
+    })
+
     it('auto-subscribes silently when permission is already granted', async () => {
         const { pushManager, requestPermissionMock } = setupPush({
             permission: 'granted',

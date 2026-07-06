@@ -115,6 +115,7 @@ from backend.services.follows import (
     ensure_calendar_subscription,
 )
 from backend.api.deps import get_admin_user_id, is_admin_user
+from backend.config.loader import get_current_onboarding_version
 
 router = APIRouter(prefix="/api/social", tags=["social"])
 limiter = Limiter(key_func=client_ip)
@@ -3629,6 +3630,7 @@ def onboarding_complete(
             followed.append(target.handle or "")
 
     viewer.onboarded_at = datetime.utcnow()
+    viewer.onboarding_version = get_current_onboarding_version()
     session.add(viewer)
     session.commit()
     session.refresh(viewer)

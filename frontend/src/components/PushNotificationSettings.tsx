@@ -15,7 +15,7 @@ import ToggleRow from './ToggleRow';
  */
 export default function PushNotificationSettings() {
     const { user, refreshUser } = useAuth();
-    const push = usePush();
+    const push = usePush(user?.user_id);
 
     const checked = push.status === 'on';
     const visible = push.status !== 'unsupported' && push.status !== 'disabled';

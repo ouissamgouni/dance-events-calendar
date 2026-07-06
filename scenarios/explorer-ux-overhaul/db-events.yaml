@@ -32,7 +32,7 @@ events:
     start: w0 Fri 20:00
     end: w0 Fri 23:00
     price_is_free: true
-    tags: ["format:social", "dance-style:salsa", "level:all-levels"]
+    tags: ["format:social", "dance-style:salsa", "level:all-levels", reach:international]
   - id: evt-ux-002
     calendar_id: bachata-cal-002
     title: Berlin Bachata Sensual Night
@@ -45,7 +45,7 @@ events:
     start: w0 Fri 21:00
     end: w0 Sat 01:00
     price_is_free: true
-    tags: ["format:social", "dance-style:bachata", "level:all-levels"]
+    tags: ["format:social", "dance-style:bachata", "level:all-levels", reach:local]
   - id: evt-ux-003
     calendar_id: salsa-cal-001
     title: Madrid Salsa Beginner Class
@@ -58,7 +58,7 @@ events:
     start: w0 Fri 19:00
     end: w0 Fri 20:30
     price_is_free: true
-    tags: ["format:class", "dance-style:salsa", "level:beginner-friendly"]
+    tags: ["format:class", "dance-style:salsa", "level:beginner-friendly", reach:regional]
 
   # ── Week 0 — Saturday + Sunday ────────────────────────────────────
   - id: evt-ux-004
@@ -73,7 +73,7 @@ events:
     start: w0 Sat 14:00
     end: w0 Sat 17:00
     price_is_free: true
-    tags: ["format:workshop", "dance-style:salsa", "level:intermediate"]
+    tags: ["format:workshop", "dance-style:salsa", "level:intermediate", reach:local]
   - id: evt-ux-005
     calendar_id: bachata-cal-002
     title: Rome Bachata Sunday Social
@@ -86,7 +86,7 @@ events:
     start: w0 Sun 19:00
     end: w0 Sun 23:00
     price_is_free: true
-    tags: ["format:social", "dance-style:bachata", "level:all-levels"]
+    tags: ["format:social", "dance-style:bachata", "level:all-levels", reach:international]
 
   # ── Week 1 ───────────────────────────────────────────────────────
   - id: evt-ux-006
@@ -101,7 +101,7 @@ events:
     start: w1 Mon 20:00
     end: w1 Mon 22:00
     price_is_free: true
-    tags: ["format:practice", "dance-style:salsa"]
+    tags: ["format:practice", "dance-style:salsa", reach:local]
   - id: evt-ux-007
     calendar_id: bachata-cal-002
     title: Vienna Bachata Wednesday Class
@@ -114,7 +114,7 @@ events:
     start: w1 Wed 19:30
     end: w1 Wed 21:00
     price_is_free: true
-    tags: ["format:class", "dance-style:bachata", "level:beginner-friendly"]
+    tags: ["format:class", "dance-style:bachata", "level:beginner-friendly", reach:international]
   - id: evt-ux-008
     calendar_id: salsa-cal-001
     title: Prague Salsa Friday Social
@@ -127,7 +127,7 @@ events:
     start: w1 Fri 21:00
     end: w1 Sat 01:00
     price_is_free: true
-    tags: ["format:social", "dance-style:salsa"]
+    tags: ["format:social", "dance-style:salsa", reach:international]
 
   # ── Week 2 ───────────────────────────────────────────────────────
   - id: evt-ux-009
@@ -142,7 +142,7 @@ events:
     start: w2 Tue 19:00
     end: w2 Tue 21:00
     price_is_free: true
-    tags: ["format:class", "dance-style:salsa"]
+    tags: ["format:class", "dance-style:salsa", reach:regional]
   - id: evt-ux-010
     calendar_id: bachata-cal-002
     title: Copenhagen Bachata Thursday Workshop
@@ -155,7 +155,7 @@ events:
     start: w2 Thu 19:00
     end: w2 Thu 22:00
     price_is_free: true
-    tags: ["format:workshop", "dance-style:bachata"]
+    tags: ["format:workshop", "dance-style:bachata", reach:regional]
   - id: evt-ux-011
     calendar_id: salsa-cal-001
     title: London Salsa Saturday Festival Preview
@@ -168,7 +168,7 @@ events:
     start: w2 Sat 20:00
     end: w2 Sun 02:00
     price_is_free: true
-    tags: ["format:social", "dance-style:salsa", "scale:large"]
+    tags: ["format:social", "dance-style:salsa", reach:local]
 
   # ── Week 4 ───────────────────────────────────────────────────────
   - id: evt-ux-012
@@ -183,7 +183,7 @@ events:
     start: w4 Mon 20:00
     end: w4 Mon 22:00
     price_is_free: true
-    tags: ["format:practice", "dance-style:salsa"]
+    tags: ["format:practice", "dance-style:salsa", reach:international]
   - id: evt-ux-013
     calendar_id: bachata-cal-002
     title: Zurich Bachata Friday Social
@@ -196,7 +196,7 @@ events:
     start: w4 Fri 21:00
     end: w4 Sat 01:00
     price_is_free: true
-    tags: ["format:social", "dance-style:bachata"]
+    tags: ["format:social", "dance-style:bachata", reach:regional]
   - id: evt-ux-014
     calendar_id: salsa-cal-001
     title: Milan Salsa Workshop Weekend
@@ -209,7 +209,7 @@ events:
     start: w4 Sat 14:00
     end: w4 Sat 18:00
     price_is_free: true
-    tags: ["format:workshop", "dance-style:salsa"]
+    tags: ["format:workshop", "dance-style:salsa", reach:local]
 
   # ── Week 6 ───────────────────────────────────────────────────────
   - id: evt-ux-015
@@ -224,7 +224,7 @@ events:
     start: w6 Wed 20:00
     end: w6 Wed 23:00
     price_is_free: true
-    tags: ["format:social", "dance-style:salsa"]
+    tags: ["format:social", "dance-style:salsa", reach:international]
   - id: evt-ux-016
     calendar_id: bachata-cal-002
     title: Stockholm Bachata Sensual Workshop
@@ -237,7 +237,7 @@ events:
     start: w6 Sat 15:00
     end: w6 Sat 18:00
     price_is_free: true
-    tags: ["format:workshop", "dance-style:bachata"]
+    tags: ["format:workshop", "dance-style:bachata", reach:regional]
   - id: evt-ux-017
     calendar_id: salsa-cal-001
     title: Athens Salsa Late Night Social
@@ -250,7 +250,7 @@ events:
     start: w6 Sat 22:00
     end: w6 Sun 03:00
     price_is_free: true
-    tags: ["format:social", "dance-style:salsa"]
+    tags: ["format:social", "dance-style:salsa", reach:international]
 
   # ── Week 8 ───────────────────────────────────────────────────────
   - id: evt-ux-018
@@ -265,7 +265,7 @@ events:
     start: w8 Mon 19:00
     end: w8 Mon 20:30
     price_is_free: true
-    tags: ["format:class", "dance-style:salsa", "level:beginner-friendly"]
+    tags: ["format:class", "dance-style:salsa", "level:beginner-friendly", reach:local]
   - id: evt-ux-019
     calendar_id: bachata-cal-002
     title: Tel Aviv Bachata Thursday Drop-in
@@ -278,7 +278,7 @@ events:
     start: w8 Thu 19:30
     end: w8 Thu 21:00
     price_is_free: true
-    tags: ["format:class", "dance-style:bachata"]
+    tags: ["format:class", "dance-style:bachata", reach:international]
   - id: evt-ux-020
     calendar_id: salsa-cal-001
     title: Marrakech Salsa Friday Big Social
@@ -291,7 +291,7 @@ events:
     start: w8 Fri 21:00
     end: w8 Sat 02:00
     price_is_free: true
-    tags: ["format:social", "dance-style:salsa", "scale:large"]
+    tags: ["format:social", "dance-style:salsa", reach:local]
   - id: evt-ux-021
     calendar_id: bachata-cal-002
     title: Dublin Bachata Sunday Brunch
@@ -304,7 +304,7 @@ events:
     start: w8 Sun 12:00
     end: w8 Sun 15:00
     price_is_free: true
-    tags: ["format:social", "dance-style:bachata"]
+    tags: ["format:social", "dance-style:bachata", reach:local]
 
   # ── Week 10 ──────────────────────────────────────────────────────
   - id: evt-ux-022
@@ -319,7 +319,7 @@ events:
     start: w10 Sat 10:00
     end: w10 Sat 17:00
     price_is_free: true
-    tags: ["format:workshop", "dance-style:salsa", "level:intermediate"]
+    tags: ["format:workshop", "dance-style:salsa", "level:intermediate", reach:international]
   - id: evt-ux-023
     calendar_id: bachata-cal-002
     title: Budapest Bachata Festival Pre-party
@@ -332,7 +332,7 @@ events:
     start: w10 Fri 22:00
     end: w10 Sat 03:00
     price_is_free: true
-    tags: ["format:social", "dance-style:bachata", "scale:large"]
+    tags: ["format:social", "dance-style:bachata", reach:international]
 
   # ── Beyond default 3 months (Extend Period reveals these) ────────
   - id: evt-ux-024
@@ -347,7 +347,7 @@ events:
     start: w14 Sat 19:00
     end: w14 Sun 04:00
     price_is_free: true
-    tags: ["format:social", "dance-style:salsa", "scale:large"]
+    tags: ["format:social", "dance-style:salsa", reach:international]
   - id: evt-ux-025
     calendar_id: bachata-cal-002
     title: Copenhagen Bachata Spring Workshop Weekend
@@ -360,7 +360,7 @@ events:
     start: w16 Sat 11:00
     end: w16 Sun 18:00
     price_is_free: true
-    tags: ["format:workshop", "dance-style:bachata", "scale:large"]
+    tags: ["format:workshop", "dance-style:bachata", reach:local]
   - id: evt-ux-026
     calendar_id: salsa-cal-001
     title: Montreal Salsa Late Spring Social
@@ -373,7 +373,7 @@ events:
     start: w18 Fri 21:00
     end: w18 Sat 02:00
     price_is_free: true
-    tags: ["format:social", "dance-style:salsa"]
+    tags: ["format:social", "dance-style:salsa", reach:regional]
   - id: evt-ux-027
     calendar_id: bachata-cal-002
     title: Cape Town Bachata Summer Kickoff
@@ -386,7 +386,7 @@ events:
     start: w20 Sat 20:00
     end: w20 Sun 01:00
     price_is_free: true
-    tags: ["format:social", "dance-style:bachata"]
+    tags: ["format:social", "dance-style:bachata", reach:local]
 
   # ── Far-away event for the "Search this area" pill ───────────────
   # New York — outside the default Europe & nearby area, visible after
@@ -403,7 +403,7 @@ events:
     start: w2 Sat 21:00
     end: w2 Sun 02:00
     price_is_free: true
-    tags: ["format:social", "dance-style:salsa"]
+    tags: ["format:social", "dance-style:salsa", reach:local]
 
 # Social proof seeds. Mirrors the map-clustering fixture style so Explorer
 # cards and pins show saved/going counts, following badges, and popularity.

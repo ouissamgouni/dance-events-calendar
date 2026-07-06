@@ -1,0 +1,23 @@
+# reminders-email cast. Alice has the email reminder channel ON;
+# Bob has it OFF as a negative probe (user-level opt-out must
+# suppress the email even though the admin gate is on).
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    account_visibility: public
+    email_event_reminders_enabled: true
+    push_event_reminders_enabled: false
+
+  # Negative probe.
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+    account_visibility: public
+    email_event_reminders_enabled: false
+    push_event_reminders_enabled: false

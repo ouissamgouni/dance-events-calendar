@@ -53,10 +53,9 @@ events:
       - dance-style:salsa
       - level:all-levels
       - venue:indoor
-      - scale:medium
-      - scope:local
       - vibe:good-music
       - vibe:social-atmosphere
+      - reach:regional
   - id: evt-trend-002
     calendar_id: bachata-cal-002
     title: Bachata Workshop with Carlos & Maria
@@ -75,8 +74,7 @@ events:
       - dance-style:bachata
       - level:all-levels
       - venue:indoor
-      - scale:small
-      - scope:local
+      - reach:international
   - id: evt-trend-003
     calendar_id: salsa-cal-001
     title: Cuban Night (boundary case)
@@ -93,9 +91,8 @@ events:
       - dance-style:salsa
       - level:all-levels
       - venue:indoor
-      - scale:medium
-      - scope:local
       - vibe:social-atmosphere
+      - reach:regional
   - id: evt-trend-004
     calendar_id: bachata-cal-002
     title: View-Bait — Free Bachata Crash Course
@@ -114,8 +111,7 @@ events:
       - dance-style:bachata
       - level:all-levels
       - venue:indoor
-      - scale:medium
-      - scope:local
+      - reach:local
   - id: evt-trend-005
     calendar_id: salsa-cal-001
     title: Last Week's Salsa Tuesday (past)
@@ -139,8 +135,7 @@ events:
       - dance-style:salsa
       - level:all-levels
       - venue:indoor
-      - scale:medium
-      - scope:local
+      - reach:local
   - id: evt-trend-010
     calendar_id: salsa-cal-001
     title: Amsterdam Salsa Sunday
@@ -158,9 +153,8 @@ events:
       - dance-style:salsa
       - level:all-levels
       - venue:indoor
-      - scale:medium
-      - scope:local
       - vibe:social-atmosphere
+      - reach:international
   - id: evt-trend-011
     calendar_id: bachata-cal-002
     title: Rome Bachata Rooftop
@@ -178,8 +172,7 @@ events:
       - dance-style:bachata
       - level:all-levels
       - venue:rooftop
-      - scale:medium
-      - scope:local
+      - reach:local
   - id: evt-trend-012
     calendar_id: salsa-cal-001
     title: Barcelona Salsa Open Air
@@ -195,9 +188,8 @@ events:
       - dance-style:salsa
       - level:all-levels
       - venue:outdoor
-      - scale:medium
-      - scope:local
       - vibe:social-atmosphere
+      - reach:regional
   - id: evt-trend-013
     calendar_id: bachata-cal-002
     title: Lisbon Kizomba & Bachata Night
@@ -216,9 +208,8 @@ events:
       - dance-style:kizomba
       - level:all-levels
       - venue:indoor
-      - scale:medium
-      - scope:local
       - vibe:social-atmosphere
+      - reach:local
   - id: evt-trend-014
     calendar_id: salsa-cal-001
     title: Prague Salsa Tuesday
@@ -234,9 +225,8 @@ events:
       - dance-style:salsa
       - level:all-levels
       - venue:indoor
-      - scale:medium
-      - scope:local
       - vibe:social-atmosphere
+      - reach:international
   - id: evt-trend-015
     calendar_id: bachata-cal-002
     title: Vienna Bachata Brunch
@@ -254,9 +244,8 @@ events:
       - dance-style:bachata
       - level:all-levels
       - venue:indoor
-      - scale:medium
-      - scope:local
       - vibe:social-atmosphere
+      - reach:international
   - id: evt-trend-016
     calendar_id: salsa-cal-001
     title: Copenhagen Latin Friday
@@ -276,8 +265,7 @@ events:
       - dance-style:kizomba
       - level:all-levels
       - venue:indoor
-      - scale:medium
-      - scope:local
+      - reach:international
   - id: evt-trend-017
     calendar_id: bachata-cal-002
     title: Dublin Salsa Tuesday
@@ -294,9 +282,8 @@ events:
       - dance-style:bachata
       - level:beginner-friendly
       - venue:indoor
-      - scale:medium
-      - scope:local
       - vibe:social-atmosphere
+      - reach:international
   - id: evt-trend-018
     calendar_id: salsa-cal-001
     title: Stockholm Salsa Open Stage
@@ -314,9 +301,8 @@ events:
       - dance-style:salsa
       - level:all-levels
       - venue:indoor
-      - scale:medium
-      - scope:local
       - vibe:good-music
+      - reach:regional
   - id: evt-trend-019
     calendar_id: bachata-cal-002
     title: Warsaw Bachata Sensual Festival (kickoff night)
@@ -334,9 +320,8 @@ events:
       - dance-style:bachata
       - level:all-levels
       - venue:indoor
-      - scale:large
-      - scope:international
       - vibe:social-atmosphere
+      - reach:local
   - id: evt-trend-020
     calendar_id: salsa-cal-001
     title: Zurich Salsa Lake Cruise
@@ -354,9 +339,8 @@ events:
       - dance-style:salsa
       - level:all-levels
       - venue:outdoor
-      - scale:medium
-      - scope:local
       - vibe:social-atmosphere
+      - reach:regional
   - id: evt-trend-021
     calendar_id: salsa-cal-001
     title: Paris Salsa Riverside Picnic
@@ -372,9 +356,8 @@ events:
       - dance-style:salsa
       - level:all-levels
       - venue:outdoor
-      - scale:medium
-      - scope:local
       - vibe:social-atmosphere
+      - reach:local
   - id: evt-trend-022
     calendar_id: bachata-cal-002
     title: Berlin Sensual Bachata Pop-up
@@ -392,8 +375,7 @@ events:
       - dance-style:bachata
       - level:all-levels
       - venue:indoor
-      - scale:medium
-      - scope:local
+      - reach:local
   - id: evt-trend-023
     calendar_id: salsa-cal-001
     title: Brussels Mojito Salsa Night
@@ -411,8 +393,7 @@ events:
       - dance-style:salsa
       - level:all-levels
       - venue:indoor
-      - scale:small
-      - scope:local
       - vibe:social-atmosphere
+      - reach:international
 
 # Going RSVPs — primary signal for the trending score.

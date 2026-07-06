@@ -45,65 +45,53 @@ tag_groups:
           ]
       - slug: class
         label: Class
-        synonyms: [ "classes", "lesson", "lessons", "course", "courses" ]
+        synonyms: ["classes", "lesson", "lessons", "course", "courses"]
       - slug: workshop
         label: Workshop
-        synonyms: [ "workshops", "stage", "masterclass", "master class" ]
+        synonyms: ["workshops", "stage", "masterclass", "master class"]
       - slug: festival
         label: Festival
         # NOTE: a dance "marathon" is its own format — keep it out of festival.
         # Congress merged into festival (2026-05): treat congress/congreso as synonyms.
-        synonyms: [ "congress", "congreso", "encuentro" ]
+        synonyms: ["congress", "congreso", "encuentro"]
       - slug: marathon
         label: Marathon
         ordinal: 6
-        synonyms: [ "dance marathon" ]
+        synonyms: ["dance marathon"]
       - slug: weekender
         label: Weekender
         ordinal: 7
-        synonyms: [ "weekend event", "weekend edition", "marathon" ]
+        synonyms: ["weekend event", "weekend edition", "marathon"]
       - slug: bootcamp
         label: Bootcamp
         ordinal: 8
-        synonyms: [ "boot camp", "intensive" ]
+        synonyms: ["boot camp", "intensive"]
       - slug: practice
         label: Practice
         ordinal: 9
-        synonyms: [ "practica", "práctica", "training", "drill", "drills" ]
+        synonyms: ["practica", "práctica", "training", "drill", "drills"]
       - slug: trip
         label: Trip
         ordinal: 10
-        synonyms: [ "getaway", "retreat", "tour", "excursion" ]
+        synonyms: ["getaway", "retreat", "tour", "excursion"]
       - slug: live-band
         label: Live band
         ordinal: 11
-        synonyms: [ "live music", "orchestra" ]
+        synonyms: ["live music", "orchestra"]
       - slug: pool-party
         label: Pool party
         ordinal: 12
-        synonyms: [ "pool" ]
+        synonyms: ["pool"]
       - slug: beach-side
         label: Beach Side
         ordinal: 13
-        synonyms: [ "beach" ]
+        synonyms: ["beach"]
 
-  - slug: scale
-    label: Scale
-    ordinal: 20
-    allow_multiple: false
-    color: "#38bdf8"
-    tags:
-      - slug: small
-        label: Small (<50)
-      - slug: medium
-        label: Medium (50-200)
-      - slug: large
-        label: Large (200+)
-
-  - slug: scope
-    label: Scope
+  - slug: reach
+    label: Reach
     ordinal: 30
     allow_multiple: true
+    onboarding_eligible: true
     color: "#a78bfa"
     tags:
       - slug: local
@@ -112,7 +100,7 @@ tag_groups:
         label: Regional
       - slug: international
         label: International
-        synonyms: [ "world", "worldwide", "global", "congress", "festival" ]
+        synonyms: ["world", "worldwide", "global", "congress", "festival"]
 
   - slug: venue
     label: Venue
@@ -122,17 +110,19 @@ tag_groups:
     tags:
       - slug: indoor
         label: Indoor
-        synonyms: [ "indoors" ]
+        synonyms: ["indoors"]
       - slug: outdoor
         label: Outdoor
-        synonyms: [ "outdoors", "open air", "open-air", "park", "beach", "terrace" ]
+        synonyms:
+          ["outdoors", "open air", "open-air", "park", "beach", "terrace"]
       - slug: rooftop
         label: Rooftop
-        synonyms: [ "roof top", "terrace" ]
+        synonyms: ["roof top", "terrace"]
       - slug: live-band
         label: Live band
         enabled: false
-        synonyms: [ "live music", "live orchestra", "live percussion", "live drummers" ]
+        synonyms:
+          ["live music", "live orchestra", "live percussion", "live drummers"]
       - slug: pool
         label: Pool
         ordinal: 4
@@ -141,44 +131,51 @@ tag_groups:
     label: Dance Style
     ordinal: 50
     allow_multiple: true
+    onboarding_eligible: true
     color: "#fb923c"
     tags:
       - slug: salsa
         label: Salsa
         is_hero_filter: true
         hero_ordinal: 1
-        synonyms: [ "salsa on1", "salsa on2", "linea", "línea", "la" ]
+        synonyms: ["salsa on1", "salsa on2", "linea", "línea", "la"]
       - slug: cuban
         label: Cuban (Casino)
-        synonyms: [ "cubana", "salsa cubana", "casino", "rueda de casino" ]
+        synonyms: ["cubana", "salsa cubana", "casino", "rueda de casino"]
       - slug: mambo
         label: Mambo (On2)
-        synonyms: [ "ny style", "new york style", "on2" ]
+        synonyms: ["ny style", "new york style", "on2"]
       - slug: bachata
         label: Bachata
         is_hero_filter: true
         hero_ordinal: 2
-        synonyms: [ "bachata sensual", "bachata moderna", "bachata dominicana", "dominicana" ]
+        synonyms:
+          [
+            "bachata sensual",
+            "bachata moderna",
+            "bachata dominicana",
+            "dominicana",
+          ]
       - slug: kizomba
         label: Kizomba
-        synonyms: [ "urban kiz", "kiz", "tarraxo", "tarraxinha", "ghetto zouk" ]
+        synonyms: ["urban kiz", "kiz", "tarraxo", "tarraxinha", "ghetto zouk"]
       - slug: semba
         label: Semba
       - slug: konpa
         label: Konpa
-        synonyms: [ "kompa", "compas" ]
+        synonyms: ["kompa", "compas"]
       - slug: zouk
         label: Zouk
-        synonyms: [ "brazilian zouk", "lambazouk" ]
+        synonyms: ["brazilian zouk", "lambazouk"]
       - slug: rueda
         label: Rueda
-        synonyms: [ "rueda de casino" ]
+        synonyms: ["rueda de casino"]
       - slug: cha-cha
         label: Cha-Cha
-        synonyms: [ "chachacha", "cha cha cha", "cha-cha-cha" ]
+        synonyms: ["chachacha", "cha cha cha", "cha-cha-cha"]
       - slug: son
         label: Son
-        synonyms: [ "son cubano" ]
+        synonyms: ["son cubano"]
 
   - slug: level
     label: Level
@@ -202,13 +199,13 @@ tag_groups:
           ]
       - slug: intermediate
         label: Intermediate
-        synonyms: [ "improver", "improvers", "int" ]
+        synonyms: ["improver", "improvers", "int"]
       - slug: advanced
         label: Advanced
-        synonyms: [ "advanced level", "adv" ]
+        synonyms: ["advanced level", "adv"]
       - slug: all-levels
         label: All Levels
-        synonyms: [ "all level", "open level", "tous niveaux" ]
+        synonyms: ["all level", "open level", "tous niveaux"]
 
   # NOTE: the previous "Vibe" group (good-music / crowded / spacious /
   # high-level-dancers / social-atmosphere / live-band) was a mix of

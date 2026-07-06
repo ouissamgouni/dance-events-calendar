@@ -226,7 +226,7 @@ def test_reminder_email_optout_keeps_inapp(session, monkeypatch):
     monkeypatch.setattr(reminder_service, "send_push", lambda *a, **k: 0)
 
     alice = _make_user(
-        session, "alice@example.com", "alice", reminder_email_enabled=False
+        session, "alice@example.com", "alice", email_event_reminders_enabled=False
     )
     _make_event(session, "ev-soon", start=datetime.utcnow() + timedelta(hours=3))
     _going(session, alice, "ev-soon")
@@ -298,7 +298,7 @@ def test_activity_digest_batches_into_one_email(session, monkeypatch):
     monkeypatch.setattr(
         activity_email,
         "send_activity_digest_email",
-        lambda recipient, lines: calls.append((recipient.id, list(lines))),
+        lambda recipient, lines, **_: calls.append((recipient.id, list(lines))),
     )
     monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
 
@@ -309,7 +309,9 @@ def test_activity_digest_batches_into_one_email(session, monkeypatch):
     _notif(session, recipient=bob, actor=a1, kind="new_follower", created_at=old)
     _notif(session, recipient=bob, actor=a2, kind="new_friend", created_at=old)
 
-    stats = activity_email.run_once()
+    # ``force=True`` bypasses the per-user schedule window so this test
+    # is deterministic regardless of wall-clock time.
+    stats = activity_email.run_once(force=True)
     assert stats["digests"] == 1
     assert len(calls) == 1
     assert calls[0][0] == bob.id
@@ -321,7 +323,7 @@ def test_activity_digest_emailed_at_is_idempotent(session, monkeypatch):
     monkeypatch.setattr(
         activity_email,
         "send_activity_digest_email",
-        lambda recipient, lines: calls.append(recipient.id),
+        lambda recipient, lines, **_: calls.append(recipient.id),
     )
     monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
 
@@ -330,9 +332,9 @@ def test_activity_digest_emailed_at_is_idempotent(session, monkeypatch):
     old = datetime.utcnow() - timedelta(minutes=5)
     _notif(session, recipient=bob, actor=a1, kind="new_follower", created_at=old)
 
-    activity_email.run_once()
+    activity_email.run_once(force=True)
     # Re-run: the notification is now stamped, so nothing to send.
-    assert activity_email.run_once() == {"digests": 0}
+    assert activity_email.run_once(force=True) == {"digests": 0}
     assert calls == [bob.id]
 
 
@@ -341,16 +343,16 @@ def test_activity_digest_optout_skips_email_but_stamps(session, monkeypatch):
     monkeypatch.setattr(
         activity_email,
         "send_activity_digest_email",
-        lambda recipient, lines: calls.append(recipient.id),
+        lambda recipient, lines, **_: calls.append(recipient.id),
     )
     monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
 
-    bob = _make_user(session, "bob@example.com", "bob", activity_email_enabled=False)
+    bob = _make_user(session, "bob@example.com", "bob", email_social_activity_enabled=False)
     a1 = _make_user(session, "a1@example.com", "a1")
     old = datetime.utcnow() - timedelta(minutes=5)
     n = _notif(session, recipient=bob, actor=a1, kind="new_follower", created_at=old)
 
-    stats = activity_email.run_once()
+    stats = activity_email.run_once(force=True)
     assert stats["digests"] == 0
     assert calls == []
     # Still stamped so it is not re-scanned forever.
@@ -358,7 +360,8 @@ def test_activity_digest_optout_skips_email_but_stamps(session, monkeypatch):
     assert n.emailed_at is not None
 
 
-def test_activity_digest_skips_recent_and_too_old(session, monkeypatch):
+def test_activity_digest_skips_notifs_older_than_max_age(session, monkeypatch):
+    """Rows older than _MAX_AGE (14 days) are dropped even with force=True."""
     monkeypatch.setattr(
         activity_email, "send_activity_digest_email", lambda *a, **k: None
     )
@@ -366,24 +369,145 @@ def test_activity_digest_skips_recent_and_too_old(session, monkeypatch):
 
     bob = _make_user(session, "bob@example.com", "bob")
     a1 = _make_user(session, "a1@example.com", "a1")
-    # Too recent (inside the 2-min batch delay) and too old (>24h) are both skipped.
-    _notif(
-        session,
-        recipient=bob,
-        actor=a1,
-        kind="new_follower",
-        created_at=datetime.utcnow(),
-    )
     _notif(
         session,
         recipient=bob,
         actor=a1,
         kind="new_friend",
         event_id=None,
-        created_at=datetime.utcnow() - timedelta(hours=30),
+        created_at=datetime.utcnow() - timedelta(days=30),
     )
 
-    assert activity_email.run_once() == {"digests": 0}
+    assert activity_email.run_once(force=True) == {"digests": 0}
+
+
+def test_activity_digest_gates_on_scheduled_slot(session, monkeypatch):
+    """Without ``force``, run_once only delivers to users in their local slot."""
+    calls: list = []
+    monkeypatch.setattr(
+        activity_email,
+        "send_activity_digest_email",
+        lambda recipient, lines, **_: calls.append(recipient.id),
+    )
+    monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
+    # Freeze the schedule so this test is TZ-independent.
+    monkeypatch.setattr(
+        "backend.services.activity_email.get_activity_digest_schedule",
+        lambda: "tue,fri @ 09:00",
+    )
+
+    bob = _make_user(session, "bob@example.com", "bob", timezone="UTC")
+    a1 = _make_user(session, "a1@example.com", "a1")
+    old = datetime.utcnow() - timedelta(minutes=5)
+    n = _notif(session, recipient=bob, actor=a1, kind="new_follower", created_at=old)
+
+    class _FakeDateTime:
+        """Freeze ``datetime.utcnow`` to a Monday 09:00 UTC (off-schedule)."""
+
+        @staticmethod
+        def utcnow():
+            return datetime(2026, 7, 6, 9, 0)  # Monday
+
+    monkeypatch.setattr("backend.services.activity_email.datetime", _FakeDateTime)
+
+    stats = activity_email.run_once()
+    assert stats.get("digests", 0) == 0
+    assert stats.get("skipped_off_schedule", 0) == 1
+    assert calls == []
+    session.refresh(n)
+    # Off-schedule rows stay unstamped so they roll into the next slot.
+    assert n.emailed_at is None
+
+
+def test_activity_digest_delivers_in_scheduled_slot(session, monkeypatch):
+    """When ``now`` matches the user's local slot the digest ships."""
+    calls: list = []
+    monkeypatch.setattr(
+        activity_email,
+        "send_activity_digest_email",
+        lambda recipient, lines, **_: calls.append(recipient.id),
+    )
+    monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
+    monkeypatch.setattr(
+        "backend.services.activity_email.get_activity_digest_schedule",
+        lambda: "tue,fri @ 09:00",
+    )
+
+    bob = _make_user(session, "bob@example.com", "bob", timezone="UTC")
+    a1 = _make_user(session, "a1@example.com", "a1")
+    _notif(
+        session,
+        recipient=bob,
+        actor=a1,
+        kind="new_follower",
+        created_at=datetime.utcnow() - timedelta(minutes=5),
+    )
+
+    class _FakeDateTime:
+        """Freeze ``datetime.utcnow`` to Tuesday 09:00 UTC."""
+
+        @staticmethod
+        def utcnow():
+            return datetime(2026, 7, 7, 9, 0)  # Tuesday
+
+    monkeypatch.setattr("backend.services.activity_email.datetime", _FakeDateTime)
+
+    stats = activity_email.run_once()
+    assert stats["digests"] == 1
+    assert calls == [bob.id]
+
+
+def test_activity_digest_per_user_timezone(session, monkeypatch):
+    """Two users on the same schedule ship in different UTC slots."""
+    calls: list = []
+    monkeypatch.setattr(
+        activity_email,
+        "send_activity_digest_email",
+        lambda recipient, lines, **_: calls.append(recipient.id),
+    )
+    monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
+    monkeypatch.setattr(
+        "backend.services.activity_email.get_activity_digest_schedule",
+        lambda: "tue @ 09:00",
+    )
+
+    paris = _make_user(
+        session, "paris@example.com", "paris", timezone="Europe/Paris"
+    )
+    tokyo = _make_user(
+        session, "tokyo@example.com", "tokyo", timezone="Asia/Tokyo"
+    )
+    a1 = _make_user(session, "a1@example.com", "a1")
+    _notif(
+        session,
+        recipient=paris,
+        actor=a1,
+        kind="new_follower",
+        created_at=datetime.utcnow() - timedelta(minutes=5),
+    )
+    _notif(
+        session,
+        recipient=tokyo,
+        actor=a1,
+        kind="new_follower",
+        created_at=datetime.utcnow() - timedelta(minutes=5),
+    )
+
+    # Tuesday 07:00 UTC → 09:00 Europe/Paris (in slot), but 16:00 in Tokyo
+    # (also past 09:00 slot for that day → in slot too). To isolate Paris,
+    # freeze to Tue 08:00 UTC = 09:00 Paris (in slot) but 17:00 Tokyo
+    # (past 09:00, in slot). Both fire.
+    class _FakeDateTime:
+        @staticmethod
+        def utcnow():
+            # Tuesday 00:15 UTC → 09:15 Tokyo (in slot), 01:15 Paris (before).
+            return datetime(2026, 7, 7, 0, 15)
+
+    monkeypatch.setattr("backend.services.activity_email.datetime", _FakeDateTime)
+
+    stats = activity_email.run_once()
+    assert stats["digests"] == 1
+    assert calls == [tokyo.id]
 
 
 # --- Notification preferences + unsubscribe ---------------------------------
@@ -414,6 +538,93 @@ def test_update_notification_preferences_rejects_bad_timezone(client, session):
     assert r.status_code == 400
 
 
+# --- Phase G: per-feature x per-channel flags --------------------------------
+
+
+def test_patch_new_flag_names_persists(client, session):
+    """Six new Phase G flags PATCH through unchanged and round-trip in GET /me."""
+    alice = _make_user(session, "alice@example.com", "alice")
+    _login(client, "alice@example.com")
+
+    r = client.patch(
+        "/api/auth/notification-preferences",
+        json={
+            "email_event_reminders_enabled": False,
+            "push_interest_matches_enabled": False,
+        },
+    )
+    assert r.status_code == 200, r.text
+
+    session.expire_all()
+    refreshed = session.get(User, alice.id)
+    assert refreshed.email_event_reminders_enabled is False
+    assert refreshed.push_interest_matches_enabled is False
+    # Untouched.
+    assert refreshed.email_social_activity_enabled is True
+    assert refreshed.email_interest_matches_enabled is True
+    assert refreshed.push_event_reminders_enabled is True
+    assert refreshed.push_social_activity_enabled is True
+
+    me = client.get("/api/auth/me").json()
+    assert me["email_event_reminders_enabled"] is False
+    assert me["push_interest_matches_enabled"] is False
+    # Legacy mirrors: `activity_email_enabled` = social AND interest email,
+    # `push_enabled` = AND of all three push_* flags,
+    # `interest_notifications_enabled` = email_interest AND push_interest.
+    assert me["reminder_email_enabled"] is False  # mirrors email_event_reminders
+    assert me["activity_email_enabled"] is True  # social+interest email both on
+    assert me["push_enabled"] is False  # any push off => legacy off
+    assert me["interest_notifications_enabled"] is False  # push_interest off
+
+
+def test_patch_legacy_flag_names_write_through_new_columns(client, session):
+    """Old clients PATCHing legacy names write through to the new flag matrix."""
+    alice = _make_user(session, "alice@example.com", "alice")
+    _login(client, "alice@example.com")
+
+    # Legacy `activity_email_enabled=False` must clear BOTH social and interest
+    # email flags on the new matrix (activity was the umbrella for both).
+    r = client.patch(
+        "/api/auth/notification-preferences",
+        json={"activity_email_enabled": False, "push_enabled": False},
+    )
+    assert r.status_code == 200, r.text
+
+    session.expire_all()
+    refreshed = session.get(User, alice.id)
+    assert refreshed.email_social_activity_enabled is False
+    assert refreshed.email_interest_matches_enabled is False
+    # push_enabled=False propagates to all three push channels.
+    assert refreshed.push_event_reminders_enabled is False
+    assert refreshed.push_social_activity_enabled is False
+    assert refreshed.push_interest_matches_enabled is False
+    # Reminder email was untouched.
+    assert refreshed.email_event_reminders_enabled is True
+
+
+def test_get_me_returns_all_six_new_flags(client, session):
+    """GET /me exposes every Phase G flag (plus the four legacy mirrors)."""
+    _make_user(session, "alice@example.com", "alice")
+    _login(client, "alice@example.com")
+
+    me = client.get("/api/auth/me").json()
+    for key in (
+        "email_event_reminders_enabled",
+        "email_social_activity_enabled",
+        "email_interest_matches_enabled",
+        "push_event_reminders_enabled",
+        "push_social_activity_enabled",
+        "push_interest_matches_enabled",
+        # Legacy mirrors still returned for one release.
+        "reminder_email_enabled",
+        "activity_email_enabled",
+        "push_enabled",
+        "interest_notifications_enabled",
+    ):
+        assert key in me, f"missing {key} in GET /me"
+        assert me[key] is True
+
+
 def test_unsubscribe_token_flips_flag(client, session):
     from backend.services.email_tokens import make_unsubscribe_token
 
@@ -426,9 +637,31 @@ def test_unsubscribe_token_flips_flag(client, session):
 
     session.expire_all()
     refreshed = session.get(User, alice.id)
-    assert refreshed.reminder_email_enabled is False
-    # The other category is untouched.
-    assert refreshed.activity_email_enabled is True
+    assert refreshed.email_event_reminders_enabled is False
+    # The other categories are untouched.
+    assert refreshed.email_social_activity_enabled is True
+
+
+def test_unsubscribe_activity_token_leaves_reminder_untouched(client, session):
+    """The 'activity' category (which carries interest-profile event
+    matches) must be isolated from the 'reminder' category so a user
+    can opt out of one without losing the other."""
+    from backend.services.email_tokens import make_unsubscribe_token
+
+    alice = _make_user(session, "alice@example.com", "alice")
+    token = make_unsubscribe_token(str(alice.id), "activity")
+
+    r = client.get(f"/api/auth/unsubscribe?token={token}")
+    assert r.status_code == 200
+    assert r.json()["status"] == "unsubscribed"
+
+    session.expire_all()
+    refreshed = session.get(User, alice.id)
+    # 'activity' is the legacy compat token — it flips BOTH social + interest
+    # email flags off (see UNSUBSCRIBE_CATEGORIES in email_tokens.py).
+    assert refreshed.email_social_activity_enabled is False
+    assert refreshed.email_interest_matches_enabled is False
+    assert refreshed.email_event_reminders_enabled is True
 
 
 def test_unsubscribe_invalid_token(client, session):
@@ -477,13 +710,13 @@ def test_admin_trigger_notifications_runs_dispatch(client, session, monkeypatch)
 
 
 def test_vapid_public_key_404_when_disabled(client, monkeypatch):
-    monkeypatch.setattr(push_module, "get_webpush_enabled", lambda: False)
+    monkeypatch.setattr(push_module, "get_web_push_enabled", lambda: False)
     r = client.get("/api/push/vapid-public-key")
     assert r.status_code == 404
 
 
 def test_vapid_public_key_returns_key_when_enabled(client, monkeypatch):
-    monkeypatch.setattr(push_module, "get_webpush_enabled", lambda: True)
+    monkeypatch.setattr(push_module, "get_web_push_enabled", lambda: True)
     monkeypatch.setattr(
         push_module,
         "get_vapid_config",
@@ -562,7 +795,7 @@ def test_send_push_prunes_stale_endpoints(session, monkeypatch):
     fake.webpush = fake_webpush
     fake.WebPushException = FakeWebPushException
     monkeypatch.setitem(sys.modules, "pywebpush", fake)
-    monkeypatch.setattr(push_service, "get_webpush_enabled", lambda: True)
+    monkeypatch.setattr(push_service, "get_web_push_enabled", lambda: True)
     monkeypatch.setattr(
         push_service,
         "get_vapid_config",

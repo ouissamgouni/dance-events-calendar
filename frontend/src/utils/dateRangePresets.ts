@@ -106,7 +106,7 @@ export function getDateRangePresetOptions(today = new Date()): DateRangePresetOp
         return {
             key,
             label: season.name,
-            mobileLabel: season.icon,
+            mobileLabel: `${season.icon} ${season.name}`,
             icon: season.icon,
             start: formatDate(offset === 0 ? thisSeasonStart : range.start),
             end: formatDate(range.end),

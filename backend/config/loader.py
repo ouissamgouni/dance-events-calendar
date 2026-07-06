@@ -189,9 +189,9 @@ def get_notification_interval_minutes() -> int:
         return 15
 
 
-def get_reminders_enabled() -> bool:
+def get_event_reminders_enabled() -> bool:
     """Master switch for event-reminder generation + emails. Default True."""
-    parsed = _parse_bool(os.getenv("REMINDERS_ENABLED"))
+    parsed = _parse_bool(os.getenv("EVENT_REMINDERS_ENABLED"))
     return True if parsed is None else parsed
 
 
@@ -204,16 +204,52 @@ def get_reminder_lead_hours() -> int:
         return 24
 
 
-def get_activity_email_enabled() -> bool:
+def get_activity_digest_email_enabled() -> bool:
     """Master switch for batched activity digest emails. Default True."""
-    parsed = _parse_bool(os.getenv("ACTIVITY_EMAIL_ENABLED"))
+    parsed = _parse_bool(os.getenv("ACTIVITY_DIGEST_EMAIL_ENABLED"))
     return True if parsed is None else parsed
 
 
-def get_webpush_enabled() -> bool:
+def get_web_push_enabled() -> bool:
     """Master switch for web-push delivery. Default False (needs VAPID keys)."""
-    parsed = _parse_bool(os.getenv("WEBPUSH_ENABLED"))
+    parsed = _parse_bool(os.getenv("WEB_PUSH_ENABLED"))
     return False if parsed is None else parsed
+
+
+def get_interest_match_notifications_enabled() -> bool:
+    """Master switch for interest-profile match notifications. Default True.
+
+    This is an ops-level kill switch for the whole feature. Per-user
+    delivery gates live on ``User.email_interest_matches_enabled`` and
+    ``User.push_interest_matches_enabled``; per-saved-search opt-out lives
+    on ``UserInterestProfile.matches_enabled``.
+    """
+    parsed = _parse_bool(os.getenv("INTEREST_MATCH_NOTIFICATIONS_ENABLED"))
+    return True if parsed is None else parsed
+
+
+# Bump this when the onboarding wizard changes in a way that requires
+# every existing user to walk through it again (e.g. a new required
+# step or PRD-driven data capture). The onboarding gate compares this
+# to ``User.onboarding_version`` and re-routes users whose stored
+# version is lower. Existing users with a stamped ``onboarded_at`` are
+# assumed to be at version 1 (backfilled by the migration).
+CURRENT_ONBOARDING_VERSION = 2
+
+
+def get_current_onboarding_version() -> int:
+    """Return the required onboarding wizard version.
+
+    Env override ``ONBOARDING_VERSION`` is intended for test scenarios
+    and staging preview only; production should rely on the constant.
+    """
+    raw = os.getenv("ONBOARDING_VERSION")
+    if raw:
+        try:
+            return int(raw)
+        except ValueError:
+            pass
+    return CURRENT_ONBOARDING_VERSION
 
 
 def get_vapid_config() -> dict:

@@ -4,8 +4,12 @@
 base_week: 0
 calendars:
   - id: salsa-cal-001
+    tags:
+    - reach:local
   - id: bachata-cal-002
 events:
+    tags:
+    - reach:local
   - id: evt-e9-001
     calendar_id: salsa-cal-001
     title: Salsa Social Friday
@@ -20,9 +24,8 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:international
   - id: evt-e9-002
     calendar_id: bachata-cal-002
     title: Bachata Workshop
@@ -37,8 +40,7 @@ events:
     - dance-style:bachata
     - level:all-levels
     - venue:indoor
-    - scale:small
-    - scope:local
+    - reach:regional
   - id: evt-e9-003
     calendar_id: salsa-cal-001
     title: Cuban Night
@@ -53,6 +55,5 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:international

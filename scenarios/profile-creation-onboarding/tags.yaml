@@ -1,0 +1,50 @@
+tag_groups:
+  - slug: format
+    label: Format
+    ordinal: 10
+    allow_multiple: true
+    onboarding_eligible: false
+    color: "#f472b6"
+    tags:
+      - slug: social
+        label: Social
+      - slug: workshop
+        label: Workshop
+      - slug: festival
+        label: Festival
+
+  - slug: dance-style
+    label: Dance Style
+    ordinal: 50
+    allow_multiple: true
+    onboarding_eligible: true
+    color: "#fb923c"
+    tags:
+      - slug: salsa
+        label: Salsa
+      - slug: bachata
+        label: Bachata
+      - slug: mambo
+        label: Mambo
+      - slug: kizomba
+        label: Kizomba
+
+  # PRD §3 — reach group is the notification-service anchor.
+  # onboarding_eligible=true is required for Step 1 to surface it and
+  # for the 'international' tag to be pre-selectable by default. The
+  # ``protected`` guard (delete/disable protection) is applied by the
+  # scope->reach rename migration (4f38e516ed38), not by seed YAML.
+  - slug: reach
+    label: Reach
+    ordinal: 30
+    allow_multiple: true
+    onboarding_eligible: true
+    color: "#a78bfa"
+    tags:
+      - slug: local
+        label: Local
+      - slug: regional
+        label: Regional
+      - slug: international
+        label: International
+        synonyms: ["world", "worldwide", "global", "congress", "festival"]

@@ -90,7 +90,7 @@ const resubscribe = useCallback(async () => {
     await subscribeAndRegister(reg, key);
 }, []);*/
 
-export function usePush() {
+export function usePush(userId?: string | null) {
     const [status, setStatus] = useState<PushStatus>('off');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -100,6 +100,17 @@ export function usePush() {
     // granted but no subscription exists yet, silently subscribe so push is
     // on-by-default for users who have allowed notifications — no prompt is
     // shown because the permission grant already happened.
+    //
+    // ``userId`` (the signed-in user id, or ``undefined``/``null`` while
+    // anonymous) is a dependency purely to re-run this effect across a
+    // login/logout transition in the same tab. The backend binds a push
+    // subscription's owner from the request's auth cookie at POST-time
+    // (see backend/api/routes/push.py), not from anything the client sends —
+    // so an existing browser-level subscription created while anonymous
+    // stays bound to `user_id = NULL` forever unless it is re-POSTed after
+    // sign-in. Re-running this effect on ``userId`` change re-registers the
+    // existing subscription, rebinding it to the now-known account without
+    // requiring the user to manually disable/re-enable notifications.
     useEffect(() => {
         let cancelled = false;
 
@@ -125,9 +136,17 @@ export function usePush() {
             const reg = await navigator.serviceWorker.ready;
             const existing = await reg.pushManager.getSubscription();
 
-            // ✅ CASE 1: already subscribed
+            // ✅ CASE 1: already subscribed. Re-register (not just locally
+            // detect) so a sign-in transition rebinds this endpoint's
+            // `user_id` server-side — see the comment on the hook above.
             if (existing) {
-                if (!cancelled) setStatus('on');
+                try {
+                    await subscribeAndRegister(reg, key);
+                    if (!cancelled) setStatus('on');
+                } catch (e) {
+                    console.error('Re-register failed', e);
+                    if (!cancelled) setStatus('on');
+                }
                 return;
             }
 
@@ -149,7 +168,7 @@ export function usePush() {
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [userId]);
 
     const enable = useCallback(async () => {
         console.log("enable() called");

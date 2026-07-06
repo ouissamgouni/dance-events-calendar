@@ -48,9 +48,18 @@ export default function HeaderUserMenu({ className }: { className?: string }) {
             <div className={'flex items-center gap-3 ' + (className ?? '')}>
                 <Link
                     to="/account"
-                    className="text-xs font-medium text-white hover:text-gray-200 transition"
+                    aria-label="Settings"
+                    title="Settings"
+                    className="text-xs font-medium text-white hover:text-gray-200 transition inline-flex items-center"
                 >
-                    Settings
+                    <img
+                        src="/menu.png"
+                        alt=""
+                        aria-hidden="true"
+                        className="sm:hidden h-4 w-4 object-contain"
+                        style={{ filter: 'brightness(0) invert(1)' }}
+                    />
+                    <span className="hidden sm:inline">Settings</span>
                 </Link>
                 <Link
                     to="/login"
@@ -70,9 +79,16 @@ export default function HeaderUserMenu({ className }: { className?: string }) {
                 aria-label="Account menu"
                 aria-haspopup="menu"
                 aria-expanded={open}
-                className="inline-flex items-center text-xs font-medium text-white hover:text-gray-200 transition max-w-[8rem] truncate"
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-white hover:text-gray-200 transition max-w-[9rem]"
             >
-                {firstName ?? 'Account'}
+                <span className="truncate">{firstName ?? 'Account'}</span>
+                <img
+                    src="/menu.png"
+                    alt=""
+                    aria-hidden="true"
+                    className="h-4 w-4 object-contain shrink-0"
+                    style={{ filter: 'brightness(0) invert(1)' }}
+                />
             </button>
 
             {open && (
@@ -80,6 +96,7 @@ export default function HeaderUserMenu({ className }: { className?: string }) {
                     role="menu"
                     className="absolute right-0 mt-1 w-44 bg-white border border-slate-200 shadow-lg z-50 py-1"
                 >
+
                     <Link
                         to="/account"
                         role="menuitem"
@@ -107,6 +124,14 @@ export default function HeaderUserMenu({ className }: { className?: string }) {
                         className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                     >
                         Invite friends
+                    </Link>
+                    <Link
+                        to="/?submit=1"
+                        role="menuitem"
+                        onClick={() => setOpen(false)}
+                        className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                        Submit event
                     </Link>
                     {user.is_admin && (
                         <Link

@@ -20,6 +20,7 @@ events:
   tags:
   - format:social
   - dance-style:salsa
+  - reach:local
 - id: evt-rating-002
   calendar_id: rating-cal-001
   title: Bachata Workshop — Rate Me!
@@ -46,6 +47,7 @@ events:
   tags:
   - format:workshop
   - dance-style:bachata
+  - reach:regional
 - id: evt-rating-003
   calendar_id: rating-cal-001
   title: Kizomba Class — No Reviews Yet
@@ -72,6 +74,7 @@ events:
   tags:
   - format:class
   - dance-style:kizomba
+  - reach:international
 tag_suggestions:
 - event_id: evt-rating-001
   free_text: live-band

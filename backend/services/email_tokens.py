@@ -8,8 +8,14 @@ expectation: every marketing-adjacent email carries a working opt-out).
 Tokens are intentionally long-lived (no expiry): an unsubscribe link in an
 old email must keep working. Categories map to a boolean User column:
 
-* ``reminder``  -> ``reminder_email_enabled``
-* ``activity``  -> ``activity_email_enabled``
+* ``reminder``         -> ``email_event_reminders_enabled``
+* ``social_activity``  -> ``email_social_activity_enabled``
+* ``interest_matches`` -> ``email_interest_matches_enabled``
+
+Legacy category ``activity`` remains accepted for one release so
+unsubscribe links in already-delivered emails continue to work; it maps
+to both feature-specific email flags (social + interest) to preserve the
+old "silence the digest" semantics.
 """
 
 from __future__ import annotations
@@ -22,10 +28,17 @@ from typing import Optional
 
 from backend.config.loader import get_session_secret
 
-# Allowed unsubscribe categories -> the User column they toggle off.
-UNSUBSCRIBE_CATEGORIES = {
-    "reminder": "reminder_email_enabled",
-    "activity": "activity_email_enabled",
+# Category token -> one or more User columns to flip to False on unsubscribe.
+UNSUBSCRIBE_CATEGORIES: dict[str, tuple[str, ...]] = {
+    "reminder": ("email_event_reminders_enabled",),
+    "social_activity": ("email_social_activity_enabled",),
+    "interest_matches": ("email_interest_matches_enabled",),
+    # Legacy alias — kept for one release so old unsubscribe links keep
+    # working. Silences both feature-specific email digests.
+    "activity": (
+        "email_social_activity_enabled",
+        "email_interest_matches_enabled",
+    ),
 }
 
 

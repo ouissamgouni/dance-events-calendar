@@ -1,0 +1,12 @@
+attendances:
+  # Alice is going → reminder pipeline should target her.
+  - event_id: ev-remind
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+
+  # Bob is going → same, second recipient.
+  - event_id: ev-remind
+    email: bob@example.com
+    share_publicly: true
+    share_audience: public

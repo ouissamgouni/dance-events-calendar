@@ -1,0 +1,4 @@
+follows:
+  - follower: newbie
+    followee: alice
+    status: approved

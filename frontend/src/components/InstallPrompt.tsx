@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { usePwaInstall } from '../context/PwaInstallContext';
+import { useAuth } from '../context/AuthContext';
 import { usePush } from '../hooks/usePush';
 
 /**
@@ -23,6 +24,12 @@ import { usePush } from '../hooks/usePush';
  * hiding it forever — a user who missed or postponed the invitation still
  * gets nudged again later, on top of always being able to enable push from
  * the persistent toggle in Account Settings.
+ *
+ * Only shown to signed-in users: `usePush()` rebinds an existing browser
+ * subscription's owner on the server whenever the signed-in user changes,
+ * but there is no such rebind target while anonymous, so there is no upside
+ * to prompting before sign-in — it would just create a device subscription
+ * with no account attached.
  *
  * iOS Safari has no `beforeinstallprompt`, so the banner simply never shows
  * there — Add-to-Home-Screen remains available via the share sheet.
@@ -64,7 +71,8 @@ function snoozePush() {
 
 export default function InstallPrompt() {
     const { canInstall, isStandalone, promptInstall } = usePwaInstall();
-    const push = usePush();
+    const { user } = useAuth();
+    const push = usePush(user?.user_id);
     const [snoozed, setSnoozed] = useState(isSnoozed());
     const [justInstalled, setJustInstalled] = useState(false);
     const [pushSnoozed, setPushSnoozed] = useState(isPushSnoozed());
@@ -104,6 +112,7 @@ export default function InstallPrompt() {
     };
 
     const showPushOptIn =
+        Boolean(user) &&
         (justInstalled || isStandalone) &&
         !pushSnoozed &&
         push.status !== 'on' &&

@@ -1,0 +1,33 @@
+base_week: 0
+# Two probes for the "no profile = no interest notifs" contract.
+events:
+  # An intl salsa congress that WOULD match a wide EUR intl-salsa
+  # profile — proves absence of interest_event rows when the user has
+  # no profiles at all.
+  - id: ev-would-match
+    calendar_id: salsa-cal-001
+    title: EUR Salsa Congress
+    description: "Would notify wide intl salsa profile — but Nora has none."
+    location: "Palacio de Congresos, Madrid, Spain"
+    latitude: 40.4168
+    longitude: -3.7038
+    start: w1 Sat 20:00
+    end: w1 Sun 04:00
+    tags:
+      - dance-style:salsa
+      - reach:local
+
+  # Friend-going event: Alice is Going, Nora follows Alice, so the
+  # activity digest MUST list this row regardless of interest gating.
+  - id: ev-friend
+    calendar_id: salsa-cal-001
+    title: Alice's Salsa Meetup
+    description: "Friend-going probe; social digest is independent of interest gating."
+    location: "Bar Latino, Paris, France"
+    latitude: 48.8650
+    longitude: 2.3600
+    start: w1 Sun 19:00
+    end: w1 Sun 22:00
+    tags:
+      - dance-style:salsa
+      - reach:international

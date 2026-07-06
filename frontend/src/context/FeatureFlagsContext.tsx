@@ -24,6 +24,21 @@ interface FeatureFlags {
     tagSortMode: 'group' | 'event_count';
     promoCodesEnabled: boolean;
     organizerClaimsEnabled: boolean;
+    forYouRailEnabled: boolean;
+    yourNextEventsRailEnabled: boolean;
+    /** When true, tags on event cards render as colored badges (legacy
+     * look). When false (default), tags render as inline "Practice · Indoor"
+     * text so cards stay quieter. */
+    tagAsBadge: boolean;
+    /** Only meaningful when `tagAsBadge` is true. When true, badges use
+     * each tag's defined color; when false (default) badges render on a
+     * neutral light-grey background. */
+    tagBadgeColored: boolean;
+    /** When true, Trending trail cards keep their compact chrome but
+     * additionally show tags and the attendee avatar stack. */
+    trendingTrailRichEnabled: boolean;
+    /** Number of tags to render inline per event card. */
+    tagsPerCard: number;
 }
 
 const defaultFlags: FeatureFlags = {
@@ -42,6 +57,12 @@ const defaultFlags: FeatureFlags = {
     tagSortMode: 'group',
     promoCodesEnabled: false,
     organizerClaimsEnabled: false,
+    forYouRailEnabled: false,
+    yourNextEventsRailEnabled: false,
+    tagAsBadge: false,
+    tagBadgeColored: false,
+    trendingTrailRichEnabled: false,
+    tagsPerCard: 3,
 };
 
 const FeatureFlagsContext = createContext<FeatureFlags>(defaultFlags);
@@ -68,6 +89,12 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     tagSortMode: s.tag_sort_mode === 'event_count' ? 'event_count' : 'group',
                     promoCodesEnabled: s.promo_codes_enabled ?? false,
                     organizerClaimsEnabled: s.organizer_claims_enabled ?? false,
+                    forYouRailEnabled: s.for_you_rail_enabled ?? false,
+                    yourNextEventsRailEnabled: s.your_next_events_rail_enabled ?? false,
+                    tagAsBadge: s.tag_as_badge_enabled ?? false,
+                    tagBadgeColored: s.tag_badge_colored ?? false,
+                    trendingTrailRichEnabled: s.trending_trail_rich_enabled ?? false,
+                    tagsPerCard: s.tags_per_card ?? 3,
                 });
             })
             .catch(() => {

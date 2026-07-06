@@ -106,11 +106,11 @@ class TestHealthEndpoint:
 
 @pytest.mark.unit
 class TestSettingsEndpoint:
-    def test_settings_returns_trending_banner_default_false(self, sqlite_client):
+    def test_settings_returns_trending_banner_default_true(self, sqlite_client):
         client, _engine = sqlite_client
         resp = client.get("/api/settings")
         assert resp.status_code == 200
-        assert resp.json()["trending_banner_enabled"] is False
+        assert resp.json()["trending_banner_enabled"] is True
         assert resp.json()["default_explorer_period"] == "next_3_months"
 
     def test_admin_can_update_trending_banner_flag(self, sqlite_client):
@@ -154,6 +154,76 @@ class TestSettingsEndpoint:
             "/api/settings", json={"default_explorer_period": "next_12_months"}
         )
         assert resp.status_code == 422
+
+    def test_settings_default_notification_flags(self, sqlite_client):
+        client, _engine = sqlite_client
+        body = client.get("/api/settings").json()
+        # Defaults come from ``config/loader.py`` (env-driven) and mirror
+        # the Pydantic response defaults when nothing is set in DB.
+        assert body["event_reminders_enabled"] is True
+        assert body["activity_digest_email_enabled"] is True
+        assert body["interest_match_notifications_enabled"] is True
+        # ``web_push_enabled`` defaults False unless VAPID keys are present.
+        assert "web_push_enabled" in body
+        assert body["reminder_lead_hours"] == 24
+        assert body["activity_digest_schedule"] == "tue,fri @ 09:00"
+
+    def test_admin_can_update_notification_gates(self, sqlite_client):
+        client, engine = sqlite_client
+        resp = client.put(
+            "/api/settings",
+            json={
+                "event_reminders_enabled": False,
+                "activity_digest_email_enabled": False,
+                "interest_match_notifications_enabled": False,
+                "web_push_enabled": True,
+                "reminder_lead_hours": 6,
+                "activity_digest_schedule": "mon,thu @ 18:30",
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["event_reminders_enabled"] is False
+        assert body["activity_digest_email_enabled"] is False
+        assert body["interest_match_notifications_enabled"] is False
+        assert body["web_push_enabled"] is True
+        assert body["reminder_lead_hours"] == 6
+        assert body["activity_digest_schedule"] == "mon,thu @ 18:30"
+
+        with Session(engine) as session:
+            assert session.get(SiteSetting, "event_reminders_enabled").value == "false"
+            assert session.get(SiteSetting, "web_push_enabled").value == "true"
+            assert session.get(SiteSetting, "reminder_lead_hours").value == "6"
+            assert (
+                session.get(SiteSetting, "activity_digest_schedule").value
+                == "mon,thu @ 18:30"
+            )
+
+        # GET reflects the persisted values.
+        body = client.get("/api/settings").json()
+        assert body["event_reminders_enabled"] is False
+        assert body["activity_digest_schedule"] == "mon,thu @ 18:30"
+
+    def test_admin_cannot_set_invalid_reminder_lead_hours(self, sqlite_client):
+        client, _engine = sqlite_client
+        # Below min.
+        assert (
+            client.put("/api/settings", json={"reminder_lead_hours": 0}).status_code
+            == 422
+        )
+        # Above max (720 = 30 days).
+        assert (
+            client.put("/api/settings", json={"reminder_lead_hours": 721}).status_code
+            == 422
+        )
+
+    def test_admin_cannot_set_malformed_digest_schedule(self, sqlite_client):
+        client, _engine = sqlite_client
+        for bad in ("everyday @ 09:00", "tue,fri", "tue,fri @ ", "TUE @ 09:00"):
+            resp = client.put("/api/settings", json={"activity_digest_schedule": bad})
+            assert resp.status_code == 422, (
+                f"expected 422 for {bad!r} got {resp.status_code}"
+            )
 
 
 @pytest.mark.unit
@@ -370,6 +440,64 @@ class TestEventsEndpoint:
         resp = client.get("/api/events/search?q=s")
 
         assert resp.status_code == 422
+
+    def test_get_events_paginates_with_limit_and_offset(self, sqlite_client):
+        client, engine = sqlite_client
+        now = datetime.now(UTC).replace(tzinfo=None)
+
+        with Session(engine) as session:
+            session.add(
+                CalendarSetting(
+                    calendar_id="cal-1",
+                    name="Test Calendar",
+                    enabled=True,
+                    color="#ff0000",
+                )
+            )
+            session.add_all(
+                [
+                    CachedEvent(
+                        event_id=f"evt-{i}",
+                        calendar_id="cal-1",
+                        title=f"Event {i}",
+                        location="Venue",
+                        start=now + timedelta(days=i),
+                        end=now + timedelta(days=i, hours=3),
+                        all_day=False,
+                        is_hidden=False,
+                    )
+                    for i in range(3)
+                ]
+            )
+            session.commit()
+
+        resp = client.get("/api/events?limit=2")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert [row["event_id"] for row in data] == ["evt-0", "evt-1"]
+        assert resp.headers["x-has-more"] == "true"
+
+        resp = client.get("/api/events?limit=2&offset=2")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert [row["event_id"] for row in data] == ["evt-2"]
+        assert resp.headers["x-has-more"] == "false"
+
+    def test_get_events_omits_has_more_header_when_unpaginated(
+        self, sample_calendar, sample_events
+    ):
+        mock_session = make_session_with_data(
+            calendars=[sample_calendar],
+            events=sample_events,
+        )
+        app.dependency_overrides[get_session] = lambda: mock_session
+        try:
+            client = TestClient(app)
+            resp = client.get("/api/events")
+            assert resp.status_code == 200
+            assert "x-has-more" not in resp.headers
+        finally:
+            app.dependency_overrides.clear()
 
 
 @pytest.mark.unit

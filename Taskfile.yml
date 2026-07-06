@@ -68,6 +68,12 @@ includes:
     vars:
       ROOT_DIR: "{{.ROOT_DIR}}"
       BACKEND_DIR: "{{.BACKEND_DIR}}"
+  notify:
+    taskfile: .taskfiles/notify.yml
+    dir: "{{.ROOT_DIR}}"
+    vars:
+      ROOT_DIR: "{{.ROOT_DIR}}"
+      BACKEND_DIR: "{{.BACKEND_DIR}}"
 
 tasks:
   default:

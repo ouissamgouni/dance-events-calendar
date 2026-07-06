@@ -56,11 +56,16 @@ export function useSeenEvents(eventIds: string[] = []): SeenEventsApi {
     useEffect(() => {
         if (hasStoredState()) return;
         if (eventIds.length === 0) return;
+        // First-visit baseline: persist an EMPTY known-set rather than
+        // seeding it with every currently-fetched event. Seeding with all
+        // events would mark everything "already seen" on arrival, so
+        // newEventIds would never populate for a first-visit user. An empty
+        // baseline means events fetched from now on can genuinely count as
+        // "new" until the viewer clicks them.
         // eslint-disable-next-line react-hooks/set-state-in-effect -- initialize localStorage baseline after async event inventory arrives
         setKnown((prev) => {
-            const next = new Set([...prev, ...eventIds]);
-            writeKnown(next);
-            return next;
+            writeKnown(prev);
+            return prev;
         });
     }, [eventIds]);
 

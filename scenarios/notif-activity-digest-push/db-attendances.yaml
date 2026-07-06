@@ -1,0 +1,9 @@
+# Fire the same subscription_going fan-out that the HTTP attendance
+# route runs, so this seed yields real Notification rows for Alice's
+# followers instead of leaving the digest with nothing to emit.
+emit_notifications: true
+attendances:
+  - event_id: ev-friend
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public

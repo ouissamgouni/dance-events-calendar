@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import type { PreferredAreaPayload } from '../api';
@@ -15,6 +15,14 @@ interface Props {
     onUseCurrentView?: () => void;
     /** Optional control rendered before the save/reset buttons. */
     controlsStart?: ReactNode;
+    /** When true, hides the "Save area in box" button and auto-fires
+     * ``onChange`` after every pan/zoom settle (debounced). Used in the
+     * onboarding + profile-edit flows where the user shouldn't need to
+     * click a save button. */
+    autoSave?: boolean;
+    /** Debounce (ms) for auto-save. Defaults to 700. Ignored when
+     * ``autoSave`` is false. */
+    autoSaveDebounceMs?: number;
 }
 
 const GUIDE_INSET_X_RATIO = 0.14;
@@ -25,11 +33,23 @@ const GUIDE_INSET_Y_RATIO = 0.16;
  * The map moves underneath a fixed guide box; saving converts that on-screen
  * guide into geographic bounds so the interaction matches what users see.
  */
-export default function AreaMapPicker({ value, onChange, onUseCurrentView, controlsStart }: Props) {
+export default function AreaMapPicker({ value, onChange, onUseCurrentView, controlsStart, autoSave = false, autoSaveDebounceMs = 700 }: Props) {
     const initial = value ?? DEFAULT_AREA_BBOX;
     const initialAreaRef = useRef(initial);
     const mapRef = useRef<L.Map | null>(null);
     const guideRef = useRef<HTMLDivElement | null>(null);
+    const autoSaveTimerRef = useRef<number | null>(null);
+    // ``mapReady`` flips true once the underlying Leaflet map has mounted so
+    // effects that need the map instance (auto-save listeners) can attach at
+    // the right time. Reading ``mapRef.current`` synchronously in an effect
+    // races with ``MapRefBinder``, which is why we track readiness explicitly.
+    const [mapReady, setMapReady] = useState(false);
+    // Latest onChange in a ref so the debounced handler always calls the
+    // freshest closure without needing to re-bind Leaflet listeners.
+    const onChangeRef = useRef(onChange);
+    useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+    const valueLabelRef = useRef(value?.label ?? null);
+    useEffect(() => { valueLabelRef.current = value?.label ?? null; }, [value?.label]);
 
     const initialBounds = useMemo<L.LatLngBoundsExpression>(
         () => [
@@ -65,6 +85,7 @@ export default function AreaMapPicker({ value, onChange, onUseCurrentView, contr
 
     const handleMapReady = useCallback(() => {
         fitAreaInGuide(initialAreaRef.current);
+        setMapReady(true);
     }, [fitAreaInGuide]);
 
     const handleUseCurrentView = () => {
@@ -93,6 +114,80 @@ export default function AreaMapPicker({ value, onChange, onUseCurrentView, contr
         onUseCurrentView?.();
     };
 
+    // Compute the area from the guide's current on-screen position.
+    // Shared by the explicit button handler and the auto-save path.
+    const computeGuideArea = useCallback((): PreferredAreaPayload | null => {
+        const map = mapRef.current;
+        const guide = guideRef.current;
+        if (!map || !guide) return null;
+        const mapRect = map.getContainer().getBoundingClientRect();
+        const guideRect = guide.getBoundingClientRect();
+        const southWest = map.containerPointToLatLng(L.point(
+            guideRect.left - mapRect.left,
+            guideRect.bottom - mapRect.top,
+        ));
+        const northEast = map.containerPointToLatLng(L.point(
+            guideRect.right - mapRect.left,
+            guideRect.top - mapRect.top,
+        ));
+        const area = clampArea({
+            min_lat: southWest.lat,
+            min_lng: southWest.lng,
+            max_lat: northEast.lat,
+            max_lng: northEast.lng,
+            label: valueLabelRef.current ?? 'Custom area',
+        });
+        if (area.min_lat >= area.max_lat || area.min_lng >= area.max_lng) return null;
+        return area;
+    }, []);
+
+    // Attach movend/zoomend auto-save when opted in. Leaflet's initial
+    // ``fitBounds`` emits BOTH a moveend and a zoomend (and layout settles
+    // may add more), so a one-shot ``suppressFirst`` flag isn't enough —
+    // the second init event slips through and spuriously saves. Instead,
+    // capture the settled bbox as a baseline on the first callback and
+    // only fire ``onChange`` when a subsequent callback yields a bbox
+    // that materially differs from that baseline.
+    // Depends on ``mapReady`` so the effect re-runs once the map instance
+    // is actually available — otherwise ``mapRef.current`` is null on the
+    // first render and no listeners get attached (the auto-save silently
+    // never fires).
+    useEffect(() => {
+        if (!autoSave || !mapReady) return;
+        const map = mapRef.current;
+        if (!map) return;
+        let baseline: PreferredAreaPayload | null = null;
+        const nearlyEqual = (a: PreferredAreaPayload, b: PreferredAreaPayload) =>
+            Math.abs(a.min_lat - b.min_lat) < 1e-3 &&
+            Math.abs(a.max_lat - b.max_lat) < 1e-3 &&
+            Math.abs(a.min_lng - b.min_lng) < 1e-3 &&
+            Math.abs(a.max_lng - b.max_lng) < 1e-3;
+        const handler = () => {
+            if (autoSaveTimerRef.current != null) window.clearTimeout(autoSaveTimerRef.current);
+            autoSaveTimerRef.current = window.setTimeout(() => {
+                const area = computeGuideArea();
+                if (!area) return;
+                if (baseline == null) {
+                    baseline = area;
+                    return;
+                }
+                if (nearlyEqual(area, baseline)) return;
+                baseline = area;
+                onChangeRef.current(area);
+            }, autoSaveDebounceMs);
+        };
+        map.on('moveend', handler);
+        map.on('zoomend', handler);
+        return () => {
+            map.off('moveend', handler);
+            map.off('zoomend', handler);
+            if (autoSaveTimerRef.current != null) {
+                window.clearTimeout(autoSaveTimerRef.current);
+                autoSaveTimerRef.current = null;
+            }
+        };
+    }, [autoSave, autoSaveDebounceMs, computeGuideArea, mapReady]);
+
     const handleResetDefault = () => {
         onChange(DEFAULT_AREA_BBOX);
         fitAreaInGuide(DEFAULT_AREA_BBOX);
@@ -101,7 +196,9 @@ export default function AreaMapPicker({ value, onChange, onUseCurrentView, contr
     return (
         <div>
             <p className="mb-2 max-w-md text-xs text-slate-600">
-                Move and zoom the map until your preferred event area fits inside the box.
+                {autoSave
+                    ? 'Move and zoom the map — the box is saved automatically as you go.'
+                    : 'Move and zoom the map until your preferred event area fits inside the box.'}
             </p>
             <div className="relative h-72 w-full max-w-md overflow-hidden border border-slate-300">
                 <MapContainer
@@ -134,13 +231,15 @@ export default function AreaMapPicker({ value, onChange, onUseCurrentView, contr
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
                 {controlsStart}
-                <button
-                    type="button"
-                    onClick={handleUseCurrentView}
-                    className="bg-blue-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-600"
-                >
-                    Save area in box
-                </button>
+                {!autoSave && (
+                    <button
+                        type="button"
+                        onClick={handleUseCurrentView}
+                        className="bg-blue-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-600"
+                    >
+                        Save area in box
+                    </button>
+                )}
                 <button
                     type="button"
                     onClick={handleResetDefault}

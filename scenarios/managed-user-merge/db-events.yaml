@@ -15,6 +15,7 @@ events:
     tags:
       - format:social
       - dance-style:salsa
+      - reach:regional
   - id: evt-merge-002
     calendar_id: merge-cal-001
     title: Duplicate Destination Bachata Night
@@ -32,6 +33,7 @@ events:
     tags:
       - format:social
       - dance-style:bachata
+      - reach:local
   - id: evt-merge-003
     calendar_id: merge-cal-001
     title: Bruno Fan Workshop
@@ -49,6 +51,7 @@ events:
     tags:
       - format:workshop
       - dance-style:salsa
+      - reach:international
 
 ratings:
   - event_id: evt-merge-001

@@ -262,6 +262,18 @@ def test_e3_onboarding_complete_with_empty_handles_just_stamps(client, session):
     assert r.json()["onboarded_at"] is not None
 
 
+def test_e3_onboarding_complete_stamps_current_version(client, session, monkeypatch):
+    """The row's onboarding_version is set to the app's current version so
+    later bumps can force users back through onboarding."""
+    monkeypatch.setattr(social_module, "get_current_onboarding_version", lambda: 7)
+    viewer = _make_user(session, "viewer@example.com", "viewer")
+    _login(client, "viewer@example.com")
+    r = client.post("/api/social/onboarding/complete", json={"handles": []})
+    assert r.status_code == 200
+    session.refresh(viewer)
+    assert viewer.onboarding_version == 7
+
+
 def test_e3_onboarding_complete_idempotent_on_duplicate_handles(client, session):
     viewer = _make_user(session, "viewer@example.com", "viewer")
     _make_user(session, "a@example.com", "alpha")

@@ -106,10 +106,28 @@ export default function TagsPicker({
 
     const totalTagsAcrossGroups = visibleGroups.reduce((n, g) => n + g.tags.length, 0);
 
+    // Hide the search box when there aren't enough tags to make searching
+    // useful (per remark: browsing is faster than typing under a small
+    // catalog). Threshold is inclusive of the whole enabled catalog, not
+    // the currently-filtered subset.
+    const totalAvailableTags = useMemo(
+        () =>
+            enabledGroups.reduce(
+                (n, g) =>
+                    n +
+                    (g.tags ?? []).filter(
+                        (t) => t.enabled !== false && (!excludeTagIds || !excludeTagIds.has(t.id)),
+                    ).length,
+                0,
+            ),
+        [enabledGroups, excludeTagIds],
+    );
+    const showSearch = searchable && totalAvailableTags >= 10;
+
     return (
         <div className={className ?? 'space-y-2'}>
             {/* Search */}
-            {searchable && (
+            {showSearch && (
                 <input
                     type="search"
                     value={search}

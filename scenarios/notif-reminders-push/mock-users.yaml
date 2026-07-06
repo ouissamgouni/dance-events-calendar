@@ -1,0 +1,24 @@
+# reminders-push cast. Alice has the push reminder channel ON and
+# is the user whose browser subscribes to push during the browser
+# precondition step. Bob has it OFF as a negative probe (user-level
+# opt-out must suppress push even with a live subscription).
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    account_visibility: public
+    email_event_reminders_enabled: false
+    push_event_reminders_enabled: true
+
+  # Negative probe.
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+    account_visibility: public
+    email_event_reminders_enabled: false
+    push_event_reminders_enabled: false

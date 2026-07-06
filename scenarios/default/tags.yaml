@@ -22,23 +22,11 @@ tag_groups:
       - slug: practice
         label: Practice
 
-  - slug: scale
-    label: Scale
-    ordinal: 20
-    allow_multiple: false
-    color: "#38bdf8"
-    tags:
-      - slug: small
-        label: Small (<50)
-      - slug: medium
-        label: Medium (50-200)
-      - slug: large
-        label: Large (200+)
-
-  - slug: scope
-    label: Scope
+  - slug: reach
+    label: Reach
     ordinal: 30
     allow_multiple: true
+    onboarding_eligible: true
     color: "#a78bfa"
     tags:
       - slug: local
@@ -65,6 +53,7 @@ tag_groups:
     label: Dance Style
     ordinal: 50
     allow_multiple: true
+    onboarding_eligible: true
     color: "#fb923c"
     tags:
       - slug: salsa

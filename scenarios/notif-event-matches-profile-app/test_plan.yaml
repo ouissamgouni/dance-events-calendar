@@ -1,0 +1,63 @@
+test_plan:
+  name: "Notification when event matches profile — in-app channel"
+  description: >
+    (Feature × Channel) truth-table cell. Feature = interest-profile
+    matches. Channel = in-app only. Asserts that
+    interest_notification_service creates the correct in-app
+    `interest_event` rows regardless of user-level email/push toggles
+    (Phase G rule: rows are always created) while the digest email
+    pipeline and web-push are OFF at the admin level so nothing
+    escapes as email or push.
+
+  preconditions:
+    - >-
+      Start scenario:
+      `SCENARIO=notif-event-matches-profile-app RESET=1 task start:scenario`
+
+  cast:
+    - "Nora — baseline salsa+intl Paris profile → matches ev-m1, ev-m2."
+    - "Bob — two profiles (salsa+bachata) same bbox → dedup probe."
+    - "Carol — empty-reach profile → matches ev-m3 (local) + ev-m6 (no reach)."
+    - "Dan — per-profile matches_enabled=false → 0 rows."
+    - "Eve — clone of Nora; every user has email + push interest_matches OFF."
+
+  steps:
+    - id: 1
+      title: "Trigger one dispatch tick"
+      description: >
+        `SCENARIO=notif-event-matches-profile-app task notify:trigger:scenario -- --reset-scan`
+      expected: >
+        Stats dict shows `interest.candidates=6` (all seeded events except
+        ev-m7-nogeo which is geo-excluded), `interest.created` ≥ 8,
+        `activity.digests=0` (email pipeline OFF), `reminders.emailed=0`.
+
+    - id: 2
+      title: "In-app notification matrix"
+      description: >
+        `GET /api/notifications` for each seeded user. See db-events.yaml
+        for the matcher truth table.
+      expected: >
+        Nora → 2 rows (ev-m1, ev-m2).
+        Bob  → 3 rows (ev-m1, ev-m2 with BOTH labels via dedup, ev-m5).
+        Carol → 4 rows (ev-m1, ev-m2, ev-m3, ev-m6).
+        Dan  → 0 rows (per-profile matches_enabled=false).
+        Eve  → 2 rows (ev-m1, ev-m2) — in-app rows fire even with
+        email + push toggles off (Phase G rule).
+
+    - id: 3
+      title: "Email + push channels remain silent"
+      description: >
+        Verify nothing was delivered on the other channels.
+      expected: >
+        Mailpit inbox is empty (no SMTP configured; digest pipeline is
+        off at admin level). `activity.pushed=0` in the stats dict.
+        Zero rows in the `push_subscription` table (none registered).
+
+    - id: 4
+      title: "Idempotence — re-run produces zero new rows"
+      description: >
+        `SCENARIO=notif-event-matches-profile-app task notify:trigger:scenario`
+        (without --reset-scan).
+      expected: >
+        `interest.created=0` on the second tick; the last-scan marker
+        has advanced past all seeded events' `updated_at`.

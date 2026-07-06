@@ -1,0 +1,51 @@
+test_plan:
+  name: "Activity digest — email channel"
+  description: >
+    (Feature × Channel) truth-table cell. Feature = social-activity
+    digest. Channel = email. Asserts activity_email delivers a
+    digest email to each follower whose `email_social_activity_enabled`
+    toggle is true. In-app rows are created regardless. Push is
+    disabled globally and per-user.
+
+  preconditions:
+    - "Start Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`"
+    - >-
+      Start scenario:
+      `SCENARIO=activity-digest-email RESET=1 task start:scenario`
+    - "Open the Mailpit inbox at http://127.0.0.1:8025 and clear existing messages."
+
+  cast:
+    - "Alice — actor (Going ev-friend)."
+    - "Bob   — follower, email_social_activity ON → expect one digest."
+    - "Carol — follower, email_social_activity OFF → in-app only."
+
+  steps:
+    - id: 1
+      title: "Trigger one dispatch tick — rows are seeded and the digest ships immediately"
+      description: >
+        `SCENARIO=notif-activity-digest-email task notify:trigger:scenario -- --immediate-emails`
+        `--immediate-emails` passes `force=True` to
+        `activity_email.run_once` so the per-user digest schedule
+        (default tue+fri @ 09:00 local) is bypassed for this run
+        only. Prod behavior is otherwise unchanged.
+      expected: >
+        In-app rows created for Bob and Carol. `activity.digests=1`
+        (Bob only — Carol's user-level `email_social_activity_enabled=false`
+        blocks email delivery). No `skipped_off_schedule` in the
+        diagnostic (force bypasses the slot check).
+
+    - id: 2
+      title: "Email delivery matrix"
+      description: >
+        Filter Mailpit by recipient address.
+      expected: >
+        Bob receives ONE digest email prefixed with "Movida:" listing
+        Alice's Going activity.
+        Carol receives 0 emails.
+
+    - id: 3
+      title: "Push channel remains silent"
+      description: >
+        Verify no push attempted.
+      expected: >
+        `activity.pushed=0` — WEB_PUSH_ENABLED is false.

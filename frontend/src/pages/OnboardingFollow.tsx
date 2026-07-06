@@ -145,11 +145,12 @@ export default function OnboardingFollow() {
             <div className="flex items-start justify-between mb-4">
                 <div>
                     <h1 className="text-xl font-semibold text-slate-900">
-                        Follow a few people to get started
+                        Build your tribe
                     </h1>
                     <p className="text-sm text-slate-600 mt-1">
-                        Their events show up in your feed. You can always
-                        change who you follow later.
+                        Follow a few people to access their calendars, see events your
+                        friends are going to, and get notified about friend activity and
+                        their event suggestions. You can always change who you follow later.
                     </p>
                 </div>
                 <button

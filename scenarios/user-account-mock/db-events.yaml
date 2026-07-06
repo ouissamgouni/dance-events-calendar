@@ -22,9 +22,8 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-acct-002
   calendar_id: salsa-cal-001
   title: Saturday Bachata Night
@@ -50,9 +49,8 @@ events:
   - dance-style:bachata
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-acct-003
   calendar_id: salsa-cal-001
   title: Sunday Kizomba
@@ -76,9 +74,8 @@ events:
   - dance-style:kizomba
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:regional
 - id: evt-acct-004
   calendar_id: salsa-cal-001
   title: Rueda de Casino
@@ -103,6 +100,5 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:regional

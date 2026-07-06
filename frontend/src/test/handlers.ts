@@ -17,10 +17,19 @@ export function makeUser(overrides: Partial<AuthUser> = {}): AuthUser {
         handle: 'testdancer',
         share_attendance_default_audience: 'friends',
         onboarded_at: '2025-01-01T00:00:00Z',
+        needs_onboarding: false,
         timezone: 'UTC',
+        email_event_reminders_enabled: true,
+        email_social_activity_enabled: true,
+        email_interest_matches_enabled: true,
+        push_event_reminders_enabled: false,
+        push_social_activity_enabled: false,
+        push_interest_matches_enabled: false,
+        // Legacy mirrors returned by the server for one release.
         reminder_email_enabled: true,
         activity_email_enabled: true,
         push_enabled: false,
+        interest_notifications_enabled: true,
         ...overrides,
     }
 }
@@ -74,9 +83,16 @@ export const handlers = [
         const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
         return HttpResponse.json({
             timezone: 'UTC',
+            email_event_reminders_enabled: true,
+            email_social_activity_enabled: true,
+            email_interest_matches_enabled: true,
+            push_event_reminders_enabled: false,
+            push_social_activity_enabled: false,
+            push_interest_matches_enabled: false,
             reminder_email_enabled: true,
             activity_email_enabled: true,
             push_enabled: false,
+            interest_notifications_enabled: true,
             ...body,
         })
     }),

@@ -1,0 +1,106 @@
+test_plan:
+  name: "Interest Profiles — skip onboarding yields no interest notifications"
+  description: >
+    Negative-path counterpart to interest-onboarding-international.
+    Nora signs in, Skips both preference and follow steps, and receives
+    ZERO interest_event notifications even though a seeded EUR intl
+    salsa congress would match the "default" profile shape she chose not
+    to create. Friend/social digests continue to fire (independence
+    contract from PRD §11).
+
+  preconditions:
+    - "Start Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`"
+    - "Run the scenario: `SCENARIO=interest-skip-no-notifications RESET=1 task start:scenario`"
+    - "Clear the Mailpit inbox at http://127.0.0.1:8025."
+    - >-
+      INTEREST_MATCH_NOTIFICATIONS_ENABLED=true so the master kill-switch is
+      NOT the reason for silence — the gating relies solely on
+      "no UserInterestProfile rows for this user".
+    - "Cast: `newbie` (fresh), `alice` (friend Nora follows), `admin`."
+
+  steps:
+    - id: 1
+      title: "Fresh sign-in lands on Step 1"
+      description: >
+        Sign in as Nora Newbie in a brand-new browser session.
+      expected: >
+        URL becomes /onboarding/preferences?next=%2F. Step 1 renders as
+        in interest-onboarding-international: dance-style + reach
+        pickers, reach 'international' pre-selected, EUR map expanded,
+        Continue disabled until a dance style is picked.
+
+    - id: 2
+      title: "Skip preferences"
+      description: >
+        Click the "Skip" link in the header (do NOT click Continue).
+      expected: >
+        URL replaces to /onboarding/local?next=%2F (Skip now still
+        suggests the optional local-profile step). NO POST to
+        /api/interest-profiles occurs (verify in the Network panel).
+        Nora does own EXACTLY ONE UserInterestProfile row — the
+        signup-seeded default (`label='My preferences'`,
+        DEFAULT_AREA_BBOX, `dance_tag_ids=[]`, `reach_tag_ids=[international]`,
+        `matches_enabled=false`, `is_active=true`). Skip is a pure
+        navigate; no additional profile is created or mutated.
+
+    - id: 2b
+      title: "Skip local step too"
+      description: >
+        On /onboarding/local, click "Skip".
+      expected: >
+        URL replaces to /onboarding/follow?next=%2F. NO POST to
+        /api/interest-profiles occurs. Profile row count remains 1
+        (the signup default is untouched).
+
+    - id: 3
+      title: "Skip follows too"
+      description: >
+        On /onboarding/follow (retitled "Build your tribe"), click Skip.
+      expected: >
+        POST /api/social/onboarding/complete with `handles: []` returns
+        200 with `onboarded_at` set and `followed: []`. App navigates to
+        /. Refreshing does not bounce back to onboarding — the guard is
+        satisfied by onboarded_at.
+
+    - id: 4
+      title: "No interest_event notifications for a matching event"
+      description: >
+        Sign in as admin@example.com in a second browser and POST
+        /api/admin/trigger-notifications. Then return to Nora and open
+        /notifications.
+      expected: >
+        ZERO `interest_event` notifications for Nora, despite
+        ev-would-match being an international salsa event that would
+        otherwise satisfy a wide EUR intl-salsa profile. Silence is
+        guaranteed by the default profile's `matches_enabled=false` —
+        the notification service's candidate query filters on
+        `matches_enabled=true`, so the default row is excluded.
+
+    - id: 5
+      title: "Friend-going digest STILL fires for Nora"
+      description: >
+        Sign in as Alice, open /event/ev-friend, click "I'm going" and
+        share publicly. Return to admin session and trigger notifications
+        again. Check Mailpit at http://127.0.0.1:8025 filtered to
+        newbie@example.com.
+      expected: >
+        Nora receives an activity-digest email listing Alice's Going on
+        ev-friend. The digest confirms that social/friend notifications
+        are independent of the interest-profile path — they use the
+        follows + attendances graph, not UserInterestProfile.
+
+    - id: 6
+      title: "Opting IN later starts producing interest notifs"
+      description: >
+        As Nora, open /account#notifications and edit the existing
+        default profile in the Alerts manager: flip its Notify toggle
+        on. (You can also add dance-style Salsa if you want narrower
+        matching, but with `dance_tag_ids=[]` the profile matches every
+        style; the guardrail banner surfaces on the wide area.) Then
+        trigger notifications again from admin.
+      expected: >
+        PATCH /api/interest-profiles/<id> returns 200 with
+        `matches_enabled=true`. After the next tick, Nora now has exactly
+        one `interest_event` row for ev-would-match, proving that
+        flipping notify on the seeded default is the sole gate (no
+        second profile creation or user-level flag flip was needed).

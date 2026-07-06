@@ -1,0 +1,120 @@
+base_week: 0
+# Event matrix for the notification pipeline. Every event either hits or
+# misses a specific gate in the matcher (dance + reach + geo) and the
+# delivery step (per-user opt-out toggles). See test_plan.yaml for the
+# expected outcomes per user.
+events:
+  # (M1) Paris salsa international — matches Nora, Bob-salsa, Carol,
+  #     Dan (silenced), Eve (killed), Grace, Hank. Bob-bachata does NOT
+  #     match (dance).
+  - id: ev-m1-paris-salsa-intl
+    calendar_id: salsa-cal-001
+    title: Paris Salsa International Weekender
+    description: Baseline match probe.
+    location: "Grand Salon, Paris, France"
+    latitude: 48.86
+    longitude: 2.35
+    start: w1 Sat 22:00
+    end: w1 Sun 03:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  # (M2) Paris salsa+bachata international — matches BOTH of Bob's
+  #     profiles, so Bob gets ONE notification with both labels comma
+  #     joined. Others behave same as M1.
+  - id: ev-m2-paris-both-dance
+    calendar_id: salsa-cal-001
+    title: Paris Fusion Night (salsa + bachata)
+    description: Multi-dance probe for Bob dedup.
+    location: "Fusion Club, Paris, France"
+    latitude: 48.87
+    longitude: 2.34
+    start: w1 Fri 21:00
+    end: w1 Sat 02:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:international
+
+  # (M3) Paris salsa LOCAL — matches Carol (reach-independent) only.
+  #     All other profiles have reach=international so this is filtered
+  #     out. Proves the reach filter.
+  - id: ev-m3-paris-salsa-local
+    calendar_id: salsa-cal-001
+    title: Paris Wednesday Local Social
+    description: Local reach — only reach-independent profile fires.
+    location: "Cafe Latino, Paris, France"
+    latitude: 48.85
+    longitude: 2.36
+    start: w1 Wed 21:00
+    end: w1 Thu 01:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  # (M4) Barcelona salsa international — matches dance + reach, but
+  #     Barcelona (41.38, 2.15) is OUTSIDE the Paris bbox (48-49 lat).
+  #     Nobody notified. Geo miss probe.
+  - id: ev-m4-barcelona-salsa-intl
+    calendar_id: salsa-cal-001
+    title: Barcelona Salsa Festival
+    description: Geo miss probe — outside Paris bbox.
+    location: "Poble Espanyol, Barcelona, Spain"
+    latitude: 41.38
+    longitude: 2.15
+    start: w1 Sat 20:00
+    end: w1 Sun 04:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  # (M5) Paris bachata international — matches ONLY Bob's second
+  #     profile (bachata). Nora/Carol/Dan/Eve/Grace/Hank have salsa
+  #     only → no match.
+  - id: ev-m5-paris-bachata-intl
+    calendar_id: bachata-cal-002
+    title: Paris Bachata Congress
+    description: Bachata-only probe.
+    location: "Kizomba Lounge, Paris, France"
+    latitude: 48.86
+    longitude: 2.33
+    start: w1 Sun 19:00
+    end: w1 Mon 00:00
+    tags:
+      - format:festival
+      - dance-style:bachata
+      - reach:international
+
+  # (M6) Paris salsa NO REACH tag — matches Carol (reach-independent).
+  #     All reach-filtered profiles skip it (PRD §11b untagged-reach
+  #     rule).
+  - id: ev-m6-paris-salsa-noreach
+    calendar_id: salsa-cal-001
+    title: Paris Salsa Class (no reach tag)
+    description: Untagged reach — reach-filtered profiles must skip.
+    location: "Studio Vitrail, Paris, France"
+    latitude: 48.855
+    longitude: 2.37
+    start: w1 Tue 20:00
+    end: w1 Tue 22:00
+    tags:
+      - format:social
+      - dance-style:salsa
+
+  # (M7) Paris salsa NO GEO — no lat/lng. Excluded from ALL profiles
+  #     (PRD §11b no-geo rule).
+  - id: ev-m7-nogeo-salsa
+    calendar_id: salsa-cal-001
+    title: Online Salsa Livestream
+    description: No lat/lng — no matcher can consider it.
+    start: w1 Thu 19:00
+    end: w1 Thu 20:30
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:international

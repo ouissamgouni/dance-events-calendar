@@ -1,0 +1,455 @@
+# Baseline + weekend-spread events for the for-you scenario.
+#
+# Design goals (see also the neighbouring following-badge + trending-events
+# scenarios, which inspired the network graph and popularity fixture):
+#
+#   * 5 baseline events (evt-fy-001..005) — kept with their original IDs
+#     and geographic spread (Paris, Madrid, Berlin, Milano, Brussels) so
+#     the existing test_plan.yaml narrative still holds. They establish
+#     the New-lens localStorage baseline (see useSeenEvents) — none of
+#     them should ever show a New marker.
+#
+#   * 20 bulk events (evt-fy-bulk-01..-20) — Salsa / Bachata weekend
+#     events (Fri / Sat / Sun) spread across the next ~7 weeks in and
+#     around Paris. Each has a unique title, a short description, and a
+#     realistic venue address. Together with the 5 baseline cards + the
+#     synced card they push the "You might like" fetch past the server
+#     batch size (limit=20), so the first fetch returns X-Has-More=true
+#     and the rail shows a "+more" tile.
+#
+#   * evt-fy-bulk-20 (Grand Paris Salsa Marathon) is the popularity
+#     hero — it sits this weekend (w0 Sat 22:00, small time-decay) with
+#     6 public "going" RSVPs so its popularity_score dominates and it
+#     is deterministically the FIRST card in "You might like".
+#
+#   * evt-fy-bulk-15 (Trocadéro Salsa Sunday) hosts a second
+#     friend-audience RSVP from `friend`, so "Friends going" holds
+#     ≥ 2 events (bulk-15 + evt-fy-004) and the ordering
+#     (going_count + saved_count) DESC is unambiguous — bulk-15 first
+#     thanks to the extra public goings from mutual friends.
+#
+# Coordinates all fall inside the DEFAULT_AREA_BBOX ("Europe & nearby")
+# so the viewer sees them without touching the area preference.
+base_week: 0
+events:
+  # ── Baseline (kept from previous scenario shape) ─────────────────
+  - id: evt-fy-001
+    calendar_id: salsa-cal-001
+    title: Friday Salsa Social
+    description: |
+      Weekly salsa social. Matches the viewer's Salsa preference — should
+      appear in the For You rail's Recommended lens.
+    location: Dance Studio, 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w0 Fri 21:00
+    end: w0 Sat 01:00
+    price_is_free: true
+    tags:
+      - dance-style:salsa
+      - format:social
+      - level:all-levels
+      - venue:indoor
+      - reach:regional
+
+  - id: evt-fy-002
+    calendar_id: salsa-cal-001
+    title: Bachata Sensual Night
+    description: |
+      Bachata social. Matches the viewer's Bachata preference — second
+      Recommended-lens candidate, proving multiple preferred tags each count.
+    location: Sala Rossa, Calle de Atocha 34, Madrid, Spain
+    latitude: 40.4168
+    longitude: -3.7038
+    start: w0 Sat 20:00
+    end: w0 Sun 00:00
+    price_is_free: false
+    price_min: 12
+    price_currency: EUR
+    tags:
+      - dance-style:bachata
+      - format:social
+      - level:all-levels
+      - venue:indoor
+      - reach:local
+
+  - id: evt-fy-003
+    calendar_id: salsa-cal-001
+    title: Kizomba Fusion Evening
+    description: |
+      Kizomba-only social. Does NOT match the viewer's preferred tags
+      (Salsa + Bachata) — must be ABSENT from the Recommended lens even
+      though it sits inside the default map area.
+    location: Linienstrasse 40, 10119 Berlin, Germany
+    latitude: 52.5200
+    longitude: 13.4050
+    start: w0 Sun 19:00
+    end: w0 Sun 23:00
+    price_is_free: true
+    tags:
+      - dance-style:kizomba
+      - format:social
+      - level:all-levels
+      - venue:indoor
+      - reach:local
+
+  - id: evt-fy-004
+    calendar_id: salsa-cal-001
+    title: Zouk Friends Meetup
+    description: |
+      Zouk practica. The viewer's mutual friend RSVPs here with a
+      friends-only audience (see db-attendances.yaml). Does NOT match the
+      viewer's preferred tags — proves the Friends lens is independent of
+      the Recommended tag filter.
+    location: Via Torino 12, 20123 Milano, Italy
+    latitude: 45.4642
+    longitude: 9.1900
+    start: w0 Sat 15:00
+    end: w0 Sat 18:00
+    price_is_free: true
+    tags:
+      - dance-style:zouk
+      - format:social
+      - level:all-levels
+      - venue:indoor
+      - reach:local
+
+  - id: evt-fy-005
+    calendar_id: salsa-cal-001
+    title: Stranger-Only Salsa Practica
+    description: |
+      Salsa practica. Only the stranger (not a friend of viewer) RSVPs here
+      publicly (see db-attendances.yaml). Matches the viewer's Salsa
+      preference (so it DOES appear under Recommended) but must be ABSENT
+      from the Friends lens — proves non-friend attendance never leaks in.
+    location: Skybar, Av. de la Liberte, Brussels, Belgium
+    latitude: 50.8503
+    longitude: 4.3517
+    start: w0 Sun 11:00
+    end: w0 Sun 14:00
+    price_is_free: true
+    tags:
+      - dance-style:salsa
+      - format:social
+      - level:all-levels
+      - venue:indoor
+      - reach:regional
+
+  # ── Weekend-spread bulk events (Paris + nearby) ──────────────────
+  # Twenty distinct Salsa / Bachata weekend events across the next ~7
+  # weeks. Ordering by (id) is unrelated to display order — cards sort
+  # by popularity_score DESC in the "You might like" lens.
+
+  - id: evt-fy-bulk-20
+    calendar_id: salsa-cal-001
+    title: Grand Paris Salsa Marathon (TOP)
+    description: |
+      Two-room takeover with rotating DJs and a live percussion set.
+      Highest attendance of the season — most public "going" RSVPs in
+      the fixture, so this card is deterministically first in the
+      "You might like" lens.
+    location: Cabaret Sauvage, 59 Bd Macdonald, Paris, France
+    latitude: 48.8931
+    longitude: 2.3894
+    start: w0 Sat 22:00
+    end: w0 Sun 03:00
+    price_is_free: false
+    price_min: 20
+    price_currency: EUR
+    tags:
+      - dance-style:salsa
+      - dance-style:bachata
+      - format:social
+      - level:all-levels
+      - venue:indoor
+      - vibe:good-music
+      - vibe:social-atmosphere
+      - reach:local
+
+  - id: evt-fy-bulk-01
+    calendar_id: salsa-cal-001
+    title: Belleville Salsa Practica
+    description: |
+      Casual practica for intermediate leads and follows. BYO shoes.
+    location: Studio Belleville, 94 Rue de Belleville, Paris, France
+    latitude: 48.8721
+    longitude: 2.3853
+    start: w1 Fri 21:00
+    end: w1 Sat 01:00
+    price_is_free: true
+    tags: [dance-style:salsa, format:practice, level:all-levels, venue:indoor, reach:international]
+
+  - id: evt-fy-bulk-02
+    calendar_id: salsa-cal-001
+    title: Boulogne Bachata Rooftop
+    description: |
+      Sensual bachata under the fairy lights. Free welcome class at 20:00.
+    location: Le Roof, 12 Av. Édouard Vaillant, Boulogne-Billancourt, France
+    latitude: 48.8380
+    longitude: 2.2410
+    start: w1 Sat 20:00
+    end: w1 Sun 00:00
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+    tags: [dance-style:bachata, format:social, level:all-levels, venue:rooftop, reach:international]
+
+  - id: evt-fy-bulk-03
+    calendar_id: salsa-cal-001
+    title: Vincennes Sunday Social
+    description: |
+      Sunday afternoon Cuban salsa. Beginner-friendly, family welcome.
+    location: Pavillon Baltard, Rue de Fontenay 12, Nogent-sur-Marne, France
+    latitude: 48.8378
+    longitude: 2.4820
+    start: w1 Sun 17:00
+    end: w1 Sun 21:00
+    price_is_free: true
+    tags: [dance-style:salsa, format:social, level:beginner-friendly, venue:indoor, reach:international]
+
+  - id: evt-fy-bulk-04
+    calendar_id: salsa-cal-001
+    title: Marais Salsa Cave
+    description: |
+      Intimate LA-style salsa night in a vaulted cellar. Small floor,
+      big vibe.
+    location: La Cave du Marais, 3 Rue Barbette, Paris, France
+    latitude: 48.8593
+    longitude: 2.3617
+    start: w2 Fri 21:30
+    end: w2 Sat 01:30
+    price_is_free: false
+    price_min: 8
+    price_currency: EUR
+    tags: [dance-style:salsa, format:social, level:all-levels, venue:indoor, reach:regional]
+
+  - id: evt-fy-bulk-05
+    calendar_id: salsa-cal-001
+    title: Batignolles Bachata Bar
+    description: |
+      Weekly bachata sensual social at a local wine bar. Cash-only bar.
+    location: Bar des Batignolles, 24 Rue Truffaut, Paris, France
+    latitude: 48.8869
+    longitude: 2.3221
+    start: w2 Sat 20:30
+    end: w2 Sun 00:30
+    price_is_free: false
+    price_min: 5
+    price_currency: EUR
+    tags: [dance-style:bachata, format:social, level:all-levels, venue:indoor, reach:regional]
+
+  - id: evt-fy-bulk-06
+    calendar_id: salsa-cal-001
+    title: Bastille Sunday Rueda
+    description: |
+      Rueda de casino call practice followed by an open social. Bring
+      water — the room heats up fast.
+    location: Le Balajo, 9 Rue de Lappe, Paris, France
+    latitude: 48.8532
+    longitude: 2.3760
+    start: w2 Sun 19:00
+    end: w2 Sun 23:00
+    price_is_free: true
+    tags: [dance-style:salsa, format:practice, level:all-levels, venue:indoor, reach:local]
+
+  - id: evt-fy-bulk-07
+    calendar_id: salsa-cal-001
+    title: Montreuil Salsa Practica
+    description: |
+      Structured practica with 15-minute rotation. Feedback encouraged.
+    location: La Marbrerie, 21 Rue Alexis Lepère, Montreuil, France
+    latitude: 48.8620
+    longitude: 2.4416
+    start: w3 Fri 21:00
+    end: w3 Sat 01:00
+    price_is_free: true
+    tags: [dance-style:salsa, format:practice, level:intermediate, venue:indoor, reach:local]
+
+  - id: evt-fy-bulk-08
+    calendar_id: salsa-cal-001
+    title: Pigalle Bachata Sensual
+    description: |
+      Guest DJ from Barcelona. Two rooms — sensual downstairs, moderna
+      upstairs.
+    location: Le Sacre, 26 Rue Frochot, Paris, France
+    latitude: 48.8823
+    longitude: 2.3374
+    start: w3 Sat 21:00
+    end: w3 Sun 02:00
+    price_is_free: false
+    price_min: 12
+    price_currency: EUR
+    tags: [dance-style:bachata, format:social, level:all-levels, venue:indoor, vibe:good-music, reach:local]
+
+  - id: evt-fy-bulk-09
+    calendar_id: salsa-cal-001
+    title: Buttes-Chaumont Salsa Picnic
+    description: |
+      Open-air salsa picnic. Weather permitting; check the meetup group
+      the morning of.
+    location: Parc des Buttes-Chaumont, Kiosque, Paris, France
+    latitude: 48.8809
+    longitude: 2.3831
+    start: w3 Sun 15:00
+    end: w3 Sun 19:00
+    price_is_free: true
+    tags: [dance-style:salsa, format:social, level:beginner-friendly, venue:outdoor, reach:international]
+
+  - id: evt-fy-bulk-10
+    calendar_id: salsa-cal-001
+    title: Canal Saint-Martin Salsa
+    description: |
+      Salsa night on the canal terrace. Salsa-only playlist, live band
+      set at midnight.
+    location: Point Éphémère, 200 Quai de Valmy, Paris, France
+    latitude: 48.8836
+    longitude: 2.3689
+    start: w4 Fri 21:30
+    end: w4 Sat 02:00
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+    tags: [dance-style:salsa, format:social, level:all-levels, venue:indoor, vibe:social-atmosphere, reach:international]
+
+  - id: evt-fy-bulk-11
+    calendar_id: salsa-cal-001
+    title: Montmartre Bachata Terrace
+    description: |
+      Bachata under the stars with a Sacré-Cœur view. Rooftop capacity
+      is limited — arrive early.
+    location: Terrass Hotel, 12 Rue Joseph de Maistre, Paris, France
+    latitude: 48.8867
+    longitude: 2.3336
+    start: w4 Sat 20:00
+    end: w4 Sun 00:00
+    price_is_free: false
+    price_min: 15
+    price_currency: EUR
+    tags: [dance-style:bachata, format:social, level:all-levels, venue:rooftop, reach:local]
+
+  - id: evt-fy-bulk-12
+    calendar_id: salsa-cal-001
+    title: Père-Lachaise Salsa Sunday
+    description: |
+      Sunday cool-down practica after the weekend socials. Includes a
+      short body-movement warmup.
+    location: Studio Fusion, 76 Bd de Ménilmontant, Paris, France
+    latitude: 48.8620
+    longitude: 2.3899
+    start: w4 Sun 18:00
+    end: w4 Sun 22:00
+    price_is_free: true
+    tags: [dance-style:salsa, format:practice, level:all-levels, venue:indoor, reach:international]
+
+  - id: evt-fy-bulk-13
+    calendar_id: salsa-cal-001
+    title: Nation Salsa & Bachata Mix
+    description: |
+      Two-room night — salsa on the main floor, bachata sensual in the
+      side room. Rotating short lessons.
+    location: Espace Charenton, 327 Rue de Charenton, Paris, France
+    latitude: 48.8340
+    longitude: 2.3898
+    start: w5 Fri 21:00
+    end: w5 Sat 02:00
+    price_is_free: false
+    price_min: 12
+    price_currency: EUR
+    tags: [dance-style:salsa, dance-style:bachata, format:social, level:all-levels, venue:indoor, reach:international]
+
+  - id: evt-fy-bulk-14
+    calendar_id: salsa-cal-001
+    title: République Bachata Roof
+    description: |
+      Bachata moderna rooftop party. Dress code: comfortable shoes,
+      street style.
+    location: Le Perchoir Marais, 33 Rue de la Verrerie, Paris, France
+    latitude: 48.8578
+    longitude: 2.3529
+    start: w5 Sat 20:30
+    end: w5 Sun 01:00
+    price_is_free: false
+    price_min: 14
+    price_currency: EUR
+    tags: [dance-style:bachata, format:social, level:all-levels, venue:rooftop, reach:international]
+
+  - id: evt-fy-bulk-15
+    calendar_id: salsa-cal-001
+    title: Trocadéro Salsa Sunday
+    description: |
+      Sunday sunset salsa social with an Eiffel Tower view. Second
+      "Friends going" card in this scenario — friend RSVPs friends-only
+      here, and mutual friends bring the ordering deterministically
+      above evt-fy-004.
+    location: Café de l'Homme, 17 Pl. du Trocadéro, Paris, France
+    latitude: 48.8618
+    longitude: 2.2879
+    start: w5 Sun 18:00
+    end: w5 Sun 22:00
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+    tags: [dance-style:salsa, format:social, level:all-levels, venue:indoor, vibe:social-atmosphere, reach:international]
+
+  - id: evt-fy-bulk-16
+    calendar_id: salsa-cal-001
+    title: Opéra Bachata Chic
+    description: |
+      Upscale bachata night with a live piano intro. Dress smart-casual.
+    location: Silencio des Prés, 142 Bd Saint-Germain, Paris, France
+    latitude: 48.8531
+    longitude: 2.3346
+    start: w6 Fri 21:30
+    end: w6 Sat 01:30
+    price_is_free: false
+    price_min: 18
+    price_currency: EUR
+    tags: [dance-style:bachata, format:social, level:intermediate, venue:indoor, reach:regional]
+
+  - id: evt-fy-bulk-17
+    calendar_id: salsa-cal-001
+    title: Champs-Élysées Salsa Fest
+    description: |
+      Salsa festival preview night — three guest teachers rotating
+      short tasters, then an open social until close.
+    location: Théâtre du Rond-Point, 2 bis Av. Franklin D. Roosevelt, Paris, France
+    latitude: 48.8672
+    longitude: 2.3103
+    start: w6 Sat 20:00
+    end: w6 Sun 02:00
+    price_is_free: false
+    price_min: 22
+    price_currency: EUR
+    tags: [dance-style:salsa, format:festival, level:all-levels, venue:indoor, vibe:good-music, reach:local]
+
+  - id: evt-fy-bulk-18
+    calendar_id: salsa-cal-001
+    title: Louvre Bachata by the Pyramid
+    description: |
+      Silent-disco style bachata evening in the Cour Napoléon. Bring
+      your own headphones or rent on-site.
+    location: Cour Napoléon, Musée du Louvre, Paris, France
+    latitude: 48.8606
+    longitude: 2.3376
+    start: w6 Sun 19:00
+    end: w6 Sun 23:00
+    price_is_free: false
+    price_min: 8
+    price_currency: EUR
+    tags: [dance-style:bachata, format:social, level:all-levels, venue:outdoor, reach:international]
+
+  - id: evt-fy-bulk-19
+    calendar_id: salsa-cal-001
+    title: La Défense Salsa After-Work
+    description: |
+      Friday after-work salsa on the CNIT rooftop. Corporate crowd,
+      surprisingly serious floor.
+    location: CNIT Skydeck, 2 Pl. de la Défense, Puteaux, France
+    latitude: 48.8918
+    longitude: 2.2384
+    start: w7 Fri 19:30
+    end: w7 Fri 23:30
+    price_is_free: false
+    price_min: 12
+    price_currency: EUR
+    tags: [dance-style:salsa, format:social, level:all-levels, venue:rooftop, vibe:social-atmosphere, reach:local]

@@ -1,0 +1,51 @@
+test_plan:
+  name: "Activity digest — in-app channel"
+  description: >
+    (Feature × Channel) truth-table cell. Feature = social-activity
+    digest. Channel = in-app only. Asserts that when an actor performs
+    a socially-visible action, the attendance service creates a
+    `social_activity` in-app row for each follower — while the digest
+    email pipeline is OFF at the admin level so no digest emails or
+    pushes fire.
+
+  preconditions:
+    - >-
+      Start scenario:
+      `SCENARIO=activity-digest-app RESET=1 task start:scenario`
+
+  cast:
+    - "Alice — actor (Going ev-friend)."
+    - "Bob, Carol — followers with email + push social_activity OFF."
+
+  steps:
+    - id: 1
+      title: "Trigger one dispatch tick"
+      description: >
+        `SCENARIO=activity-digest-app task notify:trigger:scenario`
+      expected: >
+        Stats: `reminders.created=0`, `interest.created=0`,
+        `activity.digests=0` (pipeline disabled), `activity.pushed=0`.
+
+    - id: 2
+      title: "In-app rows fire for followers"
+      description: >
+        `GET /api/notifications` as Bob and Carol.
+      expected: >
+        Each has one `social_activity` (or the relevant follower-view
+        kind — inspect Notification.kind) row referencing Alice's
+        Going on ev-friend.
+
+    - id: 3
+      title: "Alice receives nothing"
+      description: >
+        The actor should not be notified about her own action.
+      expected: >
+        Alice has zero notification rows for ev-friend.
+
+    - id: 4
+      title: "Email + push channels remain silent"
+      description: >
+        Verify no digest email or push was attempted.
+      expected: >
+        Mailpit not required (SMTP unconfigured). Stats confirm
+        `activity.digests=0` and `activity.pushed=0`.

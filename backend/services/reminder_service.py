@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlmodel import Session, select
 
-from backend.config.loader import get_reminder_lead_hours, get_reminders_enabled
+from backend.services.app_settings import get_reminder_lead_hours, get_event_reminders_enabled
 from backend.db.database import get_engine
 from backend.db.models import CachedEvent, Notification, User, UserEventAttendance
 from backend.services.email import send_event_reminder_email
@@ -82,7 +82,7 @@ def _due_pairs(session: Session, now: datetime, lead_hours: int):
 
 def run_once() -> dict:
     """Generate due reminders. Returns a small stats dict for logging."""
-    if not get_reminders_enabled():
+    if not get_event_reminders_enabled():
         return {"skipped": "reminders_disabled"}
 
     lead_hours = get_reminder_lead_hours()
@@ -103,9 +103,9 @@ def run_once() -> dict:
                     event_id=event.event_id,
                 )
             )
-            if user.reminder_email_enabled:
+            if user.email_event_reminders_enabled:
                 to_email.append((user, event))
-            if user.push_enabled:
+            if user.push_event_reminders_enabled:
                 to_push.append((user.id, event.title, event.event_id))
         session.commit()
 

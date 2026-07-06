@@ -1,0 +1,37 @@
+tag_groups:
+  - slug: format
+    label: Format
+    ordinal: 10
+    allow_multiple: true
+    color: "#f472b6"
+    tags:
+      - slug: social
+        label: Social
+      - slug: festival
+        label: Festival
+
+  - slug: dance-style
+    label: Dance Style
+    ordinal: 50
+    allow_multiple: true
+    onboarding_eligible: true
+    color: "#fb923c"
+    tags:
+      - slug: salsa
+        label: Salsa
+      - slug: bachata
+        label: Bachata
+
+  - slug: reach
+    label: Reach
+    ordinal: 30
+    allow_multiple: true
+    onboarding_eligible: true
+    color: "#a78bfa"
+    tags:
+      - slug: local
+        label: Local
+      - slug: regional
+        label: Regional
+      - slug: international
+        label: International

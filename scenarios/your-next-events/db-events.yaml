@@ -1,0 +1,140 @@
+# Events for the your-next-events scenario. All coordinates fall inside
+# DEFAULT_AREA_BBOX ("Europe & nearby") so they show up on the explorer
+# map. The viewer starts with three commitments (2 saved + 1 going);
+# additional events prove ordering (ASC by start) and the various
+# countdown-pill shapes ("tomorrow", "in X days", "in X weeks",
+# "in X months"). One event is BOTH saved and going to prove dedup.
+base_week: 0
+events:
+  - id: evt-yne-001
+    calendar_id: salsa-cal-001
+    title: Salsa Kickoff Party
+    description: |
+      Very-soon commitment used to prove the countdown pill renders
+      "in X days" / "tomorrow" for near-term events. viewer saved it.
+    location: Le Balajo, 9 Rue de Lappe, Paris, France
+    latitude: 48.8533
+    longitude: 2.3716
+    start: w0 Fri 21:00
+    end: w0 Sat 01:00
+    price_is_free: true
+    tags:
+      [
+        dance-style:salsa,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        reach:local,
+      ]
+
+  - id: evt-yne-002
+    calendar_id: salsa-cal-001
+    title: Bachata Studio Class
+    description: |
+      Next-week commitment used to prove the countdown pill renders
+      "in X weeks" for mid-range dates. viewer is going.
+    location: Studio Bachateros, Calle Mayor 12, Madrid, Spain
+    latitude: 40.4168
+    longitude: -3.7038
+    start: w1 Wed 19:30
+    end: w1 Wed 21:30
+    price_is_free: false
+    price_min: 15
+    price_currency: EUR
+    tags:
+      [
+        dance-style:bachata,
+        format:class,
+        level:beginner-friendly,
+        venue:indoor,
+        reach:international,
+      ]
+
+  - id: evt-yne-003
+    calendar_id: salsa-cal-001
+    title: Berlin Salsa Marathon
+    description: |
+      Far-future commitment (~3 months) used to prove the countdown pill
+      renders "in X months" for long-lead dates. viewer both saved AND is
+      going to this — proves the union dedup keeps only one card.
+    location: Tanzhaus Berlin, Weinbergsweg 14, Berlin, Germany
+    latitude: 52.5244
+    longitude: 13.3884
+    start: w12 Fri 18:00
+    end: w12 Sun 23:00
+    price_is_free: false
+    price_min: 90
+    price_currency: EUR
+    tags:
+      [
+        dance-style:salsa,
+        format:festival,
+        level:all-levels,
+        venue:indoor,
+        reach:regional,
+      ]
+
+  - id: evt-yne-004
+    calendar_id: salsa-cal-001
+    title: Kizomba Free Fresher
+    description: |
+      Not saved and not going: proves this rail does NOT show generic
+      upcoming events — only the viewer's OWN commitments.
+    location: Mojito Club, Passeig de Gràcia 42, Barcelona, Spain
+    latitude: 41.3925
+    longitude: 2.1568
+    start: w0 Sat 20:00
+    end: w0 Sun 00:00
+    price_is_free: true
+    tags:
+      [
+        dance-style:kizomba,
+        format:social,
+        level:beginner-friendly,
+        venue:indoor,
+        reach:international,
+      ]
+
+  - id: evt-yne-005
+    calendar_id: salsa-cal-001
+    title: Rooftop Bachata Sunset
+    description: |
+      Mid-range commitment (about 3 weeks). Second "going" event — with
+      evt-yne-002 it verifies ordering ASC by start across the rail.
+    location: Sky Bar, Rambla 10, Lisbon, Portugal
+    latitude: 38.7169
+    longitude: -9.1399
+    start: w3 Sat 19:00
+    end: w3 Sat 23:00
+    price_is_free: true
+    tags:
+      [
+        dance-style:bachata,
+        format:social,
+        level:all-levels,
+        venue:outdoor,
+        reach:local,
+      ]
+
+saves:
+  # viewer saved evt-yne-001 (private audience) and evt-yne-003 (private).
+  - event_id: evt-yne-001
+    email: viewer@example.com
+    audience: private
+  - event_id: evt-yne-003
+    email: viewer@example.com
+    audience: private
+
+attendances:
+  # viewer is going to evt-yne-002 and evt-yne-005 (public), and to
+  # evt-yne-003 (public) — evt-yne-003 is also saved above, so the
+  # union should produce ONE card, not two.
+  - event_id: evt-yne-002
+    email: viewer@example.com
+    share_audience: public
+  - event_id: evt-yne-003
+    email: viewer@example.com
+    share_audience: public
+  - event_id: evt-yne-005
+    email: viewer@example.com
+    share_audience: public

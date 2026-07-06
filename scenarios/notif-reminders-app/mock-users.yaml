@@ -1,0 +1,24 @@
+# reminders-app cast. Both attendees have email + push reminder
+# channels OFF at the user level so the only observable delivery is
+# the in-app row. Third user (Carol) is going but has BOTH channels
+# off — same as Alice/Bob — providing a small three-way replication
+# probe for the in-app fanout.
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    account_visibility: public
+    email_event_reminders_enabled: false
+    push_event_reminders_enabled: false
+
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+    account_visibility: public
+    email_event_reminders_enabled: false
+    push_event_reminders_enabled: false

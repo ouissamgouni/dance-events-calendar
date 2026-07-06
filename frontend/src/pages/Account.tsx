@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSavedEvents } from '../context/SavedEventsContext';
@@ -8,8 +8,9 @@ import {
     checkHandleAvailable,
     fetchMyRatings,
     updateUserProfile,
+    fetchEventsByIds,
 } from '../api';
-import type { MyRating } from '../types';
+import type { MyRating, CalendarEvent } from '../types';
 import PreferencesSection from '../components/PreferencesSection';
 import VisibilitySection, { ProfileLinksEditor } from '../components/VisibilitySection';
 import NotificationSettings from '../components/NotificationSettings';
@@ -19,6 +20,9 @@ import BioEditor from '../components/BioEditor';
 import NetworkPanel from '../components/NetworkPanel';
 import ReferralCard from '../components/ReferralCard';
 import OrganizerClaimSection from '../components/OrganizerClaimSection';
+import YourNextEventsRail from '../components/YourNextEventsRail';
+import EventModal from '../components/EventModal';
+import { trackView } from '../utils/tracking';
 
 function slugifyHandle(name: string): string {
     const base = name
@@ -37,13 +41,15 @@ export default function Account() {
     const { user, loading, logout, deleteAccount, refreshUser } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
-    const { savedCount } = useSavedEvents();
-    const { attendingCount } = useAttendingEvents();
+    const { savedEventIds, savedCount } = useSavedEvents();
+    const { attendingEventIds, attendingCount } = useAttendingEvents();
     const { showRatings, organizerClaimsEnabled } = useFeatureFlags();
     const [confirming, setConfirming] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [myRatings, setMyRatings] = useState<MyRating[] | null>(null);
+    const [myEvents, setMyEvents] = useState<CalendarEvent[]>([]);
+    const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 
     // --- Profile editing (display_name + handle) ---
     const [profileEditing, setProfileEditing] = useState(false);
@@ -154,6 +160,40 @@ export default function Account() {
             fetchMyRatings().then(setMyRatings).catch(() => setMyRatings([]));
         }
     }, [showRatings, user]);
+
+    const allEventIds = useMemo(
+        () => [...new Set([...savedEventIds, ...attendingEventIds])],
+        [savedEventIds, attendingEventIds],
+    );
+
+    useEffect(() => {
+        if (!user) {
+            setMyEvents([]);
+            return;
+        }
+        if (allEventIds.length === 0) {
+            setMyEvents([]);
+            return;
+        }
+        let cancelled = false;
+        fetchEventsByIds(allEventIds)
+            .then((evts) => {
+                if (cancelled) return;
+                const now = Date.now();
+                setMyEvents(
+                    evts
+                        .filter((e) => new Date(e.end).getTime() >= now)
+                        .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()),
+                );
+            })
+            .catch(() => { if (!cancelled) setMyEvents([]); });
+        return () => { cancelled = true; };
+    }, [user, allEventIds]);
+
+    const handleEventClick = useCallback((evt: CalendarEvent) => {
+        trackView(evt.event_id, 'account-my-events');
+        setSelectedEvent(evt);
+    }, []);
 
     if (loading) {
         return (
@@ -378,24 +418,48 @@ export default function Account() {
                 <ProfileLinksEditor handle={user.handle ?? null} />
             </section>
 
-            <div className={`flex flex-col md:flex-row gap-3 mb-3 items-start`}>
-                <section id="my-events" className="flex-1 w-full min-w-0 rounded-lg border border-slate-200 bg-white p-4 scroll-mt-4">
-                    <h2 className="text-sm font-semibold text-slate-900 mb-2">My Events</h2>
-                    <p className="text-xs text-slate-600">
-                        {savedCount} saved · {attendingCount} going
-                    </p>
-                    <Link to="/my-calendar" className="mt-2 inline-block text-xs text-blue-500 hover:text-blue-600 font-medium">
-                        Show calendar →
-                    </Link>
-                </section>
+            {organizerClaimsEnabled && (
+                <div className="mb-3">
+                    <OrganizerClaimSection handle={user.handle ?? null} />
+                </div>
+            )}
 
-                {organizerClaimsEnabled && (
-                    <div className="flex-1 w-full min-w-0">
-                        <OrganizerClaimSection handle={user.handle ?? null} />
-                    </div>
+            <div id="my-events" className="mb-3 scroll-mt-4">
+                {myEvents.length > 0 ? (
+                    <YourNextEventsRail
+                        events={myEvents}
+                        onEventClick={handleEventClick}
+                        headerRight={(
+                            <>
+                                <span>{savedCount} saved</span>
+                                <span className="text-slate-300">·</span>
+                                <span>{attendingCount} going</span>
+                            </>
+                        )}
+                    />
+                ) : (
+                    <section className="border border-slate-200 bg-white shadow-sm" data-testid="your-next-events-rail-empty">
+                        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-3 py-1.5">
+                            <span className="text-xs font-semibold uppercase tracking-wide text-slate-700">Your next events</span>
+                            <div className="ml-auto flex items-center gap-2 text-xs text-slate-600">
+                                <span>{savedCount} saved</span>
+                                <span className="text-slate-300">·</span>
+                                <span>{attendingCount} going</span>
+                            </div>
+                        </div>
+                        <div className="px-3 py-4 text-center">
+                            <p className="text-xs text-slate-500">
+                                No events yet. Save events or mark “I’m going” to see them here.
+                            </p>
+                            <Link
+                                to="/"
+                                className="mt-2 inline-block text-xs font-medium text-blue-500 hover:text-blue-600"
+                            >
+                                Browse events →
+                            </Link>
+                        </div>
+                    </section>
                 )}
-
-
             </div>
 
             <NetworkPanel />
@@ -514,6 +578,13 @@ export default function Account() {
                     </div>
                 )}
             </section>
+
+            {selectedEvent && (
+                <EventModal
+                    event={selectedEvent}
+                    onClose={() => setSelectedEvent(null)}
+                />
+            )}
         </div>
     );
 }

@@ -3,770 +3,1324 @@ events:
 - id: mock-evt-001
   calendar_id: salsa-cal-001
   title: New Year Salsa Bash – Paris
-  description: |
-    Kick off the year with salsa cubana at Studio Latina.
+  description: 'Kick off the year with salsa cubana at Studio Latina.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Studio Latina, 15 Rue de la Roquette, Paris, France
   latitude: 48.8534
   longitude: 2.3741
   start: w-14 Sat 21:00
   end: w-14 Sun 02:00
+  tags:
+  - reach:international
 - id: mock-evt-002
   calendar_id: bachata-cal-002
   title: Winter Bachata Festival – Budapest
-  description: |
-    3-day festival with international instructors. Thermal bath party included!
-    The programme spans multiple days with tracks for beginner, intermediate and advanced dancers.
+  description: '3-day festival with international instructors. Thermal bath party
+    included!
+
+    The programme spans multiple days with tracks for beginner, intermediate and advanced
+    dancers.
+
     Evening parties take place across several rooms, each with its own themed DJ lineup.
-    VIP passes include backstage access, a priority show seat, and an exclusive warm-up session.
+
+    VIP passes include backstage access, a priority show seat, and an exclusive warm-up
+    session.
+
     Day passes are available for those who can only join for part of the weekend.
+
     The venue is fully accessible with a dedicated cloakroom and coat-check service.
+
     An on-site registration desk opens from 9 am on the first day of the event.
+
     A gala show on Saturday evening features performances by the resident instructors.
-    Solo and couples competitions run on Sunday afternoon with prizes for the top finishers.
+
+    Solo and couples competitions run on Sunday afternoon with prizes for the top
+    finishers.
+
     A warm-up DJ set kicks off each evening at 9 pm before the main programme begins.
+
     Healthy food options and a full bar are available on-site throughout the weekend.
+
     Local accommodation partners offer discounted rates — see the official event website.
+
     Airport transfer packages can be arranged through the event website; book in advance.
+
     Participants are encouraged to share highlights using the official event hashtag.
+
     An after-party follows the gala show and runs until the early hours of the morning.
+
     Organisers will provide a dedicated event photographer and live social media coverage.
-    All levels from complete beginners to professional dancers are warmly welcomed here.
-    Emergency medical assistance and a first-aid station are available on site at all times.
-    The event team is on hand throughout the weekend to answer questions and assist you.
+
+    All levels from complete beginners to professional dancers are warmly welcomed
+    here.
+
+    Emergency medical assistance and a first-aid station are available on site at
+    all times.
+
+    The event team is on hand throughout the weekend to answer questions and assist
+    you.
+
     Check the event website for the full timetable, artist bios and ticketing information.
+
     We look forward to sharing the dance floor with you — see you there!
+
+    '
   location: Akvárium Klub, Erzsébet tér 12, Budapest, Hungary
   latitude: 47.4979
   longitude: 19.051
   start: w-13 Fri 18:00
   end: w-13 Sun 23:00
+  tags:
+  - reach:regional
 - id: mock-evt-003
   calendar_id: salsa-cal-001
   title: Salsa Fuego – London
-  description: |
-    Two floors of dancing in Soho. Guest DJs from Cuba & Colombia.
+  description: 'Two floors of dancing in Soho. Guest DJs from Cuba & Colombia.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Bar Salsa, 96 Charing Cross Rd, London, UK
   latitude: 51.5142
   longitude: -0.13
   start: w-12 Sat 21:00
   end: w-12 Sun 03:00
+  tags:
+  - reach:international
 - id: mock-evt-004
   calendar_id: bachata-cal-002
   title: Valentine Bachata Night – Rome
-  description: |
-    Romantic bachata sensual evening near the Tiber.
+  description: 'Romantic bachata sensual evening near the Tiber.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Terrazza Trastevere, Piazza Trilussa, Rome, Italy
   latitude: 41.8892
   longitude: 12.4691
   start: w-9 Sat 19:00
   end: w-9 Sat 23:30
+  tags:
+  - reach:international
 - id: mock-evt-005
   calendar_id: salsa-cal-001
   title: Salsa Vibes Berlin
-  description: |
-    Berlin's biggest monthly salsa gathering. 3 rooms: salsa, bachata, kizomba.
+  description: 'Berlin''s biggest monthly salsa gathering. 3 rooms: salsa, bachata,
+    kizomba.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Tanzhaus Berlin, Friedrichstraße 112, Berlin, Germany
   latitude: 52.5244
   longitude: 13.3884
   start: w-8 Sat 21:00
   end: w-8 Sun 03:00
+  tags:
+  - reach:local
 - id: mock-evt-006
   calendar_id: salsa-cal-001
   title: Carnaval Salsa – Lisbon
-  description: |
-    Carnival-themed party with samba & salsa fusion. Costumes encouraged!
+  description: 'Carnival-themed party with samba & salsa fusion. Costumes encouraged!
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Centro Cultural de Belém, Praça do Império, Lisbon, Portugal
   latitude: 38.696
   longitude: -9.2092
   start: w-7 Sat 22:00
   end: w-7 Sun 04:00
+  tags:
+  - reach:local
 - id: mock-evt-007
   calendar_id: bachata-cal-002
   title: Spring Bachata Workshop – Athens
-  description: |
-    Rooftop bachata workshop with a view of the Parthenon.
+  description: 'Rooftop bachata workshop with a view of the Parthenon.
+
     Each session is broken into clear, manageable steps with individual feedback.
+
     The instructor will address both leading and following roles equally.
+
     Comfortable dance shoes with a smooth, non-rubber sole are essential.
+
     No prior partner is required — participants rotate throughout the session.
+
     Water and light refreshments are provided during breaks.
+
     Spaces are strictly limited to maintain a high quality of teaching.
+
     Video recording of the technique segments is encouraged for personal review.
+
     A brief Q&A with the instructor follows each teaching block.
+
     Check the event page for warm-up videos and preparation tips in advance.
+
     Book early — this event has sold out in previous editions.
+
+    '
   location: Cine Paris Rooftop, Kidathineon 22, Plaka, Athens, Greece
   latitude: 37.972
   longitude: 23.729
   start: w-6 Sat 14:00
   end: w-6 Sat 18:00
+  tags:
+  - reach:local
 - id: mock-evt-008
   calendar_id: salsa-cal-001
   title: Salsa Cubana Party – Barcelona
-  description: |
-    Timba & casino all night on the beach. Live band Havana Sound System.
+  description: 'Timba & casino all night on the beach. Live band Havana Sound System.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Mojito Club, Carrer del Rosselló 217, Barcelona, Spain
   latitude: 41.3925
   longitude: 2.1568
   start: w-5 Sat 22:00
   end: w-5 Sun 03:00
+  tags:
+  - reach:regional
 - id: mock-evt-009
   calendar_id: bachata-cal-002
   title: Beginner Bachata Bootcamp – Paris
-  description: |
-    2-day intro to bachata sensual & moderna. No partner needed.
+  description: '2-day intro to bachata sensual & moderna. No partner needed.
+
     Each session is broken into clear, manageable steps with individual feedback.
+
     The instructor will address both leading and following roles equally.
+
     Comfortable dance shoes with a smooth, non-rubber sole are essential.
+
     No prior partner is required — participants rotate throughout the session.
+
     Water and light refreshments are provided during breaks.
+
     Spaces are strictly limited to maintain a high quality of teaching.
+
     Video recording of the technique segments is encouraged for personal review.
+
     A brief Q&A with the instructor follows each teaching block.
+
     Check the event page for warm-up videos and preparation tips in advance.
+
     Book early — this event has sold out in previous editions.
+
+    '
   location: Centre de Danse du Marais, 41 Rue du Temple, Paris, France
   latitude: 48.86
   longitude: 2.353
   start: w-4 Sat 10:00
   end: w-4 Sun 17:00
+  tags:
+  - reach:international
 - id: mock-evt-010
   calendar_id: salsa-cal-001
   title: Latin Night Amsterdam
-  description: |
-    Salsa, bachata & merengue in the canal district. Free class at 21:00.
+  description: 'Salsa, bachata & merengue in the canal district. Free class at 21:00.
+
     Each session is broken into clear, manageable steps with individual feedback.
+
     The instructor will address both leading and following roles equally.
+
     Comfortable dance shoes with a smooth, non-rubber sole are essential.
+
     No prior partner is required — participants rotate throughout the session.
+
     Water and light refreshments are provided during breaks.
+
     Spaces are strictly limited to maintain a high quality of teaching.
+
     Video recording of the technique segments is encouraged for personal review.
+
     A brief Q&A with the instructor follows each teaching block.
+
     Check the event page for warm-up videos and preparation tips in advance.
+
     Book early — this event has sold out in previous editions.
+
+    '
   location: Club Salsa, Leidseplein 12, Amsterdam, Netherlands
   latitude: 52.364
   longitude: 4.8828
   start: w-3 Sat 21:00
   end: w-3 Sun 02:30
+  tags:
+  - reach:international
 - id: mock-evt-011
   calendar_id: salsa-cal-001
   title: Salsa Social Night – Paris
-  description: |
-    Weekly social at the heart of Paris. All levels welcome. DJ set + live percussion.
+  description: 'Weekly social at the heart of Paris. All levels welcome. DJ set +
+    live percussion.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Le Balajo, 9 Rue de Lappe, 75011 Paris, France
   latitude: 48.8533
   longitude: 2.3716
   start: w0 Fri 20:30
   end: w0 Sat 01:00
+  tags:
+  - reach:regional
 - id: mock-evt-012
   calendar_id: bachata-cal-002
   title: Wien Bachata Congress
-  description: |
-    Annual Vienna bachata congress. 4 days of workshops, shows, and parties.
-    The programme spans multiple days with tracks for beginner, intermediate and advanced dancers.
+  description: 'Annual Vienna bachata congress. 4 days of workshops, shows, and parties.
+
+    The programme spans multiple days with tracks for beginner, intermediate and advanced
+    dancers.
+
     Evening parties take place across several rooms, each with its own themed DJ lineup.
-    VIP passes include backstage access, a priority show seat, and an exclusive warm-up session.
+
+    VIP passes include backstage access, a priority show seat, and an exclusive warm-up
+    session.
+
     Day passes are available for those who can only join for part of the weekend.
+
     The venue is fully accessible with a dedicated cloakroom and coat-check service.
+
     An on-site registration desk opens from 9 am on the first day of the event.
+
     A gala show on Saturday evening features performances by the resident instructors.
-    Solo and couples competitions run on Sunday afternoon with prizes for the top finishers.
+
+    Solo and couples competitions run on Sunday afternoon with prizes for the top
+    finishers.
+
     A warm-up DJ set kicks off each evening at 9 pm before the main programme begins.
+
     Healthy food options and a full bar are available on-site throughout the weekend.
+
     Local accommodation partners offer discounted rates — see the official event website.
+
     Airport transfer packages can be arranged through the event website; book in advance.
+
     Participants are encouraged to share highlights using the official event hashtag.
+
     An after-party follows the gala show and runs until the early hours of the morning.
+
     Organisers will provide a dedicated event photographer and live social media coverage.
-    All levels from complete beginners to professional dancers are warmly welcomed here.
-    Emergency medical assistance and a first-aid station are available on site at all times.
-    The event team is on hand throughout the weekend to answer questions and assist you.
+
+    All levels from complete beginners to professional dancers are warmly welcomed
+    here.
+
+    Emergency medical assistance and a first-aid station are available on site at
+    all times.
+
+    The event team is on hand throughout the weekend to answer questions and assist
+    you.
+
     Check the event website for the full timetable, artist bios and ticketing information.
+
     We look forward to sharing the dance floor with you — see you there!
+
+    '
   location: Wiener Stadthalle, Roland-Rainer-Platz 1, Vienna, Austria
   latitude: 48.2024
   longitude: 16.331
   start: w1 Thu 18:00
   end: w1 Sun 04:00
+  tags:
+  - reach:local
 - id: mock-evt-013
   calendar_id: salsa-cal-001
   title: Salsa Under the Acropolis – Athens
-  description: |
-    Rooftop salsa party with live band + DJ from Havana.
+  description: 'Rooftop salsa party with live band + DJ from Havana.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Cine Paris Rooftop, Kidathineon 22, Plaka, Athens, Greece
   latitude: 37.972
   longitude: 23.729
   start: w1 Wed 21:00
   end: w1 Thu 02:30
+  tags:
+  - reach:regional
 - id: mock-evt-014
   calendar_id: salsa-cal-001
   title: Salsa & Kizomba Festival – Lisbon
-  description: |
-    3-day festival with international instructors. Workshops + pool party.
-    The programme spans multiple days with tracks for beginner, intermediate and advanced dancers.
+  description: '3-day festival with international instructors. Workshops + pool party.
+
+    The programme spans multiple days with tracks for beginner, intermediate and advanced
+    dancers.
+
     Evening parties take place across several rooms, each with its own themed DJ lineup.
-    VIP passes include backstage access, a priority show seat, and an exclusive warm-up session.
+
+    VIP passes include backstage access, a priority show seat, and an exclusive warm-up
+    session.
+
     Day passes are available for those who can only join for part of the weekend.
+
     The venue is fully accessible with a dedicated cloakroom and coat-check service.
+
     An on-site registration desk opens from 9 am on the first day of the event.
+
     A gala show on Saturday evening features performances by the resident instructors.
-    Solo and couples competitions run on Sunday afternoon with prizes for the top finishers.
+
+    Solo and couples competitions run on Sunday afternoon with prizes for the top
+    finishers.
+
     A warm-up DJ set kicks off each evening at 9 pm before the main programme begins.
+
     Healthy food options and a full bar are available on-site throughout the weekend.
+
     Local accommodation partners offer discounted rates — see the official event website.
+
     Airport transfer packages can be arranged through the event website; book in advance.
+
     Participants are encouraged to share highlights using the official event hashtag.
+
     An after-party follows the gala show and runs until the early hours of the morning.
+
     Organisers will provide a dedicated event photographer and live social media coverage.
-    All levels from complete beginners to professional dancers are warmly welcomed here.
-    Emergency medical assistance and a first-aid station are available on site at all times.
-    The event team is on hand throughout the weekend to answer questions and assist you.
+
+    All levels from complete beginners to professional dancers are warmly welcomed
+    here.
+
+    Emergency medical assistance and a first-aid station are available on site at
+    all times.
+
+    The event team is on hand throughout the weekend to answer questions and assist
+    you.
+
     Check the event website for the full timetable, artist bios and ticketing information.
+
     We look forward to sharing the dance floor with you — see you there!
+
+    '
   location: Centro Cultural de Belém, Praça do Império, Lisbon, Portugal
   latitude: 38.696
   longitude: -9.2092
   start: w2 Fri 10:00
   end: w2 Sun 23:00
+  tags:
+  - reach:local
 - id: mock-evt-015
   calendar_id: bachata-cal-002
   title: Bachata en Praga
-  description: |
-    Monthly bachata social in the Old Town. Taster class at 20:00.
+  description: 'Monthly bachata social in the Old Town. Taster class at 20:00.
+
     Each session is broken into clear, manageable steps with individual feedback.
+
     The instructor will address both leading and following roles equally.
+
     Comfortable dance shoes with a smooth, non-rubber sole are essential.
+
     No prior partner is required — participants rotate throughout the session.
+
     Water and light refreshments are provided during breaks.
+
     Spaces are strictly limited to maintain a high quality of teaching.
+
     Video recording of the technique segments is encouraged for personal review.
+
     A brief Q&A with the instructor follows each teaching block.
+
     Check the event page for warm-up videos and preparation tips in advance.
+
     Book early — this event has sold out in previous editions.
+
+    '
   location: SaSaZu, Bubenské nábřeží 306, Prague, Czech Republic
   latitude: 50.1025
   longitude: 14.44
   start: w3 Sat 20:00
   end: w3 Sun 01:00
+  tags:
+  - reach:local
 - id: mock-evt-016
   calendar_id: salsa-cal-001
   title: Salsa al Lago – Milan
-  description: |
-    Open-air salsa by the Navigli canals. Aperitivo + dancing.
+  description: 'Open-air salsa by the Navigli canals. Aperitivo + dancing.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Navigli District, Alzaia Naviglio Grande, Milan, Italy
   latitude: 45.45
   longitude: 9.17
   start: w5 Sat 19:30
   end: w5 Sat 23:30
+  tags:
+  - reach:local
 - id: mock-evt-017
   calendar_id: salsa-cal-001
   title: Midsommar Salsa – Stockholm
-  description: |
-    Scandinavia's hottest salsa night. Warm up the Nordic summer.
+  description: 'Scandinavia''s hottest salsa night. Warm up the Nordic summer.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Debaser Strand, Hornstulls Strand 4, Stockholm, Sweden
   latitude: 59.317
   longitude: 18.034
   start: w9 Sat 20:00
   end: w9 Sun 02:00
+  tags:
+  - reach:international
 - id: mock-evt-018
   calendar_id: bachata-cal-002
   title: Fête de la Musique Bachata – Paris
-  description: |
-    Free outdoor bachata in Place de la République. All-night dancing!
+  description: 'Free outdoor bachata in Place de la République. All-night dancing!
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Place de la République, Paris, France
   latitude: 48.8676
   longitude: 2.3639
   start: w9 Sun 18:00
   end: w10 Mon 04:00
+  tags:
+  - reach:local
 - id: mock-evt-019
   calendar_id: salsa-cal-001
   title: Salsa on the Beach – Barcelona
-  description: |
-    Barefoot salsa on Barceloneta. Sunset session with live percussion.
+  description: 'Barefoot salsa on Barceloneta. Sunset session with live percussion.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Platja de la Barceloneta, Barcelona, Spain
   latitude: 41.3784
   longitude: 2.192
   start: w10 Sat 19:00
   end: w10 Sat 23:00
+  tags:
+  - reach:international
 - id: mock-evt-020
   calendar_id: bachata-cal-002
   title: Bachata Night Dubrovnik
-  description: |
-    Dancing in the Old Town. Rooftop terrace with Adriatic views.
+  description: 'Dancing in the Old Town. Rooftop terrace with Adriatic views.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Revelin Fortress, Dubrovnik, Croatia
   latitude: 42.6407
   longitude: 18.1113
   start: w8 Sat 21:00
   end: w8 Sun 02:00
+  tags:
+  - reach:regional
 - id: mock-evt-021
   calendar_id: salsa-cal-001
   title: Budapest Summer Salsa Open
-  description: |
-    Outdoor salsa on the Danube. Ruin bar pre-party from 20:00.
+  description: 'Outdoor salsa on the Danube. Ruin bar pre-party from 20:00.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Szimpla Kert, Kazinczy u. 14, Budapest, Hungary
   latitude: 47.4965
   longitude: 19.062
   start: w11 Sat 20:00
   end: w11 Sun 02:00
+  tags:
+  - reach:local
 - id: mock-evt-022
   calendar_id: bachata-cal-002
   title: Santorini Bachata Retreat
-  description: |
-    4-day island retreat with workshops, sunset socials, and caldera views.
-    The programme spans multiple days with tracks for beginner, intermediate and advanced dancers.
+  description: '4-day island retreat with workshops, sunset socials, and caldera views.
+
+    The programme spans multiple days with tracks for beginner, intermediate and advanced
+    dancers.
+
     Evening parties take place across several rooms, each with its own themed DJ lineup.
-    VIP passes include backstage access, a priority show seat, and an exclusive warm-up session.
+
+    VIP passes include backstage access, a priority show seat, and an exclusive warm-up
+    session.
+
     Day passes are available for those who can only join for part of the weekend.
+
     The venue is fully accessible with a dedicated cloakroom and coat-check service.
+
     An on-site registration desk opens from 9 am on the first day of the event.
+
     A gala show on Saturday evening features performances by the resident instructors.
-    Solo and couples competitions run on Sunday afternoon with prizes for the top finishers.
+
+    Solo and couples competitions run on Sunday afternoon with prizes for the top
+    finishers.
+
     A warm-up DJ set kicks off each evening at 9 pm before the main programme begins.
+
     Healthy food options and a full bar are available on-site throughout the weekend.
+
     Local accommodation partners offer discounted rates — see the official event website.
+
     Airport transfer packages can be arranged through the event website; book in advance.
+
     Participants are encouraged to share highlights using the official event hashtag.
+
     An after-party follows the gala show and runs until the early hours of the morning.
+
     Organisers will provide a dedicated event photographer and live social media coverage.
-    All levels from complete beginners to professional dancers are warmly welcomed here.
-    Emergency medical assistance and a first-aid station are available on site at all times.
-    The event team is on hand throughout the weekend to answer questions and assist you.
+
+    All levels from complete beginners to professional dancers are warmly welcomed
+    here.
+
+    Emergency medical assistance and a first-aid station are available on site at
+    all times.
+
+    The event team is on hand throughout the weekend to answer questions and assist
+    you.
+
     Check the event website for the full timetable, artist bios and ticketing information.
+
     We look forward to sharing the dance floor with you — see you there!
+
+    '
   location: Santo Wines, Pyrgos, Santorini, Greece
   latitude: 36.373
   longitude: 25.437
   start: w12 Thu 10:00
   end: w12 Sun 22:00
+  tags:
+  - reach:regional
 - id: mock-evt-023
   calendar_id: salsa-cal-001
   title: Salsa Fuego – London Summer Edition
-  description: |
-    Outdoor terrace party in Shoreditch. BBQ + dancing.
+  description: 'Outdoor terrace party in Shoreditch. BBQ + dancing.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Rich Mix, 35-47 Bethnal Green Rd, London, UK
   latitude: 51.5244
   longitude: -0.0725
   start: w13 Sat 20:00
   end: w13 Sun 02:00
+  tags:
+  - reach:regional
 - id: mock-evt-024
   calendar_id: salsa-cal-001
   title: Salsa al Tramonto – Napoli
-  description: |
-    Open-air dancing on the lungomare with Vesuvius in the background.
+  description: 'Open-air dancing on the lungomare with Vesuvius in the background.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Lungomare Caracciolo, Naples, Italy
   latitude: 40.8328
   longitude: 14.235
   start: w15 Sat 20:00
   end: w15 Sun 00:30
+  tags:
+  - reach:international
 - id: mock-evt-025
   calendar_id: bachata-cal-002
   title: Porto Bachata & Wine Night
-  description: |
-    Bachata social in the Ribeira district. Port wine tasting + dancing.
+  description: 'Bachata social in the Ribeira district. Port wine tasting + dancing.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Maus Hábitos, Rua de Passos Manuel 178, Porto, Portugal
   latitude: 41.148
   longitude: -8.606
   start: w16 Sat 21:00
   end: w16 Sun 02:00
+  tags:
+  - reach:international
 - id: mock-evt-026
   calendar_id: salsa-cal-001
   title: Berlin Open Air Salsa
-  description: |
-    Salsa in the park – Mauerpark edition. Free entry, BYO drinks.
+  description: 'Salsa in the park – Mauerpark edition. Free entry, BYO drinks.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Mauerpark, Gleimstraße 55, Berlin, Germany
   latitude: 52.5434
   longitude: 13.402
   start: w17 Sat 17:00
   end: w17 Sat 22:00
+  tags:
+  - reach:regional
 - id: mock-evt-027
   calendar_id: bachata-cal-002
   title: Baltic Bachata Nights – Vilnius
-  description: |
-    Monthly social in the Old Town. Bachata dominicana workshop at 20:00.
+  description: 'Monthly social in the Old Town. Bachata dominicana workshop at 20:00.
+
     Each session is broken into clear, manageable steps with individual feedback.
+
     The instructor will address both leading and following roles equally.
+
     Comfortable dance shoes with a smooth, non-rubber sole are essential.
+
     No prior partner is required — participants rotate throughout the session.
+
     Water and light refreshments are provided during breaks.
+
     Spaces are strictly limited to maintain a high quality of teaching.
+
     Video recording of the technique segments is encouraged for personal review.
+
     A brief Q&A with the instructor follows each teaching block.
+
     Check the event page for warm-up videos and preparation tips in advance.
+
     Book early — this event has sold out in previous editions.
+
+    '
   location: Salsa Club Vilnius, Vilniaus g. 22, Vilnius, Lithuania
   latitude: 54.6834
   longitude: 25.28
   start: w18 Sat 20:00
   end: w18 Sun 01:00
+  tags:
+  - reach:local
 - id: mock-evt-028
   calendar_id: salsa-cal-001
   title: Rentrée Salsa – Paris
-  description: |
-    Back-to-school salsa marathon. 12 hours of non-stop dancing.
+  description: 'Back-to-school salsa marathon. 12 hours of non-stop dancing.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: La Bellevilloise, 19 Rue Boyer, Paris, France
   latitude: 48.8686
   longitude: 2.392
   start: w20 Sat 14:00
   end: w20 Sun 02:00
+  tags:
+  - reach:local
 - id: mock-evt-029
   calendar_id: bachata-cal-002
   title: Bachata On2 Intensive – Barcelona
-  description: |
-    Weekend bootcamp with instructor Carlos Vega. Intermediate level.
-    The programme spans multiple days with tracks for beginner, intermediate and advanced dancers.
+  description: 'Weekend bootcamp with instructor Carlos Vega. Intermediate level.
+
+    The programme spans multiple days with tracks for beginner, intermediate and advanced
+    dancers.
+
     Evening parties take place across several rooms, each with its own themed DJ lineup.
-    VIP passes include backstage access, a priority show seat, and an exclusive warm-up session.
+
+    VIP passes include backstage access, a priority show seat, and an exclusive warm-up
+    session.
+
     Day passes are available for those who can only join for part of the weekend.
+
     The venue is fully accessible with a dedicated cloakroom and coat-check service.
+
     An on-site registration desk opens from 9 am on the first day of the event.
+
     A gala show on Saturday evening features performances by the resident instructors.
-    Solo and couples competitions run on Sunday afternoon with prizes for the top finishers.
+
+    Solo and couples competitions run on Sunday afternoon with prizes for the top
+    finishers.
+
     A warm-up DJ set kicks off each evening at 9 pm before the main programme begins.
+
     Healthy food options and a full bar are available on-site throughout the weekend.
+
     Local accommodation partners offer discounted rates — see the official event website.
+
     Airport transfer packages can be arranged through the event website; book in advance.
+
     Participants are encouraged to share highlights using the official event hashtag.
+
     An after-party follows the gala show and runs until the early hours of the morning.
+
     Organisers will provide a dedicated event photographer and live social media coverage.
-    All levels from complete beginners to professional dancers are warmly welcomed here.
-    Emergency medical assistance and a first-aid station are available on site at all times.
-    The event team is on hand throughout the weekend to answer questions and assist you.
+
+    All levels from complete beginners to professional dancers are warmly welcomed
+    here.
+
+    Emergency medical assistance and a first-aid station are available on site at
+    all times.
+
+    The event team is on hand throughout the weekend to answer questions and assist
+    you.
+
     Check the event website for the full timetable, artist bios and ticketing information.
+
     We look forward to sharing the dance floor with you — see you there!
+
+    '
   location: Escola de Dansa, Carrer de Balmes 50, Barcelona, Spain
   latitude: 41.39
   longitude: 2.163
   start: w21 Sat 10:00
   end: w21 Sun 17:00
+  tags:
+  - reach:local
 - id: mock-evt-030
   calendar_id: salsa-cal-001
   title: Thessaloniki Salsa Weekend
-  description: |
-    2-day event on the waterfront. Workshops + social + live music.
-    The programme spans multiple days with tracks for beginner, intermediate and advanced dancers.
+  description: '2-day event on the waterfront. Workshops + social + live music.
+
+    The programme spans multiple days with tracks for beginner, intermediate and advanced
+    dancers.
+
     Evening parties take place across several rooms, each with its own themed DJ lineup.
-    VIP passes include backstage access, a priority show seat, and an exclusive warm-up session.
+
+    VIP passes include backstage access, a priority show seat, and an exclusive warm-up
+    session.
+
     Day passes are available for those who can only join for part of the weekend.
+
     The venue is fully accessible with a dedicated cloakroom and coat-check service.
+
     An on-site registration desk opens from 9 am on the first day of the event.
+
     A gala show on Saturday evening features performances by the resident instructors.
-    Solo and couples competitions run on Sunday afternoon with prizes for the top finishers.
+
+    Solo and couples competitions run on Sunday afternoon with prizes for the top
+    finishers.
+
     A warm-up DJ set kicks off each evening at 9 pm before the main programme begins.
+
     Healthy food options and a full bar are available on-site throughout the weekend.
+
     Local accommodation partners offer discounted rates — see the official event website.
+
     Airport transfer packages can be arranged through the event website; book in advance.
+
     Participants are encouraged to share highlights using the official event hashtag.
+
     An after-party follows the gala show and runs until the early hours of the morning.
+
     Organisers will provide a dedicated event photographer and live social media coverage.
-    All levels from complete beginners to professional dancers are warmly welcomed here.
-    Emergency medical assistance and a first-aid station are available on site at all times.
-    The event team is on hand throughout the weekend to answer questions and assist you.
+
+    All levels from complete beginners to professional dancers are warmly welcomed
+    here.
+
+    Emergency medical assistance and a first-aid station are available on site at
+    all times.
+
+    The event team is on hand throughout the weekend to answer questions and assist
+    you.
+
     Check the event website for the full timetable, artist bios and ticketing information.
+
     We look forward to sharing the dance floor with you — see you there!
+
+    '
   location: Aristotelous Square, Thessaloniki, Greece
   latitude: 40.6323
   longitude: 22.9417
   start: w22 Sat 18:00
   end: w22 Sun 23:00
+  tags:
+  - reach:local
 - id: mock-evt-031
   calendar_id: bachata-cal-002
   title: Bachata Congress – Rome
-  description: |
-    3-day Italian bachata congress. International artists & shows.
-    The programme spans multiple days with tracks for beginner, intermediate and advanced dancers.
+  description: '3-day Italian bachata congress. International artists & shows.
+
+    The programme spans multiple days with tracks for beginner, intermediate and advanced
+    dancers.
+
     Evening parties take place across several rooms, each with its own themed DJ lineup.
-    VIP passes include backstage access, a priority show seat, and an exclusive warm-up session.
+
+    VIP passes include backstage access, a priority show seat, and an exclusive warm-up
+    session.
+
     Day passes are available for those who can only join for part of the weekend.
+
     The venue is fully accessible with a dedicated cloakroom and coat-check service.
+
     An on-site registration desk opens from 9 am on the first day of the event.
+
     A gala show on Saturday evening features performances by the resident instructors.
-    Solo and couples competitions run on Sunday afternoon with prizes for the top finishers.
+
+    Solo and couples competitions run on Sunday afternoon with prizes for the top
+    finishers.
+
     A warm-up DJ set kicks off each evening at 9 pm before the main programme begins.
+
     Healthy food options and a full bar are available on-site throughout the weekend.
+
     Local accommodation partners offer discounted rates — see the official event website.
+
     Airport transfer packages can be arranged through the event website; book in advance.
+
     Participants are encouraged to share highlights using the official event hashtag.
+
     An after-party follows the gala show and runs until the early hours of the morning.
+
     Organisers will provide a dedicated event photographer and live social media coverage.
-    All levels from complete beginners to professional dancers are warmly welcomed here.
-    Emergency medical assistance and a first-aid station are available on site at all times.
-    The event team is on hand throughout the weekend to answer questions and assist you.
+
+    All levels from complete beginners to professional dancers are warmly welcomed
+    here.
+
+    Emergency medical assistance and a first-aid station are available on site at
+    all times.
+
+    The event team is on hand throughout the weekend to answer questions and assist
+    you.
+
     Check the event website for the full timetable, artist bios and ticketing information.
+
     We look forward to sharing the dance floor with you — see you there!
+
+    '
   location: Auditorium Parco della Musica, Viale Pietro de Coubertin 30, Rome, Italy
   latitude: 41.928
   longitude: 12.474
   start: w24 Fri 18:00
   end: w24 Sun 23:00
+  tags:
+  - reach:international
 - id: mock-evt-032
   calendar_id: salsa-cal-001
   title: Amsterdam Latin Dance Weekend
-  description: |
-    Salsa, bachata & kizomba. 3 rooms, 20 workshops, nonstop socials.
-    The programme spans multiple days with tracks for beginner, intermediate and advanced dancers.
+  description: 'Salsa, bachata & kizomba. 3 rooms, 20 workshops, nonstop socials.
+
+    The programme spans multiple days with tracks for beginner, intermediate and advanced
+    dancers.
+
     Evening parties take place across several rooms, each with its own themed DJ lineup.
-    VIP passes include backstage access, a priority show seat, and an exclusive warm-up session.
+
+    VIP passes include backstage access, a priority show seat, and an exclusive warm-up
+    session.
+
     Day passes are available for those who can only join for part of the weekend.
+
     The venue is fully accessible with a dedicated cloakroom and coat-check service.
+
     An on-site registration desk opens from 9 am on the first day of the event.
+
     A gala show on Saturday evening features performances by the resident instructors.
-    Solo and couples competitions run on Sunday afternoon with prizes for the top finishers.
+
+    Solo and couples competitions run on Sunday afternoon with prizes for the top
+    finishers.
+
     A warm-up DJ set kicks off each evening at 9 pm before the main programme begins.
+
     Healthy food options and a full bar are available on-site throughout the weekend.
+
     Local accommodation partners offer discounted rates — see the official event website.
+
     Airport transfer packages can be arranged through the event website; book in advance.
+
     Participants are encouraged to share highlights using the official event hashtag.
+
     An after-party follows the gala show and runs until the early hours of the morning.
+
     Organisers will provide a dedicated event photographer and live social media coverage.
-    All levels from complete beginners to professional dancers are warmly welcomed here.
-    Emergency medical assistance and a first-aid station are available on site at all times.
-    The event team is on hand throughout the weekend to answer questions and assist you.
+
+    All levels from complete beginners to professional dancers are warmly welcomed
+    here.
+
+    Emergency medical assistance and a first-aid station are available on site at
+    all times.
+
+    The event team is on hand throughout the weekend to answer questions and assist
+    you.
+
     Check the event website for the full timetable, artist bios and ticketing information.
+
     We look forward to sharing the dance floor with you — see you there!
+
+    '
   location: Melkweg, Lijnbaansgracht 234A, 1017 PH Amsterdam, Netherlands
   latitude: 52.3651
   longitude: 4.8821
   start: w26 Fri 19:00
   end: w26 Sun 03:00
+  tags:
+  - reach:local
 - id: mock-evt-033
   calendar_id: salsa-cal-001
   title: Salsa Noche – Madrid
-  description: |
-    Salsa night in the heart of Malasaña. Mojitos & mambo.
+  description: 'Salsa night in the heart of Malasaña. Mojitos & mambo.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Café Central, Plaza del Ángel 10, Madrid, Spain
   latitude: 40.415
   longitude: -3.7003
   start: w27 Sat 22:00
   end: w27 Sun 03:00
+  tags:
+  - reach:international
 - id: mock-evt-034
   calendar_id: bachata-cal-002
   title: Bachata & Jazz – Paris
-  description: |
-    Bachata meets jazz at Le Duc des Lombards. Live band + social.
+  description: 'Bachata meets jazz at Le Duc des Lombards. Live band + social.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Le Duc des Lombards, 42 Rue des Lombards, Paris, France
   latitude: 48.8602
   longitude: 2.3487
   start: w29 Sat 20:00
   end: w29 Sun 01:00
+  tags:
+  - reach:local
 - id: mock-evt-035
   calendar_id: salsa-cal-001
   title: London Salsa Marathon
-  description: |
-    24-hour non-stop dancing. Shifts of DJs from around Europe.
+  description: '24-hour non-stop dancing. Shifts of DJs from around Europe.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: The Coronet Theatre, 28 New Kent Rd, London, UK
   latitude: 51.4953
   longitude: -0.0982
   start: w30 Sat 12:00
   end: w30 Sun 12:00
+  tags:
+  - reach:international
 - id: mock-evt-036
   calendar_id: bachata-cal-002
   title: Budapest Autumn Bachata Social
-  description: |
-    Cozy indoor bachata in a historic bath house. Thermal pool after-party.
+  description: 'Cozy indoor bachata in a historic bath house. Thermal pool after-party.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Rudas Baths, Döbrentei tér 9, Budapest, Hungary
   latitude: 47.487
   longitude: 19.046
   start: w31 Sat 20:00
   end: w31 Sun 02:00
+  tags:
+  - reach:international
 - id: mock-evt-037
   calendar_id: salsa-cal-001
   title: Christmas Salsa Ball – Vienna
-  description: |
-    Formal salsa gala in a Viennese palace. Black tie optional.
-    The programme spans multiple days with tracks for beginner, intermediate and advanced dancers.
+  description: 'Formal salsa gala in a Viennese palace. Black tie optional.
+
+    The programme spans multiple days with tracks for beginner, intermediate and advanced
+    dancers.
+
     Evening parties take place across several rooms, each with its own themed DJ lineup.
-    VIP passes include backstage access, a priority show seat, and an exclusive warm-up session.
+
+    VIP passes include backstage access, a priority show seat, and an exclusive warm-up
+    session.
+
     Day passes are available for those who can only join for part of the weekend.
+
     The venue is fully accessible with a dedicated cloakroom and coat-check service.
+
     An on-site registration desk opens from 9 am on the first day of the event.
+
     A gala show on Saturday evening features performances by the resident instructors.
-    Solo and couples competitions run on Sunday afternoon with prizes for the top finishers.
+
+    Solo and couples competitions run on Sunday afternoon with prizes for the top
+    finishers.
+
     A warm-up DJ set kicks off each evening at 9 pm before the main programme begins.
+
     Healthy food options and a full bar are available on-site throughout the weekend.
+
     Local accommodation partners offer discounted rates — see the official event website.
+
     Airport transfer packages can be arranged through the event website; book in advance.
+
     Participants are encouraged to share highlights using the official event hashtag.
+
     An after-party follows the gala show and runs until the early hours of the morning.
+
     Organisers will provide a dedicated event photographer and live social media coverage.
-    All levels from complete beginners to professional dancers are warmly welcomed here.
-    Emergency medical assistance and a first-aid station are available on site at all times.
-    The event team is on hand throughout the weekend to answer questions and assist you.
+
+    All levels from complete beginners to professional dancers are warmly welcomed
+    here.
+
+    Emergency medical assistance and a first-aid station are available on site at
+    all times.
+
+    The event team is on hand throughout the weekend to answer questions and assist
+    you.
+
     Check the event website for the full timetable, artist bios and ticketing information.
+
     We look forward to sharing the dance floor with you — see you there!
+
+    '
   location: Palais Ferstel, Strauchgasse 4, Vienna, Austria
   latitude: 48.2115
   longitude: 16.366
   start: w34 Sat 19:00
   end: w34 Sun 01:00
+  tags:
+  - reach:international
 - id: mock-evt-038
   calendar_id: bachata-cal-002
   title: Bachata de Navidad – Seville
-  description: |
-    Flamenco meets bachata in Andalucía. Tapas + dancing in the barrio.
+  description: 'Flamenco meets bachata in Andalucía. Tapas + dancing in the barrio.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: La Carbonería, Calle Céspedes 21, Seville, Spain
   latitude: 37.3886
   longitude: -5.987
   start: w35 Sat 21:00
   end: w35 Sun 03:00
+  tags:
+  - reach:regional
 - id: mock-evt-039
   calendar_id: salsa-cal-001
   title: NYE Salsa Countdown – Lisbon
-  description: |
-    Ring in 2027 with salsa by the river. Fireworks at midnight.
+  description: 'Ring in 2027 with salsa by the river. Fireworks at midnight.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Doca de Santo Amaro, Lisbon, Portugal
   latitude: 38.705
   longitude: -9.165
   start: w37 Thu 22:00
   end: w37 Fri 05:00
+  tags:
+  - reach:international

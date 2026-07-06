@@ -1,0 +1,22 @@
+# Minimal cast for the skip-onboarding negative path.
+#
+#  - newbie: fresh user who will Skip both onboarding steps and end up
+#    with zero UserInterestProfile rows.
+#  - alice: friend Nora already follows; her Going on ev-friend proves
+#    social digests still fire when interest notifications are absent.
+#  - admin: needed for /api/admin/trigger-notifications.
+
+# Phase G — Nora walks the onboarding flow (and Skips it), so keep her
+# onboarded_at null.
+auto_onboard: false
+
+users:
+  - email: newbie@example.com
+    name: Nora Newbie
+    handle: newbie
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

@@ -493,7 +493,7 @@ export default function EventDetailContent({
                     className={editable ? 'group relative cursor-pointer hover:bg-slate-50 -mx-2 px-2 py-1 rounded transition' : ''}
                     onClick={editable ? () => setEditingField('tags') : undefined}
                 >
-                    <TagBadges tags={event.tags} maxVisible={maxTags ?? 5} />
+                    <TagBadges tags={event.tags} maxVisible={maxTags ?? 5} forceBadge forceColored />
                     {editable && <EditHint />}
                 </div>
             ) : editable ? (

@@ -1,0 +1,55 @@
+test_plan:
+  name: "Profile match — digest email channel"
+  description: >
+    (Feature × Channel) truth-table cell. Feature = interest-profile
+    matches. Channel = digest email. Asserts that
+    interest_notification_service creates in-app rows AND
+    activity_email delivers one "Interest matches" digest email per
+    matched user via Mailpit. Web-push is disabled globally so the
+    only observable outbound delivery is email.
+
+  preconditions:
+    - "Start Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`"
+    - >-
+      Start scenario:
+      `SCENARIO=profile-match-email RESET=1 task start:scenario`
+    - "Open the Mailpit inbox at http://127.0.0.1:8025 and clear existing messages."
+
+  cast:
+    - "Nora, Bob, Carol — email_interest_matches ON → expect one digest each."
+    - "Dan — per-profile matches_enabled=false → 0 rows → 0 emails."
+    - "Eve — user email_interest_matches=false → in-app row only, no email."
+
+  steps:
+    - id: 1
+      title: "Trigger one dispatch tick — matcher creates rows and digests ship immediately"
+      description: >
+        `SCENARIO=notif-event-matches-profile-email task notify:trigger:scenario -- --reset-scan --immediate-emails`
+        `--reset-scan` widens the interest-matcher lookback to 24h;
+        `--immediate-emails` passes `force=True` to `activity_email.run_once`
+        so the per-user digest schedule (default tue+fri @ 09:00 local)
+        is bypassed for this run only. Prod behavior is otherwise unchanged.
+      expected: >
+        Stats: `interest.created` ≥ 8 (per matcher truth table in
+        db-events.yaml) and `activity.digests` = one entry per user
+        who has at least one interest_event row AND
+        email_interest_matches_enabled=true (Nora, Bob, Carol). No
+        `skipped_off_schedule` rows in the diagnostic (force bypasses
+        the slot check).
+
+    - id: 2
+      title: "Email delivery matrix"
+      description: >
+        Filter Mailpit by recipient address.
+      expected: >
+        Nora, Bob, Carol each receive ONE "Interest matches" digest.
+        Dan receives 0 (per-profile matches_enabled=false → 0 rows).
+        Eve receives 0 (user-level email_interest_matches_enabled=false).
+
+    - id: 3
+      title: "Push channel remains silent"
+      description: >
+        Verify no push was attempted.
+      expected: >
+        `activity.pushed=0` in the stats dict — WEB_PUSH_ENABLED is
+        false at admin level so send_push short-circuits.

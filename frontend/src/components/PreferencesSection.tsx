@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchTagGroups } from '../api';
 import type { TagGroup } from '../types';
 import { usePreferences } from '../context/PreferencesContext';
+import { useAuth } from '../context/AuthContext';
 import AreaMapPicker from './AreaMapPicker';
+import InterestProfilesManager from './InterestProfilesManager';
 import { DEFAULT_AREA_BBOX } from '../constants/area';
 import TagsPicker, { type TagsPickerValue } from './TagsPicker';
 import type { PreferredAreaPayload } from '../api';
@@ -26,6 +28,7 @@ const TAG_AUTOSAVE_DEBOUNCE_MS = 600;
 
 export default function PreferencesSection() {
     const { prefs, setPrefs, clearPrefs, hasSetPrefs } = usePreferences();
+    const { user } = useAuth();
     const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
     const [loading, setLoading] = useState(true);
     // Local optimistic mirror of selected tag ids. Drives the chip UI and
@@ -40,6 +43,7 @@ export default function PreferencesSection() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [savedToast, setSavedToast] = useState(false);
+    const [areaSavedFlash, setAreaSavedFlash] = useState(false);
     // Collapsible body — default open so first-time visitors see the editor,
     // but the user can fold it away to reclaim vertical space.
     const [expanded, setExpanded] = useState(true);
@@ -51,6 +55,7 @@ export default function PreferencesSection() {
     const pendingTagFlushRef = useRef(false);
     const debounceTimerRef = useRef<number | null>(null);
     const toastTimerRef = useRef<number | null>(null);
+    const areaSavedTimerRef = useRef<number | null>(null);
     const areaNameInputRef = useRef<HTMLInputElement | null>(null);
 
     useEffect(() => {
@@ -73,6 +78,12 @@ export default function PreferencesSection() {
         setSavedToast(true);
         if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
         toastTimerRef.current = window.setTimeout(() => setSavedToast(false), 2500);
+    };
+
+    const flashAreaSaved = () => {
+        setAreaSavedFlash(true);
+        if (areaSavedTimerRef.current != null) window.clearTimeout(areaSavedTimerRef.current);
+        areaSavedTimerRef.current = window.setTimeout(() => setAreaSavedFlash(false), 2000);
     };
 
     const flushTags = async (tagIds: number[]) => {
@@ -99,13 +110,20 @@ export default function PreferencesSection() {
         }, TAG_AUTOSAVE_DEBOUNCE_MS);
     };
 
-    // Area edits are explicit commits from AreaMapPicker — no debounce needed.
+    // Map-triggered area edits reset the label to "Custom" (per remark:
+    // a moved area is no longer the previously named place). Renames go
+    // through commitAreaLabel and preserve the typed name.
     const handleAreaChange = async (next: PreferredAreaPayload | null) => {
         setSaving(true);
         setError(null);
         try {
-            await setPrefs({ area: next });
+            const withLabel = next ? { ...next, label: 'Custom' } : null;
+            if (withLabel && withLabel.label !== areaLabelDraft) {
+                setAreaLabelDraft(withLabel.label);
+            }
+            await setPrefs({ area: withLabel });
             showSavedToast();
+            flashAreaSaved();
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to save preferences');
         } finally {
@@ -118,11 +136,20 @@ export default function PreferencesSection() {
         // Effective area: persisted prefs.area, else the implicit default.
         const current = prefs.area ?? DEFAULT_AREA_BBOX;
         if (trimmed === current.label) return;
-        if (!trimmed) {
-            setAreaLabelDraft(current.label);
-            return;
+        // Empty input: leave the draft untouched so the user can keep
+        // typing. Don't clobber the visual with the previous label.
+        if (!trimmed) return;
+        setSaving(true);
+        setError(null);
+        try {
+            await setPrefs({ area: { ...current, label: trimmed } });
+            showSavedToast();
+            flashAreaSaved();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Failed to save preferences');
+        } finally {
+            setSaving(false);
         }
-        await handleAreaChange({ ...current, label: trimmed });
     };
 
     const handleClearAll = async () => {
@@ -163,7 +190,9 @@ export default function PreferencesSection() {
             >
                 <span className="flex items-center gap-2">
                     <span className="text-slate-400 text-xs" aria-hidden="true">{expanded ? '▾' : '▸'}</span>
-                    <h2 className="text-sm font-semibold text-slate-900">Preferences</h2>
+                    <h2 className="text-sm font-semibold text-slate-900">
+                        {user ? 'Search Profiles' : 'Preferences'}
+                    </h2>
                 </span>
                 <span className="text-[11px] text-slate-400" role="status" aria-live="polite">
                     {saving ? 'Saving…' : savedToast ? 'Saved.' : hasSetPrefs ? 'Saved' : ''}
@@ -171,96 +200,115 @@ export default function PreferencesSection() {
             </button>
             {expanded && (
                 <div className="mt-3">
-                    <p className="text-xs text-slate-600 mb-3">
-                        These tags and map area are used as your starting event filters.
-                    </p>
+                    {user ? (
+                        // Signed-in: the interest-profiles manager is the
+                        // source of truth. The active profile is mirrored
+                        // into legacy prefs for Explorer/For You, so we
+                        // don't render the standalone tag/area editors
+                        // here to avoid duplicate/confusing UI.
+                        <InterestProfilesManager />
+                    ) : (
+                        <>
+                            <p className="text-xs text-slate-600 mb-3">
+                                These tags and map area are used as your starting event filters.
+                            </p>
 
-                    {/* ── Preferred tags (all enabled groups) ── */}
-                    <div className="mb-4">
-                        <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1.5">
-                            Preferred tags
-                        </label>
-                        {loading ? (
-                            <p className="text-xs text-slate-400">Loading…</p>
-                        ) : visibleGroups.length === 0 ? (
-                            <p className="text-xs text-slate-400">No tags available.</p>
-                        ) : (
-                            <div
-                                className="border border-slate-200 bg-white max-h-72 overflow-y-auto p-3"
-                                data-testid="preferences-tags-card"
-                            >
-                                <TagsPicker
-                                    tagGroups={visibleGroups}
-                                    value={tagsValue}
-                                    onChange={handleTagsChange}
-                                    allowFreeText={false}
-                                    searchable
+                            {/* ── Preferred tags (all enabled groups) ── */}
+                            <div className="mb-4">
+                                <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1.5">
+                                    Preferred tags
+                                </label>
+                                {loading ? (
+                                    <p className="text-xs text-slate-400">Loading…</p>
+                                ) : visibleGroups.length === 0 ? (
+                                    <p className="text-xs text-slate-400">No tags available.</p>
+                                ) : (
+                                    <div
+                                        className="border border-slate-200 bg-white max-h-72 overflow-y-auto p-3"
+                                        data-testid="preferences-tags-card"
+                                    >
+                                        <TagsPicker
+                                            tagGroups={visibleGroups}
+                                            value={tagsValue}
+                                            onChange={handleTagsChange}
+                                            allowFreeText={false}
+                                            searchable
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* ── Default event area ── */}
+                            <div className="mb-3">
+                                <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1.5">
+                                    Default event area
+                                </label>
+                                <AreaMapPicker
+                                    value={prefs.area}
+                                    onChange={handleAreaChange}
+                                    autoSave
+                                    onUseCurrentView={() => {
+                                        // Defer until after the area save commits.
+                                        window.setTimeout(() => {
+                                            const el = areaNameInputRef.current;
+                                            if (el) {
+                                                el.focus();
+                                                el.select();
+                                            }
+                                        }, 0);
+                                    }}
+                                    controlsStart={(
+                                        <div className="flex shrink-0 items-center gap-2">
+                                            <label htmlFor="pref-area-name" className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                                                Name
+                                            </label>
+                                            <input
+                                                id="pref-area-name"
+                                                ref={areaNameInputRef}
+                                                type="text"
+                                                value={areaLabelDraft}
+                                                onChange={(e) => setAreaLabelDraft(e.target.value)}
+                                                onBlur={() => { void commitAreaLabel(); }}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        (e.currentTarget as HTMLInputElement).blur();
+                                                    }
+                                                }}
+                                                maxLength={10}
+                                                placeholder="Area name"
+                                                size={12}
+                                                className="w-28 border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                data-testid="preferences-area-name"
+                                            />
+                                            <span
+                                                className={`text-[11px] transition-opacity ${areaSavedFlash ? 'text-emerald-600 opacity-100' : 'opacity-0'}`}
+                                                role="status"
+                                                aria-live="polite"
+                                            >
+                                                Saved
+                                            </span>
+                                        </div>
+                                    )}
                                 />
                             </div>
-                        )}
-                    </div>
 
-                    {/* ── Default event area ── */}
-                    <div className="mb-3">
-                        <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1.5">
-                            Default event area
-                        </label>
-                        <AreaMapPicker
-                            value={prefs.area}
-                            onChange={handleAreaChange}
-                            onUseCurrentView={() => {
-                                // Defer until after the area save commits.
-                                window.setTimeout(() => {
-                                    const el = areaNameInputRef.current;
-                                    if (el) {
-                                        el.focus();
-                                        el.select();
-                                    }
-                                }, 0);
-                            }}
-                            controlsStart={(
-                                <div className="flex shrink-0 items-center gap-2">
-                                    <label htmlFor="pref-area-name" className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                                        Name
-                                    </label>
-                                    <input
-                                        id="pref-area-name"
-                                        ref={areaNameInputRef}
-                                        type="text"
-                                        value={areaLabelDraft}
-                                        onChange={(e) => setAreaLabelDraft(e.target.value)}
-                                        onBlur={() => { void commitAreaLabel(); }}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter') {
-                                                e.preventDefault();
-                                                (e.currentTarget as HTMLInputElement).blur();
-                                            }
-                                        }}
-                                        maxLength={10}
-                                        placeholder="Area name"
-                                        size={12}
-                                        className="w-28 border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                        data-testid="preferences-area-name"
-                                    />
+                            {error && <p className="text-xs text-red-700 mb-2">{error}</p>}
+
+                            {hasSetPrefs && (
+                                <div className="flex justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={handleClearAll}
+                                        disabled={saving}
+                                        className="border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                                        data-testid="preferences-clear"
+                                    >
+                                        Clear all preferences
+                                    </button>
                                 </div>
                             )}
-                        />
-                    </div>
-
-                    {error && <p className="text-xs text-red-700 mb-2">{error}</p>}
-
-                    {hasSetPrefs && (
-                        <div className="flex justify-end">
-                            <button
-                                type="button"
-                                onClick={handleClearAll}
-                                disabled={saving}
-                                className="border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                                data-testid="preferences-clear"
-                            >
-                                Clear all preferences
-                            </button>
-                        </div>
+                        </>
                     )}
                 </div>
             )}

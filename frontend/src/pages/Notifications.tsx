@@ -33,8 +33,12 @@ export default function NotificationsPage() {
                 kind: filterKind === 'all' ? undefined : filterKind,
                 limit: 50,
             });
-            setItems(res.items);
-            setUnreadCount(res.unread_count);
+            const now = new Date().toISOString();
+            // Visiting the page acknowledges the queue: rows render as
+            // already read, mirroring how Instagram/Facebook treat
+            // "viewed" as "read" (mark-all-read is fired alongside below).
+            setItems(res.items.map((n) => (n.read_at ? n : { ...n, read_at: now })));
+            setUnreadCount(0);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load notifications');
         }
@@ -44,11 +48,10 @@ export default function NotificationsPage() {
         load();
     }, [load]);
 
-    // Visiting the page acknowledges the queue (clears bell badge); rows
-    // remain unread until clicked or "Mark all read" is invoked.
     useEffect(() => {
         markSeen();
-    }, [markSeen]);
+        markAllRead();
+    }, [markSeen, markAllRead]);
 
     const handleMarkOne = async (id: number) => {
         setBusyId(id);
@@ -142,6 +145,11 @@ export default function NotificationsPage() {
                     label="Reminders"
                     active={filterKind === 'event_reminder'}
                     onClick={() => setFilterKind('event_reminder')}
+                />
+                <KindChip
+                    label="Alerts"
+                    active={filterKind === 'interest_event'}
+                    onClick={() => setFilterKind('interest_event')}
                 />
             </div>
 
@@ -253,6 +261,65 @@ function NotificationRow({
     const actorName = item.actor.display_name || `@${item.actor.handle}`;
     const initial = (actorName || '?').trim().charAt(0).toUpperCase();
     const destination = isFollowKind ? `/u/${item.actor.handle}` : `/event/${item.event_id}`;
+    if (item.kind === 'interest_event') {
+        const label = item.context || 'your saved search';
+        return (
+            <li
+                className={`flex items-start gap-3 px-3 py-3 ${isUnread ? 'bg-blue-50/40' : 'bg-white'}`}
+            >
+                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center" aria-hidden="true">
+                    ✨
+                </div>
+                <button
+                    type="button"
+                    onClick={() => {
+                        if (isUnread) onMarkRead();
+                        navigate(`/event/${item.event_id}`);
+                    }}
+                    className="min-w-0 flex-1 text-left"
+                >
+                    <p className="text-sm text-slate-700">
+                        <span className="font-medium text-slate-900">
+                            {item.event_title || 'An event'}
+                        </span>{' '}
+                        <span className="text-slate-500">matched your {label} alert</span>
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                        {formatRelative(item.created_at)} ·{' '}
+                        <span
+                            role="link"
+                            tabIndex={0}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                navigate('/account#notifications');
+                            }}
+                            className="text-blue-600 hover:text-blue-700"
+                        >
+                            Manage alerts
+                        </span>
+                    </p>
+                </button>
+                {isUnread ? (
+                    <button
+                        type="button"
+                        onClick={onMarkRead}
+                        disabled={busy}
+                        className="shrink-0 text-xs text-slate-500 hover:text-blue-600 disabled:opacity-50"
+                    >
+                        {busy ? '…' : 'Mark read'}
+                    </button>
+                ) : (
+                    <span
+                        className="shrink-0 text-xs text-slate-300"
+                        aria-label="Read"
+                        title="Read"
+                    >
+                        ●
+                    </span>
+                )}
+            </li>
+        );
+    }
     if (item.kind === 'event_reminder') {
         const startLabel = item.event_start
             ? new Date(item.event_start).toLocaleString([], {

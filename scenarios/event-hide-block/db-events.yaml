@@ -24,10 +24,9 @@ events:
     - dance-style:salsa
     - level:beginner-friendly
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:good-music
     - vibe:social-atmosphere
+    - reach:regional
   - id: evt-hide-002
     calendar_id: bachata-cal-002
     title: Bachata Sensual Night
@@ -52,9 +51,8 @@ events:
     - dance-style:bachata
     - level:beginner-friendly
     - venue:indoor
-    - scale:small
-    - scope:local
     - vibe:social-atmosphere
+    - reach:local
   - id: evt-hide-003
     calendar_id: salsa-cal-001
     title: Salsa On2 Workshop (hidden)
@@ -79,8 +77,7 @@ events:
     - dance-style:salsa
     - level:intermediate
     - venue:indoor
-    - scale:small
-    - scope:local
+    - reach:regional
   - id: evt-hide-004
     calendar_id: bachata-cal-002
     title: Kizomba Urban Night (blocked)
@@ -105,7 +102,6 @@ events:
     - dance-style:kizomba
     - level:beginner-friendly
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:good-music
     - vibe:social-atmosphere
+    - reach:international

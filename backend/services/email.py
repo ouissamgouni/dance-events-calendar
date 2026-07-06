@@ -150,7 +150,15 @@ def _unsubscribe_footer(user_id, category: str, label: str) -> str:
     app = get_public_app_url()
     token = make_unsubscribe_token(str(user_id), category)
     unsub = f"{app}/unsubscribe?token={token}"
-    settings = f"{app}/account#notifications"
+    # Anchor points at the specific per-feature toggle row so the user
+    # lands on the exact cell governing what they just unsubscribed from.
+    fragment = {
+        "reminder": "notify-event-reminders",
+        "social_activity": "notify-social-activity",
+        "interest_matches": "notify-interest-matches",
+        "activity": "notifications",
+    }.get(category, "notifications")
+    settings = f"{app}/account#{fragment}"
     return (
         f"You're receiving {label} from Movida. "
         f'<a href="{unsub}">Unsubscribe</a> · '
@@ -169,11 +177,14 @@ def send_event_reminder_email(user, event, when_label: str) -> bool:
     app = get_public_app_url()
     event_url = f"{app}/event/{escape(str(event.event_id))}"
     title = escape(event.title or "your event")
+    title_link = (
+        f'<a href="{event_url}" style="color:#1d4ed8;text-decoration:none">{title}</a>'
+    )
     location = escape(event.location or "")
     subject = f"Reminder: {event.title or 'your event'} is coming up"
     body = f"""
     <p>This is a reminder that you're going to:</p>
-    <p style="font-size:18px;font-weight:600;margin:8px 0">{title}</p>
+    <p style="font-size:18px;font-weight:600;margin:8px 0">{title_link}</p>
     <p style="color:#374151;margin:4px 0">🕒 {escape(when_label)}</p>
     {f'<p style="color:#374151;margin:4px 0">📍 {location}</p>' if location else ""}
     <p style="margin:20px 0">
@@ -189,21 +200,42 @@ def send_event_reminder_email(user, event, when_label: str) -> bool:
     return _send_email(user.email, subject, html, "event reminder")
 
 
-def send_activity_digest_email(user, lines: list[str]) -> bool:
-    """Email a user a batched digest of recent friend/event activity.
+def send_activity_digest_email(
+    user,
+    lines: list[str],
+    *,
+    feature: str = "social_activity",
+) -> bool:
+    """Email a user a batched digest of recent activity for one feature.
 
     ``lines`` are pre-rendered, already-escaped HTML snippets (one per
     notification) produced by the activity-email worker.
+
+    ``feature`` is ``"social_activity"`` (default) or ``"interest_matches"``
+    and controls the subject line, footer copy, and the per-feature
+    unsubscribe token category so the footer link disables the right
+    email channel.
     """
     if not user.email or not lines:
         return False
     app = get_public_app_url()
     count = len(lines)
-    subject = (
-        "You have 1 new notification on Movida"
-        if count == 1
-        else f"You have {count} new notifications on Movida"
-    )
+    if feature == "interest_matches":
+        subject = (
+            "1 new event matched your saved search on Movida"
+            if count == 1
+            else f"{count} new events matched your saved searches on Movida"
+        )
+        heading = "New matches on Movida"
+        footer_label = "interest match updates"
+    else:
+        subject = (
+            "You have 1 new notification on Movida"
+            if count == 1
+            else f"You have {count} new notifications on Movida"
+        )
+        heading = "New activity on Movida"
+        footer_label = "activity updates"
     items = "".join(
         f'<li style="margin:6px 0;color:#374151">{line}</li>' for line in lines
     )
@@ -218,6 +250,6 @@ def send_activity_digest_email(user, lines: list[str]) -> bool:
       </a>
     </p>
     """
-    footer = _unsubscribe_footer(user.id, "activity", "activity updates")
-    html = _email_shell("New activity on Movida", body, footer)
-    return _send_email(user.email, subject, html, "activity digest")
+    footer = _unsubscribe_footer(user.id, feature, footer_label)
+    html = _email_shell(heading, body, footer)
+    return _send_email(user.email, subject, html, f"activity digest ({feature})")

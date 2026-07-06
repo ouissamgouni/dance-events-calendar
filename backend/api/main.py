@@ -17,6 +17,7 @@ from backend.api.routes.auth import router as auth_router
 from backend.api.routes.config import router as config_router
 from backend.api.routes.events import router as events_router
 from backend.api.routes.export import router as export_router
+from backend.api.routes.interest_profiles import router as interest_profiles_router
 from backend.api.routes.notifications import router as notifications_router
 from backend.api.routes.push import router as push_router
 from backend.api.routes.ratings import router as ratings_router
@@ -166,6 +167,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
+    expose_headers=["X-Has-More"],
 )
 
 
@@ -191,6 +193,7 @@ app.include_router(ratings_router)
 app.include_router(social_router)
 app.include_router(notifications_router)
 app.include_router(push_router)
+app.include_router(interest_profiles_router)
 
 
 @app.get("/health", response_model=HealthResponse)

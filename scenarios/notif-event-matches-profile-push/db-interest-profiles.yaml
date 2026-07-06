@@ -1,0 +1,75 @@
+# Interest profile matrix. Same matcher branch coverage as the
+# source `interest-notifications` scenario (dance / reach / geo)
+# but without Grace/Hank — per-user channel discrimination is now
+# handled at the (feature × channel) scenario level.
+interest_profiles:
+  # Nora: baseline — salsa + international, Paris bbox.
+  - user: nora@example.com
+    label: "Nora: Paris salsa (intl)"
+    min_lat: 48.0
+    min_lng: 1.0
+    max_lat: 49.0
+    max_lng: 4.0
+    dance_tags: ["dance-style:salsa"]
+    reach_tags: ["reach:international"]
+    matches_enabled: true
+    is_active: true
+
+  # Bob: two profiles same bbox, different dance style. Dedup probe.
+  - user: bob@example.com
+    label: "Bob: salsa"
+    min_lat: 48.0
+    min_lng: 1.0
+    max_lat: 49.0
+    max_lng: 4.0
+    dance_tags: ["dance-style:salsa"]
+    reach_tags: ["reach:international"]
+    matches_enabled: true
+    is_active: true
+  - user: bob@example.com
+    label: "Bob: bachata"
+    min_lat: 48.0
+    min_lng: 1.0
+    max_lat: 49.0
+    max_lng: 4.0
+    dance_tags: ["dance-style:bachata"]
+    reach_tags: ["reach:international"]
+    matches_enabled: true
+    is_active: false
+
+  # Carol: no reach tags → matches ANY reach for the bbox.
+  - user: carol@example.com
+    label: "Carol: any-reach salsa"
+    min_lat: 48.0
+    min_lng: 1.0
+    max_lat: 49.0
+    max_lng: 4.0
+    dance_tags: ["dance-style:salsa"]
+    reach_tags: []
+    matches_enabled: true
+    is_active: true
+
+  # Dan: profile silenced. Even matching events don't fire.
+  - user: dan@example.com
+    label: "Dan: silenced salsa"
+    min_lat: 48.0
+    min_lng: 1.0
+    max_lat: 49.0
+    max_lng: 4.0
+    dance_tags: ["dance-style:salsa"]
+    reach_tags: ["reach:international"]
+    matches_enabled: false
+    is_active: true
+
+  # Eve: profile enabled. Per-scenario mock-users.yaml decides which
+  # channel toggles are on/off for the isolation assertion.
+  - user: eve@example.com
+    label: "Eve: control salsa"
+    min_lat: 48.0
+    min_lng: 1.0
+    max_lat: 49.0
+    max_lng: 4.0
+    dance_tags: ["dance-style:salsa"]
+    reach_tags: ["reach:international"]
+    matches_enabled: true
+    is_active: true

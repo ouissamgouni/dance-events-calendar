@@ -1,0 +1,54 @@
+test_plan:
+  name: "Reminders — email channel"
+  description: >
+    (Feature × Channel) truth-table cell. Feature = event reminders.
+    Channel = reminder email. Asserts reminder_service sends a per-
+    event reminder email to each `going` attendee whose
+    `email_event_reminders_enabled` toggle is true, while the in-app
+    row still fires. Push is disabled globally and per-user.
+
+  preconditions:
+    - "Start Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`"
+    - >-
+      Start scenario:
+      `SCENARIO=reminders-email RESET=1 task start:scenario`
+    - "Open the Mailpit inbox at http://127.0.0.1:8025 and clear existing messages."
+
+  cast:
+    - "Alice — email_event_reminders ON → expect one reminder email."
+    - "Bob   — email_event_reminders OFF → in-app row only, no email."
+
+  steps:
+    - id: 1
+      title: "Trigger one dispatch tick"
+      description: >
+        `SCENARIO=reminders-email task notify:trigger:scenario`
+      expected: >
+        Stats: `reminders.created=2`, `reminders.emailed=1` (Alice only),
+        `reminders.pushed=0`.
+
+    - id: 2
+      title: "Email delivery matrix"
+      description: >
+        Filter Mailpit by recipient address.
+      expected: >
+        Alice receives ONE email with subject containing "Rooftop Salsa
+        Social" and an unsubscribe link ending in
+        `/api/auth/unsubscribe?token=…`.
+        Bob receives 0 emails (user-level opt-out).
+
+    - id: 3
+      title: "In-app rows still fire for both"
+      description: >
+        `GET /api/notifications` as each user.
+      expected: >
+        Both Alice and Bob have one `event_reminder` row for ev-remind
+        (Phase G: rows are always created).
+
+    - id: 4
+      title: "Push channel remains silent"
+      description: >
+        Verify no push attempted.
+      expected: >
+        `reminders.pushed=0` — WEB_PUSH_ENABLED is false and no
+        subscription exists.

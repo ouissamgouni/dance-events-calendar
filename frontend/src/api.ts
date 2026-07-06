@@ -119,6 +119,65 @@ export async function fetchEvents(
     return parseJsonResponse<CalendarEvent[]>(res, 'Failed to fetch events');
 }
 
+export interface EventsPage {
+    events: CalendarEvent[];
+    hasMore: boolean;
+}
+
+/**
+ * Paginated variant of {@link fetchEvents}, used by "+more" affordances
+ * (e.g. the ForYouRail lenses) that page through the server rather than
+ * revealing a locally-buffered slice. ``hasMore`` reflects the
+ * ``X-Has-More`` response header set by the backend when ``limit`` is
+ * supplied.
+ */
+export async function fetchEventsPage(
+    params: {
+        startDate?: string;
+        endDate?: string;
+        tagIds?: number[];
+        area?: { min_lat: number; min_lng: number; max_lat: number; max_lng: number } | null;
+        friendsGoing?: boolean;
+        friendsSaved?: boolean;
+        friendHandle?: string;
+        interestSource?: 'follows' | 'friends';
+        interestKind?: 'any' | 'going' | 'saved';
+        interestUserHandle?: string;
+        profiles?: 'me';
+        limit: number;
+        offset?: number;
+    },
+    opts?: { fresh?: boolean },
+): Promise<EventsPage> {
+    const searchParams = new URLSearchParams();
+    if (params.startDate) searchParams.set('start_date', params.startDate);
+    if (params.endDate) searchParams.set('end_date', params.endDate);
+    if (params.tagIds?.length) searchParams.set('tag_ids', params.tagIds.join(','));
+    if (params.area) {
+        searchParams.set('min_lat', String(params.area.min_lat));
+        searchParams.set('min_lng', String(params.area.min_lng));
+        searchParams.set('max_lat', String(params.area.max_lat));
+        searchParams.set('max_lng', String(params.area.max_lng));
+    }
+    if (params.friendsGoing) searchParams.set('friends_going', 'true');
+    if (params.friendsSaved) searchParams.set('friends_saved', 'true');
+    if (params.friendHandle) searchParams.set('friend_handle', params.friendHandle);
+    if (params.interestSource) searchParams.set('interest_source', params.interestSource);
+    if (params.interestKind) searchParams.set('interest_kind', params.interestKind);
+    if (params.interestUserHandle) searchParams.set('interest_user_handle', params.interestUserHandle);
+    if (params.profiles) searchParams.set('profiles', params.profiles);
+    searchParams.set('limit', String(params.limit));
+    if (params.offset) searchParams.set('offset', String(params.offset));
+    const qs = searchParams.toString();
+    const init: RequestInit = {
+        credentials: 'include',
+    };
+    if (opts?.fresh) init.cache = 'no-store';
+    const res = await fetch(`${BASE}/events?${qs}`, init);
+    const events = await parseJsonResponse<CalendarEvent[]>(res, 'Failed to fetch events');
+    return { events, hasMore: res.headers.get('X-Has-More') === 'true' };
+}
+
 export async function fetchEvent(eventId: string, opts?: { fresh?: boolean }): Promise<CalendarEvent> {
     // `fresh: true` bypasses the browser HTTP cache. The public endpoint sets
     // `Cache-Control: public, max-age=60`; admin flows that re-fetch after a
@@ -156,6 +215,32 @@ export interface SiteSettings {
     default_explorer_period?: DateRangePresetKey;
     promo_codes_enabled?: boolean;
     organizer_claims_enabled?: boolean;
+    for_you_rail_enabled?: boolean;
+    your_next_events_rail_enabled?: boolean;
+    tag_as_badge_enabled?: boolean;
+    /** When true (and tag_as_badge_enabled is on), tag badges use their
+     * defined group color; when false, tags render on a neutral light-grey
+     * background. Client default: false. */
+    tag_badge_colored?: boolean;
+    /** When true, the Trending trail's compact cards additionally show
+     * tags and the AttendeeAvatarStack. Client default: false. */
+    trending_trail_rich_enabled?: boolean;
+    /** Maximum number of tags rendered inline on an event card. Client
+     * default: 3. */
+    tags_per_card?: number;
+    /** Global notification / re-engagement gates (admin-configurable).
+     * Each flag mirrors an env-var in ``backend/config/loader.py``; when
+     * set here it overrides that default without requiring a redeploy. */
+    event_reminders_enabled?: boolean;
+    activity_digest_email_enabled?: boolean;
+    interest_match_notifications_enabled?: boolean;
+    web_push_enabled?: boolean;
+    /** Hours before an event's start when the reminder is fired. 1-720. */
+    reminder_lead_hours?: number;
+    /** Cadence for the activity-digest email in the format
+     * ``<mon|tue|...>[,<day>...] @ HH:MM`` interpreted in each recipient's
+     * ``User.timezone``. Default = twice a week (``tue,fri @ 09:00``). */
+    activity_digest_schedule?: string;
 }
 
 export async function fetchSettings(): Promise<SiteSettings> {
@@ -262,10 +347,21 @@ export interface PreferredAreaPayload {
     label: string;
 }
 
+export interface HomeLocationPayload {
+    lat: number;
+    lng: number;
+    label: string;
+}
+
+export type HomeLocationResponse = HomeLocationPayload;
+
 export interface UserPreferences {
     share_attendance_default: boolean;
     preferred_area: PreferredAreaPayload | null;
     preferred_tag_ids: number[];
+    /** Home pin used as the default center for radius-mode interest
+     * profiles. Null until the user sets one (onboarding or Settings). */
+    home_location: HomeLocationResponse | null;
     /** ISO timestamp; null until the user (or anon→authed merge) has
      * explicitly saved preferences. */
     set_at: string | null;
@@ -300,15 +396,29 @@ export interface AuthUser {
      *  skip). When ``null`` the frontend route guard redirects to
      *  ``/onboarding/follow`` after first-load. Absent for anon. */
     onboarded_at?: string | null;
+    /** True when the user has never onboarded OR when the server-side
+     *  ``CURRENT_ONBOARDING_VERSION`` was bumped since they last
+     *  completed the wizard (forced re-onboarding). The gate prefers
+     *  this over ``onboarded_at`` when present. */
+    needs_onboarding?: boolean;
     /** IANA timezone used to render reminder/event times. Defaults to
      *  ``"UTC"``; captured from the browser on first signed-in load. */
     timezone?: string;
-    /** Email-delivery toggles for upcoming-event reminders and friend/
-     *  event activity digests. Default true. */
+    /** Phase G — per-feature × per-channel gates. Rows always land in-app;
+     *  these six flags control email and push delivery only. */
+    email_event_reminders_enabled?: boolean;
+    email_social_activity_enabled?: boolean;
+    email_interest_matches_enabled?: boolean;
+    push_event_reminders_enabled?: boolean;
+    push_social_activity_enabled?: boolean;
+    push_interest_matches_enabled?: boolean;
+    /** Legacy four-flag aliases returned for one release so older
+     *  clients keep working. Derived from the six new flags on the
+     *  server (see PHASE_G_NOTIFICATION_GATING.md §G.9). */
     reminder_email_enabled?: boolean;
     activity_email_enabled?: boolean;
-    /** Web-push delivery toggle (Phase 4). Default true. */
     push_enabled?: boolean;
+    interest_notifications_enabled?: boolean;
 }
 
 export async function loginWithGoogle(
@@ -316,7 +426,7 @@ export async function loginWithGoogle(
     deviceId?: string,
     mockEmail?: string,
     mockName?: string,
-    anonPreferences?: { preferred_area: PreferredAreaPayload | null; preferred_tag_ids: number[] } | null,
+    anonPreferences?: { preferred_area: PreferredAreaPayload | null; preferred_tag_ids: number[]; home_location?: HomeLocationPayload | null } | null,
 ): Promise<AuthUser> {
     const body: Record<string, unknown> = { credential, device_id: deviceId };
     if (mockEmail) body.mock_email = mockEmail;
@@ -399,6 +509,8 @@ export interface UpdatePreferencesPayload {
     preferred_area?: PreferredAreaPayload | null;
     /** Omit to leave tags untouched; pass `[]` to clear. */
     preferred_tag_ids?: number[];
+    /** Omit to leave home pin untouched; pass `null` to clear. */
+    home_location?: HomeLocationPayload | null;
 }
 
 export async function updateUserPreferences(
@@ -416,16 +528,35 @@ export async function updateUserPreferences(
 
 export interface NotificationPreferences {
     timezone: string;
+    /** Phase G — six per-feature × per-channel gates. */
+    email_event_reminders_enabled: boolean;
+    email_social_activity_enabled: boolean;
+    email_interest_matches_enabled: boolean;
+    push_event_reminders_enabled: boolean;
+    push_social_activity_enabled: boolean;
+    push_interest_matches_enabled: boolean;
+    /** Legacy mirror kept for one release. */
     reminder_email_enabled: boolean;
     activity_email_enabled: boolean;
     push_enabled: boolean;
+    interest_notifications_enabled: boolean;
 }
 
 export interface UpdateNotificationPreferencesPayload {
     timezone?: string;
+    /** Phase G — six per-feature × per-channel gates. */
+    email_event_reminders_enabled?: boolean;
+    email_social_activity_enabled?: boolean;
+    email_interest_matches_enabled?: boolean;
+    push_event_reminders_enabled?: boolean;
+    push_social_activity_enabled?: boolean;
+    push_interest_matches_enabled?: boolean;
+    /** Legacy aliases accepted for one release — server writes through
+     *  to the corresponding new flags. */
     reminder_email_enabled?: boolean;
     activity_email_enabled?: boolean;
     push_enabled?: boolean;
+    interest_notifications_enabled?: boolean;
 }
 
 export async function updateNotificationPreferences(
@@ -439,6 +570,103 @@ export async function updateNotificationPreferences(
     });
     if (!res.ok) throw new Error('Failed to update notification preferences');
     return res.json();
+}
+
+/** Best-effort IP -> city geo prefill for the home-pin picker in
+ * onboarding Step 2. Returns null when the backend returned 204
+ * (private IP / geolocation failed) so the caller can fall back to
+ * browser geolocation or manual city typeahead. */
+export async function geolocateFromIP(): Promise<HomeLocationPayload | null> {
+    const res = await fetch(`${BASE}/auth/geolocate-ip`, { credentials: 'include' });
+    if (res.status === 204 || !res.ok) return null;
+    try {
+        return (await res.json()) as HomeLocationPayload;
+    } catch {
+        return null;
+    }
+}
+
+export interface InterestProfile {
+    id: number;
+    label: string;
+    min_lat: number;
+    min_lng: number;
+    max_lat: number;
+    max_lng: number;
+    dance_tag_ids: number[];
+    reach_tag_ids: number[];
+    matches_enabled: boolean;
+    /** Legacy alias mirror, removed in cleanup PR. Always equal to
+     *  `matches_enabled`. */
+    notify_enabled: boolean;
+    is_active: boolean;
+    created_at: string;
+}
+
+export interface InterestProfilePayload {
+    label: string;
+    min_lat: number;
+    min_lng: number;
+    max_lat: number;
+    max_lng: number;
+    dance_tag_ids?: number[];
+    reach_tag_ids?: number[];
+    matches_enabled?: boolean;
+    /** Legacy alias — accepted for one release. */
+    notify_enabled?: boolean;
+    is_active?: boolean;
+}
+
+export interface InterestProfileUpdatePayload {
+    label?: string;
+    min_lat?: number;
+    min_lng?: number;
+    max_lat?: number;
+    max_lng?: number;
+    dance_tag_ids?: number[];
+    reach_tag_ids?: number[];
+    matches_enabled?: boolean;
+    /** Legacy alias — accepted for one release. */
+    notify_enabled?: boolean;
+    is_active?: boolean;
+}
+
+export async function fetchInterestProfiles(): Promise<InterestProfile[]> {
+    const res = await fetch(`${BASE}/interest-profiles`, { credentials: 'include' });
+    return parseJsonResponse<InterestProfile[]>(res, 'Failed to fetch interest profiles');
+}
+
+export async function createInterestProfile(
+    payload: InterestProfilePayload,
+): Promise<InterestProfile> {
+    const res = await fetch(`${BASE}/interest-profiles`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+    });
+    return parseJsonResponse<InterestProfile>(res, 'Failed to create interest profile');
+}
+
+export async function updateInterestProfile(
+    id: number,
+    payload: InterestProfileUpdatePayload,
+): Promise<InterestProfile> {
+    const res = await fetch(`${BASE}/interest-profiles/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+    });
+    return parseJsonResponse<InterestProfile>(res, 'Failed to update interest profile');
+}
+
+export async function deleteInterestProfile(id: number): Promise<void> {
+    const res = await fetch(`${BASE}/interest-profiles/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to delete interest profile');
 }
 
 /** Fetch the app's VAPID public key, or null when web-push is disabled. */
@@ -1109,7 +1337,8 @@ export type NotificationKind =
     | 'promo_code_approved'
     | 'promo_code_rejected'
     | 'organizer_claim_decided'
-    | 'event_reminder';
+    | 'event_reminder'
+    | 'interest_event';
 
 export interface NotificationActor {
     handle: string;
@@ -1128,6 +1357,10 @@ export interface NotificationItem {
     event_title: string | null;
     event_start: string | null;
     actor: NotificationActor;
+    /** Extra rendering context, e.g. the matched interest profile label(s)
+     *  for `interest_event` rows (comma-joined when multiple profiles
+     *  matched). Null for kinds that don't use it. */
+    context: string | null;
     created_at: string;
     read_at: string | null;
 }

@@ -87,6 +87,18 @@ export default function Admin() {
     const [trendingTopPercent, setTrendingTopPercent] = useState(100);
     const [promoCodesEnabled, setPromoCodesEnabled] = useState(false);
     const [organizerClaimsEnabled, setOrganizerClaimsEnabled] = useState(false);
+    const [forYouRailEnabled, setForYouRailEnabled] = useState(false);
+    const [yourNextEventsRailEnabled, setYourNextEventsRailEnabled] = useState(false);
+    // Notification / re-engagement gates. Booleans are master switches
+    // that override the corresponding env vars in ``config/loader.py``;
+    // ``digestSchedule`` follows the ``dow[,dow] @ HH:MM`` grammar the
+    // backend parses in each user's local timezone.
+    const [eventRemindersEnabled, setEventRemindersEnabled] = useState(true);
+    const [activityDigestEmailEnabled, setActivityDigestEmailEnabled] = useState(true);
+    const [interestMatchNotifsEnabled, setInterestMatchNotifsEnabled] = useState(true);
+    const [webPushEnabled, setWebPushEnabled] = useState(false);
+    const [reminderLeadHours, setReminderLeadHours] = useState(24);
+    const [digestSchedule, setDigestSchedule] = useState('tue,fri @ 09:00');
     const [eventColorBarColor, setEventColorBarColor] = useState('#64748b');
     const [tagSortMode, setTagSortMode] = useState<'group' | 'event_count'>('group');
     const [defaultExplorerPeriod, setDefaultExplorerPeriod] = useState<DateRangePresetKey>(DEFAULT_EXPLORER_PERIOD);
@@ -196,6 +208,14 @@ export default function Admin() {
             setTrendingTopPercent(s.trending_top_percent ?? 100);
             setPromoCodesEnabled(s.promo_codes_enabled ?? false);
             setOrganizerClaimsEnabled(s.organizer_claims_enabled ?? false);
+            setForYouRailEnabled(s.for_you_rail_enabled ?? false);
+            setYourNextEventsRailEnabled(s.your_next_events_rail_enabled ?? false);
+            setEventRemindersEnabled(s.event_reminders_enabled ?? true);
+            setActivityDigestEmailEnabled(s.activity_digest_email_enabled ?? true);
+            setInterestMatchNotifsEnabled(s.interest_match_notifications_enabled ?? true);
+            setWebPushEnabled(s.web_push_enabled ?? false);
+            setReminderLeadHours(s.reminder_lead_hours ?? 24);
+            setDigestSchedule(s.activity_digest_schedule ?? 'tue,fri @ 09:00');
             setEventColorBarColor(s.event_color_bar_color || '#64748b');
             setTagSortMode(s.tag_sort_mode === 'event_count' ? 'event_count' : 'group');
             setDefaultExplorerPeriod(s.default_explorer_period ?? DEFAULT_EXPLORER_PERIOD);
@@ -496,6 +516,30 @@ export default function Admin() {
         }
     };
 
+    const handleToggleForYouRail = async () => {
+        const newVal = !forYouRailEnabled;
+        setForYouRailEnabled(newVal);
+        try {
+            await updateSettings({ for_you_rail_enabled: newVal });
+            setMessage(`"For you" rail ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setForYouRailEnabled(!newVal);
+            setMessage('Failed to update "For you" rail toggle.');
+        }
+    };
+
+    const handleToggleYourNextEventsRail = async () => {
+        const newVal = !yourNextEventsRailEnabled;
+        setYourNextEventsRailEnabled(newVal);
+        try {
+            await updateSettings({ your_next_events_rail_enabled: newVal });
+            setMessage(`"Your next events" rail ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setYourNextEventsRailEnabled(!newVal);
+            setMessage('Failed to update "Your next events" rail toggle.');
+        }
+    };
+
     const handleTogglePromoCodes = async () => {
         const newVal = !promoCodesEnabled;
         setPromoCodesEnabled(newVal);
@@ -599,6 +643,85 @@ export default function Admin() {
         } catch {
             setEventColorBarColor(prev);
             setMessage('Failed to update event bar color.');
+        }
+    };
+
+    const handleToggleReminders = async () => {
+        const newVal = !eventRemindersEnabled;
+        setEventRemindersEnabled(newVal);
+        try {
+            await updateSettings({ event_reminders_enabled: newVal });
+            setMessage(`Event reminders ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setEventRemindersEnabled(!newVal);
+            setMessage('Failed to update reminders toggle.');
+        }
+    };
+
+    const handleToggleActivityEmail = async () => {
+        const newVal = !activityDigestEmailEnabled;
+        setActivityDigestEmailEnabled(newVal);
+        try {
+            await updateSettings({ activity_digest_email_enabled: newVal });
+            setMessage(`Activity digest email ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setActivityDigestEmailEnabled(!newVal);
+            setMessage('Failed to update activity email toggle.');
+        }
+    };
+
+    const handleToggleInterestMatchNotifs = async () => {
+        const newVal = !interestMatchNotifsEnabled;
+        setInterestMatchNotifsEnabled(newVal);
+        try {
+            await updateSettings({ interest_match_notifications_enabled: newVal });
+            setMessage(`Interest-match notifications ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setInterestMatchNotifsEnabled(!newVal);
+            setMessage('Failed to update interest notifications toggle.');
+        }
+    };
+
+    const handleToggleWebpush = async () => {
+        const newVal = !webPushEnabled;
+        setWebPushEnabled(newVal);
+        try {
+            await updateSettings({ web_push_enabled: newVal });
+            setMessage(`Web push ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setWebPushEnabled(!newVal);
+            setMessage('Failed to update web push toggle.');
+        }
+    };
+
+    const handleReminderLeadHoursChange = async (value: number) => {
+        if (isNaN(value) || value < 1 || value > 720) return;
+        const prev = reminderLeadHours;
+        setReminderLeadHours(value);
+        try {
+            await updateSettings({ reminder_lead_hours: value });
+            setMessage(`Reminder lead time set to ${value}h.`);
+        } catch {
+            setReminderLeadHours(prev);
+            setMessage('Failed to update reminder lead time.');
+        }
+    };
+
+    const handleDigestScheduleChange = async (value: string) => {
+        const v = value.trim().toLowerCase();
+        // Mirror the backend regex: <dow>[,<dow>...] @ HH:MM.
+        if (!/^([a-z]{3})(,[a-z]{3})*\s*@\s*\d{1,2}:\d{2}$/.test(v)) {
+            setMessage('Digest schedule must look like "tue,fri @ 09:00".');
+            return;
+        }
+        const prev = digestSchedule;
+        setDigestSchedule(v);
+        try {
+            await updateSettings({ activity_digest_schedule: v });
+            setMessage(`Digest schedule set to "${v}".`);
+        } catch {
+            setDigestSchedule(prev);
+            setMessage('Failed to update digest schedule.');
         }
     };
 
@@ -1011,6 +1134,7 @@ export default function Admin() {
 
             {/* ── Configuration Tab ── */}
             {activeTab === 'configuration' && (
+                <div className="space-y-4">
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
                     {/* Settings */}
                     <div className="border border-gray-200 bg-white">
@@ -1291,6 +1415,36 @@ export default function Admin() {
                                 </button>
                             </div>
 
+                            {/* Explorer "For you" discovery rail */}
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <span className="text-[11px] font-medium text-gray-700">For you rail</span>
+                                    <p className="text-[10px] text-gray-400">Collapsible Explorer rail with You might like/Friends going/New lenses</p>
+                                </div>
+                                <button
+                                    onClick={handleToggleForYouRail}
+                                    aria-label="Toggle for you rail"
+                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${forYouRailEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                >
+                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${forYouRailEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                </button>
+                            </div>
+
+                            {/* Explorer "Your next events" rail */}
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <span className="text-[11px] font-medium text-gray-700">Your next events rail</span>
+                                    <p className="text-[10px] text-gray-400">Explorer rail showing the viewer's own saved/going events</p>
+                                </div>
+                                <button
+                                    onClick={handleToggleYourNextEventsRail}
+                                    aria-label="Toggle your next events rail"
+                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${yourNextEventsRailEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                >
+                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${yourNextEventsRailEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                </button>
+                            </div>
+
                             {/* User contributions: promo codes */}
                             <div className="flex items-center justify-between">
                                 <div>
@@ -1325,6 +1479,104 @@ export default function Admin() {
                     <div className="lg:col-span-2 border border-gray-200 bg-white lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto">
                         <AdminTagCategories />
                     </div>
+                </div>
+
+                {/* Notifications & re-engagement */}
+                <div className="border border-gray-200 bg-white">
+                    <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50">
+                        <h2 className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Notifications</h2>
+                    </div>
+                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <span className="text-[11px] font-medium text-gray-700">Event reminders</span>
+                                <p className="text-[10px] text-gray-400">Pre-event nudge (in-app + email) for saved / going users</p>
+                            </div>
+                            <button
+                                onClick={handleToggleReminders}
+                                aria-label="Toggle event reminders"
+                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${eventRemindersEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                            >
+                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${eventRemindersEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                            </button>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <span className="text-[11px] font-medium text-gray-700">Activity digest email</span>
+                                <p className="text-[10px] text-gray-400">Batched summary of new friends / follows / saves</p>
+                            </div>
+                            <button
+                                onClick={handleToggleActivityEmail}
+                                aria-label="Toggle activity digest"
+                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${activityDigestEmailEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                            >
+                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${activityDigestEmailEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                            </button>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <span className="text-[11px] font-medium text-gray-700">Interest-match notifications</span>
+                                <p className="text-[10px] text-gray-400">Alert users when a new event matches their interest profile</p>
+                            </div>
+                            <button
+                                onClick={handleToggleInterestMatchNotifs}
+                                aria-label="Toggle interest notifications"
+                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${interestMatchNotifsEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                            >
+                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${interestMatchNotifsEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                            </button>
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <span className="text-[11px] font-medium text-gray-700">Web push</span>
+                                <p className="text-[10px] text-gray-400">Requires VAPID keys configured server-side</p>
+                            </div>
+                            <button
+                                onClick={handleToggleWebpush}
+                                aria-label="Toggle web push"
+                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${webPushEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                            >
+                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${webPushEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                            </button>
+                        </div>
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-100 md:border-t-0 md:pt-0">
+                            <div>
+                                <span className="text-[11px] font-medium text-gray-700">Reminder lead time (hours)</span>
+                                <p className="text-[10px] text-gray-400">How far ahead of an event's start to fire the reminder (1–720)</p>
+                            </div>
+                            <input
+                                type="number"
+                                min={1}
+                                max={720}
+                                value={reminderLeadHours}
+                                onChange={(e) => setReminderLeadHours(Number(e.target.value))}
+                                onBlur={(e) => handleReminderLeadHoursChange(Number(e.target.value))}
+                                onKeyDown={(e) => e.key === 'Enter' && handleReminderLeadHoursChange(reminderLeadHours)}
+                                className="w-20 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                aria-label="Reminder lead time in hours"
+                            />
+                        </div>
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-100 md:border-t-0 md:pt-0">
+                            <div>
+                                <span className="text-[11px] font-medium text-gray-700">Digest schedule</span>
+                                <p className="text-[10px] text-gray-400">
+                                    Format: <code className="font-mono">dow[,dow] @ HH:MM</code> — interpreted in each user's timezone.
+                                    Default twice a week: <code className="font-mono">tue,fri @ 09:00</code>.
+                                </p>
+                            </div>
+                            <input
+                                type="text"
+                                value={digestSchedule}
+                                onChange={(e) => setDigestSchedule(e.target.value)}
+                                onBlur={(e) => handleDigestScheduleChange(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleDigestScheduleChange(digestSchedule)}
+                                placeholder="tue,fri @ 09:00"
+                                className="w-40 text-right text-[11px] font-mono border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                aria-label="Digest schedule"
+                            />
+                        </div>
+                    </div>
+                </div>
                 </div>
             )}
 

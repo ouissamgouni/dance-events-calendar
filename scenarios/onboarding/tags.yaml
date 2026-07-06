@@ -28,3 +28,18 @@ tag_groups:
         label: Kizomba
       - slug: zouk
         label: Zouk
+
+  - slug: reach
+    label: Reach
+    ordinal: 30
+    allow_multiple: true
+    onboarding_eligible: true
+    color: "#a78bfa"
+    tags:
+      - slug: local
+        label: Local
+      - slug: regional
+        label: Regional
+      - slug: international
+        label: International
+        synonyms: [ "world", "worldwide", "global", "congress", "festival" ]

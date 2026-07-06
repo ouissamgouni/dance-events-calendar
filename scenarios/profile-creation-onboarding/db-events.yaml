@@ -1,0 +1,148 @@
+base_week: 0
+# Probe matrix for the interest_notification_service. Each event tests a
+# specific branch of the matcher (dance + reach + geo) so the resulting
+# notifications form a truth table for the PRD §11 behavior contract.
+#
+# Home pin used in Step 2 = Paris (48.8566, 2.3522), radius 25 km.
+# Step 1 profile = wide EUR bbox (default DEFAULT_AREA_BBOX), dance=salsa,
+#   reach=[international] (local excluded).
+# Step 2 profile = radius 25 km around Paris, dance=salsa, reach=[local].
+events:
+  # (A) International salsa congress in Madrid — matches the WIDE INTL
+  #     profile only; does NOT match the Paris LOCAL profile (Madrid is
+  #     ~1050 km from Paris, outside the 25 km radius).
+  - id: ev-intl-madrid
+    calendar_id: salsa-cal-001
+    title: Madrid Salsa Congress
+    description: >
+      Weekend international salsa festival — should surface as an
+      "international" match for the wide EUR profile.
+    location: "Palacio de Congresos, Madrid, Spain"
+    latitude: 40.4168
+    longitude: -3.7038
+    start: w1 Sat 20:00
+    end: w1 Sun 04:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  # (B) Local salsa social in Madrid — no wide-INTL match (reach mismatch,
+  #     event is 'local' but profile filters to 'international' only) and
+  #     no Paris LOCAL match (out of radius). Net: ZERO interest notifs.
+  - id: ev-local-madrid
+    calendar_id: salsa-cal-001
+    title: Madrid Wednesday Social
+    description: "Local weekly social; should not notify the wide intl profile."
+    location: "Salsero Studio, Calle Gran Vía, Madrid, Spain"
+    latitude: 40.4200
+    longitude: -3.7060
+    start: w1 Wed 21:00
+    end: w1 Thu 01:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  # (C) Local salsa social in Paris (within 25 km of home) — matches the
+  #     Paris LOCAL profile only. Wide INTL profile filters reach to
+  #     international, so does NOT fire.
+  - id: ev-local-paris
+    calendar_id: salsa-cal-001
+    title: Paris Friday Salsa Social
+    description: "Neighborhood social near home — should match the local alert."
+    location: "Studio Azul, Paris, France"
+    latitude: 48.8662
+    longitude: 2.3744
+    start: w1 Fri 21:00
+    end: w1 Sat 01:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  # (D) Paris event tagged BOTH international AND local — matches BOTH
+  #     the wide INTL profile AND the Paris LOCAL profile. Existing
+  #     Notification unique constraint => exactly ONE notification, whose
+  #     message names BOTH matched profiles (plural-safe rendering).
+  - id: ev-dual-paris
+    calendar_id: salsa-cal-001
+    title: Paris International + Local Weekender
+    description: "Multi-scale event — dedup probe for multi-profile match."
+    location: "Grand Salon, Paris, France"
+    latitude: 48.8600
+    longitude: 2.3500
+    start: w1 Sat 22:00
+    end: w1 Sun 03:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:local
+      - reach:international
+
+  # (E) Untagged-reach salsa event in Berlin (WITHIN the wide EUR area,
+  #     but no reach tag) — reach-filtered wide profile does NOT match
+  #     (PRD §11b: events without reach tags excluded from reach-filtered
+  #     profiles). Would still match an EMPTY-reach profile, but neither
+  #     of Nora's profiles uses empty reach.
+  - id: ev-untagged-berlin
+    calendar_id: salsa-cal-001
+    title: Berlin Salsa Night (no reach tag)
+    description: "Reach tag missing — filtered profiles must skip this event."
+    location: "Tanzhaus, Friedrichstr. 100, Berlin, Germany"
+    latitude: 52.5200
+    longitude: 13.4050
+    start: w1 Thu 20:30
+    end: w1 Fri 00:30
+    tags:
+      - format:social
+      - dance-style:salsa
+
+  # (F) Salsa event with NO geo coordinates — excluded from area AND
+  #     radius matching entirely (PRD §11b). Should never notify.
+  - id: ev-nogeo
+    calendar_id: salsa-cal-001
+    title: Online Salsa Class (no location)
+    description: "No lat/lng — geo-filtered profiles must skip this event."
+    start: w1 Tue 19:00
+    end: w1 Tue 20:30
+    tags:
+      - format:workshop
+      - dance-style:salsa
+      - reach:international
+
+  # (G) International BACHATA congress in Barcelona — proves the
+  #     dance-style filter: wide INTL profile targets salsa, so this
+  #     bachata event does NOT notify. The local Paris profile also
+  #     rejects it (dance mismatch AND out-of-radius).
+  - id: ev-intl-bachata-bcn
+    calendar_id: bachata-cal-002
+    title: Barcelona Bachata Fest
+    description: "Wrong dance style for Nora's profiles — dedup probe."
+    location: "Poble Espanyol, Barcelona, Spain"
+    latitude: 41.3690
+    longitude: 2.1490
+    start: w1 Sun 18:00
+    end: w1 Sun 23:59
+    tags:
+      - format:festival
+      - dance-style:bachata
+      - reach:international
+
+  # (H) Friend-going event — Alice is going to this one and Nora follows
+  #     Alice, so the FRIEND activity digest fires regardless of interest
+  #     profiles. Proves social notifications are independent of the
+  #     PRD's interest_event path.
+  - id: ev-friend-going
+    calendar_id: salsa-cal-001
+    title: Alice's Salsa Meetup
+    description: "Friend-going probe; social digest still fires even with no profiles."
+    location: "Bar Latino, Paris, France"
+    latitude: 48.8650
+    longitude: 2.3600
+    start: w1 Sun 19:00
+    end: w1 Sun 22:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:international

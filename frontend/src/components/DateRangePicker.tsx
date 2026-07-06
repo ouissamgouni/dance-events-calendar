@@ -59,7 +59,7 @@ export default function DateRangePicker({ startDate, endDate, onChange }: DateRa
                     />
                 </label>
             </div>
-            <div className="date-range-presets" aria-label="Date presets">
+            <div className="date-range-presets scrollbar-hide" aria-label="Date presets">
                 {presets.thisPresets.length > 0 && (
                     <div className="date-range-preset-section date-range-preset-section--this">
                         <span className="date-range-preset-label">This</span>

@@ -22,6 +22,7 @@ tag_groups:
     label: Dance Style
     ordinal: 50
     allow_multiple: true
+    onboarding_eligible: true
     color: "#fb923c"
     tags:
       - slug: salsa
