@@ -1478,7 +1478,6 @@ export default function Home() {
                                     {showTrendingBanner && (
                                         <TrendingEventsBanner
                                             events={explorerMatchingEvents}
-                                            mapBounds={mapBounds}
                                             onEventClick={handleExplorerListEventClick}
                                             showPopularity={showPopularity && trendingEnabled}
                                             popularityThreshold={popularityThreshold}

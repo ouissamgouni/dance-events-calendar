@@ -1,12 +1,10 @@
 import { useMemo, useState } from 'react';
 import type { CalendarEvent } from '../types';
-import type { MapBounds } from './EventMap';
 import RailEventCard from './RailEventCard';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 
 interface TrendingEventsBannerProps {
     events: CalendarEvent[];
-    mapBounds: MapBounds | null;
     onEventClick: (event: CalendarEvent) => void;
     showPopularity: boolean;
     popularityThreshold: number;
@@ -18,17 +16,9 @@ interface TrendingEventsBannerProps {
     className?: string;
 }
 
-function isOutsideMap(event: CalendarEvent, bounds: MapBounds | null): boolean {
-    if (!bounds || event.latitude == null || event.longitude == null) return false;
-    return event.latitude < bounds.south
-        || event.latitude > bounds.north
-        || event.longitude < bounds.west
-        || event.longitude > bounds.east;
-}
 
 export default function TrendingEventsBanner({
     events,
-    mapBounds,
     onEventClick,
     showPopularity,
     popularityThreshold,
@@ -73,7 +63,6 @@ export default function TrendingEventsBanner({
             {!collapsed && (
                 <div className="flex gap-2 overflow-x-auto px-2 py-2" aria-label="Trending events">
                     {trendingEvents.map((event) => {
-                        const outsideMap = isOutsideMap(event, mapBounds);
                         return (
                             <RailEventCard
                                 key={event.event_id}

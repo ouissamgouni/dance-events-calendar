@@ -193,8 +193,8 @@ export default function NotificationSettings() {
     if (!user) return null;
 
     const flagValue = (channel: Channel, feature: FeatureKey): boolean => {
-        const key = flagKey(channel, feature);
-        const raw = (user as Record<string, unknown>)[key];
+        const key = flagKey(channel, feature) as keyof typeof user;
+        const raw = user[key];
         return typeof raw === 'boolean' ? raw : true;
     };
 
