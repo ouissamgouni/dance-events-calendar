@@ -267,6 +267,7 @@ def run_once(
     user_ids: set | None = None,
     kinds: tuple[str, ...] | None = None,
     max_notifications_per_user: int | None = None,
+    resend: bool = False,
 ) -> dict:
     """Send pending activity digest emails and push notifications.
 
@@ -288,12 +289,21 @@ def run_once(
     match) to act on a hand-picked set of users without disturbing
     everyone else's pending backlog.
 
-    ``max_notifications_per_user`` caps how many pending notifications per
+    ``max_notifications_per_user`` caps how many notifications per
     recipient are included in THIS run, applied independently per channel
-    (the most recent N are kept for each of email/push; older overflow
-    rows are left unstamped/pending for a future run). Used by the admin
-    "send now" control to bound the load of a single manual digest when a
-    user has a large backlog, instead of a time-based lookback window.
+    (the most recent N are kept for each of email/push). By default this
+    cap only looks at PENDING rows (``emailed_at``/``pushed_at`` still
+    ``None``) — older overflow rows are left unstamped/pending for a
+    future run. Used by the admin "send now" control to bound the load
+    of a single manual digest when a user has a large backlog, instead
+    of a time-based lookback window.
+
+    ``resend`` widens the candidate pool for the cap above from
+    "pending only" to ALL matching activity (including notifications
+    already emailed/pushed), and re-sends/re-stamps whichever rows the
+    cap keeps. Used by the admin "send now" control's "Resend" checkbox
+    to force a re-delivery of recent activity a user already received —
+    e.g. after fixing an email template, or for a manual re-notify.
     """
     if not get_activity_digest_email_enabled():
         return {"skipped": "activity_email_disabled"}
@@ -307,24 +317,26 @@ def run_once(
     with Session(get_engine()) as session:
         stmt = (
             select(Notification)
-            .where(
+            .where(Notification.kind.in_(kinds or ACTIVITY_KINDS))  # type: ignore[union-attr]
+            .where(Notification.created_at >= cutoff_old)
+            .order_by(Notification.recipient_user_id, Notification.created_at)
+        )
+        if not resend:
+            stmt = stmt.where(
                 or_(
                     Notification.emailed_at.is_(None),  # type: ignore[union-attr]
                     Notification.pushed_at.is_(None),  # type: ignore[union-attr]
                 )
             )
-            .where(Notification.kind.in_(kinds or ACTIVITY_KINDS))  # type: ignore[union-attr]
-            .where(Notification.created_at >= cutoff_old)
-            .order_by(Notification.recipient_user_id, Notification.created_at)
-        )
         if user_ids is not None:
             stmt = stmt.where(Notification.recipient_user_id.in_(user_ids))  # type: ignore[union-attr]
         pending = session.exec(stmt).all()
         if not pending:
             logger.debug(
-                "Activity digest run: no pending notifications (user_ids=%s kinds=%s)",
+                "Activity digest run: no matching notifications (user_ids=%s kinds=%s resend=%s)",
                 user_ids,
                 kinds,
+                resend,
             )
             return {"digests": 0, "pushed": 0}
 
@@ -358,7 +370,7 @@ def run_once(
             recipient = users.get(n.recipient_user_id)
             if not recipient or recipient.deleted_at is not None:
                 continue
-            if n.emailed_at is None:
+            if resend or n.emailed_at is None:
                 in_slot = force
                 if not force:
                     status = _slot_status(
@@ -379,9 +391,10 @@ def run_once(
                         )
                 if in_slot:
                     email_by_recipient.setdefault(recipient.id, []).append(n)
-            # Push has no schedule slot — any not-yet-pushed row is a
-            # candidate on every call, regardless of ``force``.
-            if n.pushed_at is None:
+            # Push has no schedule slot — any not-yet-pushed row (or ANY
+            # row at all when ``resend=True``) is a candidate on every
+            # call, regardless of ``force``.
+            if resend or n.pushed_at is None:
                 push_by_recipient.setdefault(recipient.id, []).append(n)
 
         # Cap the number of notifications included per recipient in THIS

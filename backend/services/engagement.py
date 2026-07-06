@@ -105,8 +105,8 @@ def set_event_engagement(
             same default for Saved).
         fan_out: when True and the resulting Going row is in a shared
             tier (``public`` | ``friends``), dispatch ``fan_out_going``.
-            Curation should usually pass False so curated entries don't
-            spam the target's followers.
+            Curation passes True by default to trigger notifications the
+            same way UI RSVPs do.
         created_by_admin_user_id: admin user id to stamp on the new row
             for audit + the "Curated" transparency pill. None for
             self-serve callers.

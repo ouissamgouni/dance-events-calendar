@@ -737,18 +737,49 @@ class ForceInterestMatchSendRequest(BaseModel):
 
 class DigestSendNowRequest(BaseModel):
     user_ids: list[UUID] = Field(..., min_length=1, max_length=50)
-    # Caps how many pending notifications per recipient are folded into
-    # this manual send (most-recent-first); the rest stay pending for a
+    # Caps how many notifications per recipient are folded into this
+    # manual send (most-recent-first); the rest stay pending for a
     # future run. Load-control knob requested in place of a time window,
     # since a user's backlog size (not its age) is what drives email/push
-    # size. None = no cap (send everything pending, as before).
+    # size. None = no cap (send everything eligible, as before).
     max_notifications_per_user: Optional[int] = Field(default=None, ge=1, le=200)
+    # When true, widens "Max per user" from pending-only to ALL matching
+    # activity (including notifications already emailed/pushed) and
+    # forces a re-send/re-stamp of whichever rows the cap keeps.
+    resend: bool = False
 
 
 class ForceSendUserResult(BaseModel):
     user_id: UUID
     email: str
     status: str  # "sent" | "no_pending_notifications" | "skipped_disabled" | "skipped_not_found"
+
+
+# ---------------------------------------------------------------------------
+# Admin Notifications log — read-only audit of every notification ever sent,
+# across all three feature types, with per-channel delivery status.
+# ---------------------------------------------------------------------------
+
+
+class NotificationLogEntry(BaseModel):
+    id: int
+    created_at: datetime
+    kind: str
+    # One of "interest_match" | "activity_digest" | "event_reminder" —
+    # mirrors the admin Configuration page's 3 notification feature gates.
+    type: str
+    channel_app: bool = True
+    channel_email: bool = False
+    channel_push: bool = False
+    recipient_user_id: UUID
+    recipient_email: str
+    recipient_handle: Optional[str] = None
+    recipient_display_name: Optional[str] = None
+
+
+class NotificationLogResponse(BaseModel):
+    items: list[NotificationLogEntry]
+    total: int
 
 
 class ForceInterestMatchSendResponse(BaseModel):
@@ -1734,8 +1765,8 @@ class AdminBulkEngagementRequest(BaseModel):
     The admin selects one or more admin-managed target users (by handle)
     and one or more events, and applies ``(kind, action)`` to the
     cross-product. Audience defaults to each target's profile default
-    when omitted. ``fan_out`` is opt-in and defaults to False so curated
-    Going entries don't notify the target's followers by default.
+    when omitted. ``fan_out`` defaults to True so curated Going entries
+    trigger activity notifications the same way UI RSVPs do.
     """
 
     handles: list[str]
@@ -1743,7 +1774,7 @@ class AdminBulkEngagementRequest(BaseModel):
     kind: Literal["save", "going"]
     action: Literal["add", "remove"]
     audience: Optional[Literal["public", "friends", "private"]] = None
-    fan_out: bool = False
+    fan_out: bool = True
 
 
 class AdminBulkEngagementItem(BaseModel):

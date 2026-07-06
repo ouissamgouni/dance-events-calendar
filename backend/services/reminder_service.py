@@ -20,9 +20,12 @@ import logging
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select, update
 
-from backend.services.app_settings import get_reminder_lead_hours, get_event_reminders_enabled
+from backend.services.app_settings import (
+    get_reminder_lead_hours,
+    get_event_reminders_enabled,
+)
 from backend.db.database import get_engine
 from backend.db.models import CachedEvent, Notification, User, UserEventAttendance
 from backend.services.email import send_event_reminder_email
@@ -89,20 +92,26 @@ def run_once() -> dict:
     now = datetime.utcnow()
     to_email: list[tuple] = []
     to_push: list[tuple] = []
+    # (recipient_user_id, event_id) -> Notification.id, so the admin
+    # Notifications log can show accurate email/push delivery status for
+    # reminders too (see stamping below), matching how activity_email.py
+    # stamps ``emailed_at``/``pushed_at`` on digest notifications.
+    notif_ids: dict[tuple, int] = {}
 
     with Session(get_engine(), expire_on_commit=False) as session:
         due = _due_pairs(session, now, lead_hours)
         if not due:
             return {"reminders": 0}
         for user, event in due:
-            session.add(
-                Notification(
-                    recipient_user_id=user.id,
-                    actor_user_id=user.id,  # self: no external actor
-                    kind=EVENT_REMINDER,
-                    event_id=event.event_id,
-                )
+            notif = Notification(
+                recipient_user_id=user.id,
+                actor_user_id=user.id,  # self: no external actor
+                kind=EVENT_REMINDER,
+                event_id=event.event_id,
             )
+            session.add(notif)
+            session.flush()
+            notif_ids[(user.id, event.event_id)] = notif.id
             if user.email_event_reminders_enabled:
                 to_email.append((user, event))
             if user.push_event_reminders_enabled:
@@ -112,22 +121,52 @@ def run_once() -> dict:
     # Send emails after commit so the in-app reminder is durable even if
     # SMTP is slow/unavailable. Best-effort; failures are logged, not raised.
     emailed = 0
+    emailed_ids: list[int] = []
     for user, event in to_email:
         when_label = _format_when(event.start, user.timezone)
         if send_event_reminder_email(user, event, when_label):
             emailed += 1
+            nid = notif_ids.get((user.id, event.event_id))
+            if nid is not None:
+                emailed_ids.append(nid)
 
     # Web-push is independent of the email opt-out (separate toggle). No-ops
     # when web-push is unconfigured.
     pushed = 0
+    pushed_ids: list[int] = []
     for user_id, title, event_id in to_push:
-        pushed += send_push(
+        delivered = send_push(
             user_id,
             title="Event reminder",
             body=f"{title or 'An event'} is coming up.",
             url=f"/event/{event_id}",
             tag=f"reminder:{event_id}",
         )
+        pushed += delivered
+        if delivered:
+            nid = notif_ids.get((user_id, event_id))
+            if nid is not None:
+                pushed_ids.append(nid)
+
+    # Stamp emailed_at/pushed_at on the notifications actually delivered so
+    # the admin Notifications log can report accurate per-channel support,
+    # same convention as activity_email.run_once().
+    if emailed_ids or pushed_ids:
+        with Session(get_engine()) as session:
+            stamp_now = datetime.utcnow()
+            if emailed_ids:
+                session.exec(
+                    update(Notification)
+                    .where(col(Notification.id).in_(emailed_ids))
+                    .values(emailed_at=stamp_now)
+                )
+            if pushed_ids:
+                session.exec(
+                    update(Notification)
+                    .where(col(Notification.id).in_(pushed_ids))
+                    .values(pushed_at=stamp_now)
+                )
+            session.commit()
 
     logger.info(
         "Reminder run: %d created, %d emailed, %d pushed", len(due), emailed, pushed

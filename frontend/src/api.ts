@@ -349,9 +349,11 @@ export interface DigestSendNowResponse {
 export async function sendDigestNow(
     userIds: string[],
     maxNotificationsPerUser?: number,
+    resend?: boolean,
 ): Promise<DigestSendNowResponse> {
     const body: Record<string, unknown> = { user_ids: userIds };
     if (maxNotificationsPerUser != null) body.max_notifications_per_user = maxNotificationsPerUser;
+    if (resend) body.resend = true;
     const res = await fetch(`${BASE}/admin/notifications/digest/send-now`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -376,6 +378,45 @@ export interface NotificationToggleCounts {
 export async function fetchNotificationToggleCounts(): Promise<NotificationToggleCounts> {
     const res = await fetch(`${BASE}/admin/notifications/toggle-counts`, { credentials: 'include' });
     return parseJsonResponse<NotificationToggleCounts>(res, 'Failed to fetch notification toggle counts');
+}
+
+export type NotificationLogType = 'interest_match' | 'activity_digest' | 'event_reminder';
+export type NotificationLogChannel = 'email' | 'push';
+
+export interface NotificationLogEntry {
+    id: number;
+    created_at: string;
+    kind: string;
+    type: NotificationLogType | string;
+    channel_app: boolean;
+    channel_email: boolean;
+    channel_push: boolean;
+    recipient_user_id: string;
+    recipient_email: string;
+    recipient_handle: string | null;
+    recipient_display_name: string | null;
+}
+
+export interface NotificationLogList {
+    items: NotificationLogEntry[];
+    total: number;
+}
+
+export async function fetchAdminNotificationsLog(
+    opts?: { type?: NotificationLogType; channel?: NotificationLogChannel; q?: string; limit?: number; offset?: number },
+): Promise<NotificationLogList> {
+    const sp = new URLSearchParams();
+    if (opts?.type) sp.set('type', opts.type);
+    if (opts?.channel) sp.set('channel', opts.channel);
+    if (opts?.q) sp.set('q', opts.q);
+    if (opts?.limit) sp.set('limit', String(opts.limit));
+    if (opts?.offset) sp.set('offset', String(opts.offset));
+    const qs = sp.toString();
+    const res = await fetch(
+        `${BASE}/admin/notifications/log${qs ? `?${qs}` : ''}`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<NotificationLogList>(res, 'Failed to fetch notifications log');
 }
 
 export async function trackEventView(eventId: string, deviceId?: string, source?: string): Promise<void> {

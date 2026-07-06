@@ -5,8 +5,8 @@ a sync, then auto-adds each newly-synced event to the configured
 admin-managed target user's Saved/Going list.
 
 Called from ``SyncService.run_enrichment`` after the enrichment
-pipeline completes. Silent by design (``fan_out=False``) — curated
-entries should not notify the target's followers.
+pipeline completes. Curated Going entries trigger activity notifications
+(``fan_out=True``) the same way UI RSVPs do.
 
 Idempotent: re-running on the same (event, rule) pair is a no-op via
 ``set_event_engagement``.
@@ -100,7 +100,7 @@ def apply_curation_rules(
                 kind=rule.kind,  # type: ignore[arg-type]
                 action="add",
                 audience=rule.audience,  # type: ignore[arg-type]
-                fan_out=False,
+                fan_out=True,
                 created_by_admin_user_id=admin_user_id,
             )
             if res.changed:

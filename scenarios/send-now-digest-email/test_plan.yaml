@@ -110,3 +110,19 @@ test_plan:
         pending activity left for him — the toast reports "0 of 1
         user(s) delivered (0 digest email(s), 0 push)" and Mailpit's
         total stays at two messages.
+
+    - id: 8
+      title: "'Resend' checkbox force-resends already-delivered activity"
+      description: |
+        Add Bob a fourth time. Check the "Resend" checkbox next to "Max
+        per user" and set "Max per user" to 2. Click "Send now (1)".
+      expected: |
+        Unlike step 7, the action succeeds this time: the toast reports
+        "1 of 1 user(s) delivered (1 digest email(s), 0 push)". A THIRD
+        email arrives in Mailpit addressed to bob@example.com — with
+        "Resend" checked, the "Max per user" cap is no longer limited to
+        pending-only notifications, so it re-selects the two most
+        recent of Bob's three (already-sent) notifications and re-sends
+        them. Mailpit's total is now three messages, all to Bob; Carol
+        and Dave still show zero new mail (scoping is unaffected by the
+        checkbox).

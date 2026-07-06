@@ -3,6 +3,7 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import or_
 from sqlmodel import Session, col, func, select
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,8 @@ from backend.api.schemas import (
     ForceInterestMatchPreviewUser,
     ForceSendUserResult,
     GeocodeSuggestion,
+    NotificationLogEntry,
+    NotificationLogResponse,
     NotificationToggleCountEntry,
     NotificationToggleCountsResponse,
     PaginatedEventsResponse,
@@ -60,6 +63,7 @@ from backend.db.models import (
     EventSave,
     EventTag,
     EventView,
+    Notification,
     PushSubscription,
     SyncLog,
     Tag,
@@ -704,6 +708,96 @@ def notification_toggle_counts(
     )
 
 
+# Notification type (as shown in the admin Notifications tab) -> the
+# Notification.kind values that roll up into it. Built from the same
+# single-source-of-truth maps the delivery workers use, so the log can
+# never drift from what "interest_match" / "activity_digest" actually mean.
+def _notification_kinds_by_type() -> dict[str, list[str]]:
+    from backend.services import activity_email
+    from backend.services.reminder_service import EVENT_REMINDER
+
+    kinds_by_type: dict[str, list[str]] = {
+        "interest_match": [],
+        "activity_digest": [],
+        "event_reminder": [EVENT_REMINDER],
+    }
+    for kind, feature in activity_email.FEATURE_BY_KIND.items():
+        if feature == "interest_matches":
+            kinds_by_type["interest_match"].append(kind)
+        elif feature == "social_activity":
+            kinds_by_type["activity_digest"].append(kind)
+    return kinds_by_type
+
+
+@router.get("/notifications/log", response_model=NotificationLogResponse)
+def admin_notifications_log(
+    type: Optional[str] = Query(default=None),
+    channel: Optional[str] = Query(default=None),
+    q: Optional[str] = Query(default=None, max_length=120),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """List every notification ever sent, newest first, for the admin
+    Notifications tab.
+
+    ``type`` filters to one of "interest_match" / "activity_digest" /
+    "event_reminder" (matching the 3 feature gates in Configuration).
+    ``channel`` filters to "email" (``emailed_at`` set) or "push"
+    (``pushed_at`` set); every row already has in-app ("app") support so
+    that channel isn't filterable. ``q`` matches the recipient's handle,
+    display name, or email (case-insensitive substring).
+    """
+    kinds_by_type = _notification_kinds_by_type()
+    if type is not None and type not in kinds_by_type:
+        raise HTTPException(status_code=400, detail=f"Unknown type: {type}")
+    if channel is not None and channel not in ("email", "push"):
+        raise HTTPException(status_code=400, detail=f"Unknown channel: {channel}")
+
+    stmt = select(Notification, User).join(
+        User, User.id == Notification.recipient_user_id
+    )
+    if type is not None:
+        stmt = stmt.where(col(Notification.kind).in_(kinds_by_type[type]))
+    if channel == "email":
+        stmt = stmt.where(col(Notification.emailed_at).is_not(None))
+    elif channel == "push":
+        stmt = stmt.where(col(Notification.pushed_at).is_not(None))
+    if q:
+        needle = f"%{q.strip().lower()}%"
+        stmt = stmt.where(
+            or_(
+                func.lower(User.handle).like(needle),
+                func.lower(User.display_name).like(needle),
+                func.lower(User.email).like(needle),
+            )
+        )
+
+    total = int(session.exec(select(func.count()).select_from(stmt.subquery())).one())
+    rows = session.exec(
+        stmt.order_by(col(Notification.created_at).desc()).limit(limit).offset(offset)
+    ).all()
+
+    kind_to_type = {k: t for t, kinds in kinds_by_type.items() for k in kinds}
+    items = [
+        NotificationLogEntry(
+            id=n.id,
+            created_at=n.created_at,
+            kind=n.kind,
+            type=kind_to_type.get(n.kind, n.kind),
+            channel_email=n.emailed_at is not None,
+            channel_push=n.pushed_at is not None,
+            recipient_user_id=u.id,
+            recipient_email=u.email,
+            recipient_handle=u.handle,
+            recipient_display_name=u.display_name,
+        )
+        for n, u in rows
+    ]
+    return NotificationLogResponse(items=items, total=total)
+
+
 @router.post(
     "/notifications/interest-match/force-send",
     response_model=ForceInterestMatchSendResponse,
@@ -881,6 +975,7 @@ def digest_send_now(
         force=True,
         user_ids=eligible_ids,
         max_notifications_per_user=body.max_notifications_per_user,
+        resend=body.resend,
     )
     delivered = set(stats.get("delivered_recipients") or [])
     for uid in eligible_ids:
