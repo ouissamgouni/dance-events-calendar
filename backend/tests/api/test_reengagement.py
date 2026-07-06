@@ -402,11 +402,11 @@ def test_activity_digest_gates_on_scheduled_slot(session, monkeypatch):
     n = _notif(session, recipient=bob, actor=a1, kind="new_follower", created_at=old)
 
     class _FakeDateTime:
-        """Freeze ``datetime.utcnow`` to a Monday 09:00 UTC (off-schedule)."""
+        """Freeze ``datetime.now`` to a Monday 09:00 UTC (off-schedule)."""
 
         @staticmethod
-        def utcnow():
-            return datetime(2026, 7, 6, 9, 0)  # Monday
+        def now(tz=None):
+            return datetime(2026, 7, 6, 9, 0, tzinfo=tz)  # Monday
 
     monkeypatch.setattr("backend.services.activity_email.datetime", _FakeDateTime)
 
@@ -444,11 +444,11 @@ def test_activity_digest_delivers_in_scheduled_slot(session, monkeypatch):
     )
 
     class _FakeDateTime:
-        """Freeze ``datetime.utcnow`` to Tuesday 09:00 UTC."""
+        """Freeze ``datetime.now`` to Tuesday 09:00 UTC."""
 
         @staticmethod
-        def utcnow():
-            return datetime(2026, 7, 7, 9, 0)  # Tuesday
+        def now(tz=None):
+            return datetime(2026, 7, 7, 9, 0, tzinfo=tz)  # Tuesday
 
     monkeypatch.setattr("backend.services.activity_email.datetime", _FakeDateTime)
 
@@ -499,9 +499,9 @@ def test_activity_digest_per_user_timezone(session, monkeypatch):
     # (past 09:00, in slot). Both fire.
     class _FakeDateTime:
         @staticmethod
-        def utcnow():
+        def now(tz=None):
             # Tuesday 00:15 UTC → 09:15 Tokyo (in slot), 01:15 Paris (before).
-            return datetime(2026, 7, 7, 0, 15)
+            return datetime(2026, 7, 7, 0, 15, tzinfo=tz)
 
     monkeypatch.setattr("backend.services.activity_email.datetime", _FakeDateTime)
 

@@ -1,7 +1,7 @@
 # Taxonomy used by the user-preferences scenario. The Settings Preferences
-# editor exposes ALL enabled tag groups as chip multi-selects, so both groups
-# defined below (`format` and `dance-style`) appear in Settings and contribute
-# to the user's saved `preferred_tag_ids`.
+# editor exposes ALL enabled tag groups as chip multi-selects, so all groups
+# defined below (`format`, `reach`, and `dance-style`) appear in Settings and
+# contribute to the user's saved `preferred_tag_ids`.
 tag_groups:
   - slug: format
     label: Format
@@ -17,6 +17,20 @@ tag_groups:
         label: Workshop
       - slug: festival
         label: Festival
+
+  - slug: reach
+    label: Reach
+    ordinal: 30
+    allow_multiple: true
+    onboarding_eligible: true
+    color: "#a78bfa"
+    tags:
+      - slug: local
+        label: Local
+      - slug: regional
+        label: Regional
+      - slug: international
+        label: International
 
   - slug: dance-style
     label: Dance Style

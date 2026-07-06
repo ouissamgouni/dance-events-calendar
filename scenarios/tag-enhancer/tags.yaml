@@ -47,6 +47,20 @@ tag_groups:
         label: Show
         synonyms: ["showcase", "performance", "demo", "exhibition"]
 
+  - slug: reach
+    label: Reach
+    ordinal: 15
+    allow_multiple: true
+    onboarding_eligible: true
+    color: "#a78bfa"
+    tags:
+      - slug: local
+        label: Local
+      - slug: regional
+        label: Regional
+      - slug: international
+        label: International
+
   - slug: dance-style
     label: Dance Style
     ordinal: 20
