@@ -94,6 +94,7 @@ from backend.db.models import (
     EventRating,
     EventSuggestion,
     OrganizerClaim,
+    PushSubscription,
     ShareToken,
     User,
     UserAccountMerge,
@@ -191,6 +192,14 @@ def _following_count(session: Session, user_id: UUID) -> int:
 
 def _to_admin_user(session: Session, user: User) -> AdminUser:
     active_block = _active_block_for_user(session, user)
+    has_push_subscription = (
+        session.exec(
+            select(func.count(PushSubscription.id)).where(
+                PushSubscription.user_id == user.id
+            )
+        ).one()
+        > 0
+    )
     return AdminUser(
         user_id=str(user.id),
         email=user.email,
@@ -207,6 +216,13 @@ def _to_admin_user(session: Session, user: User) -> AdminUser:
         following_count=_following_count(session, user.id),
         active_block_id=active_block.id if active_block else None,
         blocked_at=active_block.created_at if active_block else None,
+        email_interest_matches_enabled=bool(user.email_interest_matches_enabled),
+        push_interest_matches_enabled=bool(user.push_interest_matches_enabled),
+        email_event_reminders_enabled=bool(user.email_event_reminders_enabled),
+        push_event_reminders_enabled=bool(user.push_event_reminders_enabled),
+        email_social_activity_enabled=bool(user.email_social_activity_enabled),
+        push_social_activity_enabled=bool(user.push_social_activity_enabled),
+        has_push_subscription=has_push_subscription,
     )
 
 

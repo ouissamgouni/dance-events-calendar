@@ -716,6 +716,9 @@ class SiteSettingsResponse(BaseModel):
     # Times are interpreted in each recipient's ``User.timezone``.
     # Default = twice a week on Tuesday + Friday at 09:00 local.
     activity_digest_schedule: str = "tue,fri @ 09:00"
+    # Max matched events shown inline in an interest-match digest email
+    # before the rest collapse behind a "Discover more" link to "For you".
+    interest_match_max_events_per_email: int = 10
 
 
 # ---------------------------------------------------------------------------
@@ -734,6 +737,12 @@ class ForceInterestMatchSendRequest(BaseModel):
 
 class DigestSendNowRequest(BaseModel):
     user_ids: list[UUID] = Field(..., min_length=1, max_length=50)
+    # Caps how many pending notifications per recipient are folded into
+    # this manual send (most-recent-first); the rest stay pending for a
+    # future run. Load-control knob requested in place of a time window,
+    # since a user's backlog size (not its age) is what drives email/push
+    # size. None = no cap (send everything pending, as before).
+    max_notifications_per_user: Optional[int] = Field(default=None, ge=1, le=200)
 
 
 class ForceSendUserResult(BaseModel):
@@ -750,11 +759,35 @@ class ForceInterestMatchSendResponse(BaseModel):
     results: list[ForceSendUserResult]
 
 
+class ForceInterestMatchPreviewUser(BaseModel):
+    user_id: UUID
+    email: str
+    matched_events: int = 0
+    new_events: int = 0  # matched_events not already delivered as a notification
+
+
+class ForceInterestMatchPreviewResponse(BaseModel):
+    candidates_scanned: int
+    results: list[ForceInterestMatchPreviewUser]
+
+
 class DigestSendNowResponse(BaseModel):
     digests_sent: int
     pushes_sent: int
     stamped: int
     results: list[ForceSendUserResult]
+
+
+class NotificationToggleCountEntry(BaseModel):
+    email: int = 0
+    push: int = 0
+
+
+class NotificationToggleCountsResponse(BaseModel):
+    total_users: int
+    interest_match: NotificationToggleCountEntry
+    event_reminders: NotificationToggleCountEntry
+    activity_digest: NotificationToggleCountEntry
 
 
 class SiteSettingsUpdateRequest(BaseModel):
@@ -798,6 +831,11 @@ class SiteSettingsUpdateRequest(BaseModel):
         # provides a builder UI so the raw string is rarely edited.
         pattern=r"^([a-z]{3})(,[a-z]{3})*\s*@\s*\d{1,2}:\d{2}$",
         max_length=64,
+    )
+    # Max matched events shown inline in an interest-match digest email
+    # before the rest collapse behind a "Discover more" link to "For you".
+    interest_match_max_events_per_email: Optional[int] = Field(
+        default=None, ge=1, le=50
     )
 
 
@@ -1634,6 +1672,18 @@ class AdminUser(BaseModel):
     following_count: int = 0
     active_block_id: Optional[int] = None
     blocked_at: Optional[datetime] = None
+    # Per-feature notification channel status (email/push), read directly
+    # off the User row. Powers the read-only status columns in the admin
+    # Users table and the force-send/send-now target user pickers.
+    email_interest_matches_enabled: bool = True
+    push_interest_matches_enabled: bool = True
+    email_event_reminders_enabled: bool = True
+    push_event_reminders_enabled: bool = True
+    email_social_activity_enabled: bool = True
+    push_social_activity_enabled: bool = True
+    # True when the user has at least one registered Web Push browser
+    # endpoint (``push_subscriptions`` row).
+    has_push_subscription: bool = False
 
 
 class AdminUserListResponse(BaseModel):

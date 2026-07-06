@@ -185,11 +185,18 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         # "disabled" even when WEB_PUSH_ENABLED=true was set at the env/fly
         # level with no site_settings override yet.
         event_reminders_enabled=app_settings.get_event_reminders_enabled(session),
-        activity_digest_email_enabled=app_settings.get_activity_digest_email_enabled(session),
-        interest_match_notifications_enabled=app_settings.get_interest_match_notifications_enabled(session),
+        activity_digest_email_enabled=app_settings.get_activity_digest_email_enabled(
+            session
+        ),
+        interest_match_notifications_enabled=app_settings.get_interest_match_notifications_enabled(
+            session
+        ),
         web_push_enabled=app_settings.get_web_push_enabled(session),
         reminder_lead_hours=app_settings.get_reminder_lead_hours(session),
         activity_digest_schedule=app_settings.get_activity_digest_schedule(session),
+        interest_match_max_events_per_email=app_settings.get_interest_match_max_events_per_email(
+            session
+        ),
     )
 
 
@@ -367,7 +374,9 @@ def update_settings(
 
     # Notification global gates.
     if body.event_reminders_enabled is not None:
-        _set_bool_setting(session, "event_reminders_enabled", body.event_reminders_enabled)
+        _set_bool_setting(
+            session, "event_reminders_enabled", body.event_reminders_enabled
+        )
     if body.activity_digest_email_enabled is not None:
         _set_bool_setting(
             session, "activity_digest_email_enabled", body.activity_digest_email_enabled
@@ -396,6 +405,17 @@ def update_settings(
         else:
             row = SiteSetting(
                 key="activity_digest_schedule", value=body.activity_digest_schedule
+            )
+        session.add(row)
+
+    if body.interest_match_max_events_per_email is not None:
+        row = session.get(SiteSetting, "interest_match_max_events_per_email")
+        if row:
+            row.value = str(body.interest_match_max_events_per_email)
+        else:
+            row = SiteSetting(
+                key="interest_match_max_events_per_email",
+                value=str(body.interest_match_max_events_per_email),
             )
         session.add(row)
 

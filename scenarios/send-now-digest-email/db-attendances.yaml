@@ -1,9 +1,20 @@
 # Fire the same subscription_going fan-out that the HTTP attendance
 # route runs, so this seed yields real Notification rows for Alice's
-# followers instead of leaving the digest with nothing to send.
+# followers instead of leaving the digest with nothing to send. Alice
+# attends all three events, so each follower ends up with THREE
+# pending social_activity rows — enough backlog for the "max per user"
+# cap on "Send digest now" to actually bind (see test_plan.yaml).
 emit_notifications: true
 attendances:
   - event_id: ev-friend
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-friend2
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-friend3
     email: alice@example.com
     share_publicly: true
     share_audience: public

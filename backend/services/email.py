@@ -205,6 +205,7 @@ def send_activity_digest_email(
     lines: list[str],
     *,
     feature: str = "social_activity",
+    discover_more_count: int = 0,
 ) -> bool:
     """Email a user a batched digest of recent activity for one feature.
 
@@ -215,11 +216,16 @@ def send_activity_digest_email(
     and controls the subject line, footer copy, and the per-feature
     unsubscribe token category so the footer link disables the right
     email channel.
+
+    ``discover_more_count`` (interest-match digests only): number of
+    additional matched events beyond ``lines`` that were collapsed behind
+    a "Discover more" CTA linking to the "For you" page, per the admin's
+    configured per-email cap (``interest_match_max_events_per_email``).
     """
     if not user.email or not lines:
         return False
     app = get_public_app_url()
-    count = len(lines)
+    count = len(lines) + discover_more_count
     if feature == "interest_matches":
         subject = (
             "1 new event matched your saved search on Movida"
@@ -239,9 +245,20 @@ def send_activity_digest_email(
     items = "".join(
         f'<li style="margin:6px 0;color:#374151">{line}</li>' for line in lines
     )
+    discover_more_html = ""
+    if feature == "interest_matches" and discover_more_count > 0:
+        discover_more_html = f"""
+    <p style="margin:12px 0">
+      <a href="{app}/for-you"
+                 style="color:#1d4ed8;text-decoration:underline">
+        Discover {discover_more_count} more matching event{"s" if discover_more_count != 1 else ""} &rarr;
+      </a>
+    </p>
+    """
     body = f"""
     <p>Here's what happened in your scene:</p>
     <ul style="padding-left:18px;margin:12px 0">{items}</ul>
+    {discover_more_html}
     <p style="margin:20px 0">
       <a href="{app}/account#notifications"
                  style="background:#3b82f6;color:#fff;text-decoration:none;

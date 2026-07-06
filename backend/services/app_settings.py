@@ -21,6 +21,7 @@ from backend.db.models import SiteSetting
 
 
 DEFAULT_DIGEST_SCHEDULE = "tue,fri @ 09:00"
+DEFAULT_INTEREST_MATCH_MAX_EVENTS_PER_EMAIL = 10
 
 
 def _open_session(session: Optional[Session]) -> tuple[Session, bool]:
@@ -128,3 +129,18 @@ def get_activity_digest_schedule(session: Optional[Session] = None) -> str:
         if opened:
             s.close()
     return override or DEFAULT_DIGEST_SCHEDULE
+
+
+def get_interest_match_max_events_per_email(session: Optional[Session] = None) -> int:
+    """Max number of matched events shown inline in an interest-match
+    digest email before the rest are collapsed behind a "Discover more"
+    CTA linking to the "For you" page."""
+    s, opened = _open_session(session)
+    try:
+        override = _get_int_row(s, "interest_match_max_events_per_email")
+    finally:
+        if opened:
+            s.close()
+    if override is not None and override > 0:
+        return override
+    return DEFAULT_INTEREST_MATCH_MAX_EVENTS_PER_EMAIL

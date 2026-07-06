@@ -241,6 +241,10 @@ export interface SiteSettings {
      * ``<mon|tue|...>[,<day>...] @ HH:MM`` interpreted in each recipient's
      * ``User.timezone``. Default = twice a week (``tue,fri @ 09:00``). */
     activity_digest_schedule?: string;
+    /** Max matched events shown inline in an interest-match digest email
+     * before the rest collapse behind a "Discover more" link to "For
+     * you". 1-50, client default 10. */
+    interest_match_max_events_per_email?: number;
 }
 
 export async function fetchSettings(): Promise<SiteSettings> {
@@ -310,6 +314,31 @@ export async function forceSendInterestMatches(
     return parseJsonResponse<ForceInterestMatchSendResponse>(res, 'Failed to force-send interest matches');
 }
 
+export interface ForceInterestMatchPreviewUser {
+    user_id: string;
+    email: string;
+    matched_events: number;
+    new_events: number;
+}
+
+export interface ForceInterestMatchPreviewResponse {
+    candidates_scanned: number;
+    results: ForceInterestMatchPreviewUser[];
+}
+
+export async function previewInterestMatches(
+    userIds: string[],
+    lookbackHours: number,
+): Promise<ForceInterestMatchPreviewResponse> {
+    const res = await fetch(`${BASE}/admin/notifications/interest-match/preview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ user_ids: userIds, lookback_hours: lookbackHours }),
+    });
+    return parseJsonResponse<ForceInterestMatchPreviewResponse>(res, 'Failed to preview interest matches');
+}
+
 export interface DigestSendNowResponse {
     digests_sent: number;
     pushes_sent: number;
@@ -317,14 +346,36 @@ export interface DigestSendNowResponse {
     results: ForceSendUserResult[];
 }
 
-export async function sendDigestNow(userIds: string[]): Promise<DigestSendNowResponse> {
+export async function sendDigestNow(
+    userIds: string[],
+    maxNotificationsPerUser?: number,
+): Promise<DigestSendNowResponse> {
+    const body: Record<string, unknown> = { user_ids: userIds };
+    if (maxNotificationsPerUser != null) body.max_notifications_per_user = maxNotificationsPerUser;
     const res = await fetch(`${BASE}/admin/notifications/digest/send-now`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ user_ids: userIds }),
+        body: JSON.stringify(body),
     });
     return parseJsonResponse<DigestSendNowResponse>(res, 'Failed to send digest now');
+}
+
+export interface NotificationToggleCountEntry {
+    email: number;
+    push: number;
+}
+
+export interface NotificationToggleCounts {
+    total_users: number;
+    interest_match: NotificationToggleCountEntry;
+    event_reminders: NotificationToggleCountEntry;
+    activity_digest: NotificationToggleCountEntry;
+}
+
+export async function fetchNotificationToggleCounts(): Promise<NotificationToggleCounts> {
+    const res = await fetch(`${BASE}/admin/notifications/toggle-counts`, { credentials: 'include' });
+    return parseJsonResponse<NotificationToggleCounts>(res, 'Failed to fetch notification toggle counts');
 }
 
 export async function trackEventView(eventId: string, deviceId?: string, source?: string): Promise<void> {
@@ -1553,6 +1604,16 @@ export interface AdminUserRow {
     following_count: number;
     active_block_id: number | null;
     blocked_at: string | null;
+    // Per-feature notification channel status, read directly off the
+    // User row. Powers the read-only status columns in the admin Users
+    // table and the force-send/send-now target user pickers.
+    email_interest_matches_enabled: boolean;
+    push_interest_matches_enabled: boolean;
+    email_event_reminders_enabled: boolean;
+    push_event_reminders_enabled: boolean;
+    email_social_activity_enabled: boolean;
+    push_social_activity_enabled: boolean;
+    has_push_subscription: boolean;
 }
 
 export interface AdminUserList {

@@ -1043,6 +1043,13 @@ class Notification(SQLModel, table=True):
     # delivery idempotent across loop ticks. ``event_reminder`` rows are
     # emailed inline by the reminder service and are never picked up here.
     emailed_at: Optional[datetime] = Field(default=None, index=True)
+    # Set once this notification has been considered for push delivery
+    # (see ``services/activity_email.py``). Decoupled from ``emailed_at``
+    # because push fires on every dispatch tick (no weekly schedule gate),
+    # while email stays batched on the activity-digest schedule — a row can
+    # be pushed immediately but wait days to be folded into an email, or
+    # vice versa when push is disabled for a recipient.
+    pushed_at: Optional[datetime] = Field(default=None, index=True)
     # Free-text context for kinds that need extra message copy beyond
     # actor/event, e.g. ``interest_event`` stores the matched profile
     # label(s) (comma-joined) so the digest/in-app renderers can say

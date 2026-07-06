@@ -168,6 +168,72 @@ def _load_profile_tags(
     return out
 
 
+def _find_matches(
+    session: Session, events: list[CachedEvent], user_ids: set | None = None
+) -> dict[tuple, list[str]]:
+    """Group-aware match of candidate ``events`` against active profiles.
+
+    Returns ``(recipient_user_id, event_id) -> [matched profile labels]``.
+    Pure matching — does not touch ``Notification`` rows, so it's safe to
+    call from a dry-run preview as well as the real create path.
+    """
+    if not events:
+        return {}
+
+    event_tags = _load_event_tag_ids(session, [e.event_id for e in events])
+
+    profiles_stmt = (
+        select(UserInterestProfile, User)
+        .join(User, User.id == UserInterestProfile.user_id)  # type: ignore[arg-type]
+        .where(UserInterestProfile.matches_enabled == True)  # noqa: E712
+        .where(User.deleted_at.is_(None))  # type: ignore[union-attr]
+    )
+    if user_ids is not None:
+        profiles_stmt = profiles_stmt.where(UserInterestProfile.user_id.in_(user_ids))  # type: ignore[union-attr]
+    profiles = session.exec(profiles_stmt).all()
+    if not profiles:
+        return {}
+
+    profile_tags = _load_profile_tags(session, [p.id for p, _ in profiles])
+
+    matches: dict[tuple, list[str]] = {}
+    for profile, user in profiles:
+        dance_ids, reach_ids = profile_tags.get(profile.id, (set(), set()))
+        if not dance_ids:
+            continue
+        for event in events:
+            tags = event_tags.get(event.event_id, set())
+            if not (dance_ids & tags):
+                continue
+            if reach_ids and not (reach_ids & tags):
+                continue
+            if not _geo_match(profile, event.latitude, event.longitude):
+                continue
+            key = (user.id, event.event_id)
+            matches.setdefault(key, []).append(profile.label)
+    return matches
+
+
+def _existing_notification_pairs(
+    session: Session, matches: dict[tuple, list[str]]
+) -> set[tuple]:
+    """(recipient_user_id, event_id) pairs already delivered as
+    ``interest_event`` notifications, restricted to the given ``matches``
+    keys (avoids scanning the whole table)."""
+    if not matches:
+        return set()
+    recipient_ids = {uid for uid, _ in matches}
+    event_ids = {eid for _, eid in matches}
+    return set(
+        session.exec(
+            select(Notification.recipient_user_id, Notification.event_id)
+            .where(Notification.kind == INTEREST_EVENT)
+            .where(Notification.recipient_user_id.in_(recipient_ids))  # type: ignore[union-attr]
+            .where(Notification.event_id.in_(event_ids))  # type: ignore[union-attr]
+        ).all()
+    )
+
+
 def _scan_and_create(
     session: Session,
     since: datetime,
@@ -185,51 +251,11 @@ def _scan_and_create(
     if not events:
         return {"candidates": 0, "created": 0}
 
-    event_tags = _load_event_tag_ids(session, [e.event_id for e in events])
-
-    profiles_stmt = (
-        select(UserInterestProfile, User)
-        .join(User, User.id == UserInterestProfile.user_id)  # type: ignore[arg-type]
-        .where(UserInterestProfile.matches_enabled == True)  # noqa: E712
-        .where(User.deleted_at.is_(None))  # type: ignore[union-attr]
-    )
-    if user_ids is not None:
-        profiles_stmt = profiles_stmt.where(UserInterestProfile.user_id.in_(user_ids))  # type: ignore[union-attr]
-    profiles = session.exec(profiles_stmt).all()
-    if not profiles:
-        return {"candidates": len(events), "created": 0}
-
-    profile_tags = _load_profile_tags(session, [p.id for p, _ in profiles])
-
-    # (recipient_user_id, event_id) -> [matched profile labels]
-    matches: dict[tuple, list[str]] = {}
-    for profile, user in profiles:
-        dance_ids, reach_ids = profile_tags.get(profile.id, (set(), set()))
-        if not dance_ids:
-            continue
-        for event in events:
-            tags = event_tags.get(event.event_id, set())
-            if not (dance_ids & tags):
-                continue
-            if reach_ids and not (reach_ids & tags):
-                continue
-            if not _geo_match(profile, event.latitude, event.longitude):
-                continue
-            key = (user.id, event.event_id)
-            matches.setdefault(key, []).append(profile.label)
+    matches = _find_matches(session, events, user_ids)
 
     created = 0
     if matches:
-        recipient_ids = {uid for uid, _ in matches}
-        event_ids = {eid for _, eid in matches}
-        existing = set(
-            session.exec(
-                select(Notification.recipient_user_id, Notification.event_id)
-                .where(Notification.kind == INTEREST_EVENT)
-                .where(Notification.recipient_user_id.in_(recipient_ids))  # type: ignore[union-attr]
-                .where(Notification.event_id.in_(event_ids))  # type: ignore[union-attr]
-            ).all()
-        )
+        existing = _existing_notification_pairs(session, matches)
         for (user_id, event_id), labels in matches.items():
             if (user_id, event_id) in existing:
                 continue
@@ -259,7 +285,9 @@ def run_once() -> dict:
         since = _get_last_scan(session)
         logger.debug(
             "Interest notification scan window: since=%s now=%s (%.0fs)",
-            since, now, (now - since).total_seconds(),
+            since,
+            now,
+            (now - since).total_seconds(),
         )
         result = _scan_and_create(session, since, now)
         _set_last_scan(session, now)
@@ -267,7 +295,8 @@ def run_once() -> dict:
 
     logger.info(
         "Interest notification run: %d candidates, %d created",
-        result["candidates"], result["created"],
+        result["candidates"],
+        result["created"],
     )
     return result
 
@@ -293,6 +322,52 @@ def run_once_for_users(user_ids: set, lookback_hours: int) -> dict:
     logger.info(
         "Interest notification FORCE run: users=%d lookback_hours=%d -> "
         "%d candidates, %d created",
-        len(user_ids), lookback_hours, result["candidates"], result["created"],
+        len(user_ids),
+        lookback_hours,
+        result["candidates"],
+        result["created"],
     )
     return result
+
+
+def preview_matches_for_users(user_ids: set, lookback_hours: int) -> dict:
+    """Dry-run version of ``run_once_for_users``: reports, per user, how
+    many candidate events would match their interest profile(s) over the
+    given lookback window — WITHOUT creating any ``Notification`` rows.
+
+    Powers the admin "force-send" preview so an operator can sanity-check
+    that a user actually has matches before committing a send. This is the
+    key diagnostic for the common "N candidates, 0 created" confusion: the
+    ``candidates`` count from the force-send run is the number of events in
+    the lookback window GLOBALLY, not matches for the selected user(s) — a
+    user with 0 matches (no profile, no dance tags on their profile, no
+    geo/reach overlap) will always show 0 created regardless of how many
+    candidate events exist.
+
+    Returns ``{"candidates_scanned": int, "per_user": {user_id_str: {
+    "matched_events": int, "new_events": int}}}``. ``matched_events`` is
+    the total number of events matching that user's profile(s) in the
+    window; ``new_events`` is the subset not already delivered as an
+    ``interest_event`` notification (i.e. what a force-send would actually
+    create).
+    """
+    now = _utcnow_naive()
+    since = now - timedelta(hours=lookback_hours)
+
+    with Session(get_engine(), expire_on_commit=False) as session:
+        events = _candidate_events(session, since, now)
+        matches = _find_matches(session, events, set(user_ids))
+        existing = _existing_notification_pairs(session, matches)
+
+    per_user: dict[str, dict] = {
+        str(uid): {"matched_events": 0, "new_events": 0} for uid in user_ids
+    }
+    for (user_id, event_id), _labels in matches.items():
+        bucket = per_user.setdefault(
+            str(user_id), {"matched_events": 0, "new_events": 0}
+        )
+        bucket["matched_events"] += 1
+        if (user_id, event_id) not in existing:
+            bucket["new_events"] += 1
+
+    return {"candidates_scanned": len(events), "per_user": per_user}

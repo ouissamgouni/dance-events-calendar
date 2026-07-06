@@ -27,11 +27,12 @@ from datetime import datetime, timedelta, timezone
 from html import escape
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlmodel import Session, select
+from sqlmodel import Session, or_, select
 
 from backend.services.app_settings import (
     get_activity_digest_schedule,
     get_activity_digest_email_enabled,
+    get_interest_match_max_events_per_email,
 )
 from backend.config.loader import get_public_app_url
 from backend.db.database import get_engine
@@ -265,12 +266,20 @@ def run_once(
     force: bool = False,
     user_ids: set | None = None,
     kinds: tuple[str, ...] | None = None,
+    max_notifications_per_user: int | None = None,
 ) -> dict:
-    """Send pending activity digests. Returns a stats dict for logging.
+    """Send pending activity digest emails and push notifications.
 
-    ``force=True`` bypasses the per-user schedule window — used by the
-    admin ``trigger-notifications`` CLI so operators can flush queued
-    digests on demand for debugging.
+    Email and push are gated independently:
+      - Email stays batched on the weekly per-user activity-digest
+        schedule (``force=True`` bypasses that schedule window — used
+        by the admin ``trigger-notifications`` CLI and "force send"
+        endpoints so operators can flush queued digests on demand).
+      - Push has no schedule: any notification not yet pushed is a
+        candidate on every call (i.e. every dispatch tick), independent
+        of ``force`` and of the email cadence. This keeps push feeling
+        real-time instead of waiting for the (much slower) email
+        schedule — see ``pushed_at`` on ``Notification``.
 
     ``user_ids`` restricts the pending-notification query to a specific
     set of recipients; ``kinds`` restricts it to a subset of
@@ -278,6 +287,13 @@ def run_once(
     by the admin "force send" endpoints (send digest now / force interest
     match) to act on a hand-picked set of users without disturbing
     everyone else's pending backlog.
+
+    ``max_notifications_per_user`` caps how many pending notifications per
+    recipient are included in THIS run, applied independently per channel
+    (the most recent N are kept for each of email/push; older overflow
+    rows are left unstamped/pending for a future run). Used by the admin
+    "send now" control to bound the load of a single manual digest when a
+    user has a large backlog, instead of a time-based lookback window.
     """
     if not get_activity_digest_email_enabled():
         return {"skipped": "activity_email_disabled"}
@@ -286,11 +302,17 @@ def run_once(
     now_utc = now.replace(tzinfo=timezone.utc)
     cutoff_old = now - _MAX_AGE
     weekdays, sched_hour, sched_minute = _parse_schedule(get_activity_digest_schedule())
+    max_events_per_interest_email = get_interest_match_max_events_per_email()
 
     with Session(get_engine()) as session:
         stmt = (
             select(Notification)
-            .where(Notification.emailed_at.is_(None))  # type: ignore[union-attr]
+            .where(
+                or_(
+                    Notification.emailed_at.is_(None),  # type: ignore[union-attr]
+                    Notification.pushed_at.is_(None),  # type: ignore[union-attr]
+                )
+            )
             .where(Notification.kind.in_(kinds or ACTIVITY_KINDS))  # type: ignore[union-attr]
             .where(Notification.created_at >= cutoff_old)
             .order_by(Notification.recipient_user_id, Notification.created_at)
@@ -301,9 +323,10 @@ def run_once(
         if not pending:
             logger.debug(
                 "Activity digest run: no pending notifications (user_ids=%s kinds=%s)",
-                user_ids, kinds,
+                user_ids,
+                kinds,
             )
-            return {"digests": 0}
+            return {"digests": 0, "pushed": 0}
 
         # Hydrate actors + events in bulk.
         actor_ids = {n.actor_user_id for n in pending}
@@ -323,46 +346,98 @@ def run_once(
             if event_ids
         }
 
-        # Group per (recipient, feature) so each bucket consults its own
-        # channel flags independently. Skip recipients whose local TZ is
-        # not in a scheduled digest slot right now (unless ``force``).
+        # Split into per-channel candidate lists (chronological order —
+        # the query is already ordered this way). A row can be pending on
+        # one channel and already handled on the other (e.g. pushed
+        # immediately last tick, still waiting on the weekly email slot).
         skipped_off_schedule = 0
         skip_reason_counts: dict[str, int] = {}
-        email_groups: dict[tuple, list[Notification]] = {}
-        push_groups: dict[tuple, list[Notification]] = {}
-        delivered_recipients: set = set()
+        email_by_recipient: dict = {}
+        push_by_recipient: dict = {}
         for n in pending:
             recipient = users.get(n.recipient_user_id)
             if not recipient or recipient.deleted_at is not None:
                 continue
-            if not force:
-                status = _slot_status(
-                    recipient, now_utc, weekdays, sched_hour, sched_minute
-                )
-                if status != "in_slot":
-                    skipped_off_schedule += 1
-                    skip_reason_counts[status] = skip_reason_counts.get(status, 0) + 1
-                    logger.debug(
-                        "Activity digest: recipient=%s skipped (%s) tz=%s schedule=%r",
-                        recipient.id, status, recipient.timezone,
-                        get_activity_digest_schedule(),
+            if n.emailed_at is None:
+                in_slot = force
+                if not force:
+                    status = _slot_status(
+                        recipient, now_utc, weekdays, sched_hour, sched_minute
                     )
-                    continue
+                    in_slot = status == "in_slot"
+                    if not in_slot:
+                        skipped_off_schedule += 1
+                        skip_reason_counts[status] = (
+                            skip_reason_counts.get(status, 0) + 1
+                        )
+                        logger.debug(
+                            "Activity digest: recipient=%s skipped (%s) tz=%s schedule=%r",
+                            recipient.id,
+                            status,
+                            recipient.timezone,
+                            get_activity_digest_schedule(),
+                        )
+                if in_slot:
+                    email_by_recipient.setdefault(recipient.id, []).append(n)
+            # Push has no schedule slot — any not-yet-pushed row is a
+            # candidate on every call, regardless of ``force``.
+            if n.pushed_at is None:
+                push_by_recipient.setdefault(recipient.id, []).append(n)
+
+        # Cap the number of notifications included per recipient in THIS
+        # run, independently per channel. Keep the most recent N (lists
+        # are chronological, so this is a tail slice); the rest stay
+        # unstamped and roll into a future run rather than being dropped.
+        capped_recipient_ids: set = set()
+
+        def _apply_cap(by_recipient: dict) -> list[Notification]:
+            included: list[Notification] = []
+            for recipient_id, notifs in by_recipient.items():
+                if (
+                    max_notifications_per_user is not None
+                    and len(notifs) > max_notifications_per_user
+                ):
+                    capped_recipient_ids.add(recipient_id)
+                    included.extend(notifs[-max_notifications_per_user:])
+                else:
+                    included.extend(notifs)
+            return included
+
+        included_for_email = _apply_cap(email_by_recipient)
+        included_for_push = _apply_cap(push_by_recipient)
+
+        email_groups: dict[tuple, list[Notification]] = {}
+        push_groups: dict[tuple, list[Notification]] = {}
+        email_recipients: set = set()
+        push_recipients: set = set()
+        for n in included_for_email:
+            recipient = users[n.recipient_user_id]
             feature = FEATURE_BY_KIND.get(n.kind)
             if feature is None:
                 continue
-            key = (recipient.id, feature)
-            delivered_recipients.add(recipient.id)
-            email_flag = getattr(recipient, CHANNEL_FLAG[("email", feature)], True)
-            if email_flag:
-                email_groups.setdefault(key, []).append(n)
-            push_flag = getattr(recipient, CHANNEL_FLAG[("push", feature)], True)
-            if push_flag:
-                push_groups.setdefault(key, []).append(n)
+            email_recipients.add(recipient.id)
+            if getattr(recipient, CHANNEL_FLAG[("email", feature)], True):
+                email_groups.setdefault((recipient.id, feature), []).append(n)
+        for n in included_for_push:
+            recipient = users[n.recipient_user_id]
+            feature = FEATURE_BY_KIND.get(n.kind)
+            if feature is None:
+                continue
+            push_recipients.add(recipient.id)
+            if getattr(recipient, CHANNEL_FLAG[("push", feature)], True):
+                push_groups.setdefault((recipient.id, feature), []).append(n)
 
         digests = 0
         for (recipient_id, feature), notifs in email_groups.items():
             recipient = users[recipient_id]
+            discover_more_count = 0
+            email_notifs = notifs
+            if (
+                feature == "interest_matches"
+                and len(notifs) > max_events_per_interest_email
+            ):
+                discover_more_count = len(notifs) - max_events_per_interest_email
+                email_notifs = notifs[:max_events_per_interest_email]
             lines = [
                 _render_line(
                     n.kind,
@@ -370,9 +445,14 @@ def run_once(
                     events.get(n.event_id) if n.event_id else None,
                     n.context,
                 )
-                for n in notifs
+                for n in email_notifs
             ]
-            send_activity_digest_email(recipient, lines, feature=feature)
+            send_activity_digest_email(
+                recipient,
+                lines,
+                feature=feature,
+                discover_more_count=discover_more_count,
+            )
             digests += 1
 
         pushed = 0
@@ -394,17 +474,23 @@ def run_once(
                 tag=_push_tag_for(feature),
             )
 
-        # Stamp emailed_at only on notifications actually delivered (or
-        # would-be delivered but suppressed by per-channel flags — either
-        # way the recipient was inside their slot so we treat the rows
-        # as handled to avoid re-processing next tick). Notifications
-        # for users outside their slot stay unstamped and roll up.
+        # Stamp emailed_at on every notification considered for email this
+        # run (whether emailed, or suppressed by the recipient's email
+        # flag — either way the recipient was in-slot/forced and under
+        # the cap, so the weekly slot is "spent" for this row). Stamp
+        # pushed_at independently on every notification considered for
+        # push this run — push has no slot to spend, so this just tracks
+        # "already attempted" idempotency across ticks. Rows excluded by
+        # the email schedule gate or a per-channel cap stay unstamped on
+        # that channel and roll into a future run.
         stamped = 0
-        for n in pending:
-            if n.recipient_user_id in delivered_recipients:
-                n.emailed_at = now
-                stamped += 1
-        for rid in delivered_recipients:
+        for n in included_for_email:
+            n.emailed_at = now
+            stamped += 1
+        for n in included_for_push:
+            n.pushed_at = now
+            stamped += 1
+        for rid in email_recipients:
             user = users.get(rid)
             if user is not None:
                 user.last_digest_sent_at = now
@@ -413,7 +499,7 @@ def run_once(
 
     logger.info(
         "Activity digest run: %d emails, %d pushes, %d stamped, %d off-schedule "
-        "(wrong_weekday=%d before_scheduled_time=%d already_sent_today=%d)",
+        "(wrong_weekday=%d before_scheduled_time=%d already_sent_today=%d), %d recipient(s) capped",
         digests,
         pushed,
         stamped,
@@ -421,6 +507,7 @@ def run_once(
         skip_reason_counts.get("wrong_weekday", 0),
         skip_reason_counts.get("before_scheduled_time", 0),
         skip_reason_counts.get("already_sent_today", 0),
+        len(capped_recipient_ids),
     )
     return {
         "digests": digests,
@@ -428,5 +515,8 @@ def run_once(
         "stamped": stamped,
         "skipped_off_schedule": skipped_off_schedule,
         "skip_reasons": skip_reason_counts,
-        "delivered_recipients": [str(rid) for rid in delivered_recipients],
+        "delivered_recipients": [
+            str(rid) for rid in (email_recipients | push_recipients)
+        ],
+        "capped_recipients": len(capped_recipient_ids),
     }

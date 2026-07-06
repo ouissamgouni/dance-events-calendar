@@ -10,6 +10,7 @@ import {
 } from '../api';
 import type { AdminUserMergeResponse, AdminUserRow } from '../api';
 import { ConfirmDialog, PromptDialog } from './AppDialog';
+import { FeatureStatusCell, PushSubscriptionCell } from './NotificationStatusBadges';
 
 const PAGE_SIZE = 50;
 
@@ -257,6 +258,10 @@ export default function AdminUsersTab() {
                             <th className="px-3 py-2">Created</th>
                             <th className="px-3 py-2 text-right">Followers</th>
                             <th className="px-3 py-2 text-right">Following</th>
+                            <th className="px-3 py-2">Interest-match</th>
+                            <th className="px-3 py-2">Reminders</th>
+                            <th className="px-3 py-2">Digest</th>
+                            <th className="px-3 py-2">Push</th>
                             <th className="px-3 py-2">Status</th>
                             <th className="px-3 py-2">Actions</th>
                         </tr>
@@ -264,7 +269,7 @@ export default function AdminUsersTab() {
                     <tbody>
                         {!loading && rows.length === 0 && (
                             <tr>
-                                <td colSpan={7} className="px-3 py-8 text-center text-slate-500">
+                                <td colSpan={11} className="px-3 py-8 text-center text-slate-500">
                                     No users match these filters.
                                 </td>
                             </tr>
@@ -302,6 +307,30 @@ export default function AdminUsersTab() {
                                     </td>
                                     <td className="px-3 py-2 text-right tabular-nums">
                                         {row.following_count}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <FeatureStatusCell
+                                            label="Interest-match"
+                                            email={row.email_interest_matches_enabled}
+                                            push={row.push_interest_matches_enabled}
+                                        />
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <FeatureStatusCell
+                                            label="Event reminders"
+                                            email={row.email_event_reminders_enabled}
+                                            push={row.push_event_reminders_enabled}
+                                        />
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <FeatureStatusCell
+                                            label="Activity digest"
+                                            email={row.email_social_activity_enabled}
+                                            push={row.push_social_activity_enabled}
+                                        />
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <PushSubscriptionCell on={row.has_push_subscription} />
                                     </td>
                                     <td className="px-3 py-2">
                                         <div className="flex flex-wrap items-center gap-1">

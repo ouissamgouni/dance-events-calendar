@@ -33,8 +33,12 @@ from backend.api.schemas import (
     FilterOption,
     ForceInterestMatchSendRequest,
     ForceInterestMatchSendResponse,
+    ForceInterestMatchPreviewResponse,
+    ForceInterestMatchPreviewUser,
     ForceSendUserResult,
     GeocodeSuggestion,
+    NotificationToggleCountEntry,
+    NotificationToggleCountsResponse,
     PaginatedEventsResponse,
     SyncJobListResponse,
     SyncJobStartRequest,
@@ -592,12 +596,14 @@ def notifications_effective_config(
         ),
         "activity_digest_email_enabled": _entry(
             app_settings.get_activity_digest_email_enabled(session),
-            app_settings._get_bool_row(session, "activity_digest_email_enabled") is not None,
+            app_settings._get_bool_row(session, "activity_digest_email_enabled")
+            is not None,
             loader.get_activity_digest_email_enabled(),
         ),
         "interest_match_notifications_enabled": _entry(
             app_settings.get_interest_match_notifications_enabled(session),
-            app_settings._get_bool_row(session, "interest_match_notifications_enabled") is not None,
+            app_settings._get_bool_row(session, "interest_match_notifications_enabled")
+            is not None,
             loader.get_interest_match_notifications_enabled(),
         ),
         "web_push_enabled": _entry(
@@ -651,6 +657,53 @@ def webpush_subscriber_count(
     return {"subscriber_count": count}
 
 
+@router.get(
+    "/notifications/toggle-counts", response_model=NotificationToggleCountsResponse
+)
+def notification_toggle_counts(
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Count of non-deleted users with each per-feature notification
+    channel toggle turned on, shown next to the corresponding global gate
+    in admin Configuration so an admin can see how many users a change
+    would actually affect.
+    """
+    from sqlalchemy import case
+
+    def _count(condition) -> int:
+        return int(
+            session.exec(
+                select(func.sum(case((condition, 1), else_=0))).where(
+                    col(User.deleted_at).is_(None)
+                )
+            ).one()
+            or 0
+        )
+
+    total_users = int(
+        session.exec(
+            select(func.count()).select_from(User).where(col(User.deleted_at).is_(None))
+        ).one()
+    )
+
+    return NotificationToggleCountsResponse(
+        total_users=total_users,
+        interest_match=NotificationToggleCountEntry(
+            email=_count(User.email_interest_matches_enabled == True),  # noqa: E712
+            push=_count(User.push_interest_matches_enabled == True),  # noqa: E712
+        ),
+        event_reminders=NotificationToggleCountEntry(
+            email=_count(User.email_event_reminders_enabled == True),  # noqa: E712
+            push=_count(User.push_event_reminders_enabled == True),  # noqa: E712
+        ),
+        activity_digest=NotificationToggleCountEntry(
+            email=_count(User.email_social_activity_enabled == True),  # noqa: E712
+            push=_count(User.push_social_activity_enabled == True),  # noqa: E712
+        ),
+    )
+
+
 @router.post(
     "/notifications/interest-match/force-send",
     response_model=ForceInterestMatchSendResponse,
@@ -685,9 +738,13 @@ def force_send_interest_matches(
                 ForceSendUserResult(user_id=uid, email="", status="skipped_not_found")
             )
             continue
-        if not (user.email_interest_matches_enabled or user.push_interest_matches_enabled):
+        if not (
+            user.email_interest_matches_enabled or user.push_interest_matches_enabled
+        ):
             results.append(
-                ForceSendUserResult(user_id=uid, email=user.email, status="skipped_disabled")
+                ForceSendUserResult(
+                    user_id=uid, email=user.email, status="skipped_disabled"
+                )
             )
             continue
         eligible_ids.add(uid)
@@ -710,13 +767,64 @@ def force_send_interest_matches(
     delivered = set(digest_stats.get("delivered_recipients") or [])
     for uid in eligible_ids:
         status = "sent" if str(uid) in delivered else "no_pending_notifications"
-        results.append(ForceSendUserResult(user_id=uid, email=users[uid].email, status=status))
+        results.append(
+            ForceSendUserResult(user_id=uid, email=users[uid].email, status=status)
+        )
 
     return ForceInterestMatchSendResponse(
         candidates_scanned=match_stats.get("candidates", 0),
         notifications_created=match_stats.get("created", 0),
         digests_sent=digest_stats.get("digests", 0),
         pushes_sent=digest_stats.get("pushed", 0),
+        results=results,
+    )
+
+
+@router.post(
+    "/notifications/interest-match/preview",
+    response_model=ForceInterestMatchPreviewResponse,
+)
+def preview_interest_matches(
+    body: ForceInterestMatchSendRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Dry-run companion to ``force-send``: reports, per selected user, how
+    many events in the ``lookback_hours`` window match their interest
+    profile(s) and how many of those are new (i.e. would actually create a
+    notification). Lets an admin sanity-check a force-send before committing
+    to it — e.g. explaining a "26 candidates, 0 created" result, which means
+    none of the candidate events matched this user's saved profile(s).
+    """
+    from backend.services.interest_notification_service import preview_matches_for_users
+
+    users = {
+        u.id: u
+        for u in session.exec(
+            select(User).where(User.id.in_(body.user_ids))  # type: ignore[union-attr]
+        ).all()
+    }
+
+    preview = preview_matches_for_users(set(body.user_ids), body.lookback_hours)
+    per_user = preview.get("per_user", {})
+
+    results: list[ForceInterestMatchPreviewUser] = []
+    for uid in body.user_ids:
+        user = users.get(uid)
+        if user is None:
+            continue
+        stats = per_user.get(str(uid), {})
+        results.append(
+            ForceInterestMatchPreviewUser(
+                user_id=uid,
+                email=user.email,
+                matched_events=stats.get("matched_events", 0),
+                new_events=stats.get("new_events", 0),
+            )
+        )
+
+    return ForceInterestMatchPreviewResponse(
+        candidates_scanned=preview.get("candidates_scanned", 0),
         results=results,
     )
 
@@ -757,19 +865,29 @@ def digest_send_now(
         )
         if not has_any_channel:
             results.append(
-                ForceSendUserResult(user_id=uid, email=user.email, status="skipped_disabled")
+                ForceSendUserResult(
+                    user_id=uid, email=user.email, status="skipped_disabled"
+                )
             )
             continue
         eligible_ids.add(uid)
 
     if not eligible_ids:
-        return DigestSendNowResponse(digests_sent=0, pushes_sent=0, stamped=0, results=results)
+        return DigestSendNowResponse(
+            digests_sent=0, pushes_sent=0, stamped=0, results=results
+        )
 
-    stats = activity_email.run_once(force=True, user_ids=eligible_ids)
+    stats = activity_email.run_once(
+        force=True,
+        user_ids=eligible_ids,
+        max_notifications_per_user=body.max_notifications_per_user,
+    )
     delivered = set(stats.get("delivered_recipients") or [])
     for uid in eligible_ids:
         status = "sent" if str(uid) in delivered else "no_pending_notifications"
-        results.append(ForceSendUserResult(user_id=uid, email=users[uid].email, status=status))
+        results.append(
+            ForceSendUserResult(user_id=uid, email=users[uid].email, status=status)
+        )
 
     return DigestSendNowResponse(
         digests_sent=stats.get("digests", 0),

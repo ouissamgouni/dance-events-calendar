@@ -25,14 +25,20 @@ test_plan:
     - id: 1
       title: "Trigger one dispatch tick"
       description: >
-        `SCENARIO=notif-activity-digest-push task notify:trigger:scenario -- --immediate-emails`
-        `--immediate-emails` bypasses the per-user digest schedule
-        (default tue+fri @ 09:00 local) so push fires regardless of
-        the recipient's TZ/slot for this run only. Prod behavior is
-        otherwise unchanged.
+        `SCENARIO=notif-activity-digest-push task notify:trigger:scenario`
+        No `--immediate-emails` needed: push is no longer gated by the
+        per-user digest schedule (default tue+fri @ 09:00 local). Push
+        fires on any dispatch tick regardless of the recipient's
+        TZ/slot — it used to wrongly wait on the same schedule as email
+        unless forced (bug, fixed). This scenario's automatic scheduler
+        (`NOTIFICATION_INTERVAL_MINUTES=1`) would also deliver the push
+        within ~60s with zero manual action; this step just triggers a
+        tick on-demand so the test doesn't have to wait.
       expected: >
-        Stats: `activity.pushed=1` (Bob only). No `skipped_off_schedule`
-        rows in the diagnostic (force bypasses the slot check).
+        Stats: `activity.pushed=1` (Bob only), `activity.digests=0`
+        (email stays off-schedule/waiting — expected and unrelated to
+        the push fix; email is intentionally still batched on its
+        weekly cadence).
 
     - id: 2
       title: "Verify push arrival on Bob's device"

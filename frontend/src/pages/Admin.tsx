@@ -11,8 +11,9 @@ import {
     fetchSourceBreakdown, fetchTopCountries, fetchTopLinks, fetchExportStats,
     fetchMostAttendedEvents, getCurrentSyncJob,
     forceSendInterestMatches, sendDigestNow, fetchWebPushSubscriberCount,
+    previewInterestMatches, fetchNotificationToggleCounts,
 } from '../api';
-import type { MostSavedEvent, MostViewedEvent, MostAttendedEvent, SourceBreakdown, CountryBreakdown, TopLink, ExportStat, AdminUserRow } from '../api';
+import type { MostSavedEvent, MostViewedEvent, MostAttendedEvent, SourceBreakdown, CountryBreakdown, TopLink, ExportStat, AdminUserRow, NotificationToggleCounts, ForceInterestMatchPreviewResponse } from '../api';
 import { useAuth } from '../context/AuthContext';
 import SyncProgressCard from '../components/SyncProgressCard';
 import SyncJobsHistoryTable from '../components/SyncJobsHistoryTable';
@@ -111,6 +112,20 @@ export default function Admin() {
     const [forceSendBusy, setForceSendBusy] = useState(false);
     const [digestNowUsers, setDigestNowUsers] = useState<AdminUserRow[]>([]);
     const [digestNowBusy, setDigestNowBusy] = useState(false);
+    // Caps how many pending notifications a single "Send now" folds in per
+    // recipient (most-recent-first); undefined = no cap (send everything
+    // pending). Load-control knob in place of a time window.
+    const [digestNowMaxNotifications, setDigestNowMaxNotifications] = useState<number | undefined>(undefined);
+    // Max matched events shown inline in an interest-match digest email
+    // before the rest collapse behind a "Discover more" link to "For you".
+    const [interestMatchMaxEventsPerEmail, setInterestMatchMaxEventsPerEmail] = useState(10);
+    // Count of users with each per-feature notification channel toggle on,
+    // shown next to the corresponding global gate below.
+    const [toggleCounts, setToggleCounts] = useState<NotificationToggleCounts | null>(null);
+    // Dry-run preview of the force-send box: how many events match each
+    // selected user's interest profile(s) before actually sending.
+    const [previewResults, setPreviewResults] = useState<ForceInterestMatchPreviewResponse | null>(null);
+    const [previewBusy, setPreviewBusy] = useState(false);
     const [eventColorBarColor, setEventColorBarColor] = useState('#64748b');
     const [tagSortMode, setTagSortMode] = useState<'group' | 'event_count'>('group');
     const [defaultExplorerPeriod, setDefaultExplorerPeriod] = useState<DateRangePresetKey>(DEFAULT_EXPLORER_PERIOD);
@@ -228,6 +243,7 @@ export default function Admin() {
             setWebPushEnabled(s.web_push_enabled ?? false);
             setReminderLeadHours(s.reminder_lead_hours ?? 24);
             setDigestSchedule(s.activity_digest_schedule ?? 'tue,fri @ 09:00');
+            setInterestMatchMaxEventsPerEmail(s.interest_match_max_events_per_email ?? 10);
             setEventColorBarColor(s.event_color_bar_color || '#64748b');
             setTagSortMode(s.tag_sort_mode === 'event_count' ? 'event_count' : 'group');
             setDefaultExplorerPeriod(s.default_explorer_period ?? DEFAULT_EXPLORER_PERIOD);
@@ -241,6 +257,7 @@ export default function Admin() {
         fetchTopLinks().then(setTopLinks).catch(() => { });
         fetchExportStats().then(setExportStats).catch(() => { });
         fetchWebPushSubscriberCount().then((r) => setWebPushSubscriberCount(r.subscriber_count)).catch(() => { });
+        fetchNotificationToggleCounts().then(setToggleCounts).catch(() => { });
         // Counters (pending review, ungeolocated, tag suggestions, feedback)
         // are loaded & kept fresh by the useAdminCounters hook above — no
         // need to fetch them here.
@@ -738,6 +755,36 @@ export default function Admin() {
         }
     };
 
+    const handleInterestMatchMaxEventsChange = async (value: number) => {
+        if (isNaN(value) || value < 1 || value > 50) return;
+        const prev = interestMatchMaxEventsPerEmail;
+        setInterestMatchMaxEventsPerEmail(value);
+        try {
+            await updateSettings({ interest_match_max_events_per_email: value });
+            setMessage(`Max events per interest-match email set to ${value}.`);
+        } catch {
+            setInterestMatchMaxEventsPerEmail(prev);
+            setMessage('Failed to update max events per email.');
+        }
+    };
+
+    const handlePreviewInterestMatches = async () => {
+        if (forceSendUsers.length === 0) return;
+        setPreviewBusy(true);
+        setPreviewResults(null);
+        try {
+            const res = await previewInterestMatches(
+                forceSendUsers.map((u) => u.user_id),
+                forceSendLookbackHours,
+            );
+            setPreviewResults(res);
+        } catch (e) {
+            setMessage(e instanceof Error ? e.message : 'Failed to preview interest matches.');
+        } finally {
+            setPreviewBusy(false);
+        }
+    };
+
     const handleForceSendInterestMatches = async () => {
         if (forceSendUsers.length === 0) return;
         setForceSendBusy(true);
@@ -752,6 +799,7 @@ export default function Admin() {
                 + `${sent} of ${forceSendUsers.length} user(s) delivered (${res.digests_sent} digest email(s), ${res.pushes_sent} push).`,
             );
             setForceSendUsers([]);
+            setPreviewResults(null);
         } catch (e) {
             setMessage(e instanceof Error ? e.message : 'Failed to force-send interest matches.');
         } finally {
@@ -763,7 +811,7 @@ export default function Admin() {
         if (digestNowUsers.length === 0) return;
         setDigestNowBusy(true);
         try {
-            const res = await sendDigestNow(digestNowUsers.map((u) => u.user_id));
+            const res = await sendDigestNow(digestNowUsers.map((u) => u.user_id), digestNowMaxNotifications);
             const sent = res.results.filter((r) => r.status === 'sent').length;
             setMessage(
                 `Digest send-now: ${sent} of ${digestNowUsers.length} user(s) delivered `
@@ -1552,6 +1600,29 @@ export default function Admin() {
                                 </button>
                             </div>
                             <p className="text-[10px] text-gray-400">Alert users when a new event matches their interest profile</p>
+                            {toggleCounts && (
+                                <p className="text-[10px] text-gray-500">
+                                    {toggleCounts.interest_match.email} email · {toggleCounts.interest_match.push} push enabled
+                                    {' '}(of {toggleCounts.total_users} users)
+                                </p>
+                            )}
+                            <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
+                                <div>
+                                    <span className="text-[11px] font-medium text-gray-700">Max events per email</span>
+                                    <p className="text-[10px] text-gray-400">Events beyond this hide behind a "Discover more" link (1–50)</p>
+                                </div>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={50}
+                                    value={interestMatchMaxEventsPerEmail}
+                                    onChange={(e) => setInterestMatchMaxEventsPerEmail(Number(e.target.value))}
+                                    onBlur={(e) => handleInterestMatchMaxEventsChange(Number(e.target.value))}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleInterestMatchMaxEventsChange(interestMatchMaxEventsPerEmail)}
+                                    className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                    aria-label="Max events per interest-match email"
+                                />
+                            </div>
                             <div className="border-t border-gray-100 pt-2.5 space-y-1.5">
                                 <div>
                                     <span className="text-[11px] font-medium text-gray-700">Force-send interest matches</span>
@@ -1562,7 +1633,7 @@ export default function Admin() {
                                 </div>
                                 <AdminUserMultiPicker
                                     selected={forceSendUsers}
-                                    onChange={setForceSendUsers}
+                                    onChange={(rows) => { setForceSendUsers(rows); setPreviewResults(null); }}
                                     placeholder="Search email, handle, or name"
                                 />
                                 <div className="flex items-center gap-2">
@@ -1573,18 +1644,39 @@ export default function Admin() {
                                         min={1}
                                         max={720}
                                         value={forceSendLookbackHours}
-                                        onChange={(e) => setForceSendLookbackHours(Number(e.target.value))}
+                                        onChange={(e) => { setForceSendLookbackHours(Number(e.target.value)); setPreviewResults(null); }}
                                         className="w-20 text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                                     />
                                     <button
                                         type="button"
+                                        onClick={handlePreviewInterestMatches}
+                                        disabled={forceSendUsers.length === 0 || previewBusy || forceSendBusy}
+                                        className="ml-auto text-[11px] px-2.5 py-1 rounded border border-emerald-600 text-emerald-700 disabled:border-gray-300 disabled:text-gray-400 hover:bg-emerald-50"
+                                    >
+                                        {previewBusy ? 'Previewing…' : 'Preview'}
+                                    </button>
+                                    <button
+                                        type="button"
                                         onClick={handleForceSendInterestMatches}
                                         disabled={forceSendUsers.length === 0 || forceSendBusy}
-                                        className="ml-auto text-[11px] px-2.5 py-1 rounded bg-emerald-600 text-white disabled:bg-gray-300 hover:bg-emerald-700"
+                                        className="text-[11px] px-2.5 py-1 rounded bg-emerald-600 text-white disabled:bg-gray-300 hover:bg-emerald-700"
                                     >
                                         {forceSendBusy ? 'Sending…' : `Force send${forceSendUsers.length ? ` (${forceSendUsers.length})` : ''}`}
                                     </button>
                                 </div>
+                                {previewResults && (
+                                    <div className="text-[10px] text-gray-600 bg-gray-50 border border-gray-100 p-2 space-y-1">
+                                        <div className="text-gray-400">
+                                            {previewResults.candidates_scanned} candidate event(s) in window globally (all users, not just selected)
+                                        </div>
+                                        {previewResults.results.map((r) => (
+                                            <div key={r.user_id} className="flex items-center justify-between gap-2">
+                                                <span className="truncate">{r.email}</span>
+                                                <span className="whitespace-nowrap">{r.matched_events} matched · {r.new_events} new</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -1601,6 +1693,12 @@ export default function Admin() {
                                 </button>
                             </div>
                             <p className="text-[10px] text-gray-400">Pre-event nudge (in-app + email) for saved / going users</p>
+                            {toggleCounts && (
+                                <p className="text-[10px] text-gray-500">
+                                    {toggleCounts.event_reminders.email} email · {toggleCounts.event_reminders.push} push enabled
+                                    {' '}(of {toggleCounts.total_users} users)
+                                </p>
+                            )}
                             <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
                                 <div>
                                     <span className="text-[11px] font-medium text-gray-700">Reminder lead time (hours)</span>
@@ -1633,6 +1731,12 @@ export default function Admin() {
                                 </button>
                             </div>
                             <p className="text-[10px] text-gray-400">Batched summary of new friends / follows / saves</p>
+                            {toggleCounts && (
+                                <p className="text-[10px] text-gray-500">
+                                    {toggleCounts.activity_digest.email} email · {toggleCounts.activity_digest.push} push enabled
+                                    {' '}(of {toggleCounts.total_users} users)
+                                </p>
+                            )}
                             <div className="border-t border-gray-100 pt-2.5 space-y-1">
                                 <span className="text-[11px] font-medium text-gray-700">Schedule</span>
                                 <p className="text-[10px] text-gray-400">
@@ -1663,6 +1767,18 @@ export default function Admin() {
                                     placeholder="Search email, handle, or name"
                                 />
                                 <div className="flex items-center gap-2">
+                                    <label className="text-[10px] text-gray-500" htmlFor="digest-now-max">Max per user</label>
+                                    <input
+                                        id="digest-now-max"
+                                        type="number"
+                                        min={1}
+                                        max={200}
+                                        value={digestNowMaxNotifications ?? ''}
+                                        onChange={(e) => setDigestNowMaxNotifications(e.target.value === '' ? undefined : Number(e.target.value))}
+                                        placeholder="all"
+                                        title="Cap on pending notifications folded into this send (most recent first); leave blank to send everything pending"
+                                        className="w-16 text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                    />
                                     <button
                                         type="button"
                                         onClick={handleSendDigestNow}

@@ -333,8 +333,9 @@ def test_activity_digest_emailed_at_is_idempotent(session, monkeypatch):
     _notif(session, recipient=bob, actor=a1, kind="new_follower", created_at=old)
 
     activity_email.run_once(force=True)
-    # Re-run: the notification is now stamped, so nothing to send.
-    assert activity_email.run_once(force=True) == {"digests": 0}
+    # Re-run: the notification is now stamped (both channels), so nothing
+    # to send.
+    assert activity_email.run_once(force=True) == {"digests": 0, "pushed": 0}
     assert calls == [bob.id]
 
 
@@ -347,7 +348,9 @@ def test_activity_digest_optout_skips_email_but_stamps(session, monkeypatch):
     )
     monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
 
-    bob = _make_user(session, "bob@example.com", "bob", email_social_activity_enabled=False)
+    bob = _make_user(
+        session, "bob@example.com", "bob", email_social_activity_enabled=False
+    )
     a1 = _make_user(session, "a1@example.com", "a1")
     old = datetime.utcnow() - timedelta(minutes=5)
     n = _notif(session, recipient=bob, actor=a1, kind="new_follower", created_at=old)
@@ -378,18 +381,26 @@ def test_activity_digest_skips_notifs_older_than_max_age(session, monkeypatch):
         created_at=datetime.utcnow() - timedelta(days=30),
     )
 
-    assert activity_email.run_once(force=True) == {"digests": 0}
+    assert activity_email.run_once(force=True) == {"digests": 0, "pushed": 0}
 
 
 def test_activity_digest_gates_on_scheduled_slot(session, monkeypatch):
-    """Without ``force``, run_once only delivers to users in their local slot."""
+    """Without ``force``, email only delivers to users in their local slot,
+    but push is NOT gated by the schedule — it fires on every tick
+    regardless (see ``run_once`` docstring). Regression test for the bug
+    where push silently waited on the email cadence."""
     calls: list = []
+    push_calls: list = []
     monkeypatch.setattr(
         activity_email,
         "send_activity_digest_email",
         lambda recipient, lines, **_: calls.append(recipient.id),
     )
-    monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
+    monkeypatch.setattr(
+        activity_email,
+        "send_push",
+        lambda recipient_id, **_: push_calls.append(recipient_id) or 1,
+    )
     # Freeze the schedule so this test is TZ-independent.
     monkeypatch.setattr(
         "backend.services.activity_email.get_activity_digest_schedule",
@@ -414,9 +425,14 @@ def test_activity_digest_gates_on_scheduled_slot(session, monkeypatch):
     assert stats.get("digests", 0) == 0
     assert stats.get("skipped_off_schedule", 0) == 1
     assert calls == []
+    # Push is unaffected by the off-schedule email gate.
+    assert stats.get("pushed", 0) == 1
+    assert push_calls == [bob.id]
     session.refresh(n)
-    # Off-schedule rows stay unstamped so they roll into the next slot.
+    # Off-schedule rows stay unstamped for EMAIL so they roll into the
+    # next slot, but ARE stamped for push (already delivered).
     assert n.emailed_at is None
+    assert n.pushed_at is not None
 
 
 def test_activity_digest_delivers_in_scheduled_slot(session, monkeypatch):
@@ -471,12 +487,8 @@ def test_activity_digest_per_user_timezone(session, monkeypatch):
         lambda: "tue @ 09:00",
     )
 
-    paris = _make_user(
-        session, "paris@example.com", "paris", timezone="Europe/Paris"
-    )
-    tokyo = _make_user(
-        session, "tokyo@example.com", "tokyo", timezone="Asia/Tokyo"
-    )
+    paris = _make_user(session, "paris@example.com", "paris", timezone="Europe/Paris")
+    tokyo = _make_user(session, "tokyo@example.com", "tokyo", timezone="Asia/Tokyo")
     a1 = _make_user(session, "a1@example.com", "a1")
     _notif(
         session,

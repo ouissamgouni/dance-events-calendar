@@ -1,7 +1,8 @@
-# Focused social-activity fixture. Alice attends ev-friend; Bob, Carol
-# and Dave all follow Alice → each gets a pending social_activity
-# notification row, but only the users selected in the admin's
-# "Send digest now" action should actually be emailed.
+# Focused social-activity fixture. Alice attends ev-friend/ev-friend2/
+# ev-friend3; Bob, Carol and Dave all follow Alice → each gets THREE
+# pending social_activity notification rows (one per event), so the
+# "max per user" cap on the admin "Send digest now" action has enough
+# backlog to actually bind (see db-attendances.yaml + test_plan.yaml).
 base_week: 0
 events:
   - id: ev-friend
@@ -16,4 +17,32 @@ events:
     tags:
       - format:social
       - dance-style:bachata
+      - reach:local
+
+  - id: ev-friend2
+    calendar_id: salsa-cal-001
+    title: Salsa Sunday Practica
+    description: "Second Alice attendance — backlog filler for the 'max per user' cap test."
+    location: "Studio Azul, Paris, France"
+    latitude: 48.8662
+    longitude: 2.3744
+    start: w1 Sun 18:00
+    end: w1 Sun 21:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: ev-friend3
+    calendar_id: salsa-cal-001
+    title: Kizomba Night
+    description: "Third Alice attendance — backlog filler for the 'max per user' cap test."
+    location: "Studio Azul, Paris, France"
+    latitude: 48.8662
+    longitude: 2.3744
+    start: w1 Fri 20:00
+    end: w1 Fri 23:00
+    tags:
+      - format:social
+      - dance-style:kizomba
       - reach:local
