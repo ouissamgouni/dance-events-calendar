@@ -40,6 +40,7 @@ from datetime import datetime, timedelta, timezone
 from sqlmodel import Session, select
 
 from backend.services.app_settings import get_interest_match_notifications_enabled
+from backend.services.notification_delivery import record_delivery
 from backend.db.database import get_engine
 from backend.db.models import (
     CachedEvent,
@@ -260,15 +261,16 @@ def _scan_and_create(
             if (user_id, event_id) in existing:
                 continue
             context = ", ".join(dict.fromkeys(labels))  # dedupe, preserve order
-            session.add(
-                Notification(
-                    recipient_user_id=user_id,
-                    actor_user_id=user_id,  # self: no external actor
-                    kind=INTEREST_EVENT,
-                    event_id=event_id,
-                    context=context[:200],
-                )
+            notif = Notification(
+                recipient_user_id=user_id,
+                actor_user_id=user_id,  # self: no external actor
+                kind=INTEREST_EVENT,
+                event_id=event_id,
+                context=context[:200],
             )
+            session.add(notif)
+            session.flush()
+            record_delivery(session, notif.id, "app")
             created += 1
 
     return {"candidates": len(events), "created": created}

@@ -10,27 +10,32 @@ const TYPE_LABELS: Record<string, string> = {
     event_reminder: 'Reminder',
 };
 
-const DOT_ON =
-    'inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-[9px] font-semibold text-emerald-700';
-const DOT_OFF =
-    'inline-flex h-4 w-4 items-center justify-center rounded-full bg-gray-100 text-[9px] font-semibold text-gray-400';
+const CHANNEL_BADGE: Record<string, string> = {
+    app: 'inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700',
+    email: 'inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold text-blue-700',
+    push: 'inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-semibold text-purple-700',
+};
+const CHANNEL_BADGE_FALLBACK =
+    'inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-600';
+const CHANNEL_LABELS: Record<string, string> = {
+    app: 'App',
+    email: 'Email',
+    push: 'Push',
+};
 
-function ChannelDot({ on, letter, title }: { on: boolean; letter: string; title: string }) {
-    return (
-        <span className={on ? DOT_ON : DOT_OFF} title={title} aria-label={title}>
-            {letter}
-        </span>
-    );
+function ChannelBadge({ channel }: { channel: string }) {
+    const cls = CHANNEL_BADGE[channel] ?? CHANNEL_BADGE_FALLBACK;
+    return <span className={cls}>{CHANNEL_LABELS[channel] ?? channel}</span>;
 }
 
 /**
  * Admin Notifications tab.
  *
- * Read-only audit log of every notification ever sent (one row per
- * ``Notification`` DB row), across all three feature types, newest first.
- * The "Support" column shows which channels actually delivered it: App is
- * always on (every row is an in-app notification), Email/Push reflect
- * whether ``emailed_at``/``pushed_at`` got stamped.
+ * Read-only audit log of every notification *delivery event* ever recorded
+ * (one row per ``NotificationDelivery`` DB row — a single notification can
+ * produce up to 3 rows, one per channel it actually went out on), across
+ * all three feature types, newest first. The "Channel" column shows which
+ * channel that specific row delivered on: App, Email, or Push.
  */
 export default function AdminNotificationsTab() {
     const [rows, setRows] = useState<NotificationLogEntry[]>([]);
@@ -119,7 +124,7 @@ export default function AdminNotificationsTab() {
                     </select>
                 </label>
                 <label className="flex items-center gap-1.5">
-                    Support
+                    Channel
                     <select
                         value={channel}
                         onChange={(e) => setChannel(e.target.value as NotificationLogChannel | '')}
@@ -127,6 +132,7 @@ export default function AdminNotificationsTab() {
                         aria-label="Filter by delivery channel"
                     >
                         <option value="">Any</option>
+                        <option value="app">App</option>
                         <option value="email">Email</option>
                         <option value="push">Push</option>
                     </select>
@@ -145,7 +151,7 @@ export default function AdminNotificationsTab() {
                         <tr>
                             <th className="px-3 py-2">Date/time</th>
                             <th className="px-3 py-2">Type</th>
-                            <th className="px-3 py-2">Support</th>
+                            <th className="px-3 py-2">Channel</th>
                             <th className="px-3 py-2">User</th>
                         </tr>
                     </thead>
@@ -160,17 +166,13 @@ export default function AdminNotificationsTab() {
                         {rows.map((row) => (
                             <tr key={row.id} className="border-t border-slate-200 hover:bg-slate-50">
                                 <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
-                                    {fmtDateTime(row.created_at)}
+                                    {fmtDateTime(row.delivered_at)}
                                 </td>
                                 <td className="px-3 py-2 whitespace-nowrap" title={row.kind}>
                                     {TYPE_LABELS[row.type] || row.type}
                                 </td>
                                 <td className="px-3 py-2">
-                                    <div className="flex items-center gap-1">
-                                        <ChannelDot on={row.channel_app} letter="A" title="In-app" />
-                                        <ChannelDot on={row.channel_email} letter="E" title={`Email ${row.channel_email ? 'sent' : 'not sent'}`} />
-                                        <ChannelDot on={row.channel_push} letter="P" title={`Push ${row.channel_push ? 'sent' : 'not sent'}`} />
-                                    </div>
+                                    <ChannelBadge channel={row.channel} />
                                 </td>
                                 <td className="px-3 py-2 truncate max-w-[20rem]">
                                     {recipientLabel(row)}

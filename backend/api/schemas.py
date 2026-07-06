@@ -763,14 +763,16 @@ class ForceSendUserResult(BaseModel):
 
 class NotificationLogEntry(BaseModel):
     id: int
-    created_at: datetime
+    notification_id: int
+    delivered_at: datetime
     kind: str
     # One of "interest_match" | "activity_digest" | "event_reminder" —
     # mirrors the admin Configuration page's 3 notification feature gates.
     type: str
-    channel_app: bool = True
-    channel_email: bool = False
-    channel_push: bool = False
+    # One of "app" | "email" | "push" — the channel this specific
+    # delivery event went out on. One row per channel-event, so a single
+    # Notification with all 3 channels delivered produces 3 rows here.
+    channel: str
     recipient_user_id: UUID
     recipient_email: str
     recipient_handle: Optional[str] = None

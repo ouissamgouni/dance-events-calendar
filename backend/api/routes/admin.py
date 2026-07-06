@@ -64,6 +64,7 @@ from backend.db.models import (
     EventTag,
     EventView,
     Notification,
+    NotificationDelivery,
     PushSubscription,
     SyncLog,
     Tag,
@@ -739,31 +740,35 @@ def admin_notifications_log(
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
-    """List every notification ever sent, newest first, for the admin
-    Notifications tab.
+    """List every notification delivery event ever recorded, newest first,
+    for the admin Notifications tab.
+
+    Reads from ``NotificationDelivery`` — one row per actual app/email/push
+    distribution event — so only channels that were actually (or, for
+    "app", eligibly) delivered show up here; a notification suppressed by
+    a recipient's disabled channel produces no row for that channel.
 
     ``type`` filters to one of "interest_match" / "activity_digest" /
     "event_reminder" (matching the 3 feature gates in Configuration).
-    ``channel`` filters to "email" (``emailed_at`` set) or "push"
-    (``pushed_at`` set); every row already has in-app ("app") support so
-    that channel isn't filterable. ``q`` matches the recipient's handle,
-    display name, or email (case-insensitive substring).
+    ``channel`` filters to "app", "email", or "push". ``q`` matches the
+    recipient's handle, display name, or email (case-insensitive
+    substring).
     """
     kinds_by_type = _notification_kinds_by_type()
     if type is not None and type not in kinds_by_type:
         raise HTTPException(status_code=400, detail=f"Unknown type: {type}")
-    if channel is not None and channel not in ("email", "push"):
+    if channel is not None and channel not in ("app", "email", "push"):
         raise HTTPException(status_code=400, detail=f"Unknown channel: {channel}")
 
-    stmt = select(Notification, User).join(
-        User, User.id == Notification.recipient_user_id
+    stmt = (
+        select(NotificationDelivery, Notification, User)
+        .join(Notification, Notification.id == NotificationDelivery.notification_id)
+        .join(User, User.id == Notification.recipient_user_id)
     )
     if type is not None:
         stmt = stmt.where(col(Notification.kind).in_(kinds_by_type[type]))
-    if channel == "email":
-        stmt = stmt.where(col(Notification.emailed_at).is_not(None))
-    elif channel == "push":
-        stmt = stmt.where(col(Notification.pushed_at).is_not(None))
+    if channel is not None:
+        stmt = stmt.where(NotificationDelivery.channel == channel)
     if q:
         needle = f"%{q.strip().lower()}%"
         stmt = stmt.where(
@@ -776,24 +781,26 @@ def admin_notifications_log(
 
     total = int(session.exec(select(func.count()).select_from(stmt.subquery())).one())
     rows = session.exec(
-        stmt.order_by(col(Notification.created_at).desc()).limit(limit).offset(offset)
+        stmt.order_by(col(NotificationDelivery.delivered_at).desc())
+        .limit(limit)
+        .offset(offset)
     ).all()
 
     kind_to_type = {k: t for t, kinds in kinds_by_type.items() for k in kinds}
     items = [
         NotificationLogEntry(
-            id=n.id,
-            created_at=n.created_at,
+            id=d.id,
+            notification_id=n.id,
+            delivered_at=d.delivered_at,
             kind=n.kind,
             type=kind_to_type.get(n.kind, n.kind),
-            channel_email=n.emailed_at is not None,
-            channel_push=n.pushed_at is not None,
+            channel=d.channel,
             recipient_user_id=u.id,
             recipient_email=u.email,
             recipient_handle=u.handle,
             recipient_display_name=u.display_name,
         )
-        for n, u in rows
+        for d, n, u in rows
     ]
     return NotificationLogResponse(items=items, total=total)
 

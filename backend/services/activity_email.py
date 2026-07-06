@@ -38,6 +38,7 @@ from backend.config.loader import get_public_app_url
 from backend.db.database import get_engine
 from backend.db.models import CachedEvent, Notification, User
 from backend.services.email import send_activity_digest_email
+from backend.services.notification_delivery import record_delivery
 from backend.services.push_service import send_push
 
 logger = logging.getLogger(__name__)
@@ -460,13 +461,16 @@ def run_once(
                 )
                 for n in email_notifs
             ]
-            send_activity_digest_email(
+            ok = send_activity_digest_email(
                 recipient,
                 lines,
                 feature=feature,
                 discover_more_count=discover_more_count,
             )
             digests += 1
+            if ok:
+                for n in notifs:
+                    record_delivery(session, n.id, "email", now)
 
         pushed = 0
         for (recipient_id, feature), notifs in push_groups.items():
@@ -479,13 +483,17 @@ def run_once(
             extra = len(notifs) - 1
             body = first if extra <= 0 else f"{first} and {extra} more"
             title = "New match on Movida" if feature == "interest_matches" else "Movida"
-            pushed += send_push(
+            delivered = send_push(
                 recipient_id,
                 title=title,
                 body=body,
                 url="/notifications",
                 tag=_push_tag_for(feature),
             )
+            pushed += delivered
+            if delivered:
+                for n in notifs:
+                    record_delivery(session, n.id, "push", now)
 
         # Stamp emailed_at on every notification considered for email this
         # run (whether emailed, or suppressed by the recipient's email

@@ -1057,6 +1057,32 @@ class Notification(SQLModel, table=True):
     context: Optional[str] = Field(default=None, max_length=200)
 
 
+class NotificationDelivery(SQLModel, table=True):
+    """Audit-log row for one actual distribution event of a Notification.
+
+    Unlike ``Notification.emailed_at``/``pushed_at`` (internal bookkeeping
+    stamps that mark a row as "processed this dispatch tick" regardless of
+    whether the recipient's channel toggle allowed an actual send), a row
+    here is only inserted when the channel genuinely delivered:
+      - ``"app"``: inserted immediately when the Notification is created
+        (in-app has no opt-out today).
+      - ``"email"`` / ``"push"``: inserted only when the corresponding send
+        call actually succeeded for a recipient with that feature/channel
+        enabled.
+
+    Powers the admin Notifications log (``GET /api/admin/notifications/log``)
+    with one row per real delivery event instead of deriving delivery status
+    from the mutable bookkeeping timestamps above.
+    """
+
+    __tablename__ = "notification_deliveries"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    notification_id: int = Field(foreign_key="notifications.id", index=True)
+    channel: str = Field(index=True)  # "app" | "email" | "push"
+    delivered_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
 class PushSubscription(SQLModel, table=True):
     """A browser Web Push endpoint registered by a visitor.
 

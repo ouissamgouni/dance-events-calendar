@@ -29,6 +29,7 @@ from backend.services.app_settings import (
 from backend.db.database import get_engine
 from backend.db.models import CachedEvent, Notification, User, UserEventAttendance
 from backend.services.email import send_event_reminder_email
+from backend.services.notification_delivery import record_delivery
 from backend.services.push_service import send_push
 
 logger = logging.getLogger(__name__)
@@ -112,6 +113,7 @@ def run_once() -> dict:
             session.add(notif)
             session.flush()
             notif_ids[(user.id, event.event_id)] = notif.id
+            record_delivery(session, notif.id, "app")
             if user.email_event_reminders_enabled:
                 to_email.append((user, event))
             if user.push_event_reminders_enabled:
@@ -150,7 +152,8 @@ def run_once() -> dict:
 
     # Stamp emailed_at/pushed_at on the notifications actually delivered so
     # the admin Notifications log can report accurate per-channel support,
-    # same convention as activity_email.run_once().
+    # same convention as activity_email.run_once(). Also record a
+    # NotificationDelivery audit row per actually-delivered channel.
     if emailed_ids or pushed_ids:
         with Session(get_engine()) as session:
             stamp_now = datetime.utcnow()
@@ -160,12 +163,16 @@ def run_once() -> dict:
                     .where(col(Notification.id).in_(emailed_ids))
                     .values(emailed_at=stamp_now)
                 )
+                for nid in emailed_ids:
+                    record_delivery(session, nid, "email", stamp_now)
             if pushed_ids:
                 session.exec(
                     update(Notification)
                     .where(col(Notification.id).in_(pushed_ids))
                     .values(pushed_at=stamp_now)
                 )
+                for nid in pushed_ids:
+                    record_delivery(session, nid, "push", stamp_now)
             session.commit()
 
     logger.info(

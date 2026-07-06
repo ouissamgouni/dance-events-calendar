@@ -381,16 +381,15 @@ export async function fetchNotificationToggleCounts(): Promise<NotificationToggl
 }
 
 export type NotificationLogType = 'interest_match' | 'activity_digest' | 'event_reminder';
-export type NotificationLogChannel = 'email' | 'push';
+export type NotificationLogChannel = 'app' | 'email' | 'push';
 
 export interface NotificationLogEntry {
     id: number;
-    created_at: string;
+    notification_id: number;
+    delivered_at: string;
     kind: string;
     type: NotificationLogType | string;
-    channel_app: boolean;
-    channel_email: boolean;
-    channel_push: boolean;
+    channel: NotificationLogChannel | string;
     recipient_user_id: string;
     recipient_email: string;
     recipient_handle: string | null;
