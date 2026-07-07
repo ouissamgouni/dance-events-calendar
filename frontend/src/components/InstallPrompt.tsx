@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { usePwaInstall } from '../context/PwaInstallContext';
 import { useAuth } from '../context/AuthContext';
+import { useConsent } from '../context/ConsentContext';
 import { usePush } from '../hooks/usePush';
 
 /**
@@ -72,6 +73,7 @@ function snoozePush() {
 export default function InstallPrompt() {
     const { canInstall, isStandalone, promptInstall } = usePwaInstall();
     const { user } = useAuth();
+    const { consentResolved } = useConsent();
     const push = usePush(user?.user_id);
     const [snoozed, setSnoozed] = useState(isSnoozed());
     const [justInstalled, setJustInstalled] = useState(false);
@@ -119,22 +121,27 @@ export default function InstallPrompt() {
         push.status !== 'unsupported' &&
         push.status !== 'disabled';
 
+    // Never render either fixed-bottom banner while the cookie-consent
+    // modal's scroll-lock (`html.overflow:hidden`) is still active — see
+    // the comment on `consentResolved` in ConsentContext for why.
+    if (!consentResolved) return null;
+
     if (showPushOptIn) {
         return (
             <div
                 className="fixed inset-x-0 bottom-0 z-[8500] flex justify-center px-3 pb-3"
                 style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
             >
-                <div className="w-full max-w-md flex flex-col gap-3 border-2 border-violet-600 bg-violet-500 px-6 py-5 shadow-2xl rounded-lg">
+                <div className="w-full sm:max-w-md flex flex-col gap-3 border-2 border-orange-500 bg-orange-400 px-6 py-5 shadow-2xl rounded-lg">
                     <div>
                         <p className="text-base font-bold text-white">Stay in the loop!</p>
-                        <p className="text-sm text-violet-100 mt-1">Get notified about reminders and activity on this device.</p>
+                        <p className="text-sm text-orange-100 mt-1">Get notified about reminders and activity on this device.</p>
                     </div>
                     <div className="flex gap-3">
                         <button
                             type="button"
                             onClick={dismissPush}
-                            className="flex-1 text-sm font-semibold text-violet-600 bg-white hover:bg-violet-50 px-4 py-3 rounded transition"
+                            className="text-xs font-medium text-orange-700 bg-white/30 hover:bg-white/50 px-3 py-2 rounded transition"
                         >
                             Not now
                         </button>
@@ -144,7 +151,7 @@ export default function InstallPrompt() {
                                 push.enable();
                                 setJustInstalled(false);
                             }}
-                            className="flex-1 text-sm font-bold bg-orange-400 text-white hover:bg-orange-500 px-4 py-3 rounded transition shadow-md"
+                            className="flex-1 text-sm font-bold bg-violet-500 text-white hover:bg-violet-600 px-4 py-3 rounded transition shadow-md"
                         >
                             Enable Notifications
                         </button>
@@ -161,10 +168,10 @@ export default function InstallPrompt() {
             className="fixed inset-x-0 bottom-0 z-[8500] flex justify-center px-3 pb-3"
             style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
         >
-            <div className="w-full max-w-md flex flex-col gap-4 border-2 border-orange-600 bg-orange-500 px-6 py-5 shadow-2xl rounded-lg">
+            <div className="w-full sm:max-w-md flex flex-col gap-4 border-2 border-orange-500 bg-orange-400 px-6 py-5 shadow-2xl rounded-lg">
                 <div className="flex items-center gap-4">
                     <img src="/icons/icon-192.png" alt="" className="h-12 w-12 shrink-0" />
-                    <div>
+                    <div className="min-w-0 flex-1">
                         <p className="text-base font-bold text-white">Install Movida</p>
                         <p className="text-sm text-orange-100">Add to your home screen for faster access.</p>
                     </div>
@@ -173,7 +180,7 @@ export default function InstallPrompt() {
                     <button
                         type="button"
                         onClick={dismiss}
-                        className="flex-1 text-sm font-semibold text-orange-600 bg-white hover:bg-orange-50 px-4 py-3 rounded transition"
+                        className="text-xs font-medium text-orange-700 bg-white/30 hover:bg-white/50 px-3 py-2 rounded transition"
                     >
                         Not now
                     </button>
