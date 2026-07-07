@@ -79,7 +79,9 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Fly CLI
-        uses: superfly/flyctl-actions/setup-flyctl@master
+        run: |
+          curl -L https://fly.io/install.sh | sh
+          echo "$HOME/.fly/bin" >> $GITHUB_PATH
 
       - name: Create backend venv
         run: |
