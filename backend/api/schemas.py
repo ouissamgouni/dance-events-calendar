@@ -1713,6 +1713,12 @@ class AdminUser(BaseModel):
     # (e.g. "Salsa Nights Paris").
     is_admin_managed: bool = False
     managed_label: Optional[str] = None
+    # Admin override: bypasses InstallPrompt's 14-day dismiss snooze for
+    # this user (see force_install_prompt on the User model).
+    force_install_prompt: bool = False
+    # First-observed PWA install timestamp (null = never installed). See
+    # installed_at on the User model.
+    installed_at: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
     created_at: datetime
     followers_count: int = 0

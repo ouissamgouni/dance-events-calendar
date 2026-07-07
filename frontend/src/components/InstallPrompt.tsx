@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePwaInstall } from '../context/PwaInstallContext';
 import { useAuth } from '../context/AuthContext';
 import { useConsent } from '../context/ConsentContext';
 import { usePush } from '../hooks/usePush';
+import { reportAppInstalled } from '../api';
 
 /**
  * Dismissible "Install app" banner + post-install notification opt-in.
@@ -92,6 +93,20 @@ export default function InstallPrompt() {
         if (isStandalone) setPushSnoozed(isPushSnoozed());
     }, [isStandalone]);
 
+    // Record the first time a signed-in user is observed running as an
+    // installed PWA, powering the "Installed app" column in Admin → Users.
+    // Idempotent server-side (only sets installed_at once), so it's safe to
+    // call again on a later load; the ref just avoids re-firing on every
+    // render within this mount.
+    const reportedInstallRef = useRef(false);
+    useEffect(() => {
+        if (!isStandalone || !user || reportedInstallRef.current) return;
+        reportedInstallRef.current = true;
+        reportAppInstalled().catch(() => {
+            reportedInstallRef.current = false;
+        });
+    }, [isStandalone, user]);
+
     const dismiss = () => {
         snooze();
         setSnoozed(true);
@@ -115,6 +130,7 @@ export default function InstallPrompt() {
 
     const showPushOptIn =
         Boolean(user) &&
+        push.resolved &&
         (justInstalled || isStandalone) &&
         !pushSnoozed &&
         push.status !== 'on' &&
@@ -161,7 +177,14 @@ export default function InstallPrompt() {
         );
     }
 
-    if (!canInstall || isStandalone || snoozed) return null;
+    // Admin override (Admin → Users → "Force install prompt"): lets support
+    // re-surface the banner for a user who dismissed it, without waiting out
+    // SNOOZE_DAYS. Only bypasses the snooze, not the other conditions below.
+    const forceInstall = Boolean(user?.force_install_prompt);
+
+    // Only offered to signed-in users — anonymous visitors get prompted to
+    // sign in first elsewhere; installing before that just adds friction.
+    if (!user || !canInstall || isStandalone || (snoozed && !forceInstall)) return null;
 
     return (
         <div

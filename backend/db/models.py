@@ -96,6 +96,18 @@ class User(SQLModel, table=True):
     # Optional admin-only label shown in the Admin Users tab
     # (e.g. "Salsa Nights Paris curator"). Not exposed publicly.
     managed_label: Optional[str] = Field(default=None, max_length=120)
+    # Admin override: when True, the install-app banner ignores its local
+    # 14-day dismiss snooze for this user (see SNOOZE_DAYS in
+    # InstallPrompt.tsx), letting support re-surface the prompt for a user
+    # who dismissed it without waiting out the cooldown.
+    force_install_prompt: bool = Field(default=False, nullable=False)
+    # First time we observed this account running as an installed PWA
+    # (either right after accepting the native install prompt, or on a
+    # later load if the browser was already installed beforehand). Null
+    # means "never observed installed" — powers the "Installed app"
+    # column in the Admin Users tab. Set once via POST /auth/me/installed
+    # and never cleared (uninstall isn't detectable from the web app).
+    installed_at: Optional[datetime] = Field(default=None)
     # Optional, unverified social profile links shown on the public profile
     # for self-published credibility. Display-only; never used for auth.
     instagram_url: Optional[str] = Field(default=None, max_length=255)

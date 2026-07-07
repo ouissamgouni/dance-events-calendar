@@ -212,6 +212,8 @@ def _to_admin_user(session: Session, user: User) -> AdminUser:
         is_verified_organizer=bool(user.is_verified_organizer),
         is_admin_managed=bool(user.is_admin_managed),
         managed_label=user.managed_label,
+        force_install_prompt=bool(user.force_install_prompt),
+        installed_at=user.installed_at,
         deleted_at=user.deleted_at,
         created_at=user.created_at,
         followers_count=_followers_count(session, user.id),
@@ -2294,6 +2296,38 @@ def admin_set_verified_organizer(
     user = _resolve_handle(session, handle)
     _set_verified_organizer(session, user, payload.is_verified_organizer)
     return get_public_profile(user.handle or "", session=session, viewer=None)
+
+
+# --- Admin: force-install-prompt toggle -------------------------------------
+
+
+class _ForceInstallPromptToggleRequest(BaseModel):
+    force_install_prompt: bool
+
+
+def _set_force_install_prompt(session: Session, user: User, value: bool) -> None:
+    user.force_install_prompt = bool(value)
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+
+
+@router.patch(
+    "/admin/users/id/{user_id}/force-install-prompt", response_model=AdminUser
+)
+def admin_set_force_install_prompt_by_id(
+    user_id: UUID,
+    payload: _ForceInstallPromptToggleRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Admin-only: force the install-app banner to bypass its 14-day
+    dismiss snooze for a single user (e.g. support asked to re-surface it
+    for someone who dismissed it and hasn't installed yet).
+    """
+    user = _resolve_admin_user_id(session, user_id)
+    _set_force_install_prompt(session, user, payload.force_install_prompt)
+    return _to_admin_user(session, user)
 
 
 # --- Admin: admin-managed account toggle ------------------------------------

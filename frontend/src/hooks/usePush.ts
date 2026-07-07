@@ -94,6 +94,12 @@ export function usePush(userId?: string | null) {
     const [status, setStatus] = useState<PushStatus>('off');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // False until the initial support/permission/subscription check below
+    // has settled. `status` starts at the 'off' default before that check
+    // runs, so consumers gating a banner on e.g. `status !== 'on'` must also
+    // wait on `resolved` — otherwise an already-subscribed user briefly sees
+    // the banner flash on every page load before it corrects to 'on'.
+    const [resolved, setResolved] = useState(false);
 
     // Resolve the initial status: feature support → backend enablement →
     // browser permission → existing subscription. When permission is already
@@ -113,6 +119,7 @@ export function usePush(userId?: string | null) {
     // requiring the user to manually disable/re-enable notifications.
     useEffect(() => {
         let cancelled = false;
+        setResolved(false);
 
         (async () => {
             if (!isSupported()) {
@@ -163,7 +170,9 @@ export function usePush(userId?: string | null) {
             }
 
             if (!cancelled) setStatus('off');
-        })();
+        })().finally(() => {
+            if (!cancelled) setResolved(true);
+        });
 
         return () => {
             cancelled = true;
@@ -215,5 +224,5 @@ export function usePush(userId?: string | null) {
         }
     }, [busy]);
 
-    return { status, busy, error, enable, disable };
+    return { status, busy, error, resolved, enable, disable };
 }
