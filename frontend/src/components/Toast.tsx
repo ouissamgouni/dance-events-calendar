@@ -80,7 +80,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     return (
         <ToastContext.Provider value={{ push, dismiss }}>
             {children}
-            <div className="fixed bottom-4 right-4 z-[12000] flex flex-col gap-2 w-80 max-w-[calc(100vw-2rem)]">
+            <div className="fixed bottom-4 right-4 z-[12000] flex flex-col gap-2 w-full sm:w-80 max-w-[calc(100vw-2rem)]">
                 {toasts.map((t) => {
                     const variant = t.variant ?? 'info';
                     return (
