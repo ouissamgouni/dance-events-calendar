@@ -17,12 +17,13 @@ vi.mock('../context/ConsentContext', () => ({
 }))
 
 const SNOOZE_KEY = 'movida:install-snooze-until'
+const PUSH_SNOOZE_KEY = 'movida:push-optin-snooze-until'
 
 // The install banner is only offered to signed-in users (anonymous visitors
 // are prompted to sign in elsewhere first), so every test needs `/auth/me`
 // to resolve to a user before the banner can appear.
-function renderPrompt() {
-  server.use(http.get('*/api/auth/me', () => HttpResponse.json(makeUser())))
+function renderPrompt(userOverrides: Parameters<typeof makeUser>[0] = {}) {
+  server.use(http.get('*/api/auth/me', () => HttpResponse.json(makeUser(userOverrides))))
   return render(
     <AuthProvider>
       <PwaInstallProvider>
@@ -143,5 +144,82 @@ describe('InstallPrompt', () => {
     })
 
     expect(screen.queryByText(/install movida/i)).not.toBeInTheDocument()
+  })
+
+  it('hides "Not now" on the install banner when force_install_prompt is true', async () => {
+    // Snoozed, so without the force override the banner would stay hidden.
+    localStorage.setItem(SNOOZE_KEY, String(Date.now() + 24 * 60 * 60 * 1000))
+    renderPrompt({ force_install_prompt: true })
+
+    await act(async () => {
+      window.dispatchEvent(new FakeBeforeInstallPromptEvent('accepted'))
+    })
+
+    expect(await screen.findByText(/install movida/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /not now/i })).not.toBeInTheDocument()
+  })
+
+  describe('push opt-in force override', () => {
+    afterEach(() => {
+      for (const key of ['PushManager', 'Notification'] as const) {
+        if (key in globalThis) {
+          delete (globalThis as Record<string, unknown>)[key]
+        }
+      }
+      if ('serviceWorker' in navigator) {
+        delete (navigator as unknown as Record<string, unknown>).serviceWorker
+      }
+    })
+
+    it('shows the enable-notifications banner despite the snooze when force_enable_push_prompt is true', async () => {
+      // Snoozed, so without the force override the banner would stay hidden.
+      localStorage.setItem(PUSH_SNOOZE_KEY, String(Date.now() + 24 * 60 * 60 * 1000))
+
+      // Standalone mode satisfies the "(justInstalled || isStandalone)" gate.
+      Object.defineProperty(window, 'matchMedia', {
+        writable: true,
+        value: vi.fn().mockImplementation((query: string) => ({
+          matches: query === '(display-mode: standalone)',
+          media: query,
+          onchange: null,
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(),
+        })),
+      })
+
+      // usePush needs a VAPID key + PushManager/Notification support to
+      // settle on 'off' rather than 'disabled'/'unsupported'.
+      server.use(
+        http.get('*/api/push/vapid-public-key', () =>
+          HttpResponse.json({ public_key: 'dGVzdGtleQ' }),
+        ),
+      )
+      Object.defineProperty(navigator, 'serviceWorker', {
+        configurable: true,
+        value: {
+          ready: Promise.resolve({
+            pushManager: {
+              getSubscription: vi.fn(async () => null),
+              subscribe: vi.fn(async () => ({})),
+            },
+          }),
+        },
+      })
+      Object.defineProperty(globalThis, 'PushManager', {
+        configurable: true,
+        value: function PushManager() { },
+      })
+      Object.defineProperty(globalThis, 'Notification', {
+        configurable: true,
+        value: { permission: 'default', requestPermission: vi.fn(async () => 'granted') },
+      })
+
+      renderPrompt({ force_enable_push_prompt: true })
+
+      expect(await screen.findByText(/stay in the loop/i)).toBeInTheDocument()
+    })
   })
 })

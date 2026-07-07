@@ -1,5 +1,6 @@
 import ipaddress
 import logging
+from datetime import datetime, timedelta
 from uuid import UUID
 
 from fastapi import Cookie, Depends, HTTPException, Request
@@ -18,6 +19,12 @@ from backend.db.models import User, UserFollow
 logger = logging.getLogger(__name__)
 
 _MAX_AGE = 60 * 60 * 24 * 7  # 7 days
+
+# Minimum gap between ``last_visit_at``/``last_visit_user_agent`` refreshes
+# for a returning session-cookie visit. Avoids a DB write on every single
+# authenticated API call; "last visit" is meant to read as "last time the
+# user was active", not "last request".
+_LAST_SEEN_THROTTLE = timedelta(minutes=30)
 
 
 def _get_serializer() -> URLSafeTimedSerializer:
@@ -42,6 +49,7 @@ def get_current_user(session_token: str | None = Cookie(default=None)) -> dict:
 
 
 def get_current_user_optional(
+    request: Request,
     session_token: str | None = Cookie(default=None),
     session: Session = Depends(get_session),
 ) -> User | None:
@@ -50,6 +58,10 @@ def get_current_user_optional(
     Looks the user up by ``user_id`` in the cookie payload. Returns None if the
     cookie is missing/invalid OR the user no longer exists (e.g. account
     deleted but cookie still cached).
+
+    Also refreshes ``last_visit_at``/``last_visit_user_agent`` (throttled by
+    ``_LAST_SEEN_THROTTLE``) so "last visit" reflects any authenticated
+    request riding the session cookie, not just a fresh Google login.
     """
     data = _decode_session(session_token)
     if not data:
@@ -64,7 +76,24 @@ def get_current_user_optional(
     user = session.get(User, user_uuid)
     if user is None or user.deleted_at is not None:
         return None
+    _touch_last_visit(session, user, request)
     return user
+
+
+def _touch_last_visit(session: Session, user: User, request: Request) -> None:
+    now = datetime.utcnow()
+    if (
+        user.last_visit_at is not None
+        and now - user.last_visit_at < _LAST_SEEN_THROTTLE
+    ):
+        return
+    user.last_visit_at = now
+    user.last_visit_user_agent = (request.headers.get("user-agent") or "").strip()[
+        :400
+    ] or None
+    session.add(user)
+    session.commit()
+    session.refresh(user)
 
 
 def require_user(user: User | None = Depends(get_current_user_optional)) -> User:

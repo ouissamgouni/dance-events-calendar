@@ -7,11 +7,13 @@ import {
     adminSetVerifiedOrganizer,
     adminSetAdminManaged,
     adminSetForceInstallPrompt,
+    adminSetForceEnablePush,
     adminMergeUsers,
 } from '../api';
 import type { AdminUserMergeResponse, AdminUserRow } from '../api';
 import { ConfirmDialog, PromptDialog } from './AppDialog';
 import { FeatureStatusCell, PushSubscriptionCell } from './NotificationStatusBadges';
+import { parseUserAgent } from '../utils/userAgent';
 
 const PAGE_SIZE = 50;
 
@@ -104,6 +106,18 @@ export default function AdminUsersTab() {
         setBusyUserId(row.user_id);
         try {
             await adminSetForceInstallPrompt(row.user_id, !row.force_install_prompt);
+            await load();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Failed to update');
+        } finally {
+            setBusyUserId(null);
+        }
+    };
+
+    const onToggleForceEnablePush = async (row: AdminUserRow) => {
+        setBusyUserId(row.user_id);
+        try {
+            await adminSetForceEnablePush(row.user_id, !row.force_enable_push_prompt);
             await load();
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to update');
@@ -210,6 +224,17 @@ export default function AdminUsersTab() {
         try { return new Date(iso).toLocaleDateString(); } catch { return iso; }
     };
 
+    const formatRelative = (iso: string): string => {
+        const then = new Date(iso).getTime();
+        const now = Date.now();
+        const diffSec = Math.max(0, Math.round((now - then) / 1000));
+        if (diffSec < 60) return 'just now';
+        if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+        if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+        if (diffSec < 86400 * 7) return `${Math.floor(diffSec / 86400)}d ago`;
+        return new Date(iso).toLocaleDateString();
+    };
+
     return (
         <section className="space-y-4">
             <header className="flex flex-wrap items-center gap-3">
@@ -268,6 +293,7 @@ export default function AdminUsersTab() {
                         <tr>
                             <th className="px-3 py-2">User</th>
                             <th className="px-3 py-2">Email</th>
+                            <th className="px-3 py-2">Last visit</th>
                             <th className="px-3 py-2">Created</th>
                             <th className="px-3 py-2 text-right">Followers</th>
                             <th className="px-3 py-2 text-right">Following</th>
@@ -283,7 +309,7 @@ export default function AdminUsersTab() {
                     <tbody>
                         {!loading && rows.length === 0 && (
                             <tr>
-                                <td colSpan={12} className="px-3 py-8 text-center text-slate-500">
+                                <td colSpan={13} className="px-3 py-8 text-center text-slate-500">
                                     No users match these filters.
                                 </td>
                             </tr>
@@ -312,6 +338,29 @@ export default function AdminUsersTab() {
                                     </td>
                                     <td className="px-3 py-2 text-slate-700 truncate max-w-[16rem]">
                                         {row.email}
+                                    </td>
+                                    <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
+                                        {row.last_visit_at ? (() => {
+                                            const parsed = parseUserAgent(row.last_visit_user_agent);
+                                            const details = [
+                                                `Last visit: ${new Date(row.last_visit_at).toLocaleString()}`,
+                                                `${parsed.browserLabel} on ${parsed.osLabel} (${parsed.device})`,
+                                                row.last_visit_user_agent || '',
+                                            ].filter(Boolean).join('\n');
+                                            return (
+                                                <div className="flex items-center gap-1" title={details}>
+                                                    <span>{formatRelative(row.last_visit_at)}</span>
+                                                    {parsed.osIcon && (
+                                                        <img src={parsed.osIcon} alt={parsed.osLabel} className="w-4 h-4" />
+                                                    )}
+                                                    {parsed.browserIcon && (
+                                                        <img src={parsed.browserIcon} alt={parsed.browserLabel} className="w-4 h-4" />
+                                                    )}
+                                                </div>
+                                            );
+                                        })() : (
+                                            <span className="text-slate-400">—</span>
+                                        )}
                                     </td>
                                     <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
                                         {fmtDate(row.created_at)}
@@ -344,16 +393,38 @@ export default function AdminUsersTab() {
                                         />
                                     </td>
                                     <td className="px-3 py-2">
-                                        <PushSubscriptionCell on={row.has_push_subscription} />
+                                        <div className="flex items-center gap-2">
+                                            <PushSubscriptionCell on={row.has_push_subscription} />
+                                            <button
+                                                type="button"
+                                                disabled={isDeleted || busyUserId === row.user_id}
+                                                onClick={() => onToggleForceEnablePush(row)}
+                                                className="px-2 py-1 text-xs border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                title={row.force_enable_push_prompt ? 'Stop forcing the enable-notifications banner (normal 24h snooze applies)' : "Force-show the enable-notifications banner, bypassing this user's 24h dismiss snooze"}
+                                            >
+                                                {row.force_enable_push_prompt ? 'Unforce push' : 'Force push'}
+                                            </button>
+                                        </div>
                                     </td>
                                     <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
-                                        {row.installed_at ? (
-                                            <span title={`Installed ${fmtDate(row.installed_at)}`}>
-                                                {fmtDate(row.installed_at)}
-                                            </span>
-                                        ) : (
-                                            <span className="text-slate-400">Not installed</span>
-                                        )}
+                                        <div className="flex items-center gap-2">
+                                            {row.installed_at ? (
+                                                <span title={`Installed ${fmtDate(row.installed_at)}`}>
+                                                    {fmtDate(row.installed_at)}
+                                                </span>
+                                            ) : (
+                                                <span className="text-slate-400">Not installed</span>
+                                            )}
+                                            <button
+                                                type="button"
+                                                disabled={isDeleted || busyUserId === row.user_id}
+                                                onClick={() => onToggleForceInstall(row)}
+                                                className="px-2 py-1 text-xs border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                title={row.force_install_prompt ? 'Stop forcing the install-app banner (normal 14-day snooze applies)' : "Force-show the install-app banner, bypassing this user's 14-day dismiss snooze"}
+                                            >
+                                                {row.force_install_prompt ? 'Unforce install' : 'Force install'}
+                                            </button>
+                                        </div>
                                     </td>
                                     <td className="px-3 py-2">
                                         <div className="flex flex-wrap items-center gap-1">
@@ -432,15 +503,6 @@ export default function AdminUsersTab() {
                                                     Merge
                                                 </button>
                                             )}
-                                            <button
-                                                type="button"
-                                                disabled={isDeleted || busyUserId === row.user_id}
-                                                onClick={() => onToggleForceInstall(row)}
-                                                className="px-2 py-1 text-xs border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                                                title={row.force_install_prompt ? 'Stop forcing the install-app banner (normal 14-day snooze applies)' : "Force-show the install-app banner, bypassing this user's 14-day dismiss snooze"}
-                                            >
-                                                {row.force_install_prompt ? 'Unforce install' : 'Force install'}
-                                            </button>
                                             <button
                                                 type="button"
                                                 disabled={isDeleted || row.is_admin || busyUserId === row.user_id}

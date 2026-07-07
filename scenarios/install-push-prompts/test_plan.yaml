@@ -1,0 +1,90 @@
+test_plan:
+  name: "PWA install + push opt-in banners — forcing overrides"
+  description: >
+    Exercises the InstallPrompt.tsx "Install app" banner and its
+    follow-up "enable notifications" banner, plus the two admin-only
+    force overrides that let support re-surface either banner for a
+    user who dismissed it: force_install_prompt (bypasses the 14-day
+    install-dismiss snooze and hides "Not now") and
+    force_enable_push_prompt (bypasses the 24h push-opt-in-dismiss
+    snooze). Also covers the Admin → Users layout: the "Force install"
+    toggle sits next to the "Installed app" column, and "Force push"
+    sits next to the "Push" column.
+
+  preconditions:
+    - >-
+      Start scenario:
+      `SCENARIO=install-push-prompts RESET=1 task start:scenario`
+    - >-
+      Use a Chromium-based browser (installability + beforeinstallprompt
+      require it; Firefox/Safari won't fire the native prompt).
+
+  cast:
+    - "Alice — baseline: no overrides, never installed."
+    - "Bob   — force_install_prompt=true."
+    - "Carol — already installed (installed_at set), force_enable_push_prompt=true."
+
+  steps:
+    - id: 1
+      title: "Baseline install banner shows 'Not now'"
+      description: >
+        Sign in as Alice. Trigger the native install prompt (DevTools →
+        Application → Manifest → "Add to home screen", or wait for the
+        browser's own `beforeinstallprompt`).
+      expected: >
+        The "Install Movida" banner appears with both a "Not now" button
+        and an "Install App" button.
+
+    - id: 2
+      title: "Dismissing snoozes the banner for 14 days"
+      description: >
+        Click "Not now", then reload and re-trigger
+        `beforeinstallprompt`.
+      expected: >
+        The banner does not reappear (14-day snooze recorded in
+        localStorage under `movida:install-snooze-until`).
+
+    - id: 3
+      title: "force_install_prompt bypasses the snooze and hides 'Not now'"
+      description: >
+        Sign in as Bob (force_install_prompt=true). Optionally set a
+        future `movida:install-snooze-until` in DevTools console first
+        to simulate a prior dismissal. Re-trigger
+        `beforeinstallprompt`.
+      expected: >
+        The "Install Movida" banner appears despite the snooze, and it
+        only shows the "Install App" button — no "Not now" button.
+
+    - id: 4
+      title: "Admin Users tab layout — Force install next to Installed app"
+      description: >
+        Sign in as Admin, open Admin → Users.
+      expected: >
+        The "Installed app" column shows "Not installed" for Alice/Bob
+        and a date for Carol, each with a "Force install"/"Unforce
+        install" button directly beside it (not in the Actions column).
+        The "Push" column similarly has a "Force push"/"Unforce push"
+        button beside it. Bob's button reads "Unforce install"; Carol's
+        reads "Unforce push".
+
+    - id: 5
+      title: "force_enable_push_prompt bypasses the push-snooze"
+      description: >
+        Sign in as Carol (force_enable_push_prompt=true). Enter
+        standalone mode (DevTools → Application → Manifest → "Launch"
+        as a standalone window, or install the PWA). In the console,
+        set a future `movida:push-optin-snooze-until` to simulate a
+        prior dismissal, then reload.
+      expected: >
+        The "Stay in the loop!" enable-notifications banner appears
+        despite the snooze, with "Not now" and "Enable Notifications"
+        buttons.
+
+    - id: 6
+      title: "Unforcing restores normal snooze behavior"
+      description: >
+        As Admin, click "Unforce push" for Carol. Reload Carol's
+        already-standalone session (snooze from step 5 still set).
+      expected: >
+        The enable-notifications banner no longer appears — the 24h
+        snooze is respected again.

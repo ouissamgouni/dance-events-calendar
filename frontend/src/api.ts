@@ -591,6 +591,10 @@ export interface AuthUser {
      *  running as an installed PWA, or null if never installed. Set via
      *  POST /auth/me/installed. */
     installed_at?: string | null;
+    /** Admin override: when true, the post-install "enable notifications"
+     *  banner bypasses its 24h dismiss snooze for this user. Set via
+     *  Admin → Users. */
+    force_enable_push_prompt?: boolean;
 }
 
 export async function loginWithGoogle(
@@ -1653,8 +1657,15 @@ export interface AdminUserRow {
     managed_label: string | null;
     force_install_prompt: boolean;
     installed_at: string | null;
+    force_enable_push_prompt: boolean;
     deleted_at: string | null;
     created_at: string;
+    // Most recent visit timestamp + the raw ``User-Agent`` header captured
+    // at that visit (bumped on login and on any subsequent session-cookie
+    // request). Null until the user's next visit on a build that captures
+    // it. Powers the "Last visit" column in AdminUsersTab.
+    last_visit_at: string | null;
+    last_visit_user_agent: string | null;
     followers_count: number;
     following_count: number;
     active_block_id: number | null;
@@ -1803,6 +1814,22 @@ export async function reportAppInstalled(): Promise<{ installed_at: string }> {
         credentials: 'include',
     });
     return parseJsonResponse<{ installed_at: string }>(res, 'Failed to record app install');
+}
+
+export async function adminSetForceEnablePush(
+    userId: string,
+    value: boolean,
+): Promise<AdminUserRow> {
+    const res = await fetch(
+        `${BASE}/social/admin/users/id/${encodeURIComponent(userId)}/force-enable-push`,
+        {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ force_enable_push_prompt: value }),
+        },
+    );
+    return parseJsonResponse<AdminUserRow>(res, 'Failed to update force-enable-push flag');
 }
 
 export async function adminSetAdminManaged(

@@ -1719,8 +1719,18 @@ class AdminUser(BaseModel):
     # First-observed PWA install timestamp (null = never installed). See
     # installed_at on the User model.
     installed_at: Optional[datetime] = None
+    # Admin override: bypasses InstallPrompt's 24h push opt-in dismiss
+    # snooze for this user (see force_enable_push_prompt on the User model).
+    force_enable_push_prompt: bool = False
     deleted_at: Optional[datetime] = None
     created_at: datetime
+    # Most recent visit timestamp + the raw ``User-Agent`` header captured
+    # at that visit. Powers the "Last visit" column's relative time and
+    # browser/OS/device icons in the Admin Users tab. Null until the user's
+    # next visit on a build that captures it (see ``last_visit_user_agent``
+    # on the User model).
+    last_visit_at: Optional[datetime] = None
+    last_visit_user_agent: Optional[str] = None
     followers_count: int = 0
     following_count: int = 0
     active_block_id: Optional[int] = None

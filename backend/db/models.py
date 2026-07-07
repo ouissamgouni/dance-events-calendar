@@ -33,7 +33,13 @@ class User(SQLModel, table=True):
         default=None, unique=True, index=True, max_length=255
     )
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    last_login_at: Optional[datetime] = Field(default=None)
+    # Most recent visit: bumped on Google login AND on any subsequent
+    # session-cookie-authenticated request (throttled — see
+    # ``_LAST_SEEN_THROTTLE`` in api/deps.py).
+    last_visit_at: Optional[datetime] = Field(default=None)
+    # Raw ``User-Agent`` header captured at that visit. Powers the
+    # browser/OS/device icons in the Admin Users tab. Truncated to 400 chars.
+    last_visit_user_agent: Optional[str] = Field(default=None, max_length=400)
     deleted_at: Optional[datetime] = Field(default=None, index=True)
     # Pre-fills the "Share my name" toggle in the GoingButton confirmation
     # popover. Defaults to True so attendee lists are populated by default;
@@ -108,6 +114,11 @@ class User(SQLModel, table=True):
     # column in the Admin Users tab. Set once via POST /auth/me/installed
     # and never cleared (uninstall isn't detectable from the web app).
     installed_at: Optional[datetime] = Field(default=None)
+    # Admin override: when True, the post-install "enable notifications"
+    # banner ignores its 24h dismiss snooze for this user (see
+    # PUSH_SNOOZE_HOURS in InstallPrompt.tsx), letting support re-surface
+    # the push opt-in for a user who dismissed it and hasn't enabled push.
+    force_enable_push_prompt: bool = Field(default=False, nullable=False)
     # Optional, unverified social profile links shown on the public profile
     # for self-published credibility. Display-only; never used for auth.
     instagram_url: Optional[str] = Field(default=None, max_length=255)
