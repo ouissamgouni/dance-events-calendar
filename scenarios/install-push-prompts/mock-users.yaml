@@ -1,0 +1,33 @@
+# install-push-prompts cast.
+#
+# - Alice: plain baseline — neither override set, never installed. Shows
+#   the normal (non-forced) banner behavior: "Not now" is visible on the
+#   install banner, and both banners respect their local dismiss snooze.
+# - Bob: force_install_prompt=true — the install banner ignores the
+#   14-day dismiss snooze and hides its "Not now" button.
+# - Carol: already "installed" (installed_at set) and
+#   force_enable_push_prompt=true — the post-install "enable
+#   notifications" banner ignores its 24h dismiss snooze.
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    account_visibility: public
+
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+    account_visibility: public
+    force_install_prompt: true
+
+  - email: carol@example.com
+    name: Carol Diaz
+    handle: carol
+    account_visibility: public
+    installed_at: "2026-01-01T00:00:00"
+    force_enable_push_prompt: true

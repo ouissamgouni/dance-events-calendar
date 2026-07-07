@@ -205,6 +205,32 @@ def test_admin_managed_toggle_sets_public_default_audience(client, session):
 
 
 @pytest.mark.unit
+def test_admin_force_enable_push_toggle(client, session):
+    users = _seed_users(session)
+    assert users["alice"].force_enable_push_prompt is False
+
+    _login(client, "admin@example.com")
+    r = client.patch(
+        f"/api/social/admin/users/id/{users['alice'].id}/force-enable-push",
+        json={"force_enable_push_prompt": True},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["force_enable_push_prompt"] is True
+
+    session.expire_all()
+    alice = session.exec(select(User).where(User.handle == "alice")).first()
+    assert alice is not None
+    assert alice.force_enable_push_prompt is True
+
+    r2 = client.patch(
+        f"/api/social/admin/users/id/{users['alice'].id}/force-enable-push",
+        json={"force_enable_push_prompt": False},
+    )
+    assert r2.status_code == 200, r2.text
+    assert r2.json()["force_enable_push_prompt"] is False
+
+
+@pytest.mark.unit
 def test_admin_actions_work_for_user_without_handle(client, session):
     users = _seed_users(session)
     users["alice"].handle = None

@@ -788,6 +788,7 @@ class DatabaseSeeder:
         # may still override by setting ``onboarded_at`` explicitly.
         auto_onboard_default = bool(data.get("auto_onboard", True))
         from backend.config.loader import get_current_onboarding_version
+
         current_onboarding_version = get_current_onboarding_version()
 
         for entry in data.get("users", []) or []:
@@ -842,6 +843,14 @@ class DatabaseSeeder:
                 "onboarded_at",
                 "onboarding_version",
                 "timezone",
+                # Admin overrides for the PWA install / push opt-in banners.
+                # Lets scenarios exercise the "forced" banner state without
+                # a manual admin-panel toggle.
+                "force_install_prompt",
+                "force_enable_push_prompt",
+                # First-observed PWA install timestamp — lets scenarios seed
+                # an already-installed user for the Admin Users tab.
+                "installed_at",
             ):
                 if key in entry and entry[key] is not None:
                     user_kwargs[key] = entry[key]
@@ -851,6 +860,10 @@ class DatabaseSeeder:
             raw_onboarded = user_kwargs.get("onboarded_at")
             if isinstance(raw_onboarded, str):
                 user_kwargs["onboarded_at"] = datetime.fromisoformat(raw_onboarded)
+            # Same string/datetime normalization for installed_at.
+            raw_installed = user_kwargs.get("installed_at")
+            if isinstance(raw_installed, str):
+                user_kwargs["installed_at"] = datetime.fromisoformat(raw_installed)
             # Phase G — apply the scenario-wide auto-onboard default when
             # the entry didn't explicitly opt in or out. Explicit
             # ``onboarded_at: null`` in yaml means "leave un-onboarded" and
@@ -858,9 +871,7 @@ class DatabaseSeeder:
             # it, so we only stamp defaults here if the key is missing.
             if auto_onboard_default and "onboarded_at" not in entry:
                 user_kwargs["onboarded_at"] = datetime.utcnow()
-                user_kwargs.setdefault(
-                    "onboarding_version", current_onboarding_version
-                )
+                user_kwargs.setdefault("onboarding_version", current_onboarding_version)
             # Phase G legacy aliases — accepted for one release, written
             # through to the corresponding new flags. Emits a stderr
             # deprecation warning per §G.7.1.
@@ -883,6 +894,7 @@ class DatabaseSeeder:
             for legacy_key, targets in _legacy_write_through.items():
                 if legacy_key in entry and entry[legacy_key] is not None:
                     import sys as _sys
+
                     _sys.stderr.write(
                         f"[seed] warning: mock-user {email}: legacy "
                         f"'{legacy_key}' is deprecated; use "
@@ -1252,9 +1264,7 @@ class DatabaseSeeder:
                     if key in friend_seen:
                         continue
                     friend_seen.add(key)
-                    notify_new_friend(
-                        self.session, follower_user, followee_user
-                    )
+                    notify_new_friend(self.session, follower_user, followee_user)
 
     def _seed_interest_profiles(self, path: Path) -> None:
         """Seed UserInterestProfile rows from db-interest-profiles.yaml.
@@ -1339,6 +1349,7 @@ class DatabaseSeeder:
             matches_enabled = entry.get("matches_enabled")
             if matches_enabled is None and "notify_enabled" in entry:
                 import sys as _sys
+
                 _sys.stderr.write(
                     f"[seed] warning: interest_profile {label!r}: legacy "
                     f"'notify_enabled' is deprecated; use 'matches_enabled' "
@@ -1573,9 +1584,7 @@ class DatabaseSeeder:
                 actor = self.session.get(User, actor_id)
                 if actor is None:
                     continue
-                fanned += fan_out_going(
-                    self.session, actor, ev_id, audience=audience
-                )
+                fanned += fan_out_going(self.session, actor, ev_id, audience=audience)
             if fanned:
                 logger.info(
                     "Emitted %d subscription_going notifications from seeded attendances",

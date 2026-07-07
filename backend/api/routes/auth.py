@@ -139,6 +139,7 @@ def _upsert_user_from_claims(
     name: str,
     picture: Optional[str],
     provider_subject: Optional[str],
+    user_agent: Optional[str] = None,
 ) -> tuple[User, bool]:
     """Find an existing user by Google subject (preferred) or email; else create.
 
@@ -154,6 +155,7 @@ def _upsert_user_from_claims(
         user = session.exec(select(User).where(User.email == email)).first()
 
     now = datetime.utcnow()
+    ua = (user_agent or "").strip()[:400] or None
     is_new_user = user is None
     if user is None:
         user = User(
@@ -162,7 +164,8 @@ def _upsert_user_from_claims(
             avatar_url=picture,
             provider="google",
             provider_subject=provider_subject,
-            last_login_at=now,
+            last_visit_at=now,
+            last_visit_user_agent=ua,
         )
         session.add(user)
         # Allocate a share_code immediately for new users so their first
@@ -182,7 +185,8 @@ def _upsert_user_from_claims(
             user.display_name = name
         if picture:
             user.avatar_url = picture
-        user.last_login_at = now
+        user.last_visit_at = now
+        user.last_visit_user_agent = ua
         session.add(user)
 
     if not user.handle:
@@ -499,6 +503,7 @@ def login_with_google(
         name=name,
         picture=picture,
         provider_subject=provider_subject,
+        user_agent=request.headers.get("user-agent"),
     )
     _merge_device_data(session, user, body.device_id, anon_id=read_anon_id(request))
     _apply_anon_preferences(session, user, body.anon_preferences)
@@ -545,6 +550,7 @@ def login_with_google(
             "installed_at": (
                 user.installed_at.isoformat() if user.installed_at else None
             ),
+            "force_enable_push_prompt": bool(user.force_enable_push_prompt),
         }
     )
     return _set_session_cookie(response, user, is_admin)
@@ -693,6 +699,7 @@ def get_me(
         ),
         "force_install_prompt": bool(user.force_install_prompt),
         "installed_at": (user.installed_at.isoformat() if user.installed_at else None),
+        "force_enable_push_prompt": bool(user.force_enable_push_prompt),
     }
 
 

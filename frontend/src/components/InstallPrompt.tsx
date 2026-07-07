@@ -128,11 +128,18 @@ export default function InstallPrompt() {
         setJustInstalled(false);
     };
 
+    // Admin override (Admin → Users → "Force push"): lets support
+    // re-surface the enable-notifications banner for a user who dismissed
+    // it, without waiting out PUSH_SNOOZE_HOURS. Only bypasses the snooze,
+    // not the other conditions below (e.g. it still won't show if push is
+    // already on/unsupported/disabled).
+    const forceEnablePush = Boolean(user?.force_enable_push_prompt);
+
     const showPushOptIn =
         Boolean(user) &&
         push.resolved &&
         (justInstalled || isStandalone) &&
-        !pushSnoozed &&
+        (!pushSnoozed || forceEnablePush) &&
         push.status !== 'on' &&
         push.status !== 'unsupported' &&
         push.status !== 'disabled';
@@ -200,13 +207,15 @@ export default function InstallPrompt() {
                     </div>
                 </div>
                 <div className="flex gap-3">
-                    <button
-                        type="button"
-                        onClick={dismiss}
-                        className="text-xs font-medium text-orange-700 bg-white/30 hover:bg-white/50 px-3 py-2 rounded transition"
-                    >
-                        Not now
-                    </button>
+                    {!forceInstall && (
+                        <button
+                            type="button"
+                            onClick={dismiss}
+                            className="text-xs font-medium text-orange-700 bg-white/30 hover:bg-white/50 px-3 py-2 rounded transition"
+                        >
+                            Not now
+                        </button>
+                    )}
                     <button
                         type="button"
                         onClick={install}

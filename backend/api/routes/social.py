@@ -214,8 +214,11 @@ def _to_admin_user(session: Session, user: User) -> AdminUser:
         managed_label=user.managed_label,
         force_install_prompt=bool(user.force_install_prompt),
         installed_at=user.installed_at,
+        force_enable_push_prompt=bool(user.force_enable_push_prompt),
         deleted_at=user.deleted_at,
         created_at=user.created_at,
+        last_visit_at=user.last_visit_at,
+        last_visit_user_agent=user.last_visit_user_agent,
         followers_count=_followers_count(session, user.id),
         following_count=_following_count(session, user.id),
         active_block_id=active_block.id if active_block else None,
@@ -2327,6 +2330,36 @@ def admin_set_force_install_prompt_by_id(
     """
     user = _resolve_admin_user_id(session, user_id)
     _set_force_install_prompt(session, user, payload.force_install_prompt)
+    return _to_admin_user(session, user)
+
+
+# --- Admin: force-enable-push-prompt toggle ---------------------------------
+
+
+class _ForceEnablePushToggleRequest(BaseModel):
+    force_enable_push_prompt: bool
+
+
+def _set_force_enable_push_prompt(session: Session, user: User, value: bool) -> None:
+    user.force_enable_push_prompt = bool(value)
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+
+
+@router.patch("/admin/users/id/{user_id}/force-enable-push", response_model=AdminUser)
+def admin_set_force_enable_push_prompt_by_id(
+    user_id: UUID,
+    payload: _ForceEnablePushToggleRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Admin-only: force the post-install "enable notifications" banner to
+    bypass its 24h dismiss snooze for a single user (e.g. support asked to
+    re-surface it for someone who dismissed it and hasn't enabled push).
+    """
+    user = _resolve_admin_user_id(session, user_id)
+    _set_force_enable_push_prompt(session, user, payload.force_enable_push_prompt)
     return _to_admin_user(session, user)
 
 
