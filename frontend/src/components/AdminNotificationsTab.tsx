@@ -119,22 +119,20 @@ export default function AdminNotificationsTab() {
                 <span className="text-xs text-slate-500">
                     {loading ? 'Loading…' : `${total.toLocaleString()} total`}
                 </span>
-                <div className="ml-auto">
-                    <input
-                        type="search"
-                        value={q}
-                        onChange={(e) => {
-                            setQ(e.target.value);
-                            setOffset(0);
-                        }}
-                        placeholder="Search recipient handle, name, email"
-                        className="w-64 border border-slate-300 px-2 py-1 text-xs"
-                        aria-label="Search notifications by recipient"
-                    />
-                </div>
             </header>
 
             <div className="flex flex-wrap items-center gap-4 text-xs">
+                <input
+                    type="search"
+                    value={q}
+                    onChange={(e) => {
+                        setQ(e.target.value);
+                        setOffset(0);
+                    }}
+                    placeholder="Search recipient handle, name, email"
+                    className="w-40 border border-slate-300 px-2 py-1 text-xs"
+                    aria-label="Search notifications by recipient"
+                />
                 <label className="flex items-center gap-1.5">
                     Type
                     <select
@@ -176,10 +174,10 @@ export default function AdminNotificationsTab() {
                     <thead className="bg-slate-50 text-left text-xs uppercase text-slate-600">
                         <tr>
                             <th className="px-3 py-2">Date/time</th>
+                            <th className="px-3 py-2">User</th>
                             <th className="px-3 py-2">Type</th>
                             <th className="px-3 py-2">Channel</th>
                             <th className="px-3 py-2">About</th>
-                            <th className="px-3 py-2">User</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -195,6 +193,9 @@ export default function AdminNotificationsTab() {
                                 <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
                                     {fmtDateTime(row.delivered_at)}
                                 </td>
+                                <td className="px-3 py-2 truncate max-w-[20rem]">
+                                    {recipientLabel(row)}
+                                </td>
                                 <td className="px-3 py-2 whitespace-nowrap" title={row.kind}>
                                     {TYPE_LABELS[row.type] || row.type}
                                 </td>
@@ -203,9 +204,6 @@ export default function AdminNotificationsTab() {
                                 </td>
                                 <td className="px-3 py-2">
                                     <AboutCell row={row} />
-                                </td>
-                                <td className="px-3 py-2 truncate max-w-[20rem]">
-                                    {recipientLabel(row)}
                                 </td>
                             </tr>
                         ))}
