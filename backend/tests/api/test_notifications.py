@@ -748,8 +748,8 @@ def test_mutual_follow_creates_new_friend_notifications(client, session):
 
 
 def test_refollow_does_not_duplicate_notifications(client, session):
-    """Unfollow then re-follow sends a new notification (expected), but the
-    idempotent follow (same session, no unfollow) does not double-notify."""
+    """Calling follow twice in the same session (no unfollow in between,
+    follow row already exists) must not double-notify."""
     _make_user(session, "alice@example.com", "alice")
     _make_user(session, "bob@example.com", "bob")
 
@@ -769,6 +769,66 @@ def test_refollow_does_not_duplicate_notifications(client, session):
     assert len(follower_notifs) == 1, (
         "idempotent re-follow must not duplicate notification"
     )
+
+
+def test_unfollow_then_refollow_sends_a_new_notification(client, session):
+    """BUG (staging, July 2026): unfollowing then following again produced
+    NO new ``new_follower`` notification — ``notify_new_follower``'s dedup
+    check found the stale row from the first follow (never cleaned up by
+    unfollow) and silently no-opped forever. Fixed by having
+    ``unfollow_user`` discard the stale row so a later re-follow notifies
+    again."""
+    _make_user(session, "alice@example.com", "alice")
+    _make_user(session, "bob@example.com", "bob")
+
+    _login(client, "bob@example.com")
+    r = client.post("/api/social/users/alice/follow")
+    assert r.status_code == 201
+    r = client.delete("/api/social/users/alice/follow")
+    assert r.status_code == 200
+    r = client.post("/api/social/users/alice/follow")
+    assert r.status_code == 201
+    _logout(client)
+
+    _login(client, "alice@example.com")
+    r = client.get("/api/notifications")
+    assert r.status_code == 200
+    items = r.json()["items"]
+    follower_notifs = [n for n in items if n["kind"] == "new_follower"]
+    assert len(follower_notifs) == 1, (
+        "re-follow after unfollow must produce a fresh notification"
+    )
+
+
+def test_unfollow_then_refriend_sends_new_friend_notifications_again(client, session):
+    """Same bug class as above but for mutual friendship: breaking and
+    re-forming a mutual follow must renotify both sides."""
+    _make_user(session, "alice@example.com", "alice")
+    _make_user(session, "bob@example.com", "bob")
+
+    _login(client, "alice@example.com")
+    r = client.post("/api/social/users/bob/follow")
+    assert r.status_code == 201
+    _logout(client)
+    _login(client, "bob@example.com")
+    r = client.post("/api/social/users/alice/follow")
+    assert r.status_code == 201
+    # Bob breaks the friendship by unfollowing alice, then re-follows.
+    r = client.delete("/api/social/users/alice/follow")
+    assert r.status_code == 200
+    r = client.post("/api/social/users/alice/follow")
+    assert r.status_code == 201
+    _logout(client)
+
+    for email in ("alice@example.com", "bob@example.com"):
+        _login(client, email)
+        r = client.get("/api/notifications")
+        assert r.status_code == 200
+        friend_notifs = [n for n in r.json()["items"] if n["kind"] == "new_friend"]
+        assert len(friend_notifs) == 1, (
+            f"{email} must receive a fresh new_friend notification on re-friending"
+        )
+        _logout(client)
 
 
 # --- E8: friend-request notification correctness ----------------------------

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlmodel import Session, select
+from sqlmodel import Session, or_, select
 
 from backend.api.deps import can_view, is_mutual_follow
 from backend.db.models import (
@@ -198,10 +198,12 @@ def _notification_exists(
 def notify_new_follower(session: Session, followee: User, follower: User) -> None:
     """Notify ``followee`` that ``follower`` has started following them.
 
-    Idempotent across unfollow/refollow cycles: a prior ``new_follower``
-    notification row is not removed when the follow is revoked, so we
-    must dedup here against the ``uq_notif_no_event`` partial index
-    rather than rely on the call-site check in ``follow_user``.
+    Dedups against the ``uq_notif_no_event`` partial index so a caller
+    that already knows a row exists for this (recipient, actor) pair
+    doesn't have to special-case the INSERT. ``unfollow_user`` calls
+    ``discard_new_follower_notification`` when the edge is torn down, so
+    a later re-follow finds no stale row here and notifies again — see
+    that function's docstring for the history of this bug.
     """
     if _notification_exists(
         session,
@@ -224,9 +226,13 @@ def notify_new_follower(session: Session, followee: User, follower: User) -> Non
 def notify_new_friend(session: Session, user_a: User, user_b: User) -> None:
     """Notify both users that they are now mutual friends.
 
-    Produces one ``Notification`` row per participant. Idempotent
-    against the ``uq_notif_no_event`` partial index so a friendship
-    that re-forms after being broken does not raise IntegrityError.
+    Produces one ``Notification`` row per participant. Dedups against
+    the ``uq_notif_no_event`` partial index so a friendship that
+    re-forms after being broken does not raise IntegrityError.
+    ``unfollow_user`` calls ``discard_new_friend_notifications`` when the
+    mutual follow breaks, so a later re-friending notifies again instead
+    of silently no-oping against a stale row (see that function's
+    docstring).
     """
     if not _notification_exists(
         session, recipient_id=user_a.id, actor_id=user_b.id, kind=NEW_FRIEND
@@ -252,6 +258,57 @@ def notify_new_friend(session: Session, user_a: User, user_b: User) -> None:
         session.add(notif_b)
         session.flush()
         record_delivery(session, notif_b.id, "app")
+
+
+def discard_new_follower_notification(
+    session: Session, *, followee_id, follower_id
+) -> None:
+    """Remove a stale ``new_follower`` row when the follow edge is torn down.
+
+    BUG (found in staging, July 2026): ``notify_new_follower``'s dedup
+    check only asks "has this (recipient, actor) pair ever produced a
+    ``new_follower`` row", with no time bound. ``unfollow_user`` never
+    deleted that row, so once a follow had ever been notified, unfollowing
+    and following again would hit the dedup guard and silently produce no
+    new notification — forever, for that pair. Called from
+    ``unfollow_user`` for the reverse case (target as recipient, viewer as
+    actor) so a subsequent re-follow's dedup check finds nothing and
+    notifies again. Uses a direct ``delete()``; caller owns the commit.
+    """
+    from backend.db.models import Notification as _N  # local import
+
+    session.exec(
+        _N.__table__.delete().where(
+            (_N.recipient_user_id == followee_id)
+            & (_N.actor_user_id == follower_id)
+            & (_N.kind == NEW_FOLLOWER)
+            & (_N.event_id.is_(None))
+        )
+    )
+
+
+def discard_new_friend_notifications(session: Session, user_a_id, user_b_id) -> None:
+    """Remove both directions' stale ``new_friend`` rows when a mutual
+    follow breaks (either side unfollows the other).
+
+    Same bug class as ``discard_new_follower_notification`` above:
+    without this, re-forming a friendship after either side unfollows
+    never renotifies either participant. Uses a direct ``delete()``;
+    caller owns the commit.
+    """
+    from backend.db.models import Notification as _N  # local import
+
+    session.exec(
+        _N.__table__.delete()
+        .where(
+            or_(
+                (_N.recipient_user_id == user_a_id) & (_N.actor_user_id == user_b_id),
+                (_N.recipient_user_id == user_b_id) & (_N.actor_user_id == user_a_id),
+            )
+        )
+        .where(_N.kind == NEW_FRIEND)
+        .where(_N.event_id.is_(None))
+    )
 
 
 def notify_follow_request(session: Session, target: User, requester: User) -> None:

@@ -106,6 +106,8 @@ from backend.db.models import (
 )
 from backend.services.notifications import (
     discard_follow_request_notification,
+    discard_new_follower_notification,
+    discard_new_friend_notifications,
     notify_follow_request,
     notify_follow_request_approved,
     notify_new_follower,
@@ -849,6 +851,10 @@ def unfollow_user(
     ).first()
     if existing is not None:
         was_pending = existing.status == "pending"
+        was_approved = existing.status == "approved"
+        # Mutuality must be checked BEFORE the edge is deleted below —
+        # once it's gone, is_mutual_follow always reports False.
+        was_friend = was_approved and is_mutual_follow(session, viewer.id, target.id)
         session.delete(existing)
         if was_pending:
             # Phase E (E8): also clear the pending request notification
@@ -857,6 +863,17 @@ def unfollow_user(
             discard_follow_request_notification(
                 session, target_id=target.id, requester_id=viewer.id
             )
+        elif was_approved:
+            # BUG (staging, July 2026): without this, re-following after
+            # an unfollow silently produced no new_follower/new_friend
+            # notification — notify_new_follower's dedup check found the
+            # old (now-stale) row and no-opped forever. Clear it here so
+            # a future re-follow/re-friend notifies again.
+            discard_new_follower_notification(
+                session, followee_id=target.id, follower_id=viewer.id
+            )
+            if was_friend:
+                discard_new_friend_notifications(session, viewer.id, target.id)
     # Phase B: unfollow also drops the implied calendar subscription so
     # the user stops receiving notifications and feed entries.
     sub = _get_subscription(session, viewer.id, target.id)
