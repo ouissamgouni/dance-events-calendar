@@ -584,6 +584,13 @@ export interface AuthUser {
     activity_email_enabled?: boolean;
     push_enabled?: boolean;
     interest_notifications_enabled?: boolean;
+    /** Admin override: when true, InstallPrompt bypasses its 14-day dismiss
+     *  snooze for this user. Set via Admin → Users. */
+    force_install_prompt?: boolean;
+    /** ISO-8601 timestamp of the first time this account was observed
+     *  running as an installed PWA, or null if never installed. Set via
+     *  POST /auth/me/installed. */
+    installed_at?: string | null;
 }
 
 export async function loginWithGoogle(
@@ -1644,6 +1651,8 @@ export interface AdminUserRow {
     is_verified_organizer: boolean;
     is_admin_managed: boolean;
     managed_label: string | null;
+    force_install_prompt: boolean;
+    installed_at: string | null;
     deleted_at: string | null;
     created_at: string;
     followers_count: number;
@@ -1770,6 +1779,30 @@ export async function adminSetVerifiedOrganizer(
         },
     );
     return parseJsonResponse<AdminUserRow>(res, 'Failed to update verified flag');
+}
+
+export async function adminSetForceInstallPrompt(
+    userId: string,
+    value: boolean,
+): Promise<AdminUserRow> {
+    const res = await fetch(
+        `${BASE}/social/admin/users/id/${encodeURIComponent(userId)}/force-install-prompt`,
+        {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ force_install_prompt: value }),
+        },
+    );
+    return parseJsonResponse<AdminUserRow>(res, 'Failed to update force-install-prompt flag');
+}
+
+export async function reportAppInstalled(): Promise<{ installed_at: string }> {
+    const res = await fetch(`${BASE}/auth/me/installed`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return parseJsonResponse<{ installed_at: string }>(res, 'Failed to record app install');
 }
 
 export async function adminSetAdminManaged(

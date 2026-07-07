@@ -6,6 +6,7 @@ import {
     adminRevokeUserBlock,
     adminSetVerifiedOrganizer,
     adminSetAdminManaged,
+    adminSetForceInstallPrompt,
     adminMergeUsers,
 } from '../api';
 import type { AdminUserMergeResponse, AdminUserRow } from '../api';
@@ -91,6 +92,18 @@ export default function AdminUsersTab() {
         setBusyUserId(row.user_id);
         try {
             await adminSetAdminManaged(row.user_id, false, row.managed_label);
+            await load();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Failed to update');
+        } finally {
+            setBusyUserId(null);
+        }
+    };
+
+    const onToggleForceInstall = async (row: AdminUserRow) => {
+        setBusyUserId(row.user_id);
+        try {
+            await adminSetForceInstallPrompt(row.user_id, !row.force_install_prompt);
             await load();
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to update');
@@ -262,6 +275,7 @@ export default function AdminUsersTab() {
                             <th className="px-3 py-2">Reminders</th>
                             <th className="px-3 py-2">Digest</th>
                             <th className="px-3 py-2">Push</th>
+                            <th className="px-3 py-2">Installed app</th>
                             <th className="px-3 py-2">Status</th>
                             <th className="px-3 py-2">Actions</th>
                         </tr>
@@ -269,7 +283,7 @@ export default function AdminUsersTab() {
                     <tbody>
                         {!loading && rows.length === 0 && (
                             <tr>
-                                <td colSpan={11} className="px-3 py-8 text-center text-slate-500">
+                                <td colSpan={12} className="px-3 py-8 text-center text-slate-500">
                                     No users match these filters.
                                 </td>
                             </tr>
@@ -331,6 +345,15 @@ export default function AdminUsersTab() {
                                     </td>
                                     <td className="px-3 py-2">
                                         <PushSubscriptionCell on={row.has_push_subscription} />
+                                    </td>
+                                    <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
+                                        {row.installed_at ? (
+                                            <span title={`Installed ${fmtDate(row.installed_at)}`}>
+                                                {fmtDate(row.installed_at)}
+                                            </span>
+                                        ) : (
+                                            <span className="text-slate-400">Not installed</span>
+                                        )}
                                     </td>
                                     <td className="px-3 py-2">
                                         <div className="flex flex-wrap items-center gap-1">
@@ -409,6 +432,15 @@ export default function AdminUsersTab() {
                                                     Merge
                                                 </button>
                                             )}
+                                            <button
+                                                type="button"
+                                                disabled={isDeleted || busyUserId === row.user_id}
+                                                onClick={() => onToggleForceInstall(row)}
+                                                className="px-2 py-1 text-xs border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                title={row.force_install_prompt ? 'Stop forcing the install-app banner (normal 14-day snooze applies)' : "Force-show the install-app banner, bypassing this user's 14-day dismiss snooze"}
+                                            >
+                                                {row.force_install_prompt ? 'Unforce install' : 'Force install'}
+                                            </button>
                                             <button
                                                 type="button"
                                                 disabled={isDeleted || row.is_admin || busyUserId === row.user_id}

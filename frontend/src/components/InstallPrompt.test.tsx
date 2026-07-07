@@ -1,18 +1,28 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { http, HttpResponse } from 'msw'
 import InstallPrompt from './InstallPrompt'
 import { AuthProvider } from '../context/AuthContext'
 import { PwaInstallProvider } from '../context/PwaInstallContext'
+import { server } from '../test/server'
+import { makeUser } from '../test/handlers'
+
+// The install banner only renders once `consentResolved` is true (it's kept
+// hidden while the cookie-consent modal's scroll-lock is active — see the
+// comment on `consentResolved` in ConsentContext). The real provider pulls in
+// vanilla-cookieconsent + a live app-info fetch, so stub the hook instead.
+vi.mock('../context/ConsentContext', () => ({
+  useConsent: () => ({ consentResolved: true }),
+}))
 
 const SNOOZE_KEY = 'movida:install-snooze-until'
 
-// The install banner itself (tested here) doesn't depend on auth state —
-// only the post-install push opt-in toast is gated to signed-in users (see
-// PushNotificationSettings/usePush tests for that behavior) — but
-// InstallPrompt now reads useAuth() unconditionally, so AuthProvider must be
-// present or the hook throws.
+// The install banner is only offered to signed-in users (anonymous visitors
+// are prompted to sign in elsewhere first), so every test needs `/auth/me`
+// to resolve to a user before the banner can appear.
 function renderPrompt() {
+  server.use(http.get('*/api/auth/me', () => HttpResponse.json(makeUser())))
   return render(
     <AuthProvider>
       <PwaInstallProvider>

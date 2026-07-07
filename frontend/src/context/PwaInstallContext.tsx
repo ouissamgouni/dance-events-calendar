@@ -36,11 +36,16 @@ const PwaInstallContext = createContext<PwaInstallContextValue>({
 
 export function PwaInstallProvider({ children }: { children: ReactNode }) {
     const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
-    const [isStandalone, setIsStandalone] = useState(false);
+    // Lazy-initialized (not set in an effect) so the very first render
+    // already reflects reality — an effect-based initial value is briefly
+    // wrong (defaults to `false`) which previously let the install banner
+    // flash for an instant on every load for users already running the
+    // installed app.
+    const [isStandalone, setIsStandalone] = useState(
+        () => window.matchMedia('(display-mode: standalone)').matches,
+    );
 
     useEffect(() => {
-        setIsStandalone(window.matchMedia('(display-mode: standalone)').matches);
-
         const onPrompt = (e: Event) => {
             e.preventDefault();
             setDeferred(e as BeforeInstallPromptEvent);

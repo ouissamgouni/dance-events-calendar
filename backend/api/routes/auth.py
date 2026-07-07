@@ -541,6 +541,10 @@ def login_with_google(
                 user.onboarded_at is None
                 or (user.onboarding_version or 0) < get_current_onboarding_version()
             ),
+            "force_install_prompt": bool(user.force_install_prompt),
+            "installed_at": (
+                user.installed_at.isoformat() if user.installed_at else None
+            ),
         }
     )
     return _set_session_cookie(response, user, is_admin)
@@ -677,8 +681,7 @@ def get_me(
         # older frontend clients still work (Phase G §G.9 step 5 drops them).
         "reminder_email_enabled": user.email_event_reminders_enabled,
         "activity_email_enabled": (
-            user.email_social_activity_enabled
-            and user.email_interest_matches_enabled
+            user.email_social_activity_enabled and user.email_interest_matches_enabled
         ),
         "push_enabled": (
             user.push_event_reminders_enabled
@@ -686,10 +689,31 @@ def get_me(
             and user.push_interest_matches_enabled
         ),
         "interest_notifications_enabled": (
-            user.email_interest_matches_enabled
-            and user.push_interest_matches_enabled
+            user.email_interest_matches_enabled and user.push_interest_matches_enabled
         ),
+        "force_install_prompt": bool(user.force_install_prompt),
+        "installed_at": (user.installed_at.isoformat() if user.installed_at else None),
     }
+
+
+@router.post("/me/installed")
+def report_app_installed(
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session),
+):
+    """Record that the caller's account has installed the app as a PWA.
+
+    Idempotent: only sets ``installed_at`` the first time it's called for
+    this user (never overwritten/cleared — there's no reliable uninstall
+    signal from the web app). Called by the frontend once it observes
+    ``display-mode: standalone`` for a signed-in user (see InstallPrompt.tsx).
+    """
+    if user.installed_at is None:
+        user.installed_at = datetime.utcnow()
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+    return {"installed_at": user.installed_at.isoformat()}
 
 
 @router.patch("/preferences", response_model=UserPreferencesResponse)
@@ -877,8 +901,7 @@ def update_notification_preferences(
         # Legacy mirror (removed in cleanup PR).
         "reminder_email_enabled": user.email_event_reminders_enabled,
         "activity_email_enabled": (
-            user.email_social_activity_enabled
-            and user.email_interest_matches_enabled
+            user.email_social_activity_enabled and user.email_interest_matches_enabled
         ),
         "push_enabled": (
             user.push_event_reminders_enabled
@@ -886,8 +909,7 @@ def update_notification_preferences(
             and user.push_interest_matches_enabled
         ),
         "interest_notifications_enabled": (
-            user.email_interest_matches_enabled
-            and user.push_interest_matches_enabled
+            user.email_interest_matches_enabled and user.push_interest_matches_enabled
         ),
     }
 
