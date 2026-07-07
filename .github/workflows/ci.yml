@@ -73,3 +73,24 @@ jobs:
 
             - name: Run frontend checks (type check + unit tests + build)
               run: task test:unit:frontend
+
+            - name: Email CI result to owner
+              if: always()
+              uses: dawidd6/action-send-mail@v3
+              with:
+                  server_address: smtp-relay.brevo.com
+                  server_port: 587
+                  username: ${{ secrets.SMTP_USER }}
+                  password: ${{ secrets.SMTP_PASSWORD }}
+                  from: Movida CI <noreply@joinmovida.com>
+                  to: ${{ secrets.CI_NOTIFY_EMAIL }}
+                  subject: "${{ job.status == 'success' && '✅' || '❌' }} CI ${{ job.status }} — ${{ github.ref_name }} (${{ github.event_name }})"
+                  body: |
+                      CI run: ${{ job.status }}
+
+                      Repo:   ${{ github.repository }}
+                      Ref:    ${{ github.ref_name }}
+                      Event:  ${{ github.event_name }}
+                      Commit: ${{ github.event.head_commit.message || github.sha }}
+                      Actor:  ${{ github.actor }}
+                      Run:    ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

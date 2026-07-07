@@ -74,6 +74,11 @@ includes:
     vars:
       ROOT_DIR: "{{.ROOT_DIR}}"
       BACKEND_DIR: "{{.BACKEND_DIR}}"
+  secrets:
+    taskfile: .taskfiles/secrets.yml
+    dir: "{{.ROOT_DIR}}"
+    vars:
+      ROOT_DIR: "{{.ROOT_DIR}}"
 
 tasks:
   default:
