@@ -3683,6 +3683,11 @@ def friend_of_friend_suggestions(
     Excludes: self, viewer's existing follows, soft-deleted accounts,
     and accounts with no public handle. Anonymous viewers never hit
     this route (``require_user``).
+
+    When the viewer has zero mutual-friend candidates (no friends yet,
+    or already follows everyone reachable through their network), falls
+    back to admin-managed curator accounts (``mutual_friend_count=0``)
+    so the surface isn't empty — mirrors ``discover_suggested``.
     """
     excluded: set[UUID] = _already_followed_ids(session, viewer.id)
     excluded.add(viewer.id)
@@ -3706,7 +3711,27 @@ def friend_of_friend_suggestions(
         candidate_scores.update({r[0]: int(r[1]) for r in rows})
 
     if not candidate_scores:
-        return FoFSuggestionsResponse(items=[], total=0)
+        # No mutual-friend candidates (viewer has no friends yet, or has
+        # already followed everyone reachable through their network) —
+        # fall back to admin-managed curator accounts so the "People you
+        # may know" surface isn't empty for brand-new users. Mirrors the
+        # fallback already used by ``discover_suggested``.
+        curators = _curator_users(session, viewer, limit=limit, excluded_ids=excluded)
+        return FoFSuggestionsResponse(
+            items=[
+                FoFSuggestionItem(
+                    handle=u.handle or "",
+                    display_name=u.display_name,
+                    avatar_url=u.avatar_url,
+                    is_verified_organizer=bool(u.is_verified_organizer),
+                    is_admin_managed=bool(u.is_admin_managed),
+                    mutual_friend_count=0,
+                    mutual_friends_preview=[],
+                )
+                for u in curators
+            ],
+            total=len(curators),
+        )
 
     candidate_ids = list(candidate_scores.keys())
 

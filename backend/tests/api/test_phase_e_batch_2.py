@@ -392,14 +392,22 @@ def test_e4_fof_suggestions_empty_when_viewer_has_no_friends(client, session):
     assert r.json() == {"items": [], "total": 0}
 
 
-def test_e4_suggestions_exclude_admin_managed_curators_without_mutuals(client, session):
+def test_e4_suggestions_fall_back_to_curators_without_mutuals(client, session):
+    """When the viewer has no mutual-friend candidates, curators fill the
+    "People you may know" surface (mirrors the ``discover_suggested``
+    fallback) instead of leaving the section empty."""
     _make_user(session, "viewer@example.com", "viewer")
     _make_user(session, "curator@example.com", "curator", is_admin_managed=True)
 
     _login(client, "viewer@example.com")
     r = client.get("/api/social/me/suggestions")
     assert r.status_code == 200
-    assert r.json() == {"items": [], "total": 0}
+    items = r.json()["items"]
+    handles = [it["handle"] for it in items]
+    assert "curator" in handles
+    curator_item = next(it for it in items if it["handle"] == "curator")
+    assert curator_item["is_admin_managed"] is True
+    assert curator_item["mutual_friend_count"] == 0
 
 
 def test_e4_fof_suggestions_exclude_opted_out_users(client, session):
