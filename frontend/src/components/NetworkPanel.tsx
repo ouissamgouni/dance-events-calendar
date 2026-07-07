@@ -55,6 +55,16 @@ export default function NetworkPanel() {
     const [leaderboardPeriod, setLeaderboardPeriod] = useState<LeaderboardPeriod>('30d');
     const [leaderboard, setLeaderboard] = useState<FriendsLeaderboardResponse | null>(null);
 
+    // Tab-badge counts, fetched separately (limit: 1) from the full lists
+    // in `data` so an eager count fetch never poisons `data[tab]` with a
+    // truncated 1-item list that the full-list effect below then mistakes
+    // for "already loaded" and skips re-fetching.
+    const [counts, setCounts] = useState<Record<Exclude<Tab, 'leaderboard' | 'suggestions'>, number | null>>({
+        friends: null,
+        followers: null,
+        following: null,
+    });
+
     // E1: when a Follow action happens elsewhere (e.g. "Follow back" in
     // the notifications panel) invalidate cached lists so this panel
     // reflects the new edge on next render.
@@ -79,10 +89,10 @@ export default function NetworkPanel() {
                     fetchMyFollowing({ limit: 1 }),
                 ]);
                 if (!cancelled) {
-                    setData({
-                        friends: friendsRes,
-                        followers: followersRes,
-                        following: followingRes,
+                    setCounts({
+                        friends: friendsRes.total,
+                        followers: followersRes.total,
+                        following: followingRes.total,
                     });
                 }
             } catch (err) {
@@ -223,7 +233,7 @@ export default function NetworkPanel() {
                 {(Object.keys(TAB_LABELS) as Tab[]).map((t) => {
                     const active = t === tab;
                     const count =
-                        t === 'leaderboard' || t === 'suggestions' ? undefined : data[t]?.total;
+                        t === 'leaderboard' || t === 'suggestions' ? undefined : data[t]?.total ?? counts[t] ?? undefined;
                     return (
                         <button
                             key={t}
