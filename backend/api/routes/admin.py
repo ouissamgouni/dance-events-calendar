@@ -1107,6 +1107,8 @@ def toggle_calendar(
         raise HTTPException(status_code=404, detail="Calendar not found")
     if body.enabled is not None:
         cal.enabled = body.enabled
+    if body.show_events is not None:
+        cal.show_events = body.show_events
     if body.color is not None:
         cal.color = body.color
     if body.name is not None:

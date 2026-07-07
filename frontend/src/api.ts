@@ -449,7 +449,7 @@ export async function fetchCalendars(): Promise<CalendarSetting[]> {
 
 export async function updateCalendar(
     calendarId: string,
-    update: { enabled?: boolean; color?: string; name?: string },
+    update: { enabled?: boolean; show_events?: boolean; color?: string; name?: string },
 ): Promise<CalendarSetting> {
     const res = await fetch(`${BASE}/admin/calendars/${encodeURIComponent(calendarId)}/toggle`, {
         method: 'POST',

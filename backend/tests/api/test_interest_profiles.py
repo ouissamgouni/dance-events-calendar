@@ -351,7 +351,7 @@ def test_signup_seeds_exactly_one_default_profile(client):
     assert isinstance(listing, list)
     assert len(listing) == 1
     default = listing[0]
-    assert default["label"] == "My preferences"
+    assert default["label"] == "Default"
     assert default["is_active"] is True
     assert default["matches_enabled"] is False
     # Legacy mirror kept for one release.

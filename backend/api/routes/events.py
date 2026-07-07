@@ -457,9 +457,9 @@ def get_calendars(
     request: Request,
     session: Session = Depends(get_session),
 ):
-    """Public list of enabled calendars with name and color."""
+    """Public list of visible calendars with name and color."""
     calendars = session.exec(
-        select(CalendarSetting).where(CalendarSetting.enabled == True)
+        select(CalendarSetting).where(CalendarSetting.show_events == True)
     ).all()
     return calendars
 
@@ -573,11 +573,11 @@ def get_events(
         start_dt = datetime.fromisoformat(start_date)
         effective_start = max(since_dt, start_dt)
 
-    enabled_calendars = session.exec(
-        select(CalendarSetting).where(CalendarSetting.enabled == True)
+    visible_calendars = session.exec(
+        select(CalendarSetting).where(CalendarSetting.show_events == True)
     ).all()
-    calendar_ids = [c.calendar_id for c in enabled_calendars]
-    color_map = {c.calendar_id: c.color for c in enabled_calendars}
+    calendar_ids = [c.calendar_id for c in visible_calendars]
+    color_map = {c.calendar_id: c.color for c in visible_calendars}
 
     if not calendar_ids:
         return []
@@ -869,11 +869,11 @@ def get_events_by_ids(
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     """Fetch events by a list of IDs (for saved events / My Calendar page)."""
-    enabled_calendars = session.exec(
-        select(CalendarSetting).where(CalendarSetting.enabled == True)
+    visible_calendars = session.exec(
+        select(CalendarSetting).where(CalendarSetting.show_events == True)
     ).all()
-    calendar_ids = [c.calendar_id for c in enabled_calendars]
-    color_map = {c.calendar_id: c.color for c in enabled_calendars}
+    calendar_ids = [c.calendar_id for c in visible_calendars]
+    color_map = {c.calendar_id: c.color for c in visible_calendars}
 
     if not calendar_ids:
         return []
@@ -990,11 +990,11 @@ def get_event(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    # Check calendar is enabled
+    # Check calendar is visible
     calendar = session.exec(
         select(CalendarSetting).where(
             CalendarSetting.calendar_id == event.calendar_id,
-            CalendarSetting.enabled == True,
+            CalendarSetting.show_events == True,
         )
     ).first()
     if not calendar:
@@ -1088,7 +1088,7 @@ def get_event_og_meta(
     calendar = session.exec(
         select(CalendarSetting).where(
             CalendarSetting.calendar_id == event.calendar_id,
-            CalendarSetting.enabled == True,  # noqa: E712
+            CalendarSetting.show_events == True,  # noqa: E712
         )
     ).first()
     if not calendar:
@@ -1126,15 +1126,15 @@ def get_sitemap(
     request: Request,
     session: Session = Depends(get_session),
 ):
-    """Dynamic sitemap listing all reviewed events from enabled calendars."""
+    """Dynamic sitemap listing all reviewed events from visible calendars."""
     import os
 
     base_url = os.getenv("PUBLIC_URL", "https://example.com")
 
-    enabled_calendars = session.exec(
-        select(CalendarSetting).where(CalendarSetting.enabled == True)
+    visible_calendars = session.exec(
+        select(CalendarSetting).where(CalendarSetting.show_events == True)
     ).all()
-    calendar_ids = [c.calendar_id for c in enabled_calendars]
+    calendar_ids = [c.calendar_id for c in visible_calendars]
 
     if not calendar_ids:
         events = []

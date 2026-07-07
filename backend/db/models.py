@@ -191,11 +191,25 @@ class UserAccountMerge(SQLModel, table=True):
 
 
 class CalendarSetting(SQLModel, table=True):
+    """
+    ``enabled`` and ``show_events`` are intentionally independent:
+
+    - ``enabled`` gates whether the background sync job fetches new events
+      from this Google Calendar (see ``SyncService._sync_phase``).
+    - ``show_events`` gates whether already-cached events from this calendar
+      appear in public-facing surfaces (``/api/events``, sitemap, shared
+      calendars, profile feeds, etc.).
+
+    Disabling sync on a calendar does not hide its previously-synced events —
+    an admin must explicitly toggle ``show_events`` off for that.
+    """
+
     __tablename__ = "calendar_settings"
 
     calendar_id: str = Field(primary_key=True)
     name: str = Field(index=True)
     enabled: bool = Field(default=False)
+    show_events: bool = Field(default=True)
     color: Optional[str] = Field(default=None)
     sync_token: Optional[str] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
