@@ -33,9 +33,8 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:local
   - id: evt-fr-002
     calendar_id: salsa-cal-001
     title: Cuban Night (public attendance control)
@@ -54,6 +53,5 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:international

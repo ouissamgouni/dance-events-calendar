@@ -75,6 +75,7 @@ body {
 
 .map-selected-event-card .event-card {
   border-bottom: 0;
+  border-radius: 0;
   padding: 0.5rem 0.7rem;
 }
 
@@ -364,6 +365,18 @@ body {
   text-transform: uppercase;
 }
 
+/* Full-width search trigger inside the FilterSheet's Search section, so it
+   reads as a search box rather than a small icon button. */
+.filter-sheet-search .relative,
+.filter-sheet-search {
+  width: 100%;
+}
+
+.filter-sheet-search [data-testid="explorer-event-search-trigger"] {
+  width: 100%;
+  justify-content: flex-start;
+}
+
 /* Inside the mobile FilterSheet the date picker shouldn't render as a
    standalone elevated card — drop the inner padding/shadow so it sits
    flush with the sheet body, which already has its own padding. */
@@ -373,21 +386,31 @@ body {
   background: transparent;
 }
 
+/* Merge the "This" and "Next" preset groups into a single bordered box
+   that scrolls horizontally, instead of stacking them as two separate
+   boxes — saves vertical space in the mobile filter sheet. */
 .filter-sheet-body .date-range-presets {
   display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 0.625rem;
   margin-top: 0.5rem;
-  overflow: visible;
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  padding: 0.375rem;
 }
 
 .filter-sheet-body .date-range-preset-section {
-  align-items: flex-start;
-  padding: 0.25rem;
+  align-items: center;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
 }
 
 .filter-sheet-body .date-range-preset-buttons {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 /* Mobile: compact dates + wrapped period pills so more presets are
@@ -461,9 +484,8 @@ body {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: white;
+  background: transparent;
   border-radius: 0;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.1);
   overflow: hidden;
 }
 
@@ -576,7 +598,7 @@ body {
   left: 0;
   right: 0;
   height: 40px;
-  background: linear-gradient(transparent, white);
+  background: linear-gradient(transparent, #f8fafc);
   pointer-events: none;
   z-index: 1;
 }
@@ -593,29 +615,34 @@ body {
   width: 100%;
   text-align: left;
   padding: 0.6rem 0.85rem;
-  border: none;
-  border-bottom: 1px solid #f1f5f9;
-  background: white;
+  border: 1px solid #f1f5f9;
+  border-radius: 0.75rem;
+  background: transparent;
   cursor: pointer;
   transition: background 0.15s;
   gap: 0.625rem;
+  margin: 4px 0;
 }
 
 .event-card:hover {
-  background: #f8fafc;
+  background: rgba(255, 255, 255, 0.6);
 }
 
 .event-card-highlighted {
-  background: white !important;
+  background: rgba(255, 255, 255, 0.6) !important;
   box-shadow: inset 3px 0 0 #3b82f6;
 }
 
 .event-card-highlighted:hover {
-  background: #f8fafc !important;
+  background: rgba(255, 255, 255, 0.8) !important;
 }
 
 .event-card-user-going {
-  box-shadow: inset 3px 0 0 #22c55e;
+  box-shadow: inset 3px 0 0 #86efac;
+}
+
+.event-card-user-saved {
+  box-shadow: inset 3px 0 0 #94a3b8;
 }
 
 .event-card-offmap-badge {

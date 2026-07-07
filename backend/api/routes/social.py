@@ -94,6 +94,7 @@ from backend.db.models import (
     EventRating,
     EventSuggestion,
     OrganizerClaim,
+    PushSubscription,
     ShareToken,
     User,
     UserAccountMerge,
@@ -115,6 +116,7 @@ from backend.services.follows import (
     ensure_calendar_subscription,
 )
 from backend.api.deps import get_admin_user_id, is_admin_user
+from backend.config.loader import get_current_onboarding_version
 
 router = APIRouter(prefix="/api/social", tags=["social"])
 limiter = Limiter(key_func=client_ip)
@@ -190,6 +192,14 @@ def _following_count(session: Session, user_id: UUID) -> int:
 
 def _to_admin_user(session: Session, user: User) -> AdminUser:
     active_block = _active_block_for_user(session, user)
+    has_push_subscription = (
+        session.exec(
+            select(func.count(PushSubscription.id)).where(
+                PushSubscription.user_id == user.id
+            )
+        ).one()
+        > 0
+    )
     return AdminUser(
         user_id=str(user.id),
         email=user.email,
@@ -206,6 +216,13 @@ def _to_admin_user(session: Session, user: User) -> AdminUser:
         following_count=_following_count(session, user.id),
         active_block_id=active_block.id if active_block else None,
         blocked_at=active_block.created_at if active_block else None,
+        email_interest_matches_enabled=bool(user.email_interest_matches_enabled),
+        push_interest_matches_enabled=bool(user.push_interest_matches_enabled),
+        email_event_reminders_enabled=bool(user.email_event_reminders_enabled),
+        push_event_reminders_enabled=bool(user.push_event_reminders_enabled),
+        email_social_activity_enabled=bool(user.email_social_activity_enabled),
+        push_social_activity_enabled=bool(user.push_social_activity_enabled),
+        has_push_subscription=has_push_subscription,
     )
 
 
@@ -3629,6 +3646,7 @@ def onboarding_complete(
             followed.append(target.handle or "")
 
     viewer.onboarded_at = datetime.utcnow()
+    viewer.onboarding_version = get_current_onboarding_version()
     session.add(viewer)
     session.commit()
     session.refresh(viewer)

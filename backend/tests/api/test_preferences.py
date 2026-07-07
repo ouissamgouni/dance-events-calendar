@@ -303,6 +303,39 @@ def test_anon_preferences_with_stale_tag_ids_does_not_block_signin(
     assert prefs["preferred_tag_ids"] == []
 
 
+@pytest.mark.unit
+def test_anon_preferences_merges_home_location(client, session, tags):
+    anon = {
+        "preferred_area": None,
+        "preferred_tag_ids": [],
+        "home_location": {"lat": 48.86, "lng": 2.35, "label": "Paris, FR"},
+    }
+    resp = _login(client, email="alice@example.com", anon_prefs=anon)
+    assert resp.status_code == 200
+    prefs = resp.json()["preferences"]
+    assert prefs["home_location"] == {"lat": 48.86, "lng": 2.35, "label": "Paris, FR"}
+    assert prefs["set_at"] is not None
+
+
+@pytest.mark.unit
+def test_anon_home_location_ignored_when_user_already_has_prefs(client, session, tags):
+    _login(client, email="alice@example.com")
+    client.patch(
+        "/api/auth/preferences",
+        json={"home_location": {"lat": 40.0, "lng": -3.7, "label": "Madrid"}},
+    )
+    client.cookies.clear()
+    anon = {
+        "preferred_area": None,
+        "preferred_tag_ids": [],
+        "home_location": {"lat": 48.86, "lng": 2.35, "label": "Paris, FR"},
+    }
+    resp = _login(client, email="alice@example.com", anon_prefs=anon)
+    assert resp.status_code == 200
+    prefs = resp.json()["preferences"]
+    assert prefs["home_location"]["label"] == "Madrid"
+
+
 # --- /api/events bbox filter ------------------------------------------------
 
 

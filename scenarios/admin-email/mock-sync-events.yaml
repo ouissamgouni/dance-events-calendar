@@ -3,33 +3,52 @@ events:
 - id: example-evt-001
   calendar_id: example-movida-calendar
   title: Example Salsa Social
-  description: |
-    This is an example event to test the scenario mechanism.
+  description: 'This is an example event to test the scenario mechanism.
+
     All secrets and config layering can be verified here.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Dance Studio, 10 Rue Example, Paris
   latitude: 48.8566
   longitude: 2.3522
   start: w1 Mon 20:00
   end: w1 Tue 00:00
+  tags:
+  - reach:local
 - id: example-evt-002
   calendar_id: example-bachata-calendar
   title: Example Bachata Night
-  description: |
-    Another example event on the second calendar.
+  description: 'Another example event on the second calendar.
+
     The dance floor is open from the first beat to the last.
+
     All skill levels are welcome — no partner or prior experience needed.
+
     Expect a warm, inclusive crowd of local and visiting dancers.
+
     The venue features a full bar, cloakroom, and water stations throughout.
+
     Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
+
+    Follow the organiser''s social pages for last-minute updates and playlists.
+
+    '
   location: Club Bachata, 5 Avenue Test, Paris
   latitude: 48.86
   longitude: 2.34
   start: w1 Wed 21:00
   end: w1 Thu 02:00
+  tags:
+  - reach:international

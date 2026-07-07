@@ -439,6 +439,11 @@ def update_tag_group(
         raise HTTPException(status_code=404, detail="Tag group not found")
 
     update_data = body.model_dump(exclude_unset=True)
+    if group.protected and update_data.get("enabled") is False:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Tag group '{group.slug}' is protected and cannot be disabled",
+        )
     for field, value in update_data.items():
         setattr(group, field, value)
     session.add(group)
@@ -456,6 +461,11 @@ def delete_tag_group(
     group = session.get(TagGroup, group_id)
     if not group:
         raise HTTPException(status_code=404, detail="Tag group not found")
+    if group.protected:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Tag group '{group.slug}' is protected and cannot be deleted",
+        )
 
     # Cascade: delete event_tags → tags → group
     tag_ids = [t.id for t in group.tags]
@@ -685,7 +695,7 @@ def remove_event_tag(
 )
 def count_tag_suggestions(
     status: str | None = Query(default=None),
-    source: str | None = Query(default=None, regex="^(user|heuristic)$"),
+    source: str | None = Query(default=None, pattern="^(user|heuristic)$"),
     event_id: str | None = Query(default=None),
     include_past: bool = Query(default=False),
     session: Session = Depends(get_session),
@@ -706,7 +716,7 @@ def count_tag_suggestions(
 @router.get("/api/admin/tags/suggestions", response_model=list[TagSuggestionResponse])
 def list_tag_suggestions(
     status: str | None = Query(default=None),
-    source: str | None = Query(default=None, regex="^(user|heuristic)$"),
+    source: str | None = Query(default=None, pattern="^(user|heuristic)$"),
     event_id: str | None = Query(default=None),
     include_past: bool = Query(default=False),
     session: Session = Depends(get_session),

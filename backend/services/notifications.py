@@ -26,6 +26,7 @@ from backend.db.models import (
     Notification,
     User,
 )
+from backend.services.notification_delivery import record_delivery
 
 if TYPE_CHECKING:  # pragma: no cover
     from uuid import UUID  # noqa: F401
@@ -99,17 +100,16 @@ def _fan_out(
             session, subscriber.id, actor.id
         ):
             continue
-        session.add(
-            Notification(
-                recipient_user_id=subscriber.id,
-                actor_user_id=actor.id,
-                kind=kind,
-                event_id=event_id,
-            )
+        notif = Notification(
+            recipient_user_id=subscriber.id,
+            actor_user_id=actor.id,
+            kind=kind,
+            event_id=event_id,
         )
-        inserted += 1
-    if inserted:
+        session.add(notif)
         session.flush()
+        record_delivery(session, notif.id, "app")
+        inserted += 1
     return inserted
 
 
@@ -210,15 +210,15 @@ def notify_new_follower(session: Session, followee: User, follower: User) -> Non
         kind=NEW_FOLLOWER,
     ):
         return
-    session.add(
-        Notification(
-            recipient_user_id=followee.id,
-            actor_user_id=follower.id,
-            kind=NEW_FOLLOWER,
-            event_id=None,
-        )
+    notif = Notification(
+        recipient_user_id=followee.id,
+        actor_user_id=follower.id,
+        kind=NEW_FOLLOWER,
+        event_id=None,
     )
+    session.add(notif)
     session.flush()
+    record_delivery(session, notif.id, "app")
 
 
 def notify_new_friend(session: Session, user_a: User, user_b: User) -> None:
@@ -231,26 +231,27 @@ def notify_new_friend(session: Session, user_a: User, user_b: User) -> None:
     if not _notification_exists(
         session, recipient_id=user_a.id, actor_id=user_b.id, kind=NEW_FRIEND
     ):
-        session.add(
-            Notification(
-                recipient_user_id=user_a.id,
-                actor_user_id=user_b.id,
-                kind=NEW_FRIEND,
-                event_id=None,
-            )
+        notif_a = Notification(
+            recipient_user_id=user_a.id,
+            actor_user_id=user_b.id,
+            kind=NEW_FRIEND,
+            event_id=None,
         )
+        session.add(notif_a)
+        session.flush()
+        record_delivery(session, notif_a.id, "app")
     if not _notification_exists(
         session, recipient_id=user_b.id, actor_id=user_a.id, kind=NEW_FRIEND
     ):
-        session.add(
-            Notification(
-                recipient_user_id=user_b.id,
-                actor_user_id=user_a.id,
-                kind=NEW_FRIEND,
-                event_id=None,
-            )
+        notif_b = Notification(
+            recipient_user_id=user_b.id,
+            actor_user_id=user_a.id,
+            kind=NEW_FRIEND,
+            event_id=None,
         )
-    session.flush()
+        session.add(notif_b)
+        session.flush()
+        record_delivery(session, notif_b.id, "app")
 
 
 def notify_follow_request(session: Session, target: User, requester: User) -> None:
@@ -268,15 +269,15 @@ def notify_follow_request(session: Session, target: User, requester: User) -> No
         kind=FOLLOW_REQUEST,
     ):
         return
-    session.add(
-        Notification(
-            recipient_user_id=target.id,
-            actor_user_id=requester.id,
-            kind=FOLLOW_REQUEST,
-            event_id=None,
-        )
+    notif = Notification(
+        recipient_user_id=target.id,
+        actor_user_id=requester.id,
+        kind=FOLLOW_REQUEST,
+        event_id=None,
     )
+    session.add(notif)
     session.flush()
+    record_delivery(session, notif.id, "app")
 
 
 def notify_follow_request_approved(
@@ -295,15 +296,15 @@ def notify_follow_request_approved(
         kind=FOLLOW_REQUEST_APPROVED,
     ):
         return
-    session.add(
-        Notification(
-            recipient_user_id=requester.id,
-            actor_user_id=approver.id,
-            kind=FOLLOW_REQUEST_APPROVED,
-            event_id=None,
-        )
+    notif = Notification(
+        recipient_user_id=requester.id,
+        actor_user_id=approver.id,
+        kind=FOLLOW_REQUEST_APPROVED,
+        event_id=None,
     )
+    session.add(notif)
     session.flush()
+    record_delivery(session, notif.id, "app")
 
 
 def discard_follow_request_notification(

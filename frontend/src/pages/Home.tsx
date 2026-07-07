@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { CalendarEvent, TagGroup } from '../types';
 import { fetchEvents, fetchSettings, fetchTagGroups } from '../api';
@@ -7,7 +7,10 @@ import { trackView } from '../utils/tracking';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import type FullCalendar from '@fullcalendar/react';
-import Calendar from '../components/Calendar';
+// FullCalendar is heavy (~ tens of KB) and only rendered in the "/calendar"
+// view. Lazy-load it so the default explorer/map landing route (the LCP path)
+// doesn't ship the FullCalendar bundle.
+const Calendar = lazy(() => import('../components/Calendar'));
 import type { CalendarViewMode } from '../components/Calendar';
 import EventMap from '../components/EventMap';
 import type { MapBounds } from '../components/EventMap';
@@ -18,18 +21,17 @@ import EventListPanel, { EventListCard } from '../components/EventListPanel';
 import SummaryBar from '../components/SummaryBar';
 import FilterSheet from '../components/FilterSheet';
 import TagFilterPills from '../components/TagFilterPills';
-import AreaFilterChip from '../components/AreaFilterChip';
 import { usePreferences } from '../context/PreferencesContext';
 import { useInvalidateAttendanceSummaries } from '../context/AttendanceSummariesContext';
 import { useSavedEvents } from '../context/SavedEventsContext';
+
 import { DEFAULT_AREA_BBOX, DEFAULT_AREA_LABEL, clampArea, isDefaultArea } from '../constants/area';
 import type { PreferredAreaPayload } from '../api';
-import MineButton from '../components/MineButton';
-import FollowsButton from '../components/FollowsButton';
 import SuggestEventModal from '../components/SuggestEventModal';
 import EventAnchoredDetailPanel from '../components/EventAnchoredDetailPanel';
 import { useSeenEvents } from '../hooks/useSeenEvents';
 import TrendingEventsBanner from '../components/TrendingEventsBanner';
+import ExplorerNav from '../components/ExplorerNav';
 import ExplorerEventSearch from '../components/ExplorerEventSearch';
 import { DEFAULT_EXPLORER_PERIOD, getDateRangeForPreset } from '../utils/dateRangePresets';
 import type { DateRangePresetKey } from '../utils/dateRangePresets';
@@ -177,6 +179,9 @@ function eventMatchesBounds(event: CalendarEvent, bounds: MapBounds): boolean {
     );
 }
 
+// Loose OR match used previously by the "For you" rail's Recommended lens
+// lives on the /for-you page now.
+
 function filterEventsByTags(events: CalendarEvent[], activeTagIds: Set<number>, tagGroups: TagGroup[]): CalendarEvent[] {
     if (activeTagIds.size === 0) return events;
 
@@ -236,7 +241,6 @@ export default function Home() {
     const invalidateAttendanceSummaries = useInvalidateAttendanceSummaries();
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const eventIds = useMemo(() => events.map((event) => event.event_id), [events]);
-    const { newEventIds, markSeen } = useSeenEvents(eventIds);
     const [sinceDate, setSinceDate] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -413,16 +417,6 @@ export default function Home() {
     }, [activeTagIds, prefs.tagIds]);
 
     const [savingDefaults, setSavingDefaults] = useState(false);
-    const [savedDefaultsToast, setSavedDefaultsToast] = useState(false);
-    // Inline name-this-area form (toggled by clicking "save as default" in
-    // the area bar). Stays open until the user confirms or cancels so they
-    // can iterate on the name before persisting.
-    const [namingArea, setNamingArea] = useState(false);
-    const [areaNameDraft, setAreaNameDraft] = useState('');
-    const showSavedToast = useCallback(() => {
-        setSavedDefaultsToast(true);
-        window.setTimeout(() => setSavedDefaultsToast(false), 2500);
-    }, []);
 
     // Save just the active tag filter as the user's default tags. Area
     // prefs are left untouched. Triggered by the small CTA next to the
@@ -431,51 +425,15 @@ export default function Home() {
         setSavingDefaults(true);
         try {
             await setPrefs({ tagIds: [...activeTagIds] });
-            showSavedToast();
         } finally {
             setSavingDefaults(false);
         }
-    }, [activeTagIds, setPrefs, showSavedToast]);
+    }, [activeTagIds, setPrefs]);
 
-    // Save the user's CURRENT MAP VIEW as the default area. Tag prefs are
-    // left untouched. Triggered by the CTA in the default-location bar
-    // beneath the map (visible only when ``mapDriftsFromArea``).
-    // ``customLabel`` is the user-typed name from the inline name input
-    // (see ``namingArea`` state); falls back to the existing label when
-    // empty/whitespace.
-    const handleSaveLocationAsDefault = useCallback(async (customLabel?: string) => {
-        setSavingDefaults(true);
-        try {
-            const trimmed = customLabel?.trim();
-            const label = trimmed || effectiveArea?.label || 'My area';
-            const areaFromMap = mapBounds
-                ? clampArea({
-                    min_lat: mapBounds.south,
-                    min_lng: mapBounds.west,
-                    max_lat: mapBounds.north,
-                    max_lng: mapBounds.east,
-                    label,
-                })
-                : effectiveArea
-                    ? { ...effectiveArea, label }
-                    : null;
-            // Don't auto-fit the map after this Save — the user already
-            // chose the viewport, and any refit would slightly shift it and
-            // re-trigger ``mapDriftsFromArea`` → the CTA would pop right back.
-            suppressNextPrefsFitRef.current = true;
-            await setPrefs({ area: areaFromMap });
-            // Clear any session preset override so the freshly-saved
-            // prefs.area is what we display.
-            setAreaSessionOverride(null);
-            showSavedToast();
-        } finally {
-            setSavingDefaults(false);
-        }
-    }, [effectiveArea, mapBounds, setPrefs, showSavedToast]);
-
-    // Calendar view section visibility
+    // Calendar view section visibility. Map is always shown; this toggle
+    // only switches between the default (calendar + map) and map-only
+    // layouts — there is no calendar-only state.
     const [showCalendarGrid, setShowCalendarGrid] = useState(true);
-    const [showCalendarMap, setShowCalendarMap] = useState(true);
 
     // Mobile calendar view: 3-week (default on mobile) vs full month. Persisted.
     const [isMobileViewport, setIsMobileViewport] = useState(() => window.innerWidth < 640);
@@ -541,7 +499,26 @@ export default function Home() {
     const [hoveredEventId, setHoveredEventId] = useState<string | null>(null);
     const handleEventHover = useCallback((eventId: string | null) => {
         setHoveredEventId(eventId);
+        // Hover in rails / map / calendar does NOT mark an event seen —
+        // otherwise the "New" lens loses its own contents the instant it
+        // renders and the viewer hovers a card. The explorer list panel
+        // uses `handleExplorerListEventHover` below, which does.
     }, []);
+    // Rail hover is kept in a SEPARATE state so it doesn't drive the
+    // explorer list's auto-scroll effect (or any other cross-surface
+    // side effect wired to `hoveredEventId`). Rails still get a proper
+    // card-level highlight via this dedicated state — they just don't
+    // yank the list to the hovered event.
+    const [railHoveredEventId, setRailHoveredEventId] = useState<string | null>(null);
+    const handleRailEventHover = useCallback((eventId: string | null) => {
+        setRailHoveredEventId(eventId);
+    }, []);
+    // Hover-to-seen is scoped to the explorer LIST only (per product
+    // decision): brushing past a card in the visible list clears its
+    // unseen dot, matching the behavior of Twitter/Slack unread markers.
+    // Trails (ForYou / Your next events) and the map intentionally skip
+    // this so their "New" affordances stay stable while the viewer is
+    // still deciding whether to open a card.
 
     useEffect(() => {
         if (viewMode !== 'explorer') return;
@@ -702,25 +679,6 @@ export default function Home() {
         bumpAutoFit();
     }, [bumpAutoFit, defaultExplorerPeriod]);
 
-    // Remove a single tag from the active set (wired into SummaryBar chip ×).
-    const handleRemoveTag = useCallback((tagId: number) => {
-        userTouchedTagsRef.current = true;
-        bumpAutoFit();
-        setActiveTagIds((prev) => {
-            if (!prev.has(tagId)) return prev;
-            const next = new Set(prev);
-            next.delete(tagId);
-            return next;
-        });
-    }, [bumpAutoFit]);
-
-    // Clear the follows/friends interest filter from the SummaryBar chip ×.
-    const handleClearInterest = useCallback(() => {
-        setInterestSource(null);
-        setInterestKind('any');
-        setInterestUserHandle(null);
-    }, []);
-
     const handleClearCalendarFilters = useCallback(() => {
         userTouchedTagsRef.current = true;
         setActiveTagIds(new Set());
@@ -819,7 +777,17 @@ export default function Home() {
     );
 
     const explorerMatchingEvents = useMemo(
-        () => filterEventsByTags(areaScopedEvents, activeTagIds, tagGroups),
+        () => {
+            const tagFiltered = filterEventsByTags(areaScopedEvents, activeTagIds, tagGroups);
+            // Hide events whose end time is already in the past — the
+            // backend's ``startDate`` filter can still return an event
+            // that started earlier today but wrapped past midnight into
+            // the previous night (e.g. a Friday 22:00 → 01:00 social).
+            // Ongoing events (start<=now<end) remain visible.
+            // eslint-disable-next-line react-hooks/purity -- render-time clock snapshot for past-event filter
+            const now = Date.now();
+            return tagFiltered.filter((e) => !e.end || new Date(e.end).getTime() >= now);
+        },
         [areaScopedEvents, activeTagIds, tagGroups],
     );
 
@@ -888,6 +856,21 @@ export default function Home() {
         && trendingBannerEnabled
         && showPopularity
         && !mapFullscreen;
+
+    // "For you" rail: each lens is a dedicated server-paginated fetch,
+    // scoped to the viewer's SAVED preferred area (or DEFAULT_AREA_BBOX
+    // when none is saved) and to events starting from today forward —
+    // independent of the explorer's current pan/zoom or date-range
+    // filters. "+more" triggers the next real server page for that lens.
+    // Moved to the dedicated /for-you route — Home no longer renders the
+    // For you or Your next events rails.
+    const { newEventIds, markSeen } = useSeenEvents(eventIds);
+    // Explorer-list hover marks an event seen — see the note near
+    // `handleEventHover` above for why this is scoped to the list only.
+    const handleExplorerListEventHover = useCallback((eventId: string | null) => {
+        setHoveredEventId(eventId);
+        if (eventId) markSeen(eventId);
+    }, [markSeen]);
 
     useEffect(() => {
         if (!selectedExplorerMapEventId) return;
@@ -1103,7 +1086,7 @@ export default function Home() {
 
     // Set of event IDs not visible on the calendar-mode map
     const offMapEventIds = useMemo(() => {
-        if (!calMapBounds || !showCalendarMap) return new Set<string>();
+        if (!calMapBounds) return new Set<string>();
         return new Set(
             calendarVisibleEvents
                 .filter((e) => {
@@ -1117,7 +1100,23 @@ export default function Home() {
                 })
                 .map((e) => e.event_id),
         );
-    }, [calendarVisibleEvents, calMapBounds, showCalendarMap]);
+    }, [calendarVisibleEvents, calMapBounds]);
+
+    // Count of explorer-scope events currently outside the map viewport.
+    // Shown in the map footer as an at-a-glance "you have N events not
+    // visible on the map right now" hint. Events without coordinates are
+    // treated as off-map (they can't be shown anywhere on the map).
+    const explorerOffMapCount = useMemo(() => {
+        if (!mapBounds) return 0;
+        return explorerMatchingEvents.reduce((count, e) => {
+            if (e.latitude == null || e.longitude == null) return count + 1;
+            const onMap = e.latitude >= mapBounds.south
+                && e.latitude <= mapBounds.north
+                && e.longitude >= mapBounds.west
+                && e.longitude <= mapBounds.east;
+            return onMap ? count : count + 1;
+        }, 0);
+    }, [explorerMatchingEvents, mapBounds]);
 
     // Calendar ref + navigation (FC is always mounted in calendar mode)
     const calendarRef = useRef<FullCalendar>(null);
@@ -1230,11 +1229,13 @@ export default function Home() {
 
         return (
             <>
-                <DateRangePicker
-                    startDate={startDate}
-                    endDate={endDate}
-                    onChange={handleDateRangeChange}
-                />
+                {viewMode === 'explorer' && (
+                    <DateRangePicker
+                        startDate={startDate}
+                        endDate={endDate}
+                        onChange={handleDateRangeChange}
+                    />
+                )}
                 {tagFilters}
                 {renderInterestFilters(surface)}
             </>
@@ -1243,6 +1244,17 @@ export default function Home() {
 
     const renderCalendarFilterControls = () => (
         <>
+            <section className="filter-sheet-section" aria-labelledby="filter-sheet-calendar-search-heading">
+                <h3 id="filter-sheet-calendar-search-heading" className="filter-sheet-section-title">Search</h3>
+                <ExplorerEventSearch
+                    className="filter-sheet-search"
+                    onSelectEvent={(eventId) => {
+                        setFilterSheetOpen(false);
+                        handleExplorerSearchEventClick(eventId);
+                    }}
+                    triggerLabel="Search events"
+                />
+            </section>
             {tagGroups.length > 0 && (
                 <TagFilterPills
                     tagGroups={tagGroups}
@@ -1290,83 +1302,107 @@ export default function Home() {
         </>
     );
 
-    const renderExplorerMobileSummaryBar = (className?: string) => (
-        <SummaryBar
-            className={className}
-            totalCount={explorerMatchingEvents.length}
-            visibleCount={explorerMatchingEvents.length}
-            startDate={startDate}
-            endDate={endDate}
-            areaLabel={
-                areaChipState.kind === 'map-view' ? 'Current map view'
-                    : areaChipState.kind === 'show-all' ? 'Worldwide'
-                        : areaChipState.label
-            }
-            areaKind={areaChipState.kind}
-            areaIsDefault={areaChipState.kind === 'default' && !areaSessionOverride}
-            onClearArea={handleClearAreaOverride}
-            activeTagIds={activeTagIds}
-            tagGroups={tagGroups}
-            onRemoveTag={handleRemoveTag}
-            interestSource={interestSource}
-            interestKind={interestKind}
-            interestUserHandle={interestUserHandle}
-            onClearInterest={handleClearInterest}
-            onClearAll={handleClearAllFilters}
-            loading={loading}
-            onOpenFilters={() => setFilterSheetOpen(true)}
-            activeFilterCount={activeFilterCount}
-        />
-    );
+    const renderExplorerMobileSummaryBar = (className?: string) => {
+        const isCal = viewMode === 'calendar';
+        const count = isCal ? calendarVisibleEvents.length : explorerMatchingEvents.length;
+        return (
+            <SummaryBar
+                className={className}
+                totalCount={count}
+                visibleCount={count}
+                startDate={isCal ? calendarSummaryRange.startDate : startDate}
+                endDate={isCal ? calendarSummaryRange.endDate : endDate}
+                areaLabel={
+                    isCal ? DEFAULT_AREA_LABEL
+                        : areaChipState.kind === 'map-view' ? 'Current map view'
+                            : areaChipState.kind === 'show-all' ? 'Worldwide'
+                                : areaChipState.label
+                }
+                areaKind={isCal ? 'default' : areaChipState.kind}
+                areaIsDefault={isCal || (areaChipState.kind === 'default' && !areaSessionOverride)}
+                onClearArea={isCal ? undefined : handleClearAreaOverride}
+                activeTagIds={activeTagIds}
+                tagGroups={tagGroups}
+                interestSource={interestSource}
+                interestKind={interestKind}
+                interestUserHandle={interestUserHandle}
+                loading={loading}
+                onOpenFilters={() => setFilterSheetOpen(true)}
+                activeFilterCount={isCal ? calendarActiveFilterCount : activeFilterCount}
+            />
+        );
+    };
+
+    // List/Calendar sub-view toggle. Lives directly under the applied-
+    // filter summary (mobile) and under the desktop filter controls, so
+    // switching between the map+list surface and the FullCalendar surface
+    // is a page-content action rather than a top-nav choice. On mobile this
+    // collapses into a single button whose label reflects the destination
+    // view, to save vertical space; desktop keeps the explicit List/Calendar
+    // pill pair.
+    const renderMapCalendarSubviewToggle = (className?: string, mobile?: boolean) => {
+        if (mobile) {
+            return (
+                <div className={`shrink-0 w-fit self-end ${className ?? ''}`} data-testid="explorer-subview-toggle">
+                    <Link
+                        to={viewMode === 'explorer' ? '/calendar' : '/'}
+                        className="inline-flex items-center text-xs font-medium text-blue-500 underline-offset-2 hover:text-blue-600 hover:underline"
+                    >
+                        {viewMode === 'explorer' ? 'Show as calendar' : 'Back to list'}
+                    </Link>
+                </div>
+            );
+        }
+        const pill = (active: boolean) =>
+            `px-2 py-0.5 text-xs transition ${active
+                ? 'bg-white text-slate-900 font-medium shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'}`;
+        return (
+            <div
+                className={`flex items-center gap-1.5 shrink-0 w-fit ${className ?? ''}`}
+                data-testid="explorer-subview-toggle"
+            >
+                <div className="flex gap-0.5 bg-slate-200 p-0.5">
+                    <Link to="/" className={pill(viewMode === 'explorer')}>List</Link>
+                    <Link to="/calendar" className={pill(viewMode === 'calendar')}>Calendar</Link>
+                </div>
+            </div>
+        );
+    };
+
+    // Calendar-mode map/calendar layout toggle. A single button: default
+    // state shows both calendar and map (icon = map, tapping hides the
+    // calendar to show map-only); map-only state shows the calendar icon
+    // (tapping restores the default, both-shown state). There is no
+    // calendar-only state.
+    const renderCalendarSectionsToggle = () => {
+        const mapOnly = !showCalendarGrid;
+        return (
+            <button
+                type="button"
+                onClick={() => setShowCalendarGrid((v) => !v)}
+                className="inline-flex items-center justify-center w-7 h-7 border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition"
+                aria-pressed={mapOnly}
+                aria-label={mapOnly ? 'Show calendar and map' : 'Show map only'}
+                title={mapOnly ? 'Show calendar and map' : 'Show map only'}
+                data-testid="calendar-map-toggle"
+            >
+                {mapOnly ? '📅' : '📍'}
+            </button>
+        );
+    };
 
     return (
         <div className="min-h-screen bg-[#f8fafc]">
             <main className="mx-auto max-w-7xl px-4 py-2 sm:py-4">
-                {!loading && !error && (
-                    <div className="mb-3 sm:mb-4 flex flex-col gap-2">
+                {(!loading || initialLoadDone.current) && !error && (
+                    <div className="mb-1 sm:mb-4 flex flex-col gap-2">
                         <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <ExplorerEventSearch
-                                    className="hidden lg:flex"
-                                    onSelectEvent={handleExplorerSearchEventClick}
-                                    triggerLabel="Search events"
-                                />
-                                <ExplorerEventSearch
-                                    className="lg:hidden"
-                                    onSelectEvent={handleExplorerSearchEventClick}
-                                    triggerLabel="Search events"
-                                    compact
-                                />
-                                <div className="flex gap-1 bg-slate-200 p-1 shrink-0 w-fit">
-                                    <Link
-                                        to="/"
-                                        className={`px-3 py-1 text-sm transition ${viewMode === 'explorer' ? 'bg-white text-slate-900 font-medium shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                    >
-                                        Explorer
-                                    </Link>
-                                    <Link
-                                        to="/calendar"
-                                        className={`px-3 py-1 text-sm transition ${viewMode === 'calendar' ? 'bg-white text-slate-900 font-medium shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                                    >
-                                        Calendar
-                                    </Link>
-                                </div>
-                                <div className="flex gap-1 bg-slate-200 p-1 shrink-0 w-fit">
-                                    <MineButton />
-                                    <FollowsButton />
-                                    <button
-                                        onClick={() => setShowSuggestModal(true)}
-                                        className="hidden sm:inline-flex px-3 py-1 text-sm transition bg-white text-slate-900 font-medium shadow-sm hover:bg-slate-50"
-                                    >
-                                        <span className="sm:hidden">Submit</span>
-                                        <span className="hidden sm:inline">Submit Event</span>
-                                    </button>
-                                </div>
-                            </div>
+                            <ExplorerNav active="explorer" onSelectSearchEvent={handleExplorerSearchEventClick} />
                         </div>
                     </div>
                 )}
-                {loading && (
+                {loading && !initialLoadDone.current && (
                     <div className="flex flex-col items-center justify-center gap-2 py-10 text-slate-400" role="status" aria-live="polite">
                         <div className="h-6 w-6 border-2 border-slate-200 border-t-blue-500 animate-spin" aria-hidden="true" />
                         <span className="text-sm">Loading events…</span>
@@ -1375,32 +1411,37 @@ export default function Home() {
                 {error && (
                     <p className="text-center text-red-500">Error: {error}</p>
                 )}
-                {!loading && !error && viewMode === 'explorer' && (
+                {(!loading || initialLoadDone.current) && !error && (
                     <>
-                        {showFloatingMobileExplorerSummary && (
+                        {viewMode === 'explorer' && showFloatingMobileExplorerSummary && (
                             <div className="fixed left-4 right-4 top-10 z-[7000] lg:hidden">
                                 {renderExplorerMobileSummaryBar('shadow-md')}
                             </div>
                         )}
-                        <div className="flex flex-col gap-4">
-                            {/* Desktop inline filter stack. Hidden on
-                            mobile (rendered inside FilterSheet instead). */}
+                        <div className="flex flex-col gap-1">
+                            {/* Common filter stack — shared by Map and Calendar
+                            sub-views. Date-range picker only shows in Map
+                            mode; the calendar has its own navigator. */}
                             <div className="hidden lg:flex lg:flex-col lg:gap-4">
                                 {renderFilterControls()}
+                                {renderMapCalendarSubviewToggle()}
                             </div>
-                            <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 lg:items-start">
-                                {/* Left column: mobile summary + desktop list */}
-                                <div className="order-1 lg:order-1 lg:w-[350px] lg:shrink-0 flex flex-col gap-3 lg:gap-4 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
-                                    {/* Mobile-only filter strip. Doubles as the
-                                    "open FilterSheet" affordance AND the
-                                    applied-filters summary so users see what's
-                                    narrowing the result set without an extra
-                                    stacked block. */}
-                                    <div ref={mobileExplorerTopSummaryRef} className="lg:hidden">
-                                        {renderExplorerMobileSummaryBar()}
-                                    </div>
-                                    {/* Event list: hidden on mobile until after map, fills remaining height on desktop */}
-                                    <div className="hidden lg:flex lg:flex-col lg:flex-1 lg:min-h-0 lg:overflow-hidden">
+                            <div ref={mobileExplorerTopSummaryRef} className="lg:hidden flex flex-col gap-1">
+                                {renderExplorerMobileSummaryBar()}
+                                {renderMapCalendarSubviewToggle(undefined, true)}
+                            </div>
+                        </div>
+                    </>
+                )}
+                {(!loading || initialLoadDone.current) && !error && viewMode === 'explorer' && (
+                    <div className="mt-1 lg:mt-1">
+                        <div className="flex flex-col lg:flex-row gap-1 lg:gap-6 lg:items-start p-0 lg:p-3">
+                                {/* Left column: mobile summary + desktop list. Hidden
+                                entirely on mobile (its only content is desktop-only)
+                                so it doesn't add an empty flex gap above the map column. */}
+                                <div className="hidden lg:order-1 lg:flex lg:w-[350px] lg:shrink-0 lg:flex-col lg:gap-4 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
+                                    {/* Event list: fills remaining height on desktop */}
+                                    <div className="lg:flex lg:flex-col lg:flex-1 lg:min-h-0 lg:overflow-hidden">
                                         <div className="flex-1 min-h-0 overflow-hidden">
                                             <EventListPanel
                                                 events={explorerMatchingEvents}
@@ -1412,7 +1453,8 @@ export default function Home() {
                                                 sortBy={sortBy}
                                                 onSortChange={setSortBy}
                                                 hoveredEventId={hoveredEventId}
-                                                onEventHover={handleEventHover}
+                                                onEventHover={handleExplorerListEventHover}
+                                                onMarkSeen={markSeen}
                                                 onSuggestEvent={() => setShowSuggestModal(true)}
                                                 newEnabled={unseenStateEnabled}
                                                 newEventIds={newEventIds}
@@ -1422,6 +1464,7 @@ export default function Home() {
                                                 scopeTotalCount={explorerMatchingEvents.length}
                                                 nextPeriodEventCount={nextAvailableEventBatch === undefined ? undefined : nextAvailableEventBatch?.matchingCount ?? 0}
                                                 gateMoreEventsForAnonymous
+                                                tagsAsBadge
                                             />
                                         </div>
                                     </div>
@@ -1431,18 +1474,18 @@ export default function Home() {
                                 and event list). On desktop the column is sticky
                                 and fills available height; the bar is shrink-0
                                 so it doesn't get clipped. */}
-                                <div className="order-2 lg:order-2 lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6 lg:relative flex flex-col gap-1.5 sm:gap-2 min-w-0">
+                                <div className="order-2 lg:order-2 lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6 lg:relative flex flex-col gap-2 sm:gap-2 min-w-0">
                                     {showTrendingBanner && (
                                         <TrendingEventsBanner
                                             events={explorerMatchingEvents}
-                                            mapBounds={mapBounds}
                                             onEventClick={handleExplorerListEventClick}
                                             showPopularity={showPopularity && trendingEnabled}
                                             popularityThreshold={popularityThreshold}
                                             trendingTopN={trendingTopN}
                                             trendingTopPercent={trendingTopPercent}
-                                            hoveredEventId={hoveredEventId}
-                                            onEventHover={handleEventHover}
+                                            hoveredEventId={railHoveredEventId}
+                                            onEventHover={handleRailEventHover}
+                                            followingBadgeEnabled={followingBadgeEnabled}
                                         />
                                     )}
                                     <div
@@ -1538,140 +1581,75 @@ export default function Home() {
                                             {mapFullscreen ? '×' : '⤢'}
                                         </button>
                                     </div>
-                                    {/* Default-area bar: ONE bordered pill that
-                                visually groups the chip label + worldwide /
-                                reset toggle + save-as-default link, so the
-                                user reads it as a single "this is the area
-                                being applied, here's what you can do with
-                                it" unit. */}
+                                    {/* Map footer: quick area presets on the
+                                    left, a compact "N off map" metric plus a
+                                    settings shortcut on the right. The
+                                    area-label chip and the "save current as
+                                    default" naming flow used to live here;
+                                    both have moved to /account preferences,
+                                    reachable via the settings icon. */}
                                     <div
-                                        className="shrink-0 flex flex-col gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 border bg-slate-100 border-slate-200 text-slate-700 text-xs min-w-0 lg:absolute lg:bottom-0 lg:left-0 lg:right-0 lg:z-[703]"
+                                        className="shrink-0 flex items-center gap-1 sm:gap-2 px-1.5 sm:px-2 py-0.5 sm:py-1 border bg-slate-100 border-slate-200 text-slate-700 text-xs min-w-0 lg:absolute lg:bottom-0 lg:left-0 lg:right-0 lg:z-[703]"
                                         data-testid="area-default-bar"
                                     >
-                                        <div className="flex flex-wrap items-center gap-1 sm:gap-2 min-w-0">
-                                            <AreaFilterChip state={areaChipState} />
-                                            {/* Snap-back pill: fly the map to
-                                            the configured default area
-                                            (prefs.area when set, else the
-                                            hardcoded Europe preset). Visible
-                                            whenever the live map view has
-                                            drifted from that default OR the
-                                            user is in show-all mode — in
-                                            both cases this is how they get
-                                            back to "events I usually care
-                                            about". Hidden when the chip
-                                            already shows the default area
-                                            and the map is on it (no drift). */}
-                                            {(mapDriftsFromArea || areaChipState.kind === 'show-all') && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const target = prefs.area ?? DEFAULT_AREA_BBOX;
-                                                        setAreaSessionOverride(null);
-                                                        flyToArea(target);
-                                                    }}
-                                                    className="shrink-0 whitespace-nowrap px-1.5 py-px border border-slate-300 bg-white text-[11px] opacity-80 hover:opacity-100"
-                                                    title="Snap map back to your default area"
-                                                    data-testid="area-snap-default"
-                                                >
-                                                    Default
-                                                </button>
-                                            )}
-                                            {/* Quick-pick: switch to the hardcoded
-                                        "Europe & nearby" preset. Hidden when
-                                        the preset is already what's being
-                                        applied AND the map is on it. */}
-                                            {!(effectiveArea && isDefaultArea(effectiveArea) && !mapDriftsFromArea) && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setAreaSessionOverride({ kind: 'preset', area: DEFAULT_AREA_BBOX });
-                                                        flyToArea(DEFAULT_AREA_BBOX);
-                                                    }}
-                                                    className="shrink-0 whitespace-nowrap px-1.5 py-px border border-slate-300 bg-white text-[11px] opacity-80 hover:opacity-100"
-                                                    title="Apply the Europe & nearby preset"
-                                                    data-testid="area-preset-europe"
-                                                >
-                                                    Europe
-                                                </button>
-                                            )}
-                                            {areaChipState.kind !== 'show-all' && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setAreaSessionOverride({ kind: 'show-all' });
-                                                        flyToArea({ min_lat: -60, min_lng: -170, max_lat: 75, max_lng: 170, label: 'World' });
-                                                    }}
-                                                    className="shrink-0 whitespace-nowrap px-1.5 py-px border border-slate-300 bg-white text-[11px] opacity-80 hover:opacity-100"
-                                                    title="Show events worldwide"
-                                                    aria-label="Show events worldwide"
-                                                    data-testid="area-show-all"
-                                                >
-                                                    🌐
-                                                </button>
-                                            )}
-                                            {mapDriftsFromArea && !namingArea && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setAreaNameDraft(effectiveArea?.label ?? '');
-                                                        setNamingArea(true);
-                                                    }}
-                                                    disabled={savingDefaults}
-                                                    className="shrink-0 whitespace-nowrap underline opacity-70 hover:opacity-100 hover:no-underline disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    data-testid="save-location-as-default"
-                                                >
-                                                    current as default
-                                                </button>
-                                            )}
-                                            {savedDefaultsToast && (
-                                                <span className="shrink-0" role="status">
-                                                    Saved.
-                                                </span>
-                                            )}
-
-                                        </div>
-                                        {/* Inline name-this-area form. Submitting
-                                    persists prefs.area with the typed label;
-                                    cancelling closes without saving. */}
-                                        {namingArea && (
-                                            <form
-                                                className="flex flex-wrap items-center gap-2 min-w-0"
-                                                data-testid="area-name-form"
-                                                onSubmit={async (e) => {
-                                                    e.preventDefault();
-                                                    await handleSaveLocationAsDefault(areaNameDraft);
-                                                    setNamingArea(false);
+                                        {(mapDriftsFromArea || areaChipState.kind === 'show-all') && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const target = prefs.area ?? DEFAULT_AREA_BBOX;
+                                                    setAreaSessionOverride(null);
+                                                    flyToArea(target);
                                                 }}
+                                                className="shrink-0 whitespace-nowrap px-1.5 py-px border border-slate-300 bg-white text-[11px] opacity-80 hover:opacity-100"
+                                                title="Snap map back to your default area"
+                                                data-testid="area-snap-default"
                                             >
-                                                <input
-                                                    type="text"
-                                                    value={areaNameDraft}
-                                                    onChange={(e) => setAreaNameDraft(e.target.value)}
-                                                    placeholder="Name this area (e.g. Berlin & around)"
-                                                    autoFocus
-                                                    maxLength={60}
-                                                    className="flex-1 min-w-0 px-2 py-1 border border-slate-300 bg-white text-xs"
-                                                    data-testid="area-name-input"
-                                                />
-                                                <button
-                                                    type="submit"
-                                                    disabled={savingDefaults}
-                                                    className="shrink-0 whitespace-nowrap px-2 py-1 bg-blue-500 text-white text-xs hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    data-testid="area-name-save"
-                                                >
-                                                    {savingDefaults ? 'Saving…' : 'Save'}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setNamingArea(false)}
-                                                    className="shrink-0 whitespace-nowrap underline opacity-70 hover:opacity-100 hover:no-underline"
-                                                    data-testid="area-name-cancel"
-                                                >
-                                                    cancel
-                                                </button>
-                                            </form>
+                                                Default
+                                            </button>
                                         )}
+                                        {!(effectiveArea && isDefaultArea(effectiveArea) && !mapDriftsFromArea) && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setAreaSessionOverride({ kind: 'preset', area: DEFAULT_AREA_BBOX });
+                                                    flyToArea(DEFAULT_AREA_BBOX);
+                                                }}
+                                                className="shrink-0 whitespace-nowrap px-1.5 py-px border border-slate-300 bg-white text-[11px] opacity-80 hover:opacity-100"
+                                                title="Apply the Europe & nearby preset"
+                                                data-testid="area-preset-europe"
+                                            >
+                                                Europe
+                                            </button>
+                                        )}
+                                        {areaChipState.kind !== 'show-all' && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setAreaSessionOverride({ kind: 'show-all' });
+                                                    flyToArea({ min_lat: -60, min_lng: -170, max_lat: 75, max_lng: 170, label: 'World' });
+                                                }}
+                                                className="shrink-0 whitespace-nowrap px-1.5 py-px border border-slate-300 bg-white text-[11px] opacity-80 hover:opacity-100"
+                                                title="Show events worldwide"
+                                                aria-label="Show events worldwide"
+                                                data-testid="area-show-all"
+                                            >
+                                                🌐
+                                            </button>
+                                        )}
+                                        {explorerOffMapCount > 0 && (
+                                            <span className="ml-auto shrink-0 whitespace-nowrap text-[11px] text-slate-500" data-testid="map-footer-off-map-count">
+                                                {explorerOffMapCount} off map
+                                            </span>
+                                        )}
+                                        <Link
+                                            to="/account"
+                                            title="Open preferences"
+                                            aria-label="Open preferences"
+                                            className={`${explorerOffMapCount > 0 ? '' : 'ml-auto '}shrink-0 inline-flex h-6 w-6 items-center justify-center opacity-70 hover:opacity-100`}
+                                            data-testid="map-footer-settings-link"
+                                        >
+                                            <img src="/setting.png" alt="" aria-hidden="true" className="h-4 w-4 object-contain" />
+                                        </Link>
                                     </div>
                                 </div>
                                 {/* Event list on mobile: order-3, hidden on desktop.
@@ -1688,7 +1666,8 @@ export default function Home() {
                                         sortBy={sortBy}
                                         onSortChange={setSortBy}
                                         hoveredEventId={hoveredEventId}
-                                        onEventHover={handleEventHover}
+                                        onEventHover={handleExplorerListEventHover}
+                                        onMarkSeen={markSeen}
                                         onSuggestEvent={() => setShowSuggestModal(true)}
                                         newEnabled={unseenStateEnabled}
                                         newEventIds={newEventIds}
@@ -1699,30 +1678,17 @@ export default function Home() {
                                         scopeTotalCount={explorerMatchingEvents.length}
                                         nextPeriodEventCount={nextAvailableEventBatch === undefined ? undefined : nextAvailableEventBatch?.matchingCount ?? 0}
                                         gateMoreEventsForAnonymous
+                                        tagsAsBadge
                                     />
                                 </div>
+                                </div>
                             </div>
-                        </div>
-                    </>
                 )}
-                {!loading && !error && viewMode === 'calendar' && (
+                {(!loading || initialLoadDone.current) && !error && viewMode === 'calendar' && (
                     <>
-                        {/* Calendar toolbar: section toggles + month navigation */}
+                        {/* Calendar toolbar: month navigation + mobile view
+                        mode + the calendar/map layout toggle. */}
                         <div className="mb-4 flex items-center gap-4 flex-wrap">
-                            <div className="flex gap-1 bg-slate-200 p-1 shrink-0">
-                                <button
-                                    className={`px-2.5 py-1 text-xs font-medium transition ${showCalendarGrid ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                                    onClick={() => setShowCalendarGrid((v) => !v)}
-                                >
-                                    📅 Calendar
-                                </button>
-                                <button
-                                    className={`px-2.5 py-1 text-xs font-medium transition ${showCalendarMap ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                                    onClick={() => setShowCalendarMap((v) => !v)}
-                                >
-                                    📍 Map
-                                </button>
-                            </div>
                             <div className="flex items-center gap-1.5 sm:gap-2">
                                 <div className="flex">
                                     <button className="px-2 py-1 text-sm border border-slate-300 bg-white hover:bg-slate-50" onClick={handleCalPrev}>‹</button>
@@ -1745,71 +1711,47 @@ export default function Home() {
                                         onClick={() => setMobileCalendarView('month')}
                                         aria-pressed={mobileCalendarView === 'month'}
                                     >
-                                        Month
+                                        30d
                                     </button>
                                 </div>
                             )}
-                        </div>
-                        <div className="mb-4 sticky top-0 z-[20] shadow-sm">
-                            <SummaryBar
-                                totalCount={calendarVisibleEvents.length}
-                                visibleCount={calendarVisibleEvents.length}
-                                startDate={calendarSummaryRange.startDate}
-                                endDate={calendarSummaryRange.endDate}
-                                areaLabel={DEFAULT_AREA_LABEL}
-                                areaKind="default"
-                                areaIsDefault
-                                activeTagIds={activeTagIds}
-                                tagGroups={tagGroups}
-                                onRemoveTag={handleRemoveTag}
-                                interestSource={interestSource}
-                                interestKind={interestKind}
-                                interestUserHandle={interestUserHandle}
-                                onClearInterest={handleClearInterest}
-                                onClearAll={handleClearCalendarFilters}
-                                loading={loading}
-                                onOpenFilters={() => setFilterSheetOpen(true)}
-                                activeFilterCount={calendarActiveFilterCount}
-                            />
+                            {renderCalendarSectionsToggle()}
                         </div>
                         <div className="flex flex-col lg:flex-row gap-6">
                             {/* Calendar always mounted — CSS-hidden when toggled off */}
                             <div className={showCalendarGrid ? 'min-w-0 flex-1' : 'calendar-hide-grid h-0 overflow-hidden'}>
-                                <Calendar
-                                    ref={calendarRef}
-                                    events={filteredEvents}
-                                    sinceDate={sinceDate ?? undefined}
-                                    onDatesChange={handleDatesChange}
-                                    onEventClick={handleEventClick}
-                                    hoveredEventId={hoveredEventId}
-                                    onEventHover={handleEventHover}
-                                    offMapEventIds={offMapEventIds}
-                                    viewMode={calendarViewMode}
-                                />
-                            </div>
-                            {showCalendarMap && (
-                                <div className={showCalendarGrid
-                                    ? 'h-[400px] lg:w-[420px] lg:shrink-0 lg:h-[calc(100vh-200px)] lg:sticky lg:top-6'
-                                    : 'h-[70vh] w-full'
-                                }>
-                                    <EventMap
-                                        key={String(showCalendarGrid)}
-                                        events={calendarVisibleEvents}
-                                        focusedEvent={selectedEvent}
-                                        onEventClick={handleCalMapEventClick}
-                                        onBoundsChange={handleCalBoundsChange}
+                                <Suspense fallback={null}>
+                                    <Calendar
+                                        ref={calendarRef}
+                                        events={filteredEvents}
+                                        sinceDate={sinceDate ?? undefined}
+                                        onDatesChange={handleDatesChange}
+                                        onEventClick={handleEventClick}
                                         hoveredEventId={hoveredEventId}
                                         onEventHover={handleEventHover}
-                                        detailLinkSource="calendar-map"
-                                        newEventIds={newEventIds}
-                                        popularityThreshold={popularityThreshold}
-                                        onMarkSeen={markSeen}
+                                        offMapEventIds={offMapEventIds}
+                                        viewMode={calendarViewMode}
                                     />
-                                </div>
-                            )}
-                            {!showCalendarGrid && !showCalendarMap && (
-                                <p className="text-center text-slate-400 py-12 w-full">Enable Calendar or Map above to view events.</p>
-                            )}
+                                </Suspense>
+                            </div>
+                            <div className={showCalendarGrid
+                                ? 'h-[400px] lg:w-[420px] lg:shrink-0 lg:h-[calc(100vh-200px)] lg:sticky lg:top-6'
+                                : 'h-[70vh] w-full'
+                            }>
+                                <EventMap
+                                    key={String(showCalendarGrid)}
+                                    events={calendarVisibleEvents}
+                                    focusedEvent={selectedEvent}
+                                    onEventClick={handleCalMapEventClick}
+                                    onBoundsChange={handleCalBoundsChange}
+                                    hoveredEventId={hoveredEventId}
+                                    onEventHover={handleEventHover}
+                                    detailLinkSource="calendar-map"
+                                    newEventIds={newEventIds}
+                                    popularityThreshold={popularityThreshold}
+                                    onMarkSeen={markSeen}
+                                />
+                            </div>
                         </div>
                     </>
                 )}

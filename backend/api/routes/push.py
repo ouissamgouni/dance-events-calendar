@@ -13,6 +13,7 @@ later signs in, the same browser re-subscribes and the endpoint binds to their
 account. Actual delivery lives in ``backend.services.push_service``.
 """
 
+import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -20,10 +21,12 @@ from pydantic import BaseModel
 from sqlmodel import Session, delete, select
 
 from backend.api.deps import get_current_user_optional
-from backend.config.loader import get_vapid_config, get_webpush_enabled
+from backend.config.loader import get_vapid_config
+from backend.services.app_settings import get_web_push_enabled
 from backend.db.database import get_session
 from backend.db.models import PushSubscription, User
 
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/push", tags=["push"])
 
@@ -45,9 +48,23 @@ class UnsubscribeRequest(BaseModel):
 
 @router.get("/vapid-public-key")
 def vapid_public_key():
-    """Return the VAPID public key clients pass to ``PushManager.subscribe``."""
+    """Return the VAPID public key clients pass to ``PushManager.subscribe``.
+
+    Logs the specific reason for a 404 (gate off vs. missing/incomplete
+    VAPID keypair) so a "push toggle/toast missing in the browser" report
+    can be root-caused from server logs alone — see
+    ``GET /api/admin/notifications/effective-config`` (``web_push_enabled``
+    + ``vapid_configured``) for the same info via the admin API/UI.
+    """
+    enabled = get_web_push_enabled()
     cfg = get_vapid_config()
-    if not get_webpush_enabled() or not cfg.get("public_key"):
+    has_keys = bool(cfg.get("public_key"))
+    if not enabled or not has_keys:
+        logger.info(
+            "vapid-public-key 404: web_push_enabled=%s vapid_public_key_set=%s",
+            enabled,
+            has_keys,
+        )
         raise HTTPException(status_code=404, detail="Push not enabled")
     return {"public_key": cfg["public_key"]}
 
@@ -91,6 +108,11 @@ def subscribe(
             )
         )
     session.commit()
+    logger.info(
+        "Push subscribe: user_id=%s endpoint_suffix=...%s",
+        user_id,
+        endpoint[-24:],
+    )
     return {"status": "ok"}
 
 

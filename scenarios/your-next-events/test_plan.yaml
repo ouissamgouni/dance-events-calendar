@@ -1,0 +1,202 @@
+test_plan:
+  name: "Your Next Events rail — countdown, ordering, dedup"
+  description: >
+    Verify the explorer Home page's "Your next events" rail: the union
+    of the viewer's saved + attending events, sorted ASCENDING by start
+    date, INDEPENDENT of the explorer's current filters (pan / zoom /
+    date range / tag chips / search). The rail's header must match the
+    "For you" rail's header shape (uppercase-tracking blue label with
+    a "+/-" collapse toggle on a slate/white gradient bar). Card layout
+    is intentionally lightweight: title (truncated), start date, a
+    countdown PILL ("today" / "tomorrow" / "in X days" / "in X weeks" /
+    "in X months"), then "📍 location" — tag pills are NOT rendered on
+    this rail (they belong on the explorer list / For-you cards).
+
+    KEY BEHAVIOURS
+      • Rail is only rendered for signed-in viewers who have at least
+        one saved OR attending upcoming event.
+      • Union dedup: an event that is BOTH saved and going appears
+        exactly once.
+      • Sort: strictly ASCENDING by start date (soonest first). No
+        secondary sort by popularity.
+      • Countdown pill (data-testid="your-next-events-countdown")
+        renders directly next to the start date. Shape depends on the
+        days-until value: 0=today, 1=tomorrow, <7=in X days, <60=in X
+        weeks, else in X months. On mobile (<640px) the pill uses the
+        compact form ("in 3d" / "in 2w" / "in 3m").
+      • Location line is prefixed by a 📍 emoji, mirroring the
+        explorer event card. Cards do NOT show tag pills — this rail
+        is a quick-access shortcut, not a discovery surface.
+      • "See more →" tile (data-testid="your-next-events-see-more") at
+        the end of the row navigates to /my-calendar.
+      • Header text is UPPERCASE with tracking-wide styling, on a
+        `bg-gradient-to-r from-slate-50 to-white` bar — identical
+        shape to the "For you" rail header. Collapse indicator swaps
+        between "+" (collapsed) and "-" (expanded).
+      • Rail is scoped to the viewer's OWN commitments — panning the
+        map, changing the explorer date range, or toggling explorer
+        tag chips does NOT change its content.
+      • Anonymous visitors and viewers with zero commitments do NOT
+        see the rail at all (cold-start guard).
+      • Admin feature-flag `your_next_events_rail_enabled` hides the
+        rail regardless of data.
+      • On mobile (<1024px) the rail collapses by default; expanding
+        it keeps the map above the fold.
+
+    Seeded data:
+      • evt-yne-001 Salsa Kickoff Party (this week, Fri) — SAVED only.
+      • evt-yne-002 Bachata Studio Class (next week, Wed) — GOING only.
+      • evt-yne-003 Berlin Salsa Marathon (~3 months out) — SAVED and
+        GOING (dedup fixture).
+      • evt-yne-004 Kizomba Free Fresher (this week, Sat) — NEITHER
+        saved nor going (must be ABSENT from the rail).
+      • evt-yne-005 Rooftop Bachata Sunset (~3 weeks out) — GOING only.
+      • Users: viewer (POV), admin.
+
+  preconditions:
+    - "task start:scenario SCENARIO=your-next-events"
+    - "Use a fresh browser profile or hard-clear localStorage before step 1."
+    - "settings.yaml seeds `your_next_events_rail_enabled: true` and `for_you_rail_enabled: false` (isolates this rail from For You)."
+    - "config.env uses CALENDAR_SERVICE=mock and DEV_AUTH=true (multi-user sign-in)."
+    - "Pre-seeded saves + attendances for viewer (see db-events.yaml)."
+
+  steps:
+    - id: 1
+      title: "Anonymous visitors do not see the rail"
+      description: >
+        Open / in a fresh browser profile without signing in.
+      expected: >
+        No element with `data-testid="your-next-events-rail"` is
+        rendered — the rail is hidden for anonymous users regardless
+        of seed data (the fetch is gated on the current user id).
+
+    - id: 2
+      title: "Signed-in viewer sees the rail above 'For you' with matching header shape"
+      description: >
+        Sign in as viewer@example.com. Return to /.
+      expected: >
+        The "Your next events" rail is rendered above the (currently
+        disabled) For You slot. Its header bar uses the same shape as
+        the For You header: uppercase-tracking wide font, slate-700
+        color, on a `bg-gradient-to-r from-slate-50 to-white`
+        background, with a "-" collapse indicator on the right.
+        Aria-label: "Collapse Your next events".
+
+    - id: 3
+      title: "Rail contains exactly the viewer's commitments, sorted ASC, deduped"
+      description: >
+        Inspect the row of cards from left to right.
+      expected: >
+        Exactly FOUR cards are present (not five) in this order:
+        (1) evt-yne-001 Salsa Kickoff Party — this week Fri;
+        (2) evt-yne-002 Bachata Studio Class — next week Wed;
+        (3) evt-yne-005 Rooftop Bachata Sunset — ~3 weeks out;
+        (4) evt-yne-003 Berlin Salsa Marathon — ~3 months out.
+        evt-yne-003 appears ONCE despite being both saved AND going
+        (union dedup). evt-yne-004 (Kizomba Free Fresher) is ABSENT —
+        the viewer neither saved nor is going to it.
+
+    - id: 4
+      title: "Countdown pill renders next to the date in the expected shape"
+      description: >
+        On desktop (>=1024px), inspect the small pill next to the
+        date on each card (data-testid="your-next-events-countdown").
+      expected: >
+        Card 1 (evt-yne-001): pill matches one of "today", "tomorrow",
+        or "in X days" (X in 2-6, form "in 3 days").
+        Card 2 (evt-yne-002): pill matches "in X days" or "in X weeks"
+        (~7-14 days ahead).
+        Card 3 (evt-yne-005): pill matches "in X weeks" (~3 weeks).
+        Card 4 (evt-yne-003): pill matches "in X months" (~3 months).
+        Each pill uses the small blue chip treatment (`bg-blue-50
+        text-blue-700`) directly to the right of the start-date span.
+
+    - id: 5
+      title: "Card layout: 📍 location under date, NO tag pills"
+      description: >
+        Look at the vertical structure of any card (evt-yne-001 is a
+        good example — it has 5 tags in the fixture).
+      expected: >
+        Vertical order inside the card is: (a) title (truncated to
+        ~20 chars); (b) date + countdown pill on the same line;
+        (c) an empty visual gap (mt-auto) then the "📍 <location>"
+        line (truncated). NO TagBadges are rendered anywhere in the
+        card — even though evt-yne-001 has 5 tags in db-events.yaml,
+        none of them appear in the rail.
+
+    - id: 6
+      title: "Mobile: countdown pill uses the compact form"
+      description: >
+        Resize the viewport to a mobile width (e.g. 375px) and
+        reload /.
+      expected: >
+        The rail renders in a COLLAPSED state by default (toggle
+        button shows "+"). The map remains visible above the fold.
+        Click the header to expand. The countdown pill on each card
+        now uses the compact form: "in 3d" / "in 2w" / "in 3m"
+        (single letter suffix, no space). "today" / "tomorrow" text
+        is unchanged. Restore desktop width when done.
+
+    - id: 7
+      title: "'See more →' tile links to /my-calendar"
+      description: >
+        Scroll the rail horizontally to its right edge and click the
+        "See more →" tile
+        (`data-testid="your-next-events-see-more"`).
+      expected: >
+        The router navigates to /my-calendar and the "My calendar"
+        page renders. Use the browser back button to return to /.
+
+    - id: 8
+      title: "Explorer filters do NOT change the rail's contents"
+      description: >
+        Back on /, apply the following to the explorer ONE AT A TIME,
+        checking the rail's card list stays IDENTICAL to step 3
+        after each: (a) pan the map to central Africa (outside the
+        default bbox); (b) restore, then change the explorer date
+        range to "Past 7 days"; (c) restore date, then deselect all
+        tag chips in the explorer's tag filter.
+      expected: >
+        For each mutation, the main event list on the explorer
+        responds (empties or narrows), but the "Your next events" rail
+        keeps the SAME four cards in the SAME order. The rail's
+        content is driven by the viewer's own saved + attending IDs
+        (fetched via /api/events?ids=…), not by any explorer filter.
+        Reset all explorer filters when done.
+
+    - id: 9
+      title: "Un-going / un-saving an event removes it from the rail"
+      description: >
+        Click evt-yne-002 (Bachata Studio Class) to open the event
+        modal. Click "I'm going" to toggle OFF the RSVP. Close the
+        modal.
+      expected: >
+        On the next render (no reload needed once the going context
+        state updates), evt-yne-002 is REMOVED from the rail. The
+        remaining three cards preserve their ASC-by-start order:
+        evt-yne-001, evt-yne-005, evt-yne-003. Toggle "I'm going"
+        back on to restore the fixture state.
+
+    - id: 10
+      title: "Cold-start: unsave / un-go everything, rail disappears"
+      description: >
+        Open each of the four viewer commitments in turn and clear
+        their save + going state so the viewer has ZERO commitments.
+      expected: >
+        Once the last commitment is cleared, the rail (`data-testid
+        ="your-next-events-rail"`) is completely REMOVED from the
+        page — not shown as an empty shell. Reload / — the rail is
+        still absent. Restore the fixture state (or restart the
+        scenario) before moving on.
+
+    - id: 11
+      title: "Admin can toggle the rail off via feature flag"
+      description: >
+        Sign out, sign in as admin@example.com, go to
+        /admin/configuration, and flip the "Your next events rail"
+        toggle OFF (PUT /api/settings 200 with
+        `your_next_events_rail_enabled: false`).
+      expected: >
+        Sign back in as viewer@example.com and open /. The rail is
+        completely absent regardless of the viewer's commitments.
+        Re-enable the toggle and the rail returns on next reload.

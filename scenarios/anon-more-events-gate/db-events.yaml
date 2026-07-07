@@ -25,7 +25,7 @@ events:
         "dance-style:salsa",
         "level:all-levels",
         "venue:indoor",
-        "scope:local",
+        "reach:local",
       ]
   - id: evt-gate-002
     calendar_id: bachata-cal-002
@@ -45,7 +45,7 @@ events:
         "dance-style:bachata",
         "level:beginner-friendly",
         "venue:indoor",
-        "scope:local",
+        "reach:regional",
       ]
   - id: evt-gate-003
     calendar_id: salsa-cal-001
@@ -65,7 +65,7 @@ events:
         "dance-style:salsa",
         "level:all-levels",
         "venue:indoor",
-        "scope:local",
+        "reach:local",
       ]
   - id: evt-gate-004
     calendar_id: bachata-cal-002
@@ -85,7 +85,7 @@ events:
         "dance-style:bachata",
         "level:all-levels",
         "venue:indoor",
-        "scope:local",
+        "reach:international",
       ]
   - id: evt-gate-005
     calendar_id: salsa-cal-001
@@ -105,7 +105,7 @@ events:
         "dance-style:salsa",
         "level:all-levels",
         "venue:indoor",
-        "scope:local",
+        "reach:international",
       ]
   - id: evt-gate-006
     calendar_id: salsa-cal-001
@@ -125,7 +125,7 @@ events:
         "dance-style:salsa",
         "level:intermediate",
         "venue:indoor",
-        "scope:local",
+        "reach:international",
       ]
   - id: evt-gate-007
     calendar_id: bachata-cal-002
@@ -145,7 +145,7 @@ events:
         "dance-style:bachata",
         "level:all-levels",
         "venue:indoor",
-        "scope:local",
+        "reach:local",
       ]
   - id: evt-gate-008
     calendar_id: salsa-cal-001
@@ -165,7 +165,7 @@ events:
         "dance-style:salsa",
         "level:beginner-friendly",
         "venue:rooftop",
-        "scope:local",
+        "reach:international",
       ]
   - id: evt-gate-009
     calendar_id: bachata-cal-002
@@ -185,7 +185,7 @@ events:
         "dance-style:bachata",
         "level:all-levels",
         "venue:indoor",
-        "scope:local",
+        "reach:local",
       ]
   - id: evt-gate-010
     calendar_id: salsa-cal-001
@@ -205,7 +205,7 @@ events:
         "dance-style:salsa",
         "level:all-levels",
         "venue:indoor",
-        "scope:local",
+        "reach:local",
       ]
   - id: evt-gate-011
     calendar_id: bachata-cal-002
@@ -225,7 +225,7 @@ events:
         "dance-style:bachata",
         "level:all-levels",
         "venue:indoor",
-        "scope:local",
+        "reach:local",
       ]
   - id: evt-gate-012
     calendar_id: salsa-cal-001
@@ -245,7 +245,7 @@ events:
         "dance-style:salsa",
         "level:all-levels",
         "venue:indoor",
-        "scope:local",
+        "reach:international",
       ]
   - id: evt-gate-013
     calendar_id: bachata-cal-002
@@ -265,7 +265,7 @@ events:
         "dance-style:bachata",
         "level:all-levels",
         "venue:indoor",
-        "scope:local",
+        "reach:international",
       ]
   - id: evt-gate-014
     calendar_id: salsa-cal-001
@@ -285,7 +285,7 @@ events:
         "dance-style:salsa",
         "level:all-levels",
         "venue:indoor",
-        "scope:regional",
+        "reach:regional",
       ]
   - id: evt-gate-015
     calendar_id: bachata-cal-002
@@ -305,7 +305,7 @@ events:
         "dance-style:bachata",
         "level:all-levels",
         "venue:indoor",
-        "scope:regional",
+        "reach:local",
       ]
   - id: evt-gate-016
     calendar_id: salsa-cal-001
@@ -325,7 +325,7 @@ events:
         "dance-style:salsa",
         "level:all-levels",
         "venue:indoor",
-        "scope:local",
+        "reach:international",
       ]
   - id: evt-gate-017
     calendar_id: salsa-cal-001
@@ -345,7 +345,7 @@ events:
         "dance-style:salsa",
         "level:all-levels",
         "venue:outdoor",
-        "scope:regional",
+        "reach:regional",
       ]
   - id: evt-gate-018
     calendar_id: bachata-cal-002
@@ -365,5 +365,5 @@ events:
         "dance-style:bachata",
         "level:all-levels",
         "venue:indoor",
-        "scope:international",
+        "reach:regional",
       ]

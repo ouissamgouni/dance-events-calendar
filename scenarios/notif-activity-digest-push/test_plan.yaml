@@ -1,0 +1,67 @@
+test_plan:
+  name: "Activity digest — web-push channel"
+  description: >
+    (Feature × Channel) truth-table cell. Feature = social-activity
+    digest. Channel = web-push. Asserts activity_email dispatches a
+    web-push notification to each subscribed device of each follower
+    whose `push_social_activity_enabled` toggle is true. Email is
+    disabled per-user so the only outbound is push.
+
+  preconditions:
+    - >-
+      Start scenario:
+      `SCENARIO=activity-digest-push RESET=1 task start:scenario`
+    - >-
+      In a Chromium browser, sign in as Bob (bob@example.com), open
+      /account#notifications, and click "Enable push notifications" so
+      a live PushSubscription row is written bound to Bob's user_id.
+
+  cast:
+    - "Alice — actor (Going ev-friend)."
+    - "Bob   — follower, push_social_activity ON + real subscription."
+    - "Carol — follower, push_social_activity OFF → in-app only."
+
+  steps:
+    - id: 1
+      title: "Trigger one dispatch tick"
+      description: >
+        `SCENARIO=notif-activity-digest-push task notify:trigger:scenario`
+        No `--immediate-emails` needed: push is no longer gated by the
+        per-user digest schedule (default tue+fri @ 09:00 local). Push
+        fires on any dispatch tick regardless of the recipient's
+        TZ/slot — it used to wrongly wait on the same schedule as email
+        unless forced (bug, fixed). This scenario's automatic scheduler
+        (`NOTIFICATION_INTERVAL_MINUTES=1`) would also deliver the push
+        within ~60s with zero manual action; this step just triggers a
+        tick on-demand so the test doesn't have to wait.
+      expected: >
+        Stats: `activity.pushed=1` (Bob only), `activity.digests=0`
+        (email stays off-schedule/waiting — expected and unrelated to
+        the push fix; email is intentionally still batched on its
+        weekly cadence).
+
+    - id: 2
+      title: "Verify push arrival on Bob's device"
+      description: >
+        Observe the system notification tray on the browser/device
+        where the subscription was created.
+      expected: >
+        A system push appears with copy naming Alice's Going activity
+        on ev-friend.
+
+    - id: 3
+      title: "In-app rows still fire for both followers"
+      description: >
+        `GET /api/notifications` as Bob and Carol.
+      expected: >
+        Both have one social_activity row for Alice's Going on
+        ev-friend (Phase G: rows are always created regardless of
+        push toggle).
+
+    - id: 4
+      title: "Email channel remains silent"
+      description: >
+        No SMTP is configured; every user has
+        email_social_activity_enabled=false.
+      expected: >
+        No SMTP traffic.

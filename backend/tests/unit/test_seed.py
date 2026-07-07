@@ -226,6 +226,108 @@ class TestDatabaseSeeder:
         assert user.share_attendance_default is True
         assert user.share_attendance_default_audience == "public"
 
+    def test_seed_mock_users_auto_onboard_by_default(self, tmp_path, monkeypatch):
+        """Phase G — scenarios that don't set ``auto_onboard`` (the vast
+        majority) auto-stamp mock users as already onboarded so the
+        OnboardingGate doesn't redirect on every ``Sign in as <Name>``
+        click.
+        """
+        from backend.config import loader as loader_module
+
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir(parents=True)
+        (scenario_dir / "mock-users.yaml").write_text(
+            "users:\n"
+            "  - email: alice@example.com\n"
+            "    name: Alice\n"
+        )
+        monkeypatch.setattr(loader_module, "CURRENT_ONBOARDING_VERSION", 7)
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            DatabaseSeeder(session).seed(scenario_dir)
+            user = session.exec(
+                select(User).where(User.email == "alice@example.com")
+            ).first()
+
+        assert user is not None
+        assert user.onboarded_at is not None
+        assert user.onboarding_version == 7
+
+    def test_seed_mock_users_auto_onboard_false_leaves_null(
+        self, tmp_path, monkeypatch
+    ):
+        """Scenarios that exercise the onboarding flow itself opt out
+        with ``auto_onboard: false`` so seeded users start unonboarded.
+        """
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir(parents=True)
+        (scenario_dir / "mock-users.yaml").write_text(
+            "auto_onboard: false\n"
+            "users:\n"
+            "  - email: newbie@example.com\n"
+            "    name: Nora\n"
+        )
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            DatabaseSeeder(session).seed(scenario_dir)
+            user = session.exec(
+                select(User).where(User.email == "newbie@example.com")
+            ).first()
+
+        assert user is not None
+        assert user.onboarded_at is None
+        assert user.onboarding_version == 0
+
+    def test_seed_mock_user_explicit_onboarded_at_wins(
+        self, tmp_path, monkeypatch
+    ):
+        """An explicit ``onboarded_at`` (including ``null``) in the yaml
+        overrides the scenario-wide ``auto_onboard`` default.
+        """
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir(parents=True)
+        # auto_onboard defaults to true, but the explicit null must win.
+        (scenario_dir / "mock-users.yaml").write_text(
+            "users:\n"
+            "  - email: pending@example.com\n"
+            "    name: Pending\n"
+            "    onboarded_at: null\n"
+            "  - email: fixed@example.com\n"
+            "    name: Fixed\n"
+            "    onboarded_at: '2025-01-15T09:30:00'\n"
+            "    onboarding_version: 3\n"
+        )
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            DatabaseSeeder(session).seed(scenario_dir)
+            pending = session.exec(
+                select(User).where(User.email == "pending@example.com")
+            ).first()
+            fixed = session.exec(
+                select(User).where(User.email == "fixed@example.com")
+            ).first()
+
+        assert pending is not None
+        assert pending.onboarded_at is None
+        assert fixed is not None
+        assert fixed.onboarded_at == datetime(2025, 1, 15, 9, 30, 0)
+        assert fixed.onboarding_version == 3
+
     def test_seed_existing_mock_user_backfills_missing_avatar(
         self, tmp_path, monkeypatch
     ):
@@ -391,7 +493,7 @@ class TestDatabaseSeeder:
             attendances = session.exec(select(UserEventAttendance)).all()
 
         assert len(events) == 12
-        assert len(event_tags) == 72
+        assert len(event_tags) == 60
         assert len(views) == 24
         assert len(saves) == 12
         assert len(attendances) == 12

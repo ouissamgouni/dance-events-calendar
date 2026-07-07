@@ -1,0 +1,61 @@
+# send-now-event-matches-profile cast. All five have a matching
+# interest profile (see db-interest-profiles.yaml); their user-level
+# channel toggles and admin-selection differ to isolate the force-send
+# endpoint's scoping and per-channel fan-out:
+#
+#   - Nora  — email ON, push ON + a real device subscription (set up
+#             via the browser precondition). Selected. Full success
+#             case: proves in-app + email + push all fire together.
+#   - Bob   — email ON, push ON, matching profile. NOT selected in the
+#             force-send action → negative control proving scoping.
+#   - Carol — email ON, push ON, but her PROFILE is silenced
+#             (matches_enabled=false). Selected, to prove the
+#             per-profile opt-out still suppresses her even when
+#             hand-picked.
+#   - Dan   — email_interest_matches_enabled=false, push ON but no
+#             live subscription. Selected. Proves per-channel
+#             suppression: no email, and push is attempted but
+#             delivers nothing without a subscribed device.
+#   - Eve   — every interest-match channel toggle off. Selected.
+#             `skipped_disabled` probe — never reaches the profile
+#             scan at all.
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  - email: nora@example.com
+    name: Nora Match
+    handle: nora
+    account_visibility: public
+    email_interest_matches_enabled: true
+    push_interest_matches_enabled: true
+
+  - email: bob@example.com
+    name: Bob NotSelected
+    handle: bob
+    account_visibility: public
+    email_interest_matches_enabled: true
+    push_interest_matches_enabled: true
+
+  - email: carol@example.com
+    name: Carol Silenced
+    handle: carol
+    account_visibility: public
+    email_interest_matches_enabled: true
+    push_interest_matches_enabled: true
+
+  - email: dan@example.com
+    name: Dan EmailOff
+    handle: dan
+    account_visibility: public
+    email_interest_matches_enabled: false
+    push_interest_matches_enabled: true
+
+  - email: eve@example.com
+    name: Eve AllOff
+    handle: eve
+    account_visibility: public
+    email_interest_matches_enabled: false
+    push_interest_matches_enabled: false

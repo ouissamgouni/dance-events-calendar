@@ -1,0 +1,44 @@
+# profile-match-app: every user's email + push channels for interest
+# matches are turned OFF so the only observable delivery is the
+# in-app row. Interest-matcher branch coverage (dance / reach / geo)
+# is retained via the multi-user cast + db-interest-profiles.yaml.
+users:
+  # Baseline — one profile, matcher hits ev-m1 + ev-m2.
+  - email: nora@example.com
+    name: Nora Match
+    handle: nora
+    email_interest_matches_enabled: false
+    push_interest_matches_enabled: false
+
+  # Two-profile dedup probe (see db-interest-profiles.yaml Bob rows).
+  - email: bob@example.com
+    name: Bob Dedup
+    handle: bob
+    email_interest_matches_enabled: false
+    push_interest_matches_enabled: false
+
+  # Empty-reach profile → matches any reach + no-reach events.
+  - email: carol@example.com
+    name: Carol Anyreach
+    handle: carol
+    email_interest_matches_enabled: false
+    push_interest_matches_enabled: false
+
+  # Per-profile matches_enabled=false silences BOTH row + email/push.
+  - email: dan@example.com
+    name: Dan Silent
+    handle: dan
+    email_interest_matches_enabled: false
+    push_interest_matches_enabled: false
+
+  # Included so cast size matches the source scenario — same behaviour
+  # as Nora for the in-app assertion (channel-level flags identical).
+  - email: eve@example.com
+    name: Eve Killed
+    handle: eve
+    email_interest_matches_enabled: false
+    push_interest_matches_enabled: false
+
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

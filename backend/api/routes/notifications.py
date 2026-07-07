@@ -39,6 +39,7 @@ VALID_KINDS = {
     "follow_request",
     "follow_request_approved",
     "event_reminder",
+    "interest_event",
 }
 
 
@@ -108,6 +109,7 @@ def _hydrate(
                     is_verified_organizer=bool(a.is_verified_organizer if a else False),
                     is_following=bool(a and a.id in following_ids),
                 ),
+                context=r.context,
                 created_at=_as_utc(r.created_at),
                 read_at=_as_utc(r.read_at),
             )

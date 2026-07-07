@@ -836,3 +836,57 @@ def test_anonymous_get_attending_events_returns_cookie_identity(client, session)
             "share_audience": "private",
         }
     ]
+
+
+# --- needs_onboarding gating (onboarding_version bump) ---------------------
+
+
+@pytest.mark.unit
+def test_auth_google_reports_needs_onboarding_true_for_new_user(client, monkeypatch):
+    monkeypatch.setattr(auth_module, "get_current_onboarding_version", lambda: 2)
+    r = _login(client, email="new@example.com")
+    assert r.status_code == 200
+    assert r.json()["needs_onboarding"] is True
+
+
+@pytest.mark.unit
+def test_auth_google_reports_needs_onboarding_false_after_completion(
+    client, session, monkeypatch
+):
+    monkeypatch.setattr(auth_module, "get_current_onboarding_version", lambda: 2)
+    _login(client, email="alice@example.com")
+    user = session.exec(select(User).where(User.email == "alice@example.com")).one()
+    user.onboarded_at = datetime.utcnow()
+    user.onboarding_version = 2
+    session.add(user)
+    session.commit()
+
+    r = _login(client, email="alice@example.com")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["needs_onboarding"] is False
+    assert body["onboarded_at"] is not None
+
+    me = client.get("/api/auth/me")
+    assert me.json()["needs_onboarding"] is False
+
+
+@pytest.mark.unit
+def test_auth_google_forces_re_onboarding_when_version_bumped(
+    client, session, monkeypatch
+):
+    """Users who onboarded at an older version get sent back through."""
+    monkeypatch.setattr(auth_module, "get_current_onboarding_version", lambda: 3)
+    _login(client, email="alice@example.com")
+    user = session.exec(select(User).where(User.email == "alice@example.com")).one()
+    user.onboarded_at = datetime.utcnow()
+    user.onboarding_version = 1  # older version than current (3)
+    session.add(user)
+    session.commit()
+
+    r = _login(client, email="alice@example.com")
+    assert r.status_code == 200
+    assert r.json()["needs_onboarding"] is True
+
+    me = client.get("/api/auth/me")
+    assert me.json()["needs_onboarding"] is True

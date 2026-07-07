@@ -1,0 +1,41 @@
+# profile-match-email: every user has the email channel for interest
+# matches ON and the push channel OFF. Combined with WEB_PUSH_ENABLED
+# =false at the admin level, this leaves email as the only observable
+# outbound delivery channel.
+users:
+  - email: nora@example.com
+    name: Nora Match
+    handle: nora
+    email_interest_matches_enabled: true
+    push_interest_matches_enabled: false
+
+  - email: bob@example.com
+    name: Bob Dedup
+    handle: bob
+    email_interest_matches_enabled: true
+    push_interest_matches_enabled: false
+
+  - email: carol@example.com
+    name: Carol Anyreach
+    handle: carol
+    email_interest_matches_enabled: true
+    push_interest_matches_enabled: false
+
+  # Dan's profile has matches_enabled=false → 0 rows, 0 emails.
+  - email: dan@example.com
+    name: Dan Silent
+    handle: dan
+    email_interest_matches_enabled: true
+    push_interest_matches_enabled: false
+
+  # Eve = negative probe: user-level email toggle OFF → 0 emails but
+  # in-app row still created (Phase G).
+  - email: eve@example.com
+    name: Eve Email-off
+    handle: eve
+    email_interest_matches_enabled: false
+    push_interest_matches_enabled: false
+
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

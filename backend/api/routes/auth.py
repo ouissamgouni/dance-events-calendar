@@ -18,6 +18,7 @@ from sqlalchemy.orm import aliased
 
 from backend.api.deps import (
     create_session_token,
+    get_client_ip,
     get_current_user_optional,
     require_user,
 )
@@ -25,6 +26,8 @@ from backend.api.anon_id import clear_anon_id, read_anon_id
 from backend.api.schemas import (
     AnonPreferencesPayload,
     HandleAvailabilityResponse,
+    HomeLocationResponse,
+    IPGeolocationResponse,
     PreferredAreaResponse,
     RedeemReferralRequest,
     RedeemReferralResponse,
@@ -36,6 +39,7 @@ from backend.api.schemas import (
 )
 from backend.config.loader import (
     get_admin_email,
+    get_current_onboarding_version,
     get_dev_auth_enabled,
     get_env_name,
     get_google_client_id,
@@ -57,6 +61,7 @@ from backend.db.models import (
 )
 from backend.services.email import send_new_user_notification
 from backend.services.follows import ensure_approved_follow_with_subscription
+from backend.services.user_bootstrap import ensure_default_interest_profile
 
 logger = logging.getLogger(__name__)
 
@@ -191,6 +196,11 @@ def _upsert_user_from_claims(
 
     session.commit()
     session.refresh(user)
+    if is_new_user:
+        # Guarantee the user owns exactly one profile (the source of
+        # truth for Explorer/For You defaults). ``notify_enabled=False``
+        # so no alerts fire until the user opts in.
+        ensure_default_interest_profile(session, user)
     return user, is_new_user
 
 
@@ -355,10 +365,18 @@ def _serialize_preferences(session: Session, user: User) -> UserPreferencesRespo
             max_lng=user.preferred_area_max_lng,
             label=user.preferred_area_label,
         )
+    home_location: Optional[HomeLocationResponse] = None
+    if user.home_lat is not None and user.home_lng is not None and user.home_label:
+        home_location = HomeLocationResponse(
+            lat=user.home_lat,
+            lng=user.home_lng,
+            label=user.home_label,
+        )
     return UserPreferencesResponse(
         share_attendance_default=user.share_attendance_default,
         preferred_area=area,
         preferred_tag_ids=_load_preferred_tag_ids(session, user),
+        home_location=home_location,
         set_at=user.preferences_set_at,
     )
 
@@ -386,6 +404,11 @@ def _apply_anon_preferences(
         user.preferred_area_max_lat = area.max_lat
         user.preferred_area_max_lng = area.max_lng
         user.preferred_area_label = area.label
+    if anon_prefs.home_location is not None:
+        home = anon_prefs.home_location
+        user.home_lat = home.lat
+        user.home_lng = home.lng
+        user.home_label = home.label
     try:
         tag_ids = _validate_tag_ids(session, anon_prefs.preferred_tag_ids)
     except HTTPException:
@@ -511,6 +534,13 @@ def login_with_google(
             "onboarded_at": (
                 user.onboarded_at.isoformat() if user.onboarded_at else None
             ),
+            # True when the user has never onboarded OR the server-side
+            # ``CURRENT_ONBOARDING_VERSION`` was bumped since they last
+            # completed the wizard (forced re-onboarding).
+            "needs_onboarding": (
+                user.onboarded_at is None
+                or (user.onboarding_version or 0) < get_current_onboarding_version()
+            ),
         }
     )
     return _set_session_cookie(response, user, is_admin)
@@ -627,11 +657,38 @@ def get_me(
         # Phase E (E3): see /auth/google for shape; ``None`` triggers the
         # onboarding redirect on first signed-in navigation.
         "onboarded_at": (user.onboarded_at.isoformat() if user.onboarded_at else None),
+        # True when the user has never onboarded OR the server-side
+        # ``CURRENT_ONBOARDING_VERSION`` was bumped since they last
+        # completed the wizard (forced re-onboarding).
+        "needs_onboarding": (
+            user.onboarded_at is None
+            or (user.onboarding_version or 0) < get_current_onboarding_version()
+        ),
         # Re-engagement / notification preferences (see /auth/notification-preferences).
         "timezone": user.timezone,
-        "reminder_email_enabled": user.reminder_email_enabled,
-        "activity_email_enabled": user.activity_email_enabled,
-        "push_enabled": user.push_enabled,
+        # Phase G: six per-feature × per-channel gates.
+        "email_event_reminders_enabled": user.email_event_reminders_enabled,
+        "email_social_activity_enabled": user.email_social_activity_enabled,
+        "email_interest_matches_enabled": user.email_interest_matches_enabled,
+        "push_event_reminders_enabled": user.push_event_reminders_enabled,
+        "push_social_activity_enabled": user.push_social_activity_enabled,
+        "push_interest_matches_enabled": user.push_interest_matches_enabled,
+        # Legacy aliases derived from the new flags. Kept for one release so
+        # older frontend clients still work (Phase G §G.9 step 5 drops them).
+        "reminder_email_enabled": user.email_event_reminders_enabled,
+        "activity_email_enabled": (
+            user.email_social_activity_enabled
+            and user.email_interest_matches_enabled
+        ),
+        "push_enabled": (
+            user.push_event_reminders_enabled
+            and user.push_social_activity_enabled
+            and user.push_interest_matches_enabled
+        ),
+        "interest_notifications_enabled": (
+            user.email_interest_matches_enabled
+            and user.push_interest_matches_enabled
+        ),
     }
 
 
@@ -691,6 +748,18 @@ def update_preferences(
         validated = _validate_tag_ids(session, payload.preferred_tag_ids or [])
         _replace_preferred_tags(session, user, validated)
 
+    if "home_location" in fields_set:
+        touched_prefs = True
+        if payload.home_location is None:
+            user.home_lat = None
+            user.home_lng = None
+            user.home_label = None
+        else:
+            home = payload.home_location
+            user.home_lat = home.lat
+            user.home_lng = home.lng
+            user.home_label = home.label
+
     if touched_prefs:
         user.preferences_set_at = datetime.utcnow()
 
@@ -703,13 +772,24 @@ def update_preferences(
 class UpdateNotificationPreferencesRequest(BaseModel):
     """Partial update of the user's notification/email preferences.
 
-    All fields optional; omitted fields are left untouched.
+    All fields optional; omitted fields are left untouched. Legacy
+    four-flag names are accepted as aliases that write through to the
+    corresponding new per-feature × per-channel flags (Phase G).
     """
 
     timezone: Optional[str] = None
+    # Phase G: per-feature × per-channel gates.
+    email_event_reminders_enabled: Optional[bool] = None
+    email_social_activity_enabled: Optional[bool] = None
+    email_interest_matches_enabled: Optional[bool] = None
+    push_event_reminders_enabled: Optional[bool] = None
+    push_social_activity_enabled: Optional[bool] = None
+    push_interest_matches_enabled: Optional[bool] = None
+    # Legacy aliases — removed in the cleanup PR (§G.9 step 5).
     reminder_email_enabled: Optional[bool] = None
     activity_email_enabled: Optional[bool] = None
     push_enabled: Optional[bool] = None
+    interest_notifications_enabled: Optional[bool] = None
 
 
 def _is_valid_timezone(name: str) -> bool:
@@ -722,40 +802,120 @@ def _is_valid_timezone(name: str) -> bool:
         return False
 
 
+# Map legacy field name → tuple of new User attributes to write-through.
+# Setting a legacy flag flips every derived new flag to match, preserving
+# the pre-Phase-G "one master toggle" behaviour for older clients.
+_LEGACY_WRITE_THROUGH: dict[str, tuple[str, ...]] = {
+    "reminder_email_enabled": ("email_event_reminders_enabled",),
+    "activity_email_enabled": (
+        "email_social_activity_enabled",
+        "email_interest_matches_enabled",
+    ),
+    "push_enabled": (
+        "push_event_reminders_enabled",
+        "push_social_activity_enabled",
+        "push_interest_matches_enabled",
+    ),
+    "interest_notifications_enabled": (
+        "email_interest_matches_enabled",
+        "push_interest_matches_enabled",
+    ),
+}
+
+# New flags — direct passthrough.
+_NEW_FLAGS: tuple[str, ...] = (
+    "email_event_reminders_enabled",
+    "email_social_activity_enabled",
+    "email_interest_matches_enabled",
+    "push_event_reminders_enabled",
+    "push_social_activity_enabled",
+    "push_interest_matches_enabled",
+)
+
+
 @router.patch("/notification-preferences")
 def update_notification_preferences(
     payload: UpdateNotificationPreferencesRequest,
     user: User = Depends(require_user),
     session: Session = Depends(get_session),
 ):
-    """Update reminder/activity email toggles, web-push toggle, and timezone."""
+    """Update per-feature × per-channel email/push toggles + timezone."""
     fields_set = payload.model_fields_set
     if "timezone" in fields_set and payload.timezone is not None:
         tz = payload.timezone.strip()
         if len(tz) > 64 or not _is_valid_timezone(tz):
             raise HTTPException(status_code=400, detail="Invalid timezone")
         user.timezone = tz
-    if (
-        "reminder_email_enabled" in fields_set
-        and payload.reminder_email_enabled is not None
-    ):
-        user.reminder_email_enabled = payload.reminder_email_enabled
-    if (
-        "activity_email_enabled" in fields_set
-        and payload.activity_email_enabled is not None
-    ):
-        user.activity_email_enabled = payload.activity_email_enabled
-    if "push_enabled" in fields_set and payload.push_enabled is not None:
-        user.push_enabled = payload.push_enabled
+
+    # Apply the six new flags first so a same-payload combination of legacy
+    # + new gives the legacy write-through the final say (matches the
+    # backfill AND-semantics documented in §G.5).
+    for flag in _NEW_FLAGS:
+        if flag in fields_set:
+            value = getattr(payload, flag)
+            if value is not None:
+                setattr(user, flag, value)
+
+    for legacy, targets in _LEGACY_WRITE_THROUGH.items():
+        if legacy in fields_set:
+            value = getattr(payload, legacy)
+            if value is not None:
+                for target in targets:
+                    setattr(user, target, value)
+
     session.add(user)
     session.commit()
     session.refresh(user)
     return {
         "timezone": user.timezone,
-        "reminder_email_enabled": user.reminder_email_enabled,
-        "activity_email_enabled": user.activity_email_enabled,
-        "push_enabled": user.push_enabled,
+        "email_event_reminders_enabled": user.email_event_reminders_enabled,
+        "email_social_activity_enabled": user.email_social_activity_enabled,
+        "email_interest_matches_enabled": user.email_interest_matches_enabled,
+        "push_event_reminders_enabled": user.push_event_reminders_enabled,
+        "push_social_activity_enabled": user.push_social_activity_enabled,
+        "push_interest_matches_enabled": user.push_interest_matches_enabled,
+        # Legacy mirror (removed in cleanup PR).
+        "reminder_email_enabled": user.email_event_reminders_enabled,
+        "activity_email_enabled": (
+            user.email_social_activity_enabled
+            and user.email_interest_matches_enabled
+        ),
+        "push_enabled": (
+            user.push_event_reminders_enabled
+            and user.push_social_activity_enabled
+            and user.push_interest_matches_enabled
+        ),
+        "interest_notifications_enabled": (
+            user.email_interest_matches_enabled
+            and user.push_interest_matches_enabled
+        ),
     }
+
+
+@router.get("/geolocate-ip", response_model=Optional[IPGeolocationResponse])
+async def geolocate_ip_endpoint(
+    request: Request,
+    _user: User = Depends(require_user),
+):
+    """Best-effort IP -> city geo prefill for the home-pin picker.
+
+    Returns 204 when the IP is private or geolocation fails (silent-fail
+    so the caller falls back to browser geolocation or manual city
+    typeahead per PRD §8 Step 2).
+    """
+    from backend.services.ip_geolocation import geolocate_ip
+
+    ip = get_client_ip(request)
+    geo = await geolocate_ip(ip)
+    if not geo:
+        return JSONResponse(status_code=204, content=None)
+    lat = geo.get("lat")
+    lng = geo.get("lon")
+    if lat is None or lng is None:
+        return JSONResponse(status_code=204, content=None)
+    parts = [p for p in (geo.get("city"), geo.get("country")) if p]
+    label = ", ".join(parts) if parts else "My area"
+    return IPGeolocationResponse(lat=float(lat), lng=float(lng), label=label)
 
 
 @router.get("/unsubscribe")
@@ -779,14 +939,15 @@ def unsubscribe(
     if result is None:
         return {"status": "invalid"}
     user_id, category = result
-    column = UNSUBSCRIBE_CATEGORIES[category]
+    columns = UNSUBSCRIBE_CATEGORIES[category]
     try:
         uid = UUID(user_id)
     except (ValueError, AttributeError):
         return {"status": "invalid"}
     user = session.get(User, uid)
     if user is not None and user.deleted_at is None:
-        setattr(user, column, False)
+        for column in columns:
+            setattr(user, column, False)
         session.add(user)
         session.commit()
     return {"status": "unsubscribed", "category": category}

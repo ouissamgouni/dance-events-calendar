@@ -18,6 +18,7 @@ events:
     tags:
       - format:social
       - dance-style:salsa
+      - reach:regional
   - id: evt-promo-002
     calendar_id: promo-cal-001
     title: Bachata Workshop — Rejected promo demo
@@ -35,6 +36,7 @@ events:
     tags:
       - format:workshop
       - dance-style:bachata
+      - reach:international
   - id: evt-promo-003
     calendar_id: promo-cal-001
     title: Kizomba Class — No codes yet
@@ -52,3 +54,4 @@ events:
     tags:
       - format:class
       - dance-style:kizomba
+      - reach:local

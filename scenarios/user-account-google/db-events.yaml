@@ -22,9 +22,8 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-acct-g-002
   calendar_id: salsa-cal-001
   title: Saturday Bachata Night
@@ -50,6 +49,5 @@ events:
   - dance-style:bachata
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:international

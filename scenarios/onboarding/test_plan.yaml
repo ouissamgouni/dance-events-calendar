@@ -50,23 +50,67 @@ test_plan:
         field, and persists through /api/auth/preferences without an error.
 
     - id: 1a
-      title: "Preferences skip advances to follow suggestions"
+      title: "Preferences skip advances to local step"
       description: >
         From /onboarding/preferences?next=%2F, tap Skip.
       expected: >
-        URL becomes /onboarding/follow?next=%2F without stamping
-        onboarded_at. The follow suggestions step still appears with its own
-        Skip button and Done CTA.
+        URL becomes /onboarding/local?next=%2F (Skip still suggests the
+        optional local-profile step) without stamping onboarded_at and
+        without hitting /api/interest-profiles. Nora already owns
+        exactly one default profile from signup
+        (`matches_enabled=false`, `is_active=true`) which remains
+        untouched. On the local step, the Dance styles picker is EMPTY
+        (nothing was selected before skipping).
 
     - id: 2
-      title: "Preferences continue to follow suggestions"
+      title: "Preferences continue to local step"
       description: >
         Select `Salsa` and `Bachata`. Leave the map section collapsed and tap
         Continue.
       expected: >
-        Network saves preferred tag ids through /api/auth/preferences. URL
-        becomes /onboarding/follow?next=%2F. The suggestion list is unselected:
-        every card has a `Follow` button and the bottom CTA reads `Done`.
+        Network saves preferred tag ids through /api/auth/preferences and
+        PATCHes /api/interest-profiles/<id> on the signup-seeded default
+        profile (label, area, dance/reach tag ids, `matches_enabled=true`,
+        `is_active=true`). No new profile row is created. URL replaces
+        to /onboarding/local?next=%2F.
+
+    - id: 2a
+      title: "Local step shows dance styles first, then city + notify toggle"
+      description: >
+        Inspect the /onboarding/local page.
+      expected: >
+        Sections appear in this order: (1) optional "Dance styles"
+        TagsPicker (PRE-FILLED with whatever the user picked in Step 2
+        — e.g. Salsa + Bachata; empty if the user skipped Step 1),
+        (2) "City" search + "Use my current location", (3) "Radius"
+        slider (5–150 km, default 10), (4) preview map, (5) "Notify me
+        about matching events" checkbox CHECKED by default. Continue is
+        disabled (tooltip: "Pick a city or use your current location
+        first") until a pin is set. Skip is visible in the header.
+
+    - id: 2b
+      title: "Skip on local step creates NO second profile"
+      description: >
+        From /onboarding/local, tap Skip in the header.
+      expected: >
+        URL replaces to /onboarding/follow?next=%2F. NO POST to
+        /api/interest-profiles occurs — the preferences profile from
+        Step 2 remains the only, and active, profile.
+
+    - id: 2c
+      title: "Continue on local step creates an INACTIVE second profile"
+      description: >
+        Re-run the scenario (or navigate back), reach /onboarding/local
+        again with the preferences profile in place. Pick a city, keep
+        radius at 10 km, keep Notify checked, tap Continue.
+      expected: >
+        PATCH /api/auth/preferences persists only `home_location` (the
+        preferences profile's area is preserved). A second POST
+        /api/interest-profiles fires with the bbox, dance/reach tag ids,
+        `matches_enabled: true`, and `is_active: false` and returns 200.
+        The preferences profile remains ACTIVE. URL replaces to
+        /onboarding/follow?next=%2F. Both profiles are visible in
+        Settings → Alerts, only the first marked Active.
 
     - id: 3
       title: "Suggestion ranking and exclusions are enforced"
@@ -119,8 +163,8 @@ test_plan:
       title: "Skip path still stamps onboarded_at"
       description: >
         Reset DB (re-run `task start:scenario SCENARIO=onboarding`), sign in
-        as Nora Newbie again, continue through preferences, and tap "Skip" in
-        the top-right of the follow page.
+        as Nora Newbie again, continue through preferences, tap "Skip" on
+        the local page, and tap "Skip" in the top-right of the follow page.
       expected: >
         POST /api/social/onboarding/complete with `handles: []` → 200
         with `onboarded_at` set and `followed: []`. App navigates to

@@ -25,6 +25,7 @@ events:
     tags:
       - format:social
       - dance-style:salsa
+      - reach:international
 
   - id: evt-pref-002
     calendar_id: bachata-cal-002
@@ -44,6 +45,7 @@ events:
     tags:
       - format:workshop
       - dance-style:bachata
+      - reach:international
 
   - id: evt-pref-003
     calendar_id: kizomba-cal-003
@@ -61,6 +63,7 @@ events:
     tags:
       - format:workshop
       - dance-style:kizomba
+      - reach:regional
 
   - id: evt-pref-004
     calendar_id: salsa-cal-001
@@ -78,6 +81,7 @@ events:
     tags:
       - format:social
       - dance-style:salsa
+      - reach:local
 
   - id: evt-pref-005
     calendar_id: bachata-cal-002
@@ -96,6 +100,7 @@ events:
     tags:
       - format:festival
       - dance-style:bachata
+      - reach:international
 
   - id: evt-pref-006
     calendar_id: kizomba-cal-003
@@ -111,6 +116,7 @@ events:
     tags:
       - format:social
       - dance-style:kizomba
+      - reach:regional
 
   - id: evt-pref-007
     calendar_id: salsa-cal-001
@@ -126,6 +132,7 @@ events:
     tags:
       - format:social
       - dance-style:salsa
+      - reach:local
 
   # ── Outside default bbox (must NOT appear when bbox filter active) ─
   - id: evt-pref-100
@@ -144,6 +151,7 @@ events:
     tags:
       - format:social
       - dance-style:salsa
+      - reach:international
 
   - id: evt-pref-101
     calendar_id: bachata-cal-002
@@ -161,6 +169,7 @@ events:
     tags:
       - format:social
       - dance-style:bachata
+      - reach:local
 
   - id: evt-pref-102
     calendar_id: kizomba-cal-003
@@ -176,3 +185,4 @@ events:
     tags:
       - format:social
       - dance-style:kizomba
+      - reach:local

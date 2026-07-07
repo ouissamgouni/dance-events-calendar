@@ -52,11 +52,14 @@ function persistSeenFriendIds(ids: Set<number>): void {
  *   - ``seenAt``      — local-only timestamp of the last time the user
  *                       opened the notifications surface. The bell badge is
  *                       hidden whenever ``seenAt >= last server fetch's
- *                       latest created_at`` so a user who has glanced at
- *                       their feed isn't re-pinged for the same rows. This
- *                       mirrors the industry pattern (Slack, GitHub) where
- *                       "seen" clears the badge but rows stay "unread"
- *                       until clicked or explicitly marked.
+ *                       latest created_at``.
+ *
+ * The panel and the full page both call ``markAllRead()`` as soon as they
+ * are opened/mounted (in addition to ``markSeen()``), so simply viewing the
+ * list marks every row read — the Instagram/Facebook pattern, rather than
+ * requiring an explicit click or "Mark all read" per row. ``markRead``/
+ * ``markAllRead`` remain available for the row-click and explicit button
+ * interactions, which are now idempotent no-ops in the common case.
  *
  * Polls every 60s while authenticated; also refreshes on route changes so
  * mark-read interactions on the panel/page propagate to the bell without a

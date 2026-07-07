@@ -7,9 +7,10 @@ import NotificationsPanel from './NotificationsPanel';
  * Header bell button. Reads unread count from NotificationsContext (shared
  * with the panel + page) so mark-read interactions update the badge live.
  *
- * The badge is hidden once the user has opened the panel (``seen``) — the
- * row stays unread server-side until clicked, but the bell stops nagging.
- * This mirrors Slack/GitHub.
+ * The badge is hidden once the user has opened the panel (``seen``); opening
+ * the panel also marks every loaded row read server-side (Instagram/
+ * Facebook-style "viewing is reading"), so the bell and the rows clear
+ * together.
  */
 export default function NotificationBell({ className }: { className?: string }) {
     const { user } = useAuth();

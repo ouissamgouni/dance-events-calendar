@@ -18,6 +18,7 @@ tag_groups:
     label: Dance Style
     ordinal: 20
     allow_multiple: true
+    onboarding_eligible: true
     color: "#fb923c"
     tags:
       - slug: salsa
@@ -28,6 +29,20 @@ tag_groups:
         label: Kizomba
       - slug: zouk
         label: Zouk
+
+  - slug: reach
+    label: Reach
+    ordinal: 25
+    allow_multiple: true
+    onboarding_eligible: true
+    color: "#a78bfa"
+    tags:
+      - slug: local
+        label: Local
+      - slug: regional
+        label: Regional
+      - slug: international
+        label: International
 
   - slug: level
     label: Level

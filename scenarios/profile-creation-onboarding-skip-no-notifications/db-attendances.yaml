@@ -1,0 +1,5 @@
+attendances:
+  - event_id: ev-friend
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public

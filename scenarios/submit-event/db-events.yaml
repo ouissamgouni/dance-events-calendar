@@ -22,6 +22,7 @@ events:
   - level:beginner-friendly
   - venue:indoor
   - vibe:social-atmosphere
+  - reach:local
 - id: mock-sug-002
   calendar_id: bachata-cal-002
   title: Bachata Sensual Workshop – Paris
@@ -47,6 +48,7 @@ events:
   - dance-style:bachata
   - level:all-levels
   - venue:indoor
+  - reach:international
 - id: mock-sug-003
   calendar_id: salsa-cal-001
   title: Salsa on the Rooftop – Barcelona
@@ -70,6 +72,7 @@ events:
   - venue:rooftop
   - vibe:live-band
   - vibe:social-atmosphere
+  - reach:local
 - id: mock-sug-004
   calendar_id: bachata-cal-002
   title: Bachata Stars Night – Amsterdam
@@ -97,6 +100,7 @@ events:
   - venue:indoor
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:regional
 - id: mock-sug-005
   calendar_id: salsa-cal-001
   title: Havana Nights – London
@@ -121,3 +125,4 @@ events:
   - vibe:live-band
   - vibe:good-music
   - vibe:social-atmosphere
+  - reach:international

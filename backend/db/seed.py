@@ -32,6 +32,8 @@ from backend.db.models import (
     User,
     UserEventAttendance,
     UserFollow,
+    UserInterestProfile,
+    UserInterestProfileTag,
     UserSavedEvent,
 )
 from backend.services.follows import (
@@ -107,6 +109,7 @@ class DatabaseSeeder:
         uses_mock_calendar = get_calendar_service_type() == "mock"
 
         self._seed_tags(scenario_file_with_default(scenario_dir, "tags.yaml"))
+        self._ensure_system_tag_groups()
         self._seed_tag_synonyms_defaults()
         self._seed_calendars(scenario_dir / "calendars.yaml")
         self._seed_calendar_default_tags(scenario_dir / "calendars.yaml")
@@ -128,6 +131,8 @@ class DatabaseSeeder:
         self._seed_generated_events(scenario_dir / "generated-events.yaml")
         # Follows must come AFTER users (FK on follower_id/followee_id).
         self._seed_follows(scenario_dir / "db-follows.yaml")
+        # Interest profiles must come AFTER users + tags (FKs on both).
+        self._seed_interest_profiles(scenario_dir / "db-interest-profiles.yaml")
         # Attendances/saves must come AFTER users (FK on user_id) and after events.
         self._seed_attendances(scenario_dir / "db-events.yaml")
         self._seed_attendances(scenario_dir / "db-attendances.yaml")
@@ -136,7 +141,9 @@ class DatabaseSeeder:
         self._seed_ratings(scenario_dir / "db-events.yaml")
         self._seed_promo_codes(scenario_dir / "db-promo-codes.yaml")
         self._seed_organizer_claims(scenario_dir / "db-organizer-claims.yaml")
-        self._seed_site_settings(scenario_dir / "settings.yaml")
+        self._seed_site_settings(
+            scenario_file_with_default(scenario_dir, "settings.yaml")
+        )
         self._ingest_test_plans(scenario_dir)
         self.session.commit()
         logger.info("Seeding complete")
@@ -301,6 +308,98 @@ class DatabaseSeeder:
                                 continue
                             seen.add(term)
                             self.session.add(TagSynonym(tag_id=tag.id, term=term))
+
+    def _ensure_system_tag_groups(self) -> None:
+        """Idempotently guarantee the tag groups the app depends on.
+
+        ``reach`` and ``dance-style`` are consumed by the interest-profiles
+        code (see ``services.interest_notification_service``) and the
+        onboarding UI. Scenarios that ship a truncated ``tags.yaml`` (or
+        none at all) must still get these two groups so the app boots into
+        a usable state. Existing rows are left untouched — this only
+        creates what's missing.
+        """
+        # (group_slug, group_kwargs, [(tag_slug, tag_kwargs), ...])
+        system_groups: list[tuple[str, dict, list[tuple[str, dict]]]] = [
+            (
+                "reach",
+                dict(
+                    label="Reach",
+                    ordinal=30,
+                    allow_multiple=True,
+                    onboarding_eligible=True,
+                    color="#a78bfa",
+                    enabled=True,
+                    scope="event",
+                ),
+                [
+                    ("local", dict(label="Local", ordinal=0)),
+                    ("regional", dict(label="Regional", ordinal=1)),
+                    ("international", dict(label="International", ordinal=2)),
+                ],
+            ),
+            (
+                "dance-style",
+                dict(
+                    label="Dance Style",
+                    ordinal=50,
+                    allow_multiple=True,
+                    onboarding_eligible=True,
+                    color="#fb923c",
+                    enabled=True,
+                    scope="event",
+                ),
+                [
+                    (
+                        "salsa",
+                        dict(
+                            label="Salsa",
+                            ordinal=0,
+                            is_hero_filter=True,
+                            hero_ordinal=1,
+                        ),
+                    ),
+                    (
+                        "bachata",
+                        dict(
+                            label="Bachata",
+                            ordinal=1,
+                            is_hero_filter=True,
+                            hero_ordinal=2,
+                        ),
+                    ),
+                    ("kizomba", dict(label="Kizomba", ordinal=2)),
+                    ("semba", dict(label="Semba", ordinal=3)),
+                    ("zouk", dict(label="Zouk", ordinal=4)),
+                    ("rueda", dict(label="Rueda", ordinal=5)),
+                    ("cha-cha", dict(label="Cha-Cha", ordinal=6)),
+                    ("son", dict(label="Son", ordinal=7)),
+                ],
+            ),
+        ]
+
+        for group_slug, group_kwargs, tag_specs in system_groups:
+            with self.session.no_autoflush:
+                group = self.session.exec(
+                    select(TagGroup).where(TagGroup.slug == group_slug)
+                ).first()
+            if not group:
+                group = TagGroup(slug=group_slug, **group_kwargs)
+                self.session.add(group)
+                self.session.flush()
+                logger.info("Created system tag group: %s", group_slug)
+            for tag_slug, tag_kwargs in tag_specs:
+                with self.session.no_autoflush:
+                    existing = self.session.exec(
+                        select(Tag).where(
+                            Tag.group_id == group.id, Tag.slug == tag_slug
+                        )
+                    ).first()
+                if existing:
+                    continue
+                self.session.add(Tag(group_id=group.id, slug=tag_slug, **tag_kwargs))
+                self.session.flush()
+                logger.info("Created system tag: %s/%s", group_slug, tag_slug)
 
     def _seed_tag_synonyms_defaults(self) -> None:
         """Idempotently seed default heuristic synonyms from the static map.
@@ -664,6 +763,15 @@ class DatabaseSeeder:
         before any user has actually logged in. Idempotent.
 
         Expected structure:
+          # Scenario-level default. When true (the default), mock users
+          # without an explicit ``onboarded_at`` are auto-stamped as
+          # already-onboarded at the current server-side onboarding
+          # version, so non-onboarding scenarios don't accidentally
+          # trip the OnboardingGate redirect. Scenarios that exercise
+          # the onboarding flow (e.g. scenarios/onboarding,
+          # interest-onboarding-international) should set
+          # ``auto_onboard: false`` at the top level.
+          auto_onboard: true
           users:
             - email: alice@example.com
               name: Alice
@@ -675,6 +783,12 @@ class DatabaseSeeder:
 
         with open(path) as f:
             data = yaml.safe_load(f) or {}
+
+        # Scenario-wide onboarding default (Phase G). Individual entries
+        # may still override by setting ``onboarded_at`` explicitly.
+        auto_onboard_default = bool(data.get("auto_onboard", True))
+        from backend.config.loader import get_current_onboarding_version
+        current_onboarding_version = get_current_onboarding_version()
 
         for entry in data.get("users", []) or []:
             if not isinstance(entry, dict):
@@ -716,9 +830,66 @@ class DatabaseSeeder:
                 "facebook_url",
                 "avatar_url",
                 "bio",
+                # Phase G — per-feature × per-channel notification flags.
+                "email_event_reminders_enabled",
+                "email_social_activity_enabled",
+                "email_interest_matches_enabled",
+                "push_event_reminders_enabled",
+                "push_social_activity_enabled",
+                "push_interest_matches_enabled",
+                # Phase G — onboarding state. See ``auto_onboard`` handling
+                # below for the scenario-wide default when these are omitted.
+                "onboarded_at",
+                "onboarding_version",
+                "timezone",
             ):
                 if key in entry and entry[key] is not None:
                     user_kwargs[key] = entry[key]
+            # ``onboarded_at`` in yaml may be a raw ISO string (most yaml
+            # docs) or a parsed datetime (yaml's native timestamp syntax).
+            # Normalize to datetime so SQLite/PG both accept it.
+            raw_onboarded = user_kwargs.get("onboarded_at")
+            if isinstance(raw_onboarded, str):
+                user_kwargs["onboarded_at"] = datetime.fromisoformat(raw_onboarded)
+            # Phase G — apply the scenario-wide auto-onboard default when
+            # the entry didn't explicitly opt in or out. Explicit
+            # ``onboarded_at: null`` in yaml means "leave un-onboarded" and
+            # is preserved because ``entry[key] is not None`` above skips
+            # it, so we only stamp defaults here if the key is missing.
+            if auto_onboard_default and "onboarded_at" not in entry:
+                user_kwargs["onboarded_at"] = datetime.utcnow()
+                user_kwargs.setdefault(
+                    "onboarding_version", current_onboarding_version
+                )
+            # Phase G legacy aliases — accepted for one release, written
+            # through to the corresponding new flags. Emits a stderr
+            # deprecation warning per §G.7.1.
+            _legacy_write_through = {
+                "reminder_email_enabled": ("email_event_reminders_enabled",),
+                "activity_email_enabled": (
+                    "email_social_activity_enabled",
+                    "email_interest_matches_enabled",
+                ),
+                "push_enabled": (
+                    "push_event_reminders_enabled",
+                    "push_social_activity_enabled",
+                    "push_interest_matches_enabled",
+                ),
+                "interest_notifications_enabled": (
+                    "email_interest_matches_enabled",
+                    "push_interest_matches_enabled",
+                ),
+            }
+            for legacy_key, targets in _legacy_write_through.items():
+                if legacy_key in entry and entry[legacy_key] is not None:
+                    import sys as _sys
+                    _sys.stderr.write(
+                        f"[seed] warning: mock-user {email}: legacy "
+                        f"'{legacy_key}' is deprecated; use "
+                        f"{'/'.join(targets)} (Phase G).\n"
+                    )
+                    for target in targets:
+                        user_kwargs.setdefault(target, entry[legacy_key])
             if user_kwargs.get("is_admin_managed") is True:
                 user_kwargs["share_attendance_default"] = True
                 user_kwargs["share_attendance_default_audience"] = "public"
@@ -783,7 +954,6 @@ class DatabaseSeeder:
             ("Centro Cultural de Belem, Lisbon, Portugal", 38.696, -9.2092),
         ]
         formats = ["social", "class", "workshop", "festival", "congress", "practice"]
-        scales = ["small", "medium", "large"]
         scopes = ["local", "regional", "international"]
         venues = ["indoor", "outdoor", "rooftop"]
         styles = ["salsa", "bachata", "kizomba", "zouk", "rueda"]
@@ -847,8 +1017,7 @@ class DatabaseSeeder:
 
             tag_slugs = [
                 f"format:{event_format}",
-                f"scale:{scales[idx % len(scales)]}",
-                f"scope:{scopes[idx % len(scopes)]}",
+                f"reach:{scopes[idx % len(scopes)]}",
                 f"venue:{venues[idx % len(venues)]}",
                 f"dance-style:{style}",
                 f"level:{levels[idx % len(levels)]}",
@@ -980,7 +1149,13 @@ class DatabaseSeeder:
         be exercised without manual click-through. Idempotent on the
         (follower, followee) pair.
 
+        Set top-level ``emit_notifications: true`` to also emit
+        ``new_follower`` (and ``new_friend`` when a mutual pair is
+        seeded) — mirroring the HTTP follow route. Notification digest
+        scenarios rely on this to produce assertable rows.
+
         Expected structure:
+          emit_notifications: true   # optional, default false
           follows:
             - follower: alice@example.com   # email or handle
               followee: bob@example.com
@@ -992,6 +1167,12 @@ class DatabaseSeeder:
 
         with open(path) as f:
             data = yaml.safe_load(f) or {}
+
+        emit_notifications = bool(data.get("emit_notifications", False))
+        # Track approved (follower_id, followee_id) pairs created in this
+        # seed pass so we can fire new_follower and detect mutual pairs
+        # for new_friend after all rows are inserted.
+        approved_pairs: list[tuple[int, int]] = []
 
         def _resolve(ref: str) -> User | None:
             ref = (ref or "").strip()
@@ -1032,6 +1213,7 @@ class DatabaseSeeder:
                 ensure_approved_follow_with_subscription(
                     self.session, follower.id, followee.id
                 )
+                approved_pairs.append((follower.id, followee.id))
             else:
                 self.session.add(
                     UserFollow(
@@ -1047,6 +1229,166 @@ class DatabaseSeeder:
                 followee.email,
                 status,
             )
+
+        if emit_notifications and approved_pairs:
+            from backend.services.notifications import (
+                notify_new_follower,
+                notify_new_friend,
+            )
+
+            self.session.flush()
+            pair_set = set(approved_pairs)
+            friend_seen: set[tuple[int, int]] = set()
+            for follower_id, followee_id in approved_pairs:
+                follower_user = self.session.get(User, follower_id)
+                followee_user = self.session.get(User, followee_id)
+                if follower_user is None or followee_user is None:
+                    continue
+                notify_new_follower(
+                    self.session, followee=followee_user, follower=follower_user
+                )
+                if (followee_id, follower_id) in pair_set:
+                    key = tuple(sorted((follower_id, followee_id)))
+                    if key in friend_seen:
+                        continue
+                    friend_seen.add(key)
+                    notify_new_friend(
+                        self.session, follower_user, followee_user
+                    )
+
+    def _seed_interest_profiles(self, path: Path) -> None:
+        """Seed UserInterestProfile rows from db-interest-profiles.yaml.
+
+        Lets scenarios pre-build the notification matcher's inputs
+        (geography bbox + dance/reach tags + per-profile notify toggle)
+        without having to walk each user through the onboarding UI.
+        Idempotent on (user_id, label).
+
+        Expected structure:
+          interest_profiles:
+            - user: nora@example.com     # email or handle
+              label: "Europe & nearby"
+              min_lat: 24
+              min_lng: -18
+              max_lat: 69
+              max_lng: 50
+              dance_tags: ["dance-style:salsa"]   # slug or "group:slug"
+              reach_tags: ["reach:international"]
+              matches_enabled: true               # legacy: notify_enabled
+              is_active: true
+        """
+        if not path.exists():
+            return
+
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+
+        def _resolve_user(ref: str) -> User | None:
+            ref = (ref or "").strip()
+            if not ref:
+                return None
+            if "@" in ref:
+                return self.session.exec(
+                    select(User).where(User.email == ref.lower())
+                ).first()
+            return self.session.exec(select(User).where(User.handle == ref)).first()
+
+        def _resolve_tag(ref: str) -> Tag | None:
+            ref = (ref or "").strip()
+            if not ref:
+                return None
+            group_slug, sep, tag_slug = ref.partition(":")
+            if sep:
+                group = self.session.exec(
+                    select(TagGroup).where(TagGroup.slug == group_slug)
+                ).first()
+                if group is None:
+                    return None
+                return self.session.exec(
+                    select(Tag).where(Tag.group_id == group.id, Tag.slug == tag_slug)
+                ).first()
+            return self.session.exec(select(Tag).where(Tag.slug == ref)).first()
+
+        for entry in data.get("interest_profiles", []) or []:
+            if not isinstance(entry, dict):
+                continue
+            user = _resolve_user(entry.get("user", ""))
+            if user is None:
+                logger.warning("Skipping interest profile (unknown user): %r", entry)
+                continue
+            label = (entry.get("label") or "").strip()
+            if not label:
+                logger.warning("Skipping interest profile (missing label): %r", entry)
+                continue
+            try:
+                min_lat = float(entry["min_lat"])
+                min_lng = float(entry["min_lng"])
+                max_lat = float(entry["max_lat"])
+                max_lng = float(entry["max_lng"])
+            except (KeyError, TypeError, ValueError):
+                logger.warning("Skipping interest profile (bad bbox): %r", entry)
+                continue
+
+            existing = self.session.exec(
+                select(UserInterestProfile).where(
+                    UserInterestProfile.user_id == user.id,
+                    UserInterestProfile.label == label,
+                )
+            ).first()
+            # Accept legacy ``notify_enabled`` key for one release.
+            matches_enabled = entry.get("matches_enabled")
+            if matches_enabled is None and "notify_enabled" in entry:
+                import sys as _sys
+                _sys.stderr.write(
+                    f"[seed] warning: interest_profile {label!r}: legacy "
+                    f"'notify_enabled' is deprecated; use 'matches_enabled' "
+                    f"(Phase G).\n"
+                )
+                matches_enabled = entry["notify_enabled"]
+            if matches_enabled is None:
+                matches_enabled = True
+            matches_enabled = bool(matches_enabled)
+            if existing:
+                profile = existing
+                profile.min_lat = min_lat
+                profile.min_lng = min_lng
+                profile.max_lat = max_lat
+                profile.max_lng = max_lng
+                profile.matches_enabled = matches_enabled
+                profile.is_active = bool(entry.get("is_active", False))
+                self.session.add(profile)
+                self.session.flush()
+                self.session.exec(
+                    delete(UserInterestProfileTag).where(
+                        UserInterestProfileTag.profile_id == profile.id
+                    )
+                )
+            else:
+                profile = UserInterestProfile(
+                    user_id=user.id,
+                    label=label[:120],
+                    min_lat=min_lat,
+                    min_lng=min_lng,
+                    max_lat=max_lat,
+                    max_lng=max_lng,
+                    matches_enabled=matches_enabled,
+                    is_active=bool(entry.get("is_active", False)),
+                )
+                self.session.add(profile)
+                self.session.flush()
+
+            tag_refs = (entry.get("dance_tags") or []) + (entry.get("reach_tags") or [])
+            for tag_ref in tag_refs:
+                tag = _resolve_tag(str(tag_ref))
+                if tag is None:
+                    logger.warning(
+                        "Interest profile %r: unknown tag %r", label, tag_ref
+                    )
+                    continue
+                self.session.add(
+                    UserInterestProfileTag(profile_id=profile.id, tag_id=tag.id)
+                )
+            logger.info("Seeded interest profile %r for %s", label, user.email)
 
     def _seed_tracking(self, path: Path) -> None:
         """Seed EventView, EventLinkClick, and EventExport rows from db-tracking.yaml.
@@ -1121,7 +1463,14 @@ class DatabaseSeeder:
         lists, mixed public/private breakdowns) without driving the UI.
         Idempotent: existing (event_id, user_id, device_id) rows are skipped.
 
+        Set top-level ``emit_notifications: true`` to also run the
+        ``subscription_going`` fan-out that the HTTP attendance route
+        performs (public/friends audience only). This lets notification
+        digest scenarios pre-seed the notification rows they assert on
+        without hand-driving the UI.
+
         Expected structure:
+          emit_notifications: true   # optional, default false
           attendances:
             - event_id: evt-share-003
               email: alice@example.com   # required if no device_id
@@ -1138,6 +1487,9 @@ class DatabaseSeeder:
         rows = data.get("attendances") or []
         if not rows:
             return
+
+        emit_notifications = bool(data.get("emit_notifications", False))
+        fan_out_targets: list[tuple[int, str, str]] = []
 
         seeded = 0
         for entry in rows:
@@ -1201,8 +1553,34 @@ class DatabaseSeeder:
                 )
             )
             seeded += 1
+            if (
+                emit_notifications
+                and user_id is not None
+                and share_audience in ("public", "friends")
+            ):
+                fan_out_targets.append((user_id, event_id, share_audience))
         if seeded:
             logger.info("Seeded %d UserEventAttendance rows", seeded)
+
+        if fan_out_targets:
+            from backend.services.notifications import fan_out_going
+
+            # Flush so the CalendarSubscription seeded via _seed_follows
+            # (and any User row) is visible to fan_out_going's SELECT.
+            self.session.flush()
+            fanned = 0
+            for actor_id, ev_id, audience in fan_out_targets:
+                actor = self.session.get(User, actor_id)
+                if actor is None:
+                    continue
+                fanned += fan_out_going(
+                    self.session, actor, ev_id, audience=audience
+                )
+            if fanned:
+                logger.info(
+                    "Emitted %d subscription_going notifications from seeded attendances",
+                    fanned,
+                )
 
     def _seed_user_saved_events(self, path: Path) -> None:
         """Pre-seed ``UserSavedEvent`` rows from db-events.yaml or db-saves.yaml.

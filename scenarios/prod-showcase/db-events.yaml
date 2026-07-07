@@ -31,9 +31,9 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:mambo
-  - scope:local
   - format:social
   - format:workshop
+  - reach:international
 - id: 6sp36cpoc9j30b9iccsm6b9kc9h34bb161i6cb9kchi30opp71hm2e9j64
   calendar_id: 1e2764bc22c8fb43e0dcda5a3a3fd9d7d064112013e7525cade7dadbcd9220c4@group.calendar.google.com
   title: MagicMambo June
@@ -73,8 +73,8 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:mambo
-  - scope:local
   - format:social
+  - reach:local
 - id: 6kojac1mchh64b9nc5hmcb9kc9j36bb268r30bb4c5gj2dpgckq6adj5cg
   calendar_id: evrpds0rvercm3ugjpgjia2kds@group.calendar.google.com
   title: Hamburg Salsa Weekend 2026 - 2nd Edition
@@ -110,10 +110,10 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:mambo
-  - scope:international
   - format:social
   - format:workshop
   - format:weekender
+  - reach:local
 - id: 6dgm8ohlccq6ab9o6dhm6b9k60pm4bb2cpgjebb16dijadj6cdh36e1h60
   calendar_id: evrpds0rvercm3ugjpgjia2kds@group.calendar.google.com
   title: Grupo Galé in Antwerp
@@ -129,6 +129,7 @@ events:
   - dance-style:salsa
   - misc:live-band
   - venue:outdoor
+  - reach:regional
 - id: 69hm6c32chgm8b9mckpm8b9k6di3gb9p6lj64bb1ccqm4c1p6pi38e1kck
   calendar_id: evrpds0rvercm3ugjpgjia2kds@group.calendar.google.com
   title: The Dance Hub - 2nd Chapter Budapest 2026
@@ -148,11 +149,11 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:mambo
-  - scope:international
   - format:day-social
   - format:social
   - format:workshop
   - format:festival
+  - reach:local
 - id: cgom8e1j6sp3abb561ijib9kckr32bb2cor34b9j75hj6d9kcgo30opo6s
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: Mambo y Nada Más Madrid 2026
@@ -170,11 +171,11 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:mambo
-  - scope:international
   - format:day-social
   - format:social
   - format:workshop
   - format:festival
+  - reach:international
 - id: 69ij4db165ijabb26hh30b9kc9gj2b9pc9h34b9jcli3ad3374ojio9oc4
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: elSol Tisno Dance City 2026 OFFICIAL || 16-21 September || Croatia
@@ -205,11 +206,11 @@ events:
   - dance-style:cuban
   - dance-style:bachata
   - dance-style:kizomba
-  - scope:international
   - format:workshop
   - format:festival
   - misc:beach-side
   - venue:outdoor
+  - reach:local
 - id: 74rjgdpmchhj0bb5c8r3gb9k6crjab9p6cr3ebb26hh3ed3368o3aor66c
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: Brussels Retro Salsa Fest 3
@@ -245,12 +246,12 @@ events:
   price_is_free: false
   tags:
   - dance-style:salsa
-  - scope:international
   - format:day-social
   - format:social
   - format:weekender
   - misc:food
   - venue:rooftop
+  - reach:international
 - id: ccsm8or6clj38b9i60oj8b9k70rm6bb161hj8b9i6os30p1p6kq30e9lc4
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: 'Dancelife Salsa Weekend '
@@ -275,10 +276,10 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:mambo
-  - scope:international
   - format:social
   - format:day-social
   - format:weekender
+  - reach:international
 - id: 71hjgor66cqjeb9i68pm8b9k75i34bb16so3cb9kc9j3acr6chj32pb370
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: Back 2 Mambo 2026
@@ -299,12 +300,12 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:mambo
-  - scope:international
   - format:day-social
   - format:social
   - format:workshop
   - format:festival
   - format:bootcamp
+  - reach:international
 - id: 6dh36chlc8r62bb3cdi32b9k6lh3ab9oc4pmab9p6dim4d316hgm6opk6k
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: LONDON SALSA MARATHON/FEST 5 YEAR ANNIVERSARY 2026
@@ -326,11 +327,11 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:mambo
-  - scope:international
   - format:social
   - format:workshop
   - format:marathon
   - format:weekender
+  - reach:local
 - id: ckq32dhi68rmabb564oj6b9k6kr3ib9p70rm6b9i71j3edhpcpim6dr6co
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: Prague Salsa Marathon 2026 - autumn edition
@@ -373,13 +374,13 @@ events:
     label: null
   tags:
   - dance-style:salsa
-  - scope:international
   - format:day-social
   - format:social
   - format:marathon
   - format:weekender
   - misc:food
   - venue:outdoor
+  - reach:international
 - id: 68qmcc1icgr3ebb1ckrmcb9k60pj8b9pc4o64b9k61gjedr674pj8dpkcc
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: The Backyard Salsa Camp -2-
@@ -538,11 +539,10 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:mambo
-  - scope:local
-  - scope:international
   - format:social
   - format:workshop
   - venue:rooftop
+  - reach:international
 - id: ccs3ie3260rj4b9hcgrj0b9k64r3ebb16gpjib9jcgq36dpgc9h30e1n6k
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: 15th Transilvania Salsa Fest, 19-23 Nov 2026, Cluj-Napoca, Romania☆☆☆
@@ -590,10 +590,10 @@ events:
   - dance-style:salsa
   - dance-style:bachata
   - dance-style:kizomba
-  - scope:international
   - format:social
   - format:day-social
   - format:workshop
+  - reach:regional
 - id: c8oj2e9n70s66b9occqm4b9k6os30bb26grj2b9h68q34e1h6lj6acpi68
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: GRAZy Salsa Weekend 2026
@@ -611,6 +611,7 @@ events:
   tags:
   - dance-style:salsa
   - format:workshop
+  - reach:local
 - id: 71j32p1n61j3ab9mc4qmcb9k6hhm6bb269ijgb9m6gs3copk68sjcphg60
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: 'Vivaz 100% Salsa Weekend 2026-2nd Edition '
@@ -632,9 +633,9 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:mambo
-  - scope:international
   - format:social
   - format:workshop
+  - reach:international
 - id: 65j62db36ti30b9nc5j66b9k61i38b9p6cp30bb174qj6dhp70ojid1g6s
   calendar_id: evrpds0rvercm3ugjpgjia2kds@group.calendar.google.com
   title: 'Dance Casa Festival 2026 '
@@ -880,10 +881,10 @@ events:
   - dance-style:bachata
   - dance-style:kizomba
   - dance-style:zouk
-  - scope:international
   - format:social
   - format:workshop
   - format:festival
+  - reach:international
 - id: 6lj30e9gclijgb9pc9hjgb9kcorm8bb269ij2bb464o6ce1jccsm2cpjck
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: Paris Salsa Marathon  2026
@@ -911,12 +912,12 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:mambo
-  - scope:international
   - format:day-social
   - format:social
   - format:marathon
   - format:weekender
   - misc:food
+  - reach:regional
 - id: cdhj2e9gc5h3gbb4c8smab9k74oj4bb2cgs6cbb2cpimae9l60qjgc1ocg
   calendar_id: 0b45c3f50802bc67a86e921fe6cd0f9c6d1a0d05c2e922407677d95af78ee5ac@group.calendar.google.com
   title: Summer Bachata Festival ROVINJ 2026 *official event*
@@ -959,11 +960,11 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:bachata
-  - scope:international
   - format:festival
   - misc:trip
   - misc:beach-side
   - venue:outdoor
+  - reach:local
 - id: 6sq3acpkchijabb66gq6ab9kclgm8b9ochij2b9h6coj8oj16go6cphi6g
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: Perfectly Mambo Geneva - 3rd edition
@@ -979,11 +980,11 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:mambo
-  - scope:international
   - format:day-social
   - format:workshop
   - format:festival
   - misc:live-band
+  - reach:international
 - id: 60om8oj16oqm6bb6cgqm8b9kcks62b9o68rj4bb369h32o9j71h30p1g6s
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: The Desert Dance Marathon (4th Edition)
@@ -1004,7 +1005,6 @@ events:
   - dance-style:salsa
   - dance-style:bachata
   - dance-style:kizomba
-  - scope:international
   - format:social
   - format:workshop
   - format:marathon
@@ -1013,6 +1013,7 @@ events:
   - misc:trip
   - misc:food
   - venue:pool
+  - reach:international
 - id: c4pj0db460rjibb369gjeb9kc5h30bb2cphm8b9hc9im4cph6oojachlck
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: Chocolate Mambo Marathon 2026
@@ -1081,6 +1082,7 @@ events:
   - format:weekender
   - misc:food
   - venue:outdoor
+  - reach:regional
 - id: 6crj4phl6so6ab9g64o64b9k6lgjabb16dgj4bb660rj2dhocgpjgohj74
   calendar_id: evrpds0rvercm3ugjpgjia2kds@group.calendar.google.com
   title: Rovinj Croatian Summer Salsa Festival - CSSF 2026
@@ -1098,7 +1100,6 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:bachata
-  - scope:international
   - format:day-social
   - format:workshop
   - format:festival
@@ -1106,6 +1107,7 @@ events:
   - misc:pool-party
   - misc:trip
   - misc:beach-side
+  - reach:local
 - id: 65ijgc9k6srm6b9h6kqj6b9k6cojcbb16osj6bb36lh6cohk74s38dr374
   calendar_id: evrpds0rvercm3ugjpgjia2kds@group.calendar.google.com
   title: Salsa Grand 2026 - 2nd Edition | Official Event by SeaSunSalsa
@@ -1124,10 +1126,10 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:mambo
-  - scope:international
   - format:social
   - format:workshop
   - format:festival
+  - reach:international
 - id: cdj32cj46hij0b9j61hm4b9kcos3eb9oc4rjabb174r66c1jchj64p1nco
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: Porto Salsa Weekend 2026
@@ -1146,9 +1148,9 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:mambo
-  - scope:international
   - format:social
   - format:day-social
+  - reach:local
 - id: chhjacpp71gj8bb660rm4b9kc4s6cb9pckom6bb3ccs3ep9m6kpm4opo70
   calendar_id: evrpds0rvercm3ugjpgjia2kds@group.calendar.google.com
   title: SALSARAVE 2026 - 5 YEARS ANNIVERSARY
@@ -1194,11 +1196,11 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:mambo
-  - scope:international
   - format:social
   - format:workshop
   - misc:pool-party
   - misc:beach-side
+  - reach:local
 - id: 68o3icj660s6abb6cgrj8b9k68p3abb26gp3gb9m6grm6ohh6co38cb36s
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: FESTIVAL TEMPO LATINO
@@ -1221,11 +1223,11 @@ events:
     label: null
   tags:
   - dance-style:salsa
-  - scope:international
   - format:day-social
   - format:festival
   - misc:live-band
   - venue:outdoor
+  - reach:international
 - id: 74s6aor36kqmabb2c9h3eb9k60p3ib9oc4r3gbb36lgj8e1g6csj4cpi68
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: Berlin SalsaCongress 2026 discount code DANCINGTOM
@@ -1247,11 +1249,11 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:mambo
-  - scope:international
   - format:social
   - format:workshop
   - format:festival
   - venue:outdoor
+  - reach:regional
 - id: 6dhjaopgcop3cb9hc4pmcb9kcli68b9occp6cbb174q6ac9g60pm4dhl60
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: Festival Corazon Latino 2026 (12th edition) Official Event
@@ -1287,6 +1289,7 @@ events:
   - format:workshop
   - format:festival
   - misc:live-band
+  - reach:local
 - id: 6sq34ohhc8ojebb56tgj2b9k70o32b9o74rj0bb26pi62oj170s30pho6o
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: 'Swob Dance University - #SwobIsYou'
@@ -1307,12 +1310,12 @@ events:
   - dance-style:mambo
   - dance-style:bachata
   - dance-style:kizomba
-  - scope:international
   - format:day-social
   - format:social
   - format:workshop
   - misc:pool-party
   - misc:beach-side
+  - reach:local
 - id: 6cojae1ic4r34b9occqmab9k6gpj4bb270q3eb9k6lgm8o9p6kqjgd32cc
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: Amsterdam Int. Salsa Marathon
@@ -1374,12 +1377,12 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:mambo
-  - scope:international
   - format:social
   - format:day-social
   - format:marathon
   - format:weekender
   - misc:food
+  - reach:international
 - id: cpgj8dr475j30b9ocgq66b9k6pi34b9o6krj4bb360oj8ohk74pm4dpo6s
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: 21st elSol Festival 2026 OFFICIAL || 12-16th November || Warsaw, Poland
@@ -1410,10 +1413,10 @@ events:
   - dance-style:cuban
   - dance-style:mambo
   - dance-style:bachata
-  - scope:international
   - format:social
   - format:workshop
   - format:festival
+  - reach:local
 - id: ckrm4c9k6pgj0b9o6sq62b9kclh62bb270o6abb168s3ae1i70s3ce3660
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: 𝐁𝐫𝐮𝐬𝐬𝐞𝐥𝐬 𝐌𝐚𝐦b𝐨 S𝐚𝐥𝐬𝐚 W𝐞𝐞k𝐞𝐧d 2026 - (𝐎𝐟𝐟𝐢𝐜𝐢𝐞𝐥 𝐄v𝐞𝐧t)
@@ -1446,10 +1449,10 @@ events:
   - dance-style:cuban
   - dance-style:mambo
   - dance-style:bachata
-  - scope:international
   - format:social
   - format:day-social
   - format:workshop
+  - reach:regional
 - id: 6dhm4ohk6op38b9k6or30b9kc8r6abb26lh3ibb169h3eob2c8qm6dpn6c
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: Düsseldorf International Salsa Festival
@@ -1473,10 +1476,10 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:mambo
-  - scope:international
   - format:social
   - format:workshop
   - format:festival
+  - reach:international
 - id: 65j30d1o6pi62b9n6himab9kcpi66bb26cqj2b9l69ij2dr5chhj6c1h70
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: Watapana Weekend 2026
@@ -1538,11 +1541,11 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:bachata
-  - scope:international
   - format:day-social
   - format:workshop
   - format:festival
   - misc:live-band
+  - reach:regional
 - id: 6sqj2pb474s62bb5c4s3eb9k6hh64b9ocpi30bb271i32cpm6oq62phj60
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: Mambo Training Week 2026 | 03-09.08 | Edyta Czagowiec & Salsa Libre
@@ -1564,10 +1567,10 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:mambo
-  - scope:international
   - format:day-social
   - format:social
   - format:workshop
+  - reach:local
 - id: cco3cohncgrj2bb2coqjeb9k6kqj0b9pchhm2bb565hj2dhi6com4cr66s
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: MonTwono Gala II - 27 June
@@ -1591,9 +1594,9 @@ events:
   tags:
   - dance-style:salsa
   - dance-style:mambo
-  - scope:local
   - format:social
   - format:workshop
+  - reach:local
 - id: 6ssjicr171j66bb6c5j36b9k69i6abb26kqj2bb16gq68o9ichh34dphc4
   calendar_id: sse34geighk20sbt1kuo12r4bg@group.calendar.google.com
   title: Riviera Latin Fest 2026
@@ -1780,10 +1783,10 @@ events:
   - dance-style:cuban
   - dance-style:mambo
   - dance-style:bachata
-  - scope:international
   - format:social
   - format:workshop
   - format:bootcamp
   - misc:live-band
   - misc:beach-side
   - venue:outdoor
+  - reach:regional

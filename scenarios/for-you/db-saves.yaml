@@ -1,0 +1,36 @@
+saves:
+  # -----------------------------------------------------------------
+  # Saves are a secondary signal for popularity_score
+  # (raw = 5*going + 1*saved + 0.05*views). Distributed here across
+  # several bulk events + the baseline heroes so the popularity_score
+  # ordering has some tie-breaking texture without eclipsing the
+  # goings-driven ranking. All saves use audience=friends so they
+  # don't leak into the public-only Friends lens (they can still
+  # count toward Friends-lens ordering via saved_count).
+  # -----------------------------------------------------------------
+
+  # Hero card — 3 saves from one-way followees / strangers only, so
+  # bulk-20 stays OUT of the Friends lens while still gaining a modest
+  # tie-breaking boost above other trending-eligible cards.
+  - { event_id: evt-fy-bulk-20, email: pablo@example.com, audience: public }
+  - { event_id: evt-fy-bulk-20, email: s04@example.com, audience: public }
+  - { event_id: evt-fy-bulk-20, email: s05@example.com, audience: public }
+
+  # Friend-audience save on bulk-15 by hugo (mutual friend) — extra
+  # tie-breaker for the Friends-lens ordering (bulk-15 above evt-fy-004).
+  - { event_id: evt-fy-bulk-15, email: hugo@example.com, audience: friends }
+  - { event_id: evt-fy-bulk-15, email: friend@example.com, audience: friends }
+
+  # Baseline heroes — a save each so their score doesn't lean solely
+  # on public goings.
+  - { event_id: evt-fy-001, email: frank@example.com, audience: friends }
+  - { event_id: evt-fy-002, email: gina@example.com, audience: friends }
+
+  # Bulk decorators — one or two saves each on the bulks that already
+  # got public goings. Keeps ordering deterministic within the
+  # trending top-N.
+  - { event_id: evt-fy-bulk-01, email: hugo@example.com, audience: friends }
+  - { event_id: evt-fy-bulk-05, email: hugo@example.com, audience: friends }
+  - { event_id: evt-fy-bulk-10, email: emma@example.com, audience: friends }
+  - { event_id: evt-fy-bulk-13, email: frank@example.com, audience: friends }
+  - { event_id: evt-fy-bulk-17, email: gina@example.com, audience: friends }

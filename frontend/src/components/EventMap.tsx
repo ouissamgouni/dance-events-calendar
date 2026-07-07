@@ -10,7 +10,7 @@ import SaveEventButton from './SaveEventButton';
 import GoingButton from './GoingButton';
 import RateEventButton from './RateEventButton';
 import TagBadges from './TagBadges';
-import AttendeeAvatarStack from './AttendeeAvatarStack';
+import AttendeeAvatarStack, { PEOPLE_ICON_PATH } from './AttendeeAvatarStack';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { DEFAULT_AREA_BBOX } from '../constants/area';
 
@@ -63,6 +63,13 @@ function imageChipIcon(src: string, alt: string): string {
     return `<img src="${src}" alt="${alt}" width="8" height="8" style="display:block;width:8px;height:8px;object-fit:contain;margin-right:2px;" />`;
 }
 
+/** Inline SVG version of the two-head `PeopleIcon` glyph (shared path
+ * from AttendeeAvatarStack.tsx) for use inside Leaflet's raw HTML
+ * marker icons, which can't mount a React component directly. */
+function peopleSvgChipIcon(color: string): string {
+    return `<svg aria-hidden="true" viewBox="0 0 20 20" width="8" height="8" fill="${color}" style="display:block;width:8px;height:8px;margin-right:2px;"><path d="${PEOPLE_ICON_PATH}" /></svg>`;
+}
+
 function trendingBadge(size: number): string {
     const badgeSize = size >= 36 ? 16 : 14;
     return `<span style="position:absolute;right:-5px;top:-6px;display:inline-flex;align-items:center;justify-content:center;width:${badgeSize}px;height:${badgeSize}px;background:transparent;border:0;box-sizing:content-box;"><img src="/trending.png" alt="Trending" width="${badgeSize}" height="${badgeSize}" style="display:block;width:${badgeSize}px;height:${badgeSize}px;object-fit:contain;" /></span>`;
@@ -71,7 +78,7 @@ function trendingBadge(size: number): string {
 /** Build the HTML for the following-friend chip (bottom-right). */
 function followingChip(count: number): string {
     const label = count >= 10 ? '9+' : String(count);
-    const icon = imageChipIcon('/friends.png', 'Friends going');
+    const icon = peopleSvgChipIcon('#3b82f6');
     return `<span style="position:absolute;right:-6px;bottom:-6px;display:inline-flex;align-items:center;min-width:18px;height:14px;padding:0 4px;background:white;color:black;font-size:9px;font-weight:700;line-height:14px;border:1.5px solid rgba(255,255,255,0.8);box-sizing:content-box;font-family:system-ui,sans-serif;">${icon}${label}</span>`;
 }
 

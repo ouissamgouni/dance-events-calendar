@@ -18,6 +18,7 @@ events:
     tags:
       - format:social
       - dance-style:salsa
+      - reach:regional
   - id: evt-organizer-002
     calendar_id: organizer-cal-001
     title: Carl's Bachata Workshop — pending
@@ -35,6 +36,7 @@ events:
     tags:
       - format:workshop
       - dance-style:bachata
+      - reach:international
   - id: evt-organizer-003
     calendar_id: organizer-cal-001
     title: Open Kizomba Class — unclaimed
@@ -52,3 +54,4 @@ events:
     tags:
       - format:class
       - dance-style:kizomba
+      - reach:local

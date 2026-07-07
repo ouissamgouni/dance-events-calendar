@@ -54,3 +54,32 @@ export function clampArea<T extends { min_lat: number; min_lng: number; max_lat:
         max_lng: clamp(area.max_lng, -180, 180),
     };
 }
+
+/**
+ * An area/profile geography counts as "WIDE" once its bounding-box diagonal
+ * exceeds this many kilometres (interest-profiles PRD §11c). Used to decide
+ * when to surface the spam-risk warning for area-mode profiles that also
+ * include (or default to) the "local" reach tag.
+ */
+export const WIDE_AREA_THRESHOLD_KM = 150;
+
+/** Great-circle distance between two lat/lng points, in kilometres. */
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371;
+    const toRad = (d: number) => (d * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
+/**
+ * True when the given bbox's diagonal (min corner to max corner) exceeds
+ * {@link WIDE_AREA_THRESHOLD_KM}. Used for area-mode interest profiles.
+ */
+export function isWideArea(area: { min_lat: number; min_lng: number; max_lat: number; max_lng: number }): boolean {
+    const diagonalKm = haversineKm(area.min_lat, area.min_lng, area.max_lat, area.max_lng);
+    return diagonalKm > WIDE_AREA_THRESHOLD_KM;
+}

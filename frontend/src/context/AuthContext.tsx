@@ -6,6 +6,7 @@ import {
     logout as apiLogout,
     redeemReferral,
     type AuthUser,
+    type HomeLocationPayload,
     type PreferredAreaPayload,
 } from '../api';
 import { rotateDeviceId } from '../utils/deviceId';
@@ -38,7 +39,7 @@ function clearCookie(name: string): void {
 }
 
 function readAnonPreferencesFromStorage():
-    | { preferred_area: PreferredAreaPayload | null; preferred_tag_ids: number[] }
+    | { preferred_area: PreferredAreaPayload | null; preferred_tag_ids: number[]; home_location: HomeLocationPayload | null }
     | null {
     try {
         const raw = localStorage.getItem(PREFS_STORAGE_KEY);
@@ -46,6 +47,7 @@ function readAnonPreferencesFromStorage():
         const parsed = JSON.parse(raw) as {
             preferred_area?: PreferredAreaPayload | null;
             preferred_tag_ids?: unknown;
+            home_location?: HomeLocationPayload | null;
         };
         const area = parsed.preferred_area && typeof parsed.preferred_area === 'object'
             ? parsed.preferred_area
@@ -53,8 +55,11 @@ function readAnonPreferencesFromStorage():
         const tagIds = Array.isArray(parsed.preferred_tag_ids)
             ? parsed.preferred_tag_ids.filter((x): x is number => typeof x === 'number')
             : [];
-        if (!area && tagIds.length === 0) return null;
-        return { preferred_area: area, preferred_tag_ids: tagIds };
+        const home = parsed.home_location && typeof parsed.home_location === 'object'
+            ? parsed.home_location
+            : null;
+        if (!area && tagIds.length === 0 && !home) return null;
+        return { preferred_area: area, preferred_tag_ids: tagIds, home_location: home };
     } catch {
         return null;
     }

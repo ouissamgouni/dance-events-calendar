@@ -1,0 +1,71 @@
+# Mock users pre-seeded for the for-you scenario (For You rail: Recommended
+# / New / Friends lenses).
+#
+# Cast layout (inspired by scenarios/following-badge/mock-users.yaml so we
+# can seed a realistic network graph and drive a meaningful trending score):
+#   * viewer  — the POV account. Sets preferred tags (Salsa + Bachata)
+#     live via Settings (preferences cannot be YAML-seeded).
+#   * friend  — mutual friend of viewer. RSVPs (friends-audience) to two
+#     events so the "Friends going" lens has data.
+#   * 4 additional mutual friends of viewer — emma, frank, gina, hugo.
+#     They RSVP publicly to varied events so the "Friends going" lens has
+#     one deterministic top card (evt-fy-bulk-15) plus the friends-only
+#     card (evt-fy-004), and to boost popularity_score without leaking
+#     into the "Friends going" lens (their public RSVPs on other events
+#     still surface there because Friends lens = "mutual friend RSVP'd
+#     with friends/public audience").
+#     ⇒ To keep the Friends lens tightly scoped to bulk-15 + evt-fy-004,
+#       every RSVP from emma/frank/gina/hugo below lands on those two
+#       events or on the two baseline hero cards (evt-fy-001 & 002).
+#     ⇒ For popularity fuel on the OTHER bulk events, we lean on
+#       one-way followees (pablo/quinn/rita) + strangers (s01..s10)
+#       who are NOT mutual friends of viewer.
+#   * 3 one-way followees — pablo, quinn, rita. viewer follows them but
+#     they don't follow back. Public RSVPs from them contribute to the
+#     popularity_score but do NOT appear under the Friends lens.
+#   * 10 strangers — s01..s10. No follow graph connection to viewer.
+#     Deep bench of public RSVPs to give many events ≥3 goings so the
+#     trending 🔥 badge decorates several cards in the "You might like"
+#     lens (see scenarios/trending-events for the same pattern).
+#   * stranger — original non-connected user, kept so evt-fy-005's
+#     "stranger RSVPs publicly to a Salsa event" narrative is intact.
+#   * admin — matches ADMIN_EMAIL; runs Sync Now to populate the New
+#     lens.
+users:
+  - email: viewer@example.com
+    name: Scenario Viewer
+    handle: viewer
+  - email: friend@example.com
+    name: Friend Rivera
+    handle: friend
+  # Mutual friends of viewer (used for the Friends lens + baseline hero
+  # popularity).
+  - { email: emma@example.com, name: Emma Larsen, handle: emma }
+  - { email: frank@example.com, name: Frank Dubois, handle: frank }
+  - { email: gina@example.com, name: Gina Costa, handle: gina }
+  - { email: hugo@example.com, name: Hugo Schmidt, handle: hugo }
+  # One-way followees (viewer follows, no follow-back). Popularity fuel
+  # without leaking into Friends lens.
+  - { email: pablo@example.com, name: Pablo Ortega, handle: pablo }
+  - { email: quinn@example.com, name: Quinn Walsh, handle: quinn }
+  - { email: rita@example.com, name: Rita Falk, handle: rita }
+  # Strangers — no follow relationship with viewer either direction.
+  # Their public RSVPs boost popularity_score for many events.
+  - { email: s01@example.com, name: Stranger 01, handle: s01 }
+  - { email: s02@example.com, name: Stranger 02, handle: s02 }
+  - { email: s03@example.com, name: Stranger 03, handle: s03 }
+  - { email: s04@example.com, name: Stranger 04, handle: s04 }
+  - { email: s05@example.com, name: Stranger 05, handle: s05 }
+  - { email: s06@example.com, name: Stranger 06, handle: s06 }
+  - { email: s07@example.com, name: Stranger 07, handle: s07 }
+  - { email: s08@example.com, name: Stranger 08, handle: s08 }
+  - { email: s09@example.com, name: Stranger 09, handle: s09 }
+  - { email: s10@example.com, name: Stranger 10, handle: s10 }
+  # Pre-existing non-mutual RSVPer, kept for backwards compatibility with
+  # evt-fy-005 (stranger RSVPs publicly to a Salsa event).
+  - email: stranger@example.com
+    name: Stranger Smith
+    handle: stranger
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

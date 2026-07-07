@@ -17,6 +17,8 @@ events:
   start: w0 Fri 21:00
   end: w0 Sat 02:00
   price_is_free: true
+  tags:
+  - reach:regional
 - id: evt-002
   calendar_id: bachata-cal-002
   title: Bachata Sensual Weekender — Open Air Edition
@@ -50,6 +52,8 @@ events:
   price_is_free: false
   price_min: 60
   price_currency: EUR
+  tags:
+  - reach:local
 - id: evt-003
   calendar_id: salsa-cal-001
   title: Advanced Salsa Shines Bootcamp
@@ -73,6 +77,8 @@ events:
   price_is_free: false
   price_min: 90
   price_currency: EUR
+  tags:
+  - reach:local
 - id: evt-004
   calendar_id: kizomba-cal-003
   title: Urban Kiz & Tarraxo Night
@@ -92,6 +98,8 @@ events:
   price_is_free: false
   price_min: 8
   price_currency: EUR
+  tags:
+  - reach:international
 - id: evt-005
   calendar_id: salsa-cal-001
   title: Salsa Social on the Rooftop with Live Band
@@ -114,6 +122,7 @@ events:
   tags:
   - dance-style:salsa
   - format:social
+  - reach:regional
 - id: evt-006
   calendar_id: bachata-cal-002
   title: Bachata Workshop & Social
@@ -137,6 +146,8 @@ events:
   price_is_free: false
   price_min: 15
   price_currency: EUR
+  tags:
+  - reach:local
 - id: evt-007
   calendar_id: kizomba-cal-003
   title: Kizomba Festival Weekender
@@ -170,6 +181,8 @@ events:
   price_is_free: false
   price_min: 80
   price_currency: EUR
+  tags:
+  - reach:international
 - id: evt-008
   calendar_id: salsa-cal-001
   title: Salsa Class for Beginners
@@ -238,3 +251,5 @@ tag_suggestions:
   status: pending
   source: user
   device_id: user-device-001
+  tags:
+  - reach:international

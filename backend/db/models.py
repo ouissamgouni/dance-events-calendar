@@ -113,20 +113,35 @@ class User(SQLModel, table=True):
     # navigation. Existing pre-E3 accounts also start as NULL and pass
     # through the redirect once on their next sign-in.
     onboarded_at: Optional[datetime] = Field(default=None)
+    # Version of the onboarding wizard the user last completed. When the
+    # server-side ``CURRENT_ONBOARDING_VERSION`` constant is bumped
+    # (e.g. a new required step is introduced) the gate re-routes users
+    # whose stored version is lower back through the flow.
+    onboarding_version: int = Field(default=0, nullable=False)
+    # Timestamp of the last activity-digest email successfully sent to
+    # this user. Used by the digest scheduler to avoid re-sending within
+    # a single scheduled window (see ``activity_email.run_once``).
+    last_digest_sent_at: Optional[datetime] = Field(default=None)
     # --- Re-engagement / notification preferences ---
     # IANA timezone (e.g. "Europe/Paris") captured client-side and used to
     # format reminder/digest email times. Defaults to UTC for legacy
     # accounts; the frontend PATCHes it on first signed-in load.
     timezone: str = Field(default="UTC", max_length=64, nullable=False)
-    # Transactional event reminders (sent before events the user is "Going"
-    # to), delivered in-app always and by email when this is True.
-    reminder_email_enabled: bool = Field(default=True, nullable=False)
-    # Batched digest emails for friend/event activity (new followers, friends
-    # going, etc.). Higher opt-out rate, kept separate from reminders so users
-    # can mute social noise while keeping useful event reminders.
-    activity_email_enabled: bool = Field(default=True, nullable=False)
-    # Web-push delivery toggle (gates push for both reminders and activity).
-    push_enabled: bool = Field(default=True, nullable=False)
+    # Per-feature × per-channel delivery gates. Rows always land in-app;
+    # these six flags control email and push delivery only. See
+    # docs/PHASE_G_NOTIFICATION_GATING.md.
+    email_event_reminders_enabled: bool = Field(default=True, nullable=False)
+    email_social_activity_enabled: bool = Field(default=True, nullable=False)
+    email_interest_matches_enabled: bool = Field(default=True, nullable=False)
+    push_event_reminders_enabled: bool = Field(default=True, nullable=False)
+    push_social_activity_enabled: bool = Field(default=True, nullable=False)
+    push_interest_matches_enabled: bool = Field(default=True, nullable=False)
+    # --- Interest Profiles & Interest-Event Notifications ---
+    # Optional "home" location, used as the default center for radius-based
+    # interest profiles. Nullable until the user sets it via preferences.
+    home_lat: Optional[float] = Field(default=None)
+    home_lng: Optional[float] = Field(default=None)
+    home_label: Optional[str] = Field(default=None, max_length=120)
 
 
 class BlockedUserIdentity(SQLModel, table=True):
@@ -622,6 +637,9 @@ class TagGroup(SQLModel, table=True):
     # Mirrors the two-namespace pattern used by Google/Yelp/Airbnb (place
     # attributes vs review aspects). Enforced in routes + suggestion validation.
     scope: str = Field(default="event", index=True)
+    # Guards system-relied-upon groups (e.g. "reach", used by
+    # interest_notification_service) from admin delete/slug-change.
+    protected: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     tags: List["Tag"] = Relationship(back_populates="group")
@@ -687,6 +705,49 @@ class UserPreferredTag(SQLModel, table=True):
     __tablename__ = "user_preferred_tags"
 
     user_id: UUID = Field(foreign_key="users.id", primary_key=True)
+    tag_id: int = Field(foreign_key="tags.id", primary_key=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class UserInterestProfile(SQLModel, table=True):
+    """One opt-in "interest alert" definition: geography + tags.
+
+    Users may define multiple profiles (e.g. "home city" + "upcoming trip").
+    A newly-ingested event that matches an enabled profile's tags and
+    geography triggers an ``interest_event`` notification (see
+    backend/services/interest_notification_service.py). Geography is a
+    bounding box (``min_lat``/``min_lng``/``max_lat``/``max_lng``).
+    """
+
+    __tablename__ = "user_interest_profiles"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: UUID = Field(foreign_key="users.id", index=True)
+    label: str = Field(max_length=120)
+    min_lat: float = Field(...)
+    min_lng: float = Field(...)
+    max_lat: float = Field(...)
+    max_lng: float = Field(...)
+    matches_enabled: bool = Field(default=True, nullable=False)
+    # Explorer/For-You default filters follow the single active profile per
+    # user. Enforced by application code, not a DB constraint (SQLite-friendly).
+    is_active: bool = Field(default=False, nullable=False)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class UserInterestProfileTag(SQLModel, table=True):
+    """Dance-style and reach tags attached to a ``UserInterestProfile``.
+
+    Mirrors ``UserPreferredTag``/``EventTag``: composite primary key, no
+    relationship navigation. Holds both dance-style and reach tag ids; the
+    tag's group (via ``Tag.group_id``) determines which PRD matching rule
+    applies (OR-within-group). ``ON DELETE CASCADE`` is enforced via the
+    migration so deleting a profile or a tag tidies up the join rows.
+    """
+
+    __tablename__ = "user_interest_profile_tags"
+
+    profile_id: int = Field(foreign_key="user_interest_profiles.id", primary_key=True)
     tag_id: int = Field(foreign_key="tags.id", primary_key=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -982,6 +1043,44 @@ class Notification(SQLModel, table=True):
     # delivery idempotent across loop ticks. ``event_reminder`` rows are
     # emailed inline by the reminder service and are never picked up here.
     emailed_at: Optional[datetime] = Field(default=None, index=True)
+    # Set once this notification has been considered for push delivery
+    # (see ``services/activity_email.py``). Decoupled from ``emailed_at``
+    # because push fires on every dispatch tick (no weekly schedule gate),
+    # while email stays batched on the activity-digest schedule — a row can
+    # be pushed immediately but wait days to be folded into an email, or
+    # vice versa when push is disabled for a recipient.
+    pushed_at: Optional[datetime] = Field(default=None, index=True)
+    # Free-text context for kinds that need extra message copy beyond
+    # actor/event, e.g. ``interest_event`` stores the matched profile
+    # label(s) (comma-joined) so the digest/in-app renderers can say
+    # "matched your <label> alert" without a second lookup.
+    context: Optional[str] = Field(default=None, max_length=200)
+
+
+class NotificationDelivery(SQLModel, table=True):
+    """Audit-log row for one actual distribution event of a Notification.
+
+    Unlike ``Notification.emailed_at``/``pushed_at`` (internal bookkeeping
+    stamps that mark a row as "processed this dispatch tick" regardless of
+    whether the recipient's channel toggle allowed an actual send), a row
+    here is only inserted when the channel genuinely delivered:
+      - ``"app"``: inserted immediately when the Notification is created
+        (in-app has no opt-out today).
+      - ``"email"`` / ``"push"``: inserted only when the corresponding send
+        call actually succeeded for a recipient with that feature/channel
+        enabled.
+
+    Powers the admin Notifications log (``GET /api/admin/notifications/log``)
+    with one row per real delivery event instead of deriving delivery status
+    from the mutable bookkeeping timestamps above.
+    """
+
+    __tablename__ = "notification_deliveries"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    notification_id: int = Field(foreign_key="notifications.id", index=True)
+    channel: str = Field(index=True)  # "app" | "email" | "push"
+    delivered_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
 class PushSubscription(SQLModel, table=True):

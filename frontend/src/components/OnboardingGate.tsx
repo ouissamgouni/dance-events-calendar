@@ -1,9 +1,13 @@
 /**
  * Phase E (E3) — onboarding gate.
  *
- * Wraps the routed content. If the current user is signed in and has
- * never completed onboarding (``onboarded_at == null``), redirects to
- * ``/onboarding/preferences?next=<current>`` exactly once per app load.
+ * Wraps the routed content. If the current user is signed in and the
+ * server flags them as needing onboarding (``needs_onboarding === true``,
+ * which covers both "never onboarded" and "server bumped the wizard
+ * version"), redirects to ``/onboarding/preferences?next=<current>``
+ * exactly once per app load. Preferences is the first onboarding leg
+ * (dance styles + reach); the local step follows so users pin a home
+ * area after selecting tags.
  *
  * Bypassed when:
  *   • user is anonymous (``user == null``);
@@ -27,7 +31,16 @@ export default function OnboardingGate() {
 
     useEffect(() => {
         if (loading || !user) return;
-        if (user.onboarded_at) return;
+        // Prefer the server-computed ``needs_onboarding`` flag (covers
+        // both never-onboarded users and forced re-onboarding after a
+        // wizard-version bump). Fall back to ``onboarded_at`` so a
+        // stale cached response without the new field still gates
+        // first-time users correctly.
+        const needs =
+            typeof user.needs_onboarding === 'boolean'
+                ? user.needs_onboarding
+                : !user.onboarded_at;
+        if (!needs) return;
         const path = location.pathname;
         if (SKIP_PREFIXES.some((p) => path === p || path.startsWith(p + '/') || path.startsWith(p))) {
             // ``startsWith('/r/')`` catches the referral landing page.

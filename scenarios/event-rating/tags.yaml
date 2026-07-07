@@ -16,6 +16,7 @@ tag_groups:
     label: Dance style
     ordinal: 20
     allow_multiple: true
+    onboarding_eligible: true
     color: "#e11d48"
     tags:
       - slug: salsa
@@ -24,6 +25,20 @@ tag_groups:
         label: Bachata
       - slug: kizomba
         label: Kizomba
+
+  - slug: reach
+    label: Reach
+    ordinal: 30
+    allow_multiple: true
+    onboarding_eligible: true
+    color: "#a78bfa"
+    tags:
+      - slug: local
+        label: Local
+      - slug: regional
+        label: Regional
+      - slug: international
+        label: International
 
   - slug: review-tags
     label: Review tags

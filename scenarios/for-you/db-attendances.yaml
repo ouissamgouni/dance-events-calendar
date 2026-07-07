@@ -1,0 +1,143 @@
+attendances:
+  # -----------------------------------------------------------------
+  # Friends lens seed — narrow by design.
+  #
+  # The Friends lens surfaces events a mutual friend of viewer has RSVP'd
+  # to with a friends or public audience, ordered by
+  # (going_count + saved_count) DESC. To keep the lens deterministic and
+  # scoped to exactly TWO cards (evt-fy-004 + evt-fy-bulk-15), only
+  # `friend` — the sole mutual friend that RSVPs OUTSIDE the bulk hero /
+  # baseline hero — RSVPs to those two events. Every other mutual friend
+  # (emma / frank / gina / hugo) restricts their RSVPs to the two hero
+  # cards below (evt-fy-bulk-20 + evt-fy-bulk-15), or contributes only
+  # via saves, so no extra rows leak into the Friends lens.
+  # -----------------------------------------------------------------
+
+  # friend RSVPs friends-only to evt-fy-004 (Zouk — does NOT match the
+  # viewer's preferred tags) — proves the Friends lens is independent of
+  # the Recommended tag filter.
+  - event_id: evt-fy-004
+    email: friend@example.com
+    share_audience: friends
+
+  # friend RSVPs friends-only to evt-fy-bulk-15 (Trocadéro Salsa
+  # Sunday) — second Friends-going card. Mutual friends emma + frank
+  # also RSVP publicly to bulk-15 so (going + saved) count exceeds
+  # evt-fy-004's, making bulk-15 the deterministic first Friends-going
+  # card.
+  - event_id: evt-fy-bulk-15
+    email: friend@example.com
+    share_audience: friends
+  - event_id: evt-fy-bulk-15
+    email: emma@example.com
+    share_audience: public
+  - event_id: evt-fy-bulk-15
+    email: frank@example.com
+    share_audience: public
+
+  # stranger RSVPs publicly to evt-fy-005 (Salsa — DOES match the viewer's
+  # preferred tags, so it appears under Recommended) — proves a non-friend's
+  # attendance never leaks into the Friends lens.
+  - event_id: evt-fy-005
+    email: stranger@example.com
+    share_audience: public
+
+  # -----------------------------------------------------------------
+  # Popularity hero — evt-fy-bulk-20 (Grand Paris Salsa Marathon, TOP).
+  #
+  # 6 public "going" RSVPs, drawn entirely from ONE-WAY followees
+  # (pablo/quinn/rita) and strangers (s01..s03). No mutual friends
+  # engage with this event so it stays OUT of the Friends lens. Highest
+  # raw count in the fixture and one of the closest events on the
+  # calendar (w0 Sat, small time-decay), so it wins popularity_score
+  # by a comfortable margin and is deterministically the FIRST card in
+  # "You might like".
+  # -----------------------------------------------------------------
+  - {
+      event_id: evt-fy-bulk-20,
+      email: pablo@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-fy-bulk-20,
+      email: quinn@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-fy-bulk-20,
+      email: rita@example.com,
+      share_audience: public,
+    }
+  - { event_id: evt-fy-bulk-20, email: s01@example.com, share_audience: public }
+  - { event_id: evt-fy-bulk-20, email: s02@example.com, share_audience: public }
+  - { event_id: evt-fy-bulk-20, email: s03@example.com, share_audience: public }
+
+  # -----------------------------------------------------------------
+  # Trending-badge decorators — spread public RSVPs across the bulk
+  # events so 4-5 different cards clear popularity_threshold=1 and
+  # collect the 🔥 badge in the "You might like" lens (top_n=5). All
+  # RSVPs below come from one-way followees or strangers so they DO NOT
+  # leak into the Friends lens.
+  # -----------------------------------------------------------------
+  - { event_id: evt-fy-001, email: pablo@example.com, share_audience: public }
+  - { event_id: evt-fy-001, email: s03@example.com, share_audience: public }
+  - { event_id: evt-fy-001, email: s04@example.com, share_audience: public }
+
+  - { event_id: evt-fy-002, email: quinn@example.com, share_audience: public }
+  - { event_id: evt-fy-002, email: s05@example.com, share_audience: public }
+
+  - {
+      event_id: evt-fy-bulk-01,
+      email: rita@example.com,
+      share_audience: public,
+    }
+  - { event_id: evt-fy-bulk-01, email: s06@example.com, share_audience: public }
+  - { event_id: evt-fy-bulk-01, email: s07@example.com, share_audience: public }
+  - { event_id: evt-fy-bulk-01, email: s08@example.com, share_audience: public }
+
+  - { event_id: evt-fy-bulk-02, email: s01@example.com, share_audience: public }
+  - { event_id: evt-fy-bulk-02, email: s09@example.com, share_audience: public }
+
+  - {
+      event_id: evt-fy-bulk-05,
+      email: pablo@example.com,
+      share_audience: public,
+    }
+  - { event_id: evt-fy-bulk-05, email: s02@example.com, share_audience: public }
+  - { event_id: evt-fy-bulk-05, email: s10@example.com, share_audience: public }
+
+  - {
+      event_id: evt-fy-bulk-08,
+      email: quinn@example.com,
+      share_audience: public,
+    }
+  - { event_id: evt-fy-bulk-08, email: s03@example.com, share_audience: public }
+
+  - {
+      event_id: evt-fy-bulk-10,
+      email: rita@example.com,
+      share_audience: public,
+    }
+  - { event_id: evt-fy-bulk-10, email: s04@example.com, share_audience: public }
+  - { event_id: evt-fy-bulk-10, email: s05@example.com, share_audience: public }
+
+  - {
+      event_id: evt-fy-bulk-13,
+      email: pablo@example.com,
+      share_audience: public,
+    }
+  - { event_id: evt-fy-bulk-13, email: s06@example.com, share_audience: public }
+
+  - {
+      event_id: evt-fy-bulk-17,
+      email: quinn@example.com,
+      share_audience: public,
+    }
+  - { event_id: evt-fy-bulk-17, email: s07@example.com, share_audience: public }
+
+  - {
+      event_id: evt-fy-bulk-19,
+      email: rita@example.com,
+      share_audience: public,
+    }
+  - { event_id: evt-fy-bulk-19, email: s08@example.com, share_audience: public }

@@ -531,7 +531,7 @@ export default function GoingButton({
                 onClick={handleClick}
                 aria-label={tooltip}
                 title={tooltip}
-                className={`relative rounded-full transition-colors ${size === 'sm' ? 'p-0.5' : 'p-1.5'} ${going ? 'text-emerald-500 hover:text-emerald-700' : 'text-slate-400 hover:text-slate-600'} ${className}`.trim()}
+                className={`relative rounded-full transition-colors ${size === 'sm' ? 'p-0.5' : 'p-1.5'} ${going ? 'text-emerald-400 hover:text-emerald-500' : 'text-slate-400 hover:text-slate-600'} ${className}`.trim()}
             >
                 <RaisedHandIcon solid={going} className={iconSizeClass} />
             </button>

@@ -1,0 +1,28 @@
+# activity-digest-app cast. Alice is the actor (Going ev-friend).
+# Bob + Carol follow Alice → both should receive a social_activity
+# in-app row. Both have email + push channels for social activity
+# OFF so the only observable delivery is the in-app row.
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    account_visibility: public
+
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+    account_visibility: public
+    email_social_activity_enabled: false
+    push_social_activity_enabled: false
+
+  - email: carol@example.com
+    name: Carol Nguyen
+    handle: carol
+    account_visibility: public
+    email_social_activity_enabled: false
+    push_social_activity_enabled: false

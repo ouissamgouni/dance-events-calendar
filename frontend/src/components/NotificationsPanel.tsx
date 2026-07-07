@@ -10,10 +10,13 @@ import { useNotifications } from '../context/NotificationsContext';
  * triage drawer; "See all" links to a full /notifications page.
  *
  * Mark-as-read semantics:
- *   - Opening the panel marks all currently-loaded rows as "seen" (clears
- *     the bell badge).
- *   - Clicking a row marks it read and navigates to the event.
- *   - Explicit "Mark all read" header action available.
+ *   - Opening the panel marks all currently-loaded rows as read (clears
+ *     the bell badge and the per-row unread dots), matching the
+ *     Instagram/Facebook pattern where viewing the list is itself the
+ *     acknowledgement.
+ *   - Clicking a row still navigates to the event (rows are already read
+ *     by then, so this is a no-op on the read state).
+ *   - Explicit "Mark all read" header action remains available too.
  */
 export default function NotificationsPanel({
     open,
@@ -30,7 +33,11 @@ export default function NotificationsPanel({
     const load = useCallback(async () => {
         try {
             const res = await fetchNotifications({ limit: 20 });
-            setItems(res.items);
+            const now = new Date().toISOString();
+            // Opening the panel acknowledges the queue: rows render as
+            // already read, mirroring how Instagram/Facebook treat
+            // "viewed" as "read" (mark-all-read fires alongside below).
+            setItems(res.items.map((n) => (n.read_at ? n : { ...n, read_at: now })));
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load');
         }
@@ -39,11 +46,9 @@ export default function NotificationsPanel({
     useEffect(() => {
         if (!open) return;
         load();
-        // Opening the panel = the user has acknowledged all currently
-        // queued notifications (badge clears) but individual rows stay
-        // unread until clicked.
         markSeen();
-    }, [open, load, markSeen]);
+        markAllRead();
+    }, [open, load, markSeen, markAllRead]);
 
     // Close on Escape for keyboard a11y.
     useEffect(() => {
@@ -210,6 +215,7 @@ function NotificationRow({
     const isUnread = !item.read_at;
     const isFollowKind = item.kind === 'new_follower' || item.kind === 'new_friend' || item.kind === 'follow_request';
     const isReminder = item.kind === 'event_reminder';
+    const isInterestEvent = item.kind === 'interest_event';
     // Phase E (E1): inline Follow-back CTA on new_follower rows when the
     // viewer does not already follow the actor. ``new_friend`` rows mean
     // the relationship is already mutual, so no CTA is needed.
@@ -255,6 +261,39 @@ function NotificationRow({
                                         : 'updated';
     const actorName = item.actor.display_name || `@${item.actor.handle}`;
     const initial = (actorName || '?').trim().charAt(0).toUpperCase();
+    if (isInterestEvent) {
+        const label = item.context || 'your saved search';
+        return (
+            <li>
+                <button
+                    type="button"
+                    onClick={onClick}
+                    className={`w-full text-left flex items-start gap-3 px-4 py-3 sm:px-3 sm:py-2 hover:bg-slate-50 ${isUnread ? 'bg-blue-50/40' : 'bg-white'}`}
+                >
+                    <div className="w-8 h-8 sm:w-7 sm:h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0" aria-hidden="true">
+                        ✨
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-xs text-slate-700 truncate">
+                            <span className="font-medium text-slate-900">
+                                {item.event_title || 'An event'}
+                            </span>{' '}
+                            <span className="text-slate-500">matched your {label} alert</span>
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                            {formatRelative(item.created_at)}
+                        </p>
+                    </div>
+                    {isUnread && (
+                        <span
+                            className="mt-1.5 w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"
+                            aria-label="Unread"
+                        />
+                    )}
+                </button>
+            </li>
+        );
+    }
     if (isReminder) {
         const startLabel = item.event_start
             ? new Date(item.event_start).toLocaleString([], {

@@ -402,6 +402,43 @@ task fly:staging:status         # machine status
 
 ---
 
+### Staging Remote — Automatic Deploy
+
+After every successful CI run on the `develop` branch, a GitHub Actions workflow automatically deploys to staging.
+
+**Behavior:**
+- Triggers: When CI passes on commits pushed to `develop`
+- Deploys: All three components (db + backend + frontend) in sequence
+- Queuing: If a deploy is already in progress, the new one waits (no concurrent deploys)
+- Rollback: Manual — if deploy fails, the team rolls back by re-running `task deploy:staging:remote -- <previous-commit>`
+- Secrets: Loaded from GitHub Secrets in the "staging" environment
+
+**What this means for you:**
+
+After you merge a PR to develop and CI passes (all tests green), staging automatically updates within 5–10 minutes. No manual action needed.
+
+If automatic deploy fails:
+1. Check the workflow logs: [Actions → Deploy to Staging](../../actions/workflows/deploy-staging.yml)
+2. Fix the issue (usually a missing secret or failed health check)
+3. Re-run the workflow manually, or wait for the next commit to `develop`
+
+**To pause auto-deploy temporarily:** Disable the workflow in GitHub UI (Actions → Workflows → Deploy to Staging → ... → Disable).
+
+**To manually deploy outside the workflow:**
+- Use `task deploy:staging:remote -- develop` locally (same as always)
+- The concurrency lock will wait for any in-progress workflow to complete before running your manual deploy
+
+**GitHub Secrets required** (stored in Environment "staging"):
+- `FLY_API_TOKEN` — Fly.io deploy token
+- `CLOUDFLARE_API_TOKEN` — Cloudflare Pages API token
+- `STAGING_DATABASE_URL` — Neon develop branch connection string
+- `STAGING_ADMIN_EMAIL` — Admin user for staging
+- `STAGING_SESSION_SECRET` — Session signing key
+- `STAGING_VAPID_PUBLIC_KEY` / `STAGING_VAPID_PRIVATE_KEY` — Web push keys (optional)
+- `GOOGLE_SERVICE_ACCOUNT_JSON`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SMTP_USER`, `SMTP_PASSWORD` (optional, if used in staging)
+
+---
+
 ### Production Remote (Fly + Neon + Cloudflare)
 
 Same worktree-isolated model as staging — your local checkout is never touched.

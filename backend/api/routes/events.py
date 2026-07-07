@@ -28,9 +28,13 @@ from backend.db.models import (
     EventPromoCode,
     EventTag,
     EventView,
+    Tag,
+    TagGroup,
     User,
     UserEventAttendance,
     UserFollow,
+    UserInterestProfile,
+    UserInterestProfileTag,
     UserSavedEvent,
 )
 from backend.services.popularity import compute_popularity_scores, get_saved_counts
@@ -40,53 +44,73 @@ router = APIRouter(prefix="/api/events", tags=["events"])
 limiter = Limiter(key_func=client_ip)
 
 
-def _trending_settings(session: Session) -> tuple[bool, int, int]:
-    """Read the ``trending_*`` site settings.
+def _load_site_settings(session: Session, keys: list[str]) -> dict[str, str]:
+    """Batch-load the given ``SiteSetting`` keys in a single query.
 
-    Mirrors the helper in ``event_serializer.py`` but kept local to avoid
-    importing from a sibling that itself depends on this module's
-    ``get_event_tags``. Returns ``(enabled, window_days, floor_going)``.
+    The events list endpoint used to read each site-setting key with its
+    own ``session.get`` (since_date + 3 trending keys + following-badge +
+    promo-codes = 6 separate round-trips). When the database lives in a
+    different region from the app, each round-trip costs the full network
+    latency, so collapsing them into one ``WHERE key IN (...)`` query
+    removes several hundred ms from the hot path. Returns ``{key: value}``
+    for keys that exist; missing keys are simply absent.
     """
     from backend.db.models import SiteSetting  # local import to avoid cycle
 
-    enabled = False
+    if not keys:
+        return {}
+    try:
+        rows = session.exec(
+            select(SiteSetting).where(col(SiteSetting.key).in_(keys))
+        ).all()
+        return {row.key: row.value for row in rows if isinstance(row.value, str)}
+    except Exception:
+        return {}
+
+
+def _trending_settings_from(settings: dict[str, str]) -> tuple[bool, int, int]:
+    """Derive ``(enabled, window_days, floor_going)`` from a pre-loaded
+    ``SiteSetting`` map (see ``_load_site_settings``)."""
+    enabled = settings.get("trending_enabled", "").lower() == "true"
     window_days = 30
     floor_going = 3
-    try:
-        row = session.get(SiteSetting, "trending_enabled")
-        if row and row.value.lower() == "true":
-            enabled = True
-        row = session.get(SiteSetting, "trending_window_days")
-        if row and row.value.isdigit():
-            window_days = int(row.value)
-        row = session.get(SiteSetting, "trending_floor_going")
-        if row and row.value.lstrip("-").isdigit():
-            floor_going = int(row.value)
-    except Exception:
-        pass
+    wd = settings.get("trending_window_days")
+    if wd and wd.isdigit():
+        window_days = int(wd)
+    fg = settings.get("trending_floor_going")
+    if fg and fg.lstrip("-").isdigit():
+        floor_going = int(fg)
     return enabled, window_days, floor_going
+
+
+def _trending_settings(session: Session) -> tuple[bool, int, int]:
+    """Read the ``trending_*`` site settings (single batched query)."""
+    return _trending_settings_from(
+        _load_site_settings(
+            session,
+            ["trending_enabled", "trending_window_days", "trending_floor_going"],
+        )
+    )
 
 
 def _following_badge_enabled(session: Session) -> bool:
     """Read the ``following_badge_enabled`` site setting. Defaults to False."""
-    from backend.db.models import SiteSetting  # local import to avoid cycle
-
-    try:
-        row = session.get(SiteSetting, "following_badge_enabled")
-        return bool(row and row.value.lower() == "true")
-    except Exception:
-        return False
+    return (
+        _load_site_settings(session, ["following_badge_enabled"])
+        .get("following_badge_enabled", "")
+        .lower()
+        == "true"
+    )
 
 
 def _promo_codes_enabled(session: Session) -> bool:
     """Read the ``promo_codes_enabled`` site setting. Defaults to False."""
-    from backend.db.models import SiteSetting  # local import to avoid cycle
-
-    try:
-        row = session.get(SiteSetting, "promo_codes_enabled")
-        return bool(row and row.value.lower() == "true")
-    except Exception:
-        return False
+    return (
+        _load_site_settings(session, ["promo_codes_enabled"])
+        .get("promo_codes_enabled", "")
+        .lower()
+        == "true"
+    )
 
 
 def _set_event_list_cache_headers(
@@ -235,6 +259,82 @@ def _viewer_followed_ids(session: Session, viewer: Optional[User]) -> list:
 # so the route handler and tests can share the same source of truth.
 INTEREST_SOURCES = ("follows", "friends")
 INTEREST_KINDS = ("any", "going", "saved")
+
+
+def _profiles_filtered_event_ids(
+    *,
+    session: Session,
+    user: User,
+) -> list[str]:
+    """Union of event_ids matching ANY of ``user``'s UserInterestProfile rows.
+
+    Match rules per profile (mirror ``interest_notification_service``):
+      - event's lat/lng is inside the profile bbox (events without geo
+        are excluded, matching the notification pipeline);
+      - AND (``dance_tag_ids`` empty OR event has >=1 of those tags);
+      - AND (``reach_tag_ids`` empty OR event has >=1 of those tags).
+
+    Returns an empty list when the user has no profiles so the caller
+    can short-circuit and skip the downstream batch queries.
+    """
+    profiles = session.exec(
+        select(UserInterestProfile).where(UserInterestProfile.user_id == user.id)
+    ).all()
+    if not profiles:
+        return []
+
+    reach_group_id = session.exec(
+        select(TagGroup.id).where(TagGroup.slug == "reach")
+    ).first()
+
+    profile_ids = [p.id for p in profiles]
+    tag_rows = session.exec(
+        select(
+            UserInterestProfileTag.profile_id,
+            Tag.id,
+            Tag.group_id,
+        )
+        .join(Tag, Tag.id == UserInterestProfileTag.tag_id)
+        .where(UserInterestProfileTag.profile_id.in_(profile_ids))
+    ).all()
+    per_profile_tags: dict[int, tuple[set[int], set[int]]] = {
+        pid: (set(), set()) for pid in profile_ids
+    }
+    for profile_id, tag_id, group_id in tag_rows:
+        dance_ids, reach_ids = per_profile_tags[profile_id]
+        if reach_group_id is not None and group_id == reach_group_id:
+            reach_ids.add(int(tag_id))
+        else:
+            dance_ids.add(int(tag_id))
+
+    matched: set[str] = set()
+    for profile in profiles:
+        dance_ids, reach_ids = per_profile_tags[profile.id]
+        q = select(CachedEvent.event_id).where(
+            CachedEvent.latitude.is_not(None),
+            CachedEvent.longitude.is_not(None),
+            CachedEvent.latitude >= profile.min_lat,
+            CachedEvent.latitude <= profile.max_lat,
+            CachedEvent.longitude >= profile.min_lng,
+            CachedEvent.longitude <= profile.max_lng,
+        )
+        if dance_ids:
+            q = q.where(
+                CachedEvent.event_id.in_(
+                    select(EventTag.event_id).where(EventTag.tag_id.in_(dance_ids))
+                )
+            )
+        if reach_ids:
+            q = q.where(
+                CachedEvent.event_id.in_(
+                    select(EventTag.event_id).where(EventTag.tag_id.in_(reach_ids))
+                )
+            )
+        for row in session.exec(q).all():
+            if row:
+                matched.add(row)
+
+    return list(matched)
 
 
 def _interest_filtered_event_ids(
@@ -428,6 +528,26 @@ def get_events(
             "chokepoint — never 403 / 404)."
         ),
     ),
+    profiles: Optional[str] = Query(
+        None,
+        description=(
+            "Interest-profiles union filter. Currently the only accepted "
+            "value is ``me``: restricts the result to events matching "
+            "ANY of the viewer's UserInterestProfile rows (bbox + dance + "
+            "reach). Requires auth; returns an empty list for anonymous "
+            "viewers. Any explicit ``tag_ids`` / bbox params still apply "
+            "on top as an intersect."
+        ),
+    ),
+    limit: Optional[int] = Query(
+        None,
+        ge=1,
+        le=200,
+        description="Max events to return. Omit for the full (unpaginated) result set.",
+    ),
+    offset: int = Query(
+        0, ge=0, description="Number of events to skip, for pagination."
+    ),
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
     # Validate interest enum values early (FastAPI Query doesn't enforce
@@ -539,7 +659,44 @@ def get_events(
             return response
         query = query.where(CachedEvent.event_id.in_(interest_event_ids))
 
+    # Profiles-union filter (For You): restrict to events matching ANY
+    # of the viewer's UserInterestProfile rows. Applied as an
+    # ``event_id.in_(...)`` intersect on top of any bbox / tag_ids the
+    # caller also passed. Anonymous viewers get an empty list.
+    if profiles is not None:
+        if profiles != "me":
+            raise HTTPException(
+                status_code=400,
+                detail="profiles only accepts 'me' at this time",
+            )
+        if current_user is None:
+            return []
+        profile_event_ids = _profiles_filtered_event_ids(
+            session=session, user=current_user
+        )
+        if not profile_event_ids:
+            return []
+        query = query.where(CachedEvent.event_id.in_(profile_event_ids))
+
+    # Ordering is required for stable pagination — without it, offset/limit
+    # windows could shift between requests as the underlying table changes.
+    # event_id tiebreaker keeps the order deterministic for events sharing
+    # the same start time.
+    query = query.order_by(
+        col(CachedEvent.start).asc(), col(CachedEvent.event_id).asc()
+    )
+    if offset:
+        query = query.offset(offset)
+    if limit is not None:
+        # Fetch one extra row to cheaply determine has_more without a
+        # separate COUNT query.
+        query = query.limit(limit + 1)
+
     events = session.exec(query).all()
+    has_more = False
+    if limit is not None and len(events) > limit:
+        has_more = True
+        events = events[:limit]
 
     # Batch-fetch view counts to avoid N+1
     event_ids = [e.event_id for e in events]
@@ -564,10 +721,24 @@ def get_events(
         ).all()
         going_counts = {row[0]: row[1] for row in rows}
 
+    # Feature flags for enrichment are all read in ONE query rather than
+    # per-flag ``session.get`` calls — every avoided round-trip matters when
+    # the DB is remote from the app.
+    feature_settings = _load_site_settings(
+        session,
+        [
+            "trending_enabled",
+            "trending_window_days",
+            "trending_floor_going",
+            "following_badge_enabled",
+            "promo_codes_enabled",
+        ],
+    )
+
     # Lifetime saved count per event + (when trending is on) the
     # commitment-weighted, time-decayed popularity score.
     saved_counts = get_saved_counts(session, event_ids) if event_ids else {}
-    trending_on, window_days, floor_going = _trending_settings(session)
+    trending_on, window_days, floor_going = _trending_settings_from(feature_settings)
     if trending_on and events:
         scores = compute_popularity_scores(
             session,
@@ -583,7 +754,8 @@ def get_events(
     # bounded by the page's event_ids and the viewer's friend set.
     following_counts: dict[str, int] = {}
     following_previews: dict[str, list[dict]] = {}
-    if event_ids and current_user is not None and _following_badge_enabled(session):
+    following_on = feature_settings.get("following_badge_enabled", "").lower() == "true"
+    if event_ids and current_user is not None and following_on:
         following_counts, following_previews = _following_friend_signals(
             session, current_user, event_ids
         )
@@ -591,7 +763,8 @@ def get_events(
     tags_map = get_event_tags(session, event_ids)
 
     events_with_promos: set[str] = set()
-    if event_ids and _promo_codes_enabled(session):
+    promo_on = feature_settings.get("promo_codes_enabled", "").lower() == "true"
+    if event_ids and promo_on:
         promo_rows = session.exec(
             select(EventPromoCode.event_id)
             .where(EventPromoCode.event_id.in_(event_ids))
@@ -635,6 +808,8 @@ def get_events(
     ]
 
     response = JSONResponse(content=[d.model_dump(mode="json") for d in data])
+    if limit is not None:
+        response.headers["X-Has-More"] = "true" if has_more else "false"
     _set_event_list_cache_headers(
         response,
         current_user=current_user,

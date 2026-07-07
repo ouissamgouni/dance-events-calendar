@@ -1,0 +1,19 @@
+base_week: 0
+# Single matching event — the matcher truth table (dance/reach/geo
+# gates) is already exercised by notif-event-matches-profile-email.
+# This scenario only needs one unambiguous match so it can focus on
+# the admin force-send action's user-scoping and channel fan-out.
+events:
+  - id: ev-m1-paris-salsa-intl
+    calendar_id: salsa-cal-001
+    title: Paris Salsa International Weekender
+    description: Force-send probe event — matches every seeded profile.
+    location: "Grand Salon, Paris, France"
+    latitude: 48.86
+    longitude: 2.35
+    start: w1 Sat 22:00
+    end: w1 Sun 03:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international

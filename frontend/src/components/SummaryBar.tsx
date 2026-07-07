@@ -37,19 +37,15 @@ export interface SummaryBarProps {
     areaIsDefault: boolean;
 
     // Tag chips. ``activeTagIds`` resolved against ``tagGroups``; unknown
-    // ids are skipped silently.
+    // ids are skipped silently. Chips are display-only — removal happens
+    // inside the FilterSheet.
     activeTagIds: Set<number>;
     tagGroups: TagGroup[];
-    onRemoveTag: (tagId: number) => void;
 
-    // Interest chips.
+    // Interest chips (display-only, same rationale as tags).
     interestSource: InterestSource;
     interestKind: InterestKind;
     interestUserHandle: string | null;
-    onClearInterest: () => void;
-
-    // Clear-all link, only rendered when ≥1 non-default filter active.
-    onClearAll: () => void;
 
     // Loading: dims the count while a fetch is in flight so users don't
     // misread a stale "0 of 0".
@@ -159,12 +155,9 @@ export default function SummaryBar(props: SummaryBarProps) {
         onEditPeriod,
         activeTagIds,
         tagGroups,
-        onRemoveTag,
         interestSource,
         interestKind,
         interestUserHandle,
-        onClearInterest,
-        onClearAll,
         onOpenFilters,
         activeFilterCount = 0,
         eventSearchTrigger,
@@ -194,7 +187,6 @@ export default function SummaryBar(props: SummaryBarProps) {
         return parts.join(' · ');
     }, [interestSource, interestKind, interestUserHandle]);
 
-    const hasAnyNonDefault = tagChips.length > 0 || interestChip !== null;
     const periodIcon = (
         <svg aria-hidden="true" viewBox="0 0 20 20" className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
             <rect x="3" y="4" width="14" height="13" />
@@ -223,8 +215,12 @@ export default function SummaryBar(props: SummaryBarProps) {
                             className="inline-flex shrink-0 items-center gap-1 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold px-1.5 py-px transition"
                             data-testid="summary-open-filters"
                             aria-label={`Open filters${activeFilterCount > 0 ? ` (${activeFilterCount} active)` : ''}`}
+                            title="Filters"
                         >
-                            <span>Filters</span>
+                            <img src="/filter.png" alt="" aria-hidden="true" className="h-3.5 w-3.5 object-contain" />
+                            {activeFilterCount > 0 && (
+                                <span className="text-[10px] font-semibold text-blue-600">{activeFilterCount}</span>
+                            )}
                         </button>
                     )}
                     <Chip
@@ -240,28 +236,14 @@ export default function SummaryBar(props: SummaryBarProps) {
                             label={t.label}
                             title={t.groupLabel ? `${t.groupLabel}: ${t.label}` : t.label}
                             style={{ backgroundColor: `${t.color}30`, borderColor: `${t.color}70`, color: '#334155' }}
-                            onRemove={() => onRemoveTag(t.id)}
-                            removeAriaLabel={`Remove ${t.label} tag`}
                             testId={`summary-chip-tag-${t.id}`}
                         />
                     ))}
                     {interestChip && (
                         <Chip
                             label={interestChip}
-                            onRemove={onClearInterest}
-                            removeAriaLabel="Clear interest filter"
                             testId="summary-chip-interest"
                         />
-                    )}
-                    {hasAnyNonDefault && (
-                        <button
-                            type="button"
-                            onClick={onClearAll}
-                            className="ml-1 inline-flex items-center text-xs text-slate-500 hover:text-slate-800 underline-offset-2 hover:underline"
-                            data-testid="summary-clear-all"
-                        >
-                            Clear all
-                        </button>
                     )}
                 </div>
             </div>

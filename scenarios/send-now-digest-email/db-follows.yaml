@@ -1,0 +1,10 @@
+follows:
+  - follower: bob
+    followee: alice
+    status: approved
+  - follower: carol
+    followee: alice
+    status: approved
+  - follower: dave
+    followee: alice
+    status: approved

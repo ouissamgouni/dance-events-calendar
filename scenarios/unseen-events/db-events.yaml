@@ -18,9 +18,8 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:local
   - id: evt-unseen-002
     calendar_id: salsa-cal-001
     title: Saturday Salsa Bootcamp
@@ -39,8 +38,7 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:indoor
-    - scale:large
-    - scope:international
+    - reach:international
   - id: evt-unseen-003
     calendar_id: salsa-cal-001
     title: Sunday Cuban Night
@@ -57,6 +55,5 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:regional

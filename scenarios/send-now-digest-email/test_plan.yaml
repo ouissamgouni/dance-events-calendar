@@ -1,0 +1,128 @@
+test_plan:
+  name: "Admin 'Send digest now' — scoped manual override (email channel)"
+  description: >
+    Verifies the admin "Send digest now" action
+    (POST /api/admin/notifications/digest/send-now) delivers a pending
+    activity-digest email immediately to hand-picked users only,
+    bypassing the digest schedule and once-per-day dedup gate. The
+    in-app scheduler loop is disabled for the whole scenario, so the
+    ONLY way any email goes out is via this manual admin action —
+    proving the endpoint itself (not a background tick) is what
+    delivers the message, and that delivery is scoped strictly to the
+    selected user_ids.
+
+  preconditions:
+    - "Start a local SMTP catcher on port 1025 with a web UI, e.g. Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`."
+    - "Run the scenario with: `SCENARIO=send-now-digest-email task start:scenario BROWSER=isolated RESET_BROWSER=1`."
+    - "Open the SMTP catcher UI, e.g. Mailpit at http://127.0.0.1:8025, and clear any existing messages."
+    - "The scenario seeds Alice attending THREE events (`ev-friend`, `ev-friend2`, `ev-friend3`) with `emit_notifications: true`, so Bob, Carol and Dave (her followers) each already have three pending `subscription_going` in-app notifications before any admin action runs — enough backlog for the 'Max per user' cap to actually bind."
+
+  cast:
+    - "Bob — email_social_activity_enabled=true. Selected first with a 'Max per user' cap of 2, then again uncapped → exercises the cap keeping the most recent notifications and deferring the oldest to a later run."
+    - "Carol — email_social_activity_enabled=true too, but deliberately NOT selected → negative control proving the action is scoped to chosen users, not 'everyone eligible'."
+    - "Dave — every notification channel toggle off → `skipped_disabled` probe even when selected."
+
+  steps:
+    - id: 1
+      title: "No email is sent before any admin action"
+      description: |
+        Sign in as Dev Admin (DEV_AUTH login page). Check the Mailpit
+        inbox immediately after the scenario boots.
+      expected: |
+        `NOTIFICATION_SCHEDULER_ENABLED=false` means no background tick
+        ever runs, so the inbox is empty even though Bob, Carol and Dave
+        all have three pending in-app notifications each from the seed.
+
+    - id: 2
+      title: "Target-user picker shows per-user channel status columns"
+      description: |
+        Open the "Send digest now" widget's user picker ("Target users").
+        Search for bob, carol and dave and inspect the Interest-match,
+        Event reminders, Activity digest and Push columns for each row
+        without selecting anyone yet.
+      expected: |
+        Bob and Carol both show the Activity digest column as
+        email-on/push-off (matching `email_social_activity_enabled: true`,
+        `push_social_activity_enabled: false` in mock-users.yaml). Dave
+        shows every column (Interest-match, Event reminders, Activity
+        digest) as email-off/push-off. The Push column is off for all
+        three — this scenario has `WEB_PUSH_ENABLED=false` and seeds no
+        push subscriptions.
+
+    - id: 3
+      title: "Send digest now to Bob only, capped at 2 per user"
+      description: |
+        Navigate to /admin/configuration → Notifications card → "Send
+        digest now" widget. Use the user picker to add Bob
+        (bob@example.com) only — do not add Carol or Dave. Set "Max per
+        user" to 2. Click "Send now (1)".
+      expected: |
+        The action succeeds; the toast reports "1 of 1 user(s) delivered
+        (1 digest email(s), 0 push)". Mailpit receives exactly one email
+        addressed to bob@example.com whose body lists only TWO of the
+        three Going events — Alice's Salsa Sunday Practica and Kizomba
+        Night (the two most recently created notifications). The
+        Bachata Friendly Social notification (the oldest of the three)
+        is left pending, uncounted by the cap, for a future run.
+
+    - id: 4
+      title: "Repeat send-now for Bob uncapped flushes the remaining backlog"
+      description: |
+        Add Bob again in the "Send digest now" picker (it clears after
+        each send). Leave "Max per user" blank this time. Click
+        "Send now (1)".
+      expected: |
+        A second email arrives in Mailpit addressed to bob@example.com,
+        this time listing only the one notification the cap deferred in
+        step 3 — Alice's Bachata Friendly Social. Nothing is lost across
+        the two capped/uncapped runs, just split across them; Mailpit's
+        total is now two messages, both to Bob.
+
+    - id: 5
+      title: "Negative control — Carol was not selected"
+      description: |
+        Refresh the Mailpit inbox after steps 3 and 4.
+      expected: |
+        Carol receives ZERO emails even though her
+        email_social_activity_enabled toggle is on and she has the same
+        three pending notifications as Bob started with — the admin
+        action only acted on the selected user_ids.
+
+    - id: 6
+      title: "skipped_disabled probe — Dave"
+      description: |
+        In the same "Send digest now" widget, add Dave
+        (dave@example.com) and click "Send now (1)".
+      expected: |
+        The action reports Dave as skipped (all notification channels
+        disabled for his account) and Mailpit receives zero new
+        messages. The inbox total remains two emails (Bob's, from
+        steps 3 and 4).
+
+    - id: 7
+      title: "Repeating the action for Bob does not re-send unnecessarily"
+      description: |
+        Add Bob a third time and click "Send now (1)" once more, with
+        "Max per user" left blank.
+      expected: |
+        Because steps 3 and 4 already stamped all three of Bob's
+        notifications as emailed (`emailed_at` set), there is no
+        pending activity left for him — the toast reports "0 of 1
+        user(s) delivered (0 digest email(s), 0 push)" and Mailpit's
+        total stays at two messages.
+
+    - id: 8
+      title: "'Resend' checkbox force-resends already-delivered activity"
+      description: |
+        Add Bob a fourth time. Check the "Resend" checkbox next to "Max
+        per user" and set "Max per user" to 2. Click "Send now (1)".
+      expected: |
+        Unlike step 7, the action succeeds this time: the toast reports
+        "1 of 1 user(s) delivered (1 digest email(s), 0 push)". A THIRD
+        email arrives in Mailpit addressed to bob@example.com — with
+        "Resend" checked, the "Max per user" cap is no longer limited to
+        pending-only notifications, so it re-selects the two most
+        recent of Bob's three (already-sent) notifications and re-sends
+        them. Mailpit's total is now three messages, all to Bob; Carol
+        and Dave still show zero new mail (scoping is unaffected by the
+        checkbox).

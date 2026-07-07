@@ -1,0 +1,7 @@
+users:
+  - email: viewer@example.com
+    name: Scenario Viewer
+    handle: viewer
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

@@ -22,10 +22,9 @@ events:
     - dance-style:salsa
     - level:beginner-friendly
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:good-music
     - vibe:social-atmosphere
+    - reach:local
   - id: evt-share-002
     calendar_id: bachata-cal-002
     title: Bachata Workshop
@@ -55,8 +54,7 @@ events:
     - dance-style:bachata
     - level:intermediate
     - venue:indoor
-    - scale:small
-    - scope:local
+    - reach:regional
   - id: evt-share-003
     calendar_id: salsa-cal-001
     title: Cuban Night
@@ -81,9 +79,8 @@ events:
     - dance-style:salsa
     - level:beginner-friendly
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:international
   - id: evt-share-004
     calendar_id: bachata-cal-002
     title: Bachata Beginners Bootcamp
@@ -111,8 +108,7 @@ events:
     - dance-style:bachata
     - level:beginner-friendly
     - venue:indoor
-    - scale:large
-    - scope:international
+    - reach:local
   - id: evt-share-005
     calendar_id: salsa-cal-001
     title: Salsa Tuesday Night
@@ -135,10 +131,9 @@ events:
     - dance-style:salsa
     - level:beginner-friendly
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:good-music
     - vibe:social-atmosphere
+    - reach:regional
   - id: evt-share-006
     calendar_id: bachata-cal-002
     title: Bachata Fusion Social
@@ -164,6 +159,5 @@ events:
     - dance-style:kizomba
     - level:beginner-friendly
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:international

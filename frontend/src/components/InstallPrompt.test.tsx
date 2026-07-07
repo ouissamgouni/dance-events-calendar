@@ -2,15 +2,23 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import InstallPrompt from './InstallPrompt'
+import { AuthProvider } from '../context/AuthContext'
 import { PwaInstallProvider } from '../context/PwaInstallContext'
 
 const SNOOZE_KEY = 'movida:install-snooze-until'
 
+// The install banner itself (tested here) doesn't depend on auth state —
+// only the post-install push opt-in toast is gated to signed-in users (see
+// PushNotificationSettings/usePush tests for that behavior) — but
+// InstallPrompt now reads useAuth() unconditionally, so AuthProvider must be
+// present or the hook throws.
 function renderPrompt() {
   return render(
-    <PwaInstallProvider>
-      <InstallPrompt />
-    </PwaInstallProvider>,
+    <AuthProvider>
+      <PwaInstallProvider>
+        <InstallPrompt />
+      </PwaInstallProvider>
+    </AuthProvider>,
   )
 }
 
@@ -20,7 +28,7 @@ class FakeBeforeInstallPromptEvent extends Event {
 
   constructor(outcome: 'accepted' | 'dismissed' = 'accepted') {
     super('beforeinstallprompt', { cancelable: true })
-    this.prompt = vi.fn(async () => {})
+    this.prompt = vi.fn(async () => { })
     this.userChoice = Promise.resolve({ outcome })
   }
 }

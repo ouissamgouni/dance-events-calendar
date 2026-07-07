@@ -1,0 +1,16 @@
+settings:
+  # Pricing feature — disabled
+  show_prices: false
+
+  # All other features — enabled
+  show_popularity: true
+  show_ratings: true
+  following_badge_enabled: true
+  unseen_state_enabled: true
+  trending_enabled: true
+  trending_banner_enabled: true
+  promo_codes_enabled: true
+  organizer_claims_enabled: true
+  for_you_rail_enabled: true
+  your_next_events_rail_enabled: true
+  tag_as_badge_enabled: true

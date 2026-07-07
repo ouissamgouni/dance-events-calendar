@@ -25,6 +25,5 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:international

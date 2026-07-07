@@ -1,0 +1,169 @@
+test_plan:
+  name: "Interest Profiles — international-first onboarding flow"
+  description: >
+    UX validation of the Interest Profiles onboarding flow. Covers Step 1
+    (wide international profile with the reach 'international' tag
+    pre-selected + spam-warning guardrail logic), Step 2 (conditional
+    local profile via browser geolocation / IP fallback / city typeahead
+    + radius slider), and Step 3 (Build your tribe follow-suggestions).
+    Also covers the settings-edit guardrail parity with onboarding, and
+    the admin-side protection of the reach tag group.
+
+    Notification delivery / matcher truth table are validated in the
+    dedicated notif-event-matches-profile-{app,email,push} and
+    notif-activity-digest-{email,push} scenarios — do not duplicate
+    them here.
+
+  preconditions:
+    - "Run the scenario: `SCENARIO=profile-creation-onboarding RESET=1 task start:scenario`"
+    - >-
+      Cast: `newbie` (fresh, no onboarded_at), `alice` (pre-existing
+      friend Nora already follows), `salsahub` (verified organizer to
+      populate the follow-suggestions step), `admin` (holds
+      /api/admin/trigger-notifications).
+    - >-
+      Seeded events form a truth table used by the notif-* scenarios; in
+      this scenario they are irrelevant to assertions (kept only so the
+      scenario is self-contained when reused as a mock backdrop).
+
+  steps:
+    - id: 1
+      title: "Fresh sign-in lands on Step 1 with reach 'international' pre-selected"
+      description: >
+        Open / in a brand-new browser session, sign in as Nora Newbie.
+      expected: >
+        URL becomes /onboarding/preferences?next=%2F. The page title is
+        "Create your first alert". Two TagsPicker sections are visible —
+        "Dance styles" (Salsa / Bachata / Mambo / Kizomba) and "Reach"
+        (Local / Regional / International). The International chip is
+        pre-selected on load; Local and Regional are not. The area map
+        is expanded by default, showing "Europe & nearby" as the default
+        bbox. Continue is DISABLED until at least one dance style is
+        picked. A hint "You can edit or add profiles in Settings." sits
+        above the Continue button.
+
+    - id: 1a
+      title: "Spam-warning guardrail fires when reach adds Local on a wide area"
+      description: >
+        Keep the default EUR area (wide). Click the Local chip in the
+        Reach picker so both International + Local are selected.
+      expected: >
+        An amber warning banner appears just below the map card, exactly
+        matching the copy: "You'll be notified about all local events
+        across this large area. Narrow the Reach (e.g. keep only
+        International/Regional) to avoid this." Un-clicking Local hides
+        the banner immediately. Clearing Reach entirely (empty selection)
+        also shows the banner — empty reach = matches any scale, incl.
+        local.
+
+    - id: 1b
+      title: "Narrow area clears the guardrail even with Local selected"
+      description: >
+        Toggle Local back on, then drag/zoom the map to a small city-sized
+        bbox (< ~150 km diagonal) and save the area name "Paris metro".
+      expected: >
+        Guardrail banner disappears — narrow + local is a legitimate
+        combination. Restore the wide EUR area before continuing so
+        Step 2's conditional-offer logic is exercised.
+
+    - id: 2
+      title: "Continue updates the signup-seeded default profile"
+      description: >
+        With the EUR area restored, Reach = International only, pick
+        Salsa (and optionally Mambo). Click Continue.
+      expected: >
+        A single PATCH /api/interest-profiles/<id> fires against the
+        signup-seeded default profile with body approximately
+        `{"label":"Europe & nearby","min_lat":...,"max_lat":...,
+        "dance_tag_ids":[<salsa id>],
+        "reach_tag_ids":[<international id>],"matches_enabled":true,
+        "is_active":true}` and returns 200. NO POST is issued —
+        onboarding upgrades the pre-existing default row rather than
+        appending a duplicate. Because the profile is WIDE and reach
+        EXCLUDES Local, the router replaces the URL with
+        /onboarding/local?next=%2F (Step 2 offered — inverse of
+        guardrail trigger per PRD §8 Step 2).
+
+    - id: 3
+      title: "Step 2 lands on the local page — dance styles first, then city"
+      description: >
+        Nora is now on /onboarding/local. Inspect the section ordering.
+      expected: >
+        Page title is "Set your local area". Sections appear in this
+        order: (1) an optional "Dance styles" TagsPicker (same tags as
+        Step 1, PRE-FILLED with the dance styles the user selected in
+        Step 1 — e.g. Salsa; empty if the user skipped Step 1),
+        (2) a "City" search + "Use my current location" button, (3) a
+        "Radius" slider (min 5, max 150, default 10 km), (4) a preview
+        map showing the pin + bbox rectangle, (5) a "Notify me about
+        matching events" checkbox that is CHECKED by default. A Skip
+        link is visible in the header. The Continue button is disabled
+        (title tooltip: "Pick a city or use your current location
+        first") until a pin is set; dance styles are NOT required.
+
+    - id: 3a
+      title: "Skip on /onboarding/local creates NO profile"
+      description: >
+        Click Skip in the header without touching any field.
+      expected: >
+        URL replaces to /onboarding/follow?next=%2F. NO POST to
+        /api/interest-profiles fires (verify Network panel). The wide
+        profile from Step 1 remains the only — and active — profile.
+        Navigate back to /onboarding/local via browser back to restore
+        the page for the next step.
+
+    - id: 4
+      title: "Continue creates the local profile INACTIVE alongside the wide one"
+      description: >
+        Set the home pin to Paris (48.8566, 2.3522) via city typeahead
+        or geolocation, keep radius = 10 km, pick Salsa in the dance
+        styles picker (or leave empty — both are valid), keep Notify
+        checked. Click Continue.
+      expected: >
+        PATCH /api/auth/preferences persists only `home_location` (the
+        `area` field is NOT overwritten — the wide profile’s area
+        remains mirrored in prefs). A second POST /api/interest-profiles
+        fires with a bbox derived from pin ± radius:
+        `{"label":"...","min_lat":...,"max_lat":...,
+        "dance_tag_ids":[<salsa id or []>],
+        "reach_tag_ids":[],"matches_enabled":true,
+        "is_active":false}` and returns 200. The local profile is
+        reach-independent (empty reach = matches any reach for the
+        bbox); users can add reach tags later from Settings. The wide
+        preferences profile remains the ACTIVE one — the local profile
+        is stored alongside it and can be promoted from Settings.
+        Router replaces the URL with /onboarding/follow?next=%2F.
+
+    - id: 5
+      title: "Step 3 shows the retitled Build your tribe screen"
+      description: >
+        The follow-suggestions page loads.
+      expected: >
+        Page title is "Build your tribe" (not "Follow a few people to get
+        started"). Subtext reads "Follow a few people to access their
+        calendars, see events your friends are going to, and get notified
+        about friend activity and their event suggestions. You can always
+        change who you follow later." salsahub is offered as a follow
+        suggestion. Click Done — POST /api/social/onboarding/complete
+        with `handles: []` stamps onboarded_at and lands on /.
+
+    - id: 6
+      title: "Settings-edit guardrail: adding Local to a wide profile"
+      description: >
+        Edit the wide EUR profile in Settings and click the Local chip in
+        the Reach picker.
+      expected: >
+        The same amber guardrail banner shown during onboarding Step 1
+        appears inline in the profile card while editing. Removing Local
+        (or narrowing the area) clears it. Saving anyway is still
+        allowed — the warning is an invite, not a block.
+
+    - id: 7
+      title: "Reach group is protected against admin delete"
+      description: >
+        Sign in as admin and navigate to the admin tag-groups UI. Attempt
+        to delete or disable the Reach group.
+      expected: >
+        The action is refused (guarded by the `protected` flag set on the
+        reach group by migration 4f38e516ed38). Renaming, reordering, or
+        editing individual reach tags stays allowed.

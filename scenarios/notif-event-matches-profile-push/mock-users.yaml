@@ -1,0 +1,41 @@
+# profile-match-push: every user has the push channel for interest
+# matches ON and the email channel OFF. Web-push requires a live
+# device subscription — the browser-side setup step in test_plan.yaml
+# subscribes Nora's device before the dispatch tick.
+users:
+  - email: nora@example.com
+    name: Nora Match
+    handle: nora
+    email_interest_matches_enabled: false
+    push_interest_matches_enabled: true
+
+  - email: bob@example.com
+    name: Bob Dedup
+    handle: bob
+    email_interest_matches_enabled: false
+    push_interest_matches_enabled: true
+
+  - email: carol@example.com
+    name: Carol Anyreach
+    handle: carol
+    email_interest_matches_enabled: false
+    push_interest_matches_enabled: true
+
+  # Dan's profile has matches_enabled=false → 0 rows, 0 push.
+  - email: dan@example.com
+    name: Dan Silent
+    handle: dan
+    email_interest_matches_enabled: false
+    push_interest_matches_enabled: true
+
+  # Eve = negative probe: user-level push toggle OFF → in-app row
+  # created but no push delivered even with a live subscription.
+  - email: eve@example.com
+    name: Eve Push-off
+    handle: eve
+    email_interest_matches_enabled: false
+    push_interest_matches_enabled: false
+
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

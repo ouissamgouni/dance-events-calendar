@@ -1,0 +1,49 @@
+test_plan:
+  name: "Reminders — in-app channel"
+  description: >
+    (Feature × Channel) truth-table cell. Feature = event reminders.
+    Channel = in-app only. Asserts that reminder_service creates
+    an `event_reminder` in-app row for each `going` attendee within
+    the REMINDER_LEAD_HOURS window (240h = 10 days), while email and
+    push delivery branches are suppressed by per-user channel toggles.
+
+  preconditions:
+    - >-
+      Start scenario:
+      `SCENARIO=reminders-app RESET=1 task start:scenario`
+
+  cast:
+    - "Alice, Bob — Going ev-remind; both have email + push reminders OFF."
+
+  steps:
+    - id: 1
+      title: "Trigger one dispatch tick"
+      description: >
+        `SCENARIO=reminders-app task notify:trigger:scenario`
+      expected: >
+        Stats: `reminders.created=2` (Alice + Bob), `reminders.emailed=0`,
+        `reminders.pushed=0`, `interest.created=0`, `activity.digests=0`.
+
+    - id: 2
+      title: "In-app row appears for each attendee"
+      description: >
+        `GET /api/notifications` as Alice and Bob.
+      expected: >
+        Each has one `event_reminder` row for ev-remind with copy
+        "Reminder — you're going to Rooftop Salsa Social".
+
+    - id: 3
+      title: "Control event outside window is not reminded"
+      description: >
+        Verify no reminder row for ev-later (Sat of w2, past the 240h
+        window).
+      expected: >
+        Zero rows referencing ev-later.
+
+    - id: 4
+      title: "Idempotence — re-run creates zero new rows"
+      description: >
+        `SCENARIO=reminders-app task notify:trigger:scenario` a second time.
+      expected: >
+        `reminders.created=0` on the second tick — the unique
+        constraint on (recipient, kind, event_id) blocks duplicates.

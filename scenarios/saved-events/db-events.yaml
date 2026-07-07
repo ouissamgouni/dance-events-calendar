@@ -22,10 +22,9 @@ events:
     - dance-style:salsa
     - level:beginner-friendly
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:good-music
     - vibe:social-atmosphere
+    - reach:international
   - id: evt-save-002
     calendar_id: bachata-cal-002
     title: Bachata Sensual Workshop
@@ -55,8 +54,7 @@ events:
     - dance-style:bachata
     - level:intermediate
     - venue:indoor
-    - scale:small
-    - scope:local
+    - reach:local
   - id: evt-save-003
     calendar_id: salsa-cal-001
     title: Salsa on the Rooftop
@@ -81,10 +79,9 @@ events:
     - dance-style:salsa
     - level:beginner-friendly
     - venue:rooftop
-    - scale:medium
-    - scope:local
     - vibe:live-band
     - vibe:social-atmosphere
+    - reach:regional
   - id: evt-save-004
     calendar_id: bachata-cal-002
     title: Bachata Weekender
@@ -124,11 +121,10 @@ events:
     - dance-style:bachata
     - level:beginner-friendly
     - venue:indoor
-    - scale:large
-    - scope:international
     - vibe:good-music
     - vibe:social-atmosphere
     - vibe:crowded
+    - reach:international
   - id: evt-save-005
     calendar_id: salsa-cal-001
     title: Rueda de Casino Night
@@ -148,9 +144,8 @@ events:
     - format:social
     - dance-style:salsa
     - level:beginner-friendly
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:international
   - id: evt-save-006
     calendar_id: salsa-cal-001
     title: Salsa Beginners Night
@@ -173,9 +168,8 @@ events:
     - dance-style:salsa
     - level:beginner-friendly
     - venue:indoor
-    - scale:small
-    - scope:local
     - vibe:social-atmosphere
+    - reach:local
   - id: evt-save-007
     calendar_id: bachata-cal-002
     title: Bachata Ladies Styling Workshop
@@ -205,9 +199,8 @@ events:
     - dance-style:bachata
     - level:beginner-friendly
     - venue:indoor
-    - scale:small
-    - scope:local
     - vibe:good-music
+    - reach:regional
   - id: evt-save-008
     calendar_id: salsa-cal-001
     title: Salsa con Timba — Live Orchestra Night
@@ -233,10 +226,9 @@ events:
     - dance-style:salsa
     - level:beginner-friendly
     - venue:indoor
-    - scale:small
-    - scope:local
     - vibe:live-band
     - vibe:social-atmosphere
+    - reach:local
   - id: evt-save-past-001
     calendar_id: salsa-cal-001
     title: Last Week's Salsa Social
@@ -259,9 +251,8 @@ events:
     - dance-style:salsa
     - level:beginner-friendly
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:local
   - id: evt-save-past-002
     calendar_id: bachata-cal-002
     title: Old Bachata Workshop
@@ -290,8 +281,7 @@ events:
     - dance-style:bachata
     - level:all-levels
     - venue:indoor
-    - scale:small
-    - scope:local
+    - reach:regional
   - id: evt-save-past-003
     calendar_id: bachata-cal-002
     title: Spring Bachata Festival
@@ -326,7 +316,6 @@ events:
     - dance-style:bachata
     - level:beginner-friendly
     - venue:indoor
-    - scale:large
-    - scope:international
     - vibe:good-music
     - vibe:social-atmosphere
+    - reach:international

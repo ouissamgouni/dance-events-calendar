@@ -5,13 +5,13 @@ import { useAuth } from '../context/AuthContext';
 import { useSavedEvents } from '../context/SavedEventsContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useAttendanceSummary } from '../context/AttendanceSummariesContext';
-import { useAttendingEvents } from '../context/AttendingEventsContext';
 import SaveEventButton from './SaveEventButton';
 import GoingButton from './GoingButton';
 import AttendeeAvatarStack from './AttendeeAvatarStack';
 import RateEventButton from './RateEventButton';
 import TagBadges from './TagBadges';
-import { getTagColors } from '../utils/eventColor';
+import { isTrendingScore } from '../utils/trending';
+import { shortLocation } from '../utils/locationShort';
 
 interface MapBounds {
     north: number;
@@ -63,6 +63,18 @@ interface EventListPanelProps {
     nextPeriodEventCount?: number | null;
     /** When true, anonymous viewers hit a persistent lock before deeper pagination. */
     gateMoreEventsForAnonymous?: boolean;
+    /** When true, render tags as light-grey badges (max 4) instead of the
+     * default plain-text/flag-driven look. Used by the Explorer list. */
+    tagsAsBadge?: boolean;
+    /**
+     * Fires once per event id when a card has been at least 50% visible
+     * inside the list scroller for ~500ms on touch devices (`hover:
+     * none`). Provides a mobile-friendly equivalent of the desktop
+     * hover-to-mark-seen affordance — parent calls `markSeen(id)` here.
+     * Idempotent by contract; the observer may fire the same id multiple
+     * times if the viewer scrolls it out and back.
+     */
+    onMarkSeen?: (eventId: string) => void;
 }
 
 export interface EventListCardProps {
@@ -82,12 +94,8 @@ export interface EventListCardProps {
     isNew?: boolean;
     onEventHover?: (eventId: string | null) => void;
     cardRef?: (el: HTMLDivElement | null) => void;
-    /** First-card coachmark for the Save/Going CTAs. Triggers a subtle
-     * pulse on the action cluster and renders an inline hint underneath
-     * the card content explaining what tapping them does. Dismissed via
-     * the inline × button (writes localStorage flag). */
-    coachMark?: boolean;
-    onDismissCoachMark?: () => void;
+    /** When true, tags render as light-grey badges (max 4) on this card. */
+    tagsAsBadge?: boolean;
 }
 
 function PriceBadge({ event }: { event: CalendarEvent }) {
@@ -124,25 +132,14 @@ function PopularityBadge({
     topN: number;
     topPercent: number;
 }) {
-    if (score <= 0 || score < threshold) return null;
-    // Top-K of currently visible events where K is the effective cap
-    //   min(topN, ceil(positiveVisible * topPercent / 100))
-    // The score itself stays hidden — it's an internal blend (going +
-    // saved + tiny view term, decayed by age), not a user-facing count.
-    const sorted = [...allScores].sort((a, b) => b - a);
-    const positiveCount = sorted.filter((s) => s > 0).length;
-    const effectiveCap = Math.max(
-        1,
-        Math.min(topN, Math.ceil((positiveCount * topPercent) / 100)),
-    );
-    const isTopK = sorted.indexOf(score) < effectiveCap && sorted[0] > 0;
-    if (!isTopK) return null;
+    if (!isTrendingScore(score, allScores, threshold, topN, topPercent)) return null;
     return (
         <span
-            className="inline-flex items-center gap-0.5 bg-orange-50 px-1.5 py-0.5 text-[10px] font-medium text-orange-700"
+            className="inline-flex items-center bg-orange-50 px-1.5 py-px text-[10px] font-medium text-orange-400"
             data-testid="trending-badge"
+            title="Trending"
         >
-            🔥
+            Trending
         </span>
     );
 }
@@ -215,13 +212,11 @@ export function EventListCard({
     isNew = false,
     onEventHover,
     cardRef,
-    coachMark = false,
-    onDismissCoachMark,
+    tagsAsBadge = false,
 }: EventListCardProps) {
-    const { isAttending } = useAttendingEvents();
+    const { tagsPerCard } = useFeatureFlags();
     const start = new Date(event.start);
     const onMap = isOnMap(event, mapBounds);
-    const isGoing = isAttending(event.event_id);
     const offMapBadge = !onMap ? (
         <span className="event-card-offmap-badge" role="img" aria-label="Off map" title="Off map">
             <img src="/location-off.png" alt="" aria-hidden="true" className="event-card-offmap-icon" />
@@ -234,27 +229,13 @@ export function EventListCard({
                 ref={cardRef}
                 role="button"
                 tabIndex={0}
-                className={`event-card${onMap ? '' : ' event-card-offmap'}${isHighlighted ? ' event-card-highlighted' : ''}${isGoing ? ' event-card-user-going' : ''}`}
+                // eslint-disable-next-line no-restricted-syntax -- rounded event cards per explicit design request (Explorer list)
+                className={`event-card rounded-md${onMap ? '' : ' event-card-offmap'}${isHighlighted ? ' event-card-highlighted' : ''}`}
                 onClick={() => onEventClick(event)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onEventClick(event); } }}
                 onMouseEnter={() => onEventHover?.(event.event_id)}
                 onMouseLeave={() => onEventHover?.(null)}
             >
-                <div className="event-card-color event-tag-stripes" aria-hidden="true">
-                    {(() => {
-                        const colors = getTagColors(event);
-                        if (colors.length === 0) {
-                            return <span className="event-tag-stripe" style={{ backgroundColor: '#6b7280' }} />;
-                        }
-                        return colors.map((c, i) => (
-                            <span
-                                key={i}
-                                className="event-tag-stripe"
-                                style={{ backgroundColor: c }}
-                            />
-                        ));
-                    })()}
-                </div>
                 <div className="event-card-content relative">
                     <h4
                         className={`event-card-title${isNew ? ' font-semibold' : ''}`}
@@ -270,7 +251,18 @@ export function EventListCard({
                         )}
                         {event.title}
                     </h4>
-                    <div className="flex items-center gap-4">
+                    {showPopularity && (
+                        <div className="mt-0.5">
+                            <PopularityBadge
+                                score={event.popularity_score ?? 0}
+                                allScores={allViewCounts}
+                                threshold={popularityThreshold}
+                                topN={trendingTopN}
+                                topPercent={trendingTopPercent}
+                            />
+                        </div>
+                    )}
+                    <div className="flex items-center gap-8">
                         <p className="event-card-date shrink-0">
                             {event.all_day ? formatCardDate(start) : `${formatCardDate(start)} · ${formatCardTime(start)}`}
                         </p>
@@ -279,15 +271,6 @@ export function EventListCard({
                                 eventId={event.event_id}
                                 friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
                             />
-                            {showPopularity && (
-                                <PopularityBadge
-                                    score={event.popularity_score ?? 0}
-                                    allScores={allViewCounts}
-                                    threshold={popularityThreshold}
-                                    topN={trendingTopN}
-                                    topPercent={trendingTopPercent}
-                                />
-                            )}
                         </div>
                         <div className="ml-auto flex shrink-0 items-center gap-1.5">
                             {event.has_active_promo_codes && (
@@ -305,7 +288,7 @@ export function EventListCard({
                     {event.location && (
                         <p className="event-card-location">
                             {offMapBadge}
-                            <span className="event-card-location-text">📍 {event.location}</span>
+                            <span className="event-card-location-text" title={event.location ?? undefined}>{shortLocation(event.location) ?? event.location}</span>
                         </p>
                     )}
                     {!onMap && !event.location && (
@@ -320,37 +303,21 @@ export function EventListCard({
                     )}
                     {event.tags?.length > 0 && (
                         <div className="mt-1">
-                            <TagBadges tags={event.tags} maxVisible={5} />
+                            <TagBadges
+                                tags={event.tags}
+                                maxVisible={tagsAsBadge ? 4 : tagsPerCard}
+                                forceBadge={tagsAsBadge}
+                            />
                         </div>
                     )}
                     <div className="mt-1 flex flex-wrap items-center gap-2">
 
                     </div>
-                    <div className={`event-card-actions absolute top-0 right-0 flex items-center gap-1.5${coachMark ? ' animate-pulse' : ''}`}>
+                    <div className="event-card-actions absolute top-0 right-0 flex items-center gap-1.5">
                         <ActionCountCluster eventId={event.event_id} showRatings={!!showRatings} isSavedFlag={isSavedFlag} />
                     </div>
                 </div>
             </div>
-            {coachMark && (
-                <div
-                    className="flex items-start justify-between gap-2 border border-blue-100 bg-blue-50 px-3 py-1.5 text-[11px] text-blue-800"
-                    data-testid="event-card-coachmark"
-                    onClick={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
-                >
-                    <span>
-                        Tap the bookmark to save events to your calendar, or the check to mark you’re going.
-                    </span>
-                    <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); onDismissCoachMark?.(); }}
-                        aria-label="Dismiss hint"
-                        className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-blue-500 hover:text-blue-800 hover:bg-blue-100"
-                    >
-                        ×
-                    </button>
-                </div>
-            )}
         </>
     );
 }
@@ -378,6 +345,8 @@ export default function EventListPanel({
     scopeTotalCount,
     nextPeriodEventCount,
     gateMoreEventsForAnonymous = false,
+    onMarkSeen,
+    tagsAsBadge = false,
 }: EventListPanelProps) {
     const { user } = useAuth();
     const { isSaved } = useSavedEvents();
@@ -385,6 +354,12 @@ export default function EventListPanel({
     const location = useLocation();
     const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const scrollRef = useRef<HTMLDivElement>(null);
+    // Touch-device auto-mark-seen: fires 500ms after a card has been
+    // ≥50% visible inside the list scroller. Desktop keeps using the
+    // hover-to-mark-seen path (see Home.tsx handleExplorerListEventHover),
+    // so we only wire the observer where hover is impossible.
+    const seenObserverRef = useRef<IntersectionObserver | null>(null);
+    const seenTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
     const pendingExtendVisibleCountRef = useRef(0);
     const [showBottomFade, setShowBottomFade] = useState(false);
     // Client-side only filter: hide events that are not new for this viewer.
@@ -404,23 +379,6 @@ export default function EventListPanel({
         setVisibleCount(INITIAL_VISIBLE);
     }, [events]);
 
-    // First-card coachmark for Save/Going CTAs. Stored in localStorage so
-    // a dismissal sticks across reloads/devices for the same browser. We
-    // hydrate from storage on mount to avoid an SSR-like flash; the
-    // coachmark is only ever rendered on the first event card.
-    const COACHMARK_KEY = 'explorer.coachmark.saveGoing.shown';
-    const [coachMarkDismissed, setCoachMarkDismissed] = useState<boolean>(() => {
-        try {
-            return typeof window !== 'undefined' && window.localStorage.getItem(COACHMARK_KEY) === '1';
-        } catch {
-            return true;
-        }
-    });
-    const dismissCoachMark = useCallback(() => {
-        setCoachMarkDismissed(true);
-        try { window.localStorage.setItem(COACHMARK_KEY, '1'); } catch { /* storage may be blocked */ }
-    }, []);
-
     const updateFade = useCallback(() => {
         const el = scrollRef.current;
         if (!el) return;
@@ -433,6 +391,54 @@ export default function EventListPanel({
         updateFade();
     }, [events, updateFade]);
 
+    // Touch-device auto-mark-seen. Set up a single IntersectionObserver
+    // scoped to the browser viewport (NOT ``scrollRef.current``): on
+    // mobile the CSS in index.css switches ``.event-list-scroll`` to
+    // ``overflow: visible`` so the page scrolls instead of the inner
+    // container, which means an observer rooted on the inner div never
+    // sees intersection changes. Rooting on the viewport works for both
+    // the mobile page-scroll and the desktop inner-container-scroll
+    // (cards move relative to the viewport in both cases). Cards
+    // register/unregister through ``observeCardForSeen`` below. Fires
+    // the parent callback 500ms after a card has been ≥50% visible so a
+    // fast scroll-past doesn't silently clear every unseen dot on the
+    // way to the target card.
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        if (!onMarkSeen) return;
+        if (!('IntersectionObserver' in window)) return;
+        if (!window.matchMedia('(hover: none)').matches) return;
+        const timers = seenTimersRef.current;
+        const observer = new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+                const id = (entry.target as HTMLElement).dataset.seenId;
+                if (!id) continue;
+                if (entry.isIntersecting && entry.intersectionRatio >= 0.5) {
+                    if (timers.has(id)) continue;
+                    const timer = setTimeout(() => {
+                        timers.delete(id);
+                        onMarkSeen(id);
+                    }, 500);
+                    timers.set(id, timer);
+                } else {
+                    const timer = timers.get(id);
+                    if (timer) {
+                        clearTimeout(timer);
+                        timers.delete(id);
+                    }
+                }
+            }
+        }, { root: null, threshold: [0, 0.5, 1] });
+        seenObserverRef.current = observer;
+        for (const el of cardRefs.current.values()) observer.observe(el);
+        return () => {
+            observer.disconnect();
+            seenObserverRef.current = null;
+            for (const timer of timers.values()) clearTimeout(timer);
+            timers.clear();
+        };
+    }, [onMarkSeen]);
+
     // Scroll to highlighted card when hoveredEventId changes from an external source (map/calendar)
     useEffect(() => {
         if (!scrollHighlightedIntoView) return;
@@ -442,6 +448,21 @@ export default function EventListPanel({
             el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         }
     }, [hoveredEventId, scrollHighlightedIntoView]);
+
+    // Stable ref-callback used by <EventListCard cardRef=...>. Registers
+    // the DOM node under both the id→node lookup (used by the scroll-
+    // into-view effect above) AND the touch auto-mark-seen observer.
+    const observeCardForSeen = useCallback((eventId: string) => (el: HTMLDivElement | null) => {
+        const previous = cardRefs.current.get(eventId);
+        if (el) {
+            cardRefs.current.set(eventId, el);
+            el.dataset.seenId = eventId;
+            seenObserverRef.current?.observe(el);
+        } else {
+            cardRefs.current.delete(eventId);
+            if (previous) seenObserverRef.current?.unobserve(previous);
+        }
+    }, []);
 
     const listEvents = excludedEventId
         ? events.filter((event) => event.event_id !== excludedEventId)
@@ -490,13 +511,10 @@ export default function EventListPanel({
         ? sortedEvents.findIndex((e) => pastEventIds.has(e.event_id))
         : -1;
 
-    const onMapCount = mapBounds ? listEvents.filter((e) => isOnMap(e, mapBounds)).length : listEvents.length;
-
     // Slice the sorted list to the current ``visibleCount`` so the user only
     // sees what they explicitly asked for. The full count drives the
     // "Showing X of Y" counter and the Show more remaining count.
-    const totalCount = sortedEvents.length;
-    const totalInScope = scopeTotalCount ?? totalCount;
+    const totalCount = scopeTotalCount ?? sortedEvents.length;
     const cappedVisible = Math.min(visibleCount, totalCount);
     const renderedEvents = sortedEvents.slice(0, cappedVisible);
     const remainingInPeriod = Math.max(0, totalCount - cappedVisible);
@@ -524,12 +542,7 @@ export default function EventListPanel({
         <div className="event-list-panel">
             <div className="event-list-header">
                 <span className="event-list-count">
-                    {totalCount === 0
-                        ? `0 / ${totalInScope}`
-                        : `Displayed ${cappedVisible} / ${totalInScope}`}
-                    {mapBounds && onMapCount < totalCount && (
-                        <span className="text-slate-400 font-normal"> · {totalCount - onMapCount} off map</span>
-                    )}
+                    {`${totalCount} Events`}
                 </span>
                 <div className="event-list-sort">
                     <button
@@ -558,21 +571,12 @@ export default function EventListPanel({
                         >
                             {/* eslint-disable-next-line no-restricted-syntax -- small status dot */}
                             <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" aria-hidden="true" />
-                            <span className="sm:hidden">New</span>
+                            <span className="sm:hidden">{newCount} New</span>
                             <span className="hidden sm:inline">New only</span>
                         </button>
                     )}
                 </div>
             </div>
-            {newEnabled && newCount > 0 && (
-                <div className="flex items-center justify-between gap-2 px-3 py-1.5 text-[11px]" data-testid="new-events-bar">
-                    <span className="text-slate-600" data-testid="new-events-counter">
-                        {/* eslint-disable-next-line no-restricted-syntax -- small status dot */}
-                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500 mr-1.5 align-middle" aria-hidden="true" />
-                        {newCount} new since your last visit
-                    </span>
-                </div>
-            )}
 
             <div className="event-list-scroll-wrapper">
                 <div className="event-list-scroll" ref={scrollRef} onScroll={updateFade}>
@@ -643,16 +647,6 @@ export default function EventListPanel({
                                     const showDayHeader =
                                         groupByDay && !isPast && dayKey !== lastDayKey;
                                     if (showDayHeader) {
-                                        // Compute the count of events on this day within the
-                                        // currently-rendered slice so the header reflects what
-                                        // the user sees (not events hidden behind Show more).
-                                        let countOnDay = 0;
-                                        for (const e of renderedEvents) {
-                                            if (pastEventIds?.has(e.event_id)) continue;
-                                            if (localDayKey(new Date(e.start)) === dayKey) {
-                                                countOnDay += 1;
-                                            }
-                                        }
                                         lastDayKey = dayKey;
                                         return (
                                             <Fragment key={event.event_id}>
@@ -662,14 +656,11 @@ export default function EventListPanel({
                                                     </div>
                                                 )}
                                                 <div
-                                                    className="sticky top-0 z-[5] flex items-center justify-between gap-2 bg-slate-50 border-y border-slate-200 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600"
+                                                    className="sticky top-0 z-[5] flex items-center gap-2 bg-slate-50 border-b border-slate-300 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600"
                                                     data-testid="event-list-day-header"
                                                     data-day={dayKey}
                                                 >
                                                     <span>{formatDayHeader(start)}</span>
-                                                    <span className="text-slate-400 font-normal tabular-nums">
-                                                        {countOnDay}
-                                                    </span>
                                                 </div>
                                                 <EventListCard
                                                     event={event}
@@ -687,9 +678,8 @@ export default function EventListPanel({
                                                     isHighlighted={isHighlighted}
                                                     isNew={isNew}
                                                     onEventHover={onEventHover}
-                                                    cardRef={(el) => { if (el) cardRefs.current.set(event.event_id, el); else cardRefs.current.delete(event.event_id); }}
-                                                    coachMark={!coachMarkDismissed && idx === 0 && !isPast}
-                                                    onDismissCoachMark={dismissCoachMark}
+                                                    cardRef={observeCardForSeen(event.event_id)}
+                                                    tagsAsBadge={tagsAsBadge}
                                                 />
                                             </Fragment>
                                         );
@@ -718,9 +708,8 @@ export default function EventListPanel({
                                                 isHighlighted={isHighlighted}
                                                 isNew={isNew}
                                                 onEventHover={onEventHover}
-                                                cardRef={(el) => { if (el) cardRefs.current.set(event.event_id, el); else cardRefs.current.delete(event.event_id); }}
-                                                coachMark={!coachMarkDismissed && idx === 0 && !isPast}
-                                                onDismissCoachMark={dismissCoachMark}
+                                                cardRef={observeCardForSeen(event.event_id)}
+                                                tagsAsBadge={tagsAsBadge}
                                             />
                                         </Fragment>
                                     );
@@ -767,10 +756,7 @@ export default function EventListPanel({
                                         className="inline-flex items-center justify-center border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-2 transition"
                                         data-testid="event-list-show-more"
                                     >
-                                        Show {Math.min(SHOW_MORE_INCREMENT, remainingInPeriod)} more
-                                        <span className="ml-1 text-slate-400 font-normal">
-                                            ({remainingInPeriod} remaining)
-                                        </span>
+                                        + {Math.min(SHOW_MORE_INCREMENT, remainingInPeriod)} more
                                     </button>
                                 </div>
                             )}
@@ -789,7 +775,7 @@ export default function EventListPanel({
                                                 ? 'Looking ahead…'
                                                 : nextPeriodEventCount === 0
                                                     ? 'No future events found'
-                                                    : `Show ${nextPeriodEventCount} next available events`}
+                                                    : `+ ${nextPeriodEventCount} more`}
                                     </button>
                                 </div>
                             )}

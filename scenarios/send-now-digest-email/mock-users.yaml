@@ -1,0 +1,44 @@
+# send-now-digest-email cast.
+#
+# Alice is the actor whose RSVP fans out a `subscription_going`
+# notification to her followers. Bob and Carol both have the email
+# channel ON so both are *eligible* — but only Bob is selected in the
+# admin "Send digest now" action, proving delivery is scoped to the
+# chosen user_ids and not "everyone eligible". Dave has every channel
+# toggle off so the endpoint should short-circuit him with
+# `skipped_disabled` even if he is selected too.
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    account_visibility: public
+
+  - email: bob@example.com
+    name: Bob Selected
+    handle: bob
+    account_visibility: public
+    email_social_activity_enabled: true
+    push_social_activity_enabled: false
+
+  # Eligible but deliberately NOT selected in the admin action.
+  - email: carol@example.com
+    name: Carol NotSelected
+    handle: carol
+    account_visibility: public
+    email_social_activity_enabled: true
+    push_social_activity_enabled: false
+
+  # Every channel off — `skipped_disabled` probe.
+  - email: dave@example.com
+    name: Dave AllOff
+    handle: dave
+    account_visibility: public
+    email_social_activity_enabled: false
+    push_social_activity_enabled: false
+    email_interest_matches_enabled: false
+    push_interest_matches_enabled: false

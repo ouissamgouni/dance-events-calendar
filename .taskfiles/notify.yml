@@ -1,0 +1,165 @@
+version: "3"
+
+# ════════════════════════════════════════════════════════════════
+# Notification dispatch triggers
+#
+# Local envs (dev / scenario / staging.local) run the CLI in-process
+# against the local DB. Remote envs (staging.remote / prod) POST to
+# /api/admin/trigger-notifications with an admin session cookie the
+# caller supplies via MOVIDA_ADMIN_COOKIE.
+# ════════════════════════════════════════════════════════════════
+
+vars:
+  SCENARIO_PORTS_SH: .taskfiles/scenario_ports.sh
+  CLI_MODULE: backend.scripts.trigger_notifications
+
+tasks:
+  trigger:
+    desc: "Trigger one notification dispatch tick (all phases; alias for trigger:dev)."
+    cmds:
+      - task: trigger:dev
+
+  # ───────────────────────────────────────────────────────────────
+  # Per-phase shortcuts (local envs). Each wraps a CLI --only run so
+  # you can exercise one stage of the pipeline in isolation:
+  #   matcher   → create interest_event rows (no email)
+  #   emails    → ship pending activity digests (no matcher run)
+  #   reminders → event-reminder emails/pushes only
+  # For scenarios, pass SCENARIO=<name>. For staging.local, use the
+  # :staging:local variant of the base target below.
+  # ───────────────────────────────────────────────────────────────
+  matcher:
+    desc: "Run the interest matcher only (creates interest_event rows, no email)."
+    cmds:
+      - CLI_ARGS="--only matcher ${CLI_ARGS:-}" task notify:trigger:dev
+
+  emails:
+    desc: "Ship pending activity-digest emails only (no matcher, no reminders)."
+    cmds:
+      - CLI_ARGS="--only emails ${CLI_ARGS:-}" task notify:trigger:dev
+
+  reminders:
+    desc: "Send due event reminders only (no matcher, no activity digest)."
+    cmds:
+      - CLI_ARGS="--only reminders ${CLI_ARGS:-}" task notify:trigger:dev
+
+  matcher:scenario:
+    desc: "Interest matcher only, against a scenario DB (SCENARIO=<name>)."
+    cmds:
+      - CLI_ARGS="--only matcher ${CLI_ARGS:-}" task notify:trigger:scenario
+
+  emails:scenario:
+    desc: "Activity digests only, against a scenario DB (SCENARIO=<name>)."
+    cmds:
+      - CLI_ARGS="--only emails ${CLI_ARGS:-}" task notify:trigger:scenario
+
+  reminders:scenario:
+    desc: "Event reminders only, against a scenario DB (SCENARIO=<name>)."
+    cmds:
+      - CLI_ARGS="--only reminders ${CLI_ARGS:-}" task notify:trigger:scenario
+
+  trigger:dev:
+    desc: "Trigger dispatch against dev DB. Flags via CLI_ARGS (e.g. --reset-scan --user nora@example.com --json)."
+    dir: backend
+    dotenv: ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/dev.env"]
+    cmds:
+      - |
+        ARGS="${CLI_ARGS:-}{{.CLI_ARGS}}"
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m {{.CLI_MODULE}} $ARGS
+
+  trigger:scenario:
+    desc: "Trigger dispatch against a scenario DB (SCENARIO=<name>, default 'default'). CLI_ARGS forwarded."
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/config/base.env",
+        "{{.ROOT_DIR}}/config/scenario.env",
+        "{{.ROOT_DIR}}/config/secrets.env",
+        "{{.ROOT_DIR}}/config/secrets.scenario.env",
+      ]
+    vars:
+      SCENARIO: '{{.SCENARIO | default "default"}}'
+    cmds:
+      - |
+        source {{.SCENARIO_PORTS_SH}} "{{.SCENARIO}}"
+        SCENARIO_CFG="{{.ROOT_DIR}}/scenarios/{{.SCENARIO}}/config.env"
+        [ -f "$SCENARIO_CFG" ] && set -a && . "$SCENARIO_CFG" && set +a
+        ARGS="${CLI_ARGS:-}{{.CLI_ARGS}}"
+        DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${SC_DB_PORT}/${SC_DB_NAME}" \
+          PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m {{.CLI_MODULE}} $ARGS
+
+  trigger:staging:local:
+    desc: "Trigger dispatch against local staging DB (docker-compose, port 5436)."
+    dir: backend
+    dotenv:
+      [
+        "{{.ROOT_DIR}}/config/base.env",
+        "{{.ROOT_DIR}}/config/staging.local.env",
+      ]
+    cmds:
+      - |
+        ARGS="${CLI_ARGS:-}{{.CLI_ARGS}}"
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m {{.CLI_MODULE}} $ARGS
+
+  trigger:staging:remote:
+    desc: "POST /api/admin/trigger-notifications on remote staging (MOVIDA_ADMIN_COOKIE required)."
+    vars:
+      # The API lives on its own subdomain (see config/staging.remote.frontend.env
+      # VITE_API_URL / frontend/wrangler.toml env.preview.vars.API_BASE) so the
+      # session_token cookie is first-party. develop.joinmovida.com is the
+      # Cloudflare Pages *frontend* — posting there returns HTTP 405.
+      URL: "https://api-develop.joinmovida.com"
+      PUBLIC_URL: "https://develop.joinmovida.com"
+    cmds:
+      - task: _http_trigger
+        vars:
+          URL: "{{.URL}}"
+          PUBLIC_URL: "{{.PUBLIC_URL}}"
+          ENV_LABEL: "staging (remote)"
+
+  trigger:prod:
+    desc: "POST /api/admin/trigger-notifications on production (MOVIDA_ADMIN_COOKIE required, confirms first)."
+    vars:
+      URL: "https://api.joinmovida.com"
+      PUBLIC_URL: "https://joinmovida.com"
+    prompt: "Trigger notification dispatch on PRODUCTION? This sends real emails/pushes."
+    cmds:
+      - task: _http_trigger
+        vars:
+          URL: "{{.URL}}"
+          PUBLIC_URL: "{{.PUBLIC_URL}}"
+          ENV_LABEL: "production"
+
+  _http_trigger:
+    internal: true
+    cmds:
+      - |
+        URL="{{.URL}}"
+        PUBLIC_URL="{{.PUBLIC_URL}}"
+        LABEL="{{.ENV_LABEL}}"
+        if [ -z "$MOVIDA_ADMIN_COOKIE" ]; then
+          echo "❌ MOVIDA_ADMIN_COOKIE not set."
+          echo ""
+          echo "To trigger notifications on $LABEL you need an admin session cookie:"
+          echo "  1. Sign in as admin at $PUBLIC_URL"
+          echo "  2. DevTools → Application → Cookies → copy the 'session_token' value"
+          echo "     (cookie is set on the API host, e.g. api-develop.joinmovida.com)"
+          echo "  3. Re-run: MOVIDA_ADMIN_COOKIE='<value>' task notify:trigger:${LABEL// /-}"
+          echo ""
+          if command -v open >/dev/null 2>&1; then
+            printf "Open $PUBLIC_URL in your default browser now? [y/N] "
+            read -r ANS
+            case "$ANS" in y|Y|yes|YES|Yes) open "$PUBLIC_URL" ;; esac
+          fi
+          exit 1
+        fi
+        echo "→ POST $URL/api/admin/trigger-notifications"
+        HTTP=$(curl -sS -o /tmp/movida-trigger.out -w '%{http_code}' \
+          -X POST "$URL/api/admin/trigger-notifications" \
+          -H "Cookie: session_token=$MOVIDA_ADMIN_COOKIE" \
+          -H "Content-Type: application/json")
+        cat /tmp/movida-trigger.out; echo
+        if [ "$HTTP" != "200" ]; then
+          echo "❌ HTTP $HTTP — cookie expired or not admin?"
+          exit 1
+        fi
+        echo "✅ Dispatched on $LABEL."

@@ -425,7 +425,7 @@ export default function AdminEventDetailContent({
                     <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Tags</span>
                     {!tagsExpanded && event.tags?.length > 0 && (
                         <span className="flex-1 min-w-0">
-                            <TagBadges tags={event.tags} maxVisible={event.tags.length} />
+                            <TagBadges tags={event.tags} maxVisible={event.tags.length} forceBadge forceColored />
                         </span>
                     )}
                     {!tagsExpanded && (!event.tags || event.tags.length === 0) && (

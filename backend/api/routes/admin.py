@@ -1,7 +1,9 @@
 import logging
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import or_
 from sqlmodel import Session, col, func, select
 
 logger = logging.getLogger(__name__)
@@ -23,12 +25,23 @@ from backend.api.schemas import (
     CalendarDefaultTagsUpdate,
     CalendarSettingResponse,
     CalendarToggleRequest,
+    DigestSendNowRequest,
+    DigestSendNowResponse,
     EventFilterOptionsResponse,
     EventIdsResponse,
     EventResponse,
     EventUpdateRequest,
     FilterOption,
+    ForceInterestMatchSendRequest,
+    ForceInterestMatchSendResponse,
+    ForceInterestMatchPreviewResponse,
+    ForceInterestMatchPreviewUser,
+    ForceSendUserResult,
     GeocodeSuggestion,
+    NotificationLogEntry,
+    NotificationLogResponse,
+    NotificationToggleCountEntry,
+    NotificationToggleCountsResponse,
     PaginatedEventsResponse,
     SyncJobListResponse,
     SyncJobStartRequest,
@@ -50,6 +63,9 @@ from backend.db.models import (
     EventSave,
     EventTag,
     EventView,
+    Notification,
+    NotificationDelivery,
+    PushSubscription,
     SyncLog,
     Tag,
     TagSuggestion,
@@ -551,6 +567,449 @@ def trigger_notifications(_admin: dict = Depends(require_admin)):
 
     stats = run_notification_dispatch_once()
     return {"status": "ok", "stats": stats}
+
+
+@router.get("/notifications/effective-config")
+def notifications_effective_config(
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Resolved (site_settings-override-or-env) notification config.
+
+    For each admin-configurable gate, reports the *effective* value the
+    running instance actually uses right now plus where it came from —
+    ``site_setting`` (an explicit DB override exists) or ``env_or_default``
+    (falling through to the env var / hardcoded default in
+    ``backend.config.loader``). Answers "what is the backend actually
+    using?" without needing direct DB access.
+    """
+    from backend.config import loader
+    from backend.services import app_settings
+
+    def _entry(effective, row_present: bool, env_value):
+        return {
+            "effective": effective,
+            "source": "site_setting" if row_present else "env_or_default",
+            "env_or_default_value": env_value,
+        }
+
+    return {
+        "event_reminders_enabled": _entry(
+            app_settings.get_event_reminders_enabled(session),
+            app_settings._get_bool_row(session, "event_reminders_enabled") is not None,
+            loader.get_event_reminders_enabled(),
+        ),
+        "activity_digest_email_enabled": _entry(
+            app_settings.get_activity_digest_email_enabled(session),
+            app_settings._get_bool_row(session, "activity_digest_email_enabled")
+            is not None,
+            loader.get_activity_digest_email_enabled(),
+        ),
+        "interest_match_notifications_enabled": _entry(
+            app_settings.get_interest_match_notifications_enabled(session),
+            app_settings._get_bool_row(session, "interest_match_notifications_enabled")
+            is not None,
+            loader.get_interest_match_notifications_enabled(),
+        ),
+        "web_push_enabled": _entry(
+            app_settings.get_web_push_enabled(session),
+            app_settings._get_bool_row(session, "web_push_enabled") is not None,
+            loader.get_web_push_enabled(),
+        ),
+        "reminder_lead_hours": _entry(
+            app_settings.get_reminder_lead_hours(session),
+            app_settings._get_int_row(session, "reminder_lead_hours") is not None,
+            loader.get_reminder_lead_hours(),
+        ),
+        "activity_digest_schedule": _entry(
+            app_settings.get_activity_digest_schedule(session),
+            app_settings._get_str_row(session, "activity_digest_schedule") is not None,
+            app_settings.DEFAULT_DIGEST_SCHEDULE,
+        ),
+        # Env-only (no DB override support): the in-app scheduler loop and
+        # its tick cadence, which only take effect on process restart.
+        "notification_scheduler_enabled": {
+            "effective": loader.get_notification_scheduler_enabled(),
+            "source": "env_only",
+        },
+        "notification_interval_minutes": {
+            "effective": loader.get_notification_interval_minutes(),
+            "source": "env_only",
+        },
+        "vapid_configured": bool(
+            loader.get_vapid_config().get("public_key")
+            and loader.get_vapid_config().get("private_key")
+        ),
+    }
+
+
+@router.get("/notifications/webpush/subscriber-count")
+def webpush_subscriber_count(
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Count of distinct signed-in users with at least one registered Web
+    Push browser endpoint. Anonymous (``user_id IS NULL``) subscriptions are
+    excluded since they aren't tied to an account.
+    """
+    count = int(
+        session.exec(
+            select(func.count(func.distinct(PushSubscription.user_id))).where(
+                col(PushSubscription.user_id).is_not(None)
+            )
+        ).one()
+    )
+    return {"subscriber_count": count}
+
+
+@router.get(
+    "/notifications/toggle-counts", response_model=NotificationToggleCountsResponse
+)
+def notification_toggle_counts(
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Count of non-deleted users with each per-feature notification
+    channel toggle turned on, shown next to the corresponding global gate
+    in admin Configuration so an admin can see how many users a change
+    would actually affect.
+    """
+    from sqlalchemy import case
+
+    def _count(condition) -> int:
+        return int(
+            session.exec(
+                select(func.sum(case((condition, 1), else_=0))).where(
+                    col(User.deleted_at).is_(None)
+                )
+            ).one()
+            or 0
+        )
+
+    total_users = int(
+        session.exec(
+            select(func.count()).select_from(User).where(col(User.deleted_at).is_(None))
+        ).one()
+    )
+
+    return NotificationToggleCountsResponse(
+        total_users=total_users,
+        interest_match=NotificationToggleCountEntry(
+            email=_count(User.email_interest_matches_enabled == True),  # noqa: E712
+            push=_count(User.push_interest_matches_enabled == True),  # noqa: E712
+        ),
+        event_reminders=NotificationToggleCountEntry(
+            email=_count(User.email_event_reminders_enabled == True),  # noqa: E712
+            push=_count(User.push_event_reminders_enabled == True),  # noqa: E712
+        ),
+        activity_digest=NotificationToggleCountEntry(
+            email=_count(User.email_social_activity_enabled == True),  # noqa: E712
+            push=_count(User.push_social_activity_enabled == True),  # noqa: E712
+        ),
+    )
+
+
+# Notification type (as shown in the admin Notifications tab) -> the
+# Notification.kind values that roll up into it. Built from the same
+# single-source-of-truth maps the delivery workers use, so the log can
+# never drift from what "interest_match" / "activity_digest" actually mean.
+def _notification_kinds_by_type() -> dict[str, list[str]]:
+    from backend.services import activity_email
+    from backend.services.reminder_service import EVENT_REMINDER
+
+    kinds_by_type: dict[str, list[str]] = {
+        "interest_match": [],
+        "activity_digest": [],
+        "event_reminder": [EVENT_REMINDER],
+    }
+    for kind, feature in activity_email.FEATURE_BY_KIND.items():
+        if feature == "interest_matches":
+            kinds_by_type["interest_match"].append(kind)
+        elif feature == "social_activity":
+            kinds_by_type["activity_digest"].append(kind)
+    return kinds_by_type
+
+
+@router.get("/notifications/log", response_model=NotificationLogResponse)
+def admin_notifications_log(
+    type: Optional[str] = Query(default=None),
+    channel: Optional[str] = Query(default=None),
+    q: Optional[str] = Query(default=None, max_length=120),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """List every notification delivery event ever recorded, newest first,
+    for the admin Notifications tab.
+
+    Reads from ``NotificationDelivery`` — one row per actual app/email/push
+    distribution event — so only channels that were actually (or, for
+    "app", eligibly) delivered show up here; a notification suppressed by
+    a recipient's disabled channel produces no row for that channel.
+
+    ``type`` filters to one of "interest_match" / "activity_digest" /
+    "event_reminder" (matching the 3 feature gates in Configuration).
+    ``channel`` filters to "app", "email", or "push". ``q`` matches the
+    recipient's handle, display name, or email (case-insensitive
+    substring).
+    """
+    kinds_by_type = _notification_kinds_by_type()
+    if type is not None and type not in kinds_by_type:
+        raise HTTPException(status_code=400, detail=f"Unknown type: {type}")
+    if channel is not None and channel not in ("app", "email", "push"):
+        raise HTTPException(status_code=400, detail=f"Unknown channel: {channel}")
+
+    from sqlalchemy.orm import aliased
+
+    from backend.services.activity_email import _render_plain
+
+    Actor = aliased(User)
+    stmt = (
+        select(NotificationDelivery, Notification, User, Actor, CachedEvent)
+        .join(Notification, Notification.id == NotificationDelivery.notification_id)
+        .join(User, User.id == Notification.recipient_user_id)
+        .outerjoin(Actor, Actor.id == Notification.actor_user_id)
+        .outerjoin(CachedEvent, CachedEvent.event_id == Notification.event_id)
+    )
+    if type is not None:
+        stmt = stmt.where(col(Notification.kind).in_(kinds_by_type[type]))
+    if channel is not None:
+        stmt = stmt.where(NotificationDelivery.channel == channel)
+    if q:
+        needle = f"%{q.strip().lower()}%"
+        stmt = stmt.where(
+            or_(
+                func.lower(User.handle).like(needle),
+                func.lower(User.display_name).like(needle),
+                func.lower(User.email).like(needle),
+            )
+        )
+
+    total = int(session.exec(select(func.count()).select_from(stmt.subquery())).one())
+    rows = session.exec(
+        stmt.order_by(col(NotificationDelivery.delivered_at).desc())
+        .limit(limit)
+        .offset(offset)
+    ).all()
+
+    kind_to_type = {k: t for t, kinds in kinds_by_type.items() for k in kinds}
+    items = [
+        NotificationLogEntry(
+            id=d.id,
+            notification_id=n.id,
+            delivered_at=d.delivered_at,
+            kind=n.kind,
+            type=kind_to_type.get(n.kind, n.kind),
+            channel=d.channel,
+            recipient_user_id=u.id,
+            recipient_email=u.email,
+            recipient_handle=u.handle,
+            recipient_display_name=u.display_name,
+            summary=_render_plain(n.kind, actor, event, n.context),
+            actor_display_name=actor.display_name if actor else None,
+            actor_handle=actor.handle if actor else None,
+            event_id=event.event_id if event else None,
+            event_title=event.title if event else None,
+            context=n.context,
+        )
+        for d, n, u, actor, event in rows
+    ]
+    return NotificationLogResponse(items=items, total=total)
+
+
+@router.post(
+    "/notifications/interest-match/force-send",
+    response_model=ForceInterestMatchSendResponse,
+)
+def force_send_interest_matches(
+    body: ForceInterestMatchSendRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Admin override: scan for interest-profile matches over a custom
+    ``lookback_hours`` window for hand-picked users and deliver them right
+    away (email/push), bypassing the normal digest schedule window and the
+    global scan cursor. For support/debugging — e.g. verifying a user's
+    saved-search alert works, or backfilling a match they say they missed.
+    """
+    from backend.services import activity_email, interest_notification_service
+    from backend.services.interest_notification_service import INTEREST_EVENT
+
+    users = {
+        u.id: u
+        for u in session.exec(
+            select(User).where(User.id.in_(body.user_ids))  # type: ignore[union-attr]
+        ).all()
+    }
+
+    results: list[ForceSendUserResult] = []
+    eligible_ids: set = set()
+    for uid in body.user_ids:
+        user = users.get(uid)
+        if user is None or user.deleted_at is not None:
+            results.append(
+                ForceSendUserResult(user_id=uid, email="", status="skipped_not_found")
+            )
+            continue
+        if not (
+            user.email_interest_matches_enabled or user.push_interest_matches_enabled
+        ):
+            results.append(
+                ForceSendUserResult(
+                    user_id=uid, email=user.email, status="skipped_disabled"
+                )
+            )
+            continue
+        eligible_ids.add(uid)
+
+    if not eligible_ids:
+        return ForceInterestMatchSendResponse(
+            candidates_scanned=0,
+            notifications_created=0,
+            digests_sent=0,
+            pushes_sent=0,
+            results=results,
+        )
+
+    match_stats = interest_notification_service.run_once_for_users(
+        eligible_ids, body.lookback_hours
+    )
+    digest_stats = activity_email.run_once(
+        force=True, user_ids=eligible_ids, kinds=(INTEREST_EVENT,)
+    )
+    delivered = set(digest_stats.get("delivered_recipients") or [])
+    for uid in eligible_ids:
+        status = "sent" if str(uid) in delivered else "no_pending_notifications"
+        results.append(
+            ForceSendUserResult(user_id=uid, email=users[uid].email, status=status)
+        )
+
+    return ForceInterestMatchSendResponse(
+        candidates_scanned=match_stats.get("candidates", 0),
+        notifications_created=match_stats.get("created", 0),
+        digests_sent=digest_stats.get("digests", 0),
+        pushes_sent=digest_stats.get("pushed", 0),
+        results=results,
+    )
+
+
+@router.post(
+    "/notifications/interest-match/preview",
+    response_model=ForceInterestMatchPreviewResponse,
+)
+def preview_interest_matches(
+    body: ForceInterestMatchSendRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Dry-run companion to ``force-send``: reports, per selected user, how
+    many events in the ``lookback_hours`` window match their interest
+    profile(s) and how many of those are new (i.e. would actually create a
+    notification). Lets an admin sanity-check a force-send before committing
+    to it — e.g. explaining a "26 candidates, 0 created" result, which means
+    none of the candidate events matched this user's saved profile(s).
+    """
+    from backend.services.interest_notification_service import preview_matches_for_users
+
+    users = {
+        u.id: u
+        for u in session.exec(
+            select(User).where(User.id.in_(body.user_ids))  # type: ignore[union-attr]
+        ).all()
+    }
+
+    preview = preview_matches_for_users(set(body.user_ids), body.lookback_hours)
+    per_user = preview.get("per_user", {})
+
+    results: list[ForceInterestMatchPreviewUser] = []
+    for uid in body.user_ids:
+        user = users.get(uid)
+        if user is None:
+            continue
+        stats = per_user.get(str(uid), {})
+        results.append(
+            ForceInterestMatchPreviewUser(
+                user_id=uid,
+                email=user.email,
+                matched_events=stats.get("matched_events", 0),
+                new_events=stats.get("new_events", 0),
+            )
+        )
+
+    return ForceInterestMatchPreviewResponse(
+        candidates_scanned=preview.get("candidates_scanned", 0),
+        results=results,
+    )
+
+
+@router.post("/notifications/digest/send-now", response_model=DigestSendNowResponse)
+def digest_send_now(
+    body: DigestSendNowRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Admin override: ship each selected user's pending activity digest
+    (social activity + interest matches) right now, bypassing the digest
+    schedule window and the once-per-day dedup gate for just that user.
+    """
+    from backend.services import activity_email
+
+    users = {
+        u.id: u
+        for u in session.exec(
+            select(User).where(User.id.in_(body.user_ids))  # type: ignore[union-attr]
+        ).all()
+    }
+
+    results: list[ForceSendUserResult] = []
+    eligible_ids: set = set()
+    for uid in body.user_ids:
+        user = users.get(uid)
+        if user is None or user.deleted_at is not None:
+            results.append(
+                ForceSendUserResult(user_id=uid, email="", status="skipped_not_found")
+            )
+            continue
+        has_any_channel = (
+            user.email_social_activity_enabled
+            or user.email_interest_matches_enabled
+            or user.push_social_activity_enabled
+            or user.push_interest_matches_enabled
+        )
+        if not has_any_channel:
+            results.append(
+                ForceSendUserResult(
+                    user_id=uid, email=user.email, status="skipped_disabled"
+                )
+            )
+            continue
+        eligible_ids.add(uid)
+
+    if not eligible_ids:
+        return DigestSendNowResponse(
+            digests_sent=0, pushes_sent=0, stamped=0, results=results
+        )
+
+    stats = activity_email.run_once(
+        force=True,
+        user_ids=eligible_ids,
+        max_notifications_per_user=body.max_notifications_per_user,
+        resend=body.resend,
+    )
+    delivered = set(stats.get("delivered_recipients") or [])
+    for uid in eligible_ids:
+        status = "sent" if str(uid) in delivered else "no_pending_notifications"
+        results.append(
+            ForceSendUserResult(user_id=uid, email=users[uid].email, status=status)
+        )
+
+    return DigestSendNowResponse(
+        digests_sent=stats.get("digests", 0),
+        pushes_sent=stats.get("pushed", 0),
+        stamped=stats.get("stamped", 0),
+        results=results,
+    )
 
 
 @router.get("/sync-jobs/current")

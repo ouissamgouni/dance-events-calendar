@@ -1,0 +1,8 @@
+attendances:
+  # Alice marks Going on ev-friend-going; newbie follows Alice, so the
+  # activity digest should list this Going regardless of newbie's
+  # interest_match_notifications_enabled setting.
+  - event_id: ev-friend-going
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public

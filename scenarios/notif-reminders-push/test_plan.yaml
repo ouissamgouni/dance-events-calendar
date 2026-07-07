@@ -1,0 +1,56 @@
+test_plan:
+  name: "Reminders — web-push channel"
+  description: >
+    (Feature × Channel) truth-table cell. Feature = event reminders.
+    Channel = web-push. Asserts reminder_service dispatches a web-push
+    notification to each subscribed device belonging to a `going`
+    attendee whose `push_event_reminders_enabled` toggle is true.
+    Email is disabled per-user so the only outbound is push.
+
+  preconditions:
+    - >-
+      Start scenario:
+      `SCENARIO=reminders-push RESET=1 task start:scenario`
+    - >-
+      In a Chromium browser, sign in as Alice (alice@example.com), open
+      /account#notifications, and click "Enable push notifications" so a
+      live PushSubscription row is written bound to Alice's user_id.
+
+  cast:
+    - "Alice — push_event_reminders ON + a real device subscription."
+    - "Bob   — push_event_reminders OFF → in-app row only, no push."
+
+  steps:
+    - id: 1
+      title: "Trigger one dispatch tick"
+      description: >
+        `SCENARIO=reminders-push task notify:trigger:scenario`
+      expected: >
+        Stats: `reminders.created=2`, `reminders.emailed=0`,
+        `reminders.pushed=1` (Alice only).
+
+    - id: 2
+      title: "Verify push arrival on Alice's device"
+      description: >
+        Observe the system notification tray on the browser/device
+        where the subscription was created.
+      expected: >
+        A system push appears with copy "Reminder — you're going to
+        Rooftop Salsa Social". Clicking it opens the app to the event
+        detail page.
+
+    - id: 3
+      title: "In-app rows still fire for both"
+      description: >
+        `GET /api/notifications` as each user.
+      expected: >
+        Both Alice and Bob have one `event_reminder` row (Phase G:
+        rows are always created regardless of push toggle).
+
+    - id: 4
+      title: "Email channel remains silent"
+      description: >
+        No SMTP is configured; every user has
+        email_event_reminders_enabled=false.
+      expected: >
+        `reminders.emailed=0`.

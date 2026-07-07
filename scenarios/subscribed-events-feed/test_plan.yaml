@@ -197,28 +197,36 @@ test_plan:
 
     # ── Mark-read flows ──────────────────────────────────────────
     - id: 11
-      title: "Mark a single notification as read clears its dot"
+      title: "Opening /notifications marks every loaded row read (view = read)"
       description: >
-        Still on Browser B (Bob), on /notifications, click the
-        notification card for alice/evt-sef-002 (or its dedicated
-        "Mark read" affordance if the row has one).
+        Still on Browser B (Bob, with the 2 unread rows from steps 4+9),
+        navigate to /notifications.
       expected: >
-        Network: POST /api/notifications/{id}/read → 200 with
-        read_at populated. The unread dot on that row disappears, and
-        the bell badge decrements from 2 → 1. The row stays in the
-        list (read notifications are not auto-hidden so the user can
-        still re-open the source event).
+        Network: on mount, POST /api/notifications/read-all fires
+        automatically (alongside the GET /api/notifications load) —
+        merely viewing the page is the acknowledgement, matching the
+        Instagram/Facebook pattern rather than requiring a click per
+        row. All rows render without an unread dot immediately, and
+        the bell badge clears: GET /api/notifications/unread-count
+        → {count:0}. The rows stay in the list (read notifications
+        are not auto-hidden so the user can still re-open the source
+        event).
 
     - id: 12
-      title: "'Mark all read' clears the badge"
+      title: "Opening the bell panel also auto-marks-read"
       description: >
-        Still on Browser B (Bob), click the "Mark all read" action in
-        the /notifications header.
+        Generate a fresh unread notification (repeat step 4 with a new
+        event, or re-toggle Going on evt-sef-002 audience if needed so
+        unread_count becomes 1 again), then on Browser B click the bell
+        icon to open the slide-in panel (without navigating to
+        /notifications).
       expected: >
-        Network: POST /api/notifications/read-all → {count:0}. The
-        bell badge disappears. GET /api/notifications/unread-count
-        → {count:0}. All previously-unread rows now have a read_at
-        timestamp (the row count itself is unchanged).
+        Network: POST /api/notifications/read-all fires as soon as the
+        panel opens (same effect as visiting the full page). The badge
+        disappears immediately and GET /api/notifications/unread-count
+        → {count:0}. The explicit "Mark all read" button in the panel/
+        page header remains present and is a harmless no-op once rows
+        are already read.
 
     # ── Suggested fan-out ────────────────────────────────────────
     - id: 13

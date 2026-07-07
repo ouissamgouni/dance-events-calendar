@@ -1,0 +1,18 @@
+base_week: 0
+events:
+- id: evt-fy-sync-001
+  calendar_id: salsa-cal-001
+  title: Rooftop Salsa After Sync
+  description: 'Newly synced salsa social. Verifies the For You rail''s New lens
+
+    populates after an admin sync and stays a subset of Recommended.
+
+    '
+  location: Piazza del Duomo 1, 20122 Milano, Italy
+  start: w1 Mon 20:00
+  end: w1 Tue 00:00
+  price_is_free: false
+  price_min: 15
+  price_currency: EUR
+  tags:
+  - reach:international

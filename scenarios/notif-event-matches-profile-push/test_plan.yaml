@@ -1,0 +1,71 @@
+test_plan:
+  name: "Profile match — web-push channel"
+  description: >
+    (Feature × Channel) truth-table cell. Feature = interest-profile
+    matches. Channel = web-push. Asserts that
+    interest_notification_service creates in-app rows AND
+    activity_email dispatches web-push to subscribed devices via VAPID
+    for users who have push_interest_matches_enabled=true. Email is
+    disabled per-user so the only observable outbound delivery on
+    subscribed devices is push.
+
+  preconditions:
+    - >-
+      Start scenario:
+      `SCENARIO=profile-match-push RESET=1 task start:scenario`
+    - >-
+      In a Chromium browser, sign in as Nora (nora@example.com), open
+      /account#notifications, and click "Enable push notifications" so
+      a live PushSubscription row is written bound to Nora's user_id.
+
+  cast:
+    - "Nora — push_interest_matches ON + a real device subscription."
+    - "Bob, Carol — push toggle ON but NO subscription → dispatch is a no-op."
+    - "Dan — per-profile matches_enabled=false → 0 rows → 0 push."
+    - "Eve — user push_interest_matches=false → in-app row only, no push."
+
+  steps:
+    - id: 1
+      title: "Trigger one dispatch tick"
+      description: >
+        `SCENARIO=notif-event-matches-profile-push task notify:trigger:scenario -- --reset-scan --immediate-emails`
+        `--immediate-emails` bypasses the per-user digest schedule
+        (default tue+fri @ 09:00 local) for this run so push fires
+        regardless of the recipient's TZ/slot — prod behavior is
+        otherwise unchanged.
+      expected: >
+        Stats: `interest.created` ≥ 8, `activity.pushed` ≥ 1 (only
+        Nora has a live subscription; her push queue is drained on
+        this tick).
+
+    - id: 2
+      title: "Verify push arrival on Nora's device"
+      description: >
+        Observe the system notification tray on the browser/device
+        where step (2) of preconditions ran.
+      expected: >
+        A system push appears with the interest-match digest copy.
+        Clicking it opens the app to the target event URL.
+
+    - id: 3
+      title: "Email channel remains silent"
+      description: >
+        No SMTP is configured; every user has
+        email_interest_matches_enabled=false. Verify Mailpit if
+        running.
+      expected: >
+        No emails sent. `activity.digests` counts only push-shaped
+        rows (per activity_email's per-channel accounting) — inspect
+        by kind if needed; the important assertion is zero SMTP
+        traffic.
+
+    - id: 4
+      title: "Negative probe — Eve"
+      description: >
+        Check Eve's in-app rows and push tray (if she has a
+        subscription).
+      expected: >
+        Eve has 2 in-app rows (ev-m1, ev-m2) but received ZERO push
+        notifications — user-level `push_interest_matches_enabled=false`
+        suppresses the send even when the device is subscribed and the
+        admin gate is on.

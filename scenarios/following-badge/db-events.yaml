@@ -23,9 +23,8 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:international
   - id: evt-fb-002
     calendar_id: bachata-cal-002
     title: Bachata Workshop
@@ -44,8 +43,7 @@ events:
     - dance-style:bachata
     - level:all-levels
     - venue:indoor
-    - scale:small
-    - scope:local
+    - reach:local
   - id: evt-fb-003
     calendar_id: salsa-cal-001
     title: Cuban Night (one-way follower control)
@@ -63,9 +61,8 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:regional
   - id: evt-fb-004
     calendar_id: bachata-cal-002
     title: Stranger Bachata (no friends seeded)
@@ -105,8 +102,7 @@ events:
     - dance-style:bachata
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
+    - reach:local
   - id: evt-fb-100
     calendar_id: salsa-cal-001
     title: European Salsa Congress (Madrid)
@@ -127,9 +123,8 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:indoor
-    - scale:large
-    - scope:international
     - vibe:crowded
+    - reach:international
   - id: evt-fb-101
     calendar_id: salsa-cal-001
     title: Canal Salsa Social (Amsterdam)
@@ -147,9 +142,8 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:international
   - id: evt-fb-102
     calendar_id: bachata-cal-002
     title: Trastevere Bachata Night (Rome)
@@ -169,9 +163,8 @@ events:
     - dance-style:bachata
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:social-atmosphere
+    - reach:local
   - id: evt-fb-103
     calendar_id: salsa-cal-001
     title: Old Town Salsa (Prague)
@@ -191,9 +184,8 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
     - vibe:good-music
+    - reach:regional
   - id: evt-fb-104
     calendar_id: salsa-cal-001
     title: Donau Salsa Open Air (Vienna)
@@ -213,8 +205,7 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:outdoor
-    - scale:medium
-    - scope:local
+    - reach:local
   - id: evt-fb-105
     calendar_id: bachata-cal-002
     title: Alfama Bachata Rooftop (Lisbon)
@@ -234,8 +225,7 @@ events:
     - dance-style:bachata
     - level:all-levels
     - venue:rooftop
-    - scale:medium
-    - scope:local
+    - reach:international
   - id: evt-fb-106
     calendar_id: salsa-cal-001
     title: Gothic Quarter Salsa (Barcelona)
@@ -255,5 +245,4 @@ events:
     - dance-style:salsa
     - level:all-levels
     - venue:indoor
-    - scale:medium
-    - scope:local
+    - reach:regional

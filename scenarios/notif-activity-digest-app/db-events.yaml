@@ -1,0 +1,18 @@
+# Focused social-activity fixture. Alice attends ev-friend; Bob and
+# Carol follow Alice → each of them should receive a social_activity
+# digest entry for Alice's Going event.
+base_week: 0
+events:
+  - id: ev-friend
+    calendar_id: salsa-cal-001
+    title: Bachata Friendly Social
+    description: "Used to validate friend/activity digest."
+    location: "Studio Azul, Paris, France"
+    latitude: 48.8662
+    longitude: 2.3744
+    start: w1 Wed 19:30
+    end: w1 Wed 22:30
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local

@@ -1,8 +1,11 @@
 """Web Push delivery via VAPID + pywebpush.
 
 Sends encrypted push messages to a user's registered browser endpoints. Used
-by the notification dispatch workers (reminders + activity digests) when the
-recipient has ``push_enabled`` and at least one live subscription.
+by the notification dispatch workers (reminders + activity digests) after
+they've filtered on the appropriate per-user, per-feature push flag
+(``push_event_reminders_enabled`` / ``push_social_activity_enabled`` /
+``push_interest_matches_enabled``) and confirmed at least one live
+subscription.
 
 Resilience:
   * No-ops (returns 0) when web-push is disabled or VAPID keys are unset, so
@@ -20,7 +23,8 @@ from uuid import UUID
 
 from sqlmodel import Session, delete, select
 
-from backend.config.loader import get_vapid_config, get_webpush_enabled
+from backend.config.loader import get_vapid_config
+from backend.services.app_settings import get_web_push_enabled
 from backend.db.database import get_engine
 from backend.db.models import PushSubscription
 
@@ -29,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 def webpush_configured() -> bool:
     """True when web-push is enabled and a VAPID keypair is available."""
-    if not get_webpush_enabled():
+    if not get_web_push_enabled():
         return False
     cfg = get_vapid_config()
     return bool(cfg.get("private_key") and cfg.get("public_key"))

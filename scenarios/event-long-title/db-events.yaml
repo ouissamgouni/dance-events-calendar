@@ -17,12 +17,7 @@ events:
     end: w0 Thu 23:45
     price_is_free: true
     tags:
-      [
-        "format:social",
-        "dance-style:salsa",
-        "level:all-levels",
-        "scope:international",
-      ]
+      ["format:social", "dance-style:salsa", "level:all-levels", "reach:local"]
   - id: evt-lt-002
     calendar_id: bachata-cal-002
     title: "London Bachata Bootcamp and Social for Improvers Who Want Musicality Drills, Styling Lab Rotations, Footwork Intensives, Partner Connection Clinics, and a Late-Night Guest DJ Showcase"
@@ -43,7 +38,7 @@ events:
         "format:bootcamp",
         "dance-style:bachata",
         "level:intermediate",
-        "scope:local",
+        "reach:international",
       ]
   - id: evt-lt-003
     calendar_id: salsa-cal-001
@@ -61,5 +56,5 @@ events:
         "format:social",
         "dance-style:salsa",
         "level:beginner-friendly",
-        "scope:local",
+        "reach:regional",
       ]

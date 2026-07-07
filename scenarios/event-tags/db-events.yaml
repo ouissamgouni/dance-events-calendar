@@ -22,8 +22,8 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:indoor
-  - scale:medium
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-tag-002
   calendar_id: bachata-cal-002
   title: Bachata Night
@@ -49,6 +49,7 @@ events:
   - level:all-levels
   - venue:indoor
   - vibe:good-music
+  - reach:local
 - id: evt-tag-003
   calendar_id: salsa-cal-001
   title: Salsa On2 Intermediate Workshop
@@ -78,7 +79,7 @@ events:
   - dance-style:salsa
   - level:intermediate
   - venue:indoor
-  - scale:small
+  - reach:international
 - id: evt-tag-004
   calendar_id: kizomba-cal-003
   title: Kizomba Fundamentals
@@ -103,7 +104,7 @@ events:
   - dance-style:kizomba
   - level:beginner-friendly
   - venue:indoor
-  - scale:small
+  - reach:international
 - id: evt-tag-005
   calendar_id: salsa-cal-001
   title: Paris Salsa Congress 2025
@@ -144,11 +145,10 @@ events:
   - dance-style:bachata
   - dance-style:kizomba
   - level:all-levels
-  - scale:large
-  - scope:international
   - venue:indoor
   - vibe:crowded
   - vibe:high-level-dancers
+  - reach:international
 - id: evt-tag-006
   calendar_id: bachata-cal-002
   title: Bachata Beach Festival
@@ -187,10 +187,9 @@ events:
   - format:festival
   - dance-style:bachata
   - level:all-levels
-  - scale:large
-  - scope:international
   - venue:outdoor
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-tag-007
   calendar_id: salsa-cal-001
   title: Salsa on the Rooftop
@@ -215,10 +214,10 @@ events:
   - dance-style:salsa
   - level:all-levels
   - venue:rooftop
-  - scale:medium
   - vibe:live-band
   - vibe:good-music
   - vibe:spacious
+  - reach:international
 - id: evt-tag-008
   calendar_id: salsa-cal-001
   title: Rueda de Casino Practice
@@ -242,8 +241,7 @@ events:
   - dance-style:salsa
   - level:beginner-friendly
   - venue:indoor
-  - scale:small
-  - scope:local
+  - reach:international
 - id: evt-tag-009
   calendar_id: kizomba-cal-003
   title: Kizomba & Semba Night
@@ -270,6 +268,7 @@ events:
   - level:all-levels
   - venue:indoor
   - vibe:good-music
+  - reach:local
 - id: evt-tag-010
   calendar_id: salsa-cal-001
   title: Advanced Salsa Shines
@@ -298,8 +297,8 @@ events:
   - dance-style:salsa
   - level:advanced
   - venue:indoor
-  - scale:small
   - vibe:high-level-dancers
+  - reach:local
 - id: evt-tag-011
   calendar_id: bachata-cal-002
   title: Bachata Bootcamp Weekend
@@ -338,9 +337,8 @@ events:
   - format:bootcamp
   - dance-style:bachata
   - level:intermediate
-  - scale:small
-  - scope:regional
   - venue:indoor
+  - reach:regional
 - id: evt-tag-012
   calendar_id: kizomba-cal-003
   title: Sunday Kizomba Class
@@ -362,6 +360,8 @@ events:
   start: w0 Sun 18:00
   end: w0 Sun 19:30
   price_is_free: true
+  tags:
+  - reach:regional
 - id: evt-tag-013
   calendar_id: kizomba-cal-003
   title: Spring Kizomba Garden Party
@@ -384,8 +384,8 @@ events:
   - dance-style:kizomba
   - level:all-levels
   - venue:outdoor
-  - scale:medium
   - vibe:social-atmosphere
+  - reach:local
 - id: evt-tag-014
   calendar_id: salsa-cal-001
   title: London Latin Fiesta
@@ -426,10 +426,9 @@ events:
   - dance-style:bachata
   - level:all-levels
   - venue:indoor
-  - scale:large
-  - scope:international
   - vibe:good-music
   - vibe:crowded
+  - reach:international
 - id: evt-tag-015
   calendar_id: bachata-cal-002
   title: Bachata Summer Opener – Seville
@@ -452,9 +451,8 @@ events:
   - dance-style:bachata
   - level:all-levels
   - venue:outdoor
-  - scale:medium
-  - scope:regional
   - vibe:social-atmosphere
+  - reach:international
 - id: evt-tag-016
   calendar_id: salsa-cal-001
   title: Salsa en Plein Air – Nice
@@ -477,9 +475,9 @@ events:
   - dance-style:salsa
   - level:all-levels
   - venue:outdoor
-  - scale:medium
   - vibe:live-band
   - vibe:good-music
+  - reach:local
 - id: evt-tag-017
   calendar_id: bachata-cal-002
   title: European Bachata Summit – Vienna
@@ -520,10 +518,9 @@ events:
   - dance-style:kizomba
   - level:all-levels
   - venue:indoor
-  - scale:large
-  - scope:international
   - vibe:high-level-dancers
   - vibe:crowded
+  - reach:regional
 - id: evt-tag-018
   calendar_id: kizomba-cal-003
   title: Kizomba Sunset Rooftop – Rome
@@ -549,8 +546,8 @@ events:
   - dance-style:semba
   - level:all-levels
   - venue:rooftop
-  - scale:small
   - vibe:good-music
+  - reach:local
 - id: evt-tag-019
   calendar_id: salsa-cal-001
   title: Salsa de Rentrée – Paris
@@ -579,9 +576,8 @@ events:
   - dance-style:salsa
   - level:all-levels
   - venue:indoor
-  - scale:medium
-  - scope:local
   - vibe:social-atmosphere
+  - reach:regional
 - id: evt-tag-020
   calendar_id: bachata-cal-002
   title: Bachata Autumn Congress – Madrid
@@ -621,10 +617,9 @@ events:
   - dance-style:bachata
   - level:all-levels
   - venue:indoor
-  - scale:large
-  - scope:international
   - vibe:high-level-dancers
   - vibe:crowded
+  - reach:local
 - id: evt-tag-021
   calendar_id: kizomba-cal-003
   title: Kizomba Warmth – Amsterdam
@@ -649,9 +644,8 @@ events:
   - dance-style:kizomba
   - level:all-levels
   - venue:indoor
-  - scale:medium
-  - scope:regional
   - vibe:good-music
+  - reach:regional
 tag_suggestions:
 - event_id: evt-tag-001
   tag: vibe:good-music

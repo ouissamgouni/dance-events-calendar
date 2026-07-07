@@ -52,10 +52,9 @@ events:
       - dance-style:salsa
       - level:beginner-friendly
       - venue:indoor
-      - scale:medium
-      - scope:local
       - vibe:good-music
       - vibe:social-atmosphere
+      - reach:regional
   - id: evt-sef-002
     calendar_id: bachata-cal-002
     title: Bachata Workshop
@@ -71,8 +70,7 @@ events:
       - dance-style:bachata
       - level:intermediate
       - venue:indoor
-      - scale:small
-      - scope:local
+      - reach:international
   - id: evt-sef-003
     calendar_id: salsa-cal-001
     title: Cuban Night
@@ -88,9 +86,8 @@ events:
       - dance-style:salsa
       - level:all-levels
       - venue:indoor
-      - scale:small
-      - scope:local
       - vibe:social-atmosphere
+      - reach:international
   - id: evt-sef-004
     calendar_id: bachata-cal-002
     title: Reggaeton Block Party
@@ -107,9 +104,8 @@ events:
       - dance-style:bachata
       - level:all-levels
       - venue:outdoor
-      - scale:medium
-      - scope:local
       - vibe:social-atmosphere
+      - reach:local
   - id: evt-sef-005
     calendar_id: salsa-cal-001
     title: Mambo Matinee Social
@@ -128,9 +124,8 @@ events:
       - dance-style:salsa
       - level:beginner-friendly
       - venue:indoor
-      - scale:small
-      - scope:local
       - vibe:social-atmosphere
+      - reach:regional
   - id: evt-sef-006
     calendar_id: bachata-cal-002
     title: Bachata Practica Club
@@ -149,8 +144,7 @@ events:
       - dance-style:bachata
       - level:intermediate
       - venue:indoor
-      - scale:small
-      - scope:local
+      - reach:local
   - id: evt-sef-007
     calendar_id: salsa-cal-001
     title: Rooftop Salsa Sunset
@@ -169,9 +163,8 @@ events:
       - dance-style:salsa
       - level:all-levels
       - venue:rooftop
-      - scale:medium
-      - scope:local
       - vibe:good-music
+      - reach:international
   - id: evt-sef-008
     calendar_id: bachata-cal-002
     title: Fusion Bachata Lab
@@ -187,8 +180,7 @@ events:
       - dance-style:bachata
       - level:intermediate
       - venue:indoor
-      - scale:small
-      - scope:local
+      - reach:local
   - id: evt-sef-009
     calendar_id: salsa-cal-001
     title: Timba Late Night
@@ -207,9 +199,8 @@ events:
       - dance-style:salsa
       - level:all-levels
       - venue:indoor
-      - scale:medium
-      - scope:regional
       - vibe:good-music
+      - reach:local
   - id: evt-sef-010
     calendar_id: bachata-cal-002
     title: Bachata Sensual Intensive
@@ -229,8 +220,7 @@ events:
       - dance-style:bachata
       - level:intermediate
       - venue:indoor
-      - scale:medium
-      - scope:regional
+      - reach:local
   - id: evt-sef-011
     calendar_id: salsa-cal-001
     title: Rueda in the Park
@@ -247,9 +237,8 @@ events:
       - dance-style:rueda
       - level:all-levels
       - venue:outdoor
-      - scale:medium
-      - scope:local
       - vibe:social-atmosphere
+      - reach:regional
   - id: evt-sef-012
     calendar_id: bachata-cal-002
     title: Bachata Rooftop Party
@@ -268,9 +257,8 @@ events:
       - dance-style:bachata
       - level:all-levels
       - venue:rooftop
-      - scale:medium
-      - scope:local
       - vibe:social-atmosphere
+      - reach:regional
   - id: evt-sef-013
     calendar_id: salsa-cal-001
     title: Salsa Technique Bootcamp
@@ -289,8 +277,7 @@ events:
       - dance-style:salsa
       - level:intermediate
       - venue:indoor
-      - scale:small
-      - scope:local
+      - reach:international
   - id: evt-sef-014
     calendar_id: bachata-cal-002
     title: Bachata Beginner Crash Course
@@ -307,8 +294,7 @@ events:
       - dance-style:bachata
       - level:beginner-friendly
       - venue:indoor
-      - scale:small
-      - scope:local
+      - reach:international
   - id: evt-sef-015
     calendar_id: salsa-cal-001
     title: Live Salsa Orchestra Night
@@ -327,9 +313,8 @@ events:
       - dance-style:salsa
       - level:all-levels
       - venue:indoor
-      - scale:large
-      - scope:regional
       - vibe:live-band
+      - reach:international
   - id: evt-sef-016
     calendar_id: bachata-cal-002
     title: Bachata Congress Warm-up
@@ -348,6 +333,5 @@ events:
       - dance-style:bachata
       - level:all-levels
       - venue:indoor
-      - scale:large
-      - scope:international
       - vibe:good-music
+      - reach:local

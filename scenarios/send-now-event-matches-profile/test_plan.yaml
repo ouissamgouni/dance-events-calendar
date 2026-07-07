@@ -1,0 +1,154 @@
+test_plan:
+  name: "Admin 'Force-send interest matches' — all channels together"
+  description: >
+    Verifies the admin "Force-send interest matches" action
+    (POST /api/admin/notifications/interest-match/force-send) creates
+    the in-app notification row AND delivers both email and web-push
+    for hand-picked users, bypassing the global
+    INTEREST_MATCH_NOTIFICATIONS_ENABLED flag and the shared scan
+    cursor. Unlike the -email/-push channel-isolation scenarios, this
+    one deliberately exercises all three channels together to confirm
+    force-sending interest matches is not email-only.
+
+  preconditions:
+    - "Start a local SMTP catcher on port 1025 with a web UI, e.g. Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`."
+    - "Run the scenario with: `SCENARIO=send-now-event-matches-profile task start:scenario BROWSER=isolated RESET_BROWSER=1`."
+    - "Open the SMTP catcher UI, e.g. Mailpit at http://127.0.0.1:8025, and clear any existing messages."
+    - "In a Chromium browser, sign in as Nora (nora@example.com), open /account#notifications, and click 'Enable push notifications' so a live PushSubscription row is written bound to Nora's user_id."
+    - "The scenario seeds one matching event (ev-m1-paris-salsa-intl) and five interest profiles that all match it geographically/by tag (see db-interest-profiles.yaml). `INTEREST_MATCH_NOTIFICATIONS_ENABLED=false` and `NOTIFICATION_SCHEDULER_ENABLED=false` mean the automatic matcher never runs — the only path to a notification is the admin action below."
+    - "The scenario's own `secrets.env`/`config.env` don't need to set VAPID keys — a shared test keypair lives in the gitignored `config/secrets.scenario.env` and applies to every scenario automatically."
+
+  cast:
+    - "Nora — email ON, push ON, real device subscription. Selected. Expects in-app + email + push."
+    - "Bob — email ON, push ON, matching profile. NOT selected → negative control."
+    - "Carol — email ON, push ON, but her profile has matches_enabled=false. Selected → 0 candidates for her even though hand-picked."
+    - "Dan — email_interest_matches_enabled=false, push ON, no subscribed device. Selected → in-app row + push attempted (0 delivered, no device) but no email."
+    - "Eve — every interest-match channel off. Selected → `skipped_disabled`, never scanned."
+
+  steps:
+    - id: 1
+      title: "Nothing fires automatically"
+      description: |
+        Sign in as Dev Admin. Check Mailpit and the notification bell
+        for Nora/Bob/Carol/Dan/Eve immediately after the scenario boots.
+      expected: |
+        No in-app rows, no emails. `INTEREST_MATCH_NOTIFICATIONS_ENABLED
+        =false` and `NOTIFICATION_SCHEDULER_ENABLED=false` mean the
+        automatic matcher never runs, even though every profile above
+        matches the seeded event.
+
+    - id: 2
+      title: "Target-user picker shows per-user channel status columns"
+      description: |
+        Navigate to /admin/configuration → Notifications card →
+        "Force-send interest matches" widget → click the target-user
+        picker button to open the modal. Locate Nora, Bob, Carol, Dan
+        and Eve in the table (search by name/email if the list is
+        long) without selecting anyone yet.
+      expected: |
+        The table's "Interest-match" column shows both an email (E)
+        and push (P) dot lit for Nora, Bob, Carol and Dan (all have
+        `email_interest_matches_enabled`/`push_interest_matches_enabled`
+        =true except Dan's email, which is off), and both dots
+        unlit for Eve (both toggles false) — matching mock-users.yaml.
+        This is the same read-only status table now also shown on the
+        main Admin → Users tab.
+
+    - id: 3
+      title: "Preview matches before force-send (custom lookback hours)"
+      description: |
+        Still in the "Force-send interest matches" widget, select Nora,
+        Carol, Dan and Eve (leave Bob out). Change "Lookback (hours)"
+        from the default 24 down to 1. Click "Preview" (next to "Force
+        send").
+      expected: |
+        The preview reports `candidates_scanned: 1` (the single seeded
+        event is well inside a 1-hour window since it was just seeded).
+        Per-user: Nora and Dan each show `matched_events: 1,
+        new_events: 1`; Carol shows `matched_events: 0` (her profile's
+        `matches_enabled=false` excludes her from matching entirely,
+        independent of lookback); Eve shows `matched_events: 1,
+        new_events: 1` too — the preview matches purely on profile
+        state and does NOT consider Eve's channel toggles, so it
+        reports a real match even though the next step's force-send
+        will still skip her as `skipped_disabled` before ever
+        delivering anything. This is expected: Preview answers "does a
+        matching profile exist?", not "would this actually be sent?".
+        No notification rows are created by Preview — repeating step 4
+        below still reports fresh `new_events` for everyone.
+      notes: |
+        Lookback hours bounds candidates by each event's `updated_at`
+        (last sync/edit time), not its scheduled start date — see
+        `backend/services/interest_notification_service.py` docstring.
+        Because this scenario's event is freshly seeded, any lookback
+        from 1 to 720 hours includes it, so this step can't demonstrate
+        a lookback value that *excludes* the event from a static YAML
+        seed. Boundary-crossing coverage (an old `updated_at` outside
+        the window) is covered at the unit level in
+        `backend/tests/services/test_interest_notification_service.py`.
+
+    - id: 4
+      title: "Force-send to Nora, Carol, Dan and Eve (not Bob), same lookback"
+      description: |
+        With the same selection (Nora, Carol, Dan, Eve) and "Lookback
+        (hours)" still at 1 (matching the preview in the previous
+        step), click "Force send (4)".
+      expected: |
+        The response reports: Eve as `skipped_disabled` (excluded
+        before any scan, despite Preview showing a profile match for
+        her — see step 3); Nora and Dan each produce one match
+        (`notifications_created` includes both, matching the
+        preview's `new_events` counts); Carol produces zero matches
+        because her profile is silenced. `digests_sent` ≥ 1 (Nora's
+        email) and `pushes_sent` ≥ 1 (Nora's push). `candidates_scanned`
+        matches the Preview's `candidates_scanned` (1) since both used
+        the same 1-hour lookback.
+
+    - id: 5
+      title: "In-app rows"
+      description: |
+        Check each user's notification bell after the action.
+      expected: |
+        Nora and Dan each have exactly one new interest-match
+        notification row. Carol, Bob and Eve have none.
+
+    - id: 6
+      title: "Email channel"
+      description: |
+        Refresh the Mailpit inbox.
+      expected: |
+        Exactly one email, addressed to nora@example.com, referencing
+        the Paris Salsa International Weekender event. Dan receives no
+        email despite having an in-app row (email_interest_matches_
+        enabled=false). Bob, Carol and Eve receive nothing.
+
+    - id: 7
+      title: "Push channel on Nora's subscribed device"
+      description: |
+        Observe the system notification tray on the browser/device
+        where the precondition step enabled push for Nora.
+      expected: |
+        A system push notification appears referencing the matched
+        event, confirming force-send delivers push alongside email and
+        the in-app row — not email-only.
+
+    - id: 8
+      title: "Dan — push attempted but not delivered (no device)"
+      description: |
+        Confirm Dan has no active PushSubscription (he never visited
+        /account#notifications in this scenario run).
+      expected: |
+        Dan's in-app row exists and he was included in the push group
+        (push_interest_matches_enabled=true), but with zero subscribed
+        devices nothing is actually delivered to him — illustrating
+        that "eligible for push" and "received a push" are different
+        checks.
+
+    - id: 9
+      title: "Negative control — Bob was not selected"
+      description: |
+        Check Bob's notification bell and search Mailpit for his email.
+      expected: |
+        Bob has zero in-app rows and zero emails despite having a
+        fully matching, fully-enabled profile — proving the force-send
+        action only acts on the selected user_ids.
