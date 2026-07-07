@@ -154,14 +154,38 @@ def _wait_until(predicate, timeout: float = 2.0) -> bool:
     return False
 
 
+def _track_worker_threads(monkeypatch: pytest.MonkeyPatch) -> list[threading.Thread]:
+    """Patch ``threading.Thread`` so every thread spawned by
+    ``SyncJobService.start_job`` during the test is recorded.
+
+    ``_run_worker`` keeps running (heartbeat -> status flip -> persist ->
+    prune) after the status a test asserts on has already changed. Without
+    joining it, a slow CI runner can let that thread survive into the *next*
+    test, where it picks up whatever ``get_engine`` that test has
+    monkeypatched and silently corrupts its call-count assertions. Callers
+    must join the returned threads before the test returns.
+    """
+    threads: list[threading.Thread] = []
+    real_thread = threading.Thread
+
+    def tracking_thread(*args, **kwargs):
+        thread = real_thread(*args, **kwargs)
+        threads.append(thread)
+        return thread
+
+    monkeypatch.setattr(threading, "Thread", tracking_thread)
+    return threads
+
+
 @pytest.mark.unit
 class TestSyncJobServicePersistence:
     """All of these run without a real DB engine — _persist_record's
     try/except swallows the failure and falls back to in-memory only.
     """
 
-    def test_persist_record_is_best_effort_no_db(self) -> None:
+    def test_persist_record_is_best_effort_no_db(self, monkeypatch) -> None:
         service = SyncJobService()
+        threads = _track_worker_threads(monkeypatch)
 
         def worker(job_id, svc):
             svc.heartbeat(job_id)
@@ -175,6 +199,11 @@ class TestSyncJobServicePersistence:
         )
         # Job is still retrievable even though no DB row was actually written.
         assert service.get_job(job_id)["job_id"] == job_id
+
+        # Wait for the worker thread's post-status-flip persist/prune tail to
+        # finish so it can't leak into a later test (see _track_worker_threads).
+        for thread in threads:
+            thread.join(timeout=2.0)
 
     def test_heartbeat_persist_is_throttled(self, monkeypatch) -> None:
         """The first heartbeat opens a session; subsequent ones within
@@ -208,8 +237,9 @@ class TestSyncJobServicePersistence:
         # First call attempts DB; remaining 9 are throttled.
         assert len(engine_acquires) == 1
 
-    def test_list_jobs_in_memory_only(self) -> None:
+    def test_list_jobs_in_memory_only(self, monkeypatch) -> None:
         service = SyncJobService()
+        threads = _track_worker_threads(monkeypatch)
 
         def worker(job_id, svc):
             return {"status": SyncJobStatus.COMPLETED}
@@ -223,6 +253,8 @@ class TestSyncJobServicePersistence:
                     service.get_job(jid)["status"] == SyncJobStatus.COMPLETED
                 )
             )
+        for thread in threads:
+            thread.join(timeout=2.0)
 
         result = service.list_jobs(limit=10)
         returned_ids = [j["job_id"] for j in result["items"]]
