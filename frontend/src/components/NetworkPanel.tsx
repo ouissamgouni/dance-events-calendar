@@ -257,109 +257,111 @@ export default function NetworkPanel() {
                 })}
             </div>
 
-            {error ? (
-                <p className="text-xs text-red-600">{error}</p>
-            ) : tab === 'suggestions' ? (
-                // Phase E (E4): friend-of-friend / popular accounts the
-                // viewer might want to follow. The PYM card owns its
-                // own data fetch + Follow buttons so we just drop it in.
-                <PeopleYouMayKnowCard />
-            ) : tab === 'leaderboard' ? (
-                <LeaderboardView
-                    period={leaderboardPeriod}
-                    onPeriodChange={(p) => {
-                        setLeaderboardPeriod(p);
-                        setLeaderboard(null);
-                    }}
-                    data={leaderboard}
-                />
-            ) : current === null ? (
-                <p className="text-xs text-slate-400">Loading…</p>
-            ) : current.items.length === 0 ? (
-                <p className="text-xs text-slate-500">
-                    {tab === 'friends'
-                        ? "You don't have any friends yet. Friends are users who follow you back."
-                        : tab === 'followers'
-                            ? 'No one is following you yet.'
-                            : "You aren't following anyone yet."}
-                </p>
-            ) : (
-                <ul className="divide-y divide-slate-100">
-                    {current.items.map((u: FollowUser) => {
-                        const name = u.display_name || `@${u.handle}`;
-                        const initial = name.trim().charAt(0).toUpperCase();
-                        return (
-                            <li
-                                key={u.handle}
-                                className="flex items-center gap-3 py-2"
-                            >
-                                {u.avatar_url ? (
-                                    <img
-                                        src={u.avatar_url}
-                                        alt=""
-                                        className="w-8 h-8 rounded-full object-cover bg-slate-100"
-                                    />
-                                ) : (
-                                    <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-semibold">
-                                        {initial}
+            <div className="h-80 overflow-y-auto">
+                {error ? (
+                    <p className="text-xs text-red-600">{error}</p>
+                ) : tab === 'suggestions' ? (
+                    // Phase E (E4): friend-of-friend / popular accounts the
+                    // viewer might want to follow. The PYM card owns its
+                    // own data fetch + Follow buttons so we just drop it in.
+                    <PeopleYouMayKnowCard />
+                ) : tab === 'leaderboard' ? (
+                    <LeaderboardView
+                        period={leaderboardPeriod}
+                        onPeriodChange={(p) => {
+                            setLeaderboardPeriod(p);
+                            setLeaderboard(null);
+                        }}
+                        data={leaderboard}
+                    />
+                ) : current === null ? (
+                    <p className="text-xs text-slate-400">Loading…</p>
+                ) : current.items.length === 0 ? (
+                    <p className="text-xs text-slate-500">
+                        {tab === 'friends'
+                            ? "You don't have any friends yet. Friends are users who follow you back."
+                            : tab === 'followers'
+                                ? 'No one is following you yet.'
+                                : "You aren't following anyone yet."}
+                    </p>
+                ) : (
+                    <ul className="divide-y divide-slate-100">
+                        {current.items.map((u: FollowUser) => {
+                            const name = u.display_name || `@${u.handle}`;
+                            const initial = name.trim().charAt(0).toUpperCase();
+                            return (
+                                <li
+                                    key={u.handle}
+                                    className="flex items-center gap-3 py-2"
+                                >
+                                    {u.avatar_url ? (
+                                        <img
+                                            src={u.avatar_url}
+                                            alt=""
+                                            className="w-8 h-8 rounded-full object-cover bg-slate-100"
+                                        />
+                                    ) : (
+                                        <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-semibold">
+                                            {initial}
+                                        </div>
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                        <Link
+                                            to={`/u/${u.handle}`}
+                                            className="block truncate text-xs font-medium text-slate-900 hover:text-blue-500"
+                                        >
+                                            {name}
+                                            {u.is_verified_organizer && (
+                                                <img
+                                                    src="/orga.png"
+                                                    alt=""
+                                                    title="Verified organizer"
+                                                    aria-label="Verified organizer"
+                                                    className="inline-block w-3.5 h-3.5 ml-1 align-middle object-contain"
+                                                />
+                                            )}
+                                        </Link>
+                                        <div className="text-xs text-slate-500 truncate">
+                                            @{u.handle}
+                                            {u.is_friend && tab !== 'friends' && (
+                                                <span className="ml-1.5 text-emerald-600">
+                                                    · friend
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
-                                )}
-                                <div className="min-w-0 flex-1">
-                                    <Link
-                                        to={`/u/${u.handle}`}
-                                        className="block truncate text-xs font-medium text-slate-900 hover:text-blue-500"
-                                    >
-                                        {name}
-                                        {u.is_verified_organizer && (
-                                            <img
-                                                src="/orga.png"
-                                                alt=""
-                                                title="Verified organizer"
-                                                aria-label="Verified organizer"
-                                                className="inline-block w-3.5 h-3.5 ml-1 align-middle object-contain"
-                                            />
-                                        )}
-                                    </Link>
-                                    <div className="text-xs text-slate-500 truncate">
-                                        @{u.handle}
-                                        {u.is_friend && tab !== 'friends' && (
-                                            <span className="ml-1.5 text-emerald-600">
-                                                · friend
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                                {tab !== 'friends' && (
-                                    <div className="flex items-center gap-2 shrink-0">
-                                        {tab === 'followers' && !u.is_friend && (
+                                    {tab !== 'friends' && (
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            {tab === 'followers' && !u.is_friend && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleFollowBack(u)}
+                                                    disabled={pending === u.handle}
+                                                    className="shrink-0 bg-blue-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
+                                                >
+                                                    {pending === u.handle ? '…' : 'Follow back'}
+                                                </button>
+                                            )}
                                             <button
                                                 type="button"
-                                                onClick={() => handleFollowBack(u)}
+                                                onClick={() => handleRemove(u)}
                                                 disabled={pending === u.handle}
-                                                className="shrink-0 bg-blue-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
+                                                className="shrink-0 border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                                             >
-                                                {pending === u.handle ? '…' : 'Follow back'}
+                                                {pending === u.handle
+                                                    ? '…'
+                                                    : tab === 'followers'
+                                                        ? 'Remove'
+                                                        : 'Unfollow'}
                                             </button>
-                                        )}
-                                        <button
-                                            type="button"
-                                            onClick={() => handleRemove(u)}
-                                            disabled={pending === u.handle}
-                                            className="shrink-0 border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                                        >
-                                            {pending === u.handle
-                                                ? '…'
-                                                : tab === 'followers'
-                                                    ? 'Remove'
-                                                    : 'Unfollow'}
-                                        </button>
-                                    </div>
-                                )}
-                            </li>
-                        );
-                    })}
-                </ul>
-            )}
+                                        </div>
+                                    )}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                )}
+            </div>
             <ConfirmDialog
                 open={removeTarget !== null}
                 title={`${removeVerb} User`}
