@@ -117,11 +117,12 @@ export default function OnboardingPreferences() {
     const handleAreaChange = async (nextArea: PreferredAreaPayload | null) => {
         setSaving(true);
         setError(null);
-        // Whenever the map area changes, reset the label to "Custom" (per
-        // remark: an area is no longer the previously named place once the
-        // user moves the map). The user can rename afterwards via the name
-        // input.
-        const label = 'Custom';
+        // Whenever the map area changes, reset the label (per remark: an
+        // area is no longer the previously named place once the user moves
+        // the map). Onboarding always edits the account's default profile,
+        // so it resets to "Default" rather than "Custom". The user can
+        // rename afterwards via the name input.
+        const label = 'Default';
         const withLabel = nextArea ? { ...nextArea, label } : null;
         if (label !== areaLabelDraft) setAreaLabelDraft(label);
         try {
@@ -140,7 +141,7 @@ export default function OnboardingPreferences() {
         if (trimmed === current.label) return;
         // Empty input: leave the draft untouched so the user can keep
         // typing. We only commit non-empty renames; the map path handles
-        // the default fallback to "Custom" when the area actually changes.
+        // the default fallback to "Default" when the area actually changes.
         if (!trimmed) return;
         setSaving(true);
         setError(null);

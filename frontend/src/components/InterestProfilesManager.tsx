@@ -45,6 +45,10 @@ interface ProfileCardProps {
     reachGroup: TagGroup | null;
     localTagId: number | null;
     defaultExpanded: boolean;
+    /** True for the account's original/default profile (the one seeded at
+     * signup) — its area-drag reset label reads "Default" instead of
+     * "Custom" so the user still recognizes it. */
+    isDefault: boolean;
     onSave: (id: number, payload: InterestProfileUpdatePayload) => Promise<void>;
     onDelete: (id: number) => Promise<void>;
     onToggleNotify: (id: number, value: boolean) => Promise<void>;
@@ -57,6 +61,7 @@ function ProfileCard({
     reachGroup,
     localTagId,
     defaultExpanded,
+    isDefault,
     onSave,
     onDelete,
     onToggleNotify,
@@ -101,9 +106,9 @@ function ProfileCard({
     useEffect(() => {
         setAreaDraft((prev) =>
             prev.min_lat === profile.min_lat &&
-            prev.min_lng === profile.min_lng &&
-            prev.max_lat === profile.max_lat &&
-            prev.max_lng === profile.max_lng
+                prev.min_lng === profile.min_lng &&
+                prev.max_lat === profile.max_lat &&
+                prev.max_lng === profile.max_lng
                 ? prev
                 : {
                     min_lat: profile.min_lat,
@@ -350,12 +355,15 @@ function ProfileCard({
                                 });
                                 // Per remark: a moved area is no longer the
                                 // previously named place — reset the label
-                                // to "Custom" (user can rename afterwards).
-                                setLabelDraft('Custom');
+                                // (user can rename afterwards). The account's
+                                // default profile resets to "Default";
+                                // additional profiles reset to "Custom".
+                                const resetLabel = isDefault ? 'Default' : 'Custom';
+                                setLabelDraft(resetLabel);
                                 setSaving(true);
                                 setError(null);
                                 onSave(profile.id, {
-                                    label: 'Custom',
+                                    label: resetLabel,
                                     min_lat: next.min_lat,
                                     min_lng: next.min_lng,
                                     max_lat: next.max_lat,
@@ -403,6 +411,16 @@ export default function InterestProfilesManager() {
     const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [adding, setAdding] = useState(false);
+    // On mobile, the active profile card starts collapsed to keep the
+    // Settings page compact; desktop keeps the prior expanded-by-default
+    // behavior.
+    const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 640 : false));
+    useEffect(() => {
+        const mq = window.matchMedia('(max-width: 639px)');
+        const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+        mq.addEventListener('change', handler);
+        return () => mq.removeEventListener('change', handler);
+    }, []);
 
     // Mirror an active profile's area + tags into PreferencesContext so
     // the Explorer / For You default filters match the user's active
@@ -539,7 +557,8 @@ export default function InterestProfilesManager() {
                             danceGroup={danceGroup}
                             reachGroup={reachGroup}
                             localTagId={localTagId}
-                            defaultExpanded={profile.is_active}
+                            defaultExpanded={profile.is_active && !isMobile}
+                            isDefault={profile.id === profiles[0].id}
                             onSave={handleSaveProfile}
                             onDelete={handleDeleteProfile}
                             onToggleNotify={handleToggleNotify}

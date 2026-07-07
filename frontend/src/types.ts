@@ -221,6 +221,7 @@ export interface CalendarSetting {
     calendar_id: string;
     name: string;
     enabled: boolean;
+    show_events: boolean;
     color: string | null;
 }
 

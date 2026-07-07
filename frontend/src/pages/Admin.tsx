@@ -285,6 +285,11 @@ export default function Admin() {
         setCalendars((prev) => prev.map((c) => (c.calendar_id === updated.calendar_id ? updated : c)));
     };
 
+    const handleToggleShowEvents = async (cal: CalendarSetting) => {
+        const updated = await updateCalendar(cal.calendar_id, { show_events: !cal.show_events });
+        setCalendars((prev) => prev.map((c) => (c.calendar_id === updated.calendar_id ? updated : c)));
+    };
+
     const handleColorChange = async (cal: CalendarSetting, color: string) => {
         const updated = await updateCalendar(cal.calendar_id, { color });
         setCalendars((prev) => prev.map((c) => (c.calendar_id === updated.calendar_id ? updated : c)));
@@ -1099,8 +1104,19 @@ export default function Admin() {
                                                                 ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                                                                 : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
                                                                 }`}
+                                                            title="Whether the background job syncs new events from this calendar"
                                                         >
-                                                            {cal.enabled ? 'On' : 'Off'}
+                                                            {cal.enabled ? 'Sync On' : 'Sync Off'}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleToggleShowEvents(cal)}
+                                                            className={`text-[10px] font-medium px-2 py-0.5 transition ${cal.show_events
+                                                                ? 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                                                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                                                }`}
+                                                            title="Whether this calendar's already-synced events are shown publicly"
+                                                        >
+                                                            {cal.show_events ? 'Shown' : 'Hidden'}
                                                         </button>
                                                     </div>
                                                 </div>
@@ -1397,237 +1413,237 @@ export default function Admin() {
                                     </button>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                <div>
-                                    <span className="text-[11px] font-medium text-gray-700">Show ratings</span>
-                                    <p className="text-[10px] text-gray-400">Star ratings and reviews</p>
+                                    <div>
+                                        <span className="text-[11px] font-medium text-gray-700">Show ratings</span>
+                                        <p className="text-[10px] text-gray-400">Star ratings and reviews</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleRatings}
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${showRatings ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${showRatings ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={handleToggleRatings}
-                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${showRatings ? 'bg-emerald-500' : 'bg-gray-300'}`}
-                                >
-                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${showRatings ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                </button>
-                            </div>
 
-                            {/* Trending container — owns popularity end-to-end.
+                                {/* Trending container — owns popularity end-to-end.
                                 The old "Show popularity" toggle was merged in:
                                 trending_enabled now drives both the badge surface
                                 AND the threshold/cap knobs. */}
-                            <div className="border border-gray-200 bg-gray-50/40 p-3 space-y-2">
+                                <div className="border border-gray-200 bg-gray-50/40 p-3 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <div className="inline-flex items-center gap-1">
+                                                <span className="text-[11px] font-semibold text-gray-700">Trending</span>
+                                                <AdminInfoTooltip label={TRENDING_TOOLTIP} />
+                                            </div>
+                                            <p className="text-[10px] text-gray-400">
+                                                Drives the 🔥 chip, the orange map ring, and the "Popular" sort.
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={handleToggleTrending}
+                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${trendingEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                        >
+                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${trendingEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                        </button>
+                                    </div>
+                                    {trendingEnabled && (
+                                        <>
+                                            <div className="flex items-center justify-between mt-1 pl-1">
+                                                <div>
+                                                    <span className="text-[11px] font-medium text-gray-600">Trending banner</span>
+                                                    <p className="text-[10px] text-gray-400">Highlights top trending events in the filtered Explorer scope.</p>
+                                                </div>
+                                                <button
+                                                    onClick={handleToggleTrendingBanner}
+                                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${trendingBannerEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                                >
+                                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${trendingBannerEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                                </button>
+                                            </div>
+                                            <div className="flex items-center justify-between mt-1 pl-1">
+                                                <div>
+                                                    <span className="text-[11px] font-medium text-gray-600">🔥 Popular threshold</span>
+                                                    <p className="text-[10px] text-gray-400">Min popularity score required to show the badge</p>
+                                                </div>
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    max={10000}
+                                                    value={popularityThreshold}
+                                                    onChange={(e) => setPopularityThreshold(Number(e.target.value))}
+                                                    onBlur={(e) => handlePopularityThresholdChange(Number(e.target.value))}
+                                                    onKeyDown={(e) => e.key === 'Enter' && handlePopularityThresholdChange(popularityThreshold)}
+                                                    className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                                />
+                                            </div>
+                                            <div className="flex items-center justify-between mt-1 pl-1">
+                                                <div>
+                                                    <span className="text-[11px] font-medium text-gray-600">Trending window (days)</span>
+                                                    <p className="text-[10px] text-gray-400">Only count signals from the last N days</p>
+                                                </div>
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    max={365}
+                                                    value={trendingWindowDays}
+                                                    onChange={(e) => setTrendingWindowDays(Number(e.target.value))}
+                                                    onBlur={(e) => handleTrendingWindowDaysChange(Number(e.target.value))}
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleTrendingWindowDaysChange(trendingWindowDays)}
+                                                    className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                                />
+                                            </div>
+                                            <div className="flex items-center justify-between mt-1 pl-1">
+                                                <div>
+                                                    <span className="text-[11px] font-medium text-gray-600">Trending floor (going)</span>
+                                                    <p className="text-[10px] text-gray-400">
+                                                        Min RSVPs required to be eligible. Anti-view-bait gate;
+                                                        events below this floor get score 0.
+                                                    </p>
+                                                </div>
+                                                <input
+                                                    type="number"
+                                                    min={0}
+                                                    max={100}
+                                                    value={trendingFloorGoing}
+                                                    onChange={(e) => setTrendingFloorGoing(Number(e.target.value))}
+                                                    onBlur={(e) => handleTrendingFloorGoingChange(Number(e.target.value))}
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleTrendingFloorGoingChange(trendingFloorGoing)}
+                                                    className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                                />
+                                            </div>
+                                            <div className="flex items-center justify-between mt-1 pl-1">
+                                                <div>
+                                                    <span className="text-[11px] font-medium text-gray-600">Trending top N</span>
+                                                    <p className="text-[10px] text-gray-400">
+                                                        Absolute cap: never decorate more than N events as Trending,
+                                                        no matter how many are visible.
+                                                    </p>
+                                                </div>
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    max={50}
+                                                    value={trendingTopN}
+                                                    onChange={(e) => setTrendingTopN(Number(e.target.value))}
+                                                    onBlur={(e) => handleTrendingTopNChange(Number(e.target.value))}
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleTrendingTopNChange(trendingTopN)}
+                                                    className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                                />
+                                            </div>
+                                            <div className="flex items-center justify-between mt-1 pl-1">
+                                                <div>
+                                                    <div className="inline-flex items-center gap-1">
+                                                        <span className="text-[11px] font-medium text-gray-600">Trending top %</span>
+                                                        <AdminInfoTooltip label={TRENDING_TOP_PERCENT_TOOLTIP} />
+                                                    </div>
+                                                    <p className="text-[10px] text-gray-400">
+                                                        Relative cap (1-100). Effective decoration count is
+                                                        min(top N, ceil(visible × %  ⁄ 100)). Keeps the chip rare
+                                                        on small lists.
+                                                    </p>
+                                                </div>
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    max={100}
+                                                    value={trendingTopPercent}
+                                                    onChange={(e) => setTrendingTopPercent(Number(e.target.value))}
+                                                    onBlur={(e) => handleTrendingTopPercentChange(Number(e.target.value))}
+                                                    onKeyDown={(e) => e.key === 'Enter' && handleTrendingTopPercentChange(trendingTopPercent)}
+                                                    className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                                />
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+
+                                {/* Adoption-boost: Following badge (Track 1) */}
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <div className="inline-flex items-center gap-1">
-                                            <span className="text-[11px] font-semibold text-gray-700">Trending</span>
-                                            <AdminInfoTooltip label={TRENDING_TOOLTIP} />
-                                        </div>
-                                        <p className="text-[10px] text-gray-400">
-                                            Drives the 🔥 chip, the orange map ring, and the "Popular" sort.
-                                        </p>
+                                        <span className="text-[11px] font-medium text-gray-700">Following badge</span>
+                                        <p className="text-[10px] text-gray-400">Avatar/dot when a mutual friend is going or saved</p>
                                     </div>
                                     <button
-                                        onClick={handleToggleTrending}
-                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${trendingEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                        onClick={handleToggleFollowingBadge}
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${followingBadgeEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
                                     >
-                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${trendingEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${followingBadgeEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
-                                {trendingEnabled && (
-                                    <>
-                                        <div className="flex items-center justify-between mt-1 pl-1">
-                                            <div>
-                                                <span className="text-[11px] font-medium text-gray-600">Trending banner</span>
-                                                <p className="text-[10px] text-gray-400">Highlights top trending events in the filtered Explorer scope.</p>
-                                            </div>
-                                            <button
-                                                onClick={handleToggleTrendingBanner}
-                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${trendingBannerEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
-                                            >
-                                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${trendingBannerEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                            </button>
-                                        </div>
-                                        <div className="flex items-center justify-between mt-1 pl-1">
-                                            <div>
-                                                <span className="text-[11px] font-medium text-gray-600">🔥 Popular threshold</span>
-                                                <p className="text-[10px] text-gray-400">Min popularity score required to show the badge</p>
-                                            </div>
-                                            <input
-                                                type="number"
-                                                min={1}
-                                                max={10000}
-                                                value={popularityThreshold}
-                                                onChange={(e) => setPopularityThreshold(Number(e.target.value))}
-                                                onBlur={(e) => handlePopularityThresholdChange(Number(e.target.value))}
-                                                onKeyDown={(e) => e.key === 'Enter' && handlePopularityThresholdChange(popularityThreshold)}
-                                                className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                                            />
-                                        </div>
-                                        <div className="flex items-center justify-between mt-1 pl-1">
-                                            <div>
-                                                <span className="text-[11px] font-medium text-gray-600">Trending window (days)</span>
-                                                <p className="text-[10px] text-gray-400">Only count signals from the last N days</p>
-                                            </div>
-                                            <input
-                                                type="number"
-                                                min={1}
-                                                max={365}
-                                                value={trendingWindowDays}
-                                                onChange={(e) => setTrendingWindowDays(Number(e.target.value))}
-                                                onBlur={(e) => handleTrendingWindowDaysChange(Number(e.target.value))}
-                                                onKeyDown={(e) => e.key === 'Enter' && handleTrendingWindowDaysChange(trendingWindowDays)}
-                                                className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                                            />
-                                        </div>
-                                        <div className="flex items-center justify-between mt-1 pl-1">
-                                            <div>
-                                                <span className="text-[11px] font-medium text-gray-600">Trending floor (going)</span>
-                                                <p className="text-[10px] text-gray-400">
-                                                    Min RSVPs required to be eligible. Anti-view-bait gate;
-                                                    events below this floor get score 0.
-                                                </p>
-                                            </div>
-                                            <input
-                                                type="number"
-                                                min={0}
-                                                max={100}
-                                                value={trendingFloorGoing}
-                                                onChange={(e) => setTrendingFloorGoing(Number(e.target.value))}
-                                                onBlur={(e) => handleTrendingFloorGoingChange(Number(e.target.value))}
-                                                onKeyDown={(e) => e.key === 'Enter' && handleTrendingFloorGoingChange(trendingFloorGoing)}
-                                                className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                                            />
-                                        </div>
-                                        <div className="flex items-center justify-between mt-1 pl-1">
-                                            <div>
-                                                <span className="text-[11px] font-medium text-gray-600">Trending top N</span>
-                                                <p className="text-[10px] text-gray-400">
-                                                    Absolute cap: never decorate more than N events as Trending,
-                                                    no matter how many are visible.
-                                                </p>
-                                            </div>
-                                            <input
-                                                type="number"
-                                                min={1}
-                                                max={50}
-                                                value={trendingTopN}
-                                                onChange={(e) => setTrendingTopN(Number(e.target.value))}
-                                                onBlur={(e) => handleTrendingTopNChange(Number(e.target.value))}
-                                                onKeyDown={(e) => e.key === 'Enter' && handleTrendingTopNChange(trendingTopN)}
-                                                className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                                            />
-                                        </div>
-                                        <div className="flex items-center justify-between mt-1 pl-1">
-                                            <div>
-                                                <div className="inline-flex items-center gap-1">
-                                                    <span className="text-[11px] font-medium text-gray-600">Trending top %</span>
-                                                    <AdminInfoTooltip label={TRENDING_TOP_PERCENT_TOOLTIP} />
-                                                </div>
-                                                <p className="text-[10px] text-gray-400">
-                                                    Relative cap (1-100). Effective decoration count is
-                                                    min(top N, ceil(visible × %  ⁄ 100)). Keeps the chip rare
-                                                    on small lists.
-                                                </p>
-                                            </div>
-                                            <input
-                                                type="number"
-                                                min={1}
-                                                max={100}
-                                                value={trendingTopPercent}
-                                                onChange={(e) => setTrendingTopPercent(Number(e.target.value))}
-                                                onBlur={(e) => handleTrendingTopPercentChange(Number(e.target.value))}
-                                                onKeyDown={(e) => e.key === 'Enter' && handleTrendingTopPercentChange(trendingTopPercent)}
-                                                className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                                            />
-                                        </div>
-                                    </>
-                                )}
-                            </div>
 
-                            {/* Adoption-boost: Following badge (Track 1) */}
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <span className="text-[11px] font-medium text-gray-700">Following badge</span>
-                                    <p className="text-[10px] text-gray-400">Avatar/dot when a mutual friend is going or saved</p>
+                                {/* Adoption-boost: New event markers (Track 2) */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-gray-700">New event markers</span>
+                                        <p className="text-[10px] text-gray-400">Dot + bold title for events added after the viewer's baseline</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleUnseenState}
+                                        aria-label="Toggle new event markers"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${unseenStateEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${unseenStateEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={handleToggleFollowingBadge}
-                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${followingBadgeEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
-                                >
-                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${followingBadgeEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                </button>
-                            </div>
 
-                            {/* Adoption-boost: New event markers (Track 2) */}
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <span className="text-[11px] font-medium text-gray-700">New event markers</span>
-                                    <p className="text-[10px] text-gray-400">Dot + bold title for events added after the viewer's baseline</p>
+                                {/* Explorer "For you" discovery rail */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-gray-700">For you rail</span>
+                                        <p className="text-[10px] text-gray-400">Collapsible Explorer rail with You might like/Friends going/New lenses</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleForYouRail}
+                                        aria-label="Toggle for you rail"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${forYouRailEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${forYouRailEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={handleToggleUnseenState}
-                                    aria-label="Toggle new event markers"
-                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${unseenStateEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
-                                >
-                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${unseenStateEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                </button>
-                            </div>
 
-                            {/* Explorer "For you" discovery rail */}
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <span className="text-[11px] font-medium text-gray-700">For you rail</span>
-                                    <p className="text-[10px] text-gray-400">Collapsible Explorer rail with You might like/Friends going/New lenses</p>
+                                {/* Explorer "Your next events" rail */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-gray-700">Your next events rail</span>
+                                        <p className="text-[10px] text-gray-400">Explorer rail showing the viewer's own saved/going events</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleYourNextEventsRail}
+                                        aria-label="Toggle your next events rail"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${yourNextEventsRailEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${yourNextEventsRailEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={handleToggleForYouRail}
-                                    aria-label="Toggle for you rail"
-                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${forYouRailEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
-                                >
-                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${forYouRailEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                </button>
-                            </div>
 
-                            {/* Explorer "Your next events" rail */}
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <span className="text-[11px] font-medium text-gray-700">Your next events rail</span>
-                                    <p className="text-[10px] text-gray-400">Explorer rail showing the viewer's own saved/going events</p>
+                                {/* User contributions: promo codes */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-gray-700">Promo codes</span>
+                                        <p className="text-[10px] text-gray-400">Let users submit promo codes per event. Admin-moderated.</p>
+                                    </div>
+                                    <button
+                                        onClick={handleTogglePromoCodes}
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${promoCodesEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${promoCodesEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={handleToggleYourNextEventsRail}
-                                    aria-label="Toggle your next events rail"
-                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${yourNextEventsRailEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
-                                >
-                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${yourNextEventsRailEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                </button>
-                            </div>
 
-                            {/* User contributions: promo codes */}
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <span className="text-[11px] font-medium text-gray-700">Promo codes</span>
-                                    <p className="text-[10px] text-gray-400">Let users submit promo codes per event. Admin-moderated.</p>
+                                {/* User contributions: organizer claims */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-gray-700">Organizer claims</span>
+                                        <p className="text-[10px] text-gray-400">Let users request organizer badge + claim per-event ownership. Admin-moderated.</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleOrganizerClaims}
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${organizerClaimsEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${organizerClaimsEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={handleTogglePromoCodes}
-                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${promoCodesEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
-                                >
-                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${promoCodesEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                </button>
-                            </div>
-
-                            {/* User contributions: organizer claims */}
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <span className="text-[11px] font-medium text-gray-700">Organizer claims</span>
-                                    <p className="text-[10px] text-gray-400">Let users request organizer badge + claim per-event ownership. Admin-moderated.</p>
-                                </div>
-                                <button
-                                    onClick={handleToggleOrganizerClaims}
-                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${organizerClaimsEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
-                                >
-                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${organizerClaimsEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                </button>
-                            </div>
                             </div>
                         </div>
                     )}

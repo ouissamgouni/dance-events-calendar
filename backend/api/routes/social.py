@@ -1560,7 +1560,7 @@ def _hydrate_profile_events(
     enabled_calendar_ids = {
         c.calendar_id
         for c in session.exec(
-            select(CalendarSetting).where(CalendarSetting.enabled == True)  # noqa: E712
+            select(CalendarSetting).where(CalendarSetting.show_events == True)  # noqa: E712
         ).all()
     }
     if not enabled_calendar_ids:
@@ -3400,7 +3400,7 @@ def list_subscribed_events(
     enabled_calendar_ids = {
         c.calendar_id
         for c in session.exec(
-            select(CalendarSetting).where(CalendarSetting.enabled == True)  # noqa: E712
+            select(CalendarSetting).where(CalendarSetting.show_events == True)  # noqa: E712
         ).all()
     }
     now = datetime.utcnow()

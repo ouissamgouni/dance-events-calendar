@@ -138,15 +138,17 @@ def get_calendar_feed(
 
     events: list[CachedEvent] = []
     if event_ids:
-        enabled_calendars = session.exec(
-            select(CalendarSetting.calendar_id).where(CalendarSetting.enabled == True)
+        visible_calendars = session.exec(
+            select(CalendarSetting.calendar_id).where(
+                CalendarSetting.show_events == True
+            )
         ).all()
-        if enabled_calendars:
+        if visible_calendars:
             events = list(
                 session.exec(
                     select(CachedEvent).where(
                         CachedEvent.event_id.in_(event_ids),
-                        CachedEvent.calendar_id.in_(enabled_calendars),
+                        CachedEvent.calendar_id.in_(visible_calendars),
                         CachedEvent.deleted_at == None,
                     )
                 ).all()
@@ -226,7 +228,7 @@ def get_shared_calendar(
         return SharedCalendarResponse(events=[], owner_display_name=owner_display_name)
 
     enabled_calendars = session.exec(
-        select(CalendarSetting).where(CalendarSetting.enabled == True)
+        select(CalendarSetting).where(CalendarSetting.show_events == True)
     ).all()
     calendar_ids = [c.calendar_id for c in enabled_calendars]
     color_map = {c.calendar_id: c.color for c in enabled_calendars}

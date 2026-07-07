@@ -96,11 +96,13 @@ class CalendarSettingResponse(BaseModel):
     calendar_id: str
     name: str
     enabled: bool
+    show_events: bool = True
     color: Optional[str] = None
 
 
 class CalendarToggleRequest(BaseModel):
     enabled: Optional[bool] = None
+    show_events: Optional[bool] = None
     color: Optional[str] = None
     name: Optional[str] = None
 
