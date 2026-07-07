@@ -9,18 +9,33 @@ import { fetchAppInfo } from '../api';
 interface ConsentContextValue {
     analyticsConsent: boolean;
     personalizationConsent: boolean;
+    /**
+     * True once the cookie-consent modal is no longer blocking the page —
+     * either because a returning visitor already has valid consent, or a
+     * first-time visitor just answered it. While the initial modal is up,
+     * vanilla-cookieconsent adds `overflow:hidden` to `<html>`
+     * (`disable--interaction`), which triggers a known WebKit bug where
+     * sibling `position:fixed` elements (like the install/push banners)
+     * can render mispositioned/hidden and stay stuck that way even after
+     * the lock is lifted, until a full reload repaints them. Other fixed
+     * banners should gate on this flag so they never first render during
+     * that window.
+     */
+    consentResolved: boolean;
     showPreferences: () => void;
 }
 
 const ConsentContext = createContext<ConsentContextValue>({
     analyticsConsent: false,
     personalizationConsent: false,
+    consentResolved: false,
     showPreferences: () => { },
 });
 
 export function ConsentProvider({ children }: { children: ReactNode }) {
     const [analyticsConsent, setAnalyticsConsent] = useState(false);
     const [personalizationConsent, setPersonalizationConsent] = useState(false);
+    const [consentResolved, setConsentResolved] = useState(false);
     // null = still loading server config; once resolved, true means the
     // backend reports analytics_enabled=true (or we couldn't tell — fail
     // open to preserve existing behavior).
@@ -31,6 +46,7 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
         const personalization = CookieConsent.acceptedCategory('personalization');
         setAnalyticsConsent(analytics);
         setPersonalizationConsent(personalization);
+        setConsentResolved(CookieConsent.validConsent());
         // Only load Umami once both: (a) user consented, and (b) the
         // backend confirmed analytics are enabled (or we haven't heard
         // back yet — fail open). When the backend later says disabled,
@@ -70,7 +86,7 @@ export function ConsentProvider({ children }: { children: ReactNode }) {
     }, []);
 
     return (
-        <ConsentContext.Provider value={{ analyticsConsent, personalizationConsent, showPreferences }}>
+        <ConsentContext.Provider value={{ analyticsConsent, personalizationConsent, consentResolved, showPreferences }}>
             {children}
         </ConsentContext.Provider>
     );
