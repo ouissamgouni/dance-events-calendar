@@ -106,13 +106,16 @@ jobs:
                   STAGING_VAPID_PUBLIC_KEY: ${{ secrets.STAGING_VAPID_PUBLIC_KEY }}
                   STAGING_VAPID_PRIVATE_KEY: ${{ secrets.STAGING_VAPID_PRIVATE_KEY }}
 
-            - name: Create backend/credentials/service-account.json
-              if: secrets.GOOGLE_SERVICE_ACCOUNT_JSON != ''
-              run: |
-                  mkdir -p backend/credentials
-                  cat > backend/credentials/service-account.json << 'EOF'
-                  ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-                  EOF
+- name: Create backend/credentials/service-account.json (if provided)
+        run: |
+          if [ -n "$GOOGLE_SERVICE_ACCOUNT_JSON" ]; then
+            mkdir -p backend/credentials
+            cat > backend/credentials/service-account.json << 'EOF'
+          ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          EOF
+          fi
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
 
             - name: Deploy to staging
               run: task deploy:staging:remote -- develop
