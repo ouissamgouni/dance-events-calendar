@@ -18,6 +18,17 @@ version: "3"
 # tracks the currently-deployed SHA — releases append to tag history).
 #
 # Override the suggested bump with BUMP=patch|minor|major (default: patch).
+#
+# Flags (can be combined):
+#   AUTO_VERSION=1     — auto-accept suggested versions (no retyping)
+#   SKIP_CONFIRM=1     — skip "Release this component?" confirmation prompts
+#   SKIP_CI_CHECK=1    — skip CI status checks before deployment
+#
+# Examples:
+#   task release:prod -- --skip-confirm                  (all components, versions prompted)
+#   task release:prod -- --auto-version                  (choose components, auto-accept versions)
+#   task release:prod -- --skip-confirm --auto-version   (fully automated: all components, no prompts)
+#   task release:prod -- --skip-ci-check --skip-confirm  (skip CI + confirmations)
 # ════════════════════════════════════════════════════════════════════════════
 
 tasks:
@@ -117,11 +128,18 @@ tasks:
             echo "      (or :staging:remote:cwd:${COMPONENT} to test on staging first)"
           fi
           echo "═══════════════════════════════════════════════════════════════"
-          printf "Type the version to release [%s]: " "$SUGGESTED"
-          read -r INPUT
-          VERSION="${INPUT:-$SUGGESTED}"
-          echo ""
-          echo "→ Releasing ${COMPONENT}-$VERSION"
+          # Check if AUTO_VERSION is set; if so, skip the prompt
+          AUTO_VER="{{.AUTO_VERSION | default ""}}"
+          if [ "$AUTO_VER" = "1" ]; then
+            VERSION="$SUGGESTED"
+            echo "→ Auto-accepting suggested version: ${COMPONENT}-$VERSION"
+          else
+            printf "Type the version to release [%s]: " "$SUGGESTED"
+            read -r INPUT
+            VERSION="${INPUT:-$SUGGESTED}"
+            echo ""
+            echo "→ Releasing ${COMPONENT}-$VERSION"
+          fi
         fi
         # Single dispatch: tag, then deploy. No re-exec — this script is the
         # only place that drives the chain, so the parent task cannot run it
@@ -184,13 +202,17 @@ tasks:
   # ──────────────────────────────────────────────────────────────────────────
 
   prod:
-    desc: "Release one or more components to prod (interactive: prompts per
-      component, skip with empty)."
+    desc: "Release one or more components to prod. Supports --auto-version, --skip-confirm, --skip-ci-check flags."
     cmds:
       - |
         echo ""
         echo "═══════════════════════════════════════════════════════════════"
         echo "  RELEASE TO PRODUCTION (per-component)"
+        echo ""
+        echo "  Flags:"
+        echo "    --auto-version   Auto-accept suggested versions (no retyping)"
+        echo "    --skip-confirm   Skip 'Release this component?' prompts"
+        echo "    --skip-ci-check  Skip CI status checks before deployment"
         echo ""
         echo "  You will be prompted for each component (db, backend, frontend)."
         echo "  Press Enter on an empty line to skip a component."
@@ -202,18 +224,32 @@ tasks:
       - |
         TASK_SKIP="{{.SKIP_CI_CHECK | default ""}}"
         [ -n "$TASK_SKIP" ] && export SKIP_CI_CHECK="$TASK_SKIP"
-        for COMPONENT in db backend frontend; do
-          printf "\nRelease %s? [y/N] " "$COMPONENT"
-          read -r ANS
-          case "$ANS" in
-            y|Y|yes)
-              task release:prod:${COMPONENT} || { echo "❌ ${COMPONENT} release aborted; stopping."; exit 1; }
-              ;;
-            *)
-              echo "→ skipped ${COMPONENT}"
-              ;;
-          esac
-        done
+        TASK_AUTO="{{.AUTO_VERSION | default ""}}"
+        [ -n "$TASK_AUTO" ] && export AUTO_VERSION="$TASK_AUTO"
+        SKIP_CONFIRM="{{.SKIP_CONFIRM | default ""}}"
+
+        # If SKIP_CONFIRM is set, release all components without prompting
+        if [ "$SKIP_CONFIRM" = "1" ]; then
+          for COMPONENT in db backend frontend; do
+            echo ""
+            echo "→ Releasing $COMPONENT..."
+            task release:prod:${COMPONENT} || { echo "❌ ${COMPONENT} release aborted; stopping."; exit 1; }
+          done
+        else
+          # Default: interactive prompts per component
+          for COMPONENT in db backend frontend; do
+            printf "\nRelease %s? [y/N] " "$COMPONENT"
+            read -r ANS
+            case "$ANS" in
+              y|Y|yes)
+                task release:prod:${COMPONENT} || { echo "❌ ${COMPONENT} release aborted; stopping."; exit 1; }
+                ;;
+              *)
+                echo "→ skipped ${COMPONENT}"
+                ;;
+            esac
+          done
+        fi
         echo ""
         echo "✅ Aggregate release complete."
 
