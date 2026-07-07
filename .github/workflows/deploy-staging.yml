@@ -1,10 +1,11 @@
 name: Deploy to Staging
 
 # ════════════════════════════════════════════════════════════════════════════
-# Trigger: Automatically deploy to staging after CI passes on the develop branch.
+# Trigger: Automatically deploy to staging after CI passes on the develop branch,
+# or manually via workflow_dispatch.
 #
 # This workflow:
-# 1. Waits for CI to succeed on develop
+# 1. Waits for CI to succeed on develop (or is manually dispatched)
 # 2. Runs the full staging deploy (db + backend + frontend)
 # 3. Notifies on success/failure
 # 4. Queues concurrent deployments (one at a time)
@@ -14,99 +15,113 @@ name: Deploy to Staging
 # ════════════════════════════════════════════════════════════════════════════
 
 on:
-    workflow_run:
-        workflows: [CI]
-        types: [completed]
-        branches: [develop]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [develop]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch, tag, or SHA to deploy to staging"
+        required: false
+        default: develop
 
 concurrency:
-    group: staging-deploy
-    cancel-in-progress: false
+  group: staging-deploy
+  cancel-in-progress: false
 
 jobs:
-    deploy:
-        name: Deploy to Staging
-        runs-on: ubuntu-latest
+  deploy:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
 
-        # Use the "staging" environment to access FLY_API_TOKEN and other environment secrets
-        environment: staging
+    # Use the "staging" environment to access FLY_API_TOKEN and other environment secrets
+    environment: staging
 
-        # Only deploy if CI passed
-        if: github.event.workflow_run.conclusion == 'success'
+    # Run for a successful CI run on develop, or a manual dispatch. The head_branch
+    # check is belt-and-suspenders: workflow_run trigger config is read from the
+    # default branch, so this job-level check protects against drift/misconfiguration.
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'develop')
 
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
-              with:
-                  fetch-depth: 0 # Full history for git merge-base checks
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # workflow_run events default to checking out the default branch (main),
+          # NOT the branch/commit CI actually ran on — pin explicitly.
+          ref: ${{ github.event.inputs.ref || github.event.workflow_run.head_sha }}
+          fetch-depth: 0 # Full history for git merge-base checks
 
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: "3.14"
-                  cache: pip
-                  cache-dependency-path: backend/requirements.txt
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
 
-            - name: Set up Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: "22"
-                  cache: npm
-                  cache-dependency-path: frontend/package-lock.json
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
-            - name: Pin npm (match lockfile / packageManager)
-              run: npm install -g npm@11.6.2
+      - name: Pin npm (match lockfile / packageManager)
+        run: npm install -g npm@11.6.2
 
-            - name: Install Task
-              uses: arduino/setup-task@v2
-              with:
-                  version: 3.x
-                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Task
+        uses: arduino/setup-task@v2
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-            - name: Create backend venv
-              run: |
-                  python -m venv .venv
-                  .venv/bin/pip install --upgrade pip
+      - name: Create backend venv
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install --upgrade pip
 
-            - name: Install backend dependencies
-              run: task install:backend
+      - name: Install backend dependencies
+        run: task install:backend
 
-            - name: Install frontend dependencies
-              run: task install:frontend
+      - name: Install frontend dependencies
+        run: task install:frontend
 
-            - name: Create config/secrets.env
-              run: |
-                  cat > config/secrets.env << 'EOF'
-                  GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-                  GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
-                  CLOUDFLARE_API_TOKEN=${{ secrets.CLOUDFLARE_API_TOKEN }}
-                  SMTP_USER=${{ secrets.SMTP_USER }}
-                  SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}
-                  EOF
-              env:
-                  GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-                  GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-                  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-                  SMTP_USER: ${{ secrets.SMTP_USER }}
-                  SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      - name: Create config/secrets.env
+        run: |
+          cat > config/secrets.env << 'EOF'
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+          CLOUDFLARE_API_TOKEN=${{ secrets.CLOUDFLARE_API_TOKEN }}
+          SMTP_USER=${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}
+          EOF
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
 
-            - name: Create config/secrets.staging.env
-              run: |
-                  cat > config/secrets.staging.env << 'EOF'
-                  ADMIN_EMAIL=${{ secrets.STAGING_ADMIN_EMAIL }}
-                  DATABASE_URL=${{ secrets.STAGING_DATABASE_URL }}
-                  SESSION_SECRET=${{ secrets.STAGING_SESSION_SECRET }}
-                  VAPID_PUBLIC_KEY=${{ secrets.STAGING_VAPID_PUBLIC_KEY }}
-                  VAPID_PRIVATE_KEY=${{ secrets.STAGING_VAPID_PRIVATE_KEY }}
-                  EOF
-              env:
-                  STAGING_ADMIN_EMAIL: ${{ secrets.STAGING_ADMIN_EMAIL }}
-                  STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
-                  STAGING_SESSION_SECRET: ${{ secrets.STAGING_SESSION_SECRET }}
-                  STAGING_VAPID_PUBLIC_KEY: ${{ secrets.STAGING_VAPID_PUBLIC_KEY }}
-                  STAGING_VAPID_PRIVATE_KEY: ${{ secrets.STAGING_VAPID_PRIVATE_KEY }}
+      - name: Create config/secrets.staging.env
+        run: |
+          cat > config/secrets.staging.env << 'EOF'
+          ADMIN_EMAIL=${{ secrets.STAGING_ADMIN_EMAIL }}
+          DATABASE_URL=${{ secrets.STAGING_DATABASE_URL }}
+          SESSION_SECRET=${{ secrets.STAGING_SESSION_SECRET }}
+          VAPID_PUBLIC_KEY=${{ secrets.STAGING_VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY=${{ secrets.STAGING_VAPID_PRIVATE_KEY }}
+          EOF
+        env:
+          STAGING_ADMIN_EMAIL: ${{ secrets.STAGING_ADMIN_EMAIL }}
+          STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          STAGING_SESSION_SECRET: ${{ secrets.STAGING_SESSION_SECRET }}
+          STAGING_VAPID_PUBLIC_KEY: ${{ secrets.STAGING_VAPID_PUBLIC_KEY }}
+          STAGING_VAPID_PRIVATE_KEY: ${{ secrets.STAGING_VAPID_PRIVATE_KEY }}
 
-- name: Create backend/credentials/service-account.json (if provided)
+      - name: Create backend/credentials/service-account.json (if provided)
         run: |
           if [ -n "$GOOGLE_SERVICE_ACCOUNT_JSON" ]; then
             mkdir -p backend/credentials
@@ -117,29 +132,50 @@ jobs:
         env:
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
 
-            - name: Deploy to staging
-              run: task deploy:staging:remote -- develop
-              env:
-                  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-                  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-                  DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
-                  ADMIN_EMAIL: ${{ secrets.STAGING_ADMIN_EMAIL }}
-                  SESSION_SECRET: ${{ secrets.STAGING_SESSION_SECRET }}
-                  VAPID_PUBLIC_KEY: ${{ secrets.STAGING_VAPID_PUBLIC_KEY }}
-                  VAPID_PRIVATE_KEY: ${{ secrets.STAGING_VAPID_PRIVATE_KEY }}
+      - name: Deploy to staging
+        # :cwd primitive — deploys whatever `actions/checkout` put in CWD above.
+        # No worktree, no re-fetch of "develop": the checkout `ref` above already
+        # pins the exact commit to deploy (see Taskfile.yml naming convention).
+        run: task deploy:staging:remote:cwd
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          ADMIN_EMAIL: ${{ secrets.STAGING_ADMIN_EMAIL }}
+          SESSION_SECRET: ${{ secrets.STAGING_SESSION_SECRET }}
+          VAPID_PUBLIC_KEY: ${{ secrets.STAGING_VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.STAGING_VAPID_PRIVATE_KEY }}
 
-            - name: Notify on success
-              if: success()
-              run: |
-                  echo "✅ Staging deployment succeeded"
-                  echo "   Commit: ${{ github.event.workflow_run.head_commit.message }}"
-                  echo "   By: ${{ github.event.workflow_run.actor.login }}"
-                  echo "   URL: https://develop.joinmovida.com"
+      - name: Notify on success
+        if: success()
+        run: |
+          echo "✅ Staging deployment succeeded"
+          echo "   Commit: ${{ github.event.workflow_run.head_commit.message || github.sha }}"
+          echo "   By: ${{ github.event.workflow_run.actor.login || github.actor }}"
+          echo "   URL: https://develop.joinmovida.com"
 
-            - name: Notify on failure
-              if: failure()
-              run: |
-                  echo "❌ Staging deployment failed"
-                  echo "   Commit: ${{ github.event.workflow_run.head_commit.message }}"
-                  echo "   Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                  exit 1
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Staging deployment failed"
+          echo "   Commit: ${{ github.event.workflow_run.head_commit.message || github.sha }}"
+          echo "   Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          exit 1
+
+      - name: Email deploy result to owner
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp-relay.brevo.com
+          server_port: 587
+          username: ${{ secrets.SMTP_USER }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          from: Movida CI <noreply@joinmovida.com>
+          to: ${{ secrets.CI_NOTIFY_EMAIL || secrets.STAGING_ADMIN_EMAIL }}
+          subject: "${{ job.status == 'success' && '✅' || '❌' }} Staging deploy ${{ job.status }} — ${{ github.event.workflow_run.head_commit.message || github.sha }}"
+          body: |
+            Staging deployment: ${{ job.status }}
+
+            Commit: ${{ github.event.workflow_run.head_commit.message || github.sha }}
+            Actor:  ${{ github.event.workflow_run.actor.login || github.actor }}
+            Run:    ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
