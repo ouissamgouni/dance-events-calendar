@@ -760,10 +760,17 @@ def admin_notifications_log(
     if channel is not None and channel not in ("app", "email", "push"):
         raise HTTPException(status_code=400, detail=f"Unknown channel: {channel}")
 
+    from sqlalchemy.orm import aliased
+
+    from backend.services.activity_email import _render_plain
+
+    Actor = aliased(User)
     stmt = (
-        select(NotificationDelivery, Notification, User)
+        select(NotificationDelivery, Notification, User, Actor, CachedEvent)
         .join(Notification, Notification.id == NotificationDelivery.notification_id)
         .join(User, User.id == Notification.recipient_user_id)
+        .outerjoin(Actor, Actor.id == Notification.actor_user_id)
+        .outerjoin(CachedEvent, CachedEvent.event_id == Notification.event_id)
     )
     if type is not None:
         stmt = stmt.where(col(Notification.kind).in_(kinds_by_type[type]))
@@ -799,8 +806,14 @@ def admin_notifications_log(
             recipient_email=u.email,
             recipient_handle=u.handle,
             recipient_display_name=u.display_name,
+            summary=_render_plain(n.kind, actor, event, n.context),
+            actor_display_name=actor.display_name if actor else None,
+            actor_handle=actor.handle if actor else None,
+            event_id=event.event_id if event else None,
+            event_title=event.title if event else None,
+            context=n.context,
         )
-        for d, n, u in rows
+        for d, n, u, actor, event in rows
     ]
     return NotificationLogResponse(items=items, total=total)
 

@@ -1,0 +1,142 @@
+name: Deploy to Staging
+
+# ════════════════════════════════════════════════════════════════════════════
+# Trigger: Automatically deploy to staging after CI passes on the develop branch.
+#
+# This workflow:
+# 1. Waits for CI to succeed on develop
+# 2. Runs the full staging deploy (db + backend + frontend)
+# 3. Notifies on success/failure
+# 4. Queues concurrent deployments (one at a time)
+#
+# To manually trigger: gh workflow run deploy-staging.yml -f ref=develop
+# To disable: disable this workflow in GitHub UI (Actions → Workflows → Deploy to Staging)
+# ════════════════════════════════════════════════════════════════════════════
+
+on:
+    workflow_run:
+        workflows: [CI]
+        types: [completed]
+        branches: [develop]
+
+concurrency:
+    group: staging-deploy
+    cancel-in-progress: false
+
+jobs:
+    deploy:
+        name: Deploy to Staging
+        runs-on: ubuntu-latest
+
+        # Use the "staging" environment to access FLY_API_TOKEN and other environment secrets
+        environment: staging
+
+        # Only deploy if CI passed
+        if: github.event.workflow_run.conclusion == 'success'
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0 # Full history for git merge-base checks
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: "3.14"
+                  cache: pip
+                  cache-dependency-path: backend/requirements.txt
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+                  cache: npm
+                  cache-dependency-path: frontend/package-lock.json
+
+            - name: Pin npm (match lockfile / packageManager)
+              run: npm install -g npm@11.6.2
+
+            - name: Install Task
+              uses: arduino/setup-task@v2
+              with:
+                  version: 3.x
+                  repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Create backend venv
+              run: |
+                  python -m venv .venv
+                  .venv/bin/pip install --upgrade pip
+
+            - name: Install backend dependencies
+              run: task install:backend
+
+            - name: Install frontend dependencies
+              run: task install:frontend
+
+            - name: Create config/secrets.env
+              run: |
+                  cat > config/secrets.env << 'EOF'
+                  GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+                  GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+                  CLOUDFLARE_API_TOKEN=${{ secrets.CLOUDFLARE_API_TOKEN }}
+                  SMTP_USER=${{ secrets.SMTP_USER }}
+                  SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}
+                  EOF
+              env:
+                  GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+                  GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+                  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+                  SMTP_USER: ${{ secrets.SMTP_USER }}
+                  SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+
+            - name: Create config/secrets.staging.env
+              run: |
+                  cat > config/secrets.staging.env << 'EOF'
+                  ADMIN_EMAIL=${{ secrets.STAGING_ADMIN_EMAIL }}
+                  DATABASE_URL=${{ secrets.STAGING_DATABASE_URL }}
+                  SESSION_SECRET=${{ secrets.STAGING_SESSION_SECRET }}
+                  VAPID_PUBLIC_KEY=${{ secrets.STAGING_VAPID_PUBLIC_KEY }}
+                  VAPID_PRIVATE_KEY=${{ secrets.STAGING_VAPID_PRIVATE_KEY }}
+                  EOF
+              env:
+                  STAGING_ADMIN_EMAIL: ${{ secrets.STAGING_ADMIN_EMAIL }}
+                  STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+                  STAGING_SESSION_SECRET: ${{ secrets.STAGING_SESSION_SECRET }}
+                  STAGING_VAPID_PUBLIC_KEY: ${{ secrets.STAGING_VAPID_PUBLIC_KEY }}
+                  STAGING_VAPID_PRIVATE_KEY: ${{ secrets.STAGING_VAPID_PRIVATE_KEY }}
+
+            - name: Create backend/credentials/service-account.json
+              if: secrets.GOOGLE_SERVICE_ACCOUNT_JSON != ''
+              run: |
+                  mkdir -p backend/credentials
+                  cat > backend/credentials/service-account.json << 'EOF'
+                  ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+                  EOF
+
+            - name: Deploy to staging
+              run: task deploy:staging:remote -- develop
+              env:
+                  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+                  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+                  DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+                  ADMIN_EMAIL: ${{ secrets.STAGING_ADMIN_EMAIL }}
+                  SESSION_SECRET: ${{ secrets.STAGING_SESSION_SECRET }}
+                  VAPID_PUBLIC_KEY: ${{ secrets.STAGING_VAPID_PUBLIC_KEY }}
+                  VAPID_PRIVATE_KEY: ${{ secrets.STAGING_VAPID_PRIVATE_KEY }}
+
+            - name: Notify on success
+              if: success()
+              run: |
+                  echo "✅ Staging deployment succeeded"
+                  echo "   Commit: ${{ github.event.workflow_run.head_commit.message }}"
+                  echo "   By: ${{ github.event.workflow_run.actor.login }}"
+                  echo "   URL: https://develop.joinmovida.com"
+
+            - name: Notify on failure
+              if: failure()
+              run: |
+                  echo "❌ Staging deployment failed"
+                  echo "   Commit: ${{ github.event.workflow_run.head_commit.message }}"
+                  echo "   Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                  exit 1

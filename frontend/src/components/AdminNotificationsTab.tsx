@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { fetchAdminNotificationsLog } from '../api';
 import type { NotificationLogChannel, NotificationLogEntry, NotificationLogType } from '../api';
 
@@ -26,6 +27,31 @@ const CHANNEL_LABELS: Record<string, string> = {
 function ChannelBadge({ channel }: { channel: string }) {
     const cls = CHANNEL_BADGE[channel] ?? CHANNEL_BADGE_FALLBACK;
     return <span className={cls}>{CHANNEL_LABELS[channel] ?? channel}</span>;
+}
+
+/**
+ * Plain-text, channel-agnostic description of what the notification is
+ * about (``row.summary``, e.g. "Maria is going to Salsa Social Friday"),
+ * reconstructed server-side from the same copy the real senders use — not
+ * a verbatim record of the historically delivered email/push text. Links
+ * to the related event when one is attached to the notification.
+ */
+function AboutCell({ row }: { row: NotificationLogEntry }) {
+    return (
+        <div className="max-w-[24rem]">
+            <p className="text-slate-700">{row.summary}</p>
+            {row.event_id && (
+                <Link
+                    to={`/event/${row.event_id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                >
+                    View event ↗
+                </Link>
+            )}
+        </div>
+    );
 }
 
 /**
@@ -152,13 +178,14 @@ export default function AdminNotificationsTab() {
                             <th className="px-3 py-2">Date/time</th>
                             <th className="px-3 py-2">Type</th>
                             <th className="px-3 py-2">Channel</th>
+                            <th className="px-3 py-2">About</th>
                             <th className="px-3 py-2">User</th>
                         </tr>
                     </thead>
                     <tbody>
                         {!loading && rows.length === 0 && (
                             <tr>
-                                <td colSpan={4} className="px-3 py-8 text-center text-slate-500">
+                                <td colSpan={5} className="px-3 py-8 text-center text-slate-500">
                                     No notifications match these filters.
                                 </td>
                             </tr>
@@ -173,6 +200,9 @@ export default function AdminNotificationsTab() {
                                 </td>
                                 <td className="px-3 py-2">
                                     <ChannelBadge channel={row.channel} />
+                                </td>
+                                <td className="px-3 py-2">
+                                    <AboutCell row={row} />
                                 </td>
                                 <td className="px-3 py-2 truncate max-w-[20rem]">
                                     {recipientLabel(row)}

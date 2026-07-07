@@ -256,6 +256,10 @@ def _render_plain(
     if kind == "interest_event":
         label = context or "your saved search"
         return f"{title} matched your {label} alert"
+    if kind == "event_reminder":
+        # actor_user_id == recipient for this kind (no real actor, see
+        # reminder_service.py), so "who" is meaningless here.
+        return f"Reminder: {title} is coming up"
     return f"New activity from {who}"
 
 

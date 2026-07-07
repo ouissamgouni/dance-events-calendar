@@ -1384,19 +1384,19 @@ export default function Admin() {
                                 <h2 className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Feature Flags</h2>
                             </div>
                             <div className="p-4 space-y-3 max-w-4xl">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <span className="text-[11px] font-medium text-gray-700">Show prices</span>
-                                    <p className="text-[10px] text-gray-400">Price badges on events</p>
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-gray-700">Show prices</span>
+                                        <p className="text-[10px] text-gray-400">Price badges on events</p>
+                                    </div>
+                                    <button
+                                        onClick={handleTogglePrices}
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${showPrices ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${showPrices ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={handleTogglePrices}
-                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${showPrices ? 'bg-emerald-500' : 'bg-gray-300'}`}
-                                >
-                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${showPrices ? 'translate-x-4' : 'translate-x-0.5'}`} />
-                                </button>
-                            </div>
-                            <div className="flex items-center justify-between">
+                                <div className="flex items-center justify-between">
                                 <div>
                                     <span className="text-[11px] font-medium text-gray-700">Show ratings</span>
                                     <p className="text-[10px] text-gray-400">Star ratings and reviews</p>
@@ -1628,7 +1628,7 @@ export default function Admin() {
                                     <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${organizerClaimsEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                 </button>
                             </div>
-                        </div>
+                            </div>
                         </div>
                     )}
 

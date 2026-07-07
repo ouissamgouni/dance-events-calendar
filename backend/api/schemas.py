@@ -777,6 +777,18 @@ class NotificationLogEntry(BaseModel):
     recipient_email: str
     recipient_handle: Optional[str] = None
     recipient_display_name: Optional[str] = None
+    # Plain-text, channel-agnostic description of what the notification is
+    # about (e.g. "Maria is going to Salsa Social Friday"), reconstructed
+    # from the same data + copy used by the real senders
+    # (``activity_email._render_plain``). Not a verbatim copy of any
+    # historically delivered email/push text — see that function's
+    # per-kind branches for the exact phrasing rules.
+    summary: str
+    actor_display_name: Optional[str] = None
+    actor_handle: Optional[str] = None
+    event_id: Optional[str] = None
+    event_title: Optional[str] = None
+    context: Optional[str] = None
 
 
 class NotificationLogResponse(BaseModel):

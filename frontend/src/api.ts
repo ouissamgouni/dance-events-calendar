@@ -394,6 +394,12 @@ export interface NotificationLogEntry {
     recipient_email: string;
     recipient_handle: string | null;
     recipient_display_name: string | null;
+    summary: string;
+    actor_display_name: string | null;
+    actor_handle: string | null;
+    event_id: string | null;
+    event_title: string | null;
+    context: string | null;
 }
 
 export interface NotificationLogList {
