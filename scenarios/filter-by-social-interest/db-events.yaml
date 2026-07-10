@@ -1,37 +1,39 @@
-# Pre-seeded events for the interest-filter-following scenario.
+# Pre-seeded events for the filter-by-social-interest scenario.
 #
-# Six events, each tied to one assertion in the test plan:
+# Seven events, each tied to exactly one assertion in the test plan so
+# toggling scope / kind / person selection stays unambiguous:
 #
-#   evt-fi-001 (Salsa Social Friday)        → Alice goes (public)
-#                                              → MUST surface for viewer
-#                                                under interest_source=follows
-#                                                (was hidden under the old
-#                                                 friends-only filter — Alice
-#                                                 does not follow viewer back)
-#   evt-fi-002 (Bachata Workshop)           → Bob saves (public)
-#                                              → MUST surface (saved counts)
-#   evt-fi-003 (Cuban Night)                → Carol goes share_audience=friends
-#                                              → MUST NOT surface for viewer
-#                                                (carol & viewer are not
-#                                                 mutual — the audience gate
-#                                                 still applies even though
-#                                                 viewer follows carol)
-#   evt-fi-004 (Bachata Beginners Bootcamp) → Dave goes (public)
+#   evt-fsi-001 (Salsa Social Friday)        → Alice goes (public)
+#                                              → surfaces under "All" scope
+#                                                only (alice is a one-way
+#                                                followee, not a mutual
+#                                                friend)
+#   evt-fsi-002 (Bachata Workshop)           → Bob goes (public)
+#                                              → surfaces under BOTH "All"
+#                                                and "Friends" scope (bob
+#                                                is viewer's only mutual
+#                                                friend)
+#   evt-fsi-003 (Cuban Night)                → Carol goes, audience=friends
+#                                              → MUST NOT surface under
+#                                                either scope (viewer
+#                                                follows carol one-way,
+#                                                not mutual) until she
+#                                                follows back
+#   evt-fsi-004 (Bachata Beginners Bootcamp) → Dave goes (public)
 #                                              → MUST NOT surface (stranger)
-#   evt-fi-005 (Salsa Tuesday Night)        → Eve goes (public)
-#                                              → MUST NOT surface for viewer
-#                                                (eve follows viewer but
-#                                                 viewer does NOT follow eve;
-#                                                 the filter is by viewer's
-#                                                 followees, not followers)
-#   evt-fi-006 (Kizomba Sunday Brunch)      → Alice saves (public) — used
-#                                              for the kind=going filter
-#                                              assertion (must be excluded
-#                                              when kind=going, included
-#                                              when kind=saved or kind=any)
+#   evt-fsi-005 (Salsa Tuesday Night)        → Eve goes (public)
+#                                              → MUST NOT surface (eve
+#                                                follows viewer, but viewer
+#                                                does not follow her back)
+#   evt-fsi-006 (Kizomba Sunday Brunch)      → Alice saves (public)
+#                                              → surfaces under "All" scope
+#                                                only, kind=saved/any
+#   evt-fsi-007 (Rueda Wednesday)            → Bob saves (public)
+#                                              → surfaces under BOTH
+#                                                scopes, kind=saved/any
 base_week: 0
 events:
-  - id: evt-fi-001
+  - id: evt-fsi-001
     calendar_id: salsa-cal-001
     title: Salsa Social Friday
     description: |
@@ -50,7 +52,7 @@ events:
       - vibe:good-music
       - vibe:social-atmosphere
       - reach:local
-  - id: evt-fi-002
+  - id: evt-fsi-002
     calendar_id: bachata-cal-002
     title: Bachata Workshop
     description: |
@@ -70,7 +72,7 @@ events:
       - level:intermediate
       - venue:indoor
       - reach:international
-  - id: evt-fi-003
+  - id: evt-fsi-003
     calendar_id: salsa-cal-001
     title: Cuban Night
     description: |
@@ -90,7 +92,7 @@ events:
       - venue:indoor
       - vibe:social-atmosphere
       - reach:local
-  - id: evt-fi-004
+  - id: evt-fsi-004
     calendar_id: bachata-cal-002
     title: Bachata Beginners Bootcamp
     description: |
@@ -109,7 +111,7 @@ events:
       - level:beginner-friendly
       - venue:indoor
       - reach:international
-  - id: evt-fi-005
+  - id: evt-fsi-005
     calendar_id: salsa-cal-001
     title: Salsa Tuesday Night
     description: |
@@ -128,7 +130,7 @@ events:
       - vibe:good-music
       - vibe:social-atmosphere
       - reach:regional
-  - id: evt-fi-006
+  - id: evt-fsi-006
     calendar_id: salsa-cal-001
     title: Kizomba Sunday Brunch
     description: |
@@ -144,6 +146,24 @@ events:
       - dance-style:salsa
       - dance-style:kizomba
       - level:beginner-friendly
+      - venue:indoor
+      - vibe:social-atmosphere
+      - reach:regional
+  - id: evt-fsi-007
+    calendar_id: salsa-cal-001
+    title: Rueda Wednesday
+    description: |
+      Casino rueda circle, all levels, live calls.
+    location: Sala Rossa, Calle de Atocha 34, Madrid, Spain
+    latitude: 40.4168
+    longitude: -3.7038
+    start: w2 Wed 20:00
+    end: w2 Wed 23:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:salsa
+      - level:all-levels
       - venue:indoor
       - vibe:social-atmosphere
       - reach:regional

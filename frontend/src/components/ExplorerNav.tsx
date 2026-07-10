@@ -1,12 +1,9 @@
 import ExplorerTabs, { type ExplorerTab } from './ExplorerTabs';
-import ExplorerEventSearch from './ExplorerEventSearch';
 import FollowsButton from './FollowsButton';
 import MineButton from './MineButton';
 
 interface ExplorerNavProps {
     active: ExplorerTab;
-    /** Called with the selected event id when a search result is chosen. */
-    onSelectSearchEvent: (eventId: string) => void;
 }
 
 /**
@@ -17,7 +14,7 @@ interface ExplorerNavProps {
  * visible and consistent across both tabs instead of disappearing on
  * pages that don't render them themselves.
  */
-export default function ExplorerNav({ active, onSelectSearchEvent }: ExplorerNavProps) {
+export default function ExplorerNav({ active }: ExplorerNavProps) {
     return (
         <div className="flex flex-wrap items-center gap-2">
             <ExplorerTabs active={active} />

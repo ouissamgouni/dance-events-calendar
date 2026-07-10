@@ -1,36 +1,29 @@
-# Mock users pre-seeded for the for-you scenario (For You rail: Recommended
-# / New / Friends lenses).
+# Mock users pre-seeded for the for-you scenario (For You page: You might
+# like / Following & friends going / Build your tribe / New sections).
 #
 # Cast layout (inspired by scenarios/following-badge/mock-users.yaml so we
 # can seed a realistic network graph and drive a meaningful trending score):
-#   * viewer  — the POV account. Sets preferred tags (Salsa + Bachata)
-#     live via Settings (preferences cannot be YAML-seeded).
+#   * viewer  — the POV account. Has a seeded Interest Profile (Salsa +
+#     Bachata, see db-interest-profiles.yaml) driving "You might like".
 #   * friend  — mutual friend of viewer. RSVPs (friends-audience) to two
-#     events so the "Friends going" lens has data.
+#     events so "Following & friends going" has data.
 #   * 4 additional mutual friends of viewer — emma, frank, gina, hugo.
-#     They RSVP publicly to varied events so the "Friends going" lens has
-#     one deterministic top card (evt-fy-bulk-15) plus the friends-only
-#     card (evt-fy-004), and to boost popularity_score without leaking
-#     into the "Friends going" lens (their public RSVPs on other events
-#     still surface there because Friends lens = "mutual friend RSVP'd
-#     with friends/public audience").
-#     ⇒ To keep the Friends lens tightly scoped to bulk-15 + evt-fy-004,
-#       every RSVP from emma/frank/gina/hugo below lands on those two
-#       events or on the two baseline hero cards (evt-fy-001 & 002).
-#     ⇒ For popularity fuel on the OTHER bulk events, we lean on
-#       one-way followees (pablo/quinn/rita) + strangers (s01..s10)
-#       who are NOT mutual friends of viewer.
+#     They RSVP publicly to varied events so "Following & friends going"
+#     has one deterministic top card (evt-fy-bulk-15) plus the
+#     friends-only card (evt-fy-004), and boost popularity_score.
 #   * 3 one-way followees — pablo, quinn, rita. viewer follows them but
-#     they don't follow back. Public RSVPs from them contribute to the
-#     popularity_score but do NOT appear under the Friends lens.
+#     they don't follow back. Public RSVPs from them contribute to
+#     popularity_score AND now appear under "Following & friends going"
+#     too (that section includes every followee, not just mutual friends).
 #   * 10 strangers — s01..s10. No follow graph connection to viewer.
 #     Deep bench of public RSVPs to give many events ≥3 goings so the
-#     trending 🔥 badge decorates several cards in the "You might like"
-#     lens (see scenarios/trending-events for the same pattern).
+#     trending badge decorates several cards in "You might like" (see
+#     scenarios/trending-events for the same pattern).
 #   * stranger — original non-connected user, kept so evt-fy-005's
-#     "stranger RSVPs publicly to a Salsa event" narrative is intact.
+#     "stranger RSVPs publicly to a Salsa event, but viewer doesn't
+#     follow them" narrative is intact.
 #   * admin — matches ADMIN_EMAIL; runs Sync Now to populate the New
-#     lens.
+#     section.
 users:
   - email: viewer@example.com
     name: Scenario Viewer
@@ -69,3 +62,10 @@ users:
   - email: admin@example.com
     name: Dev Admin
     handle: admin
+  # Friend-of-friend candidates for the "Build your tribe" trail on
+  # /for-you. viewer does NOT follow either of these, but two of
+  # viewer's mutual friends (emma, gina) follow iris and one (frank)
+  # follows jonas — giving iris mutual_friend_count=2 (higher-ranked)
+  # and jonas mutual_friend_count=1 (see db-follows.yaml).
+  - { email: iris@example.com, name: Iris Novak, handle: iris }
+  - { email: jonas@example.com, name: Jonas Weber, handle: jonas }

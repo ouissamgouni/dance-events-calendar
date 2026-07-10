@@ -9,7 +9,7 @@ test_plan:
     GET /api/social/me/subscribers). Privacy chokepoint still holds
     end-to-end: subscribing to a calendar you cannot view returns 404
     (never 403). The explorer friend filter is covered separately in the
-    ``interest-filter-friends`` scenario (which seeds the necessary event data) and
+    ``filter-by-social-interest`` scenario (which seeds the necessary event data) and
     the Admin Users tab is covered in ``users-management``.
   preconditions:
     - "Run with: task start:scenario SCENARIO=friends-graph"

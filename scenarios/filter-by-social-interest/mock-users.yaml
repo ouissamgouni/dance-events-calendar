@@ -1,0 +1,41 @@
+# Mock users pre-seeded for the filter-by-social-interest scenario.
+#
+# `viewer` is the signed-in explorer user for the entire test plan. The
+# follow graph is deliberately mixed — some followees are mutual friends,
+# some are one-way only — so a single seed proves both the broad "All"
+# scope (interest_source=follows: any followee counts) and the narrower
+# "Friends" scope (interest_source=friends: mutual only) without needing
+# to switch signed-in users mid-scenario (unlike the two scenarios this
+# one replaces).
+#
+# - viewer -> alice   (one-way; alice does NOT follow back)
+# - viewer <-> bob    (mutual — bob is viewer's ONLY friend in this graph)
+# - viewer -> carol   (one-way; carol's attendance is audience=friends,
+#   so it stays hidden from viewer until she follows back — see
+#   db-follows.yaml and the privacy steps in test_plan.yaml)
+# - dave    is a stranger (no follows) — control
+# - eve     follows viewer one-way (reverse-direction control — proves
+#   the filter reads viewer's followees, not viewer's followers)
+# - admin   is included only because ADMIN_EMAIL must resolve
+users:
+  - email: viewer@example.com
+    name: Vera Viewer
+    handle: viewer
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+  - email: carol@example.com
+    name: Carol Nguyen
+    handle: carol
+  - email: dave@example.com
+    name: Dave Smith
+    handle: dave
+  - email: eve@example.com
+    name: Eve Esposito
+    handle: eve
+  - email: admin@example.com # matches ADMIN_EMAIL → admin badge
+    name: Dev Admin
+    handle: admin

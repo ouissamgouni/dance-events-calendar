@@ -1,26 +1,23 @@
 # Pre-seeded follow graph for the for-you scenario. Same shape as
 # scenarios/following-badge/db-follows.yaml — a small realistic network:
 #
-#   Mutual friends of viewer (populate the Friends lens):
+#   Mutual friends of viewer (populate "Following & friends going" and
+#   count toward "Build your tribe" mutual-friend ranking):
 #     viewer <-> friend
 #     viewer <-> emma
 #     viewer <-> frank
 #     viewer <-> gina
 #     viewer <-> hugo
 #
-#   One-way followees of viewer (public RSVPs feed popularity_score but
-#   MUST NOT appear under the Friends lens):
+#   One-way followees of viewer (public RSVPs feed popularity_score AND
+#   now also surface under "Following & friends going", which includes
+#   every followee, not just mutual friends):
 #     viewer -> pablo
 #     viewer -> quinn
 #     viewer -> rita
 #
 #   Strangers (s01..s10, stranger, admin): no follow relationship in
 #   either direction. Their public RSVPs feed popularity_score only.
-#
-# The Friends lens ("mutual friend RSVP'd with friends/public audience")
-# is deliberately narrow — the mutual friends emma/frank/gina/hugo only
-# RSVP to bulk-15 and evt-fy-004 (see db-attendances.yaml) so the lens
-# still shows exactly those two cards.
 follows:
   # --- mutual friendships of viewer ---
   - { follower: viewer, followee: friend }
@@ -37,3 +34,9 @@ follows:
   - { follower: viewer, followee: pablo }
   - { follower: viewer, followee: quinn }
   - { follower: viewer, followee: rita }
+  # --- friend-of-friend candidates for "Build your tribe" (not followed
+  #     by viewer): emma + gina both follow iris (mutual_friend_count=2),
+  #     frank follows jonas (mutual_friend_count=1) ---
+  - { follower: emma, followee: iris }
+  - { follower: gina, followee: iris }
+  - { follower: frank, followee: jonas }

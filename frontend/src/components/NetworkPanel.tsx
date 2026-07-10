@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
     fetchFriendsLeaderboard,
@@ -10,6 +10,7 @@ import {
     unfollowUser,
     type FollowList,
     type FollowUser,
+    type FoFSuggestionItem,
     type FriendsLeaderboardResponse,
     type LeaderboardPeriod,
 } from '../api';
@@ -38,6 +39,18 @@ const TAB_LABELS: Record<Tab, string> = {
 
 export default function NetworkPanel() {
     const [tab, setTab] = useState<Tab>('suggestions');
+    // Tracks whether the viewer has explicitly clicked a tab — once true,
+    // the suggestions-empty fallback below no longer overrides their choice.
+    const tabManuallySelectedRef = useRef(false);
+    const handleTabClick = useCallback((t: Tab) => {
+        tabManuallySelectedRef.current = true;
+        setTab(t);
+    }, []);
+    const handleSuggestionsResult = useCallback((items: FoFSuggestionItem[]) => {
+        if (!tabManuallySelectedRef.current && items.length === 0) {
+            setTab((current) => (current === 'suggestions' ? 'followers' : current));
+        }
+    }, []);
     const [data, setData] = useState<Record<Exclude<Tab, 'leaderboard' | 'suggestions'>, FollowList | null>>({
         friends: null,
         followers: null,
@@ -240,7 +253,7 @@ export default function NetworkPanel() {
                             type="button"
                             role="tab"
                             aria-selected={active}
-                            onClick={() => setTab(t)}
+                            onClick={() => handleTabClick(t)}
                             className={`shrink-0 px-2.5 py-1.5 text-xs font-medium border-b-2 -mb-px whitespace-nowrap ${active
                                 ? 'border-blue-500 text-blue-600'
                                 : 'border-transparent text-slate-600 hover:text-slate-900'
@@ -264,7 +277,7 @@ export default function NetworkPanel() {
                     // Phase E (E4): friend-of-friend / popular accounts the
                     // viewer might want to follow. The PYM card owns its
                     // own data fetch + Follow buttons so we just drop it in.
-                    <PeopleYouMayKnowCard />
+                    <PeopleYouMayKnowCard onResult={handleSuggestionsResult} />
                 ) : tab === 'leaderboard' ? (
                     <LeaderboardView
                         period={leaderboardPeriod}

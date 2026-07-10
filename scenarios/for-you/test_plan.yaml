@@ -1,288 +1,129 @@
 test_plan:
-  name: "For You rail — You might like / Friends going / New lenses"
+  name: "For You page"
   description: >
-    Verify the explorer Home page's "For you" rail end-to-end:
-
-    LENSES
-      • "You might like" — upcoming events matching the UNION of the
-        viewer's InterestProfiles (bbox + reach + dance-style tags per
-        profile), sorted by popularity_score DESC, excluding events the
-        viewer has already saved / is going to. Backend selects rows via
-        GET /api/events?profiles=me.
-      • "Friends going" — upcoming events a mutual friend has RSVP'd to
-        with a friends/public audience, sorted by combined going+saved
-        commitment. Non-friend RSVPs never leak in.
-      • "New" — the unseen subset of "You might like", sharing the same
-        paginated fetch stream.
-
-    KEY BEHAVIOURS
-      • "You might like" is scoped SERVER-SIDE to the viewer's
-        InterestProfiles (each profile contributes its bbox + tag
-        filters; the rail unions the matches) and to events starting
-        from TODAY forward — INDEPENDENT of the explorer's current
-        pan/zoom viewport, date-range filter, tag filter, or search text.
-      • "Friends going" is scoped to the viewer's saved preferred area
-        (or DEFAULT_AREA_BBOX when none is saved), from TODAY forward.
-      • Lens tab order: You might like, Friends going, New.
-      • "You might like" excludes events the viewer has already saved
-        or is going to; those live in the "Your next events" rail.
-      • Rail cards show: title (truncated), start date (short), 📍 +
-        location (truncated) directly under date, then tag pills
-        (TagBadges maxVisible=3), with a small Save + Going CTA cluster
-        on the bottom-right of each card (SaveEventButton + GoingButton
-        appearance="icon" size="sm"). Cards behave as normal event cards
-        — clicking the body opens the event modal, clicking the CTAs
-        toggles save/going without opening the modal.
-      • "+more" (data-testid="for-you-load-more") triggers a real next
-        server page GET /events?offset=…&limit=…&profiles=me for "You
-        might like" (fully server-filtered against InterestProfiles;
-        client only re-excludes saved/going), APPENDED to the visible
-        set (never reorders / removes existing cards). The button
-        disappears once X-Has-More=false.
-      • Trending badge (data-testid="trending-badge", orange 🔥)
-        decorates cards when trending_enabled + show_popularity are on,
-        using the same top-K rule as EventListPanel's PopularityBadge —
-        scoped to the CURRENT lens's visible set.
-      • Cold-start guard: rail is fully hidden when every lens is empty.
-      • Admin feature-flag gate (for_you_rail_enabled) hides the rail
-        regardless of data.
-      • On mobile (<1024px) the rail collapses by default; expanding it
-        keeps the map above the fold.
-
-    Seeded data (see db-events.yaml + db-attendances.yaml +
-    db-saves.yaml + db-follows.yaml + mock-users.yaml):
-      • 25 upcoming events inside the default "Europe & nearby" bbox:
-          – evt-fy-001 Salsa (Paris) — matches preferred tags.
-          – evt-fy-002 Bachata (Madrid) — matches preferred tags.
-          – evt-fy-003 Kizomba (Berlin) — does NOT match preferred tags.
-          – evt-fy-004 Zouk (Milano) — friend RSVPs friends-only;
-            does NOT match preferred tags. Friends-going only.
-          – evt-fy-005 Salsa (Brussels) — stranger RSVPs publicly;
-            matches preferred tags → "You might like" but NOT
-            "Friends going" (stranger is not a mutual friend).
-          – evt-fy-bulk-01 … evt-fy-bulk-20 — 20 uniquely-titled Salsa /
-            Bachata weekend events (Fri / Sat / Sun) across w0…w7 in and
-            around Paris (Belleville, Boulogne, Vincennes, Marais,
-            Batignolles, Bastille, Montreuil, Pigalle, Buttes-Chaumont,
-            Canal Saint-Martin, Montmartre, Père-Lachaise, Nation,
-            République, Trocadéro, Opéra, Champs-Élysées, Louvre,
-            La Défense, plus the Grand Paris Salsa Marathon hero card).
-            Together with evt-fy-001 / -005 / sync-001 they push the
-            fetch past the server batch size (limit=20 default), so the
-            first fetch returns X-Has-More=true and the rail shows a
-            "+more" tile.
-          – evt-fy-bulk-20 ("Grand Paris Salsa Marathon (TOP)", w0 Sat)
-            has 6 public RSVPs from mixed users (friends + followees +
-            strangers), so its popularity_score dominates →
-            deterministically first card in "You might like".
-          – evt-fy-bulk-15 ("Trocadéro Salsa Sunday", w5 Sun) has a
-            second friends-audience RSVP from friend PLUS two public
-            RSVPs from mutual friends (emma, frank), so "Friends going"
-            holds ≥ 2 events (bulk-15 and evt-fy-004) and the
-            (going+saved) DESC ordering puts bulk-15 first.
-          – Additional public RSVPs from one-way followees
-            (pablo/quinn/rita) and strangers (s01..s10) on evt-fy-001,
-            -002, and bulk-01/-02/-05/-08/-10/-13/-17/-19 each raise
-            those events above the trending gate (floor_going=1,
-            popularity_threshold=1, top_n=5) so the 🔥 badge decorates
-            several cards in the "You might like" lens — not just the
-            hero. Those RSVPers are NOT mutual friends of viewer, so
-            none of them leak into the Friends lens.
-      • mock-sync-events.yaml holds evt-fy-sync-001 (Salsa, w1) — only
-        imported after an admin runs "Sync Now" (verifies the New lens
-        subset semantics).
-      • Users: viewer (POV); friend + emma + frank + gina + hugo
-        (mutual friends of viewer); pablo + quinn + rita (viewer
-        follows them, no follow-back); s01..s10 (strangers); stranger
-        (isolated legacy RSVPer); admin.
+    /for-you is a dedicated page (not part of the Explorer map) with
+    four always-visible sections, top to bottom:
+      1. Your next events — events you've saved or are going to.
+      2. You might like — upcoming events matching your Interest
+         Profile (dance styles + area, set in Settings → Preferences),
+         ranked by popularity.
+      3. Following & friends going — upcoming events anyone you follow
+         (one-way or mutual) has RSVP'd to, ranked by combined
+         going+saved commitment.
+      4. Build your tribe — friend-of-friend suggestions to follow,
+         shown only when there's at least one suggestion.
+      5. New — the unseen subset of "You might like".
+    Each section paginates independently: 5 cards show at first,
+    "+ more" reveals 5 more already-fetched cards, and only once those
+    run out does it fetch the next server page (hidden once the server
+    confirms there's nothing left).
 
   preconditions:
     - "task start:scenario SCENARIO=for-you"
-    - "Use a fresh browser profile or hard-clear localStorage before step 1."
-    - "settings.yaml seeds for_you_rail_enabled: true, unseen_state_enabled: true, trending_enabled: true, show_popularity: true, trending_banner_enabled: true, trending_floor_going: 1, trending_top_n: 5, popularity_threshold: 1."
-    - "config.env uses CALENDAR_SERVICE=mock and DEV_AUTH=true (multi-user sign-in)."
-    - "Pre-seeded follows (see db-follows.yaml): viewer <-> friend / emma / frank / gina / hugo (mutual); viewer -> pablo / quinn / rita (one-way); strangers s01..s10 + stranger + admin isolated."
-    - "Pre-seeded attendances (see db-attendances.yaml): friend -> evt-fy-004 (friends); friend + emma + frank -> evt-fy-bulk-15 (friend friends-only, others public); stranger -> evt-fy-005 (public); pablo/quinn/rita/s01/s02/s03 -> evt-fy-bulk-20 (public, no mutual friends); public RSVPs from followees + strangers on evt-fy-001, -002, and bulks 01/02/05/08/10/13/17/19 to fuel the trending 🔥 badge."
-    - "Preferences (tags + area) cannot be YAML-seeded; the viewer sets them live in step 2."
+    - "viewer@example.com has a seeded Interest Profile (db-interest-profiles.yaml): Salsa + Bachata, default 'Europe & nearby' area."
+    - "Follows (db-follows.yaml): viewer <-> friend/emma/frank/gina/hugo (mutual); viewer -> pablo/quinn/rita (one-way, no follow-back); emma+gina -> iris and frank -> jonas (friend-of-friend candidates, NOT followed by viewer); s01..s10 + stranger + admin have no follow relationship with viewer at all."
+    - "Attendances/saves (db-attendances.yaml / db-saves.yaml) give evt-fy-bulk-20 the top popularity score and make evt-fy-bulk-15 the top 'Following & friends going' card."
 
   steps:
     - id: 1
-      title: "Brand-new viewer sees no For You rail (cold-start guard)"
+      title: "Sign in and see all four sections populated"
       description: >
-        Open / and sign in as viewer@example.com (no preferred tags, no
-        area override set yet). Inspect the explorer.
+        Sign in as viewer@example.com and open /for-you.
       expected: >
-        No element with `data-testid="for-you-rail"` is rendered — the
-        rail is completely hidden, not shown as an empty shell. With no
-        preferred tags, "You might like" is empty (client tag filter
-        drops all fetched rows) and "New" (a subset of "You might like")
-        is also empty. If the friend's RSVP on evt-fy-004 has already
-        been indexed, the rail MAY be visible with only the "Friends
-        going" tab; the key assertion is that neither "You might like"
-        nor "New" tabs are in the tab strip.
+        No cold-start screen — every signed-in user has an Interest
+        Profile (one is auto-created on first sign-in if none exists),
+        so "You might like" already has cards. All four sections render
+        in order: "You might like", "Following & friends going", "Build
+        your tribe", "New" (plus "Your next events" above them). A
+        section's row is empty only if it genuinely has no matches.
 
     - id: 2
-      title: "Set preferred tags to Salsa + Bachata via Settings"
+      title: "'You might like' matches the Interest Profile and ranks by popularity"
       description: >
-        Navigate to Settings → Preferences. In the Dance Style chip
-        group, click "Salsa" then "Bachata". Wait for the "Saving…" →
-        "Saved." indicator (no Save button; autosaves to localStorage).
-        Return to / (explorer view).
+        Inspect the "You might like" row
+        (`data-testid="for-you-you-might-like"`).
       expected: >
-        localStorage key `movida.preferences.v1` contains
-        `preferred_tag_ids` with the Salsa and Bachata tag ids and a
-        non-null `set_at`. The For You rail is now visible on / with
-        the tab strip showing all three lenses in order:
-        "You might like", "Friends going", "New".
+        Only Salsa/Bachata events appear — evt-fy-003 (Kizomba) and
+        evt-fy-004 (Zouk) are absent. evt-fy-bulk-20 ("Grand Paris Salsa
+        Marathon (TOP)") is the FIRST card (highest popularity score).
+        Each card shows a title, short date, location, up to 3 tag
+        pills, and a small Save/Going icon pair in the top-right
+        corner; clicking those icons toggles save/going without opening
+        the event modal, while clicking anywhere else on the card opens
+        it. Cards with enough public RSVPs show an orange "Trending"
+        badge.
 
     - id: 3
-      title: "'You might like' filters, order, and card layout"
+      title: "Save/Going CTA removes the card from the lens"
       description: >
-        Confirm "You might like" (`data-testid="for-you-lens-tab-you-might-like"`)
-        is the default active tab. Inspect each card in the row.
+        On the first "You might like" card, click the Save icon, then
+        reload /for-you.
       expected: >
-        The active tab is styled with the primary blue pill
-        (`bg-blue-500 border-blue-500 text-white`), inactive tabs are
-        white with slate border. The lens is populated with 20 Salsa /
-        Bachata events (server first page = min(match_count, 20)).
-        evt-fy-bulk-20 ("Grand Paris Salsa Marathon (TOP)") is the FIRST
-        card in scroll order (highest popularity_score = 6 public
-        goings from followees + strangers, plus 3 public saves, this
-        weekend).
-        evt-fy-003 (Kizomba) and evt-fy-004 (Zouk) are ABSENT.
-        The 🔥 trending badge decorates the TOP-5 scoring events in the
-        lens: expect it on evt-fy-bulk-20 plus a mix drawn from
-        evt-fy-001, evt-fy-002, evt-fy-bulk-01, evt-fy-bulk-05, and
-        evt-fy-bulk-10 (the exact 5 depend on the current-week time
-        decay). Cards with zero goings never show the badge.
-        Each card shows, top-to-bottom: (a) truncated title (≤22 chars)
-        + optional 🔥 trending badge on the top-right; (b) short
-        weekday-month-day date; (c) "📍 location" on the line
-        immediately under the date (truncated ≤22 chars); (d) tag
-        pills below the location (TagBadges, ≤3 visible); (e) a
-        bottom-right CTA cluster (`data-testid="for-you-card-actions"`)
-        containing a Save icon and a Going icon (both small
-        appearance="icon"). Card body is a button-region; clicking any
-        non-CTA area opens the event modal.
+        The event no longer appears in "You might like" (it moved to
+        "Your next events"). Repeat with the Going icon on a different
+        card — same result.
 
     - id: 4
-      title: "Card CTAs toggle save/going without opening the modal"
+      title: "'+ more' reveals cards, then paginates"
       description: >
-        On the first "You might like" card (evt-fy-bulk-20), click the
-        Save icon inside the CTA cluster (not the card body).
+        Scroll to the end of "You might like" and click "+ more"
+        repeatedly.
       expected: >
-        The event modal does NOT open (click propagation is stopped).
-        The Save button flips to its "saved" state and the audience
-        popover may render inline as usual. Reload / — evt-fy-bulk-20
-        is no longer in "You might like" (it moved to the "Your next
-        events" rail above). Click the Going icon on another card
-        (e.g. evt-fy-bulk-19); the modal still does not open, the icon
-        flips to its going state, and on reload the event moves out of
-        "You might like" into "Your next events" too.
+        The first few clicks reveal 5 more already-fetched cards each
+        time with NO network request (client-side reveal). Once the
+        fetched batch (20 events) is exhausted, the next click fires a
+        real `GET /api/events?...&offset=20&profiles=me` request and
+        appends the results. "+ more" disappears once the server
+        reports no more pages.
 
     - id: 5
-      title: "'Friends going' lens shows only mutual-friend RSVPs, sorted by commitment"
+      title: "'Following & friends going' includes ALL followees, not just mutual friends"
       description: >
-        Click the "Friends going" tab
-        (`data-testid="for-you-lens-tab-friends"`). Inspect the row.
+        Inspect the "Following & friends going" row
+        (`data-testid="for-you-following-friends-going"`).
       expected: >
-        Exactly two cards appear: evt-fy-bulk-15 ("Trocadéro Salsa
-        Sunday", w5 Sun) and evt-fy-004 ("Zouk Friends Meetup",
-        Milano). Their order is by (going_count + saved_count) DESC,
-        so bulk-15 is FIRST (friend friends-audience + emma & frank
-        public goings + hugo & friend friends-audience saves →
-        going=3, saved=2) and evt-fy-004 is SECOND (friend friends-
-        audience only → going=1, saved=0). Stranger-Only Salsa
-        Practica (evt-fy-005) does NOT appear (stranger is not a
-        mutual friend). Public RSVPs by one-way followees
-        (pablo/quinn/rita) and strangers (s01..s10) on the bulk
-        trending decorators do NOT surface here either — they aren't
-        mutual friends of viewer.
+        evt-fy-bulk-15 ("Trocadéro Salsa Sunday") is FIRST (highest
+        going+saved commitment). evt-fy-004 ("Zouk Friends Meetup")
+        also appears. Because one-way followees now count, evt-fy-001
+        and evt-fy-002 (public RSVPs from pablo/quinn/rita) also
+        appear. evt-fy-005 (RSVP'd only by `stranger`, whom viewer
+        doesn't follow at all) never appears.
 
     - id: 6
-      title: "Explorer scope (pan / date / tags) does NOT change the rail"
+      title: "'Build your tribe' suggests friend-of-friend accounts, ranked by mutual friends"
       description: >
-        Still on /, apply the following filters ONE AT A TIME to the
-        explorer, checking the rail's card set stays IDENTICAL to
-        step 3 after each: (a) pan the map to central Africa (outside
-        DEFAULT_AREA_BBOX) — the main event list empties; (b) restore
-        Europe, then change the date-range chip to "Past 7 days" —
-        the main event list empties again; (c) restore date, then
-        deselect Salsa in the explorer tag filter — the main list drops
-        Salsa. In each case, note the "You might like" cards.
+        Inspect "Build your tribe"
+        (`data-testid="for-you-build-your-tribe"`), then click "Follow"
+        on the first card.
       expected: >
-        For all three filter mutations, the "You might like" tab still
-        shows the SAME 20 cards in the SAME order as step 3 (including
-        evt-fy-bulk-20 first). The rail is scoped to the viewer's
-        SAVED preferred area and today-forward, and to the SAVED
-        preferred tags — the explorer's ephemeral pan/date/tag filters
-        do not touch it. Reset all explorer filters when done.
+        Two cards appear in order: Iris Novak (@iris, 2 mutual friends
+        — emma & gina) first, then Jonas Weber (@jonas, 1 mutual friend
+        — frank). Following Iris removes her card immediately; Jonas's
+        card remains since he's still a valid suggestion.
 
     - id: 7
-      title: "'+more' pagination fetches the next server page and appends"
+      title: "Admin sync adds a new event, which surfaces under 'New'"
       description: >
-        Still on "You might like", scroll horizontally to the end of
-        the card row. The "+more" tile
-        (`data-testid="for-you-load-more"`) is visible. Note the
-        current card count (should be ≤ server batch size = 20 after
-        the client tag-filter + save/going exclusion), then click
-        "+more". Observe the network tab.
+        Sign in as admin@example.com, go to /admin/configuration, click
+        "Sync Now". Sign back in as viewer@example.com (same browser
+        profile as step 1) and open /for-you.
       expected: >
-        One `GET /api/events?…&offset=…&limit=20` request fires with a
-        non-zero offset matching the number of rows already fetched
-        (NOT the visible card count — offset tracks server rows, not
-        client-filtered rows). Response rows are appended to the
-        existing set — no card is removed or reordered. The last
-        page's response includes `X-Has-More: false` (or omits it) and
-        the "+more" tile disappears. Every card that becomes visible
-        via pagination still matches the viewer's preferred tags and
-        excludes any event the viewer has saved or is going to.
+        Sync imports "Rooftop Salsa After Sync" (evt-fy-sync-001). The
+        "New" row (`data-testid="for-you-new"`) shows exactly that
+        event — it's also present in "You might like" (New is always a
+        subset), and no pre-existing event appears under "New".
 
     - id: 8
-      title: "Admin runs Sync Now to add a New-lens candidate"
+      title: "Empty states: no followees yet, and how to check the 'You might like' empty state"
       description: >
-        Sign out, sign in as admin@example.com, navigate to
-        /admin/configuration, click "Sync Now", wait for success.
+        Sign in as one of the isolated seeded users (e.g.
+        stranger@example.com or s01@example.com — neither follows nor
+        is followed by anyone) and open /for-you.
       expected: >
-        Sync completes and imports Rooftop Salsa After Sync
-        (evt-fy-sync-001, w1). The pre-seeded events (evt-fy-001..005,
-        evt-fy-bulk-01..20) are unchanged.
-
-    - id: 9
-      title: "'New' lens shows only genuinely-unseen events"
-      description: >
-        Sign back in as viewer@example.com (SAME browser profile as
-        steps 1-7, so the useSeenEvents localStorage baseline is set).
-        Open / and refresh. Click the "New" tab
-        (`data-testid="for-you-lens-tab-new"`).
-      expected: >
-        The New lens shows exactly evt-fy-sync-001 — the only event
-        imported after the baseline snapshot. That event is ALSO
-        present under "You might like" (Salsa match), confirming New
-        is always a subset of "You might like". None of the baseline
-        events (evt-fy-001, -005, -bulk-01..-bulk-20) appear under New.
-
-    - id: 10
-      title: "Admin can toggle the For You rail off"
-      description: >
-        Sign in as admin@example.com. On /admin/configuration flip the
-        "For you rail" feature-flag toggle off (PUT /api/settings 200
-        with `for_you_rail_enabled: false`). Sign back in as
-        viewer@example.com and open /.
-      expected: >
-        `data-testid="for-you-rail"` is completely absent from the
-        explorer regardless of preferences / friends / new data. The
-        "Your next events" rail is unaffected. Re-enable the toggle
-        and the For You rail returns on next reload.
-
-    - id: 11
-      title: "Rail collapses on mobile and the map stays above the fold"
-      description: >
-        With the rail re-enabled, resize the viewport to a mobile
-        width (e.g. 375px) and reload / as viewer@example.com.
-      expected: >
-        The For You rail renders in a collapsed state by default
-        (toggle button shows "+"); the map remains visible above the
-        fold. Clicking the rail header expands it and shows the lens
-        tabs and cards without pushing the map out of view. The
-        collapse toggle text swaps to "-" while expanded.
+        "Following & friends going" shows "You're not following anyone
+        yet." with a "Build your tribe" button linking to /discover
+        (instead of a generic empty message). To see the "You might
+        like" empty state (a prompt linking to Settings →
+        Preferences), narrow that user's Interest Profile in Settings →
+        Preferences to an area/dance-style combination with zero
+        matches.

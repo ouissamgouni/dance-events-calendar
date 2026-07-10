@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { CalendarEvent, TagGroup } from '../types';
-import { fetchEvents, fetchSettings, fetchTagGroups } from '../api';
-import UserInterestPicker from '../components/UserInterestPicker';
+import { fetchEvents, fetchSettings, fetchTagGroups, fetchMyFollowing, fetchInterestSummary } from '../api';
+import type { FollowUser, InterestSummaryItem } from '../api';
 import { trackView } from '../utils/tracking';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
@@ -51,7 +51,7 @@ interface InitialExplorerState {
     endDate: string;
     interestSource: InterestSource | null;
     interestKind: InterestKind;
-    interestUserHandle: string | null;
+    interestUserHandles: string[];
     sortBy: ExplorerSort;
 }
 
@@ -111,14 +111,18 @@ function normalizeUserHandleParam(value: string | null): string | null {
 
 function readInitialExplorerState(searchParams: URLSearchParams): InitialExplorerState {
     const defaults = defaultExplorerDateRange();
-    const interestUserHandle = normalizeUserHandleParam(searchParams.get('interest_user_handle'));
-    const interestSource = parseInterestSource(searchParams.get('interest_source')) ?? (interestUserHandle ? 'follows' : null);
+    const interestUserHandles = Array.from(new Set(
+        searchParams.getAll('interest_user_handle')
+            .map(normalizeUserHandleParam)
+            .filter((h): h is string => h !== null),
+    ));
+    const interestSource = parseInterestSource(searchParams.get('interest_source')) ?? (interestUserHandles.length ? 'follows' : null);
     return {
         startDate: parseDateParam(searchParams.get('start_date')) ?? defaults.startDate,
         endDate: parseDateParam(searchParams.get('end_date')) ?? defaults.endDate,
         interestSource,
         interestKind: parseInterestKind(searchParams.get('interest_kind')) ?? 'any',
-        interestUserHandle,
+        interestUserHandles,
         sortBy: parseExplorerSort(searchParams.get('sort_by')) ?? 'date',
     };
 }
@@ -132,7 +136,7 @@ function writeExplorerStateToSearchParams(
         shouldPersistEmptyTags: boolean;
         interestSource: InterestSource | null;
         interestKind: InterestKind;
-        interestUserHandle: string | null;
+        interestUserHandles: string[];
         sortBy: ExplorerSort;
     },
 ) {
@@ -144,12 +148,12 @@ function writeExplorerStateToSearchParams(
     else if (state.shouldPersistEmptyTags) next.set('tag_ids', '');
     else next.delete('tag_ids');
 
-    const interestActive = state.interestSource !== null || !!state.interestUserHandle;
+    const interestActive = state.interestSource !== null || state.interestUserHandles.length > 0;
     if (interestActive) {
         next.set('interest_source', state.interestSource ?? 'follows');
         next.set('interest_kind', state.interestKind);
-        if (state.interestUserHandle) next.set('interest_user_handle', state.interestUserHandle);
-        else next.delete('interest_user_handle');
+        next.delete('interest_user_handle');
+        for (const h of state.interestUserHandles) next.append('interest_user_handle', h);
     } else {
         next.delete('interest_source');
         next.delete('interest_kind');
@@ -480,14 +484,14 @@ export default function Home() {
     //   • `interestKind` = which signal: `any` (going OR saved), `going`,
     //     `saved`. Defaults to `any` so the chip works as a one-click
     //     "what are people I follow up to" toggle.
-    //   • `interestUserHandle` = optional narrow to a single user (any
-    //     user, not necessarily followed). When set, implies the filter
-    //     is on.
+    //   • `interestUserHandles` = optional narrow to one or more specific
+    //     users (any user, not necessarily followed). Non-empty implies
+    //     the filter is on.
     // Backend enforces per-row audience visibility; non-mutual followers
     // never see `friends`-audience rows.
     const [interestSource, setInterestSource] = useState<InterestSource | null>(initialExplorerState.interestSource);
     const [interestKind, setInterestKind] = useState<InterestKind>(initialExplorerState.interestKind);
-    const [interestUserHandle, setInterestUserHandle] = useState<string | null>(initialExplorerState.interestUserHandle);
+    const [interestUserHandles, setInterestUserHandles] = useState<string[]>(initialExplorerState.interestUserHandles);
     const [selectedExplorerMapEventId, setSelectedExplorerMapEventId] = useState<string | null>(null);
 
     // Calendar mode map bounds (for off-map styling in the calendar grid)
@@ -531,13 +535,13 @@ export default function Home() {
             shouldPersistEmptyTags: userTouchedTagsRef.current || searchParams.has('tag_ids'),
             interestSource,
             interestKind,
-            interestUserHandle,
+            interestUserHandles,
             sortBy,
         });
         if (next.toString() !== searchParams.toString()) {
             setSearchParams(next, { replace: true });
         }
-    }, [activeTagIds, endDate, interestKind, interestSource, interestUserHandle, searchParams, setSearchParams, sortBy, startDate, viewMode]);
+    }, [activeTagIds, endDate, interestKind, interestSource, interestUserHandles, searchParams, setSearchParams, sortBy, startDate, viewMode]);
 
     // Events query source: Explorer pulls the date/interest-filtered set once
     // and applies the active area + tag filters client-side. The live map
@@ -548,8 +552,8 @@ export default function Home() {
     useEffect(() => {
         setLoading(true);
         setError(null);
-        let params: { startDate?: string; endDate?: string; area?: PreferredAreaPayload | null; interestSource?: 'follows' | 'friends'; interestKind?: 'any' | 'going' | 'saved'; interestUserHandle?: string } | undefined;
-        const interestActive = interestSource !== null || !!interestUserHandle;
+        let params: { startDate?: string; endDate?: string; area?: PreferredAreaPayload | null; interestSource?: 'follows' | 'friends'; interestKind?: 'any' | 'going' | 'saved'; interestUserHandles?: string[] } | undefined;
+        const interestActive = interestSource !== null || interestUserHandles.length > 0;
         if (viewMode === 'explorer') {
             // No ``area`` here on purpose — we pull the full date/interest set
             // and apply the active area locally. That keeps panning instant,
@@ -560,7 +564,7 @@ export default function Home() {
                 endDate,
                 interestSource: interestActive ? (interestSource ?? 'follows') : undefined,
                 interestKind: interestActive ? interestKind : undefined,
-                interestUserHandle: interestUserHandle ?? undefined,
+                interestUserHandles: interestUserHandles.length ? interestUserHandles : undefined,
             };
         } else if (visibleRange) {
             params = {
@@ -568,7 +572,7 @@ export default function Home() {
                 endDate: formatDate(visibleRange.end),
                 interestSource: interestActive ? (interestSource ?? 'follows') : undefined,
                 interestKind: interestActive ? interestKind : undefined,
-                interestUserHandle: interestUserHandle ?? undefined,
+                interestUserHandles: interestUserHandles.length ? interestUserHandles : undefined,
             };
         } else {
             // Calendar mode initial load: use same default as explorer
@@ -577,7 +581,7 @@ export default function Home() {
                 endDate,
                 interestSource: interestActive ? (interestSource ?? 'follows') : undefined,
                 interestKind: interestActive ? interestKind : undefined,
-                interestUserHandle: interestUserHandle ?? undefined,
+                interestUserHandles: interestUserHandles.length ? interestUserHandles : undefined,
             };
         }
         const tagParams = params?.startDate || params?.endDate ? params : undefined;
@@ -604,7 +608,7 @@ export default function Home() {
                 setLoading(false);
                 initialLoadDone.current = true;
             });
-    }, [viewMode, startDate, endDate, visibleRange, interestSource, interestKind, interestUserHandle, initialUrlHadDateRange]);
+    }, [viewMode, startDate, endDate, visibleRange, interestSource, interestKind, interestUserHandles, initialUrlHadDateRange]);
 
     const handleDateRangeChange = useCallback((start: string, end: string) => {
         userTouchedDateRangeRef.current = true;
@@ -672,7 +676,7 @@ export default function Home() {
         setActiveTagIds(new Set());
         setInterestSource(null);
         setInterestKind('any');
-        setInterestUserHandle(null);
+        setInterestUserHandles([]);
         setStartDate(defaults.startDate);
         setEndDate(defaults.endDate);
         setAreaSessionOverride(null);
@@ -684,7 +688,7 @@ export default function Home() {
         setActiveTagIds(new Set());
         setInterestSource(null);
         setInterestKind('any');
-        setInterestUserHandle(null);
+        setInterestUserHandles([]);
         bumpAutoFit();
     }, [bumpAutoFit]);
 
@@ -705,12 +709,12 @@ export default function Home() {
     const activeFilterCount =
         activeTagIds.size
         + (interestSource ? 1 : 0)
-        + (interestUserHandle ? 1 : 0)
+        + (interestUserHandles.length ? 1 : 0)
         + (areaSessionOverride ? 1 : 0)
         + (dateRangeDiffers ? 1 : 0);
     const calendarActiveFilterCount = activeTagIds.size
         + (interestSource ? 1 : 0)
-        + (interestUserHandle ? 1 : 0);
+        + (interestUserHandles.length ? 1 : 0);
 
     // Map fullscreen toggle (mobile only — desktop layout already gives the
     // map a tall column). The map container picks up ``fixed inset-0`` when
@@ -800,7 +804,7 @@ export default function Home() {
             setNextAvailableEventBatch(null);
             return;
         }
-        const interestActive = interestSource !== null || !!interestUserHandle;
+        const interestActive = interestSource !== null || !!interestUserHandles.length;
         let cancelled = false;
         setNextAvailableEventBatch(undefined);
         const findNextBatch = async () => {
@@ -815,7 +819,7 @@ export default function Home() {
                     endDate: formatDate(windowEnd),
                     interestSource: interestActive ? (interestSource ?? 'follows') : undefined,
                     interestKind: interestActive ? interestKind : undefined,
-                    interestUserHandle: interestUserHandle ?? undefined,
+                    interestUserHandles: interestUserHandles.length ? interestUserHandles : undefined,
                 });
                 if (cancelled) return;
                 const areaFiltered = effectiveArea
@@ -840,7 +844,7 @@ export default function Home() {
         return () => {
             cancelled = true;
         };
-    }, [viewMode, endDate, interestSource, interestKind, interestUserHandle, effectiveArea, activeTagIds, tagGroups]);
+    }, [viewMode, endDate, interestSource, interestKind, interestUserHandles, effectiveArea, activeTagIds, tagGroups]);
 
     const selectedExplorerMapEvent = useMemo(
         () => explorerMatchingEvents.find((event) => event.event_id === selectedExplorerMapEventId) ?? null,
@@ -1023,7 +1027,7 @@ export default function Home() {
     const handleCloseEdit = useCallback(() => {
         setEditingEventId(null);
         // Refresh events list so any admin edits propagate to other surfaces.
-        const interestActive = interestSource !== null || !!interestUserHandle;
+        const interestActive = interestSource !== null || !!interestUserHandles.length;
         const params = {
             ...(viewMode === 'explorer'
                 ? { startDate, endDate }
@@ -1032,10 +1036,10 @@ export default function Home() {
                     : { startDate, endDate }),
             interestSource: interestActive ? (interestSource ?? 'follows') : undefined,
             interestKind: interestActive ? interestKind : undefined,
-            interestUserHandle: interestUserHandle ?? undefined,
+            interestUserHandles: interestUserHandles.length ? interestUserHandles : undefined,
         };
         fetchEvents(params).then(setEvents).catch(() => { });
-    }, [viewMode, startDate, endDate, visibleRange, interestKind, interestSource, interestUserHandle]);
+    }, [viewMode, startDate, endDate, visibleRange, interestKind, interestSource, interestUserHandles]);
 
     const handleBoundsChange = useCallback((bounds: MapBounds, userDriven: boolean) => {
         setMapBounds(bounds);
@@ -1175,25 +1179,26 @@ export default function Home() {
         />
     ) : null;
 
-    const renderInterestFilters = (surface: 'inline' | 'sheet' = 'inline') => (
+    const renderInterestFilters = () => (
         <InterestFilterChips
             signedIn={!!user}
-            surface={surface}
+            followingCount={user?.following_count}
             interestSource={interestSource}
             interestKind={interestKind}
-            interestUserHandle={interestUserHandle}
+            interestUserHandles={interestUserHandles}
             onChange={(next) => {
                 bumpAutoFit();
                 if (Object.prototype.hasOwnProperty.call(next, 'source')) {
                     setInterestSource(next.source ?? null);
-                    if (next.source === null) setInterestUserHandle(null);
+                    if (next.source === null) setInterestUserHandles([]);
                 }
                 if (Object.prototype.hasOwnProperty.call(next, 'kind')) {
                     setInterestKind(next.kind!);
                 }
-                if (Object.prototype.hasOwnProperty.call(next, 'userHandle')) {
-                    setInterestUserHandle(next.userHandle ?? null);
-                    if (next.userHandle && interestSource === null) {
+                if (Object.prototype.hasOwnProperty.call(next, 'userHandles')) {
+                    const nextHandles = next.userHandles ?? [];
+                    setInterestUserHandles(nextHandles);
+                    if (nextHandles.length > 0 && interestSource === null) {
                         setInterestSource('follows');
                     }
                 }
@@ -1220,8 +1225,17 @@ export default function Home() {
                         </section>
                     )}
                     <section className="filter-sheet-section" aria-labelledby="filter-sheet-following-heading">
-                        <h3 id="filter-sheet-following-heading" className="filter-sheet-section-title">Following</h3>
-                        {renderInterestFilters(surface)}
+                        <div className="flex items-center justify-between">
+                            <h3 id="filter-sheet-following-heading" className="filter-sheet-section-title">Following</h3>
+                            <Link
+                                to="/my-calendar/subscriptions"
+                                className="text-xs text-blue-600 hover:underline"
+                                onClick={() => setFilterSheetOpen(false)}
+                            >
+                                See all
+                            </Link>
+                        </div>
+                        {renderInterestFilters()}
                     </section>
                 </>
             );
@@ -1237,7 +1251,7 @@ export default function Home() {
                     />
                 )}
                 {tagFilters}
-                {renderInterestFilters(surface)}
+                {renderInterestFilters()}
             </>
         );
     };
@@ -1278,22 +1292,23 @@ export default function Home() {
             )}
             <InterestFilterChips
                 signedIn={!!user}
-                surface="sheet"
+                followingCount={user?.following_count}
                 interestSource={interestSource}
                 interestKind={interestKind}
-                interestUserHandle={interestUserHandle}
+                interestUserHandles={interestUserHandles}
                 onChange={(next) => {
                     bumpAutoFit();
                     if (Object.prototype.hasOwnProperty.call(next, 'source')) {
                         setInterestSource(next.source ?? null);
-                        if (next.source === null) setInterestUserHandle(null);
+                        if (next.source === null) setInterestUserHandles([]);
                     }
                     if (Object.prototype.hasOwnProperty.call(next, 'kind')) {
                         setInterestKind(next.kind!);
                     }
-                    if (Object.prototype.hasOwnProperty.call(next, 'userHandle')) {
-                        setInterestUserHandle(next.userHandle ?? null);
-                        if (next.userHandle && interestSource === null) {
+                    if (Object.prototype.hasOwnProperty.call(next, 'userHandles')) {
+                        const nextHandles = next.userHandles ?? [];
+                        setInterestUserHandles(nextHandles);
+                        if (nextHandles.length > 0 && interestSource === null) {
                             setInterestSource('follows');
                         }
                     }
@@ -1325,7 +1340,7 @@ export default function Home() {
                 tagGroups={tagGroups}
                 interestSource={interestSource}
                 interestKind={interestKind}
-                interestUserHandle={interestUserHandle}
+                interestUserHandles={interestUserHandles}
                 loading={loading}
                 onOpenFilters={() => setFilterSheetOpen(true)}
                 activeFilterCount={isCal ? calendarActiveFilterCount : activeFilterCount}
@@ -1398,7 +1413,7 @@ export default function Home() {
                 {(!loading || initialLoadDone.current) && !error && (
                     <div className="mb-1 sm:mb-4 flex flex-col gap-2">
                         <div className="flex flex-wrap items-center justify-between gap-3">
-                            <ExplorerNav active="explorer" onSelectSearchEvent={handleExplorerSearchEventClick} />
+                            <ExplorerNav active="explorer" />
                         </div>
                     </div>
                 )}
@@ -1436,253 +1451,253 @@ export default function Home() {
                 {(!loading || initialLoadDone.current) && !error && viewMode === 'explorer' && (
                     <div className="mt-1 lg:mt-1">
                         <div className="flex flex-col lg:flex-row gap-1 lg:gap-6 lg:items-start p-0 lg:p-3">
-                                {/* Left column: mobile summary + desktop list. Hidden
+                            {/* Left column: mobile summary + desktop list. Hidden
                                 entirely on mobile (its only content is desktop-only)
                                 so it doesn't add an empty flex gap above the map column. */}
-                                <div className="hidden lg:order-1 lg:flex lg:w-[350px] lg:shrink-0 lg:flex-col lg:gap-4 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
-                                    {/* Event list: fills remaining height on desktop */}
-                                    <div className="lg:flex lg:flex-col lg:flex-1 lg:min-h-0 lg:overflow-hidden">
-                                        <div className="flex-1 min-h-0 overflow-hidden">
-                                            <EventListPanel
-                                                events={explorerMatchingEvents}
-                                                mapBounds={mapBounds}
-                                                onEventClick={handleExplorerListEventClick}
-                                                showPrices={showPrices}
-                                                showPopularity={showPopularity}
-                                                popularityThreshold={popularityThreshold}
-                                                sortBy={sortBy}
-                                                onSortChange={setSortBy}
-                                                hoveredEventId={hoveredEventId}
-                                                onEventHover={handleExplorerListEventHover}
-                                                onMarkSeen={markSeen}
-                                                onSuggestEvent={() => setShowSuggestModal(true)}
-                                                newEnabled={unseenStateEnabled}
-                                                newEventIds={newEventIds}
-                                                onExtendPeriod={handleExtendPeriod}
-                                                onClearFilters={handleClearAllFilters}
-                                                extendingPeriod={extendingPeriod}
-                                                scopeTotalCount={explorerMatchingEvents.length}
-                                                nextPeriodEventCount={nextAvailableEventBatch === undefined ? undefined : nextAvailableEventBatch?.matchingCount ?? 0}
-                                                gateMoreEventsForAnonymous
-                                                tagsAsBadge
-                                            />
-                                        </div>
+                            <div className="hidden lg:order-1 lg:flex lg:w-[350px] lg:shrink-0 lg:flex-col lg:gap-4 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6">
+                                {/* Event list: fills remaining height on desktop */}
+                                <div className="lg:flex lg:flex-col lg:flex-1 lg:min-h-0 lg:overflow-hidden">
+                                    <div className="flex-1 min-h-0 overflow-hidden">
+                                        <EventListPanel
+                                            events={explorerMatchingEvents}
+                                            mapBounds={mapBounds}
+                                            onEventClick={handleExplorerListEventClick}
+                                            showPrices={showPrices}
+                                            showPopularity={showPopularity}
+                                            popularityThreshold={popularityThreshold}
+                                            sortBy={sortBy}
+                                            onSortChange={setSortBy}
+                                            hoveredEventId={hoveredEventId}
+                                            onEventHover={handleExplorerListEventHover}
+                                            onMarkSeen={markSeen}
+                                            onSuggestEvent={() => setShowSuggestModal(true)}
+                                            newEnabled={unseenStateEnabled}
+                                            newEventIds={newEventIds}
+                                            onExtendPeriod={handleExtendPeriod}
+                                            onClearFilters={handleClearAllFilters}
+                                            extendingPeriod={extendingPeriod}
+                                            scopeTotalCount={explorerMatchingEvents.length}
+                                            nextPeriodEventCount={nextAvailableEventBatch === undefined ? undefined : nextAvailableEventBatch?.matchingCount ?? 0}
+                                            gateMoreEventsForAnonymous
+                                            tagsAsBadge
+                                        />
                                     </div>
                                 </div>
-                                {/* Map column: map + default-location bar stacked.
+                            </div>
+                            {/* Map column: map + default-location bar stacked.
                                 On mobile this is order-2 (between left filters
                                 and event list). On desktop the column is sticky
                                 and fills available height; the bar is shrink-0
                                 so it doesn't get clipped. */}
-                                <div className="order-2 lg:order-2 lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6 lg:relative flex flex-col gap-2 sm:gap-2 min-w-0">
-                                    {showTrendingBanner && (
-                                        <TrendingEventsBanner
-                                            events={explorerMatchingEvents}
-                                            onEventClick={handleExplorerListEventClick}
-                                            showPopularity={showPopularity && trendingEnabled}
-                                            popularityThreshold={popularityThreshold}
-                                            trendingTopN={trendingTopN}
-                                            trendingTopPercent={trendingTopPercent}
-                                            hoveredEventId={railHoveredEventId}
-                                            onEventHover={handleRailEventHover}
-                                            followingBadgeEnabled={followingBadgeEnabled}
-                                        />
+                            <div className="order-2 lg:order-2 lg:flex-1 lg:h-[calc(100vh-140px)] lg:sticky lg:top-6 lg:relative flex flex-col gap-2 sm:gap-2 min-w-0">
+                                {showTrendingBanner && (
+                                    <TrendingEventsBanner
+                                        events={explorerMatchingEvents}
+                                        onEventClick={handleExplorerListEventClick}
+                                        showPopularity={showPopularity && trendingEnabled}
+                                        popularityThreshold={popularityThreshold}
+                                        trendingTopN={trendingTopN}
+                                        trendingTopPercent={trendingTopPercent}
+                                        hoveredEventId={railHoveredEventId}
+                                        onEventHover={handleRailEventHover}
+                                        followingBadgeEnabled={followingBadgeEnabled}
+                                    />
+                                )}
+                                <div
+                                    className={
+                                        mapFullscreen
+                                            ? 'explorer-map-shell fixed inset-0 z-[8000] bg-white overflow-hidden'
+                                            : 'explorer-map-shell relative h-[270px] sm:h-[331px] lg:h-auto lg:flex-1 lg:min-h-0 overflow-hidden'
+                                    }
+                                    data-testid="explorer-map-shell"
+                                    data-fullscreen={mapFullscreen ? 'true' : 'false'}
+                                >
+                                    <EventMap
+                                        events={explorerMatchingEvents}
+                                        onEventClick={handleExplorerMapEventClick}
+                                        onBoundsChange={handleBoundsChange}
+                                        hoveredEventId={hoveredEventId}
+                                        onEventHover={handleEventHover}
+                                        detailLinkSource="explorer-map"
+                                        autoFitToken={mapAutoFitToken}
+                                        flyToArea={flyToAreaBbox}
+                                        flyToAreaToken={flyToAreaToken}
+                                        initialArea={initialAreaRef.current}
+                                        newEventIds={newEventIds}
+                                        popularityThreshold={popularityThreshold}
+                                        onMarkSeen={markSeen}
+                                        disablePopups={!isDesktop}
+                                        onMarkerSelect={!isDesktop ? handleExplorerMapMarkerSelect : undefined}
+                                        showFollowingBadgeOverlay={mapFollowingBadgeOverlay}
+                                        showTrendingOverlay={mapTrendingOverlay}
+                                    />
+                                    {selectedExplorerMapEvent && !isDesktop && (
+                                        <div className="map-selected-event-card absolute inset-x-2 bottom-2 z-[700] lg:hidden border border-blue-100 bg-white shadow-lg" data-testid="explorer-map-selected-event">
+                                            <button
+                                                type="button"
+                                                onClick={handleCloseExplorerMapSelection}
+                                                className="absolute -top-7 right-0 z-[701] inline-flex h-6 w-6 items-center justify-center border border-blue-100 bg-white text-slate-500 shadow-sm hover:text-slate-700"
+                                                aria-label="Close selected event"
+                                            >
+                                                ×
+                                            </button>
+                                            <EventListCard
+                                                event={selectedExplorerMapEvent}
+                                                mapBounds={mapBounds}
+                                                onEventClick={handleExplorerMapEventClick}
+                                                showPrices={showPrices}
+                                                showPopularity={showPopularity && trendingEnabled}
+                                                popularityThreshold={popularityThreshold}
+                                                trendingTopN={trendingTopN}
+                                                trendingTopPercent={trendingTopPercent}
+                                                allViewCounts={explorerAllViewCounts}
+                                                followingBadgeEnabled={followingBadgeEnabled}
+                                                showRatings={!!showRatings}
+                                                isSavedFlag={isSaved(selectedExplorerMapEvent.event_id)}
+                                                isNew={unseenStateEnabled && newEventIds.has(selectedExplorerMapEvent.event_id)}
+                                                onEventHover={handleEventHover}
+                                            />
+                                            <Link
+                                                to={`/event/${selectedExplorerMapEvent.event_id}?src=explorer-map`}
+                                                className="absolute bottom-2 right-2 z-[701] text-[11px] font-semibold text-blue-500 underline underline-offset-2 hover:text-blue-600 hover:no-underline"
+                                            >
+                                                Details
+                                            </Link>
+                                        </div>
                                     )}
-                                    <div
-                                        className={
-                                            mapFullscreen
-                                                ? 'explorer-map-shell fixed inset-0 z-[8000] bg-white overflow-hidden'
-                                                : 'explorer-map-shell relative h-[270px] sm:h-[331px] lg:h-auto lg:flex-1 lg:min-h-0 overflow-hidden'
-                                        }
-                                        data-testid="explorer-map-shell"
-                                        data-fullscreen={mapFullscreen ? 'true' : 'false'}
-                                    >
-                                        <EventMap
-                                            events={explorerMatchingEvents}
-                                            onEventClick={handleExplorerMapEventClick}
-                                            onBoundsChange={handleBoundsChange}
-                                            hoveredEventId={hoveredEventId}
-                                            onEventHover={handleEventHover}
-                                            detailLinkSource="explorer-map"
-                                            autoFitToken={mapAutoFitToken}
-                                            flyToArea={flyToAreaBbox}
-                                            flyToAreaToken={flyToAreaToken}
-                                            initialArea={initialAreaRef.current}
-                                            newEventIds={newEventIds}
-                                            popularityThreshold={popularityThreshold}
-                                            onMarkSeen={markSeen}
-                                            disablePopups={!isDesktop}
-                                            onMarkerSelect={!isDesktop ? handleExplorerMapMarkerSelect : undefined}
-                                            showFollowingBadgeOverlay={mapFollowingBadgeOverlay}
-                                            showTrendingOverlay={mapTrendingOverlay}
-                                        />
-                                        {selectedExplorerMapEvent && !isDesktop && (
-                                            <div className="map-selected-event-card absolute inset-x-2 bottom-2 z-[700] lg:hidden border border-blue-100 bg-white shadow-lg" data-testid="explorer-map-selected-event">
-                                                <button
-                                                    type="button"
-                                                    onClick={handleCloseExplorerMapSelection}
-                                                    className="absolute -top-7 right-0 z-[701] inline-flex h-6 w-6 items-center justify-center border border-blue-100 bg-white text-slate-500 shadow-sm hover:text-slate-700"
-                                                    aria-label="Close selected event"
-                                                >
-                                                    ×
-                                                </button>
-                                                <EventListCard
-                                                    event={selectedExplorerMapEvent}
-                                                    mapBounds={mapBounds}
-                                                    onEventClick={handleExplorerMapEventClick}
-                                                    showPrices={showPrices}
-                                                    showPopularity={showPopularity && trendingEnabled}
-                                                    popularityThreshold={popularityThreshold}
-                                                    trendingTopN={trendingTopN}
-                                                    trendingTopPercent={trendingTopPercent}
-                                                    allViewCounts={explorerAllViewCounts}
-                                                    followingBadgeEnabled={followingBadgeEnabled}
-                                                    showRatings={!!showRatings}
-                                                    isSavedFlag={isSaved(selectedExplorerMapEvent.event_id)}
-                                                    isNew={unseenStateEnabled && newEventIds.has(selectedExplorerMapEvent.event_id)}
-                                                    onEventHover={handleEventHover}
-                                                />
-                                                <Link
-                                                    to={`/event/${selectedExplorerMapEvent.event_id}?src=explorer-map`}
-                                                    className="absolute bottom-2 right-2 z-[701] text-[11px] font-semibold text-blue-500 underline underline-offset-2 hover:text-blue-600 hover:no-underline"
-                                                >
-                                                    Details
-                                                </Link>
-                                            </div>
-                                        )}
-                                        {/* Search-this-area pill. Appears when
+                                    {/* Search-this-area pill. Appears when
                                     the user has panned/zoomed away from the
                                     current effective area filter; tapping it
                                     commits the live viewport as the area
                                     filter and clears the userMapBounds flag
                                     so the pill disappears. */}
-                                        {userMapBounds && (
-                                            <button
-                                                type="button"
-                                                onClick={handleSearchThisArea}
-                                                className="absolute top-2 left-1/2 -translate-x-1/2 z-[702] inline-flex items-center gap-1 border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold px-3 py-1.5 shadow-md transition"
-                                                data-testid="map-search-this-area"
-                                            >
-                                                Search this area
-                                            </button>
-                                        )}
-                                        {/* Fullscreen toggle. Mobile-first;
+                                    {userMapBounds && (
+                                        <button
+                                            type="button"
+                                            onClick={handleSearchThisArea}
+                                            className="absolute top-2 left-1/2 -translate-x-1/2 z-[702] inline-flex items-center gap-1 border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold px-3 py-1.5 shadow-md transition"
+                                            data-testid="map-search-this-area"
+                                        >
+                                            Search this area
+                                        </button>
+                                    )}
+                                    {/* Fullscreen toggle. Mobile-first;
                                     rendered on desktop too but rarely
                                     needed there since the map column is
                                     already tall. */}
-                                        <button
-                                            type="button"
-                                            onClick={() => setMapFullscreen((v) => !v)}
-                                            aria-label={mapFullscreen ? 'Exit fullscreen map' : 'Open fullscreen map'}
-                                            title={mapFullscreen ? 'Exit fullscreen' : 'Fullscreen map'}
-                                            className="absolute top-2 right-2 z-[702] inline-flex h-8 w-8 items-center justify-center border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm transition"
-                                            data-testid="map-fullscreen-toggle"
-                                        >
-                                            {mapFullscreen ? '×' : '⤢'}
-                                        </button>
-                                    </div>
-                                    {/* Map footer: quick area presets on the
+                                    <button
+                                        type="button"
+                                        onClick={() => setMapFullscreen((v) => !v)}
+                                        aria-label={mapFullscreen ? 'Exit fullscreen map' : 'Open fullscreen map'}
+                                        title={mapFullscreen ? 'Exit fullscreen' : 'Fullscreen map'}
+                                        className="absolute top-2 right-2 z-[702] inline-flex h-8 w-8 items-center justify-center border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm transition"
+                                        data-testid="map-fullscreen-toggle"
+                                    >
+                                        {mapFullscreen ? '×' : '⤢'}
+                                    </button>
+                                </div>
+                                {/* Map footer: quick area presets on the
                                     left, a compact "N off map" metric plus a
                                     settings shortcut on the right. The
                                     area-label chip and the "save current as
                                     default" naming flow used to live here;
                                     both have moved to /account preferences,
                                     reachable via the settings icon. */}
-                                    <div
-                                        className="shrink-0 flex items-center gap-1 sm:gap-2 px-1.5 sm:px-2 py-0.5 sm:py-1 border bg-slate-100 border-slate-200 text-slate-700 text-xs min-w-0 lg:absolute lg:bottom-0 lg:left-0 lg:right-0 lg:z-[703]"
-                                        data-testid="area-default-bar"
-                                    >
-                                        {(mapDriftsFromArea || areaChipState.kind === 'show-all') && (
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    const target = prefs.area ?? DEFAULT_AREA_BBOX;
-                                                    setAreaSessionOverride(null);
-                                                    flyToArea(target);
-                                                }}
-                                                className="shrink-0 whitespace-nowrap px-1.5 py-px border border-slate-300 bg-white text-[11px] opacity-80 hover:opacity-100"
-                                                title="Snap map back to your default area"
-                                                data-testid="area-snap-default"
-                                            >
-                                                Default
-                                            </button>
-                                        )}
-                                        {!(effectiveArea && isDefaultArea(effectiveArea) && !mapDriftsFromArea) && (
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setAreaSessionOverride({ kind: 'preset', area: DEFAULT_AREA_BBOX });
-                                                    flyToArea(DEFAULT_AREA_BBOX);
-                                                }}
-                                                className="shrink-0 whitespace-nowrap px-1.5 py-px border border-slate-300 bg-white text-[11px] opacity-80 hover:opacity-100"
-                                                title="Apply the Europe & nearby preset"
-                                                data-testid="area-preset-europe"
-                                            >
-                                                Europe
-                                            </button>
-                                        )}
-                                        {areaChipState.kind !== 'show-all' && (
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setAreaSessionOverride({ kind: 'show-all' });
-                                                    flyToArea({ min_lat: -60, min_lng: -170, max_lat: 75, max_lng: 170, label: 'World' });
-                                                }}
-                                                className="shrink-0 whitespace-nowrap px-1.5 py-px border border-slate-300 bg-white text-[11px] opacity-80 hover:opacity-100"
-                                                title="Show events worldwide"
-                                                aria-label="Show events worldwide"
-                                                data-testid="area-show-all"
-                                            >
-                                                🌐
-                                            </button>
-                                        )}
-                                        {explorerOffMapCount > 0 && (
-                                            <span className="ml-auto shrink-0 whitespace-nowrap text-[11px] text-slate-500" data-testid="map-footer-off-map-count">
-                                                {explorerOffMapCount} off map
-                                            </span>
-                                        )}
-                                        <Link
-                                            to="/account"
-                                            title="Open preferences"
-                                            aria-label="Open preferences"
-                                            className={`${explorerOffMapCount > 0 ? '' : 'ml-auto '}shrink-0 inline-flex h-6 w-6 items-center justify-center opacity-70 hover:opacity-100`}
-                                            data-testid="map-footer-settings-link"
+                                <div
+                                    className="shrink-0 flex items-center gap-1 sm:gap-2 px-1.5 sm:px-2 py-0.5 sm:py-1 border bg-slate-100 border-slate-200 text-slate-700 text-xs min-w-0 lg:absolute lg:bottom-0 lg:left-0 lg:right-0 lg:z-[703]"
+                                    data-testid="area-default-bar"
+                                >
+                                    {(mapDriftsFromArea || areaChipState.kind === 'show-all') && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const target = prefs.area ?? DEFAULT_AREA_BBOX;
+                                                setAreaSessionOverride(null);
+                                                flyToArea(target);
+                                            }}
+                                            className="shrink-0 whitespace-nowrap px-1.5 py-px border border-slate-300 bg-white text-[11px] opacity-80 hover:opacity-100"
+                                            title="Snap map back to your default area"
+                                            data-testid="area-snap-default"
                                         >
-                                            <img src="/setting.png" alt="" aria-hidden="true" className="h-4 w-4 object-contain" />
-                                        </Link>
-                                    </div>
-                                </div>
-                                {/* Event list on mobile: order-3, hidden on desktop.
-                            The top-of-map SummaryBar floats once it scrolls
-                            away, so this section does not render a duplicate. */}
-                                <div className="order-3 lg:hidden">
-                                    <EventListPanel
-                                        events={explorerMatchingEvents}
-                                        mapBounds={mapBounds}
-                                        onEventClick={handleExplorerListEventClick}
-                                        showPrices={showPrices}
-                                        showPopularity={showPopularity}
-                                        popularityThreshold={popularityThreshold}
-                                        sortBy={sortBy}
-                                        onSortChange={setSortBy}
-                                        hoveredEventId={hoveredEventId}
-                                        onEventHover={handleExplorerListEventHover}
-                                        onMarkSeen={markSeen}
-                                        onSuggestEvent={() => setShowSuggestModal(true)}
-                                        newEnabled={unseenStateEnabled}
-                                        newEventIds={newEventIds}
-                                        scrollHighlightedIntoView={false}
-                                        onExtendPeriod={handleExtendPeriod}
-                                        onClearFilters={handleClearAllFilters}
-                                        extendingPeriod={extendingPeriod}
-                                        scopeTotalCount={explorerMatchingEvents.length}
-                                        nextPeriodEventCount={nextAvailableEventBatch === undefined ? undefined : nextAvailableEventBatch?.matchingCount ?? 0}
-                                        gateMoreEventsForAnonymous
-                                        tagsAsBadge
-                                    />
-                                </div>
+                                            Default
+                                        </button>
+                                    )}
+                                    {!(effectiveArea && isDefaultArea(effectiveArea) && !mapDriftsFromArea) && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setAreaSessionOverride({ kind: 'preset', area: DEFAULT_AREA_BBOX });
+                                                flyToArea(DEFAULT_AREA_BBOX);
+                                            }}
+                                            className="shrink-0 whitespace-nowrap px-1.5 py-px border border-slate-300 bg-white text-[11px] opacity-80 hover:opacity-100"
+                                            title="Apply the Europe & nearby preset"
+                                            data-testid="area-preset-europe"
+                                        >
+                                            Europe
+                                        </button>
+                                    )}
+                                    {areaChipState.kind !== 'show-all' && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setAreaSessionOverride({ kind: 'show-all' });
+                                                flyToArea({ min_lat: -60, min_lng: -170, max_lat: 75, max_lng: 170, label: 'World' });
+                                            }}
+                                            className="shrink-0 whitespace-nowrap px-1.5 py-px border border-slate-300 bg-white text-[11px] opacity-80 hover:opacity-100"
+                                            title="Show events worldwide"
+                                            aria-label="Show events worldwide"
+                                            data-testid="area-show-all"
+                                        >
+                                            🌐
+                                        </button>
+                                    )}
+                                    {explorerOffMapCount > 0 && (
+                                        <span className="ml-auto shrink-0 whitespace-nowrap text-[11px] text-slate-500" data-testid="map-footer-off-map-count">
+                                            {explorerOffMapCount} off map
+                                        </span>
+                                    )}
+                                    <Link
+                                        to="/account"
+                                        title="Open preferences"
+                                        aria-label="Open preferences"
+                                        className={`${explorerOffMapCount > 0 ? '' : 'ml-auto '}shrink-0 inline-flex h-6 w-6 items-center justify-center opacity-70 hover:opacity-100`}
+                                        data-testid="map-footer-settings-link"
+                                    >
+                                        <img src="/setting.png" alt="" aria-hidden="true" className="h-4 w-4 object-contain" />
+                                    </Link>
                                 </div>
                             </div>
+                            {/* Event list on mobile: order-3, hidden on desktop.
+                            The top-of-map SummaryBar floats once it scrolls
+                            away, so this section does not render a duplicate. */}
+                            <div className="order-3 lg:hidden">
+                                <EventListPanel
+                                    events={explorerMatchingEvents}
+                                    mapBounds={mapBounds}
+                                    onEventClick={handleExplorerListEventClick}
+                                    showPrices={showPrices}
+                                    showPopularity={showPopularity}
+                                    popularityThreshold={popularityThreshold}
+                                    sortBy={sortBy}
+                                    onSortChange={setSortBy}
+                                    hoveredEventId={hoveredEventId}
+                                    onEventHover={handleExplorerListEventHover}
+                                    onMarkSeen={markSeen}
+                                    onSuggestEvent={() => setShowSuggestModal(true)}
+                                    newEnabled={unseenStateEnabled}
+                                    newEventIds={newEventIds}
+                                    scrollHighlightedIntoView={false}
+                                    onExtendPeriod={handleExtendPeriod}
+                                    onClearFilters={handleClearAllFilters}
+                                    extendingPeriod={extendingPeriod}
+                                    scopeTotalCount={explorerMatchingEvents.length}
+                                    nextPeriodEventCount={nextAvailableEventBatch === undefined ? undefined : nextAvailableEventBatch?.matchingCount ?? 0}
+                                    gateMoreEventsForAnonymous
+                                    tagsAsBadge
+                                />
+                            </div>
+                        </div>
+                    </div>
                 )}
                 {(!loading || initialLoadDone.current) && !error && viewMode === 'calendar' && (
                     <>
@@ -1800,61 +1815,276 @@ export default function Home() {
 interface InterestFilterChange {
     source?: 'follows' | 'friends' | null;
     kind?: 'any' | 'going' | 'saved';
-    userHandle?: string | null;
+    userHandles?: string[];
+}
+
+/**
+ * Horizontally-scrollable trail of followees/friends matching the active
+ * scope + kind, each rendered as a name + matched-event-count checkbox so
+ * the viewer can multi-select specific people to narrow the feed to.
+ * ``any`` sums going+saved (best-effort — a person who both attends and
+ * saved the same event is counted twice; acceptable for this lightweight
+ * display count). People with zero matching events are omitted.
+ */
+function FollowingPersonRail({
+    scope,
+    kind,
+    selectedHandles,
+    onToggle,
+}: {
+    scope: 'follows' | 'friends';
+    kind: 'any' | 'going' | 'saved';
+    selectedHandles: string[];
+    onToggle: (handle: string) => void;
+}) {
+    const [rows, setRows] = useState<FollowUser[]>([]);
+    const [metrics, setMetrics] = useState<Map<string, InterestSummaryItem>>(new Map());
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        let cancelled = false;
+        setLoading(true);
+        fetchMyFollowing({ limit: 25 })
+            .then((res) => {
+                if (cancelled) return null;
+                const items = scope === 'friends' ? res.items.filter((u) => u.is_friend) : res.items;
+                setRows(items);
+                return fetchInterestSummary(items.map((u) => u.handle));
+            })
+            .then((items) => {
+                if (cancelled || !items) return;
+                const m = new Map<string, InterestSummaryItem>();
+                for (const it of items) m.set(it.handle, it);
+                setMetrics(m);
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setRows([]);
+                    setMetrics(new Map());
+                }
+            })
+            .finally(() => {
+                if (!cancelled) setLoading(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [scope]);
+
+    const visible = useMemo(() => {
+        const countFor = (handle: string) => {
+            const m = metrics.get(handle);
+            if (!m) return 0;
+            if (kind === 'going') return m.upcoming_going_visible;
+            if (kind === 'saved') return m.upcoming_saved_visible;
+            return m.upcoming_going_visible + m.upcoming_saved_visible;
+        };
+        return rows
+            .map((user) => ({ user, count: countFor(user.handle) }))
+            .filter(({ count }) => count > 0)
+            .sort((a, b) => b.count - a.count);
+    }, [rows, metrics, kind]);
+
+    if (loading || visible.length === 0) return null;
+
+    return (
+        <div
+            className="flex w-full gap-1.5 overflow-x-auto pb-0.5 sm:gap-2"
+            data-testid="following-person-rail"
+        >
+            {visible.map(({ user, count }) => {
+                const checked = selectedHandles.includes(user.handle);
+                return (
+                    <label
+                        key={user.handle}
+                        className={
+                            'inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap border px-2 py-1 text-xs transition ' +
+                            (checked
+                                ? 'bg-blue-500 border-blue-500 text-white'
+                                : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500')
+                        }
+                    >
+                        <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => onToggle(user.handle)}
+                            className="h-3 w-3 shrink-0 accent-blue-600"
+                            aria-label={`Toggle ${user.display_name || '@' + user.handle}`}
+                        />
+                        <span className="max-w-[8rem] truncate">{user.display_name || `@${user.handle}`}</span>
+                        <span className={checked ? 'text-white/80' : 'text-slate-400'}>{count}</span>
+                    </label>
+                );
+            })}
+        </div>
+    );
 }
 
 function InterestFilterChips({
     signedIn,
-    surface = 'inline',
+    followingCount,
     interestSource,
     interestKind,
-    interestUserHandle,
+    interestUserHandles,
     onChange,
 }: {
     signedIn: boolean;
-    surface?: 'inline' | 'sheet';
+    followingCount?: number;
     interestSource: 'follows' | 'friends' | null;
     interestKind: 'any' | 'going' | 'saved';
-    interestUserHandle: string | null;
+    interestUserHandles: string[];
     onChange: (next: InterestFilterChange) => void;
 }) {
-    // Square corners, blue-500 for selected (matches TagFilterPills + UI
-    // conventions). The component is purely presentational + a small
-    // amount of local UI state for the picker popover.
-    const chip = (active: boolean) =>
-        'inline-flex shrink-0 items-center gap-1 whitespace-nowrap px-2 py-0.5 text-xs border transition sm:gap-1.5 sm:py-1 ' +
-        (active
-            ? 'bg-blue-500 border-blue-500 text-white'
-            : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500');
     // Anonymous users see the inline "Sign in to…" hint when they click
     // the Following pill (rather than the pill being disabled and the
     // hint only showing in the post-logout edge case where
     // interestSource had been left non-null).
     const [showAnonHint, setShowAnonHint] = useState(false);
-    const pickerActive = signedIn
-        ? interestSource !== null || !!interestUserHandle
-        : showAnonHint;
-    const [pickerOpen, setPickerOpen] = useState(false);
-    const followingLabel = surface === 'sheet'
-        ? (pickerActive ? null : 'Filter by following')
-        : 'Filter by following';
+
+    // Filter is only actually applied once the viewer has explicitly
+    // picked a scope or at least one person — nothing is on by default.
+    const filterActive = interestSource !== null || interestUserHandles.length > 0;
+
+    // Nobody to filter by yet — swap the pills for a nudge toward
+    // building a network instead of showing controls with no effect.
+    if (signedIn && followingCount === 0) {
+        return (
+            <div
+                className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500 sm:gap-2"
+                data-testid="following-filter-empty"
+            >
+                <span className="inline-flex shrink-0 items-center gap-1">
+                    <svg
+                        aria-hidden="true"
+                        viewBox="0 0 20 20"
+                        className="h-3.5 w-3.5 shrink-0"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    >
+                        <circle cx="7" cy="7" r="3" />
+                        <path d="M2 17c0-2.8 2.2-5 5-5s5 2.2 5 5" />
+                        <circle cx="14" cy="6" r="2.4" />
+                        <path d="M13 12c2.8 0 5 2 5 5" />
+                    </svg>
+                    <span className="hidden sm:inline">Filter by following</span>
+                </span>
+                <span>You're not following anyone yet.</span>
+                <Link to="/discover" className="text-blue-600 hover:underline">
+                    Build your tribe →
+                </Link>
+            </div>
+        );
+    }
+
+    const handleScopeClick = (scope: 'follows' | 'friends') => {
+        if (!signedIn) {
+            setShowAnonHint((v) => !v);
+            return;
+        }
+        // Switching (or toggling) scope always starts fresh: the person
+        // rail's candidate pool changes with scope (followees vs.
+        // mutual-only), so any previously selected people — and the
+        // going/saved narrowing — are reset rather than silently
+        // carried over to a scope they may not apply to.
+        onChange({ source: interestSource === scope ? null : scope, kind: 'any', userHandles: [] });
+    };
+
+    const handleClear = () => {
+        onChange({ source: null, kind: 'any', userHandles: [] });
+    };
+
+    const handleTogglePerson = (handle: string) => {
+        const next = interestUserHandles.includes(handle)
+            ? interestUserHandles.filter((h) => h !== handle)
+            : [...interestUserHandles, handle];
+        onChange({ userHandles: next });
+    };
+
+    // Quick shortcut to the dedicated "From people I follow" calendar view.
+    // Always shown alongside the inlined filters below.
+    const shortcutLink = (
+        <Link
+            to={signedIn ? '/my-calendar/subscriptions' : `/login?next=${encodeURIComponent('/my-calendar/subscriptions')}`}
+            data-testid="follows-shortcut"
+            aria-label="Open the calendar from people I follow"
+            title="Open the calendar from people I follow"
+            className="hidden sm:inline-flex items-center px-2 py-1 text-xs border border-slate-200 bg-white text-slate-600 hover:border-blue-500 hover:text-blue-500 transition"
+        >
+            {/* Heroicons calendar outline */}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="w-3.5 h-3.5" aria-hidden="true">
+                <rect x="2.75" y="4.25" width="14.5" height="13" rx="0" />
+                <path d="M2.75 8.25h14.5M6.5 2.75v3M13.5 2.75v3" strokeLinecap="round" />
+            </svg>
+        </Link>
+    );
+
+    // "Any" is no longer a separate pill — it's implied when both Going
+    // and Saved are active. Each pill toggles independently; the last
+    // remaining active pill can't be turned off (at least one must stay
+    // selected) so the filter never degenerates to "nothing".
+    const goingOn = interestKind !== 'saved';
+    const savedOn = interestKind !== 'going';
+    const handleToggleKind = (which: 'going' | 'saved') => {
+        const nextGoing = which === 'going' ? !goingOn : goingOn;
+        const nextSaved = which === 'saved' ? !savedOn : savedOn;
+        if (!nextGoing && !nextSaved) return;
+        onChange({ kind: nextGoing && nextSaved ? 'any' : nextGoing ? 'going' : 'saved' });
+    };
+
+    const kindControls = signedIn && (
+        <div className="flex shrink-0 gap-0.5 border border-slate-200 bg-white">
+            {([['going', goingOn], ['saved', savedOn]] as const).map(([k, on]) => (
+                <button
+                    key={k}
+                    type="button"
+                    onClick={() => handleToggleKind(k)}
+                    className={
+                        'px-1.5 py-0.5 text-[11px] transition sm:px-2 sm:py-1 sm:text-xs ' +
+                        (filterActive && on
+                            ? 'bg-blue-500 text-white'
+                            : 'text-slate-600 hover:text-blue-500')
+                    }
+                    aria-label={k === 'going' ? 'Toggle going activity' : 'Toggle saved activity'}
+                    aria-pressed={filterActive && on}
+                    title={k === 'going' ? 'Going activity' : 'Saved activity'}
+                >
+                    {k === 'going' ? 'Going' : 'Saved'}
+                </button>
+            ))}
+        </div>
+    );
+
+    const anonHint = !signedIn && showAnonHint && (
+        <span className="text-xs text-slate-500">
+            <Link to="/login" className="text-blue-600 hover:underline">
+                Sign in
+            </Link>{' '}
+            to see picks from people you follow.
+        </span>
+    );
+
+
+    const personRail = signedIn && (
+        <FollowingPersonRail
+            scope={interestSource ?? 'follows'}
+            kind={interestKind}
+            selectedHandles={interestUserHandles}
+            onToggle={handleTogglePerson}
+        />
+    );
+
+    // The scope pills are the entry point themselves, always visible on
+    // both surfaces (desktop inline + mobile filter sheet) — no separate
+    // "Filter by following" button needed to reveal them. Nothing is
+    // selected by default; the filter only applies once the viewer picks
+    // a scope (or one or more people from the rail below).
     return (
         <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-
-            <button
-                type="button"
-                onClick={() => {
-                    if (signedIn) {
-                        onChange({ source: interestSource === null ? 'follows' : null });
-                    } else {
-                        setShowAnonHint((v) => !v);
-                    }
-                }}
-                className={chip(pickerActive)}
-                aria-label={signedIn ? 'Show events from people you follow' : 'Sign in to filter by people you follow'}
-                aria-pressed={pickerActive}
-                title={signedIn ? 'Show events from people you follow' : 'Sign in to filter by people you follow'}
-            >
+            <span className="inline-flex shrink-0 items-center gap-1 text-slate-500">
+                <span className="hidden text-xs sm:inline">Filter by following</span>
                 <svg
                     aria-hidden="true"
                     viewBox="0 0 20 20"
@@ -1870,128 +2100,54 @@ function InterestFilterChips({
                     <circle cx="14" cy="6" r="2.4" />
                     <path d="M13 12c2.8 0 5 2 5 5" />
                 </svg>
-                {followingLabel && <span>{followingLabel}</span>}
-            </button>
-            {/* Quick shortcut to the dedicated "From people I follow" calendar
-            view. Revealed only when the Following filter is active so it
-            stays out of the way until users opt into the follows context. */}
-            {pickerActive && (
-                <Link
-                    to={signedIn ? '/my-calendar/subscriptions' : `/login?next=${encodeURIComponent('/my-calendar/subscriptions')}`}
-                    data-testid="follows-shortcut"
-                    aria-label="Open the calendar from people I follow"
-                    title="Open the calendar from people I follow"
-                    className="hidden sm:inline-flex items-center px-2 py-1 text-xs border border-slate-200 bg-white text-slate-600 hover:border-blue-500 hover:text-blue-500 transition"
+            </span>
+            <div className="flex shrink-0 gap-0.5 border border-slate-200 bg-white">
+                <button
+                    type="button"
+                    onClick={() => handleScopeClick('follows')}
+                    className={
+                        'px-1.5 py-0.5 text-[11px] transition sm:px-2 sm:py-1 sm:text-xs ' +
+                        (interestSource === 'follows'
+                            ? 'bg-blue-500 text-white'
+                            : 'text-slate-600 hover:text-blue-500')
+                    }
+                    aria-label={signedIn ? 'Show all people you follow' : 'Sign in to filter by people you follow'}
+                    aria-pressed={interestSource === 'follows'}
+                    title={signedIn ? 'Everyone you follow (one-way OK)' : 'Sign in to filter by people you follow'}
                 >
-                    {/* Heroicons calendar outline */}
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="w-3.5 h-3.5" aria-hidden="true">
-                        <rect x="2.75" y="4.25" width="14.5" height="13" rx="0" />
-                        <path d="M2.75 8.25h14.5M6.5 2.75v3M13.5 2.75v3" strokeLinecap="round" />
-                    </svg>
-                </Link>
+                    All
+                </button>
+                <button
+                    type="button"
+                    onClick={() => handleScopeClick('friends')}
+                    className={
+                        'px-1.5 py-0.5 text-[11px] transition sm:px-2 sm:py-1 sm:text-xs ' +
+                        (interestSource === 'friends'
+                            ? 'bg-blue-500 text-white'
+                            : 'text-slate-600 hover:text-blue-500')
+                    }
+                    aria-label={signedIn ? 'Show mutual friends only' : 'Sign in to filter by people you follow'}
+                    aria-pressed={interestSource === 'friends'}
+                    title={signedIn ? 'Mutual followers only' : 'Sign in to filter by people you follow'}
+                >
+                    Friends
+                </button>
+            </div>
+            {shortcutLink}
+            {kindControls}
+            {filterActive && (
+                <button
+                    type="button"
+                    onClick={handleClear}
+                    className="inline-flex shrink-0 items-center px-2 py-0.5 text-xs text-slate-500 hover:text-blue-500 sm:py-1"
+                    aria-label="Clear the following filter"
+                    title="Clear the following filter"
+                >
+                    ✕
+                </button>
             )}
-            {signedIn && pickerActive && (
-                <>
-                    {/* Scope pills: which graph to draw from. */}
-                    <div className="flex shrink-0 gap-0.5 border border-slate-200 bg-white">
-                        <button
-                            type="button"
-                            onClick={() => onChange({ source: 'follows' })}
-                            className={
-                                'px-1.5 py-0.5 text-[11px] transition sm:px-2 sm:py-1 sm:text-xs ' +
-                                (interestSource === 'follows'
-                                    ? 'bg-blue-500 text-white'
-                                    : 'text-slate-600 hover:text-blue-500')
-                            }
-                            aria-label="Show all people you follow"
-                            aria-pressed={interestSource === 'follows'}
-                            title="Everyone you follow (one-way OK)"
-                        >
-                            All
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => onChange({ source: 'friends' })}
-                            className={
-                                'px-1.5 py-0.5 text-[11px] transition sm:px-2 sm:py-1 sm:text-xs ' +
-                                (interestSource === 'friends'
-                                    ? 'bg-blue-500 text-white'
-                                    : 'text-slate-600 hover:text-blue-500')
-                            }
-                            aria-label="Show mutual friends only"
-                            aria-pressed={interestSource === 'friends'}
-                            title="Mutual followers only"
-                        >
-                            Friends
-                        </button>
-                    </div>
-                    {/* Kind pills: which signal. */}
-                    <div className="flex shrink-0 gap-0.5 border border-slate-200 bg-white">
-                        {(['any', 'going', 'saved'] as const).map((k) => (
-                            <button
-                                key={k}
-                                type="button"
-                                onClick={() => onChange({ kind: k })}
-                                className={
-                                    'px-1.5 py-0.5 text-[11px] transition sm:px-2 sm:py-1 sm:text-xs ' +
-                                    (interestKind === k
-                                        ? 'bg-blue-500 text-white'
-                                        : 'text-slate-600 hover:text-blue-500')
-                                }
-                                aria-label={k === 'any' ? 'Show any activity' : k === 'going' ? 'Show going activity' : 'Show saved activity'}
-                                aria-pressed={interestKind === k}
-                                title={k === 'any' ? 'Any activity' : k === 'going' ? 'Going activity' : 'Saved activity'}
-                            >
-                                {k === 'any' ? 'Any' : k === 'going' ? 'Going' : 'Saved'}
-                            </button>
-                        ))}
-                    </div>
-                    {/* Single-user narrow: show the selection as a pill +
-                    open the picker popover on click. The picker reuses the
-                    shared UserResultList primitive (same shape as the
-                    header search), composed with rich rows. */}
-                    {interestUserHandle ? (
-                        <button
-                            type="button"
-                            onClick={() => onChange({ userHandle: null })}
-                            className={chip(true)}
-                            title="Clear the person filter"
-                        >
-                            @{interestUserHandle} ✕
-                        </button>
-                    ) : (
-                        <button
-                            type="button"
-                            onClick={() => setPickerOpen((v) => !v)}
-                            className={chip(false)}
-                            aria-label="Filter to a single person you follow"
-                            aria-expanded={pickerOpen}
-                            title="Filter to a single person you follow"
-                        >
-                            + <span className="sm:hidden">Person</span><span className="hidden sm:inline">Pick a person</span>
-                        </button>
-                    )}
-                </>
-            )}
-            {!signedIn && showAnonHint && (
-                <span className="text-xs text-slate-500">
-                    <Link to="/login" className="text-blue-600 hover:underline">
-                        Sign in
-                    </Link>{' '}
-                    to see picks from people you follow.
-                </span>
-            )}
-            {pickerOpen && signedIn && (
-                <div className="relative w-full">
-                    <UserInterestPicker
-                        onPick={(handle) => {
-                            onChange({ userHandle: handle });
-                            setPickerOpen(false);
-                        }}
-                        onClose={() => setPickerOpen(false)}
-                    />
-                </div>
-            )}
+            {anonHint}
+            {personRail}
         </div>
     );
 }
