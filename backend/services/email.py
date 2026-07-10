@@ -146,6 +146,41 @@ def send_organizer_claim_notification(
 # --- User-facing re-engagement emails -------------------------------------
 
 
+def send_install_app_invitation_email(user) -> bool:
+    """Email a user inviting them to install the Movida app.
+
+    Sent on-demand by an admin (Admin → Users → "Send install email"), e.g.
+    for a user who dismissed the in-app banner and hasn't installed yet.
+    Not tied to any notification-preference category, so it carries no
+    unsubscribe link — it's a one-off invitation, not a recurring
+    subscription.
+    """
+    if not user.email:
+        return False
+    app = get_public_app_url()
+    install_url = f"{app}/install"
+    name = escape(user.display_name or "there")
+    subject = "Install Movida for faster access and reminders"
+    body = f"""
+    <p>Hi {name},</p>
+    <p>Install Movida on your phone or computer for the best experience:</p>
+    <ul style="padding-left:18px;margin:12px 0;color:#374151">
+      <li style="margin:6px 0">⚡ <strong>Faster access</strong> — opens straight from your home screen, no browser bar</li>
+      <li style="margin:6px 0">🔔 <strong>Reminders</strong> — get notified about events you're going to, new events you might like and activity from friends</li>
+      <li style="margin:6px 0">📱 <strong>App-like feel</strong> — full-screen, no need to keep a tab open</li>
+    </ul>
+    <p style="margin:20px 0">
+      <a href="{install_url}"
+                 style="background:#3b82f6;color:#fff;text-decoration:none;
+                                padding:10px 18px;display:inline-block">
+        Install Movida
+      </a>
+    </p>
+    """
+    html = _email_shell("Get the Movida app", body)
+    return _send_email(user.email, subject, html, "install app invitation")
+
+
 def _unsubscribe_footer(user_id, category: str, label: str) -> str:
     app = get_public_app_url()
     token = make_unsubscribe_token(str(user_id), category)

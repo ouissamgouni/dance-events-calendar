@@ -231,6 +231,27 @@ def test_admin_force_enable_push_toggle(client, session):
 
 
 @pytest.mark.unit
+def test_admin_send_install_email_requires_admin(client, session):
+    users = _seed_users(session)
+    _login(client, "alice@example.com")  # not admin
+    r = client.post(f"/api/social/admin/users/id/{users['bob'].id}/send-install-email")
+    assert r.status_code == 403
+
+
+@pytest.mark.unit
+def test_admin_send_install_email_skips_without_smtp(client, session):
+    # SMTP isn't configured in this test environment, so the send is a
+    # no-op (status "skipped"), but the endpoint still succeeds.
+    users = _seed_users(session)
+    _login(client, "admin@example.com")
+    r = client.post(
+        f"/api/social/admin/users/id/{users['alice'].id}/send-install-email"
+    )
+    assert r.status_code == 200, r.text
+    assert r.json() == {"status": "skipped", "user_id": str(users["alice"].id)}
+
+
+@pytest.mark.unit
 def test_admin_actions_work_for_user_without_handle(client, session):
     users = _seed_users(session)
     users["alice"].handle = None

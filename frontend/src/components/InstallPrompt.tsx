@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useConsent } from '../context/ConsentContext';
 import { usePush } from '../hooks/usePush';
 import { reportAppInstalled } from '../api';
+import { trackInstallPromptViewed } from '../utils/tracking';
 
 /**
  * Dismissible "Install app" banner + post-install notification opt-in.
@@ -198,32 +199,65 @@ export default function InstallPrompt() {
             className="fixed inset-x-0 bottom-0 z-[8500] flex justify-center px-3 pb-3"
             style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
         >
-            <div className="w-full sm:max-w-md flex flex-col gap-4 border-2 border-orange-500 bg-orange-400 px-6 py-5 shadow-2xl rounded-lg">
-                <div className="flex items-center gap-4">
-                    <img src="/icons/icon-192.png" alt="" className="h-12 w-12 shrink-0" />
-                    <div className="min-w-0 flex-1">
-                        <p className="text-base font-bold text-white">Install Movida</p>
-                        <p className="text-sm text-orange-100">Add to your home screen for faster access.</p>
-                    </div>
+            <InstallPromptCard
+                surface="toast"
+                onInstall={install}
+                onDismiss={forceInstall ? undefined : dismiss}
+            />
+        </div>
+    );
+}
+
+/**
+ * The "Install Movida" card itself: icon, copy, and action buttons.
+ * Extracted so the exact same UX/behavior can be reused outside the
+ * fixed-bottom toast — e.g. embedded directly in the dedicated `/install`
+ * page (`InstallPage`) linked from install-invitation emails.
+ *
+ * Fires an `install_prompt_viewed` Umami event on mount, tagged with
+ * `surface` so the toast and the standalone page can be compared.
+ */
+export function InstallPromptCard({
+    surface,
+    onInstall,
+    onDismiss,
+}: {
+    surface: 'toast' | 'page';
+    onInstall: () => void;
+    onDismiss?: () => void;
+}) {
+    useEffect(() => {
+        trackInstallPromptViewed(surface);
+        // Only track once per mount — `surface` is static for a given caller.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    return (
+        <div className="w-full sm:max-w-md flex flex-col gap-4 border-2 border-orange-500 bg-orange-400 px-6 py-5 shadow-2xl rounded-lg">
+            <div className="flex items-center gap-4">
+                <img src="/icons/icon-192.png" alt="" className="h-12 w-12 shrink-0" />
+                <div className="min-w-0 flex-1">
+                    <p className="text-base font-bold text-white">Install Movida</p>
+                    <p className="text-sm text-orange-100">Add to your home screen for faster access and notifications.</p>
                 </div>
-                <div className="flex gap-3">
-                    {!forceInstall && (
-                        <button
-                            type="button"
-                            onClick={dismiss}
-                            className="text-xs font-medium text-orange-700 bg-white/30 hover:bg-white/50 px-3 py-2 rounded transition"
-                        >
-                            Not now
-                        </button>
-                    )}
+            </div>
+            <div className="flex gap-3">
+                {onDismiss && (
                     <button
                         type="button"
-                        onClick={install}
-                        className="flex-1 text-sm font-bold bg-violet-500 text-white hover:bg-violet-600 px-4 py-3 rounded transition shadow-md"
+                        onClick={onDismiss}
+                        className="text-xs font-medium text-orange-700 bg-white/30 hover:bg-white/50 px-3 py-2 rounded transition"
                     >
-                        Install App
+                        Not now
                     </button>
-                </div>
+                )}
+                <button
+                    type="button"
+                    onClick={onInstall}
+                    className="flex-1 text-sm font-bold bg-violet-500 text-white hover:bg-violet-600 px-4 py-3 rounded transition shadow-md"
+                >
+                    Install App
+                </button>
             </div>
         </div>
     );

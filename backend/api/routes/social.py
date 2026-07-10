@@ -36,6 +36,7 @@ from backend.api.deps import (
 from backend.api.event_serializer import serialize_events
 from backend.api.rate_limit import client_ip
 from backend.api.routes.auth import purge_user_account
+from backend.services.email import send_install_app_invitation_email
 from backend.api.schemas import (
     AdminBlockedUser,
     AdminBlockedUserListResponse,
@@ -2331,6 +2332,26 @@ def admin_set_force_install_prompt_by_id(
     user = _resolve_admin_user_id(session, user_id)
     _set_force_install_prompt(session, user, payload.force_install_prompt)
     return _to_admin_user(session, user)
+
+
+# --- Admin: send install-app invitation email -------------------------------
+
+
+@router.post("/admin/users/id/{user_id}/send-install-email")
+def admin_send_install_email(
+    user_id: UUID,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Admin-only: email the user an invitation to install the app, with a
+    link to the dedicated ``/install`` page explaining the benefits.
+
+    Best-effort — ``status`` is ``"skipped"`` (not an HTTP error) when the
+    user has no email or SMTP isn't configured; see ``_send_email``.
+    """
+    user = _resolve_admin_user_id(session, user_id)
+    sent = send_install_app_invitation_email(user)
+    return {"status": "sent" if sent else "skipped", "user_id": str(user.id)}
 
 
 # --- Admin: force-enable-push-prompt toggle ---------------------------------
