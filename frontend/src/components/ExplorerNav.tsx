@@ -21,20 +21,9 @@ export default function ExplorerNav({ active, onSelectSearchEvent }: ExplorerNav
     return (
         <div className="flex flex-wrap items-center gap-2">
             <ExplorerTabs active={active} />
-            <ExplorerEventSearch
-                className="hidden lg:flex"
-                onSelectEvent={onSelectSearchEvent}
-                triggerLabel="Search events"
-            />
-            <ExplorerEventSearch
-                className="lg:hidden"
-                onSelectEvent={onSelectSearchEvent}
-                triggerLabel="Search events"
-                compact
-            />
             <div className="flex gap-1 bg-slate-200 p-1 shrink-0 w-fit">
-                <FollowsButton />
                 <MineButton />
+                <FollowsButton />
             </div>
         </div>
     );

@@ -1808,6 +1808,17 @@ export async function adminSetForceInstallPrompt(
     return parseJsonResponse<AdminUserRow>(res, 'Failed to update force-install-prompt flag');
 }
 
+export async function adminSendInstallEmail(userId: string): Promise<{ status: 'sent' | 'skipped'; user_id: string }> {
+    const res = await fetch(
+        `${BASE}/social/admin/users/id/${encodeURIComponent(userId)}/send-install-email`,
+        {
+            method: 'POST',
+            credentials: 'include',
+        },
+    );
+    return parseJsonResponse<{ status: 'sent' | 'skipped'; user_id: string }>(res, 'Failed to send install email');
+}
+
 export async function reportAppInstalled(): Promise<{ installed_at: string }> {
     const res = await fetch(`${BASE}/auth/me/installed`, {
         method: 'POST',

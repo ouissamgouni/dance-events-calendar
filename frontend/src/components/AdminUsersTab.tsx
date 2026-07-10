@@ -8,6 +8,7 @@ import {
     adminSetAdminManaged,
     adminSetForceInstallPrompt,
     adminSetForceEnablePush,
+    adminSendInstallEmail,
     adminMergeUsers,
 } from '../api';
 import type { AdminUserMergeResponse, AdminUserRow } from '../api';
@@ -121,6 +122,22 @@ export default function AdminUsersTab() {
             await load();
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to update');
+        } finally {
+            setBusyUserId(null);
+        }
+    };
+
+    const onSendInstallEmail = async (row: AdminUserRow) => {
+        setBusyUserId(row.user_id);
+        try {
+            const res = await adminSendInstallEmail(row.user_id);
+            setNotice(
+                res.status === 'sent'
+                    ? `Install invitation emailed to ${row.email}`
+                    : `Could not email ${row.email} — SMTP is not configured`,
+            );
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Failed to send install email');
         } finally {
             setBusyUserId(null);
         }
@@ -424,6 +441,17 @@ export default function AdminUsersTab() {
                                             >
                                                 {row.force_install_prompt ? 'Unforce install' : 'Force install'}
                                             </button>
+                                            {!row.installed_at && (
+                                                <button
+                                                    type="button"
+                                                    disabled={isDeleted || busyUserId === row.user_id}
+                                                    onClick={() => onSendInstallEmail(row)}
+                                                    className="px-2 py-1 text-xs border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    title="Email this user an invitation to install the app, with a link to the /install page"
+                                                >
+                                                    Send install email
+                                                </button>
+                                            )}
                                         </div>
                                     </td>
                                     <td className="px-3 py-2">

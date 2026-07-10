@@ -161,6 +161,15 @@ export function trackAttendance(
     return trackEventAttendance(eventId, getDeviceId(), action, analytics, sharePublicly, shareAudience);
 }
 
+// ── PWA install funnel (Umami only) ───────────────────────────────────────
+
+/** The "Install Movida" card was shown, either as the bottom toast or
+ *  embedded in the dedicated `/install` page. */
+export function trackInstallPromptViewed(surface: 'toast' | 'page'): void {
+    if (!readConsent().analytics) return;
+    umamiTrack('install_prompt_viewed', { surface });
+}
+
 // ── Auth funnel (Umami only — backend already records sessions) ──────────
 
 export type AuthMethod = 'google' | 'dev';
