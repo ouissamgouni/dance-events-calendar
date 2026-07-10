@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { CalendarEvent } from '../types';
 import { fetchEventsByIds } from '../api';
@@ -15,6 +15,7 @@ import { isTrendingScore } from '../utils/trending';
 import ExplorerNav from '../components/ExplorerNav';
 import YourNextEventsRail from '../components/YourNextEventsRail';
 import RailEventCard from '../components/RailEventCard';
+import PeopleYouMayKnowCard from '../components/PeopleYouMayKnowCard';
 
 const DISPLAY_CAP = 5;
 
@@ -41,9 +42,10 @@ interface LensTrailProps {
     newEventIds: Set<string>;
     unseenStateEnabled: boolean;
     followingBadgeEnabled: boolean;
-    emptyLabel?: string;
+    emptyContent?: ReactNode;
     contextLabel: string;
     testId: string;
+    headerRight?: ReactNode;
 }
 
 function LensTrail(props: LensTrailProps) {
@@ -51,7 +53,7 @@ function LensTrail(props: LensTrailProps) {
         title, events, hasMore, loading, onLoadMore, onEventClick,
         hoveredEventId, onEventHover, trendingEnabled, popularityThreshold,
         trendingTopN, trendingTopPercent, newEventIds, unseenStateEnabled,
-        followingBadgeEnabled, emptyLabel, contextLabel, testId,
+        followingBadgeEnabled, emptyContent, contextLabel, testId, headerRight,
     } = props;
     const [displayCap, setDisplayCap] = useState(DISPLAY_CAP);
     const visibleEvents = events.slice(0, displayCap);
@@ -71,11 +73,12 @@ function LensTrail(props: LensTrailProps) {
         <section data-testid={testId}>
             <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700">
                 <span>{title}</span>
+                {headerRight}
             </div>
             {events.length === 0 ? (
-                <p className="px-2.5 py-3 text-xs text-slate-500">
-                    {emptyLabel ?? 'Nothing here yet.'}
-                </p>
+                <div className="px-2.5 py-3 text-xs text-slate-500">
+                    {emptyContent ?? 'Nothing here yet.'}
+                </div>
             ) : (
                 <div className="flex gap-2 overflow-x-auto px-2 py-2" aria-label={title}>
                     {visibleEvents.map((event) => {
@@ -114,9 +117,9 @@ function LensTrail(props: LensTrailProps) {
 
 /**
  * "For you" surface: personalised event shortcuts for a signed-in viewer.
- * Renders four horizontal trails — Your next events, You might like,
- * Friends going, New — each independently paginated / scoped so a slow
- * lens never blocks the others.
+ * Renders five horizontal trails — Your next events, You might like,
+ * Following & friends going, Build your tribe, New — each independently
+ * paginated / scoped so a slow lens never blocks the others.
  */
 export default function ForYouPage() {
     const navigate = useNavigate();
@@ -158,12 +161,12 @@ export default function ForYouPage() {
         fetchArgs: { startDate: forYouStartDate, profiles: 'me' },
         resetKey: forYouResetKey,
     });
-    const friendsLens = useForYouLens({
+    const followingLens = useForYouLens({
         enabled: !!user,
         fetchArgs: {
             startDate: forYouStartDate,
             area: forYouArea,
-            interestSource: 'friends',
+            interestSource: 'follows',
             interestKind: 'any',
         },
         resetKey: forYouResetKey,
@@ -183,22 +186,22 @@ export default function ForYouPage() {
             .filter((event) => new Date(event.end).getTime() >= now)
             .sort((a, b) => (b.popularity_score ?? 0) - (a.popularity_score ?? 0));
     }, [youMightLikeLens.events]);
-    const friendsGoingEvents = useMemo(() => {
+    const followingGoingEvents = useMemo(() => {
         // eslint-disable-next-line react-hooks/purity -- render-time clock snapshot for past-event filter
         const now = Date.now();
-        return friendsLens.events
+        return followingLens.events
             .filter((event) => new Date(event.end).getTime() >= now)
             .sort(
                 (a, b) => (b.going_count ?? 0) + (b.saved_count ?? 0) - ((a.going_count ?? 0) + (a.saved_count ?? 0)),
             );
-    }, [friendsLens.events]);
+    }, [followingLens.events]);
 
     const seenScopeIds = useMemo(
         () => [
             ...youMightLikeLens.events.map((event) => event.event_id),
-            ...friendsLens.events.map((event) => event.event_id),
+            ...followingLens.events.map((event) => event.event_id),
         ],
-        [youMightLikeLens.events, friendsLens.events],
+        [youMightLikeLens.events, followingLens.events],
     );
     const { newEventIds, markSeen } = useSeenEvents(seenScopeIds);
     const newEvents = useMemo(
@@ -285,7 +288,14 @@ export default function ForYouPage() {
                             title="You might like"
                             testId="for-you-you-might-like"
                             contextLabel="you might like event"
-                            emptyLabel="Save a few dance styles in your profile to see recommendations here."
+                            emptyContent={(
+                                <>
+                                    Save a few dance styles in your profile to see recommendations here.{' '}
+                                    <Link to="/account#preferences" className="font-semibold text-blue-600 hover:text-blue-700">
+                                        Update your preferences
+                                    </Link>
+                                </>
+                            )}
                             events={youMightLikeEvents}
                             hasMore={youMightLikeLens.hasMore}
                             loading={youMightLikeLens.loading}
@@ -302,14 +312,34 @@ export default function ForYouPage() {
                             followingBadgeEnabled={followingBadgeEnabled}
                         />
                         <LensTrail
-                            title="Friends going"
-                            testId="for-you-friends-going"
-                            contextLabel="friends-going event"
-                            emptyLabel="No friends are going to anything upcoming yet."
-                            events={friendsGoingEvents}
-                            hasMore={friendsLens.hasMore}
-                            loading={friendsLens.loading}
-                            onLoadMore={friendsLens.loadMore}
+                            title="Following & Friends going"
+                            testId="for-you-following-friends-going"
+                            contextLabel="following & friends going event"
+                            headerRight={(
+                                <Link
+                                    to="/my-calendar/subscriptions"
+                                    className="text-[11px] font-semibold text-blue-600 hover:text-blue-700"
+                                >
+                                    See in calendar
+                                </Link>
+                            )}
+                            emptyContent={(
+                                (user?.following_count ?? 0) === 0 ? (
+                                    <>
+                                        <p className="mb-2">You&apos;re not following anyone yet.</p>
+                                        <Link
+                                            to="/discover"
+                                            className="inline-flex items-center bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                        >
+                                            Build your tribe
+                                        </Link>
+                                    </>
+                                ) : 'No one you follow is going to anything upcoming yet.'
+                            )}
+                            events={followingGoingEvents}
+                            hasMore={followingLens.hasMore}
+                            loading={followingLens.loading}
+                            onLoadMore={followingLens.loadMore}
                             onEventClick={handleEventClick}
                             hoveredEventId={hoveredEventId}
                             onEventHover={onEventHover}
@@ -321,11 +351,12 @@ export default function ForYouPage() {
                             unseenStateEnabled={unseenStateEnabled}
                             followingBadgeEnabled={followingBadgeEnabled}
                         />
+                        <PeopleYouMayKnowCard variant="trail" />
                         <LensTrail
                             title="New"
                             testId="for-you-new"
                             contextLabel="new event"
-                            emptyLabel="No new matches since your last visit."
+                            emptyContent="No new matches since your last visit."
                             events={newEvents}
                             hasMore={youMightLikeLens.hasMore}
                             loading={youMightLikeLens.loading}

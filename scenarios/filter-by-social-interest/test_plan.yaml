@@ -1,0 +1,290 @@
+test_plan:
+  name: "Social Interest Filter — Following (All) + Friends scopes, multi-select"
+  description: >
+    Verify the explorer "Filter by following" widget end-to-end: the two
+    scopes (`interest_source=follows` for any followee, `interest_source=
+    friends` for mutual-only), the person rail (a horizontally-scrollable,
+    multi-select list of matching followees/friends with per-person
+    match counts), the Going/Saved toggle pills (no separate "Any" pill —
+    selecting both, or neither having been deselected, means "any"), and
+    the summary-bar chip that names the selected people directly. This
+    scenario merges and replaces the former `social-interest-filter-
+    following` and `social-interest-filter-friends` scenarios: instead of
+    switching between two signed-in users to exercise each scope, a
+    single `viewer` follows one person one-way, one person mutually
+    (bob), and one person who shares at friends-only audience (carol),
+    which is enough to prove both scopes plus the privacy chokepoint
+    without a user swap.
+
+    Privacy invariants still apply per-row: an audience='friends' row is
+    hidden from one-way followers (mutual-only), strangers' attendance
+    never leaks, and the viewer's own attendance/saves are excluded.
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=filter-by-social-interest"
+    - >
+      Pre-seeded users: viewer, alice, bob, carol, dave, eve, admin.
+      Follow graph: viewer → alice (one-way), viewer ⇄ bob (mutual —
+      bob is viewer's ONLY friend), viewer → carol (one-way), eve →
+      viewer (reverse-direction control), dave isolated (stranger
+      control). Seven events evt-fsi-001..007, each tied to one
+      assertion.
+    - "Use a fresh browser profile or incognito window per signed-in user."
+    - >
+      Cookie banner: accept "Personalization" so /api/auth/* and
+      /api/social/* are not blocked by the consent gate.
+
+  steps:
+    # ── Setup attendance/saves on the seeded events ──────────────
+    - id: 1
+      title: "Alice and Bob each go to one event and save another"
+      description: >
+        Sign in as Alice on Browser A. Open evt-fsi-001 (Salsa Social
+        Friday) and mark Going with audience 🌐 Public. Open
+        evt-fsi-006 (Kizomba Sunday Brunch) and click Save (defaults to
+        🌐 Public). Sign in as Bob on Browser B. Open evt-fsi-002
+        (Bachata Workshop) and mark Going with 🌐 Public. Open
+        evt-fsi-007 (Rueda Wednesday) and click Save.
+      expected: >
+        Four rows persist, all 🌐 Public. Alice's rows will only
+        surface under the "All" scope (she is a one-way followee).
+        Bob's rows will surface under BOTH "All" and "Friends" (he is
+        viewer's only mutual friend).
+
+    - id: 2
+      title: "Carol (friends-only), Dave (stranger), and Eve (reverse follower) go"
+      description: >
+        Sign in as Carol on Browser C, open evt-fsi-003 (Cuban Night),
+        mark Going, and in the audience picker choose 👥 Friends. Sign
+        in as Dave on Browser D, open evt-fsi-004 (Bachata Beginners
+        Bootcamp), mark Going with 🌐 Public. Sign in as Eve on Browser
+        E, open evt-fsi-005 (Salsa Tuesday Night), mark Going with 🌐
+        Public.
+      expected: >
+        Three rows persist. Carol's row must NOT surface for viewer
+        under any scope yet (viewer follows carol one-way — not
+        mutual — so her friends-only row is gated). Dave's row is the
+        stranger control (must never surface). Eve's row tests the
+        direction invariant: eve follows viewer, but viewer does NOT
+        follow eve, so her row must never surface either.
+
+    # ── Default state: pills + rail already visible, filter inactive ──
+    - id: 3
+      title: "Nothing is applied by default, but the pills and person rail are already visible"
+      description: >
+        Sign in as Viewer on Browser F, open / (Home). Above the event
+        list, locate the "Following" row. Confirm neither the "All"
+        nor "Friends" scope pill is highlighted (no scope selected).
+        The "Going" and "Saved" pills and the horizontally-scrollable
+        person rail are already visible below them — they render for
+        any signed-in viewer regardless of whether a scope has been
+        picked yet, so the rail doubles as a browsing entry point.
+      expected: >
+        The initial page-load network request for GET /api/events
+        does NOT include `interest_source` (the filter has no default
+        scope). The rail shows "Alice Rivera" and "Bob Martin", each
+        with an unchecked checkbox and a count of 2 (their combined
+        going+saved matches under the implicit default `follows` pool
+        the rail uses to browse candidates); Carol is absent (0
+        matches — her only row is friends-only and hidden). The
+        Going/Saved pills render in their neutral (non-highlighted)
+        state since the filter isn't active yet.
+
+    # ── Checking a person directly activates the filter ────────────
+    - id: 4
+      title: "Checking a person in the rail activates the filter without clicking a scope pill first"
+      description: >
+        From the default state in step 3 (no scope pill highlighted),
+        check Alice's checkbox in the person rail directly.
+      expected: >
+        Network fires immediately: GET
+        /api/events?interest_source=follows&interest_user_handle=alice.
+        The "All" pill becomes highlighted even though it was never
+        explicitly clicked — selecting a person implicitly activates
+        the "follows" scope. The list narrows to Alice's two rows:
+        evt-fsi-001 and evt-fsi-006. Uncheck Alice to return to the
+        default state for the next step (the "All" pill stays
+        highlighted since a scope, once implied, does not silently
+        clear itself — only an explicit scope-pill click resets it,
+        per step 10).
+
+    # ── "All" scope happy path ──────────────────────────────────────
+    - id: 5
+      title: "'All' scope surfaces Alice + Bob's activity (four rows)"
+      description: >
+        Click the "All" scope pill (toggling it off then on again, to
+        start from a clean, explicitly-chosen state).
+      expected: >
+        Network: GET /api/events?interest_source=follows fires
+        (interest_kind omitted — both Going and Saved are active,
+        meaning "any"). The list renders EXACTLY four rows:
+        evt-fsi-001 (Alice going), evt-fsi-002 (Bob going), evt-fsi-006
+        (Alice saved), evt-fsi-007 (Bob saved). NOT present:
+        evt-fsi-003 (Carol, friends-only, viewer not mutual),
+        evt-fsi-004 (Dave, stranger), evt-fsi-005 (Eve, reverse
+        follower). The "Going" and "Saved" pills both render as active
+        (there is no separate "Any" pill).
+
+    # ── Going/Saved toggles (no more "Any" pill) ───────────────────
+    - id: 6
+      title: "Turning off 'Saved' narrows to Going only"
+      description: >
+        With the "All" scope active, click the "Saved" pill to
+        deactivate it (leaving only "Going" active).
+      expected: >
+        Network: GET
+        /api/events?interest_source=follows&interest_kind=going. The
+        list narrows to two rows: evt-fsi-001 (Alice going) and
+        evt-fsi-002 (Bob going); evt-fsi-006 and evt-fsi-007 (saves)
+        disappear. The person-rail counts update to 1 each for Alice
+        and Bob (their saved-only event no longer counts).
+
+    - id: 7
+      title: "The last remaining active pill can't be turned off"
+      description: >
+        With only "Going" active (from step 6), click "Going" again.
+      expected: >
+        No-op: the request is not re-fired, "Going" stays active, and
+        the two-row list from step 6 is unchanged. At least one of
+        Going/Saved must always stay selected — there is no way to
+        reach an "everything unselected" state.
+
+    - id: 8
+      title: "Re-activating 'Saved' returns to the union (both active = any)"
+      description: >
+        Click "Saved" to reactivate it, so both Going and Saved are
+        active again.
+      expected: >
+        Network: GET /api/events?interest_source=follows (interest_kind
+        omitted again). The four-row list from step 5 returns, and the
+        person-rail counts go back to 2 each for Alice and Bob.
+
+    # ── Multi-select person rail applies immediately ──────────────
+    - id: 9
+      title: "Checking a person in the rail applies immediately"
+      description: >
+        With the "All" scope and both Going/Saved active, check
+        Alice's checkbox in the person rail.
+      expected: >
+        Network fires immediately (no separate "apply" step): GET
+        /api/events?interest_source=follows&interest_user_handle=alice.
+        The list narrows to Alice's two rows: evt-fsi-001 and
+        evt-fsi-006. Bob's card in the rail remains visible,
+        unchecked, with its count still showing 2.
+
+    - id: 10
+      title: "Checking a second person unions the results"
+      description: >
+        Still on Browser F, also check Bob's checkbox (Alice's stays
+        checked).
+      expected: >
+        Network: GET
+        /api/events?interest_source=follows&interest_user_handle=alice&interest_user_handle=bob
+        (both repeated). The list returns to all four rows (the union
+        of Alice's + Bob's activity) — same rows as step 5/8, but now
+        via an explicit two-person selection rather than "everyone I
+        follow". Unchecking Alice narrows the list back down to Bob's
+        two rows (evt-fsi-002, evt-fsi-007).
+
+    # ── Scope pill click resets the filter ─────────────────────────
+    - id: 11
+      title: "Clicking 'Friends' resets the person selection and Going/Saved pills"
+      description: >
+        With Bob still checked from step 10 (Alice unchecked), click
+        the "Saved" pill to leave only "Going" active, then click the
+        "Friends" scope pill.
+      expected: >
+        The click on "Friends" clears Bob's checkbox (no person stays
+        selected) AND resets Going/Saved back to both-active (any) —
+        confirmed by the person rail re-fetching for the new scope
+        with no cards pre-checked, and the Going/Saved pills both
+        rendering active again. Network: GET
+        /api/events?interest_source=friends fires (no
+        interest_user_handle, no interest_kind). The list renders
+        EXACTLY two rows: evt-fsi-002 (Bob going) and evt-fsi-007 (Bob
+        saved) — Bob is viewer's only mutual friend, so the "Friends"
+        scope with nobody explicitly picked still resolves to "just
+        Bob's activity".
+
+    - id: 12
+      title: "Person rail under 'Friends' scope excludes non-mutual followees"
+      description: >
+        Still under the "Friends" scope from step 11, inspect the
+        person rail.
+      expected: >
+        Network: GET /api/social/me/following fires again (scope
+        change re-triggers the fetch); the rail is filtered
+        client-side to `is_friend` rows. Only "Bob Martin" (count 2)
+        appears — Alice is NOT shown, even though she is a followee
+        with matching activity, because she is not a mutual friend.
+
+    # ── Summary bar shows handles, not a count ─────────────────────
+    - id: 13
+      title: "Summary bar / mobile filter-sheet chip shows @handles, not 'N people'"
+      description: >
+        Still under "Friends" scope, check Bob's checkbox in the
+        rail. Look at the applied-filters summary (desktop SummaryBar
+        strip, or the mobile "Filters (N)" chip row). Then click
+        "All" (resets), check both Alice's and Bob's checkboxes.
+      expected: >
+        With only Bob checked: the summary chip reads "@bob" (not
+        "Friends" and not "1 person"). With both Alice and Bob checked
+        under "All": the chip reads "@alice, @bob" (not "2 people").
+
+    # ── Privacy: friends-audience hidden until mutual ───────────────
+    - id: 14
+      title: "Carol's friends-only row stays hidden until she follows viewer back"
+      description: >
+        Click "All" to reset, and confirm evt-fsi-003 (Cuban Night,
+        Carol going friends-only) is absent from the unfiltered
+        four-row list. On Browser C, sign in as Carol, open /u/viewer,
+        and click Follow so viewer ⇄ carol becomes mutual. Refresh
+        viewer's home with the "All" scope active.
+      expected: >
+        Before Carol follows back: evt-fsi-003 absent under both
+        scopes. After the back-follow, evt-fsi-003 appears under
+        "All" scope AND under "Friends" scope (carol is now also a
+        mutual friend), and Carol now appears in the person rail under
+        both scopes with a count of 1. Have Carol unfollow viewer at
+        the end of this step so later re-runs see the original graph.
+
+    # ── Deep link with an unfollowed handle ─────────────────────────
+    - id: 15
+      title: "interest_user_handle for a non-followee returns empty, not an error"
+      description: >
+        Manually edit the URL to
+        /?interest_source=follows&interest_user_handle=dave (dave is a
+        stranger — no follow edge either direction). Dave never
+        appears in the rail, so this can only be reached via the URL.
+      expected: >
+        The list renders the empty state ("No events match your
+        filters"). Network: GET
+        /api/events?interest_source=follows&interest_user_handle=dave
+        → 200 with an empty items array — never 403/404/500.
+
+    # ── "See all" shortcut in the mobile filter sheet ────────────────
+    - id: 16
+      title: "'See all' in the filter sheet's Following section opens the subscriptions calendar"
+      description: >
+        Shrink the viewport to mobile width (or use a mobile emulator),
+        tap "Open filters" to open the filter sheet, and locate the
+        "Following" section header. Tap "See all" in its top-right
+        corner.
+      expected: >
+        The filter sheet closes and the browser navigates to
+        /my-calendar/subscriptions (the dedicated calendar view scoped
+        to people the viewer follows).
+
+    # ── Anonymous viewer ──────────────────────────────────────────
+    - id: 17
+      title: "Anonymous viewer gets a sign-in nudge, not a 500"
+      description: >
+        Sign out (or open incognito on the scenario port). Open / and
+        click the "Following" row.
+      expected: >
+        No scope/kind pills or person rail render for a signed-out
+        viewer; an inline "Sign in to see picks from people you
+        follow." link appears instead. Network: the explorer does NOT
+        fire GET /api/events?interest_source=follows (gated on
+        signed-in state in the UI), or if it does, the response is 200
+        with an empty items array. No 401 / 403 / 500.

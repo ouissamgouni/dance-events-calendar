@@ -146,8 +146,8 @@ export default function MyCalendar() {
 
     const toggleSubsHandle = useCallback((handle: string) => {
         setSubsHandleFilters((current) => current.includes(handle)
-            ? current.filter((h) => h !== handle)
-            : [...current, handle]);
+            ? [] // If already selected, deselect
+            : [handle]); // If not selected, select only this one (exclusive)
     }, []);
 
     const handleEventClick = useCallback((evt: CalendarEvent) => {
@@ -276,21 +276,14 @@ export default function MyCalendar() {
     const mapEvents = eventsForList.length > 0 ? eventsForList : stableEmptyEvents;
     const activeLoading = activeView === 'subs' ? subsLoading && subsEvents.length === 0 : loading;
 
+    const handleBack = () => {
+        if (window.history.length > 1) navigate(-1);
+        else navigate('/');
+    };
+
     return (
         <div className="min-h-screen bg-[#f8fafc]">
             <main className="mx-auto max-w-7xl px-4 py-4">
-                <div className="mb-4 flex flex-wrap items-center gap-3">
-                    <Link to="/" className="text-sm text-slate-600 hover:underline shrink-0">
-                        ← Back
-                    </Link>
-                    <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-slate-700">
-                            <path d="M5 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14l-5-2.5L5 18V4Z" />
-                        </svg>
-                        My Calendar
-                    </h1>
-                </div>
-
                 {!user && allEventIds.length > 0 && !signInNudgeDismissed && (
                     <div className="mb-4 flex flex-wrap items-center gap-3 border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
                         <p className="flex-1 min-w-[14rem]">
@@ -314,29 +307,42 @@ export default function MyCalendar() {
                     </div>
                 )}
 
-                {user && subsCalendars.length > 0 && (
-                    <div className="mb-4 border-b border-slate-200 flex items-center gap-1">
-                        {([
-                            { key: 'mine' as const, label: 'My events' },
-                            {
-                                key: 'subs' as const,
-                                label: `From people I follow${subsCalendars.length > 0 ? ` (${subsCalendars.length})` : ''}`,
-                            },
-                        ]).map((t) => (
-                            <button
-                                key={t.key}
-                                type="button"
-                                onClick={() => navigate(t.key === 'subs' ? '/my-calendar/subscriptions' : '/my-calendar')}
-                                className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition ${activeView === t.key
-                                    ? 'border-blue-500 text-blue-600'
-                                    : 'border-transparent text-slate-500 hover:text-slate-700'
-                                    }`}
-                            >
-                                {t.label}
-                            </button>
-                        ))}
+                <div className="mb-4 border-b border-slate-200 flex items-center justify-between gap-1">
+                    <div className="flex items-center gap-1">
+                        {user && subsCalendars.length > 0 ? (
+                            ([
+                                { key: 'mine' as const, label: 'My events' },
+                                {
+                                    key: 'subs' as const,
+                                    label: `From people I follow${subsCalendars.length > 0 ? ` (${subsCalendars.length})` : ''}`,
+                                },
+                            ]).map((t) => (
+                                <button
+                                    key={t.key}
+                                    type="button"
+                                    onClick={() => navigate(t.key === 'subs' ? '/my-calendar/subscriptions' : '/my-calendar')}
+                                    className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition ${activeView === t.key
+                                        ? 'border-blue-500 text-blue-600'
+                                        : 'border-transparent text-slate-500 hover:text-slate-700'
+                                        }`}
+                                >
+                                    {t.label}
+                                </button>
+                            ))
+                        ) : (
+                            <span className="px-3 py-2 text-sm font-medium border-b-2 border-blue-500 -mb-px text-blue-600">
+                                My events
+                            </span>
+                        )}
                     </div>
-                )}
+                    <button
+                        type="button"
+                        onClick={handleBack}
+                        className="shrink-0 text-sm text-slate-600 hover:underline"
+                    >
+                        ← Back
+                    </button>
+                </div>
 
                 {activeView === 'mine' && allEventIds.length > 0 && (
                     <div className="mb-4 flex flex-wrap items-center gap-1.5">

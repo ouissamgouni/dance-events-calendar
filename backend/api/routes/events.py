@@ -118,13 +118,9 @@ def _set_event_list_cache_headers(
     *,
     current_user: Optional[User],
     interest_source: Optional[str],
-    interest_user_handle: Optional[str],
+    interest_user_handles: Optional[list[str]],
 ) -> None:
-    if (
-        current_user is not None
-        or interest_source is not None
-        or interest_user_handle is not None
-    ):
+    if current_user is not None or interest_source is not None or interest_user_handles:
         response.headers["Cache-Control"] = "private, max-age=0"
         response.headers["Vary"] = "Cookie"
     else:
@@ -343,15 +339,16 @@ def _interest_filtered_event_ids(
     viewer: Optional[User],
     interest_source: Optional[str],
     interest_kind: str,
-    interest_user_handle: Optional[str],
+    interest_user_handles: Optional[list[str]],
 ) -> list[str]:
     """Compute event_ids visible to ``viewer`` via the interest filter.
 
     Candidate resolution:
 
-    1. ``interest_user_handle`` (when supplied) narrows the set to that
-       single user — they need NOT be a followee. Unknown / deleted
-       handles silently resolve to an empty set (privacy chokepoint).
+    1. ``interest_user_handles`` (when supplied) narrows the set to that
+       specific union of users — they need NOT be followees. Unknown /
+       deleted handles are silently dropped; an all-unknown list resolves
+       to an empty set (privacy chokepoint).
     2. Otherwise the set is the viewer's followees (``interest_source=
        follows``) or mutual friends (``interest_source=friends``).
 
@@ -370,20 +367,24 @@ def _interest_filtered_event_ids(
     """
     # Resolve candidates.
     candidates: list[User] = []
-    if interest_user_handle is not None:
-        h = (interest_user_handle or "").strip().lstrip("@").lower()
-        if not h:
+    if interest_user_handles:
+        handles = {(h or "").strip().lstrip("@").lower() for h in interest_user_handles}
+        handles.discard("")
+        if not handles:
             return []
-        target = session.exec(select(User).where(func.lower(User.handle) == h)).first()
-        if target is None or target.deleted_at is not None:
-            return []
+        targets = session.exec(
+            select(User)
+            .where(func.lower(User.handle).in_(handles))
+            .where(User.deleted_at.is_(None))
+        ).all()
         # Optionally also constrain to the chosen source. If the viewer
         # explicitly asked for `friends`, drop targets that aren't mutual.
         if interest_source == "friends":
-            friend_ids = _viewer_friend_ids(session, viewer)
-            if target.id not in friend_ids:
-                return []
-        candidates = [target]
+            friend_ids = set(_viewer_friend_ids(session, viewer))
+            targets = [t for t in targets if t.id in friend_ids]
+        if not targets:
+            return []
+        candidates = list(targets)
     else:
         if viewer is None:
             return []
@@ -519,13 +520,14 @@ def get_events(
             "UNIONs both. Defaults to ``any``."
         ),
     ),
-    interest_user_handle: Optional[str] = Query(
+    interest_user_handle: Optional[list[str]] = Query(
         None,
         description=(
-            "Narrow the interest filter to a specific @handle. The "
-            "handle's owner must currently pass can_view for each "
-            "candidate row; otherwise an empty list is returned (privacy "
-            "chokepoint — never 403 / 404)."
+            "Narrow the interest filter to one or more specific @handles "
+            "(repeat the param for multiple). Each handle's owner must "
+            "currently pass can_view for each candidate row; otherwise "
+            "it's silently dropped (privacy chokepoint — never 403 / "
+            "404)."
         ),
     ),
     profiles: Optional[str] = Query(
@@ -637,13 +639,13 @@ def get_events(
     # viewer's followees / friends are going to or have saved. Per-row
     # ``_audience_passes`` enforces share_audience independently, so
     # broadening to one-way followees never leaks friends-only activity.
-    if interest_source is not None or interest_user_handle is not None:
+    if interest_source is not None or interest_user_handle:
         interest_event_ids = _interest_filtered_event_ids(
             session=session,
             viewer=current_user,
             interest_source=interest_source or "follows",
             interest_kind=interest_kind,
-            interest_user_handle=interest_user_handle,
+            interest_user_handles=interest_user_handle,
         )
         if not interest_event_ids:
             # Empty match — short-circuit so we don't pay for any of the
@@ -654,7 +656,7 @@ def get_events(
                 response,
                 current_user=current_user,
                 interest_source=interest_source,
-                interest_user_handle=interest_user_handle,
+                interest_user_handles=interest_user_handle,
             )
             return response
         query = query.where(CachedEvent.event_id.in_(interest_event_ids))
@@ -814,7 +816,7 @@ def get_events(
         response,
         current_user=current_user,
         interest_source=interest_source,
-        interest_user_handle=interest_user_handle,
+        interest_user_handles=interest_user_handle,
     )
     return response
 

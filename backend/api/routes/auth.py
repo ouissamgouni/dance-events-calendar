@@ -533,6 +533,7 @@ def login_with_google(
             # the AudiencePicker zero-friends hint can render immediately
             # after sign-in without waiting for the next /auth/me cycle.
             "friend_count": _friend_count(session, user.id),
+            "following_count": _following_count(session, user.id),
             # Phase E (E3): ISO-8601 timestamp of onboarding completion
             # (or skip). ``None`` means the frontend should redirect to
             # ``/onboarding/follow`` after first-load.
@@ -585,6 +586,23 @@ def _friend_count(session: Session, user_id) -> int:
                 (f2.follower_id == f1.followee_id) & (f2.followee_id == f1.follower_id),
             )
             .where(f1.follower_id == user_id)
+        ).one()
+    )
+
+
+def _following_count(session: Session, user_id) -> int:
+    """Count approved follows where ``user_id`` is the follower.
+
+    Used by ``/auth/me`` and ``/auth/google`` so the frontend can show the
+    viewer's total following count next to the Home explorer's Following
+    filter. Kept here (not in deps/social) to preserve the one-way
+    auth → social import direction (see ``_friend_count`` above).
+    """
+    return int(
+        session.exec(
+            select(func.count(UserFollow.id))
+            .where(UserFollow.follower_id == user_id)
+            .where(UserFollow.status == "approved")
         ).one()
     )
 
@@ -664,6 +682,7 @@ def get_me(
         ),
         "preferences": _serialize_preferences(session, user).model_dump(mode="json"),
         "friend_count": friend_count,
+        "following_count": _following_count(session, user.id),
         # Phase E (E3): see /auth/google for shape; ``None`` triggers the
         # onboarding redirect on first signed-in navigation.
         "onboarded_at": (user.onboarded_at.isoformat() if user.onboarded_at else None),

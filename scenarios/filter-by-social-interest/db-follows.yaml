@@ -1,0 +1,23 @@
+# Follow graph for the filter-by-social-interest scenario.
+#
+# Resulting graph:
+#   viewer -> alice   (one-way — alice does NOT follow back)
+#   viewer -> bob     (one-way half of the mutual edge below)
+#   bob    -> viewer  (completes viewer <-> bob — bob is viewer's ONLY
+#                      mutual friend in this graph)
+#   viewer -> carol   (one-way; carol's attendance is audience=friends,
+#                      so it must stay hidden until she follows back)
+#   eve    -> viewer  (reverse-direction control — eve is NOT a followee
+#                      of viewer, so her activity must never surface)
+#   dave   isolated   (stranger control)
+follows:
+  - follower: viewer
+    followee: alice
+  - follower: viewer
+    followee: bob
+  - follower: bob
+    followee: viewer
+  - follower: viewer
+    followee: carol
+  - follower: eve
+    followee: viewer

@@ -19,7 +19,7 @@
 #            to keep that assertion focused on the social-edge cleanup).
 #
 # All attendances are seeded with share_publicly=true so Phase B's friend
-# filter (covered in interest-filter-friends) sees them through; the friends-graph
+# filter (covered in filter-by-social-interest) sees them through; the friends-graph
 # plan itself doesn't toggle this flag.
 base_week: 0
 events:

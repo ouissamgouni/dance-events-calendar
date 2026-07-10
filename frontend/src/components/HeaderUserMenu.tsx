@@ -105,11 +105,25 @@ export default function HeaderUserMenu({ className }: { className?: string }) {
                         Settings
                     </Link>
                     <Link
+                        to="/for-you"
+                        role="menuitem"
+                        className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                        For You
+                    </Link>
+                    <Link
                         to="/my-calendar"
                         role="menuitem"
                         className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                     >
                         My Calendar
+                    </Link>
+                    <Link
+                        to="/my-calendar/subscriptions"
+                        role="menuitem"
+                        className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                        My tribe events
                     </Link>
                     <Link
                         to="/discover"

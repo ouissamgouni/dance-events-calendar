@@ -87,7 +87,7 @@ export async function fetchEvents(
         friendHandle?: string;
         interestSource?: 'follows' | 'friends';
         interestKind?: 'any' | 'going' | 'saved';
-        interestUserHandle?: string;
+        interestUserHandles?: string[];
     },
     opts?: { fresh?: boolean },
 ): Promise<CalendarEvent[]> {
@@ -106,7 +106,7 @@ export async function fetchEvents(
     if (params?.friendHandle) searchParams.set('friend_handle', params.friendHandle);
     if (params?.interestSource) searchParams.set('interest_source', params.interestSource);
     if (params?.interestKind) searchParams.set('interest_kind', params.interestKind);
-    if (params?.interestUserHandle) searchParams.set('interest_user_handle', params.interestUserHandle);
+    for (const h of params?.interestUserHandles ?? []) searchParams.append('interest_user_handle', h);
     const qs = searchParams.toString();
     // Friend-filter params require the session cookie to identify the viewer
     // and apply mutual-follower checks; sending credentials is harmless for
@@ -142,7 +142,7 @@ export async function fetchEventsPage(
         friendHandle?: string;
         interestSource?: 'follows' | 'friends';
         interestKind?: 'any' | 'going' | 'saved';
-        interestUserHandle?: string;
+        interestUserHandles?: string[];
         profiles?: 'me';
         limit: number;
         offset?: number;
@@ -164,7 +164,7 @@ export async function fetchEventsPage(
     if (params.friendHandle) searchParams.set('friend_handle', params.friendHandle);
     if (params.interestSource) searchParams.set('interest_source', params.interestSource);
     if (params.interestKind) searchParams.set('interest_kind', params.interestKind);
-    if (params.interestUserHandle) searchParams.set('interest_user_handle', params.interestUserHandle);
+    for (const h of params.interestUserHandles ?? []) searchParams.append('interest_user_handle', h);
     if (params.profiles) searchParams.set('profiles', params.profiles);
     searchParams.set('limit', String(params.limit));
     if (params.offset) searchParams.set('offset', String(params.offset));
@@ -557,6 +557,10 @@ export interface AuthUser {
      *  AudiencePicker to surface a "no friends yet" hint when the user
      *  picks the ``friends`` audience. Null/undefined for anon. */
     friend_count?: number;
+    /** Total number of people the viewer follows (approved, one-way OK).
+     *  Displayed next to the Home explorer's Following filter icon.
+     *  Null/undefined for anon. */
+    following_count?: number;
     /** Phase E (E3): ISO-8601 timestamp of onboarding completion (or
      *  skip). When ``null`` the frontend route guard redirects to
      *  ``/onboarding/follow`` after first-load. Absent for anon. */

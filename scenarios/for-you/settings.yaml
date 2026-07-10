@@ -1,8 +1,7 @@
-# `for_you_rail_enabled` turns on the explorer Home page's "For You" rail
-# (Recommended / New / Friends lenses). `unseen_state_enabled` is also
-# enabled so the New lens's badge/marker visual treatment stays consistent
-# with the rest of the explorer UI (the New-lens data itself does not
-# depend on this flag — see test_plan.yaml step 6 for details).
+# `for_you_rail_enabled` is set here for completeness, but it does NOT
+# currently gate the /for-you page (that route has no feature-flag
+# check). `unseen_state_enabled` drives the "New" section's unseen-badge
+# visual treatment.
 #
 # Trending badge tuning (mirrors scenarios/trending-events/settings.yaml):
 #   * `trending_enabled: true`, `show_popularity: true`, and

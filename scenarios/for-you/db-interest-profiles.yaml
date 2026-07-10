@@ -1,0 +1,23 @@
+# Seeds the viewer's Interest Profile so "You might like" on /for-you is
+# deterministic from the FIRST sign-in — no manual Settings step needed.
+#
+# Every signed-in user auto-gets a permissive "Default" profile on first
+# login (backend/services/user_bootstrap.py: whole-Europe bbox, no dance
+# tags, reach=international, matches_enabled=false) so bootstrap is
+# idempotent and skips creating it once a profile already exists here.
+#
+# This profile scopes "You might like" to Salsa + Bachata across the
+# default "Europe & nearby" bbox with no reach restriction, so all of
+# evt-fy-001/-002/-bulk-01..20 (Salsa/Bachata) match while evt-fy-003
+# (Kizomba) and evt-fy-004 (Zouk) do not.
+interest_profiles:
+  - user: viewer@example.com
+    label: "Salsa + Bachata (Europe & nearby)"
+    min_lat: 24
+    min_lng: -18
+    max_lat: 69
+    max_lng: 50
+    dance_tags: ["dance-style:salsa", "dance-style:bachata"]
+    reach_tags: []
+    matches_enabled: false
+    is_active: true

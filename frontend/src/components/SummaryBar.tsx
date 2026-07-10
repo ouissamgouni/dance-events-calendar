@@ -45,7 +45,7 @@ export interface SummaryBarProps {
     // Interest chips (display-only, same rationale as tags).
     interestSource: InterestSource;
     interestKind: InterestKind;
-    interestUserHandle: string | null;
+    interestUserHandles: string[];
 
     // Loading: dims the count while a fetch is in flight so users don't
     // misread a stale "0 of 0".
@@ -157,7 +157,7 @@ export default function SummaryBar(props: SummaryBarProps) {
         tagGroups,
         interestSource,
         interestKind,
-        interestUserHandle,
+        interestUserHandles,
         onOpenFilters,
         activeFilterCount = 0,
         eventSearchTrigger,
@@ -177,15 +177,16 @@ export default function SummaryBar(props: SummaryBarProps) {
     }, [activeTagIds, tagGroups]);
 
     const interestChip = useMemo(() => {
-        if (!interestSource && interestKind === 'any' && !interestUserHandle) return null;
+        if (!interestSource && interestKind === 'any' && interestUserHandles.length === 0) return null;
         const parts: string[] = [];
-        if (interestUserHandle) parts.push(`@${interestUserHandle}`);
+        if (interestUserHandles.length > 0) parts.push(interestUserHandles.map((h) => `@${h}`).join(', '));
         else if (interestSource === 'follows') parts.push('People you follow');
         else if (interestSource === 'friends') parts.push('Friends');
         if (interestKind === 'going') parts.push('going');
         else if (interestKind === 'saved') parts.push('saved');
         return parts.join(' · ');
-    }, [interestSource, interestKind, interestUserHandle]);
+    }, [interestSource, interestKind, interestUserHandles]);
+
 
     const periodIcon = (
         <svg aria-hidden="true" viewBox="0 0 20 20" className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">

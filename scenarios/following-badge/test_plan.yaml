@@ -12,7 +12,7 @@ test_plan:
   preconditions:
     - "Run with: task start:scenario SCENARIO=following-badge"
     - >
-      Pre-seeded follow graph mirrors interest-filter-friends for the original
+      Pre-seeded follow graph mirrors filter-by-social-interest for the original
       4 minimal events (alice<->bob mutual, carol→alice one-way), and
       adds a broader cast for the European-spread events:
       7 mutual friends of bob (alice, emma, frank, gina, hugo, nia, omar),
