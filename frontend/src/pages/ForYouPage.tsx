@@ -245,18 +245,13 @@ export default function ForYouPage() {
         navigate(`/event/${evt.event_id}?src=for-you`);
     }, [markSeen, navigate]);
 
-    const handleSearchEventClick = useCallback((eventId: string) => {
-        markSeen(eventId);
-        navigate(`/event/${eventId}?src=for-you-search`);
-    }, [markSeen, navigate]);
-
     const trendingDecoration = trendingEnabled && showPopularity;
 
     return (
         <div className="min-h-screen bg-[#f8fafc]">
             <main className="mx-auto max-w-7xl px-4 py-2 sm:py-4">
                 <div className="mb-3 sm:mb-4 flex flex-wrap items-center gap-2">
-                    <ExplorerNav active="for-you" onSelectSearchEvent={handleSearchEventClick} />
+                    <ExplorerNav active="for-you" />
                 </div>
                 {!user ? (
                     <div className="bg-blue-50 border border-blue-100 p-4 text-sm text-slate-700">

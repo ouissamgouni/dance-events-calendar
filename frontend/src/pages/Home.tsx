@@ -1398,7 +1398,7 @@ export default function Home() {
                 {(!loading || initialLoadDone.current) && !error && (
                     <div className="mb-1 sm:mb-4 flex flex-col gap-2">
                         <div className="flex flex-wrap items-center justify-between gap-3">
-                            <ExplorerNav active="explorer" onSelectSearchEvent={handleExplorerSearchEventClick} />
+                            <ExplorerNav active="explorer" />
                         </div>
                     </div>
                 )}
