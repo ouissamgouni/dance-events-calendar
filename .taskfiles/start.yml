@@ -412,7 +412,7 @@ tasks:
   scenario:ref:
     desc:
       "Start scenario from git ref (all Docker). Usage: task start:scenario:ref
-      -- <ref> SCENARIO=name"
+      -- <ref> SCENARIO=name. FOLLOW=1 to tail logs in foreground."
     dotenv:
       ["{{.ROOT_DIR}}/config/base.env", "{{.ROOT_DIR}}/config/scenario.env"]
     vars:
@@ -421,6 +421,7 @@ tasks:
       BROWSER: '{{.BROWSER | default "none"}}'
       COUNT: '{{.COUNT | default "1"}}'
       RESET_BROWSER: '{{.RESET_BROWSER | default "0"}}'
+      FOLLOW: '{{.FOLLOW | default "0"}}'
     cmds:
       - |
         REF="{{.REF}}"
@@ -475,3 +476,9 @@ tasks:
         echo "   task open:isolated:scenario SCENARIO={{.SCENARIO}}            → 1 isolated session"
         echo "   task open:isolated:scenario SCENARIO={{.SCENARIO}} COUNT=2    → multi-user QA"
         {{.ROOT_DIR}}/.taskfiles/open-browsers.sh "http://localhost:$SC_WEB_PORT" "{{.BROWSER}}" "{{.COUNT}}" "scenario-{{.SCENARIO}}" "{{.RESET_BROWSER}}"
+
+        if [ "{{.FOLLOW}}" = "1" ]; then
+          echo ""
+          echo "Following logs (Ctrl+C stops tailing only — the stack keeps running)..."
+          docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.unified.yml -p $SC_PROJECT_NAME logs -f --tail 50
+        fi
