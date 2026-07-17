@@ -179,6 +179,8 @@ interface Props {
      * imperative flyToArea re-fit. When provided, the marker auto-fit is
      * also suppressed for the first render. */
     initialArea?: { min_lat: number; min_lng: number; max_lat: number; max_lng: number } | null;
+    /** Keep the current viewport even if the visible marker set changes. */
+    preserveViewport?: boolean;
     /** Set of event_ids added after the viewer's local baseline. Drives the
      * dot overlay when ``unseenStateEnabled`` is on. */
     newEventIds?: Set<string>;
@@ -362,6 +364,7 @@ function MapController({
     autoFitToken,
     flyToAreaToken,
     skipInitialFit,
+    preserveViewport,
 }: {
     positions: [number, number][];
     focusedEventId: string | null;
@@ -373,6 +376,7 @@ function MapController({
     /** When true, suppress the very first marker auto-fit (the parent has
      * already opened the map at a known bbox via ``initialArea``). */
     skipInitialFit: boolean;
+    preserveViewport: boolean;
 }) {
     const map = useMap();
     const prevFocused = useRef<[number, number] | null>(null);
@@ -437,6 +441,10 @@ function MapController({
         if (flyToAreaToken === undefined) return;
         if (lastFlyToken.current === flyToAreaToken) return;
         lastFlyToken.current = flyToAreaToken;
+        if (preserveViewport) {
+            positionsSnapshotAtBump.current = null;
+            return;
+        }
         const positionsKey = positions
             .map((p) => `${p[0].toFixed(4)},${p[1].toFixed(4)}`)
             .join('|');
@@ -457,7 +465,7 @@ function MapController({
             }
         }, 600);
         return () => clearTimeout(timer);
-    }, [flyToAreaToken, positions, map]);
+    }, [flyToAreaToken, map, positions, preserveViewport]);
 
     // Auto-fit to markers. In controlled mode (``autoFitToken !== undefined``)
     // this runs when the parent bumps the token (or on the very first
@@ -469,6 +477,7 @@ function MapController({
     // and a refit is always desired.
     useEffect(() => {
         if (focusedPosition) return; // focus effect is in charge
+        if (preserveViewport) return;
 
         const positionsKey = positions
             .map((p) => `${p[0].toFixed(4)},${p[1].toFixed(4)}`)
@@ -543,7 +552,7 @@ function MapController({
             map.invalidateSize();
             map.fitBounds(L.latLngBounds(positions), { padding: adaptiveMarkerPadding(map) });
         }
-    }, [autoFitToken, focusedPosition, map, positions]);
+    }, [autoFitToken, focusedPosition, map, positions, preserveViewport]);
 
     return null;
 }
@@ -731,7 +740,7 @@ function MarkerClusterLayer({
     );
 }
 
-export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true }: Props) {
+export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, preserveViewport, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true }: Props) {
     const { showRatings, eventColorBarColor, followingBadgeEnabled, unseenStateEnabled, trendingEnabled, trendingTopN, trendingTopPercent } = useFeatureFlags();
     const markerRefs = useRef(new Map<string, L.Marker>());
     const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
@@ -852,6 +861,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                 autoFitToken={autoFitToken}
                 flyToAreaToken={flyToAreaToken}
                 skipInitialFit={!!initialArea}
+                preserveViewport={preserveViewport ?? false}
             />
             <MapResizeController />
             <FlyToAreaController flyToArea={flyToArea} flyToAreaToken={flyToAreaToken} />

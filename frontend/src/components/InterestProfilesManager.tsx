@@ -345,7 +345,6 @@ function ProfileCard({
                         </label>
                         <AreaMapPicker
                             value={{ ...areaDraft, label: labelDraft }}
-                            autoSave
                             onChange={(next) => {
                                 setAreaDraft({
                                     min_lat: next.min_lat,
@@ -353,11 +352,11 @@ function ProfileCard({
                                     max_lat: next.max_lat,
                                     max_lng: next.max_lng,
                                 });
-                                // Per remark: a moved area is no longer the
-                                // previously named place — reset the label
-                                // (user can rename afterwards). The account's
-                                // default profile resets to "Default";
-                                // additional profiles reset to "Custom".
+                                // A saved area is no longer the previously
+                                // named place — reset the label (user can
+                                // rename afterwards). The account's default
+                                // profile resets to "Default"; additional
+                                // profiles reset to "Custom".
                                 const resetLabel = isDefault ? 'Default' : 'Custom';
                                 setLabelDraft(resetLabel);
                                 setSaving(true);
@@ -372,6 +371,12 @@ function ProfileCard({
                                     .then(() => flashSaved())
                                     .catch((e) => setError(e instanceof Error ? e.message : 'Failed to save profile'))
                                     .finally(() => setSaving(false));
+                            }}
+                            onUseCurrentView={() => {
+                                window.setTimeout(() => {
+                                    labelInputRef.current?.focus();
+                                    labelInputRef.current?.select();
+                                }, 0);
                             }}
                         />
                     </div>

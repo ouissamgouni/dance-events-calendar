@@ -39,9 +39,10 @@ export default function AreaFilterChip({ state }: AreaFilterChipProps) {
                 className="flex items-center gap-1.5 min-w-0"
                 data-testid="area-filter-chip"
                 data-area-state="all"
+                aria-label="Worldwide"
             >
                 <span aria-hidden="true">🌐</span>
-                <span className="truncate">Worldwide</span>
+                <span className="truncate" aria-hidden="true">🌐</span>
             </span>
         );
     }

@@ -320,7 +320,6 @@ export default function OnboardingPreferences() {
                         <AreaMapPicker
                             value={prefs.area}
                             onChange={handleAreaChange}
-                            autoSave
                             onUseCurrentView={() => {
                                 window.setTimeout(() => {
                                     const el = areaNameInputRef.current;

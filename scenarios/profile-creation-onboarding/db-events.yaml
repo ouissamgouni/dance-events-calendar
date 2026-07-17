@@ -146,3 +146,457 @@ events:
       - format:social
       - dance-style:salsa
       - reach:international
+
+  # NORTH AMERICA
+  - id: ev-nyc-salsa-congress
+    calendar_id: salsa-cal-001
+    title: NYC Salsa Congress
+    description: "Major international salsa festival in Manhattan."
+    location: "Javits Center, New York, USA"
+    latitude: 40.7580
+    longitude: -74.0034
+    start: w2 Fri 19:00
+    end: w2 Sun 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: ev-la-bachata-weekend
+    calendar_id: bachata-cal-002
+    title: LA Bachata Weekend
+    description: "West Coast bachata celebration with workshops and socials."
+    location: "Convention Center, Los Angeles, USA"
+    latitude: 34.4194
+    longitude: -118.2673
+    start: w2 Sat 18:00
+    end: w2 Sun 22:00
+    tags:
+      - format:festival
+      - dance-style:bachata
+      - reach:international
+
+  - id: ev-mexico-city-salsa-fiesta
+    calendar_id: salsa-cal-001
+    title: Mexico City Salsa Fiesta
+    description: "Latin America's premier salsa destination celebration."
+    location: "Palacio de los Deportes, Mexico City, Mexico"
+    latitude: 19.3633
+    longitude: -99.1656
+    start: w2 Thu 20:00
+    end: w2 Sat 04:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: ev-toronto-salsa-social
+    calendar_id: salsa-cal-001
+    title: Toronto Friday Salsa Social
+    description: "Weekly Latin dance social in downtown Toronto."
+    location: "Salsa Central, Queen West, Toronto, Canada"
+    latitude: 43.6533
+    longitude: -79.4000
+    start: w2 Fri 21:00
+    end: w2 Sat 01:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: ev-montreal-latin-workshop
+    calendar_id: salsa-cal-001
+    title: Montreal Latin Dance Workshop
+    description: "Intensive multi-style Latin workshop with guest instructors."
+    location: "Centre Culturel, Montreal, Canada"
+    latitude: 45.5017
+    longitude: -73.5673
+    start: w2 Sat 14:00
+    end: w2 Sun 18:00
+    tags:
+      - format:workshop
+      - dance-style:salsa
+      - reach:international
+
+  # SOUTH AMERICA
+  - id: ev-buenos-aires-tango-salsa
+    calendar_id: salsa-cal-001
+    title: Buenos Aires Tango & Salsa Festival
+    description: "Fusion festival blending Argentine tango with Caribbean salsa."
+    location: "Teatro Colón, Buenos Aires, Argentina"
+    latitude: -34.6037
+    longitude: -58.3816
+    start: w3 Wed 20:00
+    end: w3 Sun 04:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: ev-sao-paulo-samba-salsa
+    calendar_id: salsa-cal-001
+    title: São Paulo Samba & Salsa Night
+    description: "Tropical mix of Brazilian and Caribbean dance styles."
+    location: "Espaço das Artes, São Paulo, Brazil"
+    latitude: -23.5505
+    longitude: -46.6333
+    start: w3 Fri 22:00
+    end: w3 Sat 05:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: ev-cartagena-caribbean-fiesta
+    calendar_id: salsa-cal-001
+    title: Cartagena Caribbean Fiesta
+    description: "UNESCO World Heritage setting for Caribbean dance celebration."
+    location: "Historic Center, Cartagena, Colombia"
+    latitude: 10.3910
+    longitude: -75.4794
+    start: w3 Sat 19:00
+    end: w3 Sun 06:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: ev-bogota-salsa-thursday
+    calendar_id: salsa-cal-001
+    title: Bogotá Thursday Salsa Social
+    description: "Weekly social in Colombia's capital."
+    location: "La Candelaria Club, Bogotá, Colombia"
+    latitude: 4.7110
+    longitude: -74.0088
+    start: w3 Thu 20:30
+    end: w3 Fri 01:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: ev-lima-peru-congress
+    calendar_id: salsa-cal-001
+    title: Lima Peruvian Salsa Congress
+    description: "Andean perspective on international salsa."
+    location: "Centro de Convenciones, Lima, Peru"
+    latitude: -12.0464
+    longitude: -77.0428
+    start: w3 Mon 19:00
+    end: w3 Wed 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  # EUROPE (additional to existing)
+  - id: ev-london-salsa-festival
+    calendar_id: salsa-cal-001
+    title: London Salsa Festival
+    description: "UK's premier Latin dance celebration in Westminster."
+    location: "Olympia London, Kensington, London, UK"
+    latitude: 51.5016
+    longitude: -0.2072
+    start: w4 Fri 18:00
+    end: w4 Sun 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: ev-amsterdam-bachata-week
+    calendar_id: bachata-cal-002
+    title: Amsterdam Bachata Week
+    description: "Seven-day celebration of sensual bachata in the Netherlands."
+    location: "Melkweg, Amsterdam, Netherlands"
+    latitude: 52.3667
+    longitude: 4.8945
+    start: w4 Mon 20:00
+    end: w4 Sun 23:00
+    tags:
+      - format:festival
+      - dance-style:bachata
+      - reach:international
+
+  - id: ev-lisbon-fado-salsa
+    calendar_id: salsa-cal-001
+    title: Lisbon Fado & Salsa Fusion
+    description: "Portuguese music meets Caribbean rhythm in riverside venue."
+    location: "MAAT Lisbon, Lisbon, Portugal"
+    latitude: 38.6597
+    longitude: -9.0891
+    start: w4 Wed 21:00
+    end: w4 Thu 02:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: ev-rome-latin-summer
+    calendar_id: salsa-cal-001
+    title: Rome Latin Summer Festival
+    description: "Ancient city meets modern Latin dance culture."
+    location: "Villa d'Este Grounds, Rome, Italy"
+    latitude: 41.9028
+    longitude: 12.4964
+    start: w4 Sat 20:00
+    end: w4 Sun 04:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: ev-athens-mediterranean-dance
+    calendar_id: salsa-cal-001
+    title: Athens Mediterranean Dance Festival
+    description: "Greek islands-inspired Latin celebration."
+    location: "Stavros Niarchos Foundation, Athens, Greece"
+    latitude: 37.9838
+    longitude: 23.7275
+    start: w4 Thu 19:00
+    end: w4 Sat 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: ev-vienna-ballroom-salsa
+    calendar_id: salsa-cal-001
+    title: Vienna Ballroom Salsa Mix
+    description: "Viennese elegance meets Latin passion."
+    location: "Musikverein, Vienna, Austria"
+    latitude: 48.2012
+    longitude: 16.3738
+    start: w5 Fri 20:00
+    end: w5 Sat 02:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: ev-prague-latin-nights
+    calendar_id: salsa-cal-001
+    title: Prague Latin Nights
+    description: "Baroque city backdrop for tropical dance celebration."
+    location: "Estates Theatre, Prague, Czech Republic"
+    latitude: 50.0877
+    longitude: 14.4305
+    start: w5 Sat 21:00
+    end: w5 Sun 05:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: ev-budapest-danube-salsa
+    calendar_id: salsa-cal-001
+    title: Budapest Danube Salsa Cruise
+    description: "Salsa dancing on a historic Danube river boat."
+    location: "Danube River Cruise Terminal, Budapest, Hungary"
+    latitude: 47.4979
+    longitude: 19.0402
+    start: w5 Sun 19:00
+    end: w5 Sun 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  # ASIA
+  - id: ev-tokyo-salsa-night
+    calendar_id: salsa-cal-001
+    title: Tokyo International Salsa Night
+    description: "Latin rhythm meets Japanese precision in Shibuya."
+    location: "Shibuya Ward Hall, Tokyo, Japan"
+    latitude: 35.6595
+    longitude: 139.7004
+    start: w5 Wed 20:00
+    end: w5 Thu 02:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: ev-bangkok-latin-fusion
+    calendar_id: salsa-cal-001
+    title: Bangkok Latin Fusion Festival
+    description: "Southeast Asian energy meets Caribbean vibes."
+    location: "CentralWorld, Bangkok, Thailand"
+    latitude: 13.6469
+    longitude: 100.5315
+    start: w5 Thu 21:00
+    end: w5 Sat 05:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: ev-singapore-tropical-salsa
+    calendar_id: salsa-cal-001
+    title: Singapore Tropical Salsa Weekend
+    description: "Modern city-state Latin celebration with tropical flair."
+    location: "Marina Bay Sands, Singapore"
+    latitude: 1.2829
+    longitude: 103.8543
+    start: w6 Fri 19:00
+    end: w6 Sun 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: ev-hong-kong-latin-gala
+    calendar_id: salsa-cal-001
+    title: Hong Kong Latin Gala
+    description: "Peak-side venue for cosmopolitan salsa celebration."
+    location: "Convention & Exhibition Centre, Hong Kong"
+    latitude: 22.3193
+    longitude: 114.1694
+    start: w6 Sat 20:00
+    end: w6 Sun 04:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: ev-manila-tropical-beats
+    calendar_id: salsa-cal-001
+    title: Manila Tropical Beats Festival
+    description: "Philippine rhythm meets Latin Caribbean style."
+    location: "Philippine International Convention Centre, Manila"
+    latitude: 14.5547
+    longitude: 121.0244
+    start: w6 Wed 19:00
+    end: w6 Fri 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: ev-seoul-latin-boom
+    calendar_id: salsa-cal-001
+    title: Seoul Latin Boom
+    description: "K-pop nation discovers Caribbean rhythms."
+    location: "KINTEX, Seoul, South Korea"
+    latitude: 37.6012
+    longitude: 126.5644
+    start: w6 Thu 19:00
+    end: w6 Sat 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  # AFRICA
+  - id: ev-cairo-nile-salsa
+    calendar_id: salsa-cal-001
+    title: Cairo Nile Salsa Evening
+    description: "Ancient Egypt hosts Latin Caribbean celebration."
+    location: "Nile Hilton Convention Centre, Cairo, Egypt"
+    latitude: 30.0444
+    longitude: 31.2357
+    start: w6 Sun 20:00
+    end: w6 Mon 02:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: ev-nairobi-east-african-salsa
+    calendar_id: salsa-cal-001
+    title: Nairobi East African Salsa Festival
+    description: "African heartbeat meets Latin rhythm in Kenya."
+    location: "Safari Park Hotel, Nairobi, Kenya"
+    latitude: -1.2921
+    longitude: 36.8219
+    start: w7 Fri 19:00
+    end: w7 Sun 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: ev-johannesburg-african-latin
+    calendar_id: salsa-cal-001
+    title: Johannesburg African-Latin Fusion
+    description: "South African energy fused with Caribbean passion."
+    location: "Coca-Cola Dome, Johannesburg, South Africa"
+    latitude: -26.1088
+    longitude: 28.0479
+    start: w7 Sat 20:00
+    end: w7 Sun 04:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: ev-capetown-summer-salsa
+    calendar_id: salsa-cal-001
+    title: Cape Town Summer Salsa
+    description: "Table Mountain backdrop for Latin celebration."
+    location: "V&A Waterfront Convention Centre, Cape Town, South Africa"
+    latitude: -33.9025
+    longitude: 18.4244
+    start: w7 Wed 19:00
+    end: w7 Fri 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: ev-lagos-west-african-night
+    calendar_id: salsa-cal-001
+    title: Lagos West African Salsa Night
+    description: "Nigeria's vibrant scene welcomes Caribbean rhythms."
+    location: "Eko Hotels & Suites, Lagos, Nigeria"
+    latitude: 6.4281
+    longitude: 3.4247
+    start: w7 Fri 21:00
+    end: w7 Sat 05:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  # OCEANIA
+  - id: ev-sydney-pacific-salsa
+    calendar_id: salsa-cal-001
+    title: Sydney Pacific Salsa Festival
+    description: "Down Under welcomes international Latin celebration."
+    location: "Sydney Convention & Exhibition Centre, Sydney, Australia"
+    latitude: -33.8761
+    longitude: 151.2055
+    start: w7 Thu 19:00
+    end: w7 Sat 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: ev-melbourne-latin-summer
+    calendar_id: salsa-cal-001
+    title: Melbourne Latin Summer
+    description: "Cosmopolitan Melbourne celebrates Southern Hemisphere style."
+    location: "Melbourne Convention Centre, Melbourne, Australia"
+    latitude: -37.8221
+    longitude: 144.9537
+    start: w8 Fri 20:00
+    end: w8 Sun 04:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: ev-auckland-island-rhythms
+    calendar_id: salsa-cal-001
+    title: Auckland Island Rhythms Festival
+    description: "New Zealand's Pacific island vibes meet Caribbean passion."
+    location: "ASB Showgrounds, Auckland, New Zealand"
+    latitude: -37.0882
+    longitude: 174.8853
+    start: w8 Sat 19:00
+    end: w8 Sun 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
