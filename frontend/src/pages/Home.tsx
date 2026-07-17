@@ -25,7 +25,7 @@ import { usePreferences } from '../context/PreferencesContext';
 import { useInvalidateAttendanceSummaries } from '../context/AttendanceSummariesContext';
 import { useSavedEvents } from '../context/SavedEventsContext';
 
-import { DEFAULT_AREA_BBOX, DEFAULT_AREA_LABEL, clampArea, isDefaultArea } from '../constants/area';
+import { AREA_PRESETS, DEFAULT_AREA_BBOX, DEFAULT_AREA_LABEL, clampArea } from '../constants/area';
 import type { PreferredAreaPayload } from '../api';
 import SuggestEventModal from '../components/SuggestEventModal';
 import EventAnchoredDetailPanel from '../components/EventAnchoredDetailPanel';
@@ -281,6 +281,10 @@ export default function Home() {
     // the current viewport. See ``EventMap.autoFitToken`` for details.
     const [mapAutoFitToken, setMapAutoFitToken] = useState(0);
     const bumpAutoFit = useCallback(() => setMapAutoFitToken((n) => n + 1), []);
+    // ``Search this area`` should keep the current zoom/pan instead of
+    // tightening to the newly available markers. The flag below suppresses
+    // the map's marker-refit effect until the next explicit reframing action.
+    const [preserveViewportAfterSearch, setPreserveViewportAfterSearch] = useState(false);
     // Set to ``true`` immediately before ``setPrefs`` calls that originate
     // from the explorer's Save CTA so the prefs.area watcher below does not
     // re-frame the map after Save (which would override the viewport the
@@ -612,6 +616,7 @@ export default function Home() {
 
     const handleDateRangeChange = useCallback((start: string, end: string) => {
         userTouchedDateRangeRef.current = true;
+        setPreserveViewportAfterSearch(false);
         setStartDate(start);
         setEndDate(end);
         bumpAutoFit();
@@ -619,6 +624,7 @@ export default function Home() {
 
     const handleToggleTag = useCallback((tagId: number) => {
         userTouchedTagsRef.current = true;
+        setPreserveViewportAfterSearch(false);
         bumpAutoFit();
         setActiveTagIds((prev) => {
             const next = new Set(prev);
@@ -642,6 +648,7 @@ export default function Home() {
 
     const handleClearTags = useCallback(() => {
         userTouchedTagsRef.current = true;
+        setPreserveViewportAfterSearch(false);
         bumpAutoFit();
         setActiveTagIds(new Set());
     }, [bumpAutoFit]);
@@ -656,6 +663,7 @@ export default function Home() {
     const handleExtendPeriod = useCallback(() => {
         if (!nextAvailableEventBatch) return;
         userTouchedDateRangeRef.current = true;
+        setPreserveViewportAfterSearch(false);
         setExtendingPeriod(true);
         setEndDate(nextAvailableEventBatch.endDate);
         bumpAutoFit();
@@ -673,6 +681,7 @@ export default function Home() {
         const defaults = defaultExplorerDateRange(defaultExplorerPeriod);
         userTouchedDateRangeRef.current = false;
         userTouchedTagsRef.current = true;
+        setPreserveViewportAfterSearch(false);
         setActiveTagIds(new Set());
         setInterestSource(null);
         setInterestKind('any');
@@ -685,6 +694,7 @@ export default function Home() {
 
     const handleClearCalendarFilters = useCallback(() => {
         userTouchedTagsRef.current = true;
+        setPreserveViewportAfterSearch(false);
         setActiveTagIds(new Set());
         setInterestSource(null);
         setInterestKind('any');
@@ -694,6 +704,7 @@ export default function Home() {
 
     // Reset any area session override (returns to saved prefs / default).
     const handleClearAreaOverride = useCallback(() => {
+        setPreserveViewportAfterSearch(false);
         setAreaSessionOverride(null);
         bumpAutoFit();
     }, [bumpAutoFit]);
@@ -721,6 +732,7 @@ export default function Home() {
     // active so users can scan markers without the URL bar / filters
     // eating screen height.
     const [mapFullscreen, setMapFullscreen] = useState(false);
+    const [areaPresetMenuOpen, setAreaPresetMenuOpen] = useState(false);
     const mobileExplorerTopSummaryRef = useRef<HTMLDivElement | null>(null);
     const [showFloatingMobileExplorerSummary, setShowFloatingMobileExplorerSummary] = useState(false);
 
@@ -754,7 +766,10 @@ export default function Home() {
     // Commit the current map viewport as the effective area filter. Paired
     // with the "Search this area" pill that appears after the user pans
     // the map; the pill disappears once committed because ``userMapBounds``
-    // is cleared below.
+    // is cleared below. We deliberately do NOT auto-fit the map to the
+    // returned events here — the user just framed the viewport they care
+    // about, and re-fitting (especially to a single event) would zoom in and
+    // lose their sense of orientation. The current zoom/pan is kept as-is.
     const handleSearchThisArea = useCallback(() => {
         if (!userMapBounds) return;
         const area: PreferredAreaPayload = {
@@ -764,10 +779,41 @@ export default function Home() {
             min_lng: userMapBounds.west,
             max_lng: userMapBounds.east,
         };
+        setPreserveViewportAfterSearch(true);
         setAreaSessionOverride({ kind: 'preset', area: clampArea(area) });
         setUserMapBounds(null);
-        bumpAutoFit();
-    }, [userMapBounds, bumpAutoFit]);
+    }, [userMapBounds]);
+
+    // Footer preset actions: apply the new area filter but keep the user's
+    // current zoom/pan (no marker-tightening refit).
+    const applyPresetAreaInPlace = useCallback((preset: (typeof AREA_PRESETS)[number]) => {
+        setPreserveViewportAfterSearch(true);
+        setAreaSessionOverride({ kind: 'preset', area: preset });
+        setUserMapBounds(null);
+        flyToArea({ ...preset });
+    }, [flyToArea]);
+
+    const applyDefaultAreaInPlace = useCallback(() => {
+        const target = prefs.area ?? DEFAULT_AREA_BBOX;
+        setPreserveViewportAfterSearch(true);
+        setAreaSessionOverride(null);
+        setUserMapBounds(null);
+        flyToArea(target);
+    }, [flyToArea, prefs.area]);
+
+    const applyWorldwideInPlace = useCallback(() => {
+        const worldwide = AREA_PRESETS.find((preset) => preset.label === 'Worldwide') ?? {
+            label: 'Worldwide',
+            min_lat: -55,
+            min_lng: -170,
+            max_lat: 75,
+            max_lng: 170,
+        };
+        setPreserveViewportAfterSearch(true);
+        setAreaSessionOverride({ kind: 'show-all' });
+        setUserMapBounds(null);
+        flyToArea({ ...worldwide });
+    }, [flyToArea]);
 
     const areaScopedEvents = useMemo(() => {
         if (viewMode !== 'explorer' || !effectiveArea) return events;
@@ -1050,44 +1096,6 @@ export default function Home() {
         setCalMapBounds(bounds);
     }, []);
 
-    // Detect when the user's live map view (``mapBounds``) has drifted from
-    // the active area filter (``effectiveArea``). Compares CENTERS plus
-    // EXTENT (zoom proxy): edge-by-edge comparison would flag drift right
-    // after a fit (Leaflet snaps to discrete zooms and pads to the
-    // viewport's aspect ratio, so the visible bbox is always a bit wider
-    // than requested). Center+extent catches both pans and zooms while
-    // tolerating that aspect-ratio slack.
-    const mapDriftsFromArea = useMemo(() => {
-        if (!mapBounds) return false;
-        if (!effectiveArea) return true; // "show all" mode — any view differs
-        const areaCenterLat = (effectiveArea.min_lat + effectiveArea.max_lat) / 2;
-        const areaCenterLng = (effectiveArea.min_lng + effectiveArea.max_lng) / 2;
-        const mapCenterLat = (mapBounds.south + mapBounds.north) / 2;
-        const mapCenterLng = (mapBounds.west + mapBounds.east) / 2;
-        const areaLatExtent = effectiveArea.max_lat - effectiveArea.min_lat;
-        const areaLngExtent = effectiveArea.max_lng - effectiveArea.min_lng;
-        const mapLatExtent = mapBounds.north - mapBounds.south;
-        const mapLngExtent = mapBounds.east - mapBounds.west;
-        // Center drift threshold: 25% of the area extent (min 1°).
-        const latThreshold = Math.max(1, areaLatExtent * 0.25);
-        const lngThreshold = Math.max(1, areaLngExtent * 0.25);
-        if (
-            Math.abs(mapCenterLat - areaCenterLat) > latThreshold ||
-            Math.abs(mapCenterLng - areaCenterLng) > lngThreshold
-        ) {
-            return true;
-        }
-        // Zoom drift: visible extent differs from area extent by more than
-        // 50% (smaller → user zoomed in; much larger → user zoomed out).
-        // Uses the larger axis to pick up the dominant change.
-        const latRatio = mapLatExtent / Math.max(0.01, areaLatExtent);
-        const lngRatio = mapLngExtent / Math.max(0.01, areaLngExtent);
-        if (latRatio < 0.5 || latRatio > 1.5 || lngRatio < 0.5 || lngRatio > 1.5) {
-            return true;
-        }
-        return false;
-    }, [mapBounds, effectiveArea]);
-
     // Set of event IDs not visible on the calendar-mode map
     const offMapEventIds = useMemo(() => {
         if (!calMapBounds) return new Set<string>();
@@ -1330,7 +1338,7 @@ export default function Home() {
                 areaLabel={
                     isCal ? DEFAULT_AREA_LABEL
                         : areaChipState.kind === 'map-view' ? 'Current map view'
-                            : areaChipState.kind === 'show-all' ? 'Worldwide'
+                            : areaChipState.kind === 'show-all' ? '🌐'
                                 : areaChipState.label
                 }
                 areaKind={isCal ? 'default' : areaChipState.kind}
@@ -1523,6 +1531,7 @@ export default function Home() {
                                         flyToArea={flyToAreaBbox}
                                         flyToAreaToken={flyToAreaToken}
                                         initialArea={initialAreaRef.current}
+                                        preserveViewport={preserveViewportAfterSearch}
                                         newEventIds={newEventIds}
                                         popularityThreshold={popularityThreshold}
                                         onMarkSeen={markSeen}
@@ -1607,64 +1616,72 @@ export default function Home() {
                                     className="shrink-0 flex items-center gap-1 sm:gap-2 px-1.5 sm:px-2 py-0.5 sm:py-1 border bg-slate-100 border-slate-200 text-slate-700 text-xs min-w-0 lg:absolute lg:bottom-0 lg:left-0 lg:right-0 lg:z-[703]"
                                     data-testid="area-default-bar"
                                 >
-                                    {(mapDriftsFromArea || areaChipState.kind === 'show-all') && (
+                                    <div className="relative">
                                         <button
                                             type="button"
-                                            onClick={() => {
-                                                const target = prefs.area ?? DEFAULT_AREA_BBOX;
-                                                setAreaSessionOverride(null);
-                                                flyToArea(target);
-                                            }}
+                                            onClick={() => setAreaPresetMenuOpen((open) => !open)}
                                             className="shrink-0 whitespace-nowrap px-1.5 py-px border border-slate-300 bg-white text-[11px] opacity-80 hover:opacity-100"
-                                            title="Snap map back to your default area"
-                                            data-testid="area-snap-default"
+                                            title="Choose your area"
+                                            data-testid="area-preset-menu-toggle"
+                                            aria-haspopup="menu"
+                                            aria-expanded={areaPresetMenuOpen}
                                         >
-                                            Default
+                                            Your area ▾
                                         </button>
-                                    )}
-                                    {!(effectiveArea && isDefaultArea(effectiveArea) && !mapDriftsFromArea) && (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setAreaSessionOverride({ kind: 'preset', area: DEFAULT_AREA_BBOX });
-                                                flyToArea(DEFAULT_AREA_BBOX);
-                                            }}
-                                            className="shrink-0 whitespace-nowrap px-1.5 py-px border border-slate-300 bg-white text-[11px] opacity-80 hover:opacity-100"
-                                            title="Apply the Europe & nearby preset"
-                                            data-testid="area-preset-europe"
-                                        >
-                                            Europe
-                                        </button>
-                                    )}
-                                    {areaChipState.kind !== 'show-all' && (
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setAreaSessionOverride({ kind: 'show-all' });
-                                                flyToArea({ min_lat: -60, min_lng: -170, max_lat: 75, max_lng: 170, label: 'World' });
-                                            }}
-                                            className="shrink-0 whitespace-nowrap px-1.5 py-px border border-slate-300 bg-white text-[11px] opacity-80 hover:opacity-100"
-                                            title="Show events worldwide"
-                                            aria-label="Show events worldwide"
-                                            data-testid="area-show-all"
-                                        >
-                                            🌐
-                                        </button>
-                                    )}
+                                        {areaPresetMenuOpen && (
+                                            <div
+                                                className="absolute left-0 bottom-full mb-1 z-[705] min-w-40 border border-slate-200 bg-white shadow-md"
+                                                role="menu"
+                                                data-testid="area-preset-menu"
+                                            >
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setAreaPresetMenuOpen(false);
+                                                        applyDefaultAreaInPlace();
+                                                    }}
+                                                    className="block w-full border-b border-slate-100 px-2 py-1 text-left text-[11px] text-slate-700 hover:bg-slate-50"
+                                                    role="menuitem"
+                                                    data-testid="area-snap-default"
+                                                >
+                                                    Your area
+                                                </button>
+                                                {AREA_PRESETS.map((preset) => (
+                                                    <button
+                                                        key={preset.label}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setAreaPresetMenuOpen(false);
+                                                            if (preset.label === 'Worldwide') {
+                                                                applyWorldwideInPlace();
+                                                                return;
+                                                            }
+                                                            applyPresetAreaInPlace(preset);
+                                                        }}
+                                                        className="block w-full border-b border-slate-100 px-2 py-1 text-left text-[11px] text-slate-700 hover:bg-slate-50 last:border-b-0"
+                                                        role="menuitem"
+                                                        data-testid={`area-preset-${preset.label.toLowerCase().replace(/\s+/g, '-')}`}
+                                                    >
+                                                        {preset.label === 'Worldwide' ? '🌐' : preset.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <Link
+                                        to="/account#preferences"
+                                        title="Open preferences"
+                                        aria-label="Open preferences"
+                                        className="shrink-0 inline-flex h-6 w-6 items-center justify-center opacity-70 hover:opacity-100"
+                                        data-testid="map-footer-settings-link"
+                                    >
+                                        <img src="/setting.png" alt="" aria-hidden="true" className="h-4 w-4 object-contain" />
+                                    </Link>
                                     {explorerOffMapCount > 0 && (
                                         <span className="ml-auto shrink-0 whitespace-nowrap text-[11px] text-slate-500" data-testid="map-footer-off-map-count">
                                             {explorerOffMapCount} off map
                                         </span>
                                     )}
-                                    <Link
-                                        to="/account"
-                                        title="Open preferences"
-                                        aria-label="Open preferences"
-                                        className={`${explorerOffMapCount > 0 ? '' : 'ml-auto '}shrink-0 inline-flex h-6 w-6 items-center justify-center opacity-70 hover:opacity-100`}
-                                        data-testid="map-footer-settings-link"
-                                    >
-                                        <img src="/setting.png" alt="" aria-hidden="true" className="h-4 w-4 object-contain" />
-                                    </Link>
                                 </div>
                             </div>
                             {/* Event list on mobile: order-3, hidden on desktop.

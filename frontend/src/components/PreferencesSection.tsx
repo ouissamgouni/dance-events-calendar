@@ -246,7 +246,6 @@ export default function PreferencesSection() {
                                 <AreaMapPicker
                                     value={prefs.area}
                                     onChange={handleAreaChange}
-                                    autoSave
                                     onUseCurrentView={() => {
                                         // Defer until after the area save commits.
                                         window.setTimeout(() => {
