@@ -24,6 +24,7 @@ from sqlmodel import Session, select
 from backend.db.database import get_engine
 from backend.db.models import CachedEvent, EventCalendarSource, EventTag
 from backend.services.calendar.base import CalendarEvent
+from backend.services.duplicate_detection import maybe_detect_duplicates_for_event
 from backend.services.pipeline.base import EnrichmentPipeline
 from backend.services.sync_service import compute_content_hash
 
@@ -622,6 +623,10 @@ class EventPipelineProcessor:
             with DBSession(engine) as session:
                 db_event, action = self._persist_with_dedup(session, task, buffer)
                 session.commit()
+                # Auto-detect near-duplicates for new/updated events. No-op
+                # unless ``duplicate_auto_detect_enabled`` site setting is on.
+                if action in ("new", "updated"):
+                    maybe_detect_duplicates_for_event(session, db_event.event_id)
                 # Run automatic tag suggestions in the same session as a
                 # post-persist step. Skipped for "deduped" (default tags
                 # already merged into the canonical event) and "unchanged"

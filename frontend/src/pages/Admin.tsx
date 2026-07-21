@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import type { CalendarSetting, EventSuggestion } from '../types';
+import type { CalendarSetting, EventSuggestion, Tag } from '../types';
 import type { AdminTagGroup } from '../api';
 import {
     fetchAdminCalendars, updateCalendar, discoverCalendars, addCalendar,
@@ -25,6 +25,7 @@ import TagSuggestionsPanel from '../components/TagSuggestionsPanel';
 import PromoCodesAdminPanel from '../components/PromoCodesAdminPanel';
 import AdminEventDetailPanel from '../components/AdminEventDetailPanel';
 import OrganizerClaimsAdminPanel from '../components/OrganizerClaimsAdminPanel';
+import DuplicatesPanel from '../components/DuplicatesPanel';
 import FeedbackPanel from '../components/FeedbackPanel';
 import AdminTagCategories from '../components/AdminTagCategories';
 import AdminAnalytics from '../components/AdminAnalytics';
@@ -149,6 +150,7 @@ export default function Admin() {
     const [feedbackPanelOpen, setFeedbackPanelOpen] = useState(false);
     const [promoCodesPanelOpen, setPromoCodesPanelOpen] = useState(false);
     const [organizerClaimsPanelOpen, setOrganizerClaimsPanelOpen] = useState(false);
+    const [duplicatesPanelOpen, setDuplicatesPanelOpen] = useState(false);
     const { counters: adminCounters, refresh: refreshAdminCounters } = useAdminCounters();
     const feedbackPendingCount = adminCounters.feedbackPending;
     const tagSuggestionCount = adminCounters.tagSuggestions;
@@ -156,6 +158,7 @@ export default function Admin() {
     const ungeolocatedCount = adminCounters.ungeolocated;
     const organizerClaimsPendingCount = adminCounters.organizerClaimsPending;
     const promoCodesPendingCount = adminCounters.promoCodesPending;
+    const duplicatesPendingCount = adminCounters.duplicatesPending;
     const setFeedbackPendingCount = useCallback((_n: number) => refreshAdminCounters(), [refreshAdminCounters]);
     const setTagSuggestionCount = useCallback((_n: number) => refreshAdminCounters(), [refreshAdminCounters]);
     const [suggestions, setSuggestions] = useState<EventSuggestion[]>([]);
@@ -170,6 +173,7 @@ export default function Admin() {
     const [expandedRulesCalId, setExpandedRulesCalId] = useState<string | null>(null);
     const [confirmReseedOpen, setConfirmReseedOpen] = useState(false);
     const [tagGroups, setTagGroups] = useState<AdminTagGroup[]>([]);
+    const allTags = useMemo<Tag[]>(() => tagGroups.flatMap((g) => g.tags), [tagGroups]);
     const [calendarDefaultTagIds, setCalendarDefaultTagIds] = useState<Record<string, number[]>>({});
     const [activeConfigTab, setActiveConfigTab] = useState<ConfigurationTab>('events-settings');
     const [digestNowMessage, setDigestNowMessage] = useState<string>('');
@@ -899,7 +903,12 @@ export default function Admin() {
                         )}
                     </button>
                     <button
-                        onClick={() => setSuggestionsPanelOpen(true)}
+                        onClick={() => {
+                            setSuggestionsPanelOpen(true);
+                            if (tagGroups.length === 0) {
+                                fetchAdminTagGroups().then(setTagGroups).catch(() => {});
+                            }
+                        }}
                         className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
                     >
                         Suggestions
@@ -965,6 +974,17 @@ export default function Admin() {
                         {feedbackPendingCount > 0 && (
                             <span className="inline-flex items-center justify-center bg-amber-500 text-white text-[10px] font-semibold px-1.5 py-0 min-w-[16px]">
                                 {feedbackPendingCount}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        onClick={() => setDuplicatesPanelOpen(true)}
+                        className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
+                    >
+                        Duplicates
+                        {duplicatesPendingCount > 0 && (
+                            <span className="inline-flex items-center justify-center bg-amber-500 text-white text-[10px] font-semibold px-1.5 py-0 min-w-[16px]">
+                                {duplicatesPendingCount}
                             </span>
                         )}
                     </button>
@@ -1951,6 +1971,7 @@ export default function Admin() {
                 onClose={() => setSuggestionsPanelOpen(false)}
                 suggestions={suggestions}
                 calendars={calendars}
+                allTags={allTags}
                 onUpdated={(updated) => {
                     setSuggestions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
                 }}
@@ -1988,6 +2009,11 @@ export default function Admin() {
             <OrganizerClaimsAdminPanel
                 isOpen={organizerClaimsPanelOpen}
                 onClose={() => setOrganizerClaimsPanelOpen(false)}
+            />
+            <DuplicatesPanel
+                isOpen={duplicatesPanelOpen}
+                onClose={() => setDuplicatesPanelOpen(false)}
+                onOpenEvent={(id) => setAdminDetailEventId(id)}
             />
             <ConfirmDialog
                 open={confirmReseedOpen}

@@ -1,0 +1,10 @@
+# Two source calendars, so the near-duplicate pairs below plausibly read as
+# the same real-world event re-posted by a second (aggregator-style) feed —
+# the scenario that most often trips up naive same-calendar dedup checks.
+calendars:
+  - id: "salsa-primary"
+    name: "Salsa Paris"
+    color: "#e11d48"
+  - id: "community-listings"
+    name: "Community Listings"
+    color: "#0ea5e9"

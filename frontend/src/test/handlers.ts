@@ -156,6 +156,59 @@ export const handlers = [
     // ── Tags (suggestion modal mount) ───────────────────────────────────────
     http.get('*/api/tags', () => HttpResponse.json([])),
 
+    // ── Suggestion geocode lookup ───────────────────────────────────────────
+    http.get('*/api/suggestions/geocode', ({ request }) => {
+        const url = new URL(request.url)
+        const q = url.searchParams.get('q') ?? 'Berlin'
+        return HttpResponse.json([
+            {
+                display_name: `${q} Center`,
+                latitude: 52.52,
+                longitude: 13.405,
+            },
+        ])
+    }),
+
+    // ── Site settings (suggestion modal mount) ──────────────────────────────
+    http.get('*/api/settings', () =>
+        HttpResponse.json({
+            since_date: '2025-01-01',
+            sync_since_date: '2025-01-01',
+            sync_interval_minutes: 60,
+            auto_sync_enabled: true,
+            auto_sync_mode: 'incremental',
+            show_prices: false,
+            show_popularity: true,
+            show_ratings: false,
+            popularity_threshold: 10,
+            following_badge_enabled: false,
+            unseen_state_enabled: false,
+            trending_enabled: true,
+            trending_banner_enabled: true,
+            trending_window_days: 30,
+            trending_floor_going: 3,
+            trending_top_n: 3,
+            trending_top_percent: 100,
+            event_color_bar_color: '#64748b',
+            tag_sort_mode: 'group',
+            default_explorer_period: 'next_3_months',
+            promo_codes_enabled: false,
+            organizer_claims_enabled: false,
+            for_you_rail_enabled: false,
+            your_next_events_rail_enabled: true,
+            suggest_event_required_dance_group_id: null,
+            suggest_event_required_reach_group_id: null,
+            tag_as_badge_enabled: false,
+            event_reminders_enabled: true,
+            activity_digest_email_enabled: true,
+            interest_match_notifications_enabled: true,
+            web_push_enabled: false,
+            reminder_lead_hours: 24,
+            activity_digest_schedule: 'tue,fri @ 09:00',
+            interest_match_max_events_per_email: 10,
+        }),
+    ),
+
     // ── Event suggestion submission ─────────────────────────────────────────
     http.post('*/api/suggestions', () =>
         HttpResponse.json({ id: 'sugg-1', message: 'Thanks! Your event is under review.' }),

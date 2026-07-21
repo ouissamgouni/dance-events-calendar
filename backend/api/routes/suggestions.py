@@ -21,23 +21,135 @@ from backend.api.schemas import (
 from backend.config.loader import get_admin_email
 from backend.db.database import get_session
 from backend.db.models import (
+    BlockedEvent,
     CachedEvent,
     CalendarSetting,
+    EventPromoCode,
     EventSuggestion,
     EventTag,
     Tag,
     TagSuggestion,
+    UserEventAttendance,
+    UserSavedEvent,
 )
 from backend.services.email import send_suggestion_notification
 from backend.services.geocoding import geocode_location
 from backend.services.ip_geolocation import geolocate_ip
-from backend.services.notifications import fan_out_suggested
+from backend.services.notifications import fan_out_going, fan_out_suggested
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["suggestions"])
 
 limiter = Limiter(key_func=client_ip)
+
+USER_SUBMISSION_CALENDAR_ID = "user-submissions"
+
+
+def _ensure_user_submission_calendar(session: Session) -> CalendarSetting:
+    calendar = session.get(CalendarSetting, USER_SUBMISSION_CALENDAR_ID)
+    if calendar is None:
+        calendar = CalendarSetting(
+            calendar_id=USER_SUBMISSION_CALENDAR_ID,
+            name="User submissions",
+            enabled=True,
+            show_events=True,
+        )
+        session.add(calendar)
+    return calendar
+
+
+def _upsert_live_event_from_suggestion(
+    session: Session,
+    suggestion: EventSuggestion,
+    *,
+    review_status: str,
+    calendar_id: str,
+    latitude: float | None,
+    longitude: float | None,
+) -> CachedEvent:
+    event_id = suggestion.created_event_id or f"suggestion-{suggestion.id}"
+    cached_event = session.get(CachedEvent, event_id)
+    if cached_event is None:
+        cached_event = CachedEvent(
+            event_id=event_id,
+            calendar_id=calendar_id,
+            title=suggestion.title,
+            description=suggestion.description,
+            location=suggestion.location,
+            start=suggestion.start,
+            end=suggestion.end,
+            all_day=suggestion.all_day,
+            latitude=latitude,
+            longitude=longitude,
+            links=suggestion.links,
+            price_min=suggestion.price_min,
+            price_max=suggestion.price_max,
+            price_currency=suggestion.price_currency,
+            price_is_free=suggestion.price_is_free,
+            review_status=review_status,
+        )
+    else:
+        cached_event.calendar_id = calendar_id
+        cached_event.title = suggestion.title
+        cached_event.description = suggestion.description
+        cached_event.location = suggestion.location
+        cached_event.start = suggestion.start
+        cached_event.end = suggestion.end
+        cached_event.all_day = suggestion.all_day
+        cached_event.latitude = latitude
+        cached_event.longitude = longitude
+        cached_event.links = suggestion.links
+        cached_event.price_min = suggestion.price_min
+        cached_event.price_max = suggestion.price_max
+        cached_event.price_currency = suggestion.price_currency
+        cached_event.price_is_free = suggestion.price_is_free
+        cached_event.review_status = review_status
+        cached_event.is_hidden = False
+        cached_event.deleted_at = None
+    suggestion.created_event_id = event_id
+    session.add(cached_event)
+    return cached_event
+
+
+def _apply_suggestion_tags(session: Session, event_id: str, suggested_tag_ids: list[int]) -> None:
+    for tag_id in suggested_tag_ids:
+        tag = session.get(Tag, tag_id)
+        if not tag:
+            continue
+        existing = session.exec(
+            select(EventTag).where(
+                EventTag.event_id == event_id,
+                EventTag.tag_id == tag_id,
+            )
+        ).first()
+        if existing is None:
+            session.add(EventTag(event_id=event_id, tag_id=tag_id))
+
+
+def _upsert_creator_going(session: Session, actor: User, event_id: str, audience: str) -> None:
+    existing = session.exec(
+        select(UserEventAttendance).where(
+            UserEventAttendance.user_id == actor.id,
+            UserEventAttendance.event_id == event_id,
+        )
+    ).first()
+    if existing is None:
+        session.add(
+            UserEventAttendance(
+                device_id=str(actor.id),
+                event_id=event_id,
+                user_id=actor.id,
+                share_publicly=audience == "public",
+                share_audience=audience,
+            )
+        )
+        return
+    existing.device_id = str(actor.id)
+    existing.user_id = actor.id
+    existing.share_publicly = audience == "public"
+    existing.share_audience = audience
+    session.add(existing)
 
 
 # --- Background tasks ---
@@ -120,6 +232,9 @@ def submit_suggestion(
         suggested_new_tags=[item.model_dump() for item in body.suggested_new_tags]
         if body.suggested_new_tags
         else None,
+        promo_code=body.promo_code,
+        promo_description=body.promo_description,
+        promo_source_url=body.promo_source_url,
         price_min=body.price_min,
         price_max=body.price_max,
         price_currency=body.price_currency,
@@ -130,6 +245,25 @@ def submit_suggestion(
     session.add(suggestion)
     session.commit()
     session.refresh(suggestion)
+
+    if current_user is not None:
+        _ensure_user_submission_calendar(session)
+        cached_event = _upsert_live_event_from_suggestion(
+            session,
+            suggestion,
+            review_status="pending",
+            calendar_id=USER_SUBMISSION_CALENDAR_ID,
+            latitude=body.latitude,
+            longitude=body.longitude,
+        )
+        _apply_suggestion_tags(session, cached_event.event_id, suggestion.suggested_tag_ids or [])
+        if body.going:
+            going_audience = body.going_audience or current_user.share_attendance_default_audience or "friends"
+            _upsert_creator_going(session, current_user, cached_event.event_id, going_audience)
+            fan_out_going(session, current_user, cached_event.event_id, audience=going_audience)
+        session.add(suggestion)
+        session.commit()
+        session.refresh(suggestion)
 
     # Fire background tasks
     background_tasks.add_task(_geolocate_and_update, suggestion.id, client_ip)
@@ -264,36 +398,20 @@ def approve_suggestion(
         if coords:
             lat, lng = coords
 
-    # Create CachedEvent
-    import uuid
-
-    event_id = f"suggestion-{suggestion.id}"
-    cached_event = CachedEvent(
-        event_id=event_id,
+    had_live_event = suggestion.created_event_id is not None
+    event_id = suggestion.created_event_id or f"suggestion-{suggestion.id}"
+    cached_event = _upsert_live_event_from_suggestion(
+        session,
+        suggestion,
+        review_status="reviewed",
         calendar_id=body.calendar_id,
-        title=suggestion.title,
-        description=suggestion.description,
-        location=suggestion.location,
-        start=suggestion.start,
-        end=suggestion.end,
-        all_day=suggestion.all_day,
         latitude=lat,
         longitude=lng,
-        links=suggestion.links,
-        price_min=suggestion.price_min,
-        price_max=suggestion.price_max,
-        price_currency=suggestion.price_currency,
-        price_is_free=suggestion.price_is_free,
-        review_status="reviewed",
     )
-    session.add(cached_event)
 
     # Create EventTags from suggested_tag_ids
     if suggestion.suggested_tag_ids:
-        for tid in suggestion.suggested_tag_ids:
-            tag = session.get(Tag, tid)
-            if tag:
-                session.add(EventTag(event_id=event_id, tag_id=tid))
+        _apply_suggestion_tags(session, event_id, suggestion.suggested_tag_ids)
 
     # Promote inline new-tag suggestions to TagSuggestion rows for admin review
     if suggestion.suggested_new_tags:
@@ -311,6 +429,28 @@ def approve_suggestion(
                 )
             )
 
+    # Promote a submitted promo code into the moderated promo-codes queue.
+    # Requires a signed-in submitter (EventPromoCode.submitter_user_id is
+    # NOT NULL) — anonymous submissions cannot own a promo code entry.
+    if suggestion.promo_code and suggestion.submitter_user_id is not None:
+        code_norm = suggestion.promo_code.strip()
+        if code_norm:
+            existing_codes = session.exec(
+                select(EventPromoCode)
+                .where(EventPromoCode.event_id == event_id)
+                .where(EventPromoCode.status != "rejected")
+            ).all()
+            if not any(row.code.lower() == code_norm.lower() for row in existing_codes):
+                session.add(
+                    EventPromoCode(
+                        event_id=event_id,
+                        code=code_norm,
+                        description=suggestion.promo_description,
+                        source_url=suggestion.promo_source_url,
+                        submitter_user_id=suggestion.submitter_user_id,
+                    )
+                )
+
     # Update suggestion
     suggestion.status = "approved"
     suggestion.assigned_calendar_id = body.calendar_id
@@ -319,9 +459,9 @@ def approve_suggestion(
     suggestion.reviewed_by = admin.get("email")
     session.add(suggestion)
 
-    # Phase C: fan out subscription_suggested notifications when the
-    # suggestion was submitted by an authenticated user.
-    if suggestion.submitter_user_id is not None:
+    # Legacy flow only: older suggestions that had not yet created a live
+    # event still fan out the suggested-event notification and auto-save.
+    if suggestion.submitter_user_id is not None and not had_live_event:
         actor = session.get(User, suggestion.submitter_user_id)
         if actor is not None:
             fan_out_suggested(session, actor, event_id)
@@ -330,8 +470,6 @@ def approve_suggestion(
             # ``UniqueConstraint(device_id, event_id)`` would block
             # duplicates anyway; we pre-check for clarity.
             if suggestion.auto_save:
-                from backend.db.models import UserSavedEvent
-
                 existing = session.exec(
                     select(UserSavedEvent).where(
                         UserSavedEvent.user_id == actor.id,
@@ -347,6 +485,24 @@ def approve_suggestion(
                             audience="public",
                         )
                     )
+    elif suggestion.submitter_user_id is not None and suggestion.auto_save:
+        actor = session.get(User, suggestion.submitter_user_id)
+        if actor is not None:
+            existing = session.exec(
+                select(UserSavedEvent).where(
+                    UserSavedEvent.user_id == actor.id,
+                    UserSavedEvent.event_id == event_id,
+                )
+            ).first()
+            if existing is None:
+                session.add(
+                    UserSavedEvent(
+                        device_id=str(actor.id),
+                        event_id=event_id,
+                        user_id=actor.id,
+                        audience="public",
+                    )
+                )
 
     session.commit()
     session.refresh(suggestion)
@@ -375,6 +531,14 @@ def reject_suggestion(
     suggestion.admin_notes = body.admin_notes or suggestion.admin_notes
     suggestion.reviewed_at = datetime.utcnow()
     suggestion.reviewed_by = admin.get("email")
+    if suggestion.created_event_id:
+        event = session.get(CachedEvent, suggestion.created_event_id)
+        if event:
+            event.is_hidden = True
+            event.deleted_at = None
+            session.add(event)
+        if session.get(BlockedEvent, suggestion.created_event_id) is None:
+            session.add(BlockedEvent(event_id=suggestion.created_event_id))
     session.add(suggestion)
     session.commit()
     session.refresh(suggestion)

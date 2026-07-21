@@ -72,6 +72,7 @@ from backend.db.models import (
     User,
     UserEventAttendance,
 )
+from backend.services.duplicate_detection import maybe_detect_duplicates_for_event
 from backend.services.geocoding import geocode_location, search_locations
 from backend.services.sync_job_service import SyncJobStatus, get_sync_job_service
 from backend.services.sync_service import SyncService
@@ -1534,6 +1535,9 @@ def update_event(
         "location" in update_data and update_data["location"] != event.location
     )
     coords_provided = "latitude" in update_data or "longitude" in update_data
+    title_or_start_changed = (
+        "title" in update_data and update_data["title"] != event.title
+    ) or ("start" in update_data and update_data["start"] != event.start)
 
     for field, value in update_data.items():
         setattr(event, field, value)
@@ -1563,6 +1567,11 @@ def update_event(
 
     session.commit()
     session.refresh(event)
+
+    # Auto-detect near-duplicates when title/start changed. No-op unless
+    # ``duplicate_auto_detect_enabled`` site setting is on.
+    if title_or_start_changed:
+        maybe_detect_duplicates_for_event(session, event_id)
 
     cal = session.get(CalendarSetting, event.calendar_id)
     event_tags = get_event_tags(session, [event_id])

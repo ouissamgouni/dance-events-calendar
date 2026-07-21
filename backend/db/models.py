@@ -290,6 +290,10 @@ class CachedEvent(SQLModel, table=True):
             "end",
             "start",
         ),
+        # Narrows the duplicate-detection candidate query (all calendars,
+        # active + upcoming events within a date window) to an index-only
+        # scan before the Python-side fuzzy title match runs.
+        Index("ix_cached_events_active_start", "deleted_at", "start"),
     )
 
     event_id: str = Field(primary_key=True)
@@ -320,6 +324,12 @@ class CachedEvent(SQLModel, table=True):
     organizer_user_id: Optional[UUID] = Field(
         default=None, foreign_key="users.id", index=True
     )
+    # Human-readable reason set when this event is rejected as a duplicate
+    # via the admin duplicate-review workflow, e.g.
+    # "Duplicate of evt-123 — Salsa Night". Cleared on unblock. Independent
+    # from ``is_hidden``/``BlockedEvent`` (the actual suppression
+    # mechanism) — this field only exists to explain *why*.
+    rejected_duplicate_reason: Optional[str] = Field(default=None)
 
 
 class BlockedEvent(SQLModel, table=True):
@@ -333,6 +343,57 @@ class BlockedEvent(SQLModel, table=True):
 
     event_id: str = Field(primary_key=True)
     blocked_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class EventDuplicateGroup(SQLModel, table=True):
+    """A cluster of CachedEvent rows suspected of being the same event.
+
+    ``status`` moves from ``pending`` to either ``resolved`` (an admin
+    picked a ``kept_event_id`` and the rest were rejected/blocked) or
+    ``dismissed`` (an admin decided the group is not actually a duplicate).
+    Once a pair of events has been recorded together in any group
+    (regardless of status), the detection scan skips recreating a group
+    for that pair — this is what makes resolved/dismissed decisions sticky.
+    """
+
+    __tablename__ = "event_duplicate_groups"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    status: str = Field(default="pending", index=True)  # pending|resolved|dismissed
+    source: str = Field(default="auto")  # auto|manual
+    kept_event_id: Optional[str] = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    resolved_at: Optional[datetime] = Field(default=None)
+    resolved_by_admin: Optional[str] = Field(default=None, max_length=255)
+
+
+class EventDuplicateMember(SQLModel, table=True):
+    """Maps a CachedEvent to the duplicate group(s) it belongs to."""
+
+    __tablename__ = "event_duplicate_members"
+    __table_args__ = (
+        UniqueConstraint("group_id", "event_id", name="uq_duplicate_group_event"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    group_id: int = Field(foreign_key="event_duplicate_groups.id", index=True)
+    event_id: str = Field(foreign_key="cached_events.event_id", index=True)
+
+
+class EventDuplicateScanLog(SQLModel, table=True):
+    """Audit trail of duplicate-detection scans (incremental/full/manual)."""
+
+    __tablename__ = "event_duplicate_scan_log"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    scan_type: str = Field(default="incremental")  # incremental|full|manual_pair
+    triggered_by_event_id: Optional[str] = Field(default=None)
+    triggered_by_admin: Optional[str] = Field(default=None, max_length=255)
+    started_at: datetime = Field(default_factory=datetime.utcnow)
+    finished_at: Optional[datetime] = Field(default=None)
+    candidates_found: int = Field(default=0)
+    groups_created: int = Field(default=0)
+    status: str = Field(default="running")  # running|completed|failed
 
 
 class EventCalendarSource(SQLModel, table=True):
@@ -531,6 +592,9 @@ class EventSuggestion(SQLModel, table=True):
     #   {"free_text": str, "group_slug": str | None}
     # On approval these become regular TagSuggestion rows tied to the new event.
     suggested_new_tags: Optional[list] = Field(default=None, sa_column=Column(JSON))
+    promo_code: Optional[str] = Field(default=None, max_length=64)
+    promo_description: Optional[str] = Field(default=None, sa_column=Column(Text))
+    promo_source_url: Optional[str] = Field(default=None, max_length=500)
 
     # Optional pricing hints from the submitter (copied to CachedEvent on approval)
     price_min: Optional[float] = Field(default=None)

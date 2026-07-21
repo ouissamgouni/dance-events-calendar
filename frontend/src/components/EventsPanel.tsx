@@ -16,6 +16,7 @@ import {
     runTagSuggestionsBulk,
     adminBulkEngagement,
     fetchAdminUsers,
+    flagEventsAsDuplicates,
 } from '../api';
 import type { AdminTagGroup, AdminBulkEngagementKind, AdminBulkEngagementAudience, AdminUserRow } from '../api';
 import LocationBadge from './LocationBadge';
@@ -314,6 +315,21 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             loadEvents();
         } catch {
             setMessage('Failed to retry geocoding.');
+        } finally {
+            setBusy('');
+        }
+    };
+
+    const handleBulkFlagDuplicates = async () => {
+        if (selectedIds.size < 2) return;
+        setBusy('bulk-flag-duplicates');
+        try {
+            await flagEventsAsDuplicates([...selectedIds]);
+            setMessage(`Flagged ${selectedIds.size} event(s) as duplicates.`);
+            setSelectedIds(new Set());
+            setAllMatchingSelected(false);
+        } catch (e) {
+            setMessage(e instanceof Error ? e.message : 'Failed to flag events as duplicates.');
         } finally {
             setBusy('');
         }
@@ -854,6 +870,14 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                             title="Run the heuristic tag suggester on the selected events. Suggestions land as pending — review in the Tag Suggestions panel."
                         >
                             {busy === 'bulk-suggest-tags' ? 'Suggesting…' : 'Auto-suggest Tags'}
+                        </button>
+                        <button
+                            onClick={handleBulkFlagDuplicates}
+                            disabled={!!busy || selectedIds.size < 2}
+                            className="text-[10px] font-medium px-2 py-1 bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-50 transition"
+                            title="Flag the selected events as duplicates of each other. Review and pick which to keep in the Duplicates panel."
+                        >
+                            {busy === 'bulk-flag-duplicates' ? 'Flagging…' : 'Flag as Duplicates'}
                         </button>
                         <button
                             onClick={() => { setSelectedIds(new Set()); setAllMatchingSelected(false); setBulkTagPickerOpen(false); }}

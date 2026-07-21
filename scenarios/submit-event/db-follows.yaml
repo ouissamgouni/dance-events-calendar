@@ -1,0 +1,8 @@
+# Jamie follows Dev User (the event submitter) so the social_activity
+# notification fan-out to friends can be verified: once Dev User's
+# suggested event goes live and they are marked "going" with a
+# "friends" audience, Jamie should receive an in-app notification.
+follows:
+  - follower: jamie
+    followee: dev-user
+    status: approved

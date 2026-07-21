@@ -39,6 +39,7 @@ from backend.db.models import (  # noqa: E402
     Notification,
     User,
     UserEventAttendance,
+    UserFollow,
     UserSavedEvent,
 )
 
@@ -248,6 +249,55 @@ def test_anonymous_going_does_not_fan_out(client, session):
     )
     assert r.status_code == 201
     assert _count_notifs(session, bob) == 0
+
+
+def test_signed_in_suggestion_submit_creates_live_event_and_going_fanout(client, session):
+    _make_user(session, "admin@example.com", "admin")
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    session.add(UserFollow(follower_id=alice.id, followee_id=bob.id))
+    session.add(UserFollow(follower_id=bob.id, followee_id=alice.id))
+    session.commit()
+    _subscribe(session, bob, alice)
+
+    _login(client, "alice@example.com")
+    r = client.post(
+        "/api/suggestions",
+        json={
+            "title": "Salsa Social",
+            "location": "Berlin Center",
+            "latitude": 52.52,
+            "longitude": 13.405,
+            "start": "2026-07-01T20:00:00",
+            "end": "2026-07-01T23:00:00",
+            "going": True,
+            "going_audience": "friends",
+        },
+    )
+    assert r.status_code == 201, r.text
+    suggestion_id = r.json()["id"]
+    event_id = f"suggestion-{suggestion_id}"
+
+    event = session.get(CachedEvent, event_id)
+    assert event is not None
+    assert event.calendar_id == "user-submissions"
+    assert event.review_status == "pending"
+
+    attendance = session.exec(
+        select(UserEventAttendance).where(
+            UserEventAttendance.user_id == alice.id,
+            UserEventAttendance.event_id == event_id,
+        )
+    ).first()
+    assert attendance is not None
+    assert attendance.share_audience == "friends"
+
+    notifs = session.exec(
+        select(Notification).where(Notification.recipient_user_id == bob.id)
+    ).all()
+    assert len(notifs) == 1
+    assert notifs[0].kind == "subscription_going"
+    assert notifs[0].event_id == event_id
 
 
 def test_going_repeat_is_idempotent(client, session):

@@ -113,6 +113,16 @@ def _get_int_setting(session: Session, key: str, default: int) -> int:
     return default
 
 
+def _get_optional_int_setting(session: Session, key: str) -> int | None:
+    try:
+        row = session.get(SiteSetting, key)
+        if row and row.value.isdigit() and int(row.value) > 0:
+            return int(row.value)
+    except Exception:
+        pass
+    return None
+
+
 def _get_str_setting(session: Session, key: str, default: str) -> str:
     """Get a string setting from the DB."""
     try:
@@ -176,6 +186,12 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         your_next_events_rail_enabled=_get_bool_setting(
             session, "your_next_events_rail_enabled", default=True
         ),
+        suggest_event_required_dance_group_id=_get_optional_int_setting(
+            session, "suggest_event_required_dance_group_id"
+        ),
+        suggest_event_required_reach_group_id=_get_optional_int_setting(
+            session, "suggest_event_required_reach_group_id"
+        ),
         # These 6 gates are DB-first with an env-var fallback (see
         # backend/services/app_settings.py); read through that module here
         # so the admin UI always reflects the *effective* value (not just
@@ -196,6 +212,9 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         activity_digest_schedule=app_settings.get_activity_digest_schedule(session),
         interest_match_max_events_per_email=app_settings.get_interest_match_max_events_per_email(
             session
+        ),
+        duplicate_auto_detect_enabled=_get_bool_setting(
+            session, "duplicate_auto_detect_enabled"
         ),
     )
 
@@ -362,6 +381,13 @@ def update_settings(
             session, "organizer_claims_enabled", body.organizer_claims_enabled
         )
 
+    if body.duplicate_auto_detect_enabled is not None:
+        _set_bool_setting(
+            session,
+            "duplicate_auto_detect_enabled",
+            body.duplicate_auto_detect_enabled,
+        )
+
     if body.for_you_rail_enabled is not None:
         _set_bool_setting(session, "for_you_rail_enabled", body.for_you_rail_enabled)
 
@@ -371,6 +397,28 @@ def update_settings(
             "your_next_events_rail_enabled",
             body.your_next_events_rail_enabled,
         )
+
+    if body.suggest_event_required_dance_group_id is not None:
+        row = session.get(SiteSetting, "suggest_event_required_dance_group_id")
+        if row:
+            row.value = str(body.suggest_event_required_dance_group_id)
+        else:
+            row = SiteSetting(
+                key="suggest_event_required_dance_group_id",
+                value=str(body.suggest_event_required_dance_group_id),
+            )
+        session.add(row)
+
+    if body.suggest_event_required_reach_group_id is not None:
+        row = session.get(SiteSetting, "suggest_event_required_reach_group_id")
+        if row:
+            row.value = str(body.suggest_event_required_reach_group_id)
+        else:
+            row = SiteSetting(
+                key="suggest_event_required_reach_group_id",
+                value=str(body.suggest_event_required_reach_group_id),
+            )
+        session.add(row)
 
     # Notification global gates.
     if body.event_reminders_enabled is not None:

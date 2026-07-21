@@ -1,0 +1,5 @@
+# Auto-detection is intentionally OFF so the scenario exercises the manual
+# "Scan now" action in the Duplicates panel. Flip to true to instead observe
+# groups being created automatically as part of the sync in step 1.
+settings:
+  duplicate_auto_detect_enabled: false

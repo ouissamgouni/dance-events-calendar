@@ -1,0 +1,168 @@
+test_plan:
+  name: "Duplicates Management — Admin Duplicate Review Workflow"
+  description: >
+    Verify the admin "Duplicates" panel end-to-end: on-demand scanning of
+    upcoming events for near-duplicate titles, manual flagging of pairs the
+    similarity check misses, per-event "Keep" resolution (which blocks and
+    tags the rejected sibling with a reason), group dismissal ("not
+    duplicates") which is sticky across future scans, the scan history log,
+    and the "Potential duplicates" section on the admin event detail panel.
+
+    Uses 2 calendars: "salsa-primary" (canonical) and "community-listings"
+    (re-posts the same nights under similar or, in one case, very
+    different wording). 3 candidate pairs are seeded:
+      - Pair A (dup-a-primary / dup-a-aggregator): near-identical titles —
+        auto-detectable by the title-similarity scan.
+      - Pair B (dup-b-primary / dup-b-aggregator): near-identical titles —
+        auto-detectable, used to exercise the "dismiss" flow instead of
+        "keep".
+      - Pair K (dup-k-primary / dup-k-aggregator): same real event, but
+        deliberately dissimilar titles — the similarity scan will NOT
+        group these; only the admin's manual "Flag as Duplicates" bulk
+        action can.
+    unique-tango has no duplicate and must never appear in any group.
+
+  preconditions:
+    - "task start:scenario SCENARIO=duplicates-management"
+    - "task db:up && task db:migrate"
+    - "settings.yaml seeds duplicate_auto_detect_enabled: false — duplicates are only found via the manual 'Scan now' action or manual flagging, not automatically during sync."
+    - "Signed in as admin (Dev Mock)."
+
+  steps:
+    # ── Sync brings events in with no groups yet (auto-detect is off) ──
+    - id: 1
+      title: "Sync brings in 7 events, no duplicate groups yet"
+      description: >
+        Trigger a manual sync from the admin Calendars panel (or
+        POST /api/admin/sync). Then open the admin "Duplicates" panel.
+      expected: >
+        GET /api/events returns 7 upcoming events. The "Duplicates" button
+        in the admin action bar shows no pending-count badge. The Pending
+        tab of the Duplicates panel is empty.
+
+    # ── Manual full scan finds the 2 similar-title pairs ────────────────
+    - id: 2
+      title: "'Scan now' finds pair A and pair B, but not pair K"
+      description: >
+        In the Duplicates panel, click "Scan now".
+      expected: >
+        POST /api/admin/duplicates/scan runs a full scan. Two pending
+        groups appear in the Pending tab:
+        - one containing "Friday Salsa Social at Le Balajo" (dup-a-primary)
+          and "Friday Salsa Social - Le Balajo" (dup-a-aggregator)
+        - one containing "Bachata Sensual Workshop with Maria"
+          (dup-b-primary) and "Bachata Sensual Workshop - Maria"
+          (dup-b-aggregator)
+        Neither dup-k-primary nor dup-k-aggregator ("Kizomba Fusion Night"
+        / "Monthly Kiz and Afro Social") appear in any group — their
+        titles are too dissimilar for the automatic check. unique-tango
+        ("Tango Milonga Under the Stars") does not appear either. The
+        Duplicates button badge now shows "2".
+
+    - id: 3
+      title: "History tab logs the full scan"
+      description: "Switch to the History tab in the Duplicates panel."
+      expected: >
+        The most recent entry shows scan_type "full", status "completed",
+        "2 candidates found, 2 group(s) created", and a finished timestamp.
+
+    # ── Event detail panel surfaces the "Potential duplicates" section ──
+    - id: 4
+      title: "Opening an event from a group shows its duplicate candidate"
+      description: >
+        In the Pending tab, click the title "Friday Salsa Social at Le
+        Balajo" (dup-a-primary).
+      expected: >
+        The admin event detail side panel opens for dup-a-primary and
+        shows a "Potential duplicates" section listing
+        "Friday Salsa Social - Le Balajo" (dup-a-aggregator) with a
+        "Keep this event" and "Not duplicates" action.
+
+    # ── Keep resolves the group and blocks the rejected sibling ─────────
+    - id: 5
+      title: "'Keep' resolves pair A and blocks the rejected sibling"
+      description: >
+        From either the event detail panel or the Duplicates panel group
+        card, click "Keep" for dup-a-primary.
+      expected: >
+        POST /api/admin/duplicates/{id}/keep returns the group with
+        status "resolved" and kept_event_id = dup-a-primary. The group
+        moves from Pending to the Resolved tab, showing dup-a-primary as
+        "kept" and dup-a-aggregator as "rejected" with reason
+        "Duplicate of dup-a-primary — Friday Salsa Social at Le Balajo".
+        dup-a-aggregator is now hidden: it is blocked (is_hidden=true,
+        a BlockedEvent row exists) and no longer appears in
+        GET /api/events or the public Explorer view. The Duplicates
+        button badge drops to "1".
+
+    # ── Dismiss keeps both events, and the decision is sticky ───────────
+    - id: 6
+      title: "'Not duplicates — dismiss group' keeps both events untouched"
+      description: >
+        On the remaining pending group (Bachata Sensual Workshop), click
+        "Not duplicates — dismiss group".
+      expected: >
+        POST /api/admin/duplicates/{id}/dismiss returns status
+        "dismissed". The group moves to the Resolved tab (shown as
+        dismissed). Both dup-b-primary and dup-b-aggregator remain
+        visible and unblocked in GET /api/events. The Duplicates button
+        badge drops to "0".
+
+    - id: 7
+      title: "Re-scanning does not recreate the dismissed pair's group"
+      description: >
+        Click "Scan now" again in the Duplicates panel.
+      expected: >
+        The Pending tab remains empty afterwards — dup-b-primary and
+        dup-b-aggregator already co-occurred in a group once (now
+        dismissed), so the scan does not recreate a group for that pair.
+        The History tab shows a second "full" scan entry with
+        "1 candidate found, 0 group(s) created" (the pair is still a
+        title-similarity match — that's why it was found at all — but no
+        new group is created because the dismissal is sticky). dup-a's
+        pair is no longer even considered a candidate since
+        dup-a-aggregator is now hidden/blocked.
+
+    # ── Manual flagging catches the dissimilar-title pair ───────────────
+    - id: 8
+      title: "Bulk 'Flag as Duplicates' groups the dissimilar-title pair"
+      description: >
+        Open the Events panel. Multi-select "Kizomba Fusion Night -
+        Session Latina" (dup-k-primary) and "Monthly Kiz and Afro Social"
+        (dup-k-aggregator). Click "Flag as Duplicates".
+      expected: >
+        POST /api/admin/duplicates/manual creates a new pending group
+        with source "manual" containing both events. It appears in the
+        Duplicates panel's Pending tab. The Duplicates button badge shows
+        "1". A toast confirms "Flagged 2 event(s) as duplicates."
+
+    - id: 9
+      title: "'Keep' resolves the manually-flagged group the same way"
+      description: >
+        In the Duplicates panel, click "Keep" for dup-k-primary on the
+        manual group.
+      expected: >
+        The group becomes "resolved" with kept_event_id = dup-k-primary.
+        dup-k-aggregator is now hidden/blocked with reason
+        "Duplicate of dup-k-primary — Kizomba Fusion Night - Session
+        Latina". The Duplicates button badge returns to "0".
+
+    # ── Final state check ───────────────────────────────────────────────
+    - id: 10
+      title: "History tab lists all 3 scans; Resolved tab lists all 3 groups"
+      description: >
+        Review the History and Resolved tabs of the Duplicates panel.
+      expected: >
+        History shows 3 entries: 2 "full" scans and 1 "manual_pair" scan,
+        in reverse-chronological order. Resolved shows 3 groups: pair A
+        (resolved), pair B (dismissed), pair K (resolved).
+
+    - id: 11
+      title: "Only the 2 rejected events are hidden; the unique event is untouched"
+      description: "Call GET /api/events (public, unauthenticated)."
+      expected: >
+        5 events are returned: dup-a-primary, dup-b-primary,
+        dup-b-aggregator, dup-k-primary, unique-tango ("Tango Milonga
+        Under the Stars"). dup-a-aggregator and dup-k-aggregator are
+        excluded. unique-tango never appeared in any duplicate group at
+        any point in this test.

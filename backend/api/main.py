@@ -12,6 +12,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from backend.api.rate_limit import client_ip
 from backend.api.routes.admin import router as admin_router
+from backend.api.routes.admin_duplicates import router as admin_duplicates_router
 from backend.api.routes.attendance import router as attendance_router
 from backend.api.routes.auth import router as auth_router
 from backend.api.routes.config import router as config_router
@@ -183,6 +184,7 @@ app.include_router(tracking_router)
 app.include_router(attendance_router)
 app.include_router(sharing_router)
 app.include_router(admin_router)
+app.include_router(admin_duplicates_router)
 app.include_router(settings_router)
 app.include_router(config_router)
 app.include_router(suggestions_router)

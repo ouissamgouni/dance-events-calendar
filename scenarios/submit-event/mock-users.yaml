@@ -1,6 +1,19 @@
 # Mock users pre-seeded for this scenario.
+# Dev User is the signed-in submitter who marks themselves "going" on
+# their own suggested event with a "friends" audience. Jamie follows
+# Dev User (approved) so the social_activity notification fan-out to
+# friends can be exercised once the suggestion is approved and the
+# submitter's Going status goes live.
 users:
   - email: dev-user@example.com
     name: Dev User
+    handle: dev-user
+    account_visibility: public
   - email: g.ouissam@gmail.com # matches ADMIN_EMAIL → admin badge on /account
     name: Admin
+    handle: admin
+    account_visibility: public
+  - email: jamie@example.com
+    name: Jamie Lee
+    handle: jamie
+    account_visibility: public

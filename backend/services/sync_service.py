@@ -29,6 +29,7 @@ def compute_content_hash(title: str, start: datetime, location: str | None) -> s
 
 
 from backend.services.calendar.base import BaseCalendarService
+from backend.services.duplicate_detection import maybe_detect_duplicates_for_event
 from backend.services.pipeline.base import EnrichmentPipeline
 from backend.services.pipeline.stages.geocoding import GeocodingStage
 from backend.services.pipeline.stages.link_extraction import LinkExtractionStage
@@ -419,6 +420,7 @@ class SyncService:
         duplicates_merged = 0
         needs_enrichment: list[str] = []
         dedup_entries: list[dict] = []
+        duplicate_scan_event_ids: list[str] = []
 
         for event in result.events:
             content_hash = compute_content_hash(
@@ -457,6 +459,8 @@ class SyncService:
                 # Track this calendar as a source (ignore if already recorded)
                 _upsert_calendar_source(session, event.event_id, cal.calendar_id)
                 upserted += 1
+                if existing.title != event.title or existing.start != event.start:
+                    duplicate_scan_event_ids.append(event.event_id)
             else:
                 # --- Unknown Google event ID: check for content-hash duplicate ---
                 canonical = session.exec(
@@ -516,6 +520,7 @@ class SyncService:
                     if event.location or event.description:
                         needs_enrichment.append(event.event_id)
                     upserted += 1
+                    duplicate_scan_event_ids.append(event.event_id)
 
         deleted = 0
         for event_id in result.deleted_event_ids:
@@ -532,6 +537,13 @@ class SyncService:
 
         # Commit events immediately — visible to API consumers now
         session.commit()
+
+        # Auto-detect near-duplicates for newly created/retitled/rescheduled
+        # events. No-op unless the ``duplicate_auto_detect_enabled`` site
+        # setting is on.
+        for event_id in duplicate_scan_event_ids:
+            maybe_detect_duplicates_for_event(session, event_id)
+
         logger.info(
             "Synced calendar %s: %d upserted, %d deleted, %d duplicates merged",
             cal.calendar_id,

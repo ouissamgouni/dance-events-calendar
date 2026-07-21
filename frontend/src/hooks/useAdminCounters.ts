@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { fetchAdminOrganizerClaims, fetchAdminPromoCodes, fetchAdminRatings, fetchAdminTagSuggestionCount, fetchEventFilterOptions } from '../api';
+import { fetchAdminOrganizerClaims, fetchAdminPromoCodes, fetchAdminRatings, fetchAdminTagSuggestionCount, fetchDuplicateGroups, fetchEventFilterOptions } from '../api';
 import { useAdminPrefs } from '../context/AdminPrefsContext';
 
 export interface AdminCounters {
@@ -25,6 +25,7 @@ export interface AdminCounters {
     feedbackPending: number;
     organizerClaimsPending: number;
     promoCodesPending: number;
+    duplicatesPending: number;
 }
 
 const ZERO: AdminCounters = {
@@ -34,6 +35,7 @@ const ZERO: AdminCounters = {
     feedbackPending: 0,
     organizerClaimsPending: 0,
     promoCodesPending: 0,
+    duplicatesPending: 0,
 };
 
 /**
@@ -97,6 +99,15 @@ export function useAdminCounters(): { counters: AdminCounters; refresh: () => vo
                 setCounters((prev) => ({
                     ...prev,
                     promoCodesPending: rows.length,
+                })),
+            )
+            .catch(() => undefined);
+
+        fetchDuplicateGroups('pending')
+            .then((res) =>
+                setCounters((prev) => ({
+                    ...prev,
+                    duplicatesPending: res.total,
                 })),
             )
             .catch(() => undefined);

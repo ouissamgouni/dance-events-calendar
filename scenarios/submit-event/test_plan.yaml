@@ -1,14 +1,20 @@
 # Event Suggestions — QA Test Plan
 # ===================================
-# Validates the full event suggestion workflow: public submission,
-# admin review, approve/reject, and Google Calendar sync.
+# Validates the full event suggestion workflow: the stepped collapsible
+# public submission form (with required tags, non-blocking geocode
+# warning, price/promo split, Going toggle), signed-in vs. anonymous
+# visibility, admin review, approve/reject, and notification fan-out to
+# friends.
 
 test_plan:
   name: "Event Suggestions — Full Workflow QA"
   description: >
-    End-to-end test of the event suggestion feature: public form submission with
-    honeypot, admin review panel, approve/reject flows, structured links, and
-    sync-to-Google (mock).
+    End-to-end test of the event suggestion feature: the stepped "Suggest an
+    Event" form, immediate visibility for signed-in submitters (pending
+    review) vs. anonymous submitters (invisible until approved), admin
+    review/approve/reject, rejection hard-block, and social_activity
+    notification fan-out to friends when a signed-in submitter's event goes
+    live with them marked "going".
 
   steps:
     - id: 1
@@ -22,51 +28,143 @@ test_plan:
       verification: "Button is visible and clickable"
 
     - id: 2
-      title: "Suggest modal opens with full form"
+      title: "Suggest modal opens as a stepped, collapsible form"
       description: >
-        Click "Suggest an Event". Verify the modal opens with all form fields.
+        Click "Suggest an Event" while signed out. Verify the modal opens with
+        collapsible sections: Name/dates/location, Description, Links, Tags,
+        Price, Promo code, RSVP and contact. Only the active section is
+        expanded; there are no numbered steps, no "Back" buttons, and no
+        "Edit" buttons — clicking a collapsed section's header opens it.
       expected: >
-        Modal shows: title, description, location (with autocomplete), links
-        (dynamic rows), start, end, all_day checkbox, name, email.
-      verification: "All fields present, modal renders cleanly"
+        Sections render collapsed except the first ("Name, dates, location").
+        Clicking any collapsed section header expands it; clicking it again
+        (or another section) collapses/expands accordingly.
+      verification: "Sections toggle open on header click; no Back/Edit buttons present"
 
     - id: 3
-      title: "Submit empty form shows validation"
+      title: "Submit empty basics section shows a warning, not a hard block"
       description: >
-        Click Submit without filling in any fields.
+        Click Next on the Name/dates/location section without filling anything.
       expected: >
-        Title field shows required validation error. Form does not submit.
-      verification: "Client-side validation triggers for title"
+        A warning message (amber background/text) appears at the bottom of the
+        section explaining title/dates/location are required. The section
+        stays open.
+      verification: "Warning renders in the section's own footer, not a modal-wide banner"
 
     - id: 4
-      title: "Location autocomplete works"
+      title: "Location without a validated geocode is a warning, not a blocker"
       description: >
-        Type a location like "Berlin" in the location field.
+        Fill title/dates. Type a location but do NOT select a suggestion from
+        the autocomplete dropdown. Click Next.
       expected: >
-        Address suggestions appear in a dropdown after a short debounce.
-        Selecting one populates the field.
-      verification: "Nominatim geocode endpoint responds, suggestions show"
+        A non-blocking amber warning appears ("We couldn't verify this
+        address…"), but clicking Next still advances to the Description
+        section since the address text itself is non-empty.
+      verification: "Section advances despite unresolved geocode; warning is advisory only"
 
     - id: 5
-      title: "Submit full suggestion"
+      title: "Collapsed basics section shows name + location + dates preview"
       description: >
-        Fill in: title "Salsa Open Air", dates, description, select location
-        from autocomplete, add a link (https://example.com, "Tickets"), fill
-        name and email. Submit.
+        After advancing past the basics section, inspect its collapsed header.
       expected: >
-        Success message "Thank you! Your suggestion is under review." appears.
-        Form resets or closes.
-      verification: "201 response, success UI shown"
+        The collapsed header shows the event title, plus a single line with a
+        truncated location preview (city/country if identifiable) and the
+        formatted date/time range, and a green checkmark to the left of the
+        title (since the section is valid).
+      verification: "Collapsed summary line shows location + dates together; checkmark icon visible"
 
     - id: 6
-      title: "Submit minimal suggestion"
+      title: "Description section preview truncates to 2 lines"
       description: >
-        Open suggest modal again. Fill only title + start + end. Submit.
+        Enter a long, multi-paragraph description and advance to Links.
       expected: >
-        Success message appears. Only required fields needed.
-      verification: "Minimal submission succeeds"
+        The collapsed Description section shows only a 2-line clamped preview
+        of the text (no scrollbar, ellipsis-style overflow).
+      verification: "Description preview never exceeds 2 visual lines"
 
     - id: 7
+      title: "Link URL field is pre-filled with https://"
+      description: >
+        Open the Links section.
+      expected: >
+        The URL input already contains "https://" so the user only needs to
+        type the rest of the address.
+      verification: "Input default value is 'https://'"
+
+    - id: 8
+      title: "Required tags block Next; collapsed tags show pill previews"
+      description: >
+        Advance to Tags without selecting a dance-style or reach tag, click
+        Next (warning shown), then select "Salsa" and "Local" and advance.
+      expected: >
+        A warning appears until both required tag groups have a selection.
+        Once advanced, the collapsed Tags section shows colored pill previews
+        reusing the same pill style as the tag picker.
+      verification: "Warning clears once required tags selected; collapsed pills render"
+
+    - id: 9
+      title: "Price section is compact and inputs sit on one line"
+      description: >
+        Open the Price section, uncheck "Free event".
+      expected: >
+        Min, Max, and Currency inputs are narrow and sit side-by-side on one
+        row (including on mobile viewport widths).
+      verification: "Min/Max/Currency inputs share a single flex row at 375px width"
+
+    - id: 10
+      title: "Promo code has its own section"
+      description: >
+        Advance past Price.
+      expected: >
+        A separate "Promo code" section appears (distinct from Price) with
+        promo code, promo URL, and promo description fields.
+      verification: "Promo code section exists independently of Price"
+
+    - id: 11
+      title: "Going audience selector is compact on mobile"
+      description: >
+        Sign in as Dev User (dev-user@example.com). Open the RSVP section.
+      expected: >
+        The "Mark me going by default" checkbox and the audience selector
+        (Friends/Public/Private) sit on one row; the selector is narrow enough
+        to avoid wrapping at mobile widths (375px).
+      verification: "Going checkbox + audience select share one row without overflow"
+
+    - id: 12
+      title: "Signed-in submission is immediately live (pending review)"
+      description: >
+        As Dev User, fill out the whole form for "Salsa Open Air" with Going
+        checked (audience: Friends) and submit.
+      expected: >
+        Success screen reads "Your event is live and under review." Navigating
+        back to Home shows the event immediately in the calendar/explorer view,
+        even though it is still pending admin approval.
+      verification: "Event appears on Home immediately for the signed-in submitter's own submission"
+
+    - id: 13
+      title: "Friend fan-out notification on signed-in Going submission"
+      description: >
+        Jamie (who follows Dev User) checks their in-app notifications after
+        Dev User's step-12 submission goes live with Going=friends.
+      expected: >
+        Jamie receives a social_activity in-app notification referencing Dev
+        User going to "Salsa Open Air", the same fan-out mechanism used for
+        regular attendance toggles.
+      verification: "Notification row created for follower Jamie via the notification scheduler"
+
+    - id: 14
+      title: "Anonymous submission is NOT visible until approved"
+      description: >
+        Sign out. Submit a second suggestion ("Bachata Night") anonymously,
+        leaving Going unavailable (no RSVP section audience for anon users).
+      expected: >
+        Success screen reads "Thank you! Your suggestion is under review."
+        (not the "is live" message). Navigating Home does NOT show "Bachata
+        Night" anywhere, since anonymous submissions never create a live
+        event before admin approval.
+      verification: "No CachedEvent/UI entry exists for the anonymous suggestion pre-approval"
+
+    - id: 15
       title: "Admin login"
       description: >
         Use the /login dev sign-in to access the admin panel ("Sign in as Admin"
@@ -75,75 +173,58 @@ test_plan:
         Admin page loads with calendar sources, settings, feature flags.
       verification: "Admin page renders with action bar"
 
-    - id: 8
+    - id: 16
       title: "Suggestions panel shows pending items"
       description: >
         Click the "Suggestions" button in the admin action bar.
       expected: >
-        Slide-out panel opens. Two pending suggestions are listed (from steps 5
-        and 6). Pending tab is active with count badge.
+        Slide-out panel opens. Both pending suggestions ("Salsa Open Air" and
+        "Bachata Night") are listed with amber pending badges.
       verification: "Panel shows 2 suggestions with amber pending badges"
 
-    - id: 9
-      title: "Review modal shows details + metadata"
+    - id: 17
+      title: "Review modal shows details, tags, price/promo, and metadata"
       description: >
-        Click the first suggestion (Salsa Open Air) in the panel.
+        Click "Salsa Open Air" in the panel.
       expected: >
-        Review modal opens showing all event fields, the link, and submitter
-        metadata section (IP, timezone, screen size, etc.).
-      verification: "All fields + metadata section visible"
+        Review modal shows all event fields, the selected tags, price/promo
+        details, and submitter metadata (IP, timezone, screen size, etc.).
+      verification: "All fields, tags, price/promo, and metadata section visible"
 
-    - id: 10
-      title: "Edit suggestion title"
-      description: >
-        In the review modal, change the title to "Salsa Open Air Festival".
-        Click "Save Changes".
-      expected: >
-        Title updates. No error shown.
-      verification: "PATCH request succeeds, title reflected in panel"
-
-    - id: 11
-      title: "Approve suggestion to Movida calendar"
+    - id: 18
+      title: "Approve signed-in submission to Movida calendar"
       description: >
         Select "Movida" from the calendar dropdown. Click "Approve".
       expected: >
-        Status badge changes to green "approved". assigned_calendar_id set. A
-        CachedEvent is created (visible on Home page).
-      verification: "Status approved, event appears in public calendar"
+        Status badge changes to green "approved". The already-live CachedEvent
+        is confirmed/kept associated with the approved suggestion.
+      verification: "Status approved; event remains visible on Home"
 
-    - id: 12
-      title: "Approved event visible on Home page"
+    - id: 19
+      title: "Approve anonymous submission — event becomes visible"
       description: >
-        Navigate back to the Home page.
+        Click "Bachata Night" (the anonymous suggestion). Approve it to the
+        Bachata Events calendar.
       expected: >
-        The approved event "Salsa Open Air Festival" appears in the
-        calendar/explorer view alongside the seed events.
-      verification: "Event shows in event list/calendar"
+        Status changes to green "approved". Navigating Home now shows
+        "Bachata Night" for the first time (it was invisible before approval).
+      verification: "Anonymous event appears on Home only after approval"
 
-    - id: 13
-      title: "Sync to Google button on approved suggestion"
+    - id: 20
+      title: "Reject hard-blocks re-import"
       description: >
-        Go back to Admin → Suggestions. Click the approved suggestion.
+        Submit a third anonymous suggestion duplicating an existing event
+        title. In Admin → Suggestions, reject it with notes "Duplicate event".
       expected: >
-        "Sync to Google" button is visible. Click it. Status shows "✓ Synced to
-        Google" after success (mock returns ID).
-      verification: "Sync button works, synced_to_google=true"
+        Status changes to red "rejected" with notes saved. The event stays
+        hidden and is blocked from being recreated by a later sync/import.
+      verification: "Status rejected; BlockedEvent-style suppression prevents reimport"
 
-    - id: 14
-      title: "Reject second suggestion"
-      description: >
-        Click the second suggestion (minimal one). Click "Reject". Add notes
-        "Duplicate event" and confirm.
-      expected: >
-        Status changes to red "rejected". Admin notes saved. reviewed_at
-        timestamp set.
-      verification: "Status rejected with notes"
-
-    - id: 15
+    - id: 21
       title: "Status filter tabs work"
       description: >
         Use the filter tabs at the top of the Suggestions panel.
       expected: >
-        All: 2 suggestions. Pending: 0. Approved: 1. Rejected: 1. Counts in tab
+        All: 3 suggestions. Pending: 0. Approved: 2. Rejected: 1. Counts in tab
         labels match.
       verification: "Filter tabs correctly filter and show counts"

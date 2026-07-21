@@ -1,0 +1,108 @@
+base_week: 0
+events:
+  # ── Pair A: near-identical titles, close start times, 2 calendars ──────
+  # Should be auto-detected as candidates (title similarity >= 0.72, start
+  # times within 36h of each other).
+  - id: dup-a-primary
+    calendar_id: salsa-primary
+    title: Friday Salsa Social at Le Balajo
+    description: Weekly salsa social. All levels welcome, live DJ from 21:00.
+    location: Le Balajo, 9 Rue de Lappe, 75011 Paris, France
+    latitude: 48.8533
+    longitude: 2.3716
+    start: w1 Fri 21:00
+    end: w1 Sat 01:00
+    price_is_free: true
+    tags:
+      - reach:local
+
+  - id: dup-a-aggregator
+    calendar_id: community-listings
+    title: Friday Salsa Social - Le Balajo
+    description: Salsa social night, all levels. Doors open at 9pm.
+    location: Le Balajo, 9 Rue de Lappe, 75011 Paris, France
+    latitude: 48.8533
+    longitude: 2.3716
+    start: w1 Fri 21:30
+    end: w1 Sat 01:30
+    price_is_free: true
+    tags:
+      - reach:regional
+
+  # ── Pair B: same idea, second near-duplicate pair ───────────────────────
+  - id: dup-b-primary
+    calendar_id: salsa-primary
+    title: Bachata Sensual Workshop with Maria
+    description: Intermediate bachata sensual technique workshop with Maria.
+    location: Studio Latina, 15 Rue de la Roquette, 75011 Paris, France
+    latitude: 48.8534
+    longitude: 2.3741
+    start: w1 Sat 15:00
+    end: w1 Sat 18:00
+    price_is_free: false
+    price_min: 20
+    price_currency: EUR
+    tags:
+      - reach:local
+
+  - id: dup-b-aggregator
+    calendar_id: community-listings
+    title: Bachata Sensual Workshop - Maria
+    description: Bachata sensual technique session, register on the door.
+    location: Studio Latina, 15 Rue de la Roquette, 75011 Paris, France
+    latitude: 48.8534
+    longitude: 2.3741
+    start: w1 Sat 15:00
+    end: w1 Sat 18:00
+    price_is_free: false
+    price_min: 20
+    price_currency: EUR
+    tags:
+      - reach:regional
+
+  # ── Pair K: same real event, but titles are too dissimilar for the
+  # auto-similarity check (ratio < 0.72) — only catchable via the admin's
+  # manual "Flag as Duplicates" bulk action in the Events panel. ──────────
+  - id: dup-k-primary
+    calendar_id: salsa-primary
+    title: Kizomba Fusion Night - Session Latina
+    description: Kizomba and Afro-fusion night with resident DJs.
+    location: Session Latina, 8 Rue de Charonne, 75011 Paris, France
+    latitude: 48.8544
+    longitude: 2.3778
+    start: w1 Sun 20:00
+    end: w1 Mon 00:00
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+    tags:
+      - reach:local
+
+  - id: dup-k-aggregator
+    calendar_id: community-listings
+    title: Monthly Kiz and Afro Social
+    description: Monthly kizomba and afro social, same venue as always.
+    location: Session Latina, 8 Rue de Charonne, 75011 Paris, France
+    latitude: 48.8544
+    longitude: 2.3778
+    start: w1 Sun 20:30
+    end: w1 Mon 00:30
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+    tags:
+      - reach:regional
+
+  # ── Unique event — must never appear in any duplicate group ────────────
+  - id: unique-tango
+    calendar_id: salsa-primary
+    title: Tango Milonga Under the Stars
+    description: Outdoor tango milonga, weather permitting.
+    location: Jardins du Trocadéro, 75016 Paris, France
+    latitude: 48.8619
+    longitude: 2.2891
+    start: w2 Fri 20:00
+    end: w2 Sat 00:00
+    price_is_free: true
+    tags:
+      - reach:international

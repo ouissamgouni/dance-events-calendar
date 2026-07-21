@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { blockEvent, fetchAdminEvent, unblockEvent, updateEvent } from '../api';
+import { blockEvent, dismissDuplicateGroup, fetchAdminEvent, fetchEventDuplicateCandidates, keepDuplicateEvent, unblockEvent, updateEvent } from '../api';
 import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
 import AdminEventDetailContent from './AdminEventDetailContent';
 import EventMap from './EventMap';
-import type { CalendarEvent } from '../types';
+import type { CalendarEvent, DuplicateGroup } from '../types';
 
 interface Props {
     eventId: string | null;
@@ -27,6 +27,11 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
     const [confirmAction, setConfirmAction] = useState<'block' | 'restore' | null>(null);
     const [actionLoading, setActionLoading] = useState(false);
 
+    // Potential duplicates
+    const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[]>([]);
+    const [duplicatesLoading, setDuplicatesLoading] = useState(false);
+    const [duplicateActing, setDuplicateActing] = useState<number | null>(null);
+
     const isOpen = eventId !== null;
 
     useEffect(() => {
@@ -43,6 +48,18 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
             .then((e) => { setEvent(e); setTitleValue(e.title); })
             .catch(() => setError(true))
             .finally(() => setLoading(false));
+    }, [eventId]);
+
+    useEffect(() => {
+        if (!eventId) {
+            setDuplicateGroups([]);
+            return;
+        }
+        setDuplicatesLoading(true);
+        fetchEventDuplicateCandidates(eventId)
+            .then((res) => setDuplicateGroups(res.items))
+            .catch(() => setDuplicateGroups([]))
+            .finally(() => setDuplicatesLoading(false));
     }, [eventId]);
 
     // Keyboard close
@@ -123,6 +140,28 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
             onEventUpdated?.(updated.event_id);
             notifyAdminDataChanged();
         } finally { setActionLoading(false); setConfirmAction(null); }
+    };
+
+    const handleKeepDuplicate = async (groupId: number, keepEventId: string) => {
+        setDuplicateActing(groupId);
+        try {
+            const updated = await keepDuplicateEvent(groupId, keepEventId);
+            setDuplicateGroups((prev) => prev.map((g) => (g.id === groupId ? updated : g)));
+            notifyAdminDataChanged();
+        } finally {
+            setDuplicateActing(null);
+        }
+    };
+
+    const handleDismissDuplicateGroup = async (groupId: number) => {
+        setDuplicateActing(groupId);
+        try {
+            const updated = await dismissDuplicateGroup(groupId);
+            setDuplicateGroups((prev) => prev.map((g) => (g.id === groupId ? updated : g)));
+            notifyAdminDataChanged();
+        } finally {
+            setDuplicateActing(null);
+        }
     };
 
     const handleTitleBlur = async () => {
@@ -243,6 +282,52 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                 onTagsUpdated={handleTagsUpdated}
                                 compact
                             />
+                            {!duplicatesLoading && duplicateGroups.length > 0 && (
+                                <div className="mt-4 border border-amber-200 bg-amber-50 overflow-hidden">
+                                    <p className="px-3 py-2 text-[10px] font-semibold text-amber-800 uppercase tracking-wide">
+                                        Potential duplicates
+                                    </p>
+                                    <ul className="divide-y divide-amber-100">
+                                        {duplicateGroups.map((g) => (
+                                            <li key={g.id} className="px-3 py-2">
+                                                <div className="flex items-center gap-2 flex-wrap mb-1">
+                                                    <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 bg-amber-100 text-amber-700">
+                                                        {g.status}
+                                                    </span>
+                                                    <span className="text-[10px] uppercase text-amber-600">{g.source}</span>
+                                                </div>
+                                                <ul className="space-y-1">
+                                                    {g.events
+                                                        .filter((ev) => ev.event_id !== event.event_id)
+                                                        .map((ev) => (
+                                                            <li key={ev.event_id} className="text-xs text-slate-700">
+                                                                {ev.title} — {new Date(ev.start).toLocaleString()}
+                                                            </li>
+                                                        ))}
+                                                </ul>
+                                                {g.status === 'pending' && (
+                                                    <div className="mt-1.5 flex items-center gap-2">
+                                                        <button
+                                                            disabled={duplicateActing === g.id}
+                                                            onClick={() => handleKeepDuplicate(g.id, event.event_id)}
+                                                            className="text-[11px] bg-blue-500 text-white px-2 py-1 hover:bg-blue-600 disabled:opacity-50"
+                                                        >
+                                                            Keep this event
+                                                        </button>
+                                                        <button
+                                                            disabled={duplicateActing === g.id}
+                                                            onClick={() => handleDismissDuplicateGroup(g.id)}
+                                                            className="text-[11px] text-amber-700 hover:text-amber-900 px-2 py-1 disabled:opacity-50"
+                                                        >
+                                                            Not duplicates
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
                             <div className="mt-4 border border-gray-200 overflow-hidden">
                                 {event.latitude != null && event.longitude != null ? (
                                     <div className="h-[300px]">
