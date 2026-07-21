@@ -27,12 +27,12 @@ function stubWebPushCapable() {
     writable: true,
   })
   Object.defineProperty(window, 'PushManager', {
-    value: function () {},
+    value: function () { },
     configurable: true,
     writable: true,
   })
   Object.defineProperty(window, 'Notification', {
-    value: function () {},
+    value: function () { },
     configurable: true,
     writable: true,
   })
@@ -59,10 +59,15 @@ describe('NotificationSettings', () => {
     await waitFor(() => expect(container).toBeEmptyDOMElement())
   })
 
-  it('renders the 3x2 feature x channel matrix', async () => {
+  it('renders the 4x2 feature x channel matrix', async () => {
     renderSignedIn()
-    // Six switches: three features x two channels.
-    for (const feature of ['Event reminders', 'Friends & social', 'Interest matches']) {
+    // Eight switches: four features x two channels.
+    for (const feature of [
+      'Event reminders',
+      'Friends & social',
+      'Interest matches',
+      'Promo codes',
+    ]) {
       expect(
         await screen.findByRole('switch', { name: `${feature} \u2014 email` }),
       ).toBeInTheDocument()
@@ -126,6 +131,8 @@ describe('NotificationSettings', () => {
         push_social_activity_enabled: false,
         email_interest_matches_enabled: false,
         push_interest_matches_enabled: false,
+        email_promo_codes_enabled: false,
+        push_promo_codes_enabled: false,
       }),
     )
   })

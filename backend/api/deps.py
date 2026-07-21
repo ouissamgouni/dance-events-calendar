@@ -162,6 +162,28 @@ def require_flag(name: str):
     return _dep
 
 
+def require_promo_codes_enabled_for_event(
+    event_id: str, session: Session = Depends(get_session)
+) -> None:
+    """404 unless promo codes are enabled for this specific event.
+
+    Per-event ``CachedEvent.show_promo_override`` takes precedence over the
+    global ``promo_codes_enabled`` site setting when set (``True`` always
+    allows, ``False`` always 404s); ``None`` means inherit the global flag.
+    """
+    from backend.db.models import CachedEvent, SiteSetting
+
+    event = session.get(CachedEvent, event_id)
+    override = event.show_promo_override if event else None
+    if override is True:
+        return
+    if override is False:
+        raise HTTPException(status_code=404, detail="Not found")
+    row = session.get(SiteSetting, "promo_codes_enabled")
+    if not row or row.value.lower() != "true":
+        raise HTTPException(status_code=404, detail="Not found")
+
+
 def create_session_token(
     email: str, name: str, user_id: str | None = None, is_admin: bool = False
 ) -> str:

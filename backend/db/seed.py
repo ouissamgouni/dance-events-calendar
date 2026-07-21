@@ -564,6 +564,10 @@ class DatabaseSeeder:
                 existing.review_status = "reviewed"
                 if "is_hidden" in evt_data:
                     existing.is_hidden = evt_data["is_hidden"]
+                if "show_price_override" in evt_data:
+                    existing.show_price_override = evt_data["show_price_override"]
+                if "show_promo_override" in evt_data:
+                    existing.show_promo_override = evt_data["show_promo_override"]
                 self.session.add(existing)
                 logger.info("Updated event: %s", evt_data["title"])
             else:
@@ -586,6 +590,8 @@ class DatabaseSeeder:
                         price_is_free=evt_data.get("price_is_free", False),
                         review_status="reviewed",
                         is_hidden=evt_data.get("is_hidden", False),
+                        show_price_override=evt_data.get("show_price_override"),
+                        show_promo_override=evt_data.get("show_promo_override"),
                     )
                 )
                 logger.info("Created event: %s", evt_data["title"])

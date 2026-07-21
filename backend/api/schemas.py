@@ -72,6 +72,11 @@ class EventResponse(BaseModel):
     # code. Powers the small "%" badge on event cards; gated by the
     # ``promo_codes_enabled`` site setting (always False when off).
     has_active_promo_codes: bool = False
+    # Per-event overrides for the ``show_prices`` / ``promo_codes_enabled``
+    # global site settings. ``None`` means "inherit the global flag";
+    # ``True``/``False`` force the section on/off for this event only.
+    show_price_override: Optional[bool] = None
+    show_promo_override: Optional[bool] = None
     # Verified organizer mini-profile when an admin-approved
     # OrganizerClaimEvent maps this event to a user. Gated by the
     # ``organizer_claims_enabled`` site setting (always None when off).
@@ -915,6 +920,8 @@ class EventUpdateRequest(BaseModel):
     calendar_id: Optional[str] = None
     review_status: Optional[str] = Field(default=None, pattern="^(pending|reviewed)$")
     is_hidden: Optional[bool] = None
+    show_price_override: Optional[bool] = None
+    show_promo_override: Optional[bool] = None
 
 
 class GeocodeSuggestion(BaseModel):
@@ -958,7 +965,9 @@ class EventSuggestionCreate(BaseModel):
     suggested_tag_ids: list[int] = Field(default_factory=list)
     suggested_new_tags: list[NewTagSuggestionItem] = Field(default_factory=list)
     going: bool = False
-    going_audience: Optional[str] = Field(default=None, pattern="^(public|friends|private)$")
+    going_audience: Optional[str] = Field(
+        default=None, pattern="^(public|friends|private)$"
+    )
     promo_code: Optional[str] = Field(default=None, max_length=64)
     promo_description: Optional[str] = Field(default=None, max_length=200)
     promo_source_url: Optional[str] = Field(default=None, max_length=500)
@@ -2086,6 +2095,7 @@ class FoFSuggestionItem(BaseModel):
     is_admin_managed: bool = False
     mutual_friend_count: int = 0
     mutual_friends_preview: list[str] = []
+    followers_count: int = 0
 
 
 class FoFSuggestionsResponse(BaseModel):

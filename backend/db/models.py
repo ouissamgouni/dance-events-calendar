@@ -159,6 +159,10 @@ class User(SQLModel, table=True):
     push_event_reminders_enabled: bool = Field(default=True, nullable=False)
     push_social_activity_enabled: bool = Field(default=True, nullable=False)
     push_interest_matches_enabled: bool = Field(default=True, nullable=False)
+    # Promo codes added to an event the user saved (see promo_codes.py
+    # ``_fan_out_saved_event_promo_code``).
+    email_promo_codes_enabled: bool = Field(default=True, nullable=False)
+    push_promo_codes_enabled: bool = Field(default=True, nullable=False)
     # --- Interest Profiles & Interest-Event Notifications ---
     # Optional "home" location, used as the default center for radius-based
     # interest profiles. Nullable until the user sets it via preferences.
@@ -318,6 +322,12 @@ class CachedEvent(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     deleted_at: Optional[datetime] = Field(default=None, index=True)
     is_hidden: bool = Field(default=False, index=True)
+    # Per-event overrides for the ``show_prices`` / ``promo_codes_enabled``
+    # global site settings. ``None`` means "inherit the global flag";
+    # ``True``/``False`` force the section on/off for this event only,
+    # regardless of the global setting.
+    show_price_override: Optional[bool] = Field(default=None)
+    show_promo_override: Optional[bool] = Field(default=None)
     # Per-event organizer attribution. Set when an admin approves an
     # ``OrganizerClaimEvent`` row tying a user to this event. Independent
     # from ``User.is_verified_organizer`` (the account-level badge).

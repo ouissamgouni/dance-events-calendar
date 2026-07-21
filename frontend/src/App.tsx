@@ -42,6 +42,7 @@ const OnboardingFollow = lazy(() => import('./pages/OnboardingFollow'));
 const ReferralLanding = lazy(() => import('./pages/ReferralLanding'));
 const ForYouPage = lazy(() => import('./pages/ForYouPage'));
 const InstallPage = lazy(() => import('./pages/InstallPage'));
+const InvitePage = lazy(() => import('./pages/InvitePage'));
 import OnboardingGate from './components/OnboardingGate';
 import UserSearchBox from './components/UserSearchBox';
 import ExplorerEventSearch from './components/ExplorerEventSearch';
@@ -149,6 +150,7 @@ function AppShell() {
                 <Route path="/shared/:token" element={<SharedCalendarPage />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/install" element={<InstallPage />} />
+                <Route path="/invite" element={<InvitePage />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/account" element={<Account />} />
                 <Route

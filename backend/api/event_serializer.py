@@ -111,14 +111,23 @@ def serialize_events(
     except Exception:
         pass
 
-    events_with_promos: set[str] = set()
-    if promo_codes_enabled:
-        from datetime import datetime
+    from datetime import datetime
 
+    promo_eligible_ids = [
+        e.event_id
+        for e in events_list
+        if (
+            e.show_promo_override
+            if e.show_promo_override is not None
+            else promo_codes_enabled
+        )
+    ]
+    events_with_promos: set[str] = set()
+    if promo_eligible_ids:
         now = datetime.utcnow()
         promo_rows = session.exec(
             select(EventPromoCode.event_id)
-            .where(EventPromoCode.event_id.in_(event_ids))
+            .where(EventPromoCode.event_id.in_(promo_eligible_ids))
             .where(EventPromoCode.status == "approved")
             .where(
                 (EventPromoCode.expires_at.is_(None))
@@ -182,6 +191,8 @@ def serialize_events(
             tags=tags_map.get(e.event_id, []),
             has_active_promo_codes=e.event_id in events_with_promos,
             organizer=organizer_by_event.get(e.event_id),
+            show_price_override=e.show_price_override,
+            show_promo_override=e.show_promo_override,
         )
         for e in events_list
     ]

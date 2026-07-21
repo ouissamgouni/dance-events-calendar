@@ -5,3 +5,25 @@ follows:
   - follower: carol
     followee: alice
     status: approved
+  # Alice follows Bob back, making them mutual friends — Bob's digest
+  # suggestions are now ranked via Alice's network instead of the
+  # empty-mutuals curator fallback.
+  - follower: alice
+    followee: bob
+    status: approved
+  # Alice's network — surfaced as Bob's "People you may want to
+  # follow" suggestions (mutual_friend_count=1 via Alice).
+  - follower: alice
+    followee: diego
+    status: approved
+  - follower: alice
+    followee: elena
+    status: approved
+  - follower: alice
+    followee: curator-bachata
+    status: approved
+  # Extra follower so diego's suggestion row shows "2 followers"
+  # instead of 1, for a more representative "x followers" count.
+  - follower: carol
+    followee: diego
+    status: approved

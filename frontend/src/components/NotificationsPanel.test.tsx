@@ -92,6 +92,55 @@ describe('NotificationsPanel (event reminders)', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
+  it('renders the promo code added row copy and routes to the event on click', async () => {
+    server.use(
+      http.get('*/api/notifications', () =>
+        HttpResponse.json({
+          items: [
+            {
+              id: 43,
+              kind: 'promo_code_added',
+              event_id: 'ev-promo',
+              event_title: 'Rooftop Salsa Social',
+              event_start: null,
+              context: 'SAVE10',
+              actor: {
+                handle: 'alice',
+                display_name: 'Alice',
+                avatar_url: null,
+                is_verified_organizer: false,
+              },
+              created_at: '2026-06-25T10:00:00Z',
+              read_at: null,
+            },
+          ],
+          total: 1,
+          unread_count: 1,
+          limit: 20,
+          offset: 0,
+        }),
+      ),
+    )
+
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+
+    render(
+      <MemoryRouter>
+        <NotificationsPanel open onClose={onClose} />
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText(/promo code added/i)).toBeInTheDocument()
+    expect(screen.getByText(/rooftop salsa social/i)).toBeInTheDocument()
+    expect(screen.getByText(/code: save10/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /promo code added/i }))
+
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/event/ev-promo'))
+    expect(onClose).toHaveBeenCalled()
+  })
+
   it('marks everything read as soon as the panel opens (view = read)', async () => {
     server.use(
       http.get('*/api/notifications', () =>

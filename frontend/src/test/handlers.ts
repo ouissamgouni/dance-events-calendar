@@ -25,6 +25,8 @@ export function makeUser(overrides: Partial<AuthUser> = {}): AuthUser {
         push_event_reminders_enabled: false,
         push_social_activity_enabled: false,
         push_interest_matches_enabled: false,
+        email_promo_codes_enabled: true,
+        push_promo_codes_enabled: false,
         // Legacy mirrors returned by the server for one release.
         reminder_email_enabled: true,
         activity_email_enabled: true,
@@ -89,6 +91,8 @@ export const handlers = [
             push_event_reminders_enabled: false,
             push_social_activity_enabled: false,
             push_interest_matches_enabled: false,
+            email_promo_codes_enabled: true,
+            push_promo_codes_enabled: false,
             reminder_email_enabled: true,
             activity_email_enabled: true,
             push_enabled: false,

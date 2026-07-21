@@ -5,13 +5,22 @@
  * any existing row), renders a copy-to-clipboard link and an optional
  * native share trigger, plus invite stats.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchMyReferral, type ReferralResponse } from '../api';
 
-export default function ReferralCard() {
+type ReferralCardProps = {
+    /** Auto-triggers the native share sheet (falling back to a clipboard
+     * copy) once the referral link loads. Used by the `/invite` page so
+     * an "Invite a friend" email link lands on a page that immediately
+     * offers to share, instead of requiring an extra click. */
+    autoShare?: boolean;
+};
+
+export default function ReferralCard({ autoShare = false }: ReferralCardProps) {
     const [data, setData] = useState<ReferralResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
+    const autoTriggered = useRef(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -50,6 +59,16 @@ export default function ReferralCard() {
             // User dismissed share sheet; not an error.
         }
     }, [data, copy]);
+
+    useEffect(() => {
+        if (!autoShare || autoTriggered.current || !data) return;
+        autoTriggered.current = true;
+        // Copy is guaranteed to land the invitation link even in browsers/
+        // contexts where the native share sheet can't be invoked without a
+        // direct user gesture; share is attempted best-effort on top of it.
+        void copy();
+        void share();
+    }, [autoShare, data, copy, share]);
 
     return (
         <section className="border border-slate-200 bg-white p-6 mb-4">

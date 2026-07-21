@@ -7,10 +7,11 @@ import {
 } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
-import type { PromoCode } from '../types';
+import { isPromoSectionVisible } from '../utils/sectionVisibility';
+import type { CalendarEvent, PromoCode } from '../types';
 
 interface Props {
-    eventId: string;
+    event: CalendarEvent;
 }
 
 interface FormState {
@@ -31,8 +32,10 @@ function formatExpiry(iso: string | null): string {
     }
 }
 
-export function EventPromoCodes({ eventId }: Props) {
+export function EventPromoCodes({ event }: Props) {
+    const eventId = event.event_id;
     const { promoCodesEnabled } = useFeatureFlags();
+    const visible = isPromoSectionVisible(event, promoCodesEnabled);
     const { user } = useAuth();
     const [codes, setCodes] = useState<PromoCode[]>([]);
     const [loaded, setLoaded] = useState(false);
@@ -46,7 +49,7 @@ export function EventPromoCodes({ eventId }: Props) {
     const [toastMsg, setToastMsg] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!promoCodesEnabled) return;
+        if (!visible) return;
         let alive = true;
         fetchEventPromoCodes(eventId)
             .then((rows) => {
@@ -60,9 +63,9 @@ export function EventPromoCodes({ eventId }: Props) {
         return () => {
             alive = false;
         };
-    }, [eventId, promoCodesEnabled]);
+    }, [eventId, visible]);
 
-    if (!promoCodesEnabled) return null;
+    if (!visible) return null;
 
     const isAuthed = !!user;
 

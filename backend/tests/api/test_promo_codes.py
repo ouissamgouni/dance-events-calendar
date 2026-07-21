@@ -33,7 +33,11 @@ from backend.db.models import (  # noqa: E402
     CachedEvent,
     EventPromoCode,
     Notification,
+    NotificationDelivery,
     SiteSetting,
+    User,
+    UserEventAttendance,
+    UserSavedEvent,
 )
 
 
@@ -41,6 +45,10 @@ from backend.db.models import (  # noqa: E402
 # stub it out — engine creation needs POSTGRES_PASSWORD or DATABASE_URL,
 # neither of which the unit-test runner provides.
 promo_codes_module._notify_admin_promo = lambda _id: None
+# Same reasoning for the saved-event fan-out email/push background task —
+# the in-app fan-out (``_fan_out_saved_event_promo_code``) runs
+# synchronously in the request and is covered directly below.
+promo_codes_module._send_promo_code_added_notifications = lambda *_a, **_kw: None
 
 
 @pytest.fixture
@@ -124,6 +132,42 @@ def test_submit_returns_404_when_flag_off(client, event):
         json={"code": "TEST10"},
     )
     assert resp.status_code == 404
+
+
+# ── Per-event override ───────────────────────────────────────────────
+
+
+@pytest.mark.unit
+def test_list_allowed_when_flag_off_but_event_override_true(client, session, event):
+    event.show_promo_override = True
+    session.add(event)
+    session.commit()
+    resp = client.get(f"/api/events/{event.event_id}/promo-codes")
+    assert resp.status_code == 200
+
+
+@pytest.mark.unit
+def test_list_returns_404_when_flag_on_but_event_override_false(
+    client, session, event, flag_on
+):
+    event.show_promo_override = False
+    session.add(event)
+    session.commit()
+    resp = client.get(f"/api/events/{event.event_id}/promo-codes")
+    assert resp.status_code == 404
+
+
+@pytest.mark.unit
+def test_submit_allowed_when_flag_off_but_event_override_true(client, session, event):
+    event.show_promo_override = True
+    session.add(event)
+    session.commit()
+    assert _login(client, email="user@example.com").status_code == 200
+    resp = client.post(
+        f"/api/events/{event.event_id}/promo-codes",
+        json={"code": "OVERRIDE10"},
+    )
+    assert resp.status_code == 201, resp.text
 
 
 # ── Submit + list ────────────────────────────────────────────────────
@@ -281,3 +325,154 @@ def test_admin_list_filter_by_status(client, event, flag_on):
     assert resp.status_code == 200
     codes = {r["code"] for r in resp.json()}
     assert "AAA" in codes and "BBB" in codes
+
+
+@pytest.mark.unit
+def test_admin_list_filter_by_event_id(client, session, event, flag_on):
+    other_event = CachedEvent(
+        event_id="evt-promo-2",
+        calendar_id="cal-1",
+        title="Other Event",
+        start=datetime(2099, 1, 3, 20, 0, 0),
+        end=datetime(2099, 1, 3, 23, 0, 0),
+    )
+    session.add(other_event)
+    session.commit()
+
+    assert _login(client, email="user@example.com").status_code == 200
+    client.post(f"/api/events/{event.event_id}/promo-codes", json={"code": "MINE"})
+    client.post(
+        f"/api/events/{other_event.event_id}/promo-codes", json={"code": "OTHER"}
+    )
+
+    assert _login(client, email="admin@example.com").status_code == 200
+    resp = client.get("/api/admin/promo-codes", params={"event_id": event.event_id})
+    assert resp.status_code == 200
+    codes = {r["code"] for r in resp.json()}
+    assert codes == {"MINE"}
+
+
+# ── Saved-event fan-out notification (promo_code_added) ───────────────
+
+
+def _user_id(session, email: str):
+    return session.exec(select(User).where(User.email == email)).one().id
+
+
+def _save_event(session, *, user_id, event_id, device_id):
+    session.add(UserSavedEvent(device_id=device_id, event_id=event_id, user_id=user_id))
+    session.commit()
+
+
+def _mark_going(session, *, user_id, event_id, device_id):
+    session.add(
+        UserEventAttendance(device_id=device_id, event_id=event_id, user_id=user_id)
+    )
+    session.commit()
+
+
+@pytest.mark.unit
+def test_approve_notifies_saved_users_excluding_submitter(
+    client, session, event, flag_on
+):
+    assert _login(client, email="submitter@example.com").status_code == 200
+    resp = client.post(
+        f"/api/events/{event.event_id}/promo-codes", json={"code": "SAVE10"}
+    )
+    promo_id = resp.json()["id"]
+
+    assert _login(client, email="saver@example.com").status_code == 200
+    saver_id = _user_id(session, "saver@example.com")
+    submitter_id = _user_id(session, "submitter@example.com")
+    _save_event(
+        session, user_id=saver_id, event_id=event.event_id, device_id="dev-saver"
+    )
+    _save_event(
+        session,
+        user_id=submitter_id,
+        event_id=event.event_id,
+        device_id="dev-submitter",
+    )
+
+    assert _login(client, email="admin@example.com").status_code == 200
+    resp = client.post(f"/api/admin/promo-codes/{promo_id}/approve")
+    assert resp.status_code == 200
+
+    added = session.exec(
+        select(Notification).where(Notification.kind == "promo_code_added")
+    ).all()
+    recipients = {n.recipient_user_id for n in added}
+    assert recipients == {saver_id}
+    assert added[0].context == "SAVE10"
+
+    deliveries = session.exec(
+        select(NotificationDelivery).where(
+            NotificationDelivery.notification_id == added[0].id
+        )
+    ).all()
+    assert [d.channel for d in deliveries] == ["app"]
+
+
+@pytest.mark.unit
+def test_approve_excludes_users_already_going(client, session, event, flag_on):
+    assert _login(client, email="submitter2@example.com").status_code == 200
+    resp = client.post(
+        f"/api/events/{event.event_id}/promo-codes", json={"code": "GOING10"}
+    )
+    promo_id = resp.json()["id"]
+
+    assert _login(client, email="goer@example.com").status_code == 200
+    goer_id = _user_id(session, "goer@example.com")
+    _save_event(session, user_id=goer_id, event_id=event.event_id, device_id="dev-goer")
+    _mark_going(session, user_id=goer_id, event_id=event.event_id, device_id="dev-goer")
+
+    assert _login(client, email="admin@example.com").status_code == 200
+    resp = client.post(f"/api/admin/promo-codes/{promo_id}/approve")
+    assert resp.status_code == 200
+
+    added = session.exec(
+        select(Notification).where(Notification.kind == "promo_code_added")
+    ).all()
+    assert added == []
+
+
+@pytest.mark.unit
+def test_second_approved_code_does_not_renotify_same_saver(
+    client, session, event, flag_on
+):
+    """v1 limitation: the dedupe constraint on Notification is keyed by
+    (recipient, kind, actor=self, event) — a saved user already notified
+    about one approved promo code for an event won't be notified again
+    for a second one. This test locks in that accepted behaviour and
+    guards against it raising an IntegrityError instead of silently
+    skipping. Uses two different submitters so the pre-existing
+    ``promo_code_approved`` submitter-notification dedupe (a separate,
+    unrelated constraint) isn't what's under test here.
+    """
+    assert _login(client, email="submitter3a@example.com").status_code == 200
+    first = client.post(
+        f"/api/events/{event.event_id}/promo-codes", json={"code": "FIRST10"}
+    ).json()
+
+    assert _login(client, email="submitter3b@example.com").status_code == 200
+    second = client.post(
+        f"/api/events/{event.event_id}/promo-codes", json={"code": "SECOND10"}
+    ).json()
+
+    assert _login(client, email="repeat-saver@example.com").status_code == 200
+    saver_id = _user_id(session, "repeat-saver@example.com")
+    _save_event(
+        session, user_id=saver_id, event_id=event.event_id, device_id="dev-repeat"
+    )
+
+    assert _login(client, email="admin@example.com").status_code == 200
+    resp = client.post(f"/api/admin/promo-codes/{first['id']}/approve")
+    assert resp.status_code == 200
+    resp = client.post(f"/api/admin/promo-codes/{second['id']}/approve")
+    assert resp.status_code == 200
+
+    added = session.exec(
+        select(Notification).where(Notification.kind == "promo_code_added")
+    ).all()
+    assert len(added) == 1
+    assert added[0].recipient_user_id == saver_id

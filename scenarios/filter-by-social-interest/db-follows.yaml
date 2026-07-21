@@ -2,9 +2,12 @@
 #
 # Resulting graph:
 #   viewer -> alice   (one-way — alice does NOT follow back)
+#   viewer -> frank   (one-way — second one-way followee)
 #   viewer -> bob     (one-way half of the mutual edge below)
-#   bob    -> viewer  (completes viewer <-> bob — bob is viewer's ONLY
-#                      mutual friend in this graph)
+#   bob    -> viewer  (completes viewer <-> bob — bob is viewer's first
+#                      mutual friend)
+#   viewer -> grace   (one-way half of the mutual edge below)
+#   grace  -> viewer  (completes viewer <-> grace — second mutual friend)
 #   viewer -> carol   (one-way; carol's attendance is audience=friends,
 #                      so it must stay hidden until she follows back)
 #   eve    -> viewer  (reverse-direction control — eve is NOT a followee
@@ -14,8 +17,14 @@ follows:
   - follower: viewer
     followee: alice
   - follower: viewer
+    followee: frank
+  - follower: viewer
     followee: bob
   - follower: bob
+    followee: viewer
+  - follower: viewer
+    followee: grace
+  - follower: grace
     followee: viewer
   - follower: viewer
     followee: carol

@@ -40,6 +40,9 @@ VALID_KINDS = {
     "follow_request_approved",
     "event_reminder",
     "interest_event",
+    "promo_code_approved",
+    "promo_code_rejected",
+    "promo_code_added",
 }
 
 

@@ -1596,6 +1596,8 @@ def update_event(
         tags=event_tags.get(event_id, []),
         is_hidden=event.is_hidden,
         is_blocked=_is_event_blocked(session, event_id),
+        show_price_override=event.show_price_override,
+        show_promo_override=event.show_promo_override,
     )
 
 
@@ -2214,6 +2216,8 @@ def get_admin_event(
         tags=event_tags.get(event_id, []),
         is_hidden=event.is_hidden,
         is_blocked=_is_event_blocked(session, event_id),
+        show_price_override=event.show_price_override,
+        show_promo_override=event.show_promo_override,
     )
 
 

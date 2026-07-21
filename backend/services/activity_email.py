@@ -446,6 +446,9 @@ def run_once(
                 push_groups.setdefault((recipient.id, feature), []).append(n)
 
         digests = 0
+        # Late import to avoid circular dependency with backend.api.routes.social.
+        from backend.api.routes.social import get_people_suggestions_for_email
+
         for (recipient_id, feature), notifs in email_groups.items():
             recipient = users[recipient_id]
             discover_more_count = 0
@@ -465,11 +468,26 @@ def run_once(
                 )
                 for n in email_notifs
             ]
+            suggestions = None
+            if feature == "social_activity":
+                suggestions = [
+                    {
+                        "handle": item.handle,
+                        "display_name": item.display_name,
+                        "avatar_url": item.avatar_url,
+                        "mutual_friend_count": item.mutual_friend_count,
+                        "followers_count": item.followers_count,
+                    }
+                    for item in get_people_suggestions_for_email(
+                        session, recipient, limit=5
+                    )
+                ]
             ok = send_activity_digest_email(
                 recipient,
                 lines,
                 feature=feature,
                 discover_more_count=discover_more_count,
+                suggestions=suggestions,
             )
             digests += 1
             if ok:

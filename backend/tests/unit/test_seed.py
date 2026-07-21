@@ -237,9 +237,7 @@ class TestDatabaseSeeder:
         scenario_dir = tmp_path / "scenario"
         scenario_dir.mkdir(parents=True)
         (scenario_dir / "mock-users.yaml").write_text(
-            "users:\n"
-            "  - email: alice@example.com\n"
-            "    name: Alice\n"
+            "users:\n  - email: alice@example.com\n    name: Alice\n"
         )
         monkeypatch.setattr(loader_module, "CURRENT_ONBOARDING_VERSION", 7)
         monkeypatch.setattr(
@@ -288,9 +286,7 @@ class TestDatabaseSeeder:
         assert user.onboarded_at is None
         assert user.onboarding_version == 0
 
-    def test_seed_mock_user_explicit_onboarded_at_wins(
-        self, tmp_path, monkeypatch
-    ):
+    def test_seed_mock_user_explicit_onboarded_at_wins(self, tmp_path, monkeypatch):
         """An explicit ``onboarded_at`` (including ``null``) in the yaml
         overrides the scenario-wide ``auto_onboard`` default.
         """
@@ -414,6 +410,50 @@ class TestDatabaseSeeder:
         assert len(saves) == 1
         assert saves[0].event_id == "event-1"
         assert saves[0].audience == "friends"
+
+    def test_seed_events_sets_and_updates_visibility_overrides(
+        self, tmp_path, monkeypatch
+    ):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir(parents=True)
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            (scenario_dir / "db-events.yaml").write_text(
+                "events:\n"
+                "  - id: event-1\n"
+                "    calendar_id: cal-1\n"
+                "    title: Event One\n"
+                "    start: '2026-06-01T20:00:00'\n"
+                "    end: '2026-06-01T22:00:00'\n"
+                "    show_price_override: true\n"
+                "    show_promo_override: false\n"
+            )
+            DatabaseSeeder(session).seed(scenario_dir)
+            event = session.get(CachedEvent, "event-1")
+            assert event is not None
+            assert event.show_price_override is True
+            assert event.show_promo_override is False
+
+            # Re-seeding with the overrides removed from the fixture must not
+            # clear them (only an explicit key updates the field).
+            (scenario_dir / "db-events.yaml").write_text(
+                "events:\n"
+                "  - id: event-1\n"
+                "    calendar_id: cal-1\n"
+                "    title: Event One\n"
+                "    start: '2026-06-01T20:00:00'\n"
+                "    end: '2026-06-01T22:00:00'\n"
+            )
+            DatabaseSeeder(session).seed(scenario_dir)
+            event = session.get(CachedEvent, "event-1")
+            assert event is not None
+            assert event.show_price_override is True
+            assert event.show_promo_override is False
 
     def test_seed_approved_follows_create_calendar_subscriptions(
         self, tmp_path, monkeypatch

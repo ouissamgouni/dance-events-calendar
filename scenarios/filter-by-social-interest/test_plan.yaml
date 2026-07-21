@@ -11,9 +11,10 @@ test_plan:
     scenario merges and replaces the former `social-interest-filter-
     following` and `social-interest-filter-friends` scenarios: instead of
     switching between two signed-in users to exercise each scope, a
-    single `viewer` follows one person one-way, one person mutually
-    (bob), and one person who shares at friends-only audience (carol),
-    which is enough to prove both scopes plus the privacy chokepoint
+    single `viewer` follows two people one-way (alice, frank), two
+    people mutually (bob, grace), and one person who shares at
+    friends-only audience (carol) — enough to prove both scopes union
+    correctly across more than one source, plus the privacy chokepoint,
     without a user swap.
 
     Privacy invariants still apply per-row: an audience='friends' row is
@@ -23,12 +24,17 @@ test_plan:
   preconditions:
     - "Run with: task start:scenario SCENARIO=filter-by-social-interest"
     - >
-      Pre-seeded users: viewer, alice, bob, carol, dave, eve, admin.
-      Follow graph: viewer → alice (one-way), viewer ⇄ bob (mutual —
-      bob is viewer's ONLY friend), viewer → carol (one-way), eve →
-      viewer (reverse-direction control), dave isolated (stranger
-      control). Seven events evt-fsi-001..007, each tied to one
-      assertion.
+      Pre-seeded users: viewer, alice, bob, carol, dave, eve, frank,
+      grace, admin. Follow graph: viewer → alice (one-way), viewer →
+      frank (one-way), viewer ⇄ bob (mutual), viewer ⇄ grace (mutual),
+      viewer → carol (one-way), eve → viewer (reverse-direction
+      control), dave isolated (stranger control). Events evt-fsi-001..009
+      are each tied to one assertion (001/006 alice, 002/007 bob, 003
+      carol, 004 dave, 005 eve, 008 frank, 009 grace). evt-fsi-010..012
+      are catalog-only filler events (no attendance) seeded purely so
+      every tag in every group has a non-zero event_count, for manually
+      testing the tag filter's per-group horizontal scroll — they are
+      not tied to any numbered assertion below.
     - "Use a fresh browser profile or incognito window per signed-in user."
     - >
       Cookie banner: accept "Personalization" so /api/auth/* and
@@ -37,19 +43,23 @@ test_plan:
   steps:
     # ── Setup attendance/saves on the seeded events ──────────────
     - id: 1
-      title: "Alice and Bob each go to one event and save another"
+      title: "Alice, Bob, Frank and Grace each go to an event (Alice/Bob also save one)"
       description: >
         Sign in as Alice on Browser A. Open evt-fsi-001 (Salsa Social
         Friday) and mark Going with audience 🌐 Public. Open
         evt-fsi-006 (Kizomba Sunday Brunch) and click Save (defaults to
         🌐 Public). Sign in as Bob on Browser B. Open evt-fsi-002
         (Bachata Workshop) and mark Going with 🌐 Public. Open
-        evt-fsi-007 (Rueda Wednesday) and click Save.
+        evt-fsi-007 (Rueda Wednesday) and click Save. Sign in as Frank
+        on Browser G, open evt-fsi-008 (Kizomba Rooftop Mixer), and mark
+        Going with 🌐 Public. Sign in as Grace on Browser H, open
+        evt-fsi-009 (Rueda Congress Grand Ball), and mark Going with
+        🌐 Public.
       expected: >
-        Four rows persist, all 🌐 Public. Alice's rows will only
-        surface under the "All" scope (she is a one-way followee).
-        Bob's rows will surface under BOTH "All" and "Friends" (he is
-        viewer's only mutual friend).
+        Six rows persist, all 🌐 Public. Alice's and Frank's rows will
+        only surface under the "All" scope (they are one-way
+        followees). Bob's and Grace's rows will surface under BOTH
+        "All" and "Friends" (they are viewer's mutual friends).
 
     - id: 2
       title: "Carol (friends-only), Dave (stranger), and Eve (reverse follower) go"
@@ -82,13 +92,14 @@ test_plan:
       expected: >
         The initial page-load network request for GET /api/events
         does NOT include `interest_source` (the filter has no default
-        scope). The rail shows "Alice Rivera" and "Bob Martin", each
-        with an unchecked checkbox and a count of 2 (their combined
-        going+saved matches under the implicit default `follows` pool
-        the rail uses to browse candidates); Carol is absent (0
-        matches — her only row is friends-only and hidden). The
-        Going/Saved pills render in their neutral (non-highlighted)
-        state since the filter isn't active yet.
+        scope). The rail shows "Alice Rivera" and "Bob Martin" with a
+        count of 2 each (going+saved), and "Frank Okafor" and "Grace
+        Kim" with a count of 1 each (going only) — all four unchecked,
+        under the implicit default `follows` pool the rail uses to
+        browse candidates; Carol is absent (0 matches — her only row
+        is friends-only and hidden). The Going/Saved pills render in
+        their neutral (non-highlighted) state since the filter isn't
+        active yet.
 
     # ── Checking a person directly activates the filter ────────────
     - id: 4
@@ -110,20 +121,20 @@ test_plan:
 
     # ── "All" scope happy path ──────────────────────────────────────
     - id: 5
-      title: "'All' scope surfaces Alice + Bob's activity (four rows)"
+      title: "'All' scope surfaces Alice + Bob + Frank + Grace's activity (six rows)"
       description: >
         Click the "All" scope pill (toggling it off then on again, to
         start from a clean, explicitly-chosen state).
       expected: >
         Network: GET /api/events?interest_source=follows fires
         (interest_kind omitted — both Going and Saved are active,
-        meaning "any"). The list renders EXACTLY four rows:
-        evt-fsi-001 (Alice going), evt-fsi-002 (Bob going), evt-fsi-006
-        (Alice saved), evt-fsi-007 (Bob saved). NOT present:
-        evt-fsi-003 (Carol, friends-only, viewer not mutual),
-        evt-fsi-004 (Dave, stranger), evt-fsi-005 (Eve, reverse
-        follower). The "Going" and "Saved" pills both render as active
-        (there is no separate "Any" pill).
+        meaning "any"). The list renders EXACTLY six rows: evt-fsi-001
+        (Alice going), evt-fsi-002 (Bob going), evt-fsi-006 (Alice
+        saved), evt-fsi-007 (Bob saved), evt-fsi-008 (Frank going),
+        evt-fsi-009 (Grace going). NOT present: evt-fsi-003 (Carol,
+        friends-only, viewer not mutual), evt-fsi-004 (Dave, stranger),
+        evt-fsi-005 (Eve, reverse follower). The "Going" and "Saved"
+        pills both render as active (there is no separate "Any" pill).
 
     # ── Going/Saved toggles (no more "Any" pill) ───────────────────
     - id: 6
@@ -134,10 +145,12 @@ test_plan:
       expected: >
         Network: GET
         /api/events?interest_source=follows&interest_kind=going. The
-        list narrows to two rows: evt-fsi-001 (Alice going) and
-        evt-fsi-002 (Bob going); evt-fsi-006 and evt-fsi-007 (saves)
-        disappear. The person-rail counts update to 1 each for Alice
-        and Bob (their saved-only event no longer counts).
+        list narrows to four rows: evt-fsi-001 (Alice going),
+        evt-fsi-002 (Bob going), evt-fsi-008 (Frank going), evt-fsi-009
+        (Grace going); evt-fsi-006 and evt-fsi-007 (saves) disappear.
+        The person-rail counts update to 1 each for Alice and Bob
+        (their saved-only event no longer counts); Frank and Grace stay
+        at 1 (they had no saved event to begin with).
 
     - id: 7
       title: "The last remaining active pill can't be turned off"
@@ -156,8 +169,9 @@ test_plan:
         active again.
       expected: >
         Network: GET /api/events?interest_source=follows (interest_kind
-        omitted again). The four-row list from step 5 returns, and the
-        person-rail counts go back to 2 each for Alice and Bob.
+        omitted again). The six-row list from step 5 returns, and the
+        person-rail counts go back to 2 each for Alice and Bob (Frank
+        and Grace stay at 1).
 
     # ── Multi-select person rail applies immediately ──────────────
     - id: 9
@@ -169,8 +183,9 @@ test_plan:
         Network fires immediately (no separate "apply" step): GET
         /api/events?interest_source=follows&interest_user_handle=alice.
         The list narrows to Alice's two rows: evt-fsi-001 and
-        evt-fsi-006. Bob's card in the rail remains visible,
-        unchecked, with its count still showing 2.
+        evt-fsi-006. Bob's, Frank's, and Grace's cards in the rail
+        remain visible, unchecked, with their counts still showing 2,
+        1, and 1 respectively.
 
     - id: 10
       title: "Checking a second person unions the results"
@@ -180,10 +195,11 @@ test_plan:
       expected: >
         Network: GET
         /api/events?interest_source=follows&interest_user_handle=alice&interest_user_handle=bob
-        (both repeated). The list returns to all four rows (the union
-        of Alice's + Bob's activity) — same rows as step 5/8, but now
-        via an explicit two-person selection rather than "everyone I
-        follow". Unchecking Alice narrows the list back down to Bob's
+        (both repeated). The list narrows to four rows (the union of
+        Alice's + Bob's activity): evt-fsi-001, evt-fsi-002,
+        evt-fsi-006, evt-fsi-007 — a subset of the six-row "everyone I
+        follow" list from step 5/8, since Frank and Grace are not
+        checked. Unchecking Alice narrows the list back down to Bob's
         two rows (evt-fsi-002, evt-fsi-007).
 
     # ── Scope pill click resets the filter ─────────────────────────
@@ -201,10 +217,10 @@ test_plan:
         rendering active again. Network: GET
         /api/events?interest_source=friends fires (no
         interest_user_handle, no interest_kind). The list renders
-        EXACTLY two rows: evt-fsi-002 (Bob going) and evt-fsi-007 (Bob
-        saved) — Bob is viewer's only mutual friend, so the "Friends"
-        scope with nobody explicitly picked still resolves to "just
-        Bob's activity".
+        EXACTLY three rows: evt-fsi-002 (Bob going), evt-fsi-007 (Bob
+        saved), and evt-fsi-009 (Grace going) — Bob and Grace are
+        viewer's mutual friends, so the "Friends" scope with nobody
+        explicitly picked resolves to "Bob's + Grace's activity".
 
     - id: 12
       title: "Person rail under 'Friends' scope excludes non-mutual followees"
@@ -215,8 +231,9 @@ test_plan:
         Network: GET /api/social/me/following fires again (scope
         change re-triggers the fetch); the rail is filtered
         client-side to `is_friend` rows. Only "Bob Martin" (count 2)
-        appears — Alice is NOT shown, even though she is a followee
-        with matching activity, because she is not a mutual friend.
+        and "Grace Kim" (count 1) appear — Alice and Frank are NOT
+        shown, even though they are followees with matching activity,
+        because they are not mutual friends.
 
     # ── Summary bar shows handles, not a count ─────────────────────
     - id: 13
@@ -237,16 +254,18 @@ test_plan:
       description: >
         Click "All" to reset, and confirm evt-fsi-003 (Cuban Night,
         Carol going friends-only) is absent from the unfiltered
-        four-row list. On Browser C, sign in as Carol, open /u/viewer,
+        six-row list. On Browser C, sign in as Carol, open /u/viewer,
         and click Follow so viewer ⇄ carol becomes mutual. Refresh
         viewer's home with the "All" scope active.
       expected: >
         Before Carol follows back: evt-fsi-003 absent under both
         scopes. After the back-follow, evt-fsi-003 appears under
-        "All" scope AND under "Friends" scope (carol is now also a
-        mutual friend), and Carol now appears in the person rail under
-        both scopes with a count of 1. Have Carol unfollow viewer at
-        the end of this step so later re-runs see the original graph.
+        "All" scope (seven rows total) AND under "Friends" scope
+        (carol is now also a mutual friend, joining bob and grace for
+        four rows total), and Carol now appears in the person rail
+        under both scopes with a count of 1. Have Carol unfollow
+        viewer at the end of this step so later re-runs see the
+        original graph.
 
     # ── Deep link with an unfollowed handle ─────────────────────────
     - id: 15

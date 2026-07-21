@@ -20,6 +20,7 @@ import SuggestTagsButton from './SuggestTagsButton';
 import ExpandableDescription from './ExpandableDescription';
 import ShareButton from './ShareButton';
 import { EventPromoCodes } from './EventPromoCodes';
+import { isPriceSectionVisible } from '../utils/sectionVisibility';
 
 interface Props {
     event: CalendarEvent;
@@ -159,8 +160,9 @@ export default function EventDetailContent({
 
     const fallbackLinks = parseLinks(event.description);
     const structuredLinks = event.links && event.links.length > 0 ? event.links : null;
+    const priceVisible = isPriceSectionVisible(event, showPrices);
     const hasVisibleBadge =
-        (showPrices && (event.price_is_free || (event.price_min != null && event.price_currency))) ||
+        (priceVisible && (event.price_is_free || (event.price_min != null && event.price_currency))) ||
         (showPopularity && event.view_count > 0);
     const start = new Date(event.start);
     const end = new Date(event.end);
@@ -283,12 +285,12 @@ export default function EventDetailContent({
                             className={`flex items-center gap-2 flex-wrap ${editable ? 'group relative cursor-pointer hover:bg-slate-50 -mx-2 px-2 py-1 rounded transition' : ''}`}
                             onClick={editable ? startPriceEdit : undefined}
                         >
-                            {showPrices && event.price_is_free && (
+                            {priceVisible && event.price_is_free && (
                                 <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
                                     Free
                                 </span>
                             )}
-                            {showPrices && !event.price_is_free && event.price_min != null && event.price_currency && (
+                            {priceVisible && !event.price_is_free && event.price_min != null && event.price_currency && (
                                 <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
                                     {event.price_max != null && event.price_max !== event.price_min
                                         ? `${event.price_currency} ${event.price_min}\u2013${event.price_max}`
@@ -538,7 +540,7 @@ export default function EventDetailContent({
             ) : null}
 
             {/* Promo codes — collapsible section under the description. */}
-            <EventPromoCodes eventId={event.event_id} />
+            <EventPromoCodes event={event} />
 
             {/* Links */}
             {editable && editingField === 'links' ? (

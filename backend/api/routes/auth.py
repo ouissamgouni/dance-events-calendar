@@ -702,6 +702,8 @@ def get_me(
         "push_event_reminders_enabled": user.push_event_reminders_enabled,
         "push_social_activity_enabled": user.push_social_activity_enabled,
         "push_interest_matches_enabled": user.push_interest_matches_enabled,
+        "email_promo_codes_enabled": user.email_promo_codes_enabled,
+        "push_promo_codes_enabled": user.push_promo_codes_enabled,
         # Legacy aliases derived from the new flags. Kept for one release so
         # older frontend clients still work (Phase G §G.9 step 5 drops them).
         "reminder_email_enabled": user.email_event_reminders_enabled,
@@ -835,6 +837,8 @@ class UpdateNotificationPreferencesRequest(BaseModel):
     push_event_reminders_enabled: Optional[bool] = None
     push_social_activity_enabled: Optional[bool] = None
     push_interest_matches_enabled: Optional[bool] = None
+    email_promo_codes_enabled: Optional[bool] = None
+    push_promo_codes_enabled: Optional[bool] = None
     # Legacy aliases — removed in the cleanup PR (§G.9 step 5).
     reminder_email_enabled: Optional[bool] = None
     activity_email_enabled: Optional[bool] = None
@@ -880,6 +884,8 @@ _NEW_FLAGS: tuple[str, ...] = (
     "push_event_reminders_enabled",
     "push_social_activity_enabled",
     "push_interest_matches_enabled",
+    "email_promo_codes_enabled",
+    "push_promo_codes_enabled",
 )
 
 
@@ -924,6 +930,8 @@ def update_notification_preferences(
         "push_event_reminders_enabled": user.push_event_reminders_enabled,
         "push_social_activity_enabled": user.push_social_activity_enabled,
         "push_interest_matches_enabled": user.push_interest_matches_enabled,
+        "email_promo_codes_enabled": user.email_promo_codes_enabled,
+        "push_promo_codes_enabled": user.push_promo_codes_enabled,
         # Legacy mirror (removed in cleanup PR).
         "reminder_email_enabled": user.email_event_reminders_enabled,
         "activity_email_enabled": (

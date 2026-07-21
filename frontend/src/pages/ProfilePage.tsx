@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
     fetchPublicProfile,
@@ -34,6 +34,7 @@ export default function ProfilePage() {
     const { handle } = useParams<{ handle: string }>();
     const { user: viewer } = useAuth();
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [profile, setProfile] = useState<PublicProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -101,6 +102,35 @@ export default function ProfilePage() {
             setFollowBusy(false);
         }
     };
+
+    // Email-driven "Follow" links use a `?follow=1` query param so the
+    // suggestion rows in the activity digest email can trigger a follow
+    // with a single click, reusing the authenticated follow API instead
+    // of a signed-token GET action. Unauthenticated viewers are bounced
+    // through login with `?next=` (the app's existing redirect-after-
+    // login convention) and land back here with the param intact.
+    useEffect(() => {
+        if (searchParams.get('follow') !== '1' || !handle) return;
+        if (!viewer) {
+            const target = `/u/${handle}?follow=1`;
+            navigate(`/login?next=${encodeURIComponent(target)}`, { replace: true });
+            return;
+        }
+        if (!profile) return;
+        setSearchParams(
+            (prev) => {
+                const next = new URLSearchParams(prev);
+                next.delete('follow');
+                return next;
+            },
+            { replace: true },
+        );
+        const isPending = profile.follow_status === 'pending';
+        if (!profile.is_following && !isPending) {
+            handleFollowToggle();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams, handle, viewer, profile]);
 
     const handleNotifyToggle = async (next: boolean) => {
         if (!profile || !profile.is_subscribed) return;

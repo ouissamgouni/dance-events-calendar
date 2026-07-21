@@ -584,6 +584,8 @@ export interface AuthUser {
     push_event_reminders_enabled?: boolean;
     push_social_activity_enabled?: boolean;
     push_interest_matches_enabled?: boolean;
+    email_promo_codes_enabled?: boolean;
+    push_promo_codes_enabled?: boolean;
     /** Legacy four-flag aliases returned for one release so older
      *  clients keep working. Derived from the six new flags on the
      *  server (see PHASE_G_NOTIFICATION_GATING.md §G.9). */
@@ -718,6 +720,8 @@ export interface NotificationPreferences {
     push_event_reminders_enabled: boolean;
     push_social_activity_enabled: boolean;
     push_interest_matches_enabled: boolean;
+    email_promo_codes_enabled: boolean;
+    push_promo_codes_enabled: boolean;
     /** Legacy mirror kept for one release. */
     reminder_email_enabled: boolean;
     activity_email_enabled: boolean;
@@ -734,6 +738,8 @@ export interface UpdateNotificationPreferencesPayload {
     push_event_reminders_enabled?: boolean;
     push_social_activity_enabled?: boolean;
     push_interest_matches_enabled?: boolean;
+    email_promo_codes_enabled?: boolean;
+    push_promo_codes_enabled?: boolean;
     /** Legacy aliases accepted for one release — server writes through
      *  to the corresponding new flags. */
     reminder_email_enabled?: boolean;
@@ -1519,6 +1525,7 @@ export type NotificationKind =
     | 'follow_request_approved'
     | 'promo_code_approved'
     | 'promo_code_rejected'
+    | 'promo_code_added'
     | 'organizer_claim_decided'
     | 'event_reminder'
     | 'interest_event';
@@ -3483,8 +3490,11 @@ export async function deleteEventPromoCode(
     }
 }
 
-export async function fetchAdminPromoCodes(status?: string): Promise<PromoCodeAdmin[]> {
-    const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+export async function fetchAdminPromoCodes(status?: string, eventId?: string): Promise<PromoCodeAdmin[]> {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (eventId) params.set('event_id', eventId);
+    const qs = params.toString() ? `?${params.toString()}` : '';
     const res = await fetch(`${BASE}/admin/promo-codes${qs}`, {
         credentials: 'include',
     });

@@ -379,8 +379,17 @@ body {
 
 /* Inside the mobile FilterSheet the date picker shouldn't render as a
    standalone elevated card — drop the inner padding/shadow so it sits
-   flush with the sheet body, which already has its own padding. */
+   flush with the sheet body, which already has its own padding. The
+   FilterSheet is now the only surface for the date range picker (no
+   more separate always-visible desktop inline column), so the >=1024px
+   side-by-side layout below — which put the period pills to the right
+   of the date inputs — no longer applies here. Force the sheet/modal
+   copy back to a stacked column so the period pills always render under
+   the date inputs, at every breakpoint. Specificity (two classes) wins
+   over the plain `.date-range-picker` rule in the media query below
+   regardless of source order. */
 .filter-sheet-body .date-range-picker {
+  display: block;
   padding: 0;
   box-shadow: none;
   background: transparent;
@@ -765,13 +774,6 @@ body {
   white-space: nowrap;
 }
 
-.event-card-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem;
-  margin-top: 0.375rem;
-}
-
 @media (max-width: 639px) {
   .event-list-header {
     padding: 0.55rem 0.75rem;
@@ -784,10 +786,5 @@ body {
 
   .event-card-title {
     line-height: 1.25;
-  }
-
-  .event-card-badges {
-    gap: 0.25rem;
-    margin-top: 0.25rem;
   }
 }
