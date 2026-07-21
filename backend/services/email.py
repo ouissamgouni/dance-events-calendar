@@ -176,6 +176,15 @@ def send_install_app_invitation_email(user) -> bool:
         Install Movida
       </a>
     </p>
+    <p style="color:#6b7280;font-size:13px">
+      Button not doing anything on your device? Our
+      <a href="{install_url}">install page</a> has step-by-step
+      instructions for iPhone/iPad and Android.
+    </p>
+    <p style="color:#6b7280;font-size:13px">
+      Once installed, open Movida from your Home Screen and allow
+      notifications so you don't miss reminders and updates.
+    </p>
     """
     html = _email_shell("Get the Movida app", body)
     return _send_email(user.email, subject, html, "install app invitation")

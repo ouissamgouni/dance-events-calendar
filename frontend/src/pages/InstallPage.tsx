@@ -56,8 +56,11 @@ export default function InstallPage() {
                         <InstallPromptCard surface="page" onInstall={install} />
                     </div>
                 ) : (
-                    <div className="w-full border border-slate-200 bg-slate-50 px-6 py-5 text-sm text-slate-700">
-                        Your browser can't install Movida directly here. On iPhone/iPad, tap the Share icon in Safari and choose "Add to Home Screen".
+                    <div className="w-full border border-slate-200 bg-slate-50 px-6 py-5 text-sm text-slate-700 text-left space-y-2">
+                        <p>Your browser can't install Movida directly here — but you can still add it manually:</p>
+                        <p><strong>iPhone/iPad:</strong> In Safari, tap Share, then "Add to Home Screen".</p>
+                        <p><strong>Android:</strong> In Chrome, tap the ⋮ menu, then "Install app" (or "Add to Home screen").</p>
+                        <p>Once added, open Movida from your Home Screen and allow notifications so you don't miss reminders.</p>
                     </div>
                 )}
             </div>

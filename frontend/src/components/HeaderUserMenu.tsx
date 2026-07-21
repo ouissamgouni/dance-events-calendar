@@ -156,6 +156,13 @@ export default function HeaderUserMenu({ className }: { className?: string }) {
                             {isAdminPage ? 'Explorer' : 'Admin'}
                         </Link>
                     )}
+                    <Link
+                        to="/install"
+                        role="menuitem"
+                        className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                        Install app
+                    </Link>
                     <button
                         type="button"
                         onClick={onLogout}
