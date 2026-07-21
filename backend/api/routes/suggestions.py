@@ -398,7 +398,6 @@ def approve_suggestion(
         if coords:
             lat, lng = coords
 
-    had_live_event = suggestion.created_event_id is not None
     event_id = suggestion.created_event_id or f"suggestion-{suggestion.id}"
     cached_event = _upsert_live_event_from_suggestion(
         session,
@@ -459,16 +458,19 @@ def approve_suggestion(
     suggestion.reviewed_by = admin.get("email")
     session.add(suggestion)
 
-    # Legacy flow only: older suggestions that had not yet created a live
-    # event still fan out the suggested-event notification and auto-save.
-    if suggestion.submitter_user_id is not None and not had_live_event:
+    # Fan out the suggested-event notification to subscribers of the
+    # submitter, and auto-save the new event to the submitter's Calendar
+    # tab unless they opted out at submission time. This runs regardless
+    # of whether a live "pending" event already existed (signed-in
+    # submitters get one immediately at submission so they can preview
+    # it) — subscribers should only be notified once the event is
+    # actually approved. Idempotent: ``UniqueConstraint(device_id,
+    # event_id)`` would block duplicate saves anyway; we pre-check for
+    # clarity.
+    if suggestion.submitter_user_id is not None:
         actor = session.get(User, suggestion.submitter_user_id)
         if actor is not None:
             fan_out_suggested(session, actor, event_id)
-            # Auto-save the new event to the submitter's Calendar tab
-            # unless they opted out at submission time. Idempotent:
-            # ``UniqueConstraint(device_id, event_id)`` would block
-            # duplicates anyway; we pre-check for clarity.
             if suggestion.auto_save:
                 existing = session.exec(
                     select(UserSavedEvent).where(
@@ -485,24 +487,6 @@ def approve_suggestion(
                             audience="public",
                         )
                     )
-    elif suggestion.submitter_user_id is not None and suggestion.auto_save:
-        actor = session.get(User, suggestion.submitter_user_id)
-        if actor is not None:
-            existing = session.exec(
-                select(UserSavedEvent).where(
-                    UserSavedEvent.user_id == actor.id,
-                    UserSavedEvent.event_id == event_id,
-                )
-            ).first()
-            if existing is None:
-                session.add(
-                    UserSavedEvent(
-                        device_id=str(actor.id),
-                        event_id=event_id,
-                        user_id=actor.id,
-                        audience="public",
-                    )
-                )
 
     session.commit()
     session.refresh(suggestion)
