@@ -1,0 +1,7 @@
+# Admin-only feature — a single admin account is enough to exercise the
+# Duplicates panel, the Events panel bulk action, and the event detail panel.
+users:
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin
+    account_visibility: public

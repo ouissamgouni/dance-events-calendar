@@ -1,4 +1,4 @@
-import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide } from './types';
+import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide, DuplicateGroup, DuplicateGroupListResponse, DuplicateScanLogEntry, DuplicateScanLogListResponse } from './types';
 import type { DateRangePresetKey } from './utils/dateRangePresets';
 
 declare const __VITE_API_URL__: string;
@@ -215,8 +215,11 @@ export interface SiteSettings {
     default_explorer_period?: DateRangePresetKey;
     promo_codes_enabled?: boolean;
     organizer_claims_enabled?: boolean;
+    duplicate_auto_detect_enabled?: boolean;
     for_you_rail_enabled?: boolean;
     your_next_events_rail_enabled?: boolean;
+    suggest_event_required_dance_group_id?: number | null;
+    suggest_event_required_reach_group_id?: number | null;
     tag_as_badge_enabled?: boolean;
     /** When true (and tag_as_badge_enabled is on), tag badges use their
      * defined group color; when false, tags render on a neutral light-grey
@@ -2627,6 +2630,7 @@ export async function submitSuggestion(data: EventSuggestionCreate): Promise<{ i
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
+        credentials: 'include',
     });
     if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -3599,4 +3603,71 @@ export async function decideOrganizerClaim(
         body: JSON.stringify(body),
     });
     return parseJsonResponse<OrganizerClaimAdmin>(res, 'Failed to decide claim');
+}
+
+// --- Admin: duplicate detection ---
+
+export async function fetchDuplicateGroups(
+    status?: string,
+): Promise<DuplicateGroupListResponse> {
+    const qs = status ? `?status=${status}` : '';
+    const res = await fetch(`${BASE}/admin/duplicates${qs}`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<DuplicateGroupListResponse>(res, 'Failed to fetch duplicate groups');
+}
+
+export async function fetchDuplicateScanHistory(): Promise<DuplicateScanLogListResponse> {
+    const res = await fetch(`${BASE}/admin/duplicates/history`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<DuplicateScanLogListResponse>(res, 'Failed to fetch scan history');
+}
+
+export async function triggerDuplicateScan(): Promise<DuplicateScanLogEntry> {
+    const res = await fetch(`${BASE}/admin/duplicates/scan`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return parseJsonResponse<DuplicateScanLogEntry>(res, 'Failed to trigger duplicate scan');
+}
+
+export async function flagEventsAsDuplicates(eventIds: string[]): Promise<DuplicateGroup> {
+    const res = await fetch(`${BASE}/admin/duplicates/manual`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ event_ids: eventIds }),
+    });
+    return parseJsonResponse<DuplicateGroup>(res, 'Failed to flag events as duplicates');
+}
+
+export async function keepDuplicateEvent(
+    groupId: number,
+    keepEventId: string,
+): Promise<DuplicateGroup> {
+    const res = await fetch(`${BASE}/admin/duplicates/${groupId}/keep`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ keep_event_id: keepEventId }),
+    });
+    return parseJsonResponse<DuplicateGroup>(res, 'Failed to keep event');
+}
+
+export async function dismissDuplicateGroup(groupId: number): Promise<DuplicateGroup> {
+    const res = await fetch(`${BASE}/admin/duplicates/${groupId}/dismiss`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return parseJsonResponse<DuplicateGroup>(res, 'Failed to dismiss duplicate group');
+}
+
+export async function fetchEventDuplicateCandidates(
+    eventId: string,
+): Promise<DuplicateGroupListResponse> {
+    const res = await fetch(`${BASE}/admin/events/${eventId}/duplicates`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<DuplicateGroupListResponse>(res, 'Failed to fetch duplicate candidates');
 }

@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import type { EventSuggestion, CalendarSetting } from '../types';
+import { useMemo, useState } from 'react';
+import type { EventSuggestion, CalendarSetting, Tag } from '../types';
 import { approveSuggestion, rejectSuggestion, syncSuggestionToGoogle } from '../api';
 import AdminEventDetailPanel from './AdminEventDetailPanel';
 
 interface Props {
     suggestion: EventSuggestion;
     calendars: CalendarSetting[];
+    allTags?: Tag[];
     onClose: () => void;
     onUpdated: (s: EventSuggestion) => void;
 }
@@ -29,7 +30,19 @@ const fmtPrice = (s: EventSuggestion): string | null => {
     return null;
 };
 
-export default function SuggestionReviewModal({ suggestion, calendars, onClose, onUpdated }: Props) {
+function TagPill({ label, color }: { label: string; color?: string | null }) {
+    const c = color || '#64748b';
+    return (
+        <span
+            className="inline-flex items-center px-2 py-0.5 text-[11px] font-medium border"
+            style={{ backgroundColor: c, borderColor: c, color: 'white' }}
+        >
+            {label}
+        </span>
+    );
+}
+
+export default function SuggestionReviewModal({ suggestion, calendars, allTags = [], onClose, onUpdated }: Props) {
     const [selectedCalendarId, setSelectedCalendarId] = useState(
         suggestion.assigned_calendar_id ?? calendars.find((c) => c.enabled)?.calendar_id ?? '',
     );
@@ -38,6 +51,7 @@ export default function SuggestionReviewModal({ suggestion, calendars, onClose, 
     const [error, setError] = useState('');
     const [rejectMode, setRejectMode] = useState(false);
     const [adminDetailEventId, setAdminDetailEventId] = useState<string | null>(null);
+    const tagsById = useMemo(() => new Map(allTags.map((t) => [t.id, t])), [allTags]);
 
     const isPending = suggestion.status === 'pending';
     const isApproved = suggestion.status === 'approved';
@@ -90,10 +104,10 @@ export default function SuggestionReviewModal({ suggestion, calendars, onClose, 
 
     return (
         <>
-            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
-                <div className="mx-4 w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white p-6 shadow-xl">
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+                <div className="flex w-full max-w-2xl flex-col bg-white shadow-xl max-h-[90dvh]">
                     {/* Header */}
-                    <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-start justify-between px-6 pt-6 pb-4">
                         <div>
                             <h2 className="text-base font-semibold text-slate-800">Review Suggestion</h2>
                             <div className="mt-1 flex items-center gap-2">
@@ -111,126 +125,135 @@ export default function SuggestionReviewModal({ suggestion, calendars, onClose, 
                         <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-lg p-1">✕</button>
                     </div>
 
-                    {/* APPROVED → collapsed view: link to created event + suggest sync */}
-                    {isApproved ? (
-                        <div className="space-y-4">
-                            <div className="border border-slate-200 bg-slate-50 p-4">
-                                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">Approved Suggestion</p>
-                                <p className="text-sm font-medium text-slate-800">{suggestion.title}</p>
-                                <p className="text-[11px] text-slate-500 mt-0.5">
-                                    {fmtDate(suggestion.start)}
-                                    {suggestion.location && ` • ${suggestion.location}`}
-                                </p>
-                                {suggestion.created_event_id && (
-                                    <button
-                                        onClick={() => setAdminDetailEventId(suggestion.created_event_id!)}
-                                        className="mt-3 inline-flex items-center gap-1 bg-blue-600 text-white text-xs font-medium px-3 py-1.5 hover:bg-blue-700 transition"
-                                    >
-                                        Open created event →
-                                    </button>
+                    {/* Scrollable body */}
+                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6">
+                        {/* APPROVED → collapsed view: link to created event + suggest sync */}
+                        {isApproved ? (
+                            <div className="space-y-4 pb-6">
+                                <div className="border border-slate-200 bg-slate-50 p-4">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1">Approved Suggestion</p>
+                                    <p className="text-sm font-medium text-slate-800">{suggestion.title}</p>
+                                    <p className="text-[11px] text-slate-500 mt-0.5">
+                                        {fmtDate(suggestion.start)}
+                                        {suggestion.location && ` • ${suggestion.location}`}
+                                    </p>
+                                    {suggestion.created_event_id && (
+                                        <button
+                                            onClick={() => setAdminDetailEventId(suggestion.created_event_id!)}
+                                            className="mt-3 inline-flex items-center gap-1 bg-blue-600 text-white text-xs font-medium px-3 py-1.5 hover:bg-blue-700 transition"
+                                        >
+                                            Open created event →
+                                        </button>
+                                    )}
+                                </div>
+
+                                {!suggestion.synced_to_google && (
+                                    <div className="border border-amber-200 bg-amber-50 p-4">
+                                        <p className="text-xs text-amber-800 mb-2">
+                                            This event isn't synced to Google Calendar yet. Sync it so it appears on the source calendar.
+                                        </p>
+                                        <button
+                                            onClick={handleSync}
+                                            disabled={saving}
+                                            className="bg-blue-600 text-white text-xs font-medium px-3 py-1.5 hover:bg-blue-700 disabled:opacity-50 transition"
+                                        >
+                                            {saving ? 'Syncing…' : 'Sync to Google Calendar'}
+                                        </button>
+                                    </div>
                                 )}
                             </div>
-
-                            {!suggestion.synced_to_google && (
-                                <div className="border border-amber-200 bg-amber-50 p-4">
-                                    <p className="text-xs text-amber-800 mb-2">
-                                        This event isn't synced to Google Calendar yet. Sync it so it appears on the source calendar.
-                                    </p>
-                                    <button
-                                        onClick={handleSync}
-                                        disabled={saving}
-                                        className="bg-blue-600 text-white text-xs font-medium px-3 py-1.5 hover:bg-blue-700 disabled:opacity-50 transition"
-                                    >
-                                        {saving ? 'Syncing…' : 'Sync to Google Calendar'}
-                                    </button>
+                        ) : (
+                            <div className="pb-6">
+                                {/* Submitter info — shown first */}
+                                <div className="mb-4 border border-slate-200 bg-slate-50 p-3">
+                                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Submitter</p>
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-600">
+                                        <div><span className="text-slate-400">Name:</span> {suggestion.submitter_name || '—'}</div>
+                                        <div><span className="text-slate-400">Email:</span> {suggestion.submitter_email || '—'}</div>
+                                        {suggestion.submitter_ip && <div><span className="text-slate-400">IP:</span> {suggestion.submitter_ip}</div>}
+                                        {(suggestion.submitter_city || suggestion.submitter_country) && (
+                                            <div><span className="text-slate-400">Location:</span> {[suggestion.submitter_city, suggestion.submitter_country].filter(Boolean).join(', ')}</div>
+                                        )}
+                                        {suggestion.submitter_timezone && <div><span className="text-slate-400">Timezone:</span> {suggestion.submitter_timezone}</div>}
+                                        <div><span className="text-slate-400">Submitted:</span> {fmtDate(suggestion.created_at)}</div>
+                                    </div>
                                 </div>
-                            )}
 
-                            {error && <p className="text-sm text-slate-700 bg-slate-100 px-2 py-1">{error}</p>}
+                                {/* Suggestion details — read-only (event is editable after approval) */}
+                                <div className="space-y-3 mb-4">
+                                    <Field label="Title" value={suggestion.title} />
+                                    {suggestion.description && (
+                                        <Field label="Description" value={suggestion.description} multiline />
+                                    )}
+                                    {suggestion.location && (
+                                        <Field label="Location" value={suggestion.location} />
+                                    )}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <Field label="Start" value={fmtDate(suggestion.start)} />
+                                        <Field label="End" value={fmtDate(suggestion.end)} />
+                                    </div>
+                                    {suggestion.all_day && (
+                                        <p className="text-[11px] text-slate-500">All day event</p>
+                                    )}
 
-                            <div className="flex justify-end pt-2">
+                                    {price && <Field label="Price" value={price} />}
+
+                                    {suggestion.links && suggestion.links.length > 0 && (
+                                        <div>
+                                            <p className="mb-1 text-xs font-medium text-slate-600">Links</p>
+                                            <ul className="text-xs space-y-1">
+                                                {suggestion.links.map((l, i) => (
+                                                    <li key={i}>
+                                                        <a
+                                                            href={l.url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-blue-600 hover:text-blue-800 hover:underline break-all"
+                                                        >
+                                                            {l.label || l.url}
+                                                        </a>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                    {suggestion.suggested_tag_ids && suggestion.suggested_tag_ids.length > 0 && (
+                                        <div>
+                                            <p className="mb-1 text-xs font-medium text-slate-600">Suggested tags</p>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {suggestion.suggested_tag_ids.map((id) => {
+                                                    const tag = tagsById.get(id);
+                                                    return <TagPill key={id} label={tag?.label ?? `#${id}`} color={tag?.color} />;
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Admin notes */}
+                                <div className="mb-4">
+                                    <label className="mb-1 block text-xs font-medium text-slate-600">Admin Notes</label>
+                                    <textarea
+                                        value={adminNotes}
+                                        onChange={(e) => setAdminNotes(e.target.value)}
+                                        rows={2}
+                                        placeholder="Internal notes…"
+                                        className="w-full border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Actions — pinned so they stay reachable on small screens */}
+                    <div className="border-t border-slate-100 px-6 py-4">
+                        {error && <p className="mb-3 text-sm text-slate-700 bg-slate-100 px-2 py-1">{error}</p>}
+                        {isApproved ? (
+                            <div className="flex justify-end">
                                 <button onClick={onClose} className="text-xs text-slate-500 hover:text-slate-700">Close</button>
                             </div>
-                        </div>
-                    ) : (
-                        <>
-                            {/* Submitter info — shown first */}
-                            <div className="mb-4 border border-slate-200 bg-slate-50 p-3">
-                                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Submitter</p>
-                                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-600">
-                                    <div><span className="text-slate-400">Name:</span> {suggestion.submitter_name || '—'}</div>
-                                    <div><span className="text-slate-400">Email:</span> {suggestion.submitter_email || '—'}</div>
-                                    {suggestion.submitter_ip && <div><span className="text-slate-400">IP:</span> {suggestion.submitter_ip}</div>}
-                                    {(suggestion.submitter_city || suggestion.submitter_country) && (
-                                        <div><span className="text-slate-400">Location:</span> {[suggestion.submitter_city, suggestion.submitter_country].filter(Boolean).join(', ')}</div>
-                                    )}
-                                    {suggestion.submitter_timezone && <div><span className="text-slate-400">Timezone:</span> {suggestion.submitter_timezone}</div>}
-                                    <div><span className="text-slate-400">Submitted:</span> {fmtDate(suggestion.created_at)}</div>
-                                </div>
-                            </div>
-
-                            {/* Suggestion details — read-only (event is editable after approval) */}
-                            <div className="space-y-3 mb-4">
-                                <Field label="Title" value={suggestion.title} />
-                                {suggestion.description && (
-                                    <Field label="Description" value={suggestion.description} multiline />
-                                )}
-                                {suggestion.location && (
-                                    <Field label="Location" value={suggestion.location} />
-                                )}
-                                <div className="grid grid-cols-2 gap-3">
-                                    <Field label="Start" value={fmtDate(suggestion.start)} />
-                                    <Field label="End" value={fmtDate(suggestion.end)} />
-                                </div>
-                                {suggestion.all_day && (
-                                    <p className="text-[11px] text-slate-500">All day event</p>
-                                )}
-
-                                {price && <Field label="Price" value={price} />}
-
-                                {suggestion.links && suggestion.links.length > 0 && (
-                                    <div>
-                                        <p className="mb-1 text-xs font-medium text-slate-600">Links</p>
-                                        <ul className="text-xs space-y-1">
-                                            {suggestion.links.map((l, i) => (
-                                                <li key={i}>
-                                                    <a
-                                                        href={l.url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-blue-600 hover:text-blue-800 hover:underline break-all"
-                                                    >
-                                                        {l.label || l.url}
-                                                    </a>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                )}
-
-                                {suggestion.suggested_tag_ids && suggestion.suggested_tag_ids.length > 0 && (
-                                    <div>
-                                        <p className="mb-1 text-xs font-medium text-slate-600">Suggested tag IDs</p>
-                                        <p className="text-xs text-slate-500">{suggestion.suggested_tag_ids.join(', ')}</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Admin notes */}
-                            <div className="mb-4">
-                                <label className="mb-1 block text-xs font-medium text-slate-600">Admin Notes</label>
-                                <textarea
-                                    value={adminNotes}
-                                    onChange={(e) => setAdminNotes(e.target.value)}
-                                    rows={2}
-                                    placeholder="Internal notes…"
-                                    className="w-full border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                />
-                            </div>
-
-                            {error && <p className="mb-3 text-sm text-slate-700 bg-slate-100 px-2 py-1">{error}</p>}
-
-                            {/* Actions */}
+                        ) : (
                             <div className="flex items-center gap-2 flex-wrap">
                                 {isPending && !rejectMode && (
                                     <>
@@ -282,8 +305,8 @@ export default function SuggestionReviewModal({ suggestion, calendars, onClose, 
                                     Close
                                 </button>
                             </div>
-                        </>
-                    )}
+                        )}
+                    </div>
                 </div>
             </div>
 

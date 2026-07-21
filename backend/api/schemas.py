@@ -698,6 +698,9 @@ class SiteSettingsResponse(BaseModel):
     # Explorer "Your next events" rail (viewer's own saved/going events).
     # When False, the rail is hidden entirely.
     your_next_events_rail_enabled: bool = True
+    # Required tag-group ids used by the event suggestion form.
+    suggest_event_required_dance_group_id: Optional[int] = None
+    suggest_event_required_reach_group_id: Optional[int] = None
     # ---------------------------------------------------------------
     # Notification / re-engagement global gates (admin-configurable).
     # These override the corresponding env vars in ``config/loader.py``
@@ -721,6 +724,11 @@ class SiteSettingsResponse(BaseModel):
     # Max matched events shown inline in an interest-match digest email
     # before the rest collapse behind a "Discover more" link to "For you".
     interest_match_max_events_per_email: int = 10
+    # When True, saving/syncing an event automatically runs the near-duplicate
+    # detection scan for it (see backend/services/duplicate_detection.py).
+    # The admin Duplicates panel and manual "Scan now"/"Flag as duplicates"
+    # actions are always available regardless of this flag.
+    duplicate_auto_detect_enabled: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -866,6 +874,8 @@ class SiteSettingsUpdateRequest(BaseModel):
     organizer_claims_enabled: Optional[bool] = None
     for_you_rail_enabled: Optional[bool] = None
     your_next_events_rail_enabled: Optional[bool] = None
+    suggest_event_required_dance_group_id: Optional[int] = Field(default=None, ge=1)
+    suggest_event_required_reach_group_id: Optional[int] = Field(default=None, ge=1)
     # Notification / re-engagement global gates.
     event_reminders_enabled: Optional[bool] = None
     activity_digest_email_enabled: Optional[bool] = None
@@ -884,6 +894,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     interest_match_max_events_per_email: Optional[int] = Field(
         default=None, ge=1, le=50
     )
+    duplicate_auto_detect_enabled: Optional[bool] = None
 
 
 class EventUpdateRequest(BaseModel):
@@ -946,6 +957,11 @@ class EventSuggestionCreate(BaseModel):
     timezone: Optional[str] = None
     suggested_tag_ids: list[int] = Field(default_factory=list)
     suggested_new_tags: list[NewTagSuggestionItem] = Field(default_factory=list)
+    going: bool = False
+    going_audience: Optional[str] = Field(default=None, pattern="^(public|friends|private)$")
+    promo_code: Optional[str] = Field(default=None, max_length=64)
+    promo_description: Optional[str] = Field(default=None, max_length=200)
+    promo_source_url: Optional[str] = Field(default=None, max_length=500)
     price_min: Optional[float] = Field(default=None, ge=0)
     price_max: Optional[float] = Field(default=None, ge=0)
     price_currency: Optional[str] = Field(default=None, max_length=8)
@@ -987,6 +1003,9 @@ class EventSuggestionResponse(BaseModel):
     google_event_id: Optional[str] = None
     suggested_tag_ids: Optional[list[int]] = None
     suggested_new_tags: Optional[list[NewTagSuggestionItem]] = None
+    promo_code: Optional[str] = None
+    promo_description: Optional[str] = None
+    promo_source_url: Optional[str] = None
     price_min: Optional[float] = None
     price_max: Optional[float] = None
     price_currency: Optional[str] = None
@@ -1177,6 +1196,59 @@ class BulkTagSuggestionRunResponse(BaseModel):
 class PaginatedEventsResponse(BaseModel):
     items: list[EventResponse]
     total: int
+
+
+# --- Admin: near-duplicate event detection & review ---
+
+
+class DuplicateEventSummary(BaseModel):
+    event_id: str
+    title: str
+    start: datetime
+    end: datetime
+    calendar_id: str
+    is_hidden: bool = False
+    is_blocked: bool = False
+    rejected_duplicate_reason: Optional[str] = None
+
+
+class DuplicateGroupResponse(BaseModel):
+    id: int
+    status: str  # pending | resolved | dismissed
+    source: str  # auto | manual
+    kept_event_id: Optional[str] = None
+    created_at: datetime
+    resolved_at: Optional[datetime] = None
+    events: list[DuplicateEventSummary] = []
+
+
+class DuplicateGroupListResponse(BaseModel):
+    items: list[DuplicateGroupResponse]
+    total: int
+
+
+class DuplicateScanLogEntry(BaseModel):
+    id: int
+    scan_type: str  # incremental | full | manual_pair
+    triggered_by_event_id: Optional[str] = None
+    started_at: datetime
+    finished_at: Optional[datetime] = None
+    candidates_found: int = 0
+    groups_created: int = 0
+    status: str
+
+
+class DuplicateScanLogListResponse(BaseModel):
+    items: list[DuplicateScanLogEntry]
+    total: int
+
+
+class DuplicateKeepRequest(BaseModel):
+    keep_event_id: str
+
+
+class ManualDuplicateGroupRequest(BaseModel):
+    event_ids: list[str] = Field(..., min_length=2, max_length=20)
 
 
 class FilterOption(BaseModel):

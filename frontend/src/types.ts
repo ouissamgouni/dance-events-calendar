@@ -217,6 +217,50 @@ export interface OrganizerClaimDecide {
     overwrite?: boolean;
 }
 
+// --- Duplicate detection ----------------------------------------------------
+
+export interface DuplicateEventSummary {
+    event_id: string;
+    title: string;
+    start: string;
+    end: string;
+    calendar_id: string;
+    is_hidden: boolean;
+    is_blocked: boolean;
+    rejected_duplicate_reason: string | null;
+}
+
+export interface DuplicateGroup {
+    id: number;
+    status: 'pending' | 'resolved' | 'dismissed';
+    source: 'auto' | 'manual';
+    kept_event_id: string | null;
+    created_at: string;
+    resolved_at: string | null;
+    events: DuplicateEventSummary[];
+}
+
+export interface DuplicateGroupListResponse {
+    items: DuplicateGroup[];
+    total: number;
+}
+
+export interface DuplicateScanLogEntry {
+    id: number;
+    scan_type: 'incremental' | 'full' | 'manual_pair';
+    triggered_by_event_id: string | null;
+    started_at: string;
+    finished_at: string | null;
+    candidates_found: number;
+    groups_created: number;
+    status: string;
+}
+
+export interface DuplicateScanLogListResponse {
+    items: DuplicateScanLogEntry[];
+    total: number;
+}
+
 export interface CalendarSetting {
     calendar_id: string;
     name: string;
@@ -305,6 +349,11 @@ export interface EventSuggestionCreate {
     submitter_email?: string;
     suggested_tag_ids?: number[];
     suggested_new_tags?: { free_text: string; group_slug?: string | null }[];
+    going?: boolean;
+    going_audience?: 'public' | 'friends' | 'private' | null;
+    promo_code?: string | null;
+    promo_description?: string | null;
+    promo_source_url?: string | null;
     price_min?: number | null;
     price_max?: number | null;
     price_currency?: string | null;
@@ -348,6 +397,9 @@ export interface EventSuggestion {
     synced_to_google: boolean;
     google_event_id: string | null;
     suggested_tag_ids?: number[] | null;
+    promo_code?: string | null;
+    promo_description?: string | null;
+    promo_source_url?: string | null;
     price_min?: number | null;
     price_max?: number | null;
     price_currency?: string | null;

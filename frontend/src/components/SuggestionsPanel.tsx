@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { EventSuggestion, CalendarSetting } from '../types';
+import type { EventSuggestion, CalendarSetting, Tag } from '../types';
 import { syncSuggestionToGoogle } from '../api';
 import SuggestionReviewModal from './SuggestionReviewModal';
 import AdminEventDetailPanel from './AdminEventDetailPanel';
@@ -9,6 +9,7 @@ interface Props {
     onClose: () => void;
     suggestions: EventSuggestion[];
     calendars: CalendarSetting[];
+    allTags?: Tag[];
     onUpdated: (s: EventSuggestion) => void;
     onRefresh?: () => void;
 }
@@ -16,7 +17,7 @@ interface Props {
 const TABS = ['all', 'pending', 'approved', 'rejected'] as const;
 type Tab = typeof TABS[number];
 
-export default function SuggestionsPanel({ isOpen, onClose, suggestions, calendars, onUpdated, onRefresh }: Props) {
+export default function SuggestionsPanel({ isOpen, onClose, suggestions, calendars, allTags, onUpdated, onRefresh }: Props) {
     const [activeTab, setActiveTab] = useState<Tab>('pending');
     const [reviewingSuggestion, setReviewingSuggestion] = useState<EventSuggestion | null>(null);
     const [adminDetailEventId, setAdminDetailEventId] = useState<string | null>(null);
@@ -181,6 +182,7 @@ export default function SuggestionsPanel({ isOpen, onClose, suggestions, calenda
                 <SuggestionReviewModal
                     suggestion={reviewingSuggestion}
                     calendars={calendars}
+                    allTags={allTags}
                     onClose={() => setReviewingSuggestion(null)}
                     onUpdated={(updated) => {
                         setReviewingSuggestion(updated);
