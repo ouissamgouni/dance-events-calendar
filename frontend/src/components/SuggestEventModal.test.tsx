@@ -135,21 +135,6 @@ function setupSignedInUser() {
     server.use(http.get('*/api/auth/me', () => HttpResponse.json(makeUser())))
 }
 
-async function fillBasics() {
-    const user = renderWithProviders(<SuggestEventModal onClose={() => { }} />).user
-    await user.type(screen.getByPlaceholderText('Event name'), 'Salsa Social')
-}
-
-async function openAndFillBasics(user: ReturnType<typeof renderWithProviders>['user']) {
-    await user.type(screen.getByPlaceholderText('Event name'), 'Salsa Social')
-    await user.type(screen.getByPlaceholderText('Type an address…'), 'Berlin')
-    const suggestion = await screen.findByText('Berlin Center')
-    await user.click(suggestion)
-    await user.click(screen.getByRole('button', { name: /Next/i }))
-    await user.click(screen.getByRole('button', { name: /Next/i }))
-    await user.click(screen.getByRole('button', { name: /Next/i }))
-}
-
 describe('SuggestEventModal', () => {
     it('requires a validated location and required tags before submission', async () => {
         setupTagGroups()
