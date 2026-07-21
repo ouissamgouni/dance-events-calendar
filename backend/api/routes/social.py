@@ -3822,6 +3822,7 @@ def _build_fof_suggestions(
                     is_admin_managed=bool(u.is_admin_managed),
                     mutual_friend_count=0,
                     mutual_friends_preview=[],
+                    followers_count=_followers_count(session, u.id),
                 )
                 for u in curators
             ],
@@ -3871,6 +3872,7 @@ def _build_fof_suggestions(
                 is_admin_managed=bool(u.is_admin_managed),
                 mutual_friend_count=candidate_scores.get(u.id, 0),
                 mutual_friends_preview=[h for h in preview_rows if h],
+                followers_count=_followers_count(session, u.id),
             )
         )
 
