@@ -906,7 +906,7 @@ export default function Admin() {
                         onClick={() => {
                             setSuggestionsPanelOpen(true);
                             if (tagGroups.length === 0) {
-                                fetchAdminTagGroups().then(setTagGroups).catch(() => {});
+                                fetchAdminTagGroups().then(setTagGroups).catch(() => { });
                             }
                         }}
                         className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
@@ -940,19 +940,17 @@ export default function Admin() {
                             </span>
                         )}
                     </button>
-                    {promoCodesEnabled && (
-                        <button
-                            onClick={() => setPromoCodesPanelOpen(true)}
-                            className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
-                        >
-                            Promo Codes
-                            {promoCodesPendingCount > 0 && (
-                                <span className="inline-flex items-center justify-center bg-amber-500 text-white text-[10px] font-semibold px-1.5 py-0 min-w-[16px]">
-                                    {promoCodesPendingCount}
-                                </span>
-                            )}
-                        </button>
-                    )}
+                    <button
+                        onClick={() => setPromoCodesPanelOpen(true)}
+                        className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
+                    >
+                        Promo Codes
+                        {promoCodesPendingCount > 0 && (
+                            <span className="inline-flex items-center justify-center bg-amber-500 text-white text-[10px] font-semibold px-1.5 py-0 min-w-[16px]">
+                                {promoCodesPendingCount}
+                            </span>
+                        )}
+                    </button>
                     {organizerClaimsEnabled && (
                         <button
                             onClick={() => setOrganizerClaimsPanelOpen(true)}

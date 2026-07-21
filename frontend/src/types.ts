@@ -123,6 +123,14 @@ export interface CalendarEvent {
     /** Server-computed: at least one approved, non-expired promo code exists.
      * Drives the badge/count next to the price block. */
     has_active_promo_codes?: boolean;
+    /**
+     * Per-event overrides for the ``show_prices`` / ``promo_codes_enabled``
+     * global feature flags. ``null``/``undefined`` means "inherit the
+     * global flag"; ``true``/``false`` force the section on/off for this
+     * event only. Set from the admin event detail page.
+     */
+    show_price_override?: boolean | null;
+    show_promo_override?: boolean | null;
     /** Approved organizer claim for this event (or null). */
     organizer?: EventOrganizerMini | null;
 }

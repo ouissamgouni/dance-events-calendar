@@ -9,7 +9,12 @@
 # one replaces).
 #
 # - viewer -> alice   (one-way; alice does NOT follow back)
-# - viewer <-> bob    (mutual — bob is viewer's ONLY friend in this graph)
+# - viewer -> frank   (one-way; frank does NOT follow back — second
+#   one-way followee, so the "All" scope has more than one non-mutual
+#   source to union)
+# - viewer <-> bob    (mutual — bob is viewer's first friend)
+# - viewer <-> grace  (mutual — second friend, so the "Friends" scope
+#   has more than one source to union)
 # - viewer -> carol   (one-way; carol's attendance is audience=friends,
 #   so it stays hidden from viewer until she follows back — see
 #   db-follows.yaml and the privacy steps in test_plan.yaml)
@@ -36,6 +41,12 @@ users:
   - email: eve@example.com
     name: Eve Esposito
     handle: eve
+  - email: frank@example.com
+    name: Frank Okafor
+    handle: frank
+  - email: grace@example.com
+    name: Grace Kim
+    handle: grace
   - email: admin@example.com # matches ADMIN_EMAIL → admin badge
     name: Dev Admin
     handle: admin

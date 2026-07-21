@@ -55,3 +55,24 @@ events:
       - format:class
       - dance-style:kizomba
       - reach:local
+  - id: evt-promo-004
+    calendar_id: promo-cal-001
+    title: Zouk Night — Promo section forced off
+    description: |
+      The global promo_codes_enabled flag is on for this scenario, but this
+      event has show_promo_override set to false, so its promo codes section
+      is hidden regardless. Use this to verify the per-event override takes
+      precedence over the global flag.
+    location: Test Venue 4, Lisbon, Portugal
+    latitude: 38.7223
+    longitude: -9.1393
+    start: w0 Sun 21:30
+    end: w0 Mon 00:30
+    price_is_free: false
+    price_min: 18
+    price_currency: EUR
+    show_promo_override: false
+    tags:
+      - format:social
+      - dance-style:zouk
+      - reach:regional

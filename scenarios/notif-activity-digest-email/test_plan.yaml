@@ -15,9 +15,11 @@ test_plan:
     - "Open the Mailpit inbox at http://127.0.0.1:8025 and clear existing messages."
 
   cast:
-    - "Alice — actor (Going ev-friend)."
+    - "Alice — actor (Going ev-friend); mutual friend of Bob."
     - "Bob   — follower, email_social_activity ON → expect one digest."
     - "Carol — follower, email_social_activity OFF → in-app only."
+    - "diego, elena — followed by Alice; surfaced as Bob's mutual-friend suggestions."
+    - "curator-bachata — admin-managed curator, also followed by Alice; surfaced as a third suggestion alongside diego/elena."
 
   steps:
     - id: 1
@@ -49,3 +51,44 @@ test_plan:
         Verify no push attempted.
       expected: >
         `activity.pushed=0` — WEB_PUSH_ENABLED is false.
+
+    - id: 4
+      title: "People you may want to follow section"
+      description: >
+        Open Bob's digest email in Mailpit and inspect the section below
+        the activity list.
+      expected: >
+        A section titled "People you may want to follow" lists 3 rows —
+        diego, elena and curator-bachata — each ranked via Bob and
+        Alice's mutual friendship (`mutual_friend_count=1`). Each row
+        shows: a circular avatar (diego/elena/curator-bachata all have an
+        `avatar_url`, so no gray-circle placeholder should appear), a
+        "Friend of 1 mutual friend · N followers" line (diego shows 2
+        followers — Alice and Carol both follow him; elena and
+        curator-bachata show 1 follower — Alice only), and a blue
+        "Follow" button. The Follow button links to
+        `{app}/u/{handle}?follow=1` (where `{app}` is the scenario's
+        actual assigned frontend origin, e.g. `http://localhost:<SC_WEB_PORT>`
+        — NOT a hardcoded `localhost:5173`; clicking it while signed in
+        auto-follows that person on page load). Carol receives no email
+        so this section is moot for her.
+
+    - id: 5
+      title: "Engagement links"
+      description: >
+        Inspect the CTA block at the bottom of Bob's digest email, above
+        the unsubscribe footer.
+      expected: >
+        All four CTAs render on a single horizontal line (one table row):
+        "Open Movida" (a button prefixed with the open.png icon, linking
+        to `{app}/`, the Movida home page — not the notifications settings
+        anchor), followed immediately by three smaller plain links (not
+        buttons, `font-size:12px`), each prefixed with its icon: "Invite a
+        friend" (share.png) links to `{app}/invite`; "Install Movida"
+        (save-pink.png) links to `{app}/install`; "Notifications Settings"
+        (setting.png) links to `{app}/account#notifications` (the
+        "Notifications & email" section). `{app}` is the scenario's actual
+        assigned frontend origin (dynamic port), not a hardcoded
+        `localhost:5173` — and the `open.png`/`share.png`/etc. icons must
+        render (both depend on the scenario's `PUBLIC_APP_URL` override
+        matching the live frontend port).

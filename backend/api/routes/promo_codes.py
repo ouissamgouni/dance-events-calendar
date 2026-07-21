@@ -21,7 +21,7 @@ from sqlmodel import Session, col, select
 from backend.api.deps import (
     get_current_user_optional,
     require_admin,
-    require_flag,
+    require_promo_codes_enabled_for_event,
     require_user,
 )
 from backend.api.rate_limit import client_ip
@@ -35,13 +35,26 @@ from backend.api.schemas import (
 )
 from backend.config.loader import get_admin_email
 from backend.db.database import get_session
-from backend.db.models import CachedEvent, EventPromoCode, Notification, User
-from backend.services.email import send_promo_code_notification
+from backend.db.models import (
+    CachedEvent,
+    EventPromoCode,
+    Notification,
+    User,
+    UserEventAttendance,
+    UserSavedEvent,
+)
+from backend.services.email import (
+    send_promo_code_added_email,
+    send_promo_code_notification,
+)
+from backend.services.notification_delivery import record_delivery
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["promo-codes"])
 limiter = Limiter(key_func=client_ip)
+
+PROMO_CODE_ADDED = "promo_code_added"
 
 
 # --- helpers ---
@@ -131,13 +144,114 @@ def _notify_submitter(session: Session, promo: EventPromoCode, kind: str) -> Non
     session.add(notif)
 
 
+def _fan_out_saved_event_promo_code(
+    session: Session, promo: EventPromoCode
+) -> list[UUID]:
+    """Insert in-app ``promo_code_added`` rows for users who saved this
+    event, excluding the submitter and anyone also "Going" to it. No
+    commit — caller owns the transaction. Returns newly-notified user ids
+    (for the caller to enqueue email/push delivery).
+    """
+    saved_user_ids = set(
+        session.exec(
+            select(UserSavedEvent.user_id)
+            .where(UserSavedEvent.event_id == promo.event_id)
+            .where(col(UserSavedEvent.user_id).is_not(None))
+        ).all()
+    )
+    if not saved_user_ids:
+        return []
+    going_user_ids = set(
+        session.exec(
+            select(UserEventAttendance.user_id)
+            .where(UserEventAttendance.event_id == promo.event_id)
+            .where(col(UserEventAttendance.user_id).is_not(None))
+        ).all()
+    )
+    already_notified = set(
+        session.exec(
+            select(Notification.recipient_user_id)
+            .where(Notification.kind == PROMO_CODE_ADDED)
+            .where(Notification.event_id == promo.event_id)
+        ).all()
+    )
+    recipients = (
+        saved_user_ids - going_user_ids - already_notified - {promo.submitter_user_id}
+    )
+    for recipient_id in recipients:
+        notif = Notification(
+            recipient_user_id=recipient_id,
+            actor_user_id=recipient_id,
+            kind=PROMO_CODE_ADDED,
+            event_id=promo.event_id,
+            context=promo.code,
+        )
+        session.add(notif)
+        session.flush()
+        record_delivery(session, notif.id, "app")
+    return list(recipients)
+
+
+def _send_promo_code_added_notifications(
+    promo_id: UUID, recipient_ids: list[UUID]
+) -> None:
+    """Background task: email/push the users fanned out to by
+    ``_fan_out_saved_event_promo_code``. Own session; stamps
+    ``emailed_at``/``pushed_at`` and records deliveries for channels that
+    actually send, same durability convention as ``reminder_service.py``.
+    """
+    from backend.db.database import get_engine
+    from backend.services.push_service import send_push
+    from sqlmodel import Session as SyncSession
+
+    if not recipient_ids:
+        return
+    engine = get_engine()
+    with SyncSession(engine) as session:
+        promo = session.get(EventPromoCode, promo_id)
+        if not promo:
+            return
+        event = session.get(CachedEvent, promo.event_id)
+        notifs = session.exec(
+            select(Notification)
+            .where(Notification.kind == PROMO_CODE_ADDED)
+            .where(Notification.event_id == promo.event_id)
+            .where(col(Notification.recipient_user_id).in_(recipient_ids))
+        ).all()
+        notif_by_user = {n.recipient_user_id: n for n in notifs}
+        users = session.exec(select(User).where(col(User.id).in_(recipient_ids))).all()
+        stamp_now = datetime.utcnow()
+        for user in users:
+            notif = notif_by_user.get(user.id)
+            if notif is None:
+                continue
+            if user.email_promo_codes_enabled and send_promo_code_added_email(
+                user, event, promo
+            ):
+                notif.emailed_at = stamp_now
+                record_delivery(session, notif.id, "email", stamp_now)
+            if user.push_promo_codes_enabled:
+                delivered = send_push(
+                    user.id,
+                    title="New promo code",
+                    body=f"{(event.title if event else 'An event')} has a new promo code: {promo.code}",
+                    url=f"/event/{promo.event_id}",
+                    tag=f"promo:{promo.event_id}",
+                )
+                if delivered:
+                    notif.pushed_at = stamp_now
+                    record_delivery(session, notif.id, "push", stamp_now)
+            session.add(notif)
+        session.commit()
+
+
 # --- Public endpoints ---
 
 
 @router.get(
     "/api/events/{event_id}/promo-codes",
     response_model=list[PromoCodeOut],
-    dependencies=[Depends(require_flag("promo_codes_enabled"))],
+    dependencies=[Depends(require_promo_codes_enabled_for_event)],
 )
 def list_event_promo_codes(
     event_id: str,
@@ -186,7 +300,7 @@ def list_event_promo_codes(
     "/api/events/{event_id}/promo-codes",
     response_model=PromoCodeOut,
     status_code=201,
-    dependencies=[Depends(require_flag("promo_codes_enabled"))],
+    dependencies=[Depends(require_promo_codes_enabled_for_event)],
 )
 def submit_promo_code(
     event_id: str,
@@ -238,7 +352,7 @@ def submit_promo_code(
 @router.patch(
     "/api/events/{event_id}/promo-codes/{promo_id}",
     response_model=PromoCodeOut,
-    dependencies=[Depends(require_flag("promo_codes_enabled"))],
+    dependencies=[Depends(require_promo_codes_enabled_for_event)],
 )
 def update_promo_code(
     event_id: str,
@@ -306,7 +420,7 @@ def update_promo_code(
 @router.delete(
     "/api/events/{event_id}/promo-codes/{promo_id}",
     status_code=204,
-    dependencies=[Depends(require_flag("promo_codes_enabled"))],
+    dependencies=[Depends(require_promo_codes_enabled_for_event)],
 )
 def delete_promo_code(
     event_id: str,
@@ -341,12 +455,15 @@ def delete_promo_code(
 @router.get("/api/admin/promo-codes", response_model=list[PromoCodeAdminOut])
 def admin_list_promo_codes(
     status: str | None = Query(default=None),
+    event_id: str | None = Query(default=None),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
     q = select(EventPromoCode).order_by(col(EventPromoCode.created_at).desc())
     if status:
         q = q.where(EventPromoCode.status == status)
+    if event_id:
+        q = q.where(EventPromoCode.event_id == event_id)
     rows = session.exec(q).all()
     if not rows:
         return []
@@ -396,6 +513,7 @@ def admin_get_promo_code(
 )
 def admin_approve_promo_code(
     promo_id: UUID,
+    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
     admin: dict = Depends(require_admin),
 ):
@@ -411,8 +529,13 @@ def admin_approve_promo_code(
     promo.updated_at = datetime.utcnow()
     session.add(promo)
     _notify_submitter(session, promo, "promo_code_approved")
+    recipient_ids = _fan_out_saved_event_promo_code(session, promo)
     session.commit()
     session.refresh(promo)
+    if recipient_ids:
+        background_tasks.add_task(
+            _send_promo_code_added_notifications, promo.id, recipient_ids
+        )
     submitter = session.get(User, promo.submitter_user_id)
     event = session.get(CachedEvent, promo.event_id)
     return _to_admin_out(

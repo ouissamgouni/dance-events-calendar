@@ -1,6 +1,10 @@
 # activity-digest-email cast. Bob has email_social_activity ON;
 # Carol has it OFF as a negative probe (user-level opt-out must
-# suppress the email even though the admin gate is on).
+# suppress the email even though the admin gate is on). Bob and Alice
+# are mutual friends, and Alice follows diego/elena/curator-bachata —
+# this gives Bob a richer, realistic "People you may want to follow"
+# section (3 mutual-friend suggestions) instead of the empty-mutuals
+# curator-only fallback (mirrors scenarios/suggestions-surfaces).
 users:
   - email: admin@example.com
     name: Admin
@@ -11,6 +15,7 @@ users:
     name: Alice Rivera
     handle: alice
     account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Alice%20Rivera
 
   - email: bob@example.com
     name: Bob Martin
@@ -26,3 +31,26 @@ users:
     account_visibility: public
     email_social_activity_enabled: false
     push_social_activity_enabled: false
+
+  # Mutual friends of Alice, surfaced as suggestions in Bob's digest.
+  - email: diego@example.com
+    name: Diego Fernandez
+    handle: diego
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Diego%20Fernandez
+
+  - email: elena@example.com
+    name: Elena Cruz
+    handle: elena
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Elena%20Cruz
+
+  # Curator suggestion, surfaced via Alice's follow (no longer a bare
+  # empty-mutuals fallback — appears alongside diego/elena above).
+  - email: curator-bachata@example.com
+    name: Bachata Curator
+    handle: curator-bachata
+    account_visibility: public
+    is_admin_managed: true
+    managed_label: Bachata Curator
+    bio: Editorial bachata calendar for social dancers.

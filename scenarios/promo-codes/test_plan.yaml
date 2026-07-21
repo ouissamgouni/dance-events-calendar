@@ -2,7 +2,7 @@ test_plan:
   name: "Promo Codes — critical path"
   description: |
     Verify the user-submitted promo code feature end-to-end. The scenario
-    pre-seeds three events and three promo codes (1 approved, 1 pending,
+    pre-seeds four events and three promo codes (1 approved, 1 pending,
     1 rejected) so most steps just check what's already there.
 
     Sign-in tip: at /login, dev mode shows one button per mock user. Use
@@ -89,6 +89,16 @@ test_plan:
         corresponding event detail page.
 
     - id: 9
+      title: "Per-event override forces the section off while the flag is on"
+      description: |
+        Global "Promo codes" flag is still on. Open evt-promo-004 (Zouk
+        Night) from the calendar.
+      expected: |
+        No promo codes badge/section appears next to the price, because
+        this event's show_promo_override is set to false (visible/editable
+        from the admin event detail page), overriding the global flag.
+
+    - id: 10
       title: "Feature flag off → UI disappears"
       description: |
         As Dev Admin, in /admin → Configuration tab, toggle
@@ -97,3 +107,14 @@ test_plan:
         The promo codes section is hidden on the detail page even though
         approved codes exist. In the admin Data toolbar, the
         "Promo Codes" button disappears.
+
+    - id: 11
+      title: "Per-event override still unlocks the section while the flag is off"
+      description: |
+        With the global flag still off from step 10, open the admin event
+        detail page for evt-promo-001 and set its show_promo_override to
+        true. Reload the public detail page.
+      expected: |
+        The promo codes section reappears for evt-promo-001 only, listing
+        EARLYBIRD + NEEDREVIEW, even though the global flag is off. Other
+        events remain without a promo codes section.

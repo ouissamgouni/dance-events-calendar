@@ -16,6 +16,7 @@ from backend.db.models import (
     BlockedEvent,
     CachedEvent,
     CalendarSetting,
+    EventPromoCode,
     SiteSetting,
     User,
 )
@@ -483,6 +484,63 @@ class TestEventsEndpoint:
         assert [row["event_id"] for row in data] == ["evt-2"]
         assert resp.headers["x-has-more"] == "false"
 
+    def test_get_events_promo_override_unlocks_badge_when_flag_off(self, sqlite_client):
+        client, engine = sqlite_client
+        now = datetime.now(UTC).replace(tzinfo=None)
+
+        with Session(engine) as session:
+            session.add(
+                CalendarSetting(
+                    calendar_id="cal-1",
+                    name="Test Calendar",
+                    enabled=True,
+                    color="#ff0000",
+                )
+            )
+            submitter = User(email="submitter@example.com")
+            session.add(submitter)
+            session.add_all(
+                [
+                    CachedEvent(
+                        event_id="evt-override",
+                        calendar_id="cal-1",
+                        title="Override Event",
+                        start=now + timedelta(days=1),
+                        end=now + timedelta(days=1, hours=3),
+                        is_hidden=False,
+                        show_promo_override=True,
+                    ),
+                    CachedEvent(
+                        event_id="evt-default",
+                        calendar_id="cal-1",
+                        title="Default Event",
+                        start=now + timedelta(days=2),
+                        end=now + timedelta(days=2, hours=3),
+                        is_hidden=False,
+                    ),
+                ]
+            )
+            session.commit()
+            session.refresh(submitter)
+            session.add(
+                EventPromoCode(
+                    event_id="evt-override",
+                    code="SAVE10",
+                    status="approved",
+                    submitter_user_id=submitter.id,
+                )
+            )
+            session.commit()
+
+        # promo_codes_enabled global flag is off (no SiteSetting row) — only
+        # the event with an explicit ``show_promo_override=True`` should
+        # report an active promo code.
+        resp = client.get("/api/events")
+        assert resp.status_code == 200
+        by_id = {row["event_id"]: row for row in resp.json()}
+        assert by_id["evt-override"]["has_active_promo_codes"] is True
+        assert by_id["evt-default"]["has_active_promo_codes"] is False
+
     def test_get_events_omits_has_more_header_when_unpaginated(
         self, sample_calendar, sample_events
     ):
@@ -853,6 +911,37 @@ class TestHideBlockEndpoints:
             resp = client.patch("/api/admin/events/evt-1", json={"is_hidden": True})
             assert resp.status_code == 200
             assert resp.json()["is_hidden"] is True
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_patch_section_overrides_round_trip(self):
+        event = self._make_event()
+        cal = self._make_cal()
+        mock_session = MagicMock(spec=Session)
+        mock_session.get.side_effect = lambda model, key: (
+            event if model == CachedEvent else cal
+        )
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[require_admin] = _fake_admin
+        try:
+            client = TestClient(app)
+            resp = client.patch(
+                "/api/admin/events/evt-1",
+                json={"show_price_override": True, "show_promo_override": False},
+            )
+            assert resp.status_code == 200
+            body = resp.json()
+            assert body["show_price_override"] is True
+            assert body["show_promo_override"] is False
+
+            # Explicit null resets an override back to "inherit global".
+            resp = client.patch(
+                "/api/admin/events/evt-1", json={"show_price_override": None}
+            )
+            assert resp.status_code == 200
+            body = resp.json()
+            assert body["show_price_override"] is None
+            assert body["show_promo_override"] is False
         finally:
             app.dependency_overrides.clear()
 

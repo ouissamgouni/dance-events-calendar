@@ -1,7 +1,7 @@
 # Pre-seeded events for the filter-by-social-interest scenario.
 #
-# Seven events, each tied to exactly one assertion in the test plan so
-# toggling scope / kind / person selection stays unambiguous:
+# evt-fsi-001..007, each tied to exactly one assertion in the test plan
+# so toggling scope / kind / person selection stays unambiguous:
 #
 #   evt-fsi-001 (Salsa Social Friday)        → Alice goes (public)
 #                                              → surfaces under "All" scope
@@ -11,8 +11,7 @@
 #   evt-fsi-002 (Bachata Workshop)           → Bob goes (public)
 #                                              → surfaces under BOTH "All"
 #                                                and "Friends" scope (bob
-#                                                is viewer's only mutual
-#                                                friend)
+#                                                is a mutual friend)
 #   evt-fsi-003 (Cuban Night)                → Carol goes, audience=friends
 #                                              → MUST NOT surface under
 #                                                either scope (viewer
@@ -31,6 +30,21 @@
 #   evt-fsi-007 (Rueda Wednesday)            → Bob saves (public)
 #                                              → surfaces under BOTH
 #                                                scopes, kind=saved/any
+#   evt-fsi-008 (Kizomba Rooftop Mixer)      → Frank goes (public)
+#                                              → surfaces under "All" scope
+#                                                only (frank is a second
+#                                                one-way followee)
+#   evt-fsi-009 (Rueda Congress Grand Ball)  → Grace goes (public)
+#                                              → surfaces under BOTH "All"
+#                                                and "Friends" scope (grace
+#                                                is a second mutual friend)
+#
+# evt-fsi-010..012 are catalog-only filler events with NO attendance —
+# they never surface under any follows/friends scope. They exist purely
+# to give every tag in every group (see scenarios/default/tags.yaml) a
+# non-zero event_count, so the TagFilterPills per-group row has enough
+# distinct pills to require horizontal scrolling when manually testing
+# that UI (not tied to any test_plan.yaml assertion).
 base_week: 0
 events:
   - id: evt-fsi-001
@@ -166,4 +180,103 @@ events:
       - level:all-levels
       - venue:indoor
       - vibe:social-atmosphere
+      - reach:regional
+  - id: evt-fsi-008
+    calendar_id: salsa-cal-001
+    title: Kizomba Rooftop Mixer
+    description: |
+      Sunset kizomba social on the rooftop terrace, live band closing set.
+    location: Sky Terrace, Rua Augusta 100, Lisbon, Portugal
+    latitude: 38.7107
+    longitude: -9.1366
+    start: w0 Sun 19:00
+    end: w0 Sun 23:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:kizomba
+      - level:beginner-friendly
+      - venue:rooftop
+      - vibe:live-band
+      - reach:local
+  - id: evt-fsi-009
+    calendar_id: salsa-cal-001
+    title: Rueda Congress Grand Ball
+    description: |
+      Closing gala of the rueda congress, international guest instructors.
+    location: Grand Ballroom, Via Roma 20, Milan, Italy
+    latitude: 45.4642
+    longitude: 9.19
+    start: w1 Mon 20:00
+    end: w1 Tue 01:00
+    price_is_free: false
+    price_min: 40
+    price_currency: EUR
+    tags:
+      - format:congress
+      - dance-style:rueda
+      - dance-style:salsa
+      - level:advanced
+      - venue:indoor
+      - vibe:high-level-dancers
+      - vibe:crowded
+      - reach:international
+  - id: evt-fsi-010
+    calendar_id: bachata-cal-002
+    title: Zouk & Semba Fusion Class
+    description: |
+      Two-hour fusion class blending Brazilian zouk and semba footwork.
+    location: Studio 8, Karl-Marx-Allee 50, Berlin, Germany
+    latitude: 52.5186
+    longitude: 13.4295
+    start: w1 Wed 18:30
+    end: w1 Wed 20:30
+    price_is_free: false
+    price_min: 15
+    price_currency: EUR
+    tags:
+      - format:class
+      - dance-style:zouk
+      - dance-style:semba
+      - level:intermediate
+      - venue:indoor
+      - reach:local
+  - id: evt-fsi-011
+    calendar_id: salsa-cal-001
+    title: Outdoor Rueda Flash Practice
+    description: |
+      Casual open-air rueda circle in the park, all levels drop in.
+    location: Parc de la Ciutadella, Passeig de Picasso, Barcelona, Spain
+    latitude: 41.3888
+    longitude: 2.1873
+    start: w2 Thu 18:00
+    end: w2 Thu 20:00
+    price_is_free: true
+    tags:
+      - format:practice
+      - dance-style:rueda
+      - dance-style:salsa
+      - level:all-levels
+      - venue:outdoor
+      - vibe:spacious
+      - reach:regional
+  - id: evt-fsi-012
+    calendar_id: salsa-cal-001
+    title: Cha-Cha & Son Heritage Bootcamp
+    description: |
+      Full-day bootcamp covering cha-cha-cha and son fundamentals.
+    location: Casa de la Salsa, Calle Obispo 200, Havana, Cuba
+    latitude: 23.1367
+    longitude: -82.359
+    start: w2 Fri 10:00
+    end: w2 Fri 17:00
+    price_is_free: false
+    price_min: 20
+    price_currency: USD
+    tags:
+      - format:bootcamp
+      - dance-style:cha-cha
+      - dance-style:son
+      - level:advanced
+      - venue:indoor
       - reach:regional

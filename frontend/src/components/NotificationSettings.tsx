@@ -18,7 +18,7 @@ import {
  * that flips all six channel flags to false in a single PATCH.
  */
 
-type FeatureKey = 'event_reminders' | 'social_activity' | 'interest_matches';
+type FeatureKey = 'event_reminders' | 'social_activity' | 'interest_matches' | 'promo_codes';
 type Channel = 'email' | 'push';
 type FlagKey =
     | 'email_event_reminders_enabled'
@@ -26,7 +26,9 @@ type FlagKey =
     | 'email_interest_matches_enabled'
     | 'push_event_reminders_enabled'
     | 'push_social_activity_enabled'
-    | 'push_interest_matches_enabled';
+    | 'push_interest_matches_enabled'
+    | 'email_promo_codes_enabled'
+    | 'push_promo_codes_enabled';
 
 const FEATURES: {
     key: FeatureKey;
@@ -34,25 +36,31 @@ const FEATURES: {
     description: string;
     anchor: string;
 }[] = [
-    {
-        key: 'event_reminders',
-        label: 'Event reminders',
-        description: "Before events I've RSVP'd to.",
-        anchor: 'notify-event-reminders',
-    },
-    {
-        key: 'social_activity',
-        label: 'Friends & social',
-        description: 'Follows, friend requests, and friends going to events.',
-        anchor: 'notify-social-activity',
-    },
-    {
-        key: 'interest_matches',
-        label: 'Interest matches',
-        description: 'New events matching your saved searches.',
-        anchor: 'notify-interest-matches',
-    },
-];
+        {
+            key: 'event_reminders',
+            label: 'Event reminders',
+            description: "Before events I've RSVP'd to.",
+            anchor: 'notify-event-reminders',
+        },
+        {
+            key: 'social_activity',
+            label: 'Friends & social',
+            description: 'Follows, friend requests, and friends going to events.',
+            anchor: 'notify-social-activity',
+        },
+        {
+            key: 'interest_matches',
+            label: 'Interest matches',
+            description: 'New events matching your saved searches.',
+            anchor: 'notify-interest-matches',
+        },
+        {
+            key: 'promo_codes',
+            label: 'Promo codes',
+            description: 'When a promo code is approved for an event you saved.',
+            anchor: 'notify-promo-codes',
+        },
+    ];
 
 function flagKey(channel: Channel, feature: FeatureKey): FlagKey {
     return `${channel}_${feature}_enabled` as FlagKey;

@@ -766,10 +766,15 @@ def get_events(
 
     events_with_promos: set[str] = set()
     promo_on = feature_settings.get("promo_codes_enabled", "").lower() == "true"
-    if event_ids and promo_on:
+    promo_eligible_ids = [
+        e.event_id
+        for e in events
+        if (e.show_promo_override if e.show_promo_override is not None else promo_on)
+    ]
+    if promo_eligible_ids:
         promo_rows = session.exec(
             select(EventPromoCode.event_id)
-            .where(EventPromoCode.event_id.in_(event_ids))
+            .where(EventPromoCode.event_id.in_(promo_eligible_ids))
             .where(EventPromoCode.status == "approved")
             .where(
                 (EventPromoCode.expires_at.is_(None))
@@ -805,6 +810,8 @@ def get_events(
             links=e.links,
             tags=tags_map.get(e.event_id, []),
             has_active_promo_codes=e.event_id in events_with_promos,
+            show_price_override=e.show_price_override,
+            show_promo_override=e.show_promo_override,
         )
         for e in events
     ]
@@ -930,10 +937,16 @@ def get_events_by_ids(
     tags_map = get_event_tags(session, event_ids)
 
     events_with_promos: set[str] = set()
-    if event_ids and _promo_codes_enabled(session):
+    promo_on = _promo_codes_enabled(session)
+    promo_eligible_ids = [
+        e.event_id
+        for e in events
+        if (e.show_promo_override if e.show_promo_override is not None else promo_on)
+    ]
+    if promo_eligible_ids:
         promo_rows = session.exec(
             select(EventPromoCode.event_id)
-            .where(EventPromoCode.event_id.in_(event_ids))
+            .where(EventPromoCode.event_id.in_(promo_eligible_ids))
             .where(EventPromoCode.status == "approved")
             .where(
                 (EventPromoCode.expires_at.is_(None))
@@ -969,6 +982,8 @@ def get_events_by_ids(
             links=e.links,
             tags=tags_map.get(e.event_id, []),
             has_active_promo_codes=e.event_id in events_with_promos,
+            show_price_override=e.show_price_override,
+            show_promo_override=e.show_promo_override,
         )
         for e in events
     ]
@@ -1056,6 +1071,8 @@ def get_event(
         links=event.links,
         tags=tags_map.get(event_id, []),
         organizer=organizer_mini,
+        show_price_override=event.show_price_override,
+        show_promo_override=event.show_promo_override,
     )
     response = JSONResponse(content=data.model_dump(mode="json"))
     response.headers["Cache-Control"] = "public, max-age=60"

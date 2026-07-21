@@ -12,6 +12,8 @@ import RateEventButton from './RateEventButton';
 import TagBadges from './TagBadges';
 import { isTrendingScore } from '../utils/trending';
 import { shortLocation } from '../utils/locationShort';
+import { isPriceSectionVisible } from '../utils/sectionVisibility';
+import { currencySymbol } from '../utils/currency';
 
 interface MapBounds {
     north: number;
@@ -101,22 +103,38 @@ export interface EventListCardProps {
 function PriceBadge({ event }: { event: CalendarEvent }) {
     if (event.price_is_free) {
         return (
-            <span className="inline-flex items-center bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+            <span className="inline-flex items-center gap-1 bg-slate-100 px-1.5 py-px text-[10px] font-medium leading-3 text-slate-600">
+                <img src="/price-tag.png" alt="" aria-hidden="true" className="w-2.5 h-2.5 object-contain" />
                 Free
             </span>
         );
     }
     if (event.price_min != null && event.price_currency) {
+        const sign = currencySymbol(event.price_currency);
         const priceText = event.price_max != null && event.price_max !== event.price_min
-            ? `${event.price_currency} ${event.price_min}–${event.price_max}`
-            : `${event.price_currency} ${event.price_min}`;
+            ? `${sign}${event.price_min}–${sign}${event.price_max}`
+            : `${sign}${event.price_min}`;
         return (
-            <span className="inline-flex items-center bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+            <span className="inline-flex items-center gap-1 bg-slate-100 px-1.5 py-px text-[10px] font-medium leading-3 text-slate-600">
+                <img src="/price-tag.png" alt="" aria-hidden="true" className="w-2.5 h-2.5 object-contain" />
                 {priceText}
             </span>
         );
     }
     return null;
+}
+
+function DiscountBadge() {
+    return (
+        <span
+            className="inline-flex items-center gap-1 bg-amber-50 px-1.5 py-px text-[10px] font-medium leading-3 text-amber-700"
+            title="Has promo codes"
+            data-testid="event-card-promo-icon"
+        >
+            <img src="/promo-code.png" alt="" aria-hidden="true" className="w-2.5 h-2.5 object-contain" />
+            Discount
+        </span>
+    );
 }
 
 function PopularityBadge({
@@ -215,6 +233,7 @@ export function EventListCard({
     tagsAsBadge = false,
 }: EventListCardProps) {
     const { tagsPerCard } = useFeatureFlags();
+    const priceVisible = isPriceSectionVisible(event, showPrices);
     const start = new Date(event.start);
     const onMap = isOnMap(event, mapBounds);
     const offMapBadge = !onMap ? (
@@ -272,34 +291,26 @@ export function EventListCard({
                                 friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
                             />
                         </div>
-                        <div className="ml-auto flex shrink-0 items-center gap-1.5">
-                            {event.has_active_promo_codes && (
-                                <img
-                                    src="/promo-code.png"
-                                    alt=""
-                                    aria-hidden="true"
-                                    title="Has promo codes"
-                                    className="w-4 h-4 object-contain"
-                                    data-testid="event-card-promo-icon"
-                                />
-                            )}
-                        </div>
                     </div>
-                    {event.location && (
-                        <p className="event-card-location">
+                    {(priceVisible || event.has_active_promo_codes || event.location) ? (
+                        <p className="event-card-location gap-1.5">
                             {offMapBadge}
-                            <span className="event-card-location-text" title={event.location ?? undefined}>{shortLocation(event.location) ?? event.location}</span>
+                            {event.location && (
+                                <span className="event-card-location-text" title={event.location ?? undefined}>{shortLocation(event.location) ?? event.location}</span>
+                            )}
+                            {(priceVisible || event.has_active_promo_codes) && (
+                                <span className="ml-auto flex shrink-0 items-center gap-1.5">
+                                    {priceVisible && <PriceBadge event={event} />}
+                                    {event.has_active_promo_codes && <DiscountBadge />}
+                                </span>
+                            )}
                         </p>
-                    )}
-                    {!onMap && !event.location && (
-                        <span className="event-card-offmap-badge event-card-offmap-badge-standalone" role="img" aria-label="Off map" title="Off map">
-                            <img src="/location-off.png" alt="" aria-hidden="true" className="event-card-offmap-icon" />
-                        </span>
-                    )}
-                    {((showPrices && (event.price_is_free || (event.price_min != null && event.price_currency)))) && (
-                        <div className="event-card-badges">
-                            {showPrices && <PriceBadge event={event} />}
-                        </div>
+                    ) : (
+                        !onMap && (
+                            <span className="event-card-offmap-badge event-card-offmap-badge-standalone" role="img" aria-label="Off map" title="Off map">
+                                <img src="/location-off.png" alt="" aria-hidden="true" className="event-card-offmap-icon" />
+                            </span>
+                        )
                     )}
                     {event.tags?.length > 0 && (
                         <div className="mt-1">

@@ -6,6 +6,7 @@ import { parseLinks } from '../utils/parseLinks';
 import { deriveLinkLabel } from '../utils/deriveLinkLabel';
 import AddressAutocomplete from './AddressAutocomplete';
 import AdminAutoTagSuggestions from './AdminAutoTagSuggestions';
+import AdminEventPromoCodes from './AdminEventPromoCodes';
 import InlineTagsPicker from './InlineTagsPicker';
 import LocationBadge from './LocationBadge';
 import TagBadges from './TagBadges';
@@ -16,6 +17,55 @@ interface Props {
     onFieldSave: (changes: Partial<CalendarEvent> & { review_status?: string; calendar_id?: string }) => Promise<void>;
     onTagsUpdated?: () => void;
     compact?: boolean;
+}
+
+/**
+ * Tri-state segmented control (Auto / Show / Hide) for overriding a global
+ * feature flag on a single event. ``value`` is ``null`` for "inherit the
+ * global flag", ``true`` to force the section on, ``false`` to force it off.
+ */
+export function VisibilityOverrideControl({
+    label,
+    value,
+    disabled,
+    onChange,
+}: {
+    label?: string;
+    value: boolean | null;
+    disabled?: boolean;
+    onChange: (value: boolean | null) => void;
+}) {
+    const options: { label: string; val: boolean | null }[] = [
+        { label: 'Auto', val: null },
+        { label: 'Show', val: true },
+        { label: 'Hide', val: false },
+    ];
+    return (
+        <div className="flex items-center gap-1.5">
+            {label && (
+                <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</span>
+            )}
+            <div className="flex">
+                {options.map((opt) => {
+                    const active = value === opt.val;
+                    return (
+                        <button
+                            key={opt.label}
+                            type="button"
+                            disabled={disabled}
+                            onClick={() => onChange(opt.val)}
+                            className={`px-2 py-0.5 text-[11px] border disabled:opacity-50 ${active
+                                ? 'bg-blue-500 border-blue-500 text-white'
+                                : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500'
+                                }`}
+                        >
+                            {opt.label}
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
 }
 
 /**
@@ -64,6 +114,8 @@ export default function AdminEventDetailContent({
 
     // Collapsible state for the tags section (collapsed shows applied tags inline).
     const [tagsExpanded, setTagsExpanded] = useState(false);
+    // Collapsible state for the price section (collapsed shows a summary chip).
+    const [priceExpanded, setPriceExpanded] = useState(false);
 
     const startEdit = (field: string, value = '') => {
         setSaveError(null);
@@ -184,7 +236,7 @@ export default function AdminEventDetailContent({
                 </div>
             </div>
 
-            {/* Date + price */}
+            {/* Date */}
             <div>
                 {editingField === 'datetime' ? (
                     <div className="space-y-2 rounded-lg bg-slate-50 p-3 border border-slate-200">
@@ -242,102 +294,138 @@ export default function AdminEventDetailContent({
                             </p>
                             <EditHint />
                         </div>
-
-                        {/* Price (always shown for admin — feature flags ignored) */}
-                        {editingField !== 'price' && (event.price_is_free || event.price_min != null) ? (
-                            <div
-                                className="ml-auto flex items-center gap-2 flex-wrap group relative cursor-pointer hover:bg-slate-50 px-2 py-1 rounded transition"
-                                onClick={startPriceEdit}
-                            >
-                                {event.price_is_free && (
-                                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
-                                        Free
-                                    </span>
-                                )}
-                                {!event.price_is_free && event.price_min != null && (
-                                    <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
-                                        {event.price_max != null && event.price_max !== event.price_min
-                                            ? `${event.price_currency ?? ''} ${event.price_min}\u2013${event.price_max}`
-                                            : `${event.price_currency ?? ''} ${event.price_min}`}
-                                    </span>
-                                )}
-                                {event.view_count > 0 && (
-                                    <span className="inline-flex items-center gap-1 bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
-                                        <svg viewBox="0 0 20 20" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-                                            <path d="M2 10s2.5-5 8-5 8 5 8 5-2.5 5-8 5-8-5-8-5Z" strokeLinejoin="round" />
-                                            <circle cx="10" cy="10" r="2.25" />
-                                        </svg>
-                                        {event.view_count}
-                                    </span>
-                                )}
-                                <EditHint />
-                            </div>
-                        ) : editingField !== 'price' ? (
-                            <div
-                                className="ml-auto cursor-pointer text-[11px] text-slate-400 hover:text-slate-600 border border-dashed border-slate-200 rounded px-3 py-1.5 transition w-fit"
-                                onClick={startPriceEdit}
-                            >+ Add price</div>
-                        ) : null}
+                        {event.view_count > 0 && (
+                            <span className="ml-auto inline-flex items-center gap-1 bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                                <svg viewBox="0 0 20 20" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                                    <path d="M2 10s2.5-5 8-5 8 5 8 5-2.5 5-8 5-8-5-8-5Z" strokeLinejoin="round" />
+                                    <circle cx="10" cy="10" r="2.25" />
+                                </svg>
+                                {event.view_count}
+                            </span>
+                        )}
                     </div>
                 )}
+            </div>
 
-                {editingField === 'price' && (
-                    <div className="mt-2 rounded-lg bg-slate-50 p-3 border border-slate-200 space-y-2">
-                        <label className="flex items-center gap-2 text-xs text-slate-600">
-                            <input
-                                type="checkbox"
-                                checked={editIsFree}
-                                onChange={(e) => setEditIsFree(e.target.checked)}
-                                className="h-3.5 w-3.5"
-                            />
-                            Free event
-                        </label>
-                        {!editIsFree && (
-                            <div className="flex gap-2 items-center flex-wrap">
-                                <input
-                                    type="number"
-                                    placeholder="Min"
-                                    value={editPriceMin}
-                                    onChange={(e) => setEditPriceMin(e.target.value)}
-                                    className="w-20 border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
-                                />
-                                <span className="text-xs text-slate-400">–</span>
-                                <input
-                                    type="number"
-                                    placeholder="Max"
-                                    value={editPriceMax}
-                                    onChange={(e) => setEditPriceMax(e.target.value)}
-                                    className="w-20 border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
-                                />
-                                <input
-                                    type="text"
-                                    placeholder="EUR"
-                                    value={editCurrency}
-                                    onChange={(e) => setEditCurrency(e.target.value)}
-                                    className="w-16 border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
-                                />
+            {/* Price (collapsible: price settings + section visibility override) */}
+            <div className="border border-slate-200 rounded-lg bg-slate-50 overflow-hidden">
+                <div className="w-full flex items-center gap-2 px-3 py-1.5">
+                    <button
+                        type="button"
+                        onClick={() => setPriceExpanded((v) => !v)}
+                        className="flex flex-1 min-w-0 items-center gap-2 text-left hover:opacity-80 transition"
+                    >
+                        <span className="text-slate-400 text-[10px]">{priceExpanded ? '▾' : '▸'}</span>
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Price</span>
+                        {!priceExpanded && (
+                            event.price_is_free ? (
+                                <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                                    Free
+                                </span>
+                            ) : event.price_min != null ? (
+                                <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                                    {event.price_max != null && event.price_max !== event.price_min
+                                        ? `${event.price_currency ?? ''} ${event.price_min}\u2013${event.price_max}`
+                                        : `${event.price_currency ?? ''} ${event.price_min}`}
+                                </span>
+                            ) : (
+                                <span className="text-[11px] text-slate-400 italic">not set</span>
+                            )
+                        )}
+                    </button>
+                    <VisibilityOverrideControl
+                        value={event.show_price_override ?? null}
+                        disabled={saving}
+                        onChange={(v) => saveField({ show_price_override: v })}
+                    />
+                </div>
+                {priceExpanded && (
+                    <div className="border-t border-slate-200 bg-white p-3">
+                        {editingField !== 'price' ? (
+                            (event.price_is_free || event.price_min != null) ? (
+                                <div
+                                    className="group relative cursor-pointer hover:bg-slate-50 -mx-2 px-2 py-1 rounded transition flex items-center gap-2 flex-wrap w-fit"
+                                    onClick={startPriceEdit}
+                                >
+                                    {event.price_is_free && (
+                                        <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                                            Free
+                                        </span>
+                                    )}
+                                    {!event.price_is_free && event.price_min != null && (
+                                        <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                                            {event.price_max != null && event.price_max !== event.price_min
+                                                ? `${event.price_currency ?? ''} ${event.price_min}\u2013${event.price_max}`
+                                                : `${event.price_currency ?? ''} ${event.price_min}`}
+                                        </span>
+                                    )}
+                                    <EditHint />
+                                </div>
+                            ) : (
+                                <div
+                                    className="cursor-pointer text-[11px] text-slate-400 hover:text-slate-600 border border-dashed border-slate-200 rounded px-3 py-1.5 transition w-fit"
+                                    onClick={startPriceEdit}
+                                >+ Add price</div>
+                            )
+                        ) : (
+                            <div className="space-y-2">
+                                <label className="flex items-center gap-2 text-xs text-slate-600">
+                                    <input
+                                        type="checkbox"
+                                        checked={editIsFree}
+                                        onChange={(e) => setEditIsFree(e.target.checked)}
+                                        className="h-3.5 w-3.5"
+                                    />
+                                    Free event
+                                </label>
+                                {!editIsFree && (
+                                    <div className="flex gap-2 items-center flex-wrap">
+                                        <input
+                                            type="number"
+                                            placeholder="Min"
+                                            value={editPriceMin}
+                                            onChange={(e) => setEditPriceMin(e.target.value)}
+                                            className="w-20 border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
+                                        />
+                                        <span className="text-xs text-slate-400">–</span>
+                                        <input
+                                            type="number"
+                                            placeholder="Max"
+                                            value={editPriceMax}
+                                            onChange={(e) => setEditPriceMax(e.target.value)}
+                                            className="w-20 border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="EUR"
+                                            value={editCurrency}
+                                            onChange={(e) => setEditCurrency(e.target.value)}
+                                            className="w-16 border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
+                                        />
+                                    </div>
+                                )}
+                                {saveError && <p className="text-[10px] text-red-500">{saveError}</p>}
+                                <div className="flex gap-2 pt-1">
+                                    <button
+                                        disabled={saving}
+                                        onClick={() => {
+                                            if (editIsFree) {
+                                                saveField({ price_is_free: true, price_min: 0, price_max: 0, price_currency: '' });
+                                            } else {
+                                                saveField({
+                                                    price_is_free: false,
+                                                    price_min: editPriceMin !== '' ? parseFloat(editPriceMin) : null,
+                                                    price_max: editPriceMax !== '' ? parseFloat(editPriceMax) : null,
+                                                    price_currency: editCurrency || null,
+                                                });
+                                            }
+                                        }}
+                                        className="text-[11px] font-medium px-2.5 py-1 bg-rose-500 text-white rounded hover:bg-rose-600 disabled:opacity-50 transition"
+                                    >{saving ? 'Saving…' : 'Save'}</button>
+                                    <button onClick={cancelEdit} className="text-[11px] text-slate-500 hover:text-slate-700 px-2">Cancel</button>
+                                </div>
                             </div>
                         )}
-                        {saveError && <p className="text-[10px] text-red-500">{saveError}</p>}
-                        <div className="flex gap-2 pt-1">
-                            <button
-                                disabled={saving}
-                                onClick={() => {
-                                    if (editIsFree) {
-                                        saveField({ price_is_free: true, price_min: 0, price_max: 0, price_currency: '' });
-                                    } else {
-                                        saveField({
-                                            price_is_free: false,
-                                            price_min: editPriceMin !== '' ? parseFloat(editPriceMin) : null,
-                                            price_max: editPriceMax !== '' ? parseFloat(editPriceMax) : null,
-                                            price_currency: editCurrency || null,
-                                        });
-                                    }
-                                }}
-                                className="text-[11px] font-medium px-2.5 py-1 bg-rose-500 text-white rounded hover:bg-rose-600 disabled:opacity-50 transition"
-                            >{saving ? 'Saving…' : 'Save'}</button>
-                            <button onClick={cancelEdit} className="text-[11px] text-slate-500 hover:text-slate-700 px-2">Cancel</button>
-                        </div>
                     </div>
                 )}
             </div>
@@ -447,6 +535,14 @@ export default function AdminEventDetailContent({
             <AdminAutoTagSuggestions
                 eventId={event.event_id}
                 onApproved={() => onTagsUpdated?.()}
+            />
+
+            {/* Promo codes (admin moderation + section visibility override) */}
+            <AdminEventPromoCodes
+                eventId={event.event_id}
+                overrideValue={event.show_promo_override ?? null}
+                overrideDisabled={saving}
+                onOverrideChange={(v) => saveField({ show_promo_override: v })}
             />
 
             {/* Description */}

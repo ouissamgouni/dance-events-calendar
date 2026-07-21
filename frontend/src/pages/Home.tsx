@@ -1160,11 +1160,9 @@ export default function Home() {
         return mid.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
     }, [visibleRange]);
 
-    // Shared filter controls JSX. Rendered inline in the desktop left
-    // column AND inside the mobile FilterSheet. The components are all
-    // controlled (state lives in this component) so mounting twice is safe;
-    // the desktop instance is CSS-hidden on mobile while the sheet is
-    // closed.
+    // Shared filter controls JSX, rendered inside the FilterSheet (bottom
+    // sheet on mobile, centered modal on desktop — see `variant` on
+    // <FilterSheet> below).
     const tagFilters = tagGroups.length > 0 ? (
         <TagFilterPills
             tagGroups={tagGroups}
@@ -1214,55 +1212,37 @@ export default function Home() {
         />
     );
 
-    const renderFilterControls = (surface: 'inline' | 'sheet' = 'inline') => {
-        if (surface === 'sheet') {
-            return (
-                <>
-                    <section className="filter-sheet-section" aria-labelledby="filter-sheet-period-heading">
-                        <h3 id="filter-sheet-period-heading" className="filter-sheet-section-title">Period</h3>
-                        <DateRangePicker
-                            startDate={startDate}
-                            endDate={endDate}
-                            onChange={handleDateRangeChange}
-                        />
-                    </section>
-                    {tagFilters && (
-                        <section className="filter-sheet-section" aria-labelledby="filter-sheet-tags-heading">
-                            <h3 id="filter-sheet-tags-heading" className="filter-sheet-section-title">Tags</h3>
-                            {tagFilters}
-                        </section>
-                    )}
-                    <section className="filter-sheet-section" aria-labelledby="filter-sheet-following-heading">
-                        <div className="flex items-center justify-between">
-                            <h3 id="filter-sheet-following-heading" className="filter-sheet-section-title">Following</h3>
-                            <Link
-                                to="/my-calendar/subscriptions"
-                                className="text-xs text-blue-600 hover:underline"
-                                onClick={() => setFilterSheetOpen(false)}
-                            >
-                                See all
-                            </Link>
-                        </div>
-                        {renderInterestFilters()}
-                    </section>
-                </>
-            );
-        }
-
-        return (
-            <>
-                {viewMode === 'explorer' && (
-                    <DateRangePicker
-                        startDate={startDate}
-                        endDate={endDate}
-                        onChange={handleDateRangeChange}
-                    />
-                )}
-                {tagFilters}
+    const renderFilterControls = () => (
+        <>
+            <section className="filter-sheet-section" aria-labelledby="filter-sheet-period-heading">
+                <h3 id="filter-sheet-period-heading" className="filter-sheet-section-title">Period</h3>
+                <DateRangePicker
+                    startDate={startDate}
+                    endDate={endDate}
+                    onChange={handleDateRangeChange}
+                />
+            </section>
+            {tagFilters && (
+                <section className="filter-sheet-section" aria-labelledby="filter-sheet-tags-heading">
+                    <h3 id="filter-sheet-tags-heading" className="filter-sheet-section-title">Tags</h3>
+                    {tagFilters}
+                </section>
+            )}
+            <section className="filter-sheet-section" aria-labelledby="filter-sheet-following-heading">
+                <div className="flex items-center justify-between">
+                    <h3 id="filter-sheet-following-heading" className="filter-sheet-section-title">Following</h3>
+                    <Link
+                        to="/my-calendar/subscriptions"
+                        className="text-xs text-blue-600 hover:underline"
+                        onClick={() => setFilterSheetOpen(false)}
+                    >
+                        See all
+                    </Link>
+                </div>
                 {renderInterestFilters()}
-            </>
-        );
-    };
+            </section>
+        </>
+    );
 
     const renderCalendarFilterControls = () => (
         <>
@@ -1325,7 +1305,7 @@ export default function Home() {
         </>
     );
 
-    const renderExplorerMobileSummaryBar = (className?: string) => {
+    const renderFilterSummaryBar = (className?: string) => {
         const isCal = viewMode === 'calendar';
         const count = isCal ? calendarVisibleEvents.length : explorerMatchingEvents.length;
         return (
@@ -1438,19 +1418,19 @@ export default function Home() {
                     <>
                         {viewMode === 'explorer' && showFloatingMobileExplorerSummary && (
                             <div className="fixed left-4 right-4 top-10 z-[7000] lg:hidden">
-                                {renderExplorerMobileSummaryBar('shadow-md')}
+                                {renderFilterSummaryBar('shadow-md')}
                             </div>
                         )}
-                        <div className="flex flex-col gap-1">
-                            {/* Common filter stack — shared by Map and Calendar
-                            sub-views. Date-range picker only shows in Map
-                            mode; the calendar has its own navigator. */}
-                            <div className="hidden lg:flex lg:flex-col lg:gap-4">
-                                {renderFilterControls()}
+                        {/* Filter summary strip — shared by Map and Calendar
+                        sub-views, at every breakpoint. Tapping the "Filters"
+                        pill opens the FilterSheet (bottom sheet on mobile,
+                        centered modal on desktop). */}
+                        <div ref={mobileExplorerTopSummaryRef} className="flex flex-col gap-1">
+                            {renderFilterSummaryBar()}
+                            <div className="hidden lg:block">
                                 {renderMapCalendarSubviewToggle()}
                             </div>
-                            <div ref={mobileExplorerTopSummaryRef} className="lg:hidden flex flex-col gap-1">
-                                {renderExplorerMobileSummaryBar()}
+                            <div className="lg:hidden">
                                 {renderMapCalendarSubviewToggle(undefined, true)}
                             </div>
                         </div>
@@ -1822,8 +1802,9 @@ export default function Home() {
                 onClearAll={viewMode === 'calendar' ? handleClearCalendarFilters : handleClearAllFilters}
                 activeFilterCount={viewMode === 'calendar' ? calendarActiveFilterCount : activeFilterCount}
                 matchingEventCount={viewMode === 'calendar' ? calendarVisibleEvents.length : explorerMatchingEvents.length}
+                variant={isDesktop ? 'modal' : 'sheet'}
             >
-                {viewMode === 'calendar' ? renderCalendarFilterControls() : renderFilterControls('sheet')}
+                {viewMode === 'calendar' ? renderCalendarFilterControls() : renderFilterControls()}
             </FilterSheet>
         </div>
     );

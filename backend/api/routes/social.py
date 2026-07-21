@@ -3767,18 +3767,9 @@ def onboarding_complete(
 # ---------------------------------------------------------------------------
 
 
-@router.get(
-    "/me/suggestions",
-    response_model=FoFSuggestionsResponse,
-)
-@limiter.limit("60/hour")
-def friend_of_friend_suggestions(
-    request: Request,
-    limit: int = Query(default=12, ge=1, le=50),
-    offset: int = Query(default=0, ge=0),
-    session: Session = Depends(get_session),
-    viewer: User = Depends(require_user),
-):
+def _build_fof_suggestions(
+    session: Session, viewer: User, limit: int, offset: int = 0
+) -> FoFSuggestionsResponse:
     """Phase E (E4): "People you may know" — ranked by mutual friends.
 
     For each candidate ``c`` we compute ``mutual_friend_count`` =
@@ -3786,8 +3777,7 @@ def friend_of_friend_suggestions(
     order): verified-organizer flag desc, then handle asc.
 
     Excludes: self, viewer's existing follows, soft-deleted accounts,
-    and accounts with no public handle. Anonymous viewers never hit
-    this route (``require_user``).
+    and accounts with no public handle.
 
     When the viewer has zero mutual-friend candidates (no friends yet,
     or already follows everyone reachable through their network), falls
@@ -3832,6 +3822,7 @@ def friend_of_friend_suggestions(
                     is_admin_managed=bool(u.is_admin_managed),
                     mutual_friend_count=0,
                     mutual_friends_preview=[],
+                    followers_count=_followers_count(session, u.id),
                 )
                 for u in curators
             ],
@@ -3881,10 +3872,37 @@ def friend_of_friend_suggestions(
                 is_admin_managed=bool(u.is_admin_managed),
                 mutual_friend_count=candidate_scores.get(u.id, 0),
                 mutual_friends_preview=[h for h in preview_rows if h],
+                followers_count=_followers_count(session, u.id),
             )
         )
 
     return FoFSuggestionsResponse(items=items, total=total)
+
+
+@router.get(
+    "/me/suggestions",
+    response_model=FoFSuggestionsResponse,
+)
+@limiter.limit("60/hour")
+def friend_of_friend_suggestions(
+    request: Request,
+    limit: int = Query(default=12, ge=1, le=50),
+    offset: int = Query(default=0, ge=0),
+    session: Session = Depends(get_session),
+    viewer: User = Depends(require_user),
+):
+    """Anonymous viewers never hit this route (``require_user``)."""
+    return _build_fof_suggestions(session, viewer, limit, offset)
+
+
+def get_people_suggestions_for_email(
+    session: Session, viewer: User, limit: int = 5
+) -> list[FoFSuggestionItem]:
+    """Suggestion rows for the activity-digest email's "people you may
+    want to follow" section — same ranking/fallback as ``/me/suggestions``
+    but callable outside of an HTTP request (no rate-limit context).
+    """
+    return _build_fof_suggestions(session, viewer, limit).items
 
 
 # ---------------------------------------------------------------------------
