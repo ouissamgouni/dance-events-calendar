@@ -201,6 +201,26 @@ class BlockedUserIdentity(SQLModel, table=True):
     )
 
 
+class EmailLoginCode(SQLModel, table=True):
+    """One-time numeric code for passwordless email sign-in.
+
+    Only the SHA-256 hash of the code is stored (never the plaintext). A code
+    is single-use (``consumed_at``), short-lived (``expires_at``) and capped at
+    a small number of verify ``attempt_count`` before it is burned.
+    """
+
+    __tablename__ = "email_login_codes"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(index=True, max_length=255)
+    code_hash: str = Field(max_length=64)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    expires_at: datetime = Field()
+    consumed_at: Optional[datetime] = Field(default=None)
+    attempt_count: int = Field(default=0, nullable=False)
+    request_ip: Optional[str] = Field(default=None, max_length=64)
+
+
 class UserAccountMerge(SQLModel, table=True):
     """Admin audit trail for one managed account merged into another."""
 

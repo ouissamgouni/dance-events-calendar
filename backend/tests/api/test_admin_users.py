@@ -159,6 +159,34 @@ def test_admin_list_users_search(client, session):
 
 
 @pytest.mark.unit
+def test_admin_list_users_sort_by_followers_count(client, session):
+    users = _seed_users(session)
+    # Bob and Carol both follow Alice → followers_count(alice) == 2.
+    session.add(UserFollow(follower_id=users["bob"].id, followee_id=users["alice"].id))
+    session.add(
+        UserFollow(follower_id=users["carol"].id, followee_id=users["alice"].id)
+    )
+    session.commit()
+
+    _login(client, "admin@example.com")
+    r = client.get(
+        "/api/social/admin/users",
+        params={"sort_by": "followers_count", "sort_dir": "desc"},
+    )
+    assert r.status_code == 200, r.text
+    handles = [row["handle"] for row in r.json()["items"]]
+    assert handles[0] == "alice"
+
+    r2 = client.get(
+        "/api/social/admin/users",
+        params={"sort_by": "followers_count", "sort_dir": "asc"},
+    )
+    assert r2.status_code == 200
+    handles2 = [row["handle"] for row in r2.json()["items"]]
+    assert handles2[-1] == "alice"
+
+
+@pytest.mark.unit
 def test_admin_list_users_excludes_deleted_by_default(client, session):
     users = _seed_users(session)
     # Soft-delete Carol the same way the auth flow would.

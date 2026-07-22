@@ -172,7 +172,7 @@ export function trackInstallPromptViewed(surface: 'toast' | 'page'): void {
 
 // ── Auth funnel (Umami only — backend already records sessions) ──────────
 
-export type AuthMethod = 'google' | 'dev';
+export type AuthMethod = 'google' | 'dev' | 'email';
 
 export function trackSignupStarted(method: AuthMethod): void {
     if (!readConsent().analytics) return;

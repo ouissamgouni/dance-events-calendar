@@ -7,7 +7,7 @@ share-token claim, etc.).
 
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import UUID
 
 import pytest
@@ -29,6 +29,7 @@ from backend.db import seed as seed_module  # noqa: E402
 from backend.db.models import (  # noqa: E402
     BlockedUserIdentity,
     CalendarSubscription,
+    EmailLoginCode,
     ShareToken,
     User,
     UserEventAttendance,
@@ -890,3 +891,166 @@ def test_auth_google_forces_re_onboarding_when_version_bumped(
 
     me = client.get("/api/auth/me")
     assert me.json()["needs_onboarding"] is True
+
+
+# ── Email one-time-code sign-in ────────────────────────────────────────
+
+
+def _request_code(client: TestClient, email: str):
+    return client.post("/api/auth/email-code/request", json={"email": email})
+
+
+def _verify_code(
+    client: TestClient, email: str, code: str, device_id: str | None = None
+):
+    body: dict = {"email": email, "code": code}
+    if device_id is not None:
+        body["device_id"] = device_id
+    return client.post("/api/auth/email-code/verify", json=body)
+
+
+@pytest.mark.unit
+def test_email_code_request_returns_dev_code_and_stores_hash(client, session):
+    resp = _request_code(client, "alice@example.com")
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["sent"] is True
+    assert data["expires_in"] == 600
+    assert data["dev_code"] and len(data["dev_code"]) == 6
+
+    rows = session.exec(select(EmailLoginCode)).all()
+    assert len(rows) == 1
+    # The plaintext code is never stored — only its SHA-256 hash.
+    assert rows[0].code_hash != data["dev_code"]
+    assert rows[0].email == "alice@example.com"
+    assert rows[0].consumed_at is None
+
+
+@pytest.mark.unit
+def test_email_code_request_rejects_invalid_email(client):
+    resp = _request_code(client, "not-an-email")
+    assert resp.status_code == 400
+
+
+@pytest.mark.unit
+def test_email_code_request_resend_cooldown(client):
+    first = _request_code(client, "alice@example.com")
+    assert first.status_code == 200
+    second = _request_code(client, "alice@example.com")
+    assert second.status_code == 429
+
+
+@pytest.mark.unit
+def test_email_code_verify_creates_email_user(client, session, monkeypatch):
+    monkeypatch.setattr(auth_module, "get_admin_email", lambda: "admin@example.com")
+    req = _request_code(client, "alice@example.com")
+    code = req.json()["dev_code"]
+
+    resp = _verify_code(client, "alice@example.com", code)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["email"] == "alice@example.com"
+    assert data["is_new_user"] is True
+    assert data["is_admin"] is False
+    assert data["user_id"]
+    # Session cookie is issued just like the Google flow.
+    assert "session_token" in resp.cookies
+
+    user = session.exec(select(User).where(User.email == "alice@example.com")).one()
+    assert user.provider == "email"
+    assert user.provider_subject is None
+    # The code is single-use — consumed after a successful verify.
+    row = session.exec(select(EmailLoginCode)).one()
+    assert row.consumed_at is not None
+
+
+@pytest.mark.unit
+def test_email_code_verify_reused_code_fails(client, session, monkeypatch):
+    monkeypatch.setattr(auth_module, "get_admin_email", lambda: "admin@example.com")
+    code = _request_code(client, "alice@example.com").json()["dev_code"]
+
+    assert _verify_code(client, "alice@example.com", code).status_code == 200
+    # Same code cannot be replayed.
+    assert _verify_code(client, "alice@example.com", code).status_code == 400
+
+
+@pytest.mark.unit
+def test_email_code_verify_wrong_code_burns_after_max_attempts(client):
+    code = _request_code(client, "alice@example.com").json()["dev_code"]
+    wrong = "111111" if code != "111111" else "222222"
+
+    for _ in range(5):
+        assert _verify_code(client, "alice@example.com", wrong).status_code == 400
+    # The correct code no longer works — the row was burned at the attempt cap.
+    assert _verify_code(client, "alice@example.com", code).status_code == 400
+
+
+@pytest.mark.unit
+def test_email_code_verify_expired_code_fails(client, session):
+    code = _request_code(client, "alice@example.com").json()["dev_code"]
+    row = session.exec(select(EmailLoginCode)).one()
+    row.expires_at = datetime.utcnow() - timedelta(minutes=1)
+    session.add(row)
+    session.commit()
+
+    assert _verify_code(client, "alice@example.com", code).status_code == 400
+
+
+@pytest.mark.unit
+def test_email_code_unifies_with_existing_google_user(client, session, monkeypatch):
+    """Verifying an email code for an address that already signed in with
+    Google logs into the SAME internal user id (no duplicate account)."""
+    monkeypatch.setattr(auth_module, "get_admin_email", lambda: "admin@example.com")
+
+    google_resp = _login(client, email="alice@example.com")
+    assert google_resp.status_code == 200
+    google_user_id = google_resp.json()["user_id"]
+
+    code = _request_code(client, "alice@example.com").json()["dev_code"]
+    email_resp = _verify_code(client, "alice@example.com", code)
+    assert email_resp.status_code == 200
+    assert email_resp.json()["user_id"] == google_user_id
+    assert email_resp.json()["is_new_user"] is False
+
+    users = session.exec(select(User)).all()
+    assert len(users) == 1
+    # Provider is not rewritten — the original Google identity is preserved.
+    assert users[0].provider == "google"
+
+
+@pytest.mark.unit
+def test_email_code_verify_merges_anonymous_device_data(client, session, monkeypatch):
+    monkeypatch.setattr(auth_module, "get_admin_email", lambda: "admin@example.com")
+    device_id = "dev-email-merge"
+    session.add(UserSavedEvent(device_id=device_id, event_id="evt-e1", user_id=None))
+    session.commit()
+
+    code = _request_code(client, "alice@example.com").json()["dev_code"]
+    resp = _verify_code(client, "alice@example.com", code, device_id=device_id)
+    assert resp.status_code == 200
+    user_id = resp.json()["user_id"]
+
+    saved = session.exec(select(UserSavedEvent)).all()
+    assert len(saved) == 1
+    assert str(saved[0].user_id) == user_id
+
+
+@pytest.mark.unit
+def test_email_code_request_sends_email_when_not_dev(client, monkeypatch):
+    """Outside dev mode a real email is dispatched and no code is leaked."""
+    monkeypatch.setattr(auth_module, "_is_dev_auth", lambda: False)
+    sent: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        auth_module,
+        "send_login_code_email",
+        lambda to_addr, code: sent.append((to_addr, code)) or True,
+    )
+
+    resp = _request_code(client, "alice@example.com")
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["sent"] is True
+    assert "dev_code" not in data
+    assert len(sent) == 1
+    assert sent[0][0] == "alice@example.com"
+    assert len(sent[0][1]) == 6

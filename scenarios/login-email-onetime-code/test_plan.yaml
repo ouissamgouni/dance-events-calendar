@@ -1,0 +1,109 @@
+test_plan:
+  name: "Email one-time code (real SMTP) — passwordless sign-in by email"
+  description: >
+    End-to-end check of the email one-time-code login method with REAL email
+    delivery (DEV_AUTH=false). The 6-digit code is sent only by email; it is
+    never returned in the API response or shown on the page. Confirms code
+    delivery, verification, account unification by email under one internal
+    user id, and the single-use / expiry / rate-limit guards.
+
+    Use this alongside `login-email-onetime-code-dev` (which covers the same
+    logic without needing SMTP).
+
+  preconditions:
+    - >
+      In secrets.env set working SMTP_HOST / SMTP_PORT / SMTP_USER /
+      SMTP_PASSWORD / SMTP_FROM (a Gmail app password or a Mailtrap sandbox
+      inbox both work). Set ADMIN_EMAIL to an inbox you can read.
+    - "Run with: task start:scenario SCENARIO=login-email-onetime-code"
+    - >
+      You need access to at least one real inbox to read the delivered codes.
+      A second address (matching ADMIN_EMAIL) is used for the admin step.
+
+  steps:
+    - id: 1
+      title: "Requesting a code sends an email and leaks nothing"
+      description: >
+        Open http://localhost:5173/login. In the "Sign in with an email code"
+        field enter a real address you can read and click "Send code".
+      expected: >
+        The form advances to the 6-digit code step with a "check your email"
+        notice and NO code shown on the page. POST /api/auth/email-code/request
+        returns 200 with `{sent: true, expires_in: 600}` and NO `dev_code`
+        field. An email titled "Your Movida sign-in code: ######" arrives with a
+        6-digit code that expires in 10 minutes. In the DB the `email_login_codes`
+        row stores only a `code_hash`, never the plain code.
+
+    - id: 2
+      title: "Verifying the emailed code signs you in"
+      description: >
+        Read the code from the email, enter it, and click "Verify & sign in".
+      expected: >
+        POST /api/auth/email-code/verify returns 200 and you land signed in. A
+        User row exists with `provider = 'email'` and a display name derived
+        from the email local-part; the code row is marked `consumed_at`.
+
+    - id: 3
+      title: "An expired code is rejected"
+      description: >
+        Request a fresh code, wait more than 10 minutes, then try to verify it.
+      expected: >
+        HTTP 400 `{"detail":"Invalid or expired code"}`. No session cookie is
+        issued; you must request a new code.
+
+    - id: 4
+      title: "A used code cannot be replayed"
+      description: >
+        After a successful sign-in (step 2), sign out and try to verify the same
+        code again via curl.
+      expected: >
+        HTTP 400 `{"detail":"Invalid or expired code"}`.
+
+    - id: 5
+      title: "Signing in with ADMIN_EMAIL grants the admin badge"
+      description: >
+        Request a code for ADMIN_EMAIL, read it from that inbox, and verify.
+      expected: >
+        Sign-in succeeds and /account shows the "Administrator" badge; the nav
+        shows an "Admin" link.
+
+    - id: 6
+      title: "Email login unifies with an existing account by email"
+      description: >
+        First sign in with Google (or a dev button) using an address, sign out,
+        then sign in again with an email code for that SAME address. Compare the
+        `user_id` from /api/auth/me across both logins.
+      expected: >
+        Both logins resolve to the SAME internal `user_id`; no duplicate User
+        row. Both methods are unified under one internal identity.
+
+    - id: 7
+      title: "Anonymous → email-code merge preserves device data"
+      description: >
+        While anonymous, save one event and mark another as going. Then sign in
+        with an email code for a new address (passing the anonymous device id).
+      expected: >
+        After sign-in, /my-calendar shows both events as saved/going, now linked
+        to the new user_id.
+
+    - id: 8
+      title: "Request rate-limit is enforced"
+      description: >
+        From the same IP, call POST /api/auth/email-code/request 6 times within
+        an hour.
+      expected: >
+        The first 5 succeed; the 6th returns HTTP 429 (limited to 5/hour per IP).
+        No code emails are sent for the throttled request.
+
+    - id: 9
+      title: "Code is never leaked in secure (staging/prod) environments"
+      description: >
+        Temporarily break SMTP (e.g. wrong SMTP_HOST), restart the scenario, and
+        request a code. Note the response `sent`/`dev_code` fields. Then repeat
+        the reasoning for a staging/production run (ENV_NAME=staging|production).
+      expected: >
+        On this LOCAL (non-secure) run a failed send falls back to exposing the
+        code (`sent: false` with a `dev_code`) so local testing isn't blocked.
+        In a SECURE environment (staging/production) the response NEVER contains
+        the code even when the send fails — `dev_code` is omitted regardless.
+        Restore the correct SMTP settings before continuing.

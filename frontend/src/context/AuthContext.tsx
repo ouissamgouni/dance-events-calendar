@@ -5,6 +5,7 @@ import {
     loginWithGoogle as apiLogin,
     logout as apiLogout,
     redeemReferral,
+    verifyEmailCode,
     type AuthUser,
     type HomeLocationPayload,
     type PreferredAreaPayload,
@@ -74,6 +75,13 @@ interface AuthContextType {
         mockEmail?: string,
         mockName?: string,
     ) => Promise<void>;
+    /** Sign in with a one-time code emailed to `email`. Unifies onto an
+     *  existing account (Google or email) matched by address. */
+    loginWithEmailCode: (
+        email: string,
+        code: string,
+        deviceId?: string,
+    ) => Promise<void>;
     logout: () => Promise<void>;
     deleteAccount: () => Promise<void>;
     /** Re-fetch the current user. Use after mutations that change
@@ -120,21 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
     }, []);
 
-    const login = useCallback(async (
-        credential: string,
-        deviceId?: string,
-        mockEmail?: string,
-        mockName?: string,
-    ) => {
-        // Bump the generation FIRST so any in-flight fetchMe can no longer
-        // overwrite the user state we are about to set.
-        generation.current++;
-        // Surface anonymous preferences (preferred area + tags) saved by the
-        // user before signing in. Read straight from localStorage so we don't
-        // create an Auth↔Preferences context cycle. The backend silently
-        // ignores this payload when the user already has server-side prefs.
-        const anonPrefs = readAnonPreferencesFromStorage();
-        const u = await apiLogin(credential, deviceId, mockEmail, mockName, anonPrefs);
+    const applyLoggedInUser = useCallback(async (u: User, method: AuthMethod) => {
         setUser(u);
         setLoading(false);
         // Admin sessions are excluded from analytics — see fetchMe handler above.
@@ -145,7 +139,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         // Analytics: distinguish first-time signup from returning login, then
         // identify the Umami session by internal user id (no PII).
-        const method: AuthMethod = mockEmail ? 'dev' : 'google';
         if (u.is_new_user) {
             trackSignupCompleted(method);
         } else {
@@ -171,6 +164,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
         }
     }, []);
+
+    const login = useCallback(async (
+        credential: string,
+        deviceId?: string,
+        mockEmail?: string,
+        mockName?: string,
+    ) => {
+        // Bump the generation FIRST so any in-flight fetchMe can no longer
+        // overwrite the user state we are about to set.
+        generation.current++;
+        // Surface anonymous preferences (preferred area + tags) saved by the
+        // user before signing in. Read straight from localStorage so we don't
+        // create an Auth↔Preferences context cycle. The backend silently
+        // ignores this payload when the user already has server-side prefs.
+        const anonPrefs = readAnonPreferencesFromStorage();
+        const u = await apiLogin(credential, deviceId, mockEmail, mockName, anonPrefs);
+        const method: AuthMethod = mockEmail ? 'dev' : 'google';
+        await applyLoggedInUser(u, method);
+    }, [applyLoggedInUser]);
+
+    const loginWithEmailCode = useCallback(async (
+        email: string,
+        code: string,
+        deviceId?: string,
+    ) => {
+        generation.current++;
+        const anonPrefs = readAnonPreferencesFromStorage();
+        const u = await verifyEmailCode(email, code, deviceId, anonPrefs);
+        await applyLoggedInUser(u, 'email');
+    }, [applyLoggedInUser]);
 
     const logout = useCallback(async () => {
         generation.current++;
@@ -220,7 +243,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [user, refreshUser]);
 
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout, deleteAccount, refreshUser }}>
+        <AuthContext.Provider value={{ user, loading, login, loginWithEmailCode, logout, deleteAccount, refreshUser }}>
             {children}
         </AuthContext.Provider>
     );

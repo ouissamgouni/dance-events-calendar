@@ -2849,12 +2849,24 @@ def admin_merge_users(
     )
 
 
+_ADMIN_USER_SORT_FIELDS = {
+    "created_at",
+    "last_visit_at",
+    "installed_at",
+    "followers_count",
+    "following_count",
+    "has_push_subscription",
+}
+
+
 @router.get("/admin/users", response_model=AdminUserListResponse)
 def admin_list_users(
     q: Optional[str] = Query(default=None, max_length=120),
     include_deleted: bool = Query(default=False),
     verified_only: bool = Query(default=False),
     managed_only: bool = Query(default=False),
+    sort_by: str = Query(default="created_at"),
+    sort_dir: str = Query(default="desc"),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     session: Session = Depends(get_session),
@@ -2866,7 +2878,9 @@ def admin_list_users(
     insensitive, substring). ``include_deleted`` surfaces soft-deleted rows
     (their email is the anonymised ``deleted-<uuid>@example.invalid`` form).
     Returns counts joined per row so the table can flag accounts with
-    unusual social activity.
+    unusual social activity. ``sort_by`` / ``sort_dir`` control ordering of
+    the (server-paginated) result set; unrecognised ``sort_by`` values fall
+    back to ``created_at``.
     """
     stmt = select(User)
     if not include_deleted:
@@ -2885,8 +2899,44 @@ def admin_list_users(
             )
         )
     total = int(session.exec(select(func.count()).select_from(stmt.subquery())).one())
+
+    if sort_by not in _ADMIN_USER_SORT_FIELDS:
+        sort_by = "created_at"
+    ascending = sort_dir == "asc"
+    sort_columns = {
+        "created_at": User.created_at,
+        "last_visit_at": User.last_visit_at,
+        "installed_at": User.installed_at,
+        "followers_count": (
+            select(func.count(UserFollow.id))
+            .where(UserFollow.followee_id == User.id)
+            .where(UserFollow.status == "approved")
+            .correlate(User)
+            .scalar_subquery()
+        ),
+        "following_count": (
+            select(func.count(UserFollow.id))
+            .where(UserFollow.follower_id == User.id)
+            .where(UserFollow.status == "approved")
+            .correlate(User)
+            .scalar_subquery()
+        ),
+        "has_push_subscription": (
+            select(func.count(PushSubscription.id))
+            .where(PushSubscription.user_id == User.id)
+            .correlate(User)
+            .scalar_subquery()
+        ),
+    }
+    sort_column = sort_columns[sort_by]
+    order_expr = sort_column.asc() if ascending else sort_column.desc()
+    if sort_by in ("last_visit_at", "installed_at"):
+        # Users who never visited/installed shouldn't dominate either end
+        # of the sort.
+        order_expr = order_expr.nulls_last()
+
     rows = session.exec(
-        stmt.order_by(User.created_at.desc()).limit(limit).offset(offset)
+        stmt.order_by(order_expr, User.created_at.desc()).limit(limit).offset(offset)
     ).all()
 
     items = [_to_admin_user(session, u) for u in rows]
