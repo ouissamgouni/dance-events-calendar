@@ -202,6 +202,29 @@ def send_install_app_invitation_email(user) -> bool:
     return _send_email(user.email, subject, html, "install app invitation")
 
 
+def send_login_code_email(to_addr: str, code: str) -> bool:
+    """Email a one-time sign-in code. Returns True if dispatched.
+
+    Carries no unsubscribe link — it is a transactional security email, not a
+    subscription. The code is displayed prominently and expires in 10 minutes.
+    """
+    if not to_addr:
+        return False
+    subject = f"Your {APP_NAME} sign-in code: {escape(code)}"
+    body = f"""
+    <p>Use this code to sign in to {APP_NAME}:</p>
+    <p style="font-size:32px;font-weight:700;letter-spacing:6px;
+              font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+              color:#111827;margin:20px 0">{escape(code)}</p>
+    <p style="color:#6b7280;font-size:13px">
+      This code expires in 10 minutes. If you didn't request it, you can safely
+      ignore this email.
+    </p>
+    """
+    html = _email_shell("Sign in to Movida", body)
+    return _send_email(to_addr, subject, html, "login code")
+
+
 def _unsubscribe_footer(user_id, category: str, label: str) -> str:
     app = get_public_app_url()
     token = make_unsubscribe_token(str(user_id), category)

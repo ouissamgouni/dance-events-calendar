@@ -1,0 +1,10 @@
+# Users pre-seeded for this scenario.
+#
+# At scenario boot the seeder upserts these into the User table so the
+# account-unification steps have an existing user to match against by email.
+# `admin@example.com` matches ADMIN_EMAIL and gets the admin badge.
+users:
+  - email: existing-user@example.com
+    name: Existing User
+  - email: admin@example.com # matches ADMIN_EMAIL → admin badge on /account
+    name: Dev Admin

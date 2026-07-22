@@ -627,6 +627,49 @@ export async function loginWithGoogle(
     return res.json();
 }
 
+export interface EmailCodeRequestResult {
+    sent: boolean;
+    expires_in: number;
+    /** Present only in dev / non-secure envs without working SMTP so the
+     *  code can be used without a real mail server. Never set in prod. */
+    dev_code?: string;
+}
+
+export async function requestEmailCode(email: string): Promise<EmailCodeRequestResult> {
+    const res = await fetch(`${BASE}/auth/email-code/request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+        credentials: 'include',
+    });
+    if (!res.ok) {
+        const detail = await res.json().catch(() => null) as { detail?: string } | null;
+        throw new Error(detail?.detail || 'Could not send code');
+    }
+    return res.json();
+}
+
+export async function verifyEmailCode(
+    email: string,
+    code: string,
+    deviceId?: string,
+    anonPreferences?: { preferred_area: PreferredAreaPayload | null; preferred_tag_ids: number[]; home_location?: HomeLocationPayload | null } | null,
+): Promise<AuthUser> {
+    const body: Record<string, unknown> = { email, code, device_id: deviceId };
+    if (anonPreferences) body.anon_preferences = anonPreferences;
+    const res = await fetch(`${BASE}/auth/email-code/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        credentials: 'include',
+    });
+    if (!res.ok) {
+        const detail = await res.json().catch(() => null) as { detail?: string } | null;
+        throw new Error(detail?.detail || 'Invalid or expired code');
+    }
+    return res.json();
+}
+
 export interface DevUser {
     email: string;
     name: string;
@@ -1726,13 +1769,15 @@ export interface AdminBlockedUserList {
 }
 
 export async function fetchAdminUsers(
-    opts?: { q?: string; includeDeleted?: boolean; verifiedOnly?: boolean; managedOnly?: boolean; limit?: number; offset?: number },
+    opts?: { q?: string; includeDeleted?: boolean; verifiedOnly?: boolean; managedOnly?: boolean; sortBy?: string; sortDir?: 'asc' | 'desc'; limit?: number; offset?: number },
 ): Promise<AdminUserList> {
     const sp = new URLSearchParams();
     if (opts?.q) sp.set('q', opts.q);
     if (opts?.includeDeleted) sp.set('include_deleted', 'true');
     if (opts?.verifiedOnly) sp.set('verified_only', 'true');
     if (opts?.managedOnly) sp.set('managed_only', 'true');
+    if (opts?.sortBy) sp.set('sort_by', opts.sortBy);
+    if (opts?.sortDir) sp.set('sort_dir', opts.sortDir);
     if (opts?.limit) sp.set('limit', String(opts.limit));
     if (opts?.offset) sp.set('offset', String(opts.offset));
     const qs = sp.toString();

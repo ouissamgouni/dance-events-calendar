@@ -18,6 +18,14 @@ import { parseUserAgent } from '../utils/userAgent';
 
 const PAGE_SIZE = 50;
 
+type AdminUserSortField =
+    | 'created_at'
+    | 'last_visit_at'
+    | 'followers_count'
+    | 'following_count'
+    | 'has_push_subscription'
+    | 'installed_at';
+
 /**
  * Admin Users tab.
  *
@@ -41,6 +49,8 @@ export default function AdminUsersTab() {
     const [includeDeleted, setIncludeDeleted] = useState(false);
     const [verifiedOnly, setVerifiedOnly] = useState(false);
     const [offset, setOffset] = useState(0);
+    const [sortBy, setSortBy] = useState<AdminUserSortField>('created_at');
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
     const [busyUserId, setBusyUserId] = useState<string | null>(null);
     const [managedPrompt, setManagedPrompt] = useState<{ row: AdminUserRow; mode: 'manage' | 'label' } | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<AdminUserRow | null>(null);
@@ -57,6 +67,8 @@ export default function AdminUsersTab() {
                 q: q.trim() || undefined,
                 includeDeleted,
                 verifiedOnly,
+                sortBy,
+                sortDir,
                 limit: PAGE_SIZE,
                 offset,
             });
@@ -67,13 +79,22 @@ export default function AdminUsersTab() {
         } finally {
             setLoading(false);
         }
-    }, [q, includeDeleted, verifiedOnly, offset]);
+    }, [q, includeDeleted, verifiedOnly, sortBy, sortDir, offset]);
 
     useEffect(() => { load(); }, [load]);
 
-    // Reset pagination whenever a filter changes — avoids landing on an
-    // empty page after narrowing the result set.
-    useEffect(() => { setOffset(0); }, [includeDeleted, verifiedOnly]);
+    // Reset pagination whenever a filter or sort changes — avoids landing
+    // on an empty page after narrowing/reordering the result set.
+    useEffect(() => { setOffset(0); }, [includeDeleted, verifiedOnly, sortBy, sortDir]);
+
+    const onSort = (field: AdminUserSortField) => {
+        if (sortBy === field) {
+            setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+        } else {
+            setSortBy(field);
+            setSortDir('desc');
+        }
+    };
 
     const onToggleVerified = async (row: AdminUserRow) => {
         setBusyUserId(row.user_id);
@@ -252,6 +273,27 @@ export default function AdminUsersTab() {
         return new Date(iso).toLocaleDateString();
     };
 
+    const sortIndicator = (field: AdminUserSortField) => {
+        if (sortBy !== field) return null;
+        return <span aria-hidden>{sortDir === 'asc' ? '▲' : '▼'}</span>;
+    };
+
+    const sortableTh = (field: AdminUserSortField, label: string, align: 'left' | 'right' = 'left') => (
+        <th
+            className={`px-3 py-2${align === 'right' ? ' text-right' : ''}`}
+            aria-sort={sortBy === field ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+        >
+            <button
+                type="button"
+                onClick={() => onSort(field)}
+                className={`flex items-center gap-1 uppercase hover:text-slate-900${align === 'right' ? ' ml-auto' : ''}`}
+            >
+                {label}
+                {sortIndicator(field)}
+            </button>
+        </th>
+    );
+
     return (
         <section className="space-y-4">
             <header className="flex flex-wrap items-center gap-3">
@@ -310,15 +352,15 @@ export default function AdminUsersTab() {
                         <tr>
                             <th className="px-3 py-2">User</th>
                             <th className="px-3 py-2">Email</th>
-                            <th className="px-3 py-2">Last visit</th>
-                            <th className="px-3 py-2">Created</th>
-                            <th className="px-3 py-2 text-right">Followers</th>
-                            <th className="px-3 py-2 text-right">Following</th>
+                            {sortableTh('last_visit_at', 'Last visit')}
+                            {sortableTh('followers_count', 'Followers', 'right')}
+                            {sortableTh('following_count', 'Following', 'right')}
                             <th className="px-3 py-2">Interest-match</th>
                             <th className="px-3 py-2">Reminders</th>
                             <th className="px-3 py-2">Digest</th>
-                            <th className="px-3 py-2">Push</th>
-                            <th className="px-3 py-2">Installed app</th>
+                            {sortableTh('has_push_subscription', 'Push')}
+                            {sortableTh('installed_at', 'Installed app')}
+                            <th className="px-3 py-2">Created</th>
                             <th className="px-3 py-2">Status</th>
                             <th className="px-3 py-2">Actions</th>
                         </tr>
@@ -368,19 +410,16 @@ export default function AdminUsersTab() {
                                                 <div className="flex items-center gap-1" title={details}>
                                                     <span>{formatRelative(row.last_visit_at)}</span>
                                                     {parsed.osIcon && (
-                                                        <img src={parsed.osIcon} alt={parsed.osLabel} className="w-4 h-4" />
+                                                        <img src={parsed.osIcon} alt={parsed.osLabel} className="w-4 h-4 shrink-0" />
                                                     )}
                                                     {parsed.browserIcon && (
-                                                        <img src={parsed.browserIcon} alt={parsed.browserLabel} className="w-4 h-4" />
+                                                        <img src={parsed.browserIcon} alt={parsed.browserLabel} className="w-4 h-4 shrink-0" />
                                                     )}
                                                 </div>
                                             );
                                         })() : (
                                             <span className="text-slate-400">—</span>
                                         )}
-                                    </td>
-                                    <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
-                                        {fmtDate(row.created_at)}
                                     </td>
                                     <td className="px-3 py-2 text-right tabular-nums">
                                         {row.followers_count}
@@ -453,6 +492,9 @@ export default function AdminUsersTab() {
                                                 </button>
                                             )}
                                         </div>
+                                    </td>
+                                    <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
+                                        {fmtDate(row.created_at)}
                                     </td>
                                     <td className="px-3 py-2">
                                         <div className="flex flex-wrap items-center gap-1">

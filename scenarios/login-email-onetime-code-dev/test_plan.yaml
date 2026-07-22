@@ -1,0 +1,117 @@
+test_plan:
+  name: "Email one-time code (DEV) — passwordless sign-in without SMTP"
+  description: >
+    Verifies the email one-time-code login method end-to-end in DEV mode, where
+    DEV_AUTH=true surfaces the generated 6-digit code back to the /login page
+    (and the backend logs), so no mail server is needed. Covers: requesting a
+    code, verifying it to sign in as a brand-new email user, unifying with an
+    existing account by email, merging anonymous device data, and the
+    single-use / wrong-code / resend guards.
+
+    Google Sign-In and the dev "Sign in as <user>" buttons remain available on
+    the same page; this plan only exercises the email-code path. Pair this with
+    `login-email-onetime-code` (real SMTP delivery) for a full check.
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=login-email-onetime-code-dev"
+    - >
+      No SMTP setup required — the API response and the /login page expose the
+      code directly because DEV_AUTH=true.
+    - >
+      Cookie consent is not required for save / RSVP persistence or the
+      anonymous→user merge.
+
+  steps:
+    - id: 1
+      title: "Request a code for a brand-new email"
+      description: >
+        Open http://localhost:5173/login. In the "Sign in with an email code"
+        field enter newcomer@example.com and click "Send code".
+      expected: >
+        The form advances to the 6-digit code step. An amber dev box shows the
+        code (also visible in the backend logs). POST /api/auth/email-code/request
+        returns 200 with `{sent, expires_in: 600, dev_code}`. In the DB one row
+        exists in `email_login_codes` for that email with a non-empty
+        `code_hash` (the plain code is NOT stored) and `consumed_at` NULL.
+
+    - id: 2
+      title: "Verify the code creates a new email-provider user"
+      description: >
+        Enter the code from step 1 and click "Verify & sign in".
+      expected: >
+        POST /api/auth/email-code/verify returns 200 and you land signed in. The
+        nav switches from "Sign in" to your name (derived from the email
+        local-part, e.g. "newcomer"). In the DB a new User row exists with
+        `provider = 'email'`, and the matching `email_login_codes` row now has
+        `consumed_at` set.
+
+    - id: 3
+      title: "A consumed code cannot be reused"
+      description: >
+        Sign out. From a terminal replay the same code:
+        `curl -i -X POST http://localhost:8001/api/auth/email-code/verify
+        -H 'Content-Type: application/json'
+        -d '{"email":"newcomer@example.com","code":"<code from step 1>"}'`
+      expected: >
+        HTTP 400 with body `{"detail":"Invalid or expired code"}`. No new
+        session cookie is issued.
+
+    - id: 4
+      title: "Wrong code is rejected and burns after 5 attempts"
+      description: >
+        Request a fresh code for guard@example.com. Submit an incorrect 6-digit
+        code five times via the /login form (or curl).
+      expected: >
+        Each wrong attempt returns 400. `attempt_count` on the code row
+        increments to 5; after the 5th the code is burned (marked consumed), so
+        even entering the correct code afterwards returns 400. A new code must
+        be requested.
+
+    - id: 5
+      title: "Resend cooldown is enforced"
+      description: >
+        Request a code for cooldown@example.com, then immediately click "Resend
+        code" (or re-request within 60s).
+      expected: >
+        The resend button is disabled with a countdown, and a direct
+        POST /api/auth/email-code/request within the cooldown returns HTTP 429.
+        After the countdown a resend succeeds (200) and invalidates the prior
+        unconsumed code.
+
+    - id: 6
+      title: "Signing in with an existing account's email unifies (no duplicate)"
+      description: >
+        Request and verify a code for existing-user@example.com (pre-seeded via
+        mock-users.yaml). Compare the resulting /api/auth/me `user_id` to the
+        seeded user's id.
+      expected: >
+        You sign in as the SAME internal user — `user_id` matches the existing
+        row; no duplicate User is created. The existing row's `provider` is
+        left unchanged (email login unifies by email under one internal id).
+
+    - id: 7
+      title: "Signing in with ADMIN_EMAIL grants the admin badge"
+      description: >
+        Request and verify a code for admin@example.com (matches ADMIN_EMAIL).
+      expected: >
+        Sign-in succeeds and /account shows the "Administrator" badge; the nav
+        shows an "Admin" link.
+
+    - id: 8
+      title: "Anonymous → email-code merge preserves device data"
+      description: >
+        Sign out. While anonymous, save one event and mark another as going
+        (confirm the POSTs return 201). Then sign in with an email code for a
+        NEW email, passing the anonymous device id.
+      expected: >
+        After sign-in, /my-calendar shows both events as saved/going, now linked
+        to the new user_id in the DB.
+
+    - id: 9
+      title: "Rate-limit smoke on the request endpoint"
+      description: >
+        From the same IP, call POST /api/auth/email-code/request 6 times in
+        under an hour for distinct emails.
+      expected: >
+        The first 5 succeed; the 6th returns HTTP 429 (the endpoint is limited
+        to 5/hour per IP).

@@ -1,8 +1,11 @@
+import hashlib
+import hmac
 import logging
 import os
 import re
+import secrets
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -49,6 +52,7 @@ from backend.db.seed import scenario_file_with_default
 from backend.db.models import (
     BlockedUserIdentity,
     CalendarSubscription,
+    EmailLoginCode,
     EventRating,
     ShareToken,
     Tag,
@@ -59,7 +63,7 @@ from backend.db.models import (
     UserReferral,
     UserSavedEvent,
 )
-from backend.services.email import send_new_user_notification
+from backend.services.email import send_login_code_email, send_new_user_notification
 from backend.services.follows import ensure_approved_follow_with_subscription
 from backend.services.user_bootstrap import ensure_default_interest_profile
 
@@ -87,6 +91,24 @@ class GoogleLoginRequest(BaseModel):
     # has no server-side prefs yet (see ``_apply_anon_preferences``); a
     # returning user signing in on a second device keeps their saved prefs.
     anon_preferences: Optional[AnonPreferencesPayload] = None
+
+
+class EmailCodeRequest(BaseModel):
+    email: str
+
+
+class EmailCodeVerifyRequest(BaseModel):
+    email: str
+    code: str
+    device_id: Optional[str] = None
+    anon_preferences: Optional[AnonPreferencesPayload] = None
+
+
+# Email one-time-code sign-in tuning.
+_CODE_TTL = timedelta(minutes=10)
+_CODE_RESEND_COOLDOWN = timedelta(seconds=60)
+_CODE_MAX_ATTEMPTS = 5
+_CODE_RE = re.compile(r"^\d{6}$")
 
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -139,12 +161,16 @@ def _upsert_user_from_claims(
     name: str,
     picture: Optional[str],
     provider_subject: Optional[str],
+    provider: str = "google",
     user_agent: Optional[str] = None,
 ) -> tuple[User, bool]:
     """Find an existing user by Google subject (preferred) or email; else create.
 
     Returns (user, is_new_user) so the caller can distinguish first-time signup
     from a repeat login (used for analytics — `signup_completed` vs `login_completed`).
+    ``provider`` is recorded only on brand-new accounts; a returning user keeps
+    their original provider so email sign-in unifies onto an existing Google
+    account (matched by email) without rewriting its identity.
     """
     user: Optional[User] = None
     if provider_subject:
@@ -162,7 +188,7 @@ def _upsert_user_from_claims(
             email=email,
             display_name=name,
             avatar_url=picture,
-            provider="google",
+            provider=provider,
             provider_subject=provider_subject,
             last_visit_at=now,
             last_visit_user_agent=ua,
@@ -431,6 +457,45 @@ def _notify_admin_new_user(user: User) -> None:
     send_new_user_notification(user, admin_email)
 
 
+def _build_auth_response(session: Session, user: User, is_new_user: bool) -> dict:
+    """Build the JSON body returned by both login flows (Google + email code)."""
+    is_admin = _is_admin_email(user.email)
+    return {
+        "user_id": str(user.id),
+        "email": user.email,
+        "name": user.display_name or user.email,
+        "handle": user.handle,
+        "avatar_url": user.avatar_url,
+        "is_admin": is_admin,
+        "is_new_user": is_new_user,
+        "share_attendance_default": user.share_attendance_default,
+        "share_attendance_default_audience": (
+            user.share_attendance_default_audience
+            or ("public" if user.share_attendance_default else "private")
+        ),
+        "preferences": _serialize_preferences(session, user).model_dump(mode="json"),
+        # Phase E (E2): include friend_count on the login response so
+        # the AudiencePicker zero-friends hint can render immediately
+        # after sign-in without waiting for the next /auth/me cycle.
+        "friend_count": _friend_count(session, user.id),
+        "following_count": _following_count(session, user.id),
+        # Phase E (E3): ISO-8601 timestamp of onboarding completion
+        # (or skip). ``None`` means the frontend should redirect to
+        # ``/onboarding/follow`` after first-load.
+        "onboarded_at": (user.onboarded_at.isoformat() if user.onboarded_at else None),
+        # True when the user has never onboarded OR the server-side
+        # ``CURRENT_ONBOARDING_VERSION`` was bumped since they last
+        # completed the wizard (forced re-onboarding).
+        "needs_onboarding": (
+            user.onboarded_at is None
+            or (user.onboarding_version or 0) < get_current_onboarding_version()
+        ),
+        "force_install_prompt": bool(user.force_install_prompt),
+        "installed_at": (user.installed_at.isoformat() if user.installed_at else None),
+        "force_enable_push_prompt": bool(user.force_enable_push_prompt),
+    }
+
+
 @router.post("/google")
 @limiter.limit("10/minute")
 def login_with_google(
@@ -512,48 +577,161 @@ def login_with_google(
         background_tasks.add_task(_notify_admin_new_user, user)
 
     is_admin = _is_admin_email(user.email)
-    response = JSONResponse(
-        content={
-            "user_id": str(user.id),
-            "email": user.email,
-            "name": user.display_name or user.email,
-            "handle": user.handle,
-            "avatar_url": user.avatar_url,
-            "is_admin": is_admin,
-            "is_new_user": is_new_user,
-            "share_attendance_default": user.share_attendance_default,
-            "share_attendance_default_audience": (
-                user.share_attendance_default_audience
-                or ("public" if user.share_attendance_default else "private")
-            ),
-            "preferences": _serialize_preferences(session, user).model_dump(
-                mode="json"
-            ),
-            # Phase E (E2): include friend_count on the login response so
-            # the AudiencePicker zero-friends hint can render immediately
-            # after sign-in without waiting for the next /auth/me cycle.
-            "friend_count": _friend_count(session, user.id),
-            "following_count": _following_count(session, user.id),
-            # Phase E (E3): ISO-8601 timestamp of onboarding completion
-            # (or skip). ``None`` means the frontend should redirect to
-            # ``/onboarding/follow`` after first-load.
-            "onboarded_at": (
-                user.onboarded_at.isoformat() if user.onboarded_at else None
-            ),
-            # True when the user has never onboarded OR the server-side
-            # ``CURRENT_ONBOARDING_VERSION`` was bumped since they last
-            # completed the wizard (forced re-onboarding).
-            "needs_onboarding": (
-                user.onboarded_at is None
-                or (user.onboarding_version or 0) < get_current_onboarding_version()
-            ),
-            "force_install_prompt": bool(user.force_install_prompt),
-            "installed_at": (
-                user.installed_at.isoformat() if user.installed_at else None
-            ),
-            "force_enable_push_prompt": bool(user.force_enable_push_prompt),
-        }
+    response = JSONResponse(content=_build_auth_response(session, user, is_new_user))
+    return _set_session_cookie(response, user, is_admin)
+
+
+def _hash_code(code: str) -> str:
+    return hashlib.sha256(code.encode("utf-8")).hexdigest()
+
+
+@router.post("/email-code/request")
+@limiter.limit("5/hour")
+def request_email_code(
+    request: Request,
+    body: EmailCodeRequest,
+    session: Session = Depends(get_session),
+):
+    """Generate a 6-digit sign-in code for ``email`` and email it.
+
+    In dev (DEV_AUTH) or a non-secure env with no working SMTP, the code is
+    logged and returned as ``dev_code`` so it can be used without a mail server.
+    The response never reveals whether the email already has an account (email
+    OTP creates the account on first verify), so there is no user enumeration.
+    """
+    email = (body.email or "").strip().lower()
+    if not _EMAIL_RE.match(email):
+        return JSONResponse(status_code=400, content={"detail": "Invalid email"})
+
+    now = datetime.utcnow()
+    # Per-email resend cooldown: block a fresh code while a recent unconsumed
+    # one is still within the cooldown window (limits email bombing beyond the
+    # per-IP rate limit).
+    recent = session.exec(
+        select(EmailLoginCode)
+        .where(EmailLoginCode.email == email)
+        .where(EmailLoginCode.consumed_at.is_(None))
+        .where(EmailLoginCode.created_at > now - _CODE_RESEND_COOLDOWN)
+        .order_by(EmailLoginCode.created_at.desc())
+    ).first()
+    if recent is not None:
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Please wait before requesting another code"},
+        )
+
+    # Invalidate any prior unconsumed codes so only the newest one verifies.
+    for stale in session.exec(
+        select(EmailLoginCode)
+        .where(EmailLoginCode.email == email)
+        .where(EmailLoginCode.consumed_at.is_(None))
+    ).all():
+        stale.consumed_at = now
+        session.add(stale)
+
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    session.add(
+        EmailLoginCode(
+            email=email,
+            code_hash=_hash_code(code),
+            created_at=now,
+            expires_at=now + _CODE_TTL,
+            request_ip=get_client_ip(request),
+        )
     )
+    session.commit()
+
+    dev_mode = _is_dev_auth()
+    secure_env = get_env_name() in _SECURE_ENV_NAMES
+    sent = False
+    if not dev_mode:
+        sent = send_login_code_email(email, code)
+    # Expose the code only in dev mode or when a non-secure env has no working
+    # SMTP — never leak it in staging/production.
+    expose_code = dev_mode or (not sent and not secure_env)
+    if expose_code:
+        logger.info("Email login code for %s: %s", email, code)
+
+    content: dict = {
+        "sent": bool(sent or dev_mode),
+        "expires_in": int(_CODE_TTL.total_seconds()),
+    }
+    if expose_code:
+        content["dev_code"] = code
+    return JSONResponse(content=content)
+
+
+@router.post("/email-code/verify")
+@limiter.limit("10/minute")
+def verify_email_code(
+    request: Request,
+    body: EmailCodeVerifyRequest,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session),
+):
+    """Verify a one-time code, upsert the user, merge anon data, set the cookie.
+
+    Matching by email means an existing Google account with the same address is
+    reused (unified under the same internal user id); a brand-new email-only
+    account is created with ``provider="email"``.
+    """
+    email = (body.email or "").strip().lower()
+    code = (body.code or "").strip()
+    if not _EMAIL_RE.match(email) or not _CODE_RE.match(code):
+        return JSONResponse(
+            status_code=400, content={"detail": "Invalid or expired code"}
+        )
+
+    now = datetime.utcnow()
+    row = session.exec(
+        select(EmailLoginCode)
+        .where(EmailLoginCode.email == email)
+        .where(EmailLoginCode.consumed_at.is_(None))
+        .order_by(EmailLoginCode.created_at.desc())
+    ).first()
+    if row is None or row.expires_at < now:
+        if row is not None:
+            row.consumed_at = now
+            session.add(row)
+            session.commit()
+        return JSONResponse(
+            status_code=400, content={"detail": "Invalid or expired code"}
+        )
+
+    row.attempt_count += 1
+    session.add(row)
+    session.commit()
+
+    if not hmac.compare_digest(_hash_code(code), row.code_hash):
+        if row.attempt_count >= _CODE_MAX_ATTEMPTS:
+            row.consumed_at = now
+            session.add(row)
+            session.commit()
+        return JSONResponse(
+            status_code=400, content={"detail": "Invalid or expired code"}
+        )
+
+    row.consumed_at = now
+    session.add(row)
+    session.commit()
+
+    user, is_new_user = _upsert_user_from_claims(
+        session,
+        email=email,
+        name=email.split("@", 1)[0],
+        picture=None,
+        provider_subject=None,
+        provider="email",
+        user_agent=request.headers.get("user-agent"),
+    )
+    _merge_device_data(session, user, body.device_id, anon_id=read_anon_id(request))
+    _apply_anon_preferences(session, user, body.anon_preferences)
+    session.refresh(user)
+    if is_new_user:
+        background_tasks.add_task(_notify_admin_new_user, user)
+
+    is_admin = _is_admin_email(user.email)
+    response = JSONResponse(content=_build_auth_response(session, user, is_new_user))
     return _set_session_cookie(response, user, is_admin)
 
 
