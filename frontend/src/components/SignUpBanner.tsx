@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getActiveReferral } from '../hooks/useReferralAttribution';
 
@@ -43,6 +43,7 @@ function hasActiveShareReferral(): boolean {
  */
 export default function SignUpBanner() {
     const { user, loading } = useAuth();
+    const { pathname } = useLocation();
     const [dismissed, setDismissed] = useState<boolean>(true);
     const [shareReferralActive, setShareReferralActive] = useState<boolean>(false);
 
@@ -57,7 +58,7 @@ export default function SignUpBanner() {
         return () => window.removeEventListener('referral:changed', evaluate);
     }, []);
 
-    if (loading || user || dismissed || shareReferralActive) return null;
+    if (loading || user || dismissed || shareReferralActive || pathname === '/login') return null;
 
     const handleDismiss = () => {
         try {
