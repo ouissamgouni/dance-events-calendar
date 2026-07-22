@@ -464,7 +464,7 @@ export default function Account() {
 
             <NetworkPanel />
 
-            <ReferralCard />
+            <ReferralCard compact />
 
             <div id="preferences" className="scroll-mt-4">
                 <PreferencesSection />

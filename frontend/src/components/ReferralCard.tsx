@@ -6,6 +6,8 @@
  * native share trigger, plus invite stats.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { QRCodeSVG } from 'qrcode.react';
 import { fetchMyReferral, type ReferralResponse } from '../api';
 
 type ReferralCardProps = {
@@ -14,9 +16,13 @@ type ReferralCardProps = {
      * an "Invite a friend" email link lands on a page that immediately
      * offers to share, instead of requiring an extra click. */
     autoShare?: boolean;
+    /** Renders a shrunk-down version (title, description, stat and a
+     * single button linking to the dedicated `/invite` page) instead of
+     * the full URL/Copy/Share/QR UI. Used on the account settings page. */
+    compact?: boolean;
 };
 
-export default function ReferralCard({ autoShare = false }: ReferralCardProps) {
+export default function ReferralCard({ autoShare = false, compact = false }: ReferralCardProps) {
     const [data, setData] = useState<ReferralResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
@@ -61,14 +67,45 @@ export default function ReferralCard({ autoShare = false }: ReferralCardProps) {
     }, [data, copy]);
 
     useEffect(() => {
-        if (!autoShare || autoTriggered.current || !data) return;
+        if (compact || !autoShare || autoTriggered.current || !data) return;
         autoTriggered.current = true;
         // Copy is guaranteed to land the invitation link even in browsers/
         // contexts where the native share sheet can't be invoked without a
         // direct user gesture; share is attempted best-effort on top of it.
         void copy();
         void share();
-    }, [autoShare, data, copy, share]);
+    }, [compact, autoShare, data, copy, share]);
+
+    const statLine = data && (
+        data.used_count === 0
+            ? 'No one has used your link yet.'
+            : `${data.used_count} ${data.used_count === 1 ? 'person has' : 'people have'} joined via your link.`
+    );
+
+    if (compact) {
+        return (
+            <section className="border border-slate-200 bg-white p-6 mb-4">
+                <h2 className="text-base font-semibold text-slate-900 mb-1">
+                    Invite friends
+                </h2>
+                <p className="text-xs text-slate-600 mb-3">
+                    Anyone who joins with your link becomes mutual friends with you.
+                </p>
+                {error && (
+                    <div className="mb-3 border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                        {error}
+                    </div>
+                )}
+                {statLine && <p className="mb-3 text-xs text-slate-500">{statLine}</p>}
+                <Link
+                    to="/invite"
+                    className="inline-block bg-blue-500 px-4 py-2 text-xs font-medium text-white hover:bg-blue-600"
+                >
+                    Invite a friend
+                </Link>
+            </section>
+        );
+    }
 
     return (
         <section className="border border-slate-200 bg-white p-6 mb-4">
@@ -87,6 +124,11 @@ export default function ReferralCard({ autoShare = false }: ReferralCardProps) {
                 <p className="text-sm text-slate-400">Loading…</p>
             ) : data ? (
                 <>
+                    <div className="mb-4 flex justify-center">
+                        <div className="border border-slate-200 p-3">
+                            <QRCodeSVG value={data.url} size={200} />
+                        </div>
+                    </div>
                     <div className="flex items-center gap-2">
                         <input
                             type="text"
@@ -111,11 +153,7 @@ export default function ReferralCard({ autoShare = false }: ReferralCardProps) {
                             Share
                         </button>
                     </div>
-                    <p className="mt-2 text-xs text-slate-500">
-                        {data.used_count === 0
-                            ? 'No one has used your link yet.'
-                            : `${data.used_count} ${data.used_count === 1 ? 'person has' : 'people have'} joined via your link.`}
-                    </p>
+                    <p className="mt-2 text-xs text-slate-500">{statLine}</p>
                 </>
             ) : null}
         </section>
