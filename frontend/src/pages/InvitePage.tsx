@@ -6,9 +6,10 @@ import ReferralCard from '../components/ReferralCard';
 /**
  * Dedicated, linkable "Invite a friend" page — the destination for the
  * "Invite a friend" link sent in notification emails (activity digest,
- * interest match, and event reminder). Lands on the referral card with
- * the native share sheet auto-triggered (clipboard copy guaranteed as a
- * fallback) so a single click from the email offers to share right away.
+ * interest match, and event reminder) and the header menu/settings link.
+ * Shows the referral QR code plus URL/Copy/Share controls. Does not
+ * auto-trigger the native share sheet, since that dialog would cover the
+ * QR code as soon as the page loads.
  */
 export default function InvitePage() {
     const { user, loading } = useAuth();
@@ -30,7 +31,7 @@ export default function InvitePage() {
                         </Link>
                     </div>
                 ) : (
-                    <ReferralCard autoShare />
+                    <ReferralCard />
                 )}
             </div>
         </>

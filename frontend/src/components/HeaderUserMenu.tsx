@@ -133,7 +133,7 @@ export default function HeaderUserMenu({ className }: { className?: string }) {
                         Find people
                     </Link>
                     <Link
-                        to="/account#network"
+                        to="/invite"
                         role="menuitem"
                         className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                     >

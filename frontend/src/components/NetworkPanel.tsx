@@ -270,7 +270,7 @@ export default function NetworkPanel() {
                 })}
             </div>
 
-            <div className="h-80 overflow-y-auto">
+            <div className="max-h-80 overflow-y-auto">
                 {error ? (
                     <p className="text-xs text-red-600">{error}</p>
                 ) : tab === 'suggestions' ? (

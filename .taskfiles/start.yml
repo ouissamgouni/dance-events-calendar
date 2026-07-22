@@ -256,6 +256,9 @@ tasks:
           set +a
           CALENDAR_SVC="${CALENDAR_SERVICE:-mock}"
         fi
+        # Umami containers are opt-in: only scenarios that explicitly set
+        # UMAMI_ENABLED=true in their config.env will spin them up.
+        UMAMI_ENABLED="${UMAMI_ENABLED:-false}"
 
         # Load per-scenario secrets.env if it exists (overrides root secrets.env)
         if [ -f "$SCENARIO_DIR/secrets.env" ]; then
@@ -314,57 +317,62 @@ tasks:
         DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${SC_DB_PORT}/${SC_DB_NAME}" \
         PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.seed $SEED_ARG
 
-        # ── Start Umami analytics ──
-        echo ""
-        echo "Starting Umami analytics..."
-        SC_UMAMI_PORT=$SC_UMAMI_PORT \
-        SC_PROJECT_NAME=$SC_PROJECT_NAME \
-        docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.scenario-umami.yml -p $SC_UMAMI_PROJECT up -d
-
-        # Wait for Umami HTTP to be ready (up to 60s)
-        UMAMI_URL="http://localhost:${SC_UMAMI_PORT}"
-        echo "Waiting for Umami at $UMAMI_URL ..."
-        for i in $(seq 1 30); do
-          if curl -sf "${UMAMI_URL}/api/heartbeat" >/dev/null 2>&1; then
-            break
-          fi
-          sleep 2
-        done
-
-        # Bootstrap: login with retry (Umami runs DB migrations after heartbeat is ready,
-        # so login can fail for 5-15s even after /api/heartbeat returns OK)
-        UMAMI_TOKEN=""
-        for attempt in $(seq 1 20); do
-          UMAMI_TOKEN=$(curl -sf -X POST "${UMAMI_URL}/api/auth/login" \
-            -H 'Content-Type: application/json' \
-            -d '{"username":"admin","password":"umami"}' 2>/dev/null \
-            | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])" 2>/dev/null \
-            || true)
-          if [ -n "$UMAMI_TOKEN" ]; then
-            break
-          fi
-          echo "  Umami login attempt $attempt/20 not ready yet, retrying in 2s..."
-          sleep 2
-        done
-
+        # ── Start Umami analytics (opt-in via UMAMI_ENABLED=true in scenario config.env) ──
         SC_UMAMI_WEBSITE_ID=""
-        if [ -z "$UMAMI_TOKEN" ]; then
-          echo "⚠️  Umami bootstrap failed: could not log in after 20 attempts"
-          echo "   Umami tracking will be disabled for this session"
-        else
-          SC_UMAMI_WEBSITE_ID=$(curl -sf -X POST "${UMAMI_URL}/api/websites" \
-            -H 'Content-Type: application/json' \
-            -H "Authorization: Bearer ${UMAMI_TOKEN}" \
-            -d "{\"name\":\"${SCENARIO_NAME}\",\"domain\":\"localhost\"}" 2>/dev/null \
-            | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])" 2>/dev/null \
-            || true)
-          if [ -z "$SC_UMAMI_WEBSITE_ID" ]; then
-            echo "⚠️  Umami bootstrap failed: could not create website (got empty ID)"
+        if [ "$UMAMI_ENABLED" = "true" ]; then
+          echo ""
+          echo "Starting Umami analytics..."
+          SC_UMAMI_PORT=$SC_UMAMI_PORT \
+          SC_PROJECT_NAME=$SC_PROJECT_NAME \
+          docker compose -f {{.ROOT_DIR}}/infra/docker/docker-compose.scenario-umami.yml -p $SC_UMAMI_PROJECT up -d
+
+          # Wait for Umami HTTP to be ready (up to 60s)
+          UMAMI_URL="http://localhost:${SC_UMAMI_PORT}"
+          echo "Waiting for Umami at $UMAMI_URL ..."
+          for i in $(seq 1 30); do
+            if curl -sf "${UMAMI_URL}/api/heartbeat" >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+
+          # Bootstrap: login with retry (Umami runs DB migrations after heartbeat is ready,
+          # so login can fail for 5-15s even after /api/heartbeat returns OK)
+          UMAMI_TOKEN=""
+          for attempt in $(seq 1 20); do
+            UMAMI_TOKEN=$(curl -sf -X POST "${UMAMI_URL}/api/auth/login" \
+              -H 'Content-Type: application/json' \
+              -d '{"username":"admin","password":"umami"}' 2>/dev/null \
+              | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])" 2>/dev/null \
+              || true)
+            if [ -n "$UMAMI_TOKEN" ]; then
+              break
+            fi
+            echo "  Umami login attempt $attempt/20 not ready yet, retrying in 2s..."
+            sleep 2
+          done
+
+          if [ -z "$UMAMI_TOKEN" ]; then
+            echo "⚠️  Umami bootstrap failed: could not log in after 20 attempts"
             echo "   Umami tracking will be disabled for this session"
           else
-            echo "✅ Umami ready — website ID: $SC_UMAMI_WEBSITE_ID"
-            echo "   Dashboard: $UMAMI_URL"
+            SC_UMAMI_WEBSITE_ID=$(curl -sf -X POST "${UMAMI_URL}/api/websites" \
+              -H 'Content-Type: application/json' \
+              -H "Authorization: Bearer ${UMAMI_TOKEN}" \
+              -d "{\"name\":\"${SCENARIO_NAME}\",\"domain\":\"localhost\"}" 2>/dev/null \
+              | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])" 2>/dev/null \
+              || true)
+            if [ -z "$SC_UMAMI_WEBSITE_ID" ]; then
+              echo "⚠️  Umami bootstrap failed: could not create website (got empty ID)"
+              echo "   Umami tracking will be disabled for this session"
+            else
+              echo "✅ Umami ready — website ID: $SC_UMAMI_WEBSITE_ID"
+              echo "   Dashboard: $UMAMI_URL"
+            fi
           fi
+        else
+          echo ""
+          echo "Umami analytics disabled for this scenario (set UMAMI_ENABLED=true in scenario config.env to enable)"
         fi
 
         # Persist Umami info into state file
