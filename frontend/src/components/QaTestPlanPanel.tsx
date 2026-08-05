@@ -233,7 +233,7 @@ function QaTestPlanPanelInner({
                             {done} / {total} completed
                         </span>
 
-                        {testPlan.steps.map((step) => {
+                        {(testPlan.steps ?? []).map((step) => {
                             const isDone = doneSet.has(step.id);
                             return (
                                 <div

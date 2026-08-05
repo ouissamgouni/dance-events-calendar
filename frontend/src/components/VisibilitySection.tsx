@@ -4,6 +4,7 @@ import {
     updateMySocialLinks,
     updateMyVisibility,
     type AccountVisibility,
+    type PassportVisibility,
     type PublicProfile,
     type ShareAudience,
 } from '../api';
@@ -22,6 +23,12 @@ const ACCOUNT_VISIBILITY_OPTIONS: { value: AccountVisibility; label: string; hel
         label: 'Friends only',
         help: 'Only mutual followers (friends) can see your profile, calendar, and activity. People can still find you by search to request access.',
     },
+];
+
+const PASSPORT_VISIBILITY_OPTIONS: { value: PassportVisibility; label: string; help: string }[] = [
+    { value: 'public', label: 'Anyone', help: 'Everyone who opens your profile can see your Dance Passport.' },
+    { value: 'friends', label: 'Friends', help: 'Only people you follow back can see your Dance Passport on your profile.' },
+    { value: 'private', label: 'Only me', help: 'Hidden from your profile — you still see it on your own passport page.' },
 ];
 
 /**
@@ -99,6 +106,22 @@ export default function VisibilitySection({ handle }: { handle: string | null })
         }
     };
 
+    const setPassportVisibility = async (value: PassportVisibility) => {
+        if (!profile) return;
+        const prev = profile;
+        setProfile({ ...profile, passport_visibility: value });
+        setSavingScope('passport_visibility');
+        try {
+            const next = await updateMyVisibility({ passport_visibility: value });
+            setProfile(next);
+        } catch (err) {
+            setProfile(prev);
+            setError(err instanceof Error ? err.message : 'Failed to save');
+        } finally {
+            setSavingScope(null);
+        }
+    };
+
     if (!handle) {
         return (
             <section className="border border-slate-200 bg-white p-4 mb-3">
@@ -155,6 +178,46 @@ export default function VisibilitySection({ handle }: { handle: string | null })
                                         type="button"
                                         disabled={savingScope === 'account_visibility'}
                                         onClick={() => setAccountVisibility(opt.value)}
+                                        className={
+                                            'w-full text-left border px-4 py-3 transition ' +
+                                            (active
+                                                ? 'border-blue-500 bg-blue-50'
+                                                : 'border-slate-200 bg-white hover:bg-slate-50')
+                                        }
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-medium text-slate-900">
+                                                {opt.label}
+                                            </span>
+                                            {active && (
+                                                <span className="text-xs font-semibold text-blue-600">
+                                                    Current
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="text-xs text-slate-500 mt-1">{opt.help}</div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                    <div className="border-t border-slate-100 pt-4">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
+                            Dance Passport
+                        </div>
+                        <p className="text-xs text-slate-500 mb-3">
+                            Who can see your Dance Passport on your profile. Which
+                            sections are shared is chosen when you share it.
+                        </p>
+                        <div className="space-y-3">
+                            {PASSPORT_VISIBILITY_OPTIONS.map((opt) => {
+                                const active = (profile.passport_visibility ?? 'friends') === opt.value;
+                                return (
+                                    <button
+                                        key={opt.value}
+                                        type="button"
+                                        disabled={savingScope === 'passport_visibility'}
+                                        onClick={() => setPassportVisibility(opt.value)}
                                         className={
                                             'w-full text-left border px-4 py-3 transition ' +
                                             (active

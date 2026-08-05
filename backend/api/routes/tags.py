@@ -63,6 +63,8 @@ def _tag_to_response(tag: Tag) -> TagResponse:
         group_slug=tag.group.slug if tag.group else "",
         group_label=tag.group.label if tag.group else "",
         group_color=tag.group.color if tag.group else None,
+        group_scope=tag.group.scope if tag.group else "event",
+        polarity=tag.polarity,
         enabled=tag.enabled,
         is_hero_filter=tag.is_hero_filter,
         hero_ordinal=tag.hero_ordinal,
@@ -80,6 +82,7 @@ def _group_to_response(group: TagGroup) -> TagGroupResponse:
         enabled=group.enabled,
         onboarding_eligible=group.onboarding_eligible,
         scope=group.scope,
+        condition_tag_slugs=group.condition_tag_slugs,
         tags=[_tag_to_response(t) for t in sorted(group.tags, key=lambda t: t.ordinal)],
     )
 
@@ -192,6 +195,8 @@ def get_event_tags(
             group_slug=group.slug,
             group_label=group.label,
             group_color=group.color,
+            group_scope=group.scope,
+            polarity=tag.polarity,
             enabled=tag.enabled,
             is_hero_filter=tag.is_hero_filter,
             hero_ordinal=tag.hero_ordinal,
@@ -216,12 +221,12 @@ def list_tag_groups(
     ),
     scope: str = Query(
         default="event",
-        pattern="^(event|review)$",
+        pattern="^(event|aspect|audience|review)$",
         description=(
             "Tag namespace. 'event' (default) returns groups used for "
-            "explorer filtering and event classification. 'review' returns "
-            "review-only aspect tags used inside the rate-event modal and "
-            "review-list filter chips."
+            "explorer filtering and event classification. 'aspect' returns "
+            "review aspect groups (polarised tags), 'audience' returns "
+            "recommendation-audience tags used inside the review modal."
         ),
     ),
     onboarding: bool = Query(
@@ -420,6 +425,7 @@ def create_tag_group(
         color=body.color,
         ordinal=(max_ordinal or 0) + 1,
         scope=body.scope or "event",
+        condition_tag_slugs=body.condition_tag_slugs,
     )
     session.add(group)
     session.commit()
@@ -521,6 +527,7 @@ def create_tag(
         label=body.label,
         color=body.color,
         ordinal=(max_ordinal or 0) + 1,
+        polarity=body.polarity,
     )
     session.add(tag)
     session.commit()

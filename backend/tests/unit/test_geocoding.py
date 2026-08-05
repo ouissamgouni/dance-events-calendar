@@ -430,3 +430,102 @@ class TestSearchLocations:
 
         results = search_locations("Paris", limit=3)
         assert len(results) == 3
+
+
+# ---------------------------------------------------------------------------
+# Tests for reverse_geocode (coordinates -> city / country)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestReverseGeocode:
+    def setup_method(self):
+        from backend.services.geocoding import _reset_state
+
+        _reset_state()
+
+    def test_parses_google_address_components(self):
+        from backend.services.geocoding import _parse_google_place
+
+        raw = {
+            "address_components": [
+                {"long_name": "Paris", "short_name": "Paris", "types": ["locality"]},
+                {
+                    "long_name": "France",
+                    "short_name": "FR",
+                    "types": ["country", "political"],
+                },
+            ]
+        }
+        assert _parse_google_place(raw) == ("Paris", "France", "FR")
+
+    def test_parses_nominatim_address(self):
+        from backend.services.geocoding import _parse_nominatim_place
+
+        address = {"town": "Bristol", "country": "United Kingdom", "country_code": "gb"}
+        assert _parse_nominatim_place(address) == ("Bristol", "United Kingdom", "GB")
+
+    def test_empty_address_returns_none(self):
+        from backend.services.geocoding import _parse_nominatim_place
+
+        assert _parse_nominatim_place({}) is None
+
+    @patch("backend.services.geocoding._throttle")
+    @patch("backend.services.geocoding._geocoder")
+    @patch("backend.services.geocoding._get_google_geocoder", return_value=None)
+    def test_reverse_uses_nominatim_when_no_google(
+        self, _mock_google, mock_geocoder, _mock_throttle
+    ):
+        result = MagicMock()
+        result.raw = {
+            "address": {"city": "Berlin", "country": "Germany", "country_code": "de"}
+        }
+        mock_geocoder.reverse.return_value = result
+
+        from backend.services.geocoding import reverse_geocode
+
+        assert reverse_geocode(52.52, 13.40) == ("Berlin", "Germany", "DE")
+
+    @patch("backend.services.geocoding._throttle")
+    @patch("backend.services.geocoding._geocoder")
+    @patch("backend.services.geocoding._get_google_geocoder", return_value=None)
+    def test_reverse_result_is_cached(
+        self, _mock_google, mock_geocoder, _mock_throttle
+    ):
+        result = MagicMock()
+        result.raw = {"address": {"city": "Berlin", "country": "Germany"}}
+        mock_geocoder.reverse.return_value = result
+
+        from backend.services.geocoding import reverse_geocode
+
+        reverse_geocode(52.52, 13.40)
+        reverse_geocode(52.52, 13.40)
+
+        mock_geocoder.reverse.assert_called_once()
+
+    @patch("backend.services.geocoding._throttle")
+    @patch("backend.services.geocoding._geocoder")
+    def test_reverse_prefers_google_when_configured(
+        self, mock_nominatim, _mock_throttle
+    ):
+        google_r = MagicMock()
+        google_r.raw = {
+            "address_components": [
+                {"long_name": "Lisbon", "short_name": "Lisbon", "types": ["locality"]},
+                {"long_name": "Portugal", "short_name": "PT", "types": ["country"]},
+            ]
+        }
+        mock_google_geocoder = MagicMock()
+        mock_google_geocoder.reverse.return_value = google_r
+
+        with patch(
+            "backend.services.geocoding._get_google_geocoder",
+            return_value=mock_google_geocoder,
+        ):
+            from backend.services.geocoding import reverse_geocode, _reset_state
+
+            _reset_state()
+            place = reverse_geocode(38.72, -9.14)
+
+        assert place == ("Lisbon", "Portugal", "PT")
+        mock_nominatim.reverse.assert_not_called()

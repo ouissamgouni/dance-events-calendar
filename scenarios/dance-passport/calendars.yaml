@@ -1,0 +1,4 @@
+calendars:
+  - id: "passport-cal-001"
+    name: "Dance Passport Calendar"
+    color: "#0ea5e9"

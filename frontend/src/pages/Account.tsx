@@ -11,6 +11,7 @@ import {
     fetchEventsByIds,
 } from '../api';
 import type { MyRating, CalendarEvent } from '../types';
+import { SENTIMENT_META } from '../utils/reviewSentiment';
 import PreferencesSection from '../components/PreferencesSection';
 import VisibilitySection, { ProfileLinksEditor } from '../components/VisibilitySection';
 import NotificationSettings from '../components/NotificationSettings';
@@ -499,17 +500,24 @@ export default function Account() {
                                         {r.event_title || r.event_id}
                                     </Link>
                                     <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
-                                        <span className="text-amber-500">
-                                            {'★'.repeat(r.stars)}{'☆'.repeat(5 - r.stars)}
-                                        </span>
-                                        <span className="capitalize">{r.status}</span>
+                                        {r.overall_sentiment && (
+                                            <span title={SENTIMENT_META[r.overall_sentiment].label}>
+                                                {SENTIMENT_META[r.overall_sentiment].emoji}{' '}
+                                                {SENTIMENT_META[r.overall_sentiment].label}
+                                            </span>
+                                        )}
                                         {r.is_anonymous && <span>· anonymous</span>}
                                         <span className="ml-auto">
                                             {new Date(r.created_at).toLocaleDateString()}
                                         </span>
                                     </div>
                                     {r.comment && (
-                                        <p className="text-xs text-slate-600 mt-1 line-clamp-2">{r.comment}</p>
+                                        <p className="text-xs text-slate-600 mt-1 line-clamp-2">
+                                            {r.comment}
+                                            {r.comment_status === 'pending' && (
+                                                <span className="ml-1 text-slate-400">(awaiting review)</span>
+                                            )}
+                                        </p>
                                     )}
                                 </li>
                             ))}

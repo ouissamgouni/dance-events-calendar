@@ -1,0 +1,11 @@
+# Series detection only ever groups events within the SAME calendar (unlike
+# duplicate detection, which spans all calendars) — a recurring event is
+# assumed to come from one organizer's feed. "other-calendar" exists purely
+# to prove a same-titled event in a different calendar is never grouped.
+calendars:
+  - id: "tango-collective"
+    name: "Tango Collective"
+    color: "#7c3aed"
+  - id: "other-calendar"
+    name: "Other Organizer"
+    color: "#0ea5e9"

@@ -89,7 +89,10 @@ def test_bool_getters_prefer_db_row_over_loader(
     "getter,loader_attr",
     [
         (app_settings.get_event_reminders_enabled, "get_event_reminders_enabled"),
-        (app_settings.get_activity_digest_email_enabled, "get_activity_digest_email_enabled"),
+        (
+            app_settings.get_activity_digest_email_enabled,
+            "get_activity_digest_email_enabled",
+        ),
         (
             app_settings.get_interest_match_notifications_enabled,
             "get_interest_match_notifications_enabled",
@@ -107,7 +110,9 @@ def test_bool_getters_fall_back_to_loader_when_row_missing(
 
 
 def test_bool_getter_ignores_malformed_row_and_uses_loader(session, monkeypatch):
-    monkeypatch.setattr("backend.config.loader.get_event_reminders_enabled", lambda: True)
+    monkeypatch.setattr(
+        "backend.config.loader.get_event_reminders_enabled", lambda: True
+    )
     _put(session, "event_reminders_enabled", "maybe")
     assert app_settings.get_event_reminders_enabled(session) is True
 
@@ -138,6 +143,100 @@ def test_reminder_lead_hours_ignores_malformed_row(session, monkeypatch):
     monkeypatch.setattr("backend.config.loader.get_reminder_lead_hours", lambda: 24)
     _put(session, "reminder_lead_hours", "abc")
     assert app_settings.get_reminder_lead_hours(session) == 24
+
+
+# --- review_prompt_lookback_hours -------------------------------------------
+
+
+def test_review_prompt_lookback_hours_prefers_db_row(session, monkeypatch):
+    monkeypatch.setattr(
+        "backend.config.loader.get_review_prompt_lookback_hours", lambda: 24
+    )
+    _put(session, "review_prompt_lookback_hours", "48")
+    assert app_settings.get_review_prompt_lookback_hours(session) == 48
+
+
+def test_review_prompt_lookback_hours_falls_back_when_row_missing(session, monkeypatch):
+    monkeypatch.setattr(
+        "backend.config.loader.get_review_prompt_lookback_hours", lambda: 24
+    )
+    assert app_settings.get_review_prompt_lookback_hours(session) == 24
+
+
+def test_review_prompt_lookback_hours_ignores_non_positive_row(session, monkeypatch):
+    monkeypatch.setattr(
+        "backend.config.loader.get_review_prompt_lookback_hours", lambda: 24
+    )
+    _put(session, "review_prompt_lookback_hours", "0")
+    assert app_settings.get_review_prompt_lookback_hours(session) == 24
+
+
+def test_review_prompt_lookback_hours_ignores_malformed_row(session, monkeypatch):
+    monkeypatch.setattr(
+        "backend.config.loader.get_review_prompt_lookback_hours", lambda: 24
+    )
+    _put(session, "review_prompt_lookback_hours", "abc")
+    assert app_settings.get_review_prompt_lookback_hours(session) == 24
+
+
+# --- for_you_review_window_days ---------------------------------------------
+
+
+def test_for_you_review_window_days_prefers_db_row(session, monkeypatch):
+    monkeypatch.setattr(
+        "backend.config.loader.get_for_you_review_window_days", lambda: 180
+    )
+    _put(session, "for_you_review_window_days", "365")
+    assert app_settings.get_for_you_review_window_days(session) == 365
+
+
+def test_for_you_review_window_days_falls_back_when_row_missing(session, monkeypatch):
+    monkeypatch.setattr(
+        "backend.config.loader.get_for_you_review_window_days", lambda: 180
+    )
+    assert app_settings.get_for_you_review_window_days(session) == 180
+
+
+def test_for_you_review_window_days_ignores_non_positive_row(session, monkeypatch):
+    monkeypatch.setattr(
+        "backend.config.loader.get_for_you_review_window_days", lambda: 180
+    )
+    _put(session, "for_you_review_window_days", "0")
+    assert app_settings.get_for_you_review_window_days(session) == 180
+
+
+def test_for_you_review_window_days_ignores_malformed_row(session, monkeypatch):
+    monkeypatch.setattr(
+        "backend.config.loader.get_for_you_review_window_days", lambda: 180
+    )
+    _put(session, "for_you_review_window_days", "abc")
+    assert app_settings.get_for_you_review_window_days(session) == 180
+
+
+# --- review_mood_headline_min_reviews -------------------------------------
+
+
+def test_mood_headline_min_reviews_prefers_db_row(session, monkeypatch):
+    monkeypatch.setattr(
+        "backend.config.loader.get_review_mood_headline_min_reviews", lambda: 3
+    )
+    _put(session, "review_mood_headline_min_reviews", "10")
+    assert app_settings.get_review_mood_headline_min_reviews(session) == 10
+
+
+def test_mood_headline_min_reviews_falls_back_when_row_missing(session, monkeypatch):
+    monkeypatch.setattr(
+        "backend.config.loader.get_review_mood_headline_min_reviews", lambda: 5
+    )
+    assert app_settings.get_review_mood_headline_min_reviews(session) == 5
+
+
+def test_mood_headline_min_reviews_ignores_non_positive_row(session, monkeypatch):
+    monkeypatch.setattr(
+        "backend.config.loader.get_review_mood_headline_min_reviews", lambda: 3
+    )
+    _put(session, "review_mood_headline_min_reviews", "0")
+    assert app_settings.get_review_mood_headline_min_reviews(session) == 3
 
 
 # --- activity_digest_schedule ---------------------------------------------

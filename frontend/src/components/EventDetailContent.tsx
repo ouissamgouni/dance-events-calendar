@@ -15,6 +15,7 @@ import GoingButton from './GoingButton';
 import AttendeeList from './AttendeeList';
 import GoingWedge from './GoingWedge';
 import RateEventButton from './RateEventButton';
+import CommunityExperienceSummary from './CommunityExperienceSummary';
 import TagBadges from './TagBadges';
 import SuggestTagsButton from './SuggestTagsButton';
 import ExpandableDescription from './ExpandableDescription';
@@ -668,7 +669,7 @@ export default function EventDetailContent({
                 <div className="border-t border-slate-100 pt-3 flex items-center gap-2 flex-wrap">
                     <SaveEventButton eventId={event.event_id} appearance="pill" />
                     <GoingButton eventId={event.event_id} appearance="pill" />
-                    {showRatings && <RateEventButton eventId={event.event_id} appearance="pill" />}
+                    {showRatings && <RateEventButton eventId={event.event_id} appearance="pill" isEventDetailPage showCount={false} isPast={new Date(event.end).getTime() < Date.now()} />}
                     <ShareButton
                         eventId={event.event_id}
                         title={event.title}
@@ -703,6 +704,16 @@ export default function EventDetailContent({
                         </button>
                     )}
                 </div>
+            )}
+
+            {/* Community Experience — compact summary only (the "Overall"/
+                "Typical experience" mood box + a link to the full breakdown on
+                the event page). The full review list lives on the detail page. */}
+            {showActions && showRatings && (
+                <CommunityExperienceSummary
+                    eventId={event.event_id}
+                    isPast={new Date(event.end).getTime() < Date.now()}
+                />
             )}
         </div>
     );

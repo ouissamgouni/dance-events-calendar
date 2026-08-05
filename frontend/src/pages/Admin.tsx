@@ -12,8 +12,9 @@ import {
     fetchMostAttendedEvents, getCurrentSyncJob,
     forceSendInterestMatches, sendDigestNow, fetchWebPushSubscriberCount,
     previewInterestMatches, fetchNotificationToggleCounts,
+    sendReviewPromptNow, searchEvents, fetchReviewPromptCandidates,
 } from '../api';
-import type { MostSavedEvent, MostViewedEvent, MostAttendedEvent, SourceBreakdown, CountryBreakdown, TopLink, ExportStat, AdminUserRow, NotificationToggleCounts, ForceInterestMatchPreviewResponse } from '../api';
+import type { MostSavedEvent, MostViewedEvent, MostAttendedEvent, SourceBreakdown, CountryBreakdown, TopLink, ExportStat, AdminUserRow, NotificationToggleCounts, ForceInterestMatchPreviewResponse, EventSearchResult, ReviewPromptCandidate } from '../api';
 import { useAuth } from '../context/AuthContext';
 import SyncProgressCard from '../components/SyncProgressCard';
 import SyncJobsHistoryTable from '../components/SyncJobsHistoryTable';
@@ -26,6 +27,7 @@ import PromoCodesAdminPanel from '../components/PromoCodesAdminPanel';
 import AdminEventDetailPanel from '../components/AdminEventDetailPanel';
 import OrganizerClaimsAdminPanel from '../components/OrganizerClaimsAdminPanel';
 import DuplicatesPanel from '../components/DuplicatesPanel';
+import SeriesPanel from '../components/SeriesPanel';
 import FeedbackPanel from '../components/FeedbackPanel';
 import AdminTagCategories from '../components/AdminTagCategories';
 import AdminAnalytics from '../components/AdminAnalytics';
@@ -105,6 +107,11 @@ export default function Admin() {
     const [webPushEnabled, setWebPushEnabled] = useState(false);
     const [reminderLeadHours, setReminderLeadHours] = useState(24);
     const [digestSchedule, setDigestSchedule] = useState('tue,fri @ 09:00');
+    const [reviewPromptEnabled, setReviewPromptEnabled] = useState(true);
+    const [reviewPromptDelayHours, setReviewPromptDelayHours] = useState(3);
+    const [reviewPromptLookbackHours, setReviewPromptLookbackHours] = useState(24);
+    const [forYouReviewWindowDays, setForYouReviewWindowDays] = useState(180);
+    const [reviewMoodMinReviews, setReviewMoodMinReviews] = useState(3);
     // Count of distinct signed-in users with a registered Web Push browser
     // endpoint (`push_subscriptions` table). Informational only.
     const [webPushSubscriberCount, setWebPushSubscriberCount] = useState<number | null>(null);
@@ -123,6 +130,17 @@ export default function Admin() {
     // re-send of notifications already delivered.
     const [digestNowMaxNotifications, setDigestNowMaxNotifications] = useState<number | undefined>(undefined);
     const [digestNowResend, setDigestNowResend] = useState(false);
+    // Manual review-prompt force-send: pick one event + specific attendees
+    // and fire the "how was it?" prompt now, bypassing the delay window.
+    const [reviewNowEvent, setReviewNowEvent] = useState<EventSearchResult | null>(null);
+    const [reviewNowQuery, setReviewNowQuery] = useState('');
+    const [reviewNowSearchResults, setReviewNowSearchResults] = useState<EventSearchResult[]>([]);
+    const [reviewNowCandidates, setReviewNowCandidates] = useState<ReviewPromptCandidate[]>([]);
+    const [reviewNowCandidatesLoading, setReviewNowCandidatesLoading] = useState(false);
+    const [reviewNowUsers, setReviewNowUsers] = useState<ReviewPromptCandidate[]>([]);
+    const [reviewNowResend, setReviewNowResend] = useState(false);
+    const [reviewNowBusy, setReviewNowBusy] = useState(false);
+    const [reviewNowMessage, setReviewNowMessage] = useState<string>('');
     // Max matched events shown inline in an interest-match digest email
     // before the rest collapse behind a "Discover more" link to "For you".
     const [interestMatchMaxEventsPerEmail, setInterestMatchMaxEventsPerEmail] = useState(10);
@@ -151,6 +169,7 @@ export default function Admin() {
     const [promoCodesPanelOpen, setPromoCodesPanelOpen] = useState(false);
     const [organizerClaimsPanelOpen, setOrganizerClaimsPanelOpen] = useState(false);
     const [duplicatesPanelOpen, setDuplicatesPanelOpen] = useState(false);
+    const [seriesPanelOpen, setSeriesPanelOpen] = useState(false);
     const { counters: adminCounters, refresh: refreshAdminCounters } = useAdminCounters();
     const feedbackPendingCount = adminCounters.feedbackPending;
     const tagSuggestionCount = adminCounters.tagSuggestions;
@@ -159,6 +178,7 @@ export default function Admin() {
     const organizerClaimsPendingCount = adminCounters.organizerClaimsPending;
     const promoCodesPendingCount = adminCounters.promoCodesPending;
     const duplicatesPendingCount = adminCounters.duplicatesPending;
+    const seriesPendingCount = adminCounters.seriesPending;
     const setFeedbackPendingCount = useCallback((_n: number) => refreshAdminCounters(), [refreshAdminCounters]);
     const setTagSuggestionCount = useCallback((_n: number) => refreshAdminCounters(), [refreshAdminCounters]);
     const [suggestions, setSuggestions] = useState<EventSuggestion[]>([]);
@@ -256,6 +276,11 @@ export default function Admin() {
             setWebPushEnabled(s.web_push_enabled ?? false);
             setReminderLeadHours(s.reminder_lead_hours ?? 24);
             setDigestSchedule(s.activity_digest_schedule ?? 'tue,fri @ 09:00');
+            setReviewPromptEnabled(s.review_prompt_enabled ?? true);
+            setReviewPromptDelayHours(s.review_prompt_delay_hours ?? 3);
+            setReviewPromptLookbackHours(s.review_prompt_lookback_hours ?? 24);
+            setForYouReviewWindowDays(s.for_you_review_window_days ?? 180);
+            setReviewMoodMinReviews(s.review_mood_headline_min_reviews ?? 3);
             setInterestMatchMaxEventsPerEmail(s.interest_match_max_events_per_email ?? 10);
             setEventColorBarColor(s.event_color_bar_color || '#64748b');
             setTagSortMode(s.tag_sort_mode === 'event_count' ? 'event_count' : 'group');
@@ -773,6 +798,70 @@ export default function Admin() {
         }
     };
 
+    const handleToggleReviewPrompt = async () => {
+        const newVal = !reviewPromptEnabled;
+        setReviewPromptEnabled(newVal);
+        try {
+            await updateSettings({ review_prompt_enabled: newVal });
+            setMessage(`Review prompts ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setReviewPromptEnabled(!newVal);
+            setMessage('Failed to update review prompt toggle.');
+        }
+    };
+
+    const handleReviewPromptDelayHoursChange = async (value: number) => {
+        if (isNaN(value) || value < 1 || value > 720) return;
+        const prev = reviewPromptDelayHours;
+        setReviewPromptDelayHours(value);
+        try {
+            await updateSettings({ review_prompt_delay_hours: value });
+            setMessage(`Review prompt delay set to ${value}h.`);
+        } catch {
+            setReviewPromptDelayHours(prev);
+            setMessage('Failed to update review prompt delay.');
+        }
+    };
+
+    const handleReviewPromptLookbackHoursChange = async (value: number) => {
+        if (isNaN(value) || value < 1 || value > 720) return;
+        const prev = reviewPromptLookbackHours;
+        setReviewPromptLookbackHours(value);
+        try {
+            await updateSettings({ review_prompt_lookback_hours: value });
+            setMessage(`Review prompt lookback set to ${value}h.`);
+        } catch {
+            setReviewPromptLookbackHours(prev);
+            setMessage('Failed to update review prompt lookback.');
+        }
+    };
+
+    const handleForYouReviewWindowDaysChange = async (value: number) => {
+        if (isNaN(value) || value < 1 || value > 3650) return;
+        const prev = forYouReviewWindowDays;
+        setForYouReviewWindowDays(value);
+        try {
+            await updateSettings({ for_you_review_window_days: value });
+            setMessage(`"Share your experience" window set to ${value} days.`);
+        } catch {
+            setForYouReviewWindowDays(prev);
+            setMessage('Failed to update review window.');
+        }
+    };
+
+    const handleReviewMoodMinReviewsChange = async (value: number) => {
+        if (isNaN(value) || value < 1 || value > 1000) return;
+        const prev = reviewMoodMinReviews;
+        setReviewMoodMinReviews(value);
+        try {
+            await updateSettings({ review_mood_headline_min_reviews: value });
+            setMessage(`Mood headline threshold set to ${value} reviews.`);
+        } catch {
+            setReviewMoodMinReviews(prev);
+            setMessage('Failed to update mood headline threshold.');
+        }
+    };
+
     const handleInterestMatchMaxEventsChange = async (value: number) => {
         if (isNaN(value) || value < 1 || value > 50) return;
         const prev = interestMatchMaxEventsPerEmail;
@@ -844,6 +933,65 @@ export default function Admin() {
             setMessage(msg);
         } finally {
             setDigestNowBusy(false);
+        }
+    };
+
+    // Debounced typeahead for the review-prompt "Send now" event picker.
+    // include_past=true so already-ended events (the review-prompt targets)
+    // surface — the default search only returns upcoming events.
+    useEffect(() => {
+        const q = reviewNowQuery.trim();
+        if (q.length < 2) {
+            setReviewNowSearchResults([]);
+            return;
+        }
+        const t = setTimeout(() => {
+            searchEvents(q, 8, true)
+                .then(setReviewNowSearchResults)
+                .catch(() => setReviewNowSearchResults([]));
+        }, 250);
+        return () => clearTimeout(t);
+    }, [reviewNowQuery]);
+
+    // Load the selected event's attendees as the force-send candidate list.
+    useEffect(() => {
+        if (!reviewNowEvent) {
+            setReviewNowCandidates([]);
+            setReviewNowUsers([]);
+            return;
+        }
+        let cancelled = false;
+        setReviewNowCandidatesLoading(true);
+        fetchReviewPromptCandidates(reviewNowEvent.event_id)
+            .then((rows) => { if (!cancelled) setReviewNowCandidates(rows); })
+            .catch(() => { if (!cancelled) setReviewNowCandidates([]); })
+            .finally(() => { if (!cancelled) setReviewNowCandidatesLoading(false); });
+        return () => { cancelled = true; };
+    }, [reviewNowEvent]);
+
+    const handleSendReviewPromptNow = async () => {
+        if (!reviewNowEvent || reviewNowUsers.length === 0) return;
+        setReviewNowBusy(true);
+        try {
+            const res = await sendReviewPromptNow(
+                reviewNowEvent.event_id,
+                reviewNowUsers.map((u) => u.user_id),
+                reviewNowResend,
+            );
+            const sent = res.results.filter((r) => r.status === 'sent').length;
+            const skipped = res.results.length - sent;
+            const msg = `Review prompt send-now: ${sent} of ${reviewNowUsers.length} user(s) sent `
+                + `(${res.emailed} email, ${res.pushed} push, ${res.in_app_created} in-app)`
+                + (skipped ? `; ${skipped} skipped.` : '.');
+            setReviewNowMessage(msg);
+            setMessage(msg);
+            setReviewNowUsers([]);
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : 'Failed to send review prompt now.';
+            setReviewNowMessage(msg);
+            setMessage(msg);
+        } finally {
+            setReviewNowBusy(false);
         }
     };
 
@@ -983,6 +1131,17 @@ export default function Admin() {
                         {duplicatesPendingCount > 0 && (
                             <span className="inline-flex items-center justify-center bg-amber-500 text-white text-[10px] font-semibold px-1.5 py-0 min-w-[16px]">
                                 {duplicatesPendingCount}
+                            </span>
+                        )}
+                    </button>
+                    <button
+                        onClick={() => setSeriesPanelOpen(true)}
+                        className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
+                    >
+                        Series
+                        {seriesPendingCount > 0 && (
+                            <span className="inline-flex items-center justify-center bg-amber-500 text-white text-[10px] font-semibold px-1.5 py-0 min-w-[16px]">
+                                {seriesPendingCount}
                             </span>
                         )}
                     </button>
@@ -1407,6 +1566,23 @@ export default function Admin() {
                                         ))}
                                     </select>
                                 </div>
+                                <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-gray-700">Mood headline threshold (reviews)</span>
+                                        <p className="text-[10px] text-gray-400">Minimum reviews before an event/series shows a computed "Overall Mood" label; below this it shows "Early feedback" (1–1000)</p>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={1000}
+                                        value={reviewMoodMinReviews}
+                                        onChange={(e) => setReviewMoodMinReviews(Number(e.target.value))}
+                                        onBlur={(e) => handleReviewMoodMinReviewsChange(Number(e.target.value))}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleReviewMoodMinReviewsChange(reviewMoodMinReviews)}
+                                        className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                        aria-label="Mood headline minimum reviews"
+                                    />
+                                </div>
                             </div>
                         </div>
                     )}
@@ -1816,6 +1992,226 @@ export default function Admin() {
                                     </div>
                                 </div>
 
+                                {/* Review prompt */}
+                                <div className="border border-gray-100 p-3 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Review prompt</span>
+                                        <button
+                                            onClick={handleToggleReviewPrompt}
+                                            aria-label="Toggle review prompt"
+                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${reviewPromptEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                        >
+                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${reviewPromptEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                        </button>
+                                    </div>
+                                    <p className="text-[10px] text-gray-400">Post-event "how was it?" nudge (in-app + email) for going users who haven't rated yet</p>
+                                    {toggleCounts && (
+                                        <p className="text-[10px] text-gray-500">
+                                            {toggleCounts.review_prompt.email} email · {toggleCounts.review_prompt.push} push enabled
+                                            {' '}(of {toggleCounts.total_users} users)
+                                        </p>
+                                    )}
+                                    <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
+                                        <div>
+                                            <span className="text-[11px] font-medium text-gray-700">Delay after event ends (hours)</span>
+                                            <p className="text-[10px] text-gray-400">How long after an event's end to fire the prompt (1–720)</p>
+                                        </div>
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={720}
+                                            value={reviewPromptDelayHours}
+                                            onChange={(e) => setReviewPromptDelayHours(Number(e.target.value))}
+                                            onBlur={(e) => handleReviewPromptDelayHoursChange(Number(e.target.value))}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleReviewPromptDelayHoursChange(reviewPromptDelayHours)}
+                                            className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                            aria-label="Review prompt delay in hours"
+                                        />
+                                    </div>
+                                    <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
+                                        <div>
+                                            <span className="text-[11px] font-medium text-gray-700">Scan lookback (hours)</span>
+                                            <p className="text-[10px] text-gray-400">How far past the delay window to scan for newly-eligible events each tick (1–720)</p>
+                                        </div>
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={720}
+                                            value={reviewPromptLookbackHours}
+                                            onChange={(e) => setReviewPromptLookbackHours(Number(e.target.value))}
+                                            onBlur={(e) => handleReviewPromptLookbackHoursChange(Number(e.target.value))}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleReviewPromptLookbackHoursChange(reviewPromptLookbackHours)}
+                                            className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                            aria-label="Review prompt lookback in hours"
+                                        />
+                                    </div>
+                                    <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
+                                        <div>
+                                            <span className="text-[11px] font-medium text-gray-700">"Share your experience" window (days)</span>
+                                            <p className="text-[10px] text-gray-400">How far back attended-but-unreviewed events surface in the "For you" trail (1–3650)</p>
+                                        </div>
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={3650}
+                                            value={forYouReviewWindowDays}
+                                            onChange={(e) => setForYouReviewWindowDays(Number(e.target.value))}
+                                            onBlur={(e) => handleForYouReviewWindowDaysChange(Number(e.target.value))}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleForYouReviewWindowDaysChange(forYouReviewWindowDays)}
+                                            className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                            aria-label="Share your experience review window in days"
+                                        />
+                                    </div>
+                                    <div className="border-t border-gray-100 pt-2.5 space-y-1.5">
+                                        <div>
+                                            <span className="text-[11px] font-medium text-gray-700">Send now</span>
+                                            <p className="text-[10px] text-gray-400">
+                                                Fire the "how was it?" prompt for a specific event to hand-picked
+                                                attendees now, bypassing the delay window. Non-attendees and users
+                                                who already rated are skipped; per-channel opt-outs are respected.
+                                            </p>
+                                        </div>
+                                        {reviewNowEvent ? (
+                                            <div className="flex items-center gap-2 text-[11px] border border-gray-200 rounded px-2 py-1">
+                                                <span className="min-w-0 flex-1 truncate">
+                                                    <span className="font-medium text-gray-800">{reviewNowEvent.title}</span>
+                                                    {reviewNowEvent.start && (
+                                                        <span className="text-gray-400"> · {new Date(reviewNowEvent.start).toLocaleDateString()}</span>
+                                                    )}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setReviewNowEvent(null); setReviewNowMessage(''); }}
+                                                    className="text-gray-400 hover:text-gray-600"
+                                                    aria-label="Clear selected event"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    value={reviewNowQuery}
+                                                    onChange={(e) => setReviewNowQuery(e.target.value)}
+                                                    placeholder="Search past event by title"
+                                                    className="w-full text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                                    aria-label="Search event for review prompt"
+                                                />
+                                                {reviewNowSearchResults.length > 0 && (
+                                                    <ul className="absolute z-10 mt-0.5 w-full max-h-48 overflow-auto bg-white border border-gray-200 rounded shadow">
+                                                        {reviewNowSearchResults.map((ev) => (
+                                                            <li key={ev.event_id}>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setReviewNowEvent(ev);
+                                                                        setReviewNowQuery('');
+                                                                        setReviewNowSearchResults([]);
+                                                                        setReviewNowMessage('');
+                                                                    }}
+                                                                    className="w-full text-left text-[11px] px-2 py-1 hover:bg-gray-50"
+                                                                >
+                                                                    <span className="font-medium text-gray-800">{ev.title}</span>
+                                                                    {ev.start && (
+                                                                        <span className="text-gray-400"> · {new Date(ev.start).toLocaleDateString()}</span>
+                                                                    )}
+                                                                </button>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                )}
+                                            </div>
+                                        )}
+                                        {reviewNowEvent && (
+                                            <div className="border border-gray-200 rounded">
+                                                <div className="flex items-center justify-between px-2 py-1 border-b border-gray-100">
+                                                    <span className="text-[10px] font-medium text-gray-600">
+                                                        Attendees{reviewNowCandidates.length ? ` (${reviewNowCandidates.length})` : ''}
+                                                    </span>
+                                                    {reviewNowCandidates.some((c) => !c.already_rated) && (
+                                                        <button
+                                                            type="button"
+                                                            className="text-[10px] text-emerald-700 hover:underline"
+                                                            onClick={() => {
+                                                                setReviewNowMessage('');
+                                                                const selectable = reviewNowCandidates.filter((c) => !c.already_rated);
+                                                                setReviewNowUsers(
+                                                                    reviewNowUsers.length === selectable.length ? [] : selectable,
+                                                                );
+                                                            }}
+                                                        >
+                                                            {reviewNowUsers.length === reviewNowCandidates.filter((c) => !c.already_rated).length ? 'Clear all' : 'Select all'}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                {reviewNowCandidatesLoading ? (
+                                                    <p className="text-[10px] text-gray-400 px-2 py-2">Loading attendees…</p>
+                                                ) : reviewNowCandidates.length === 0 ? (
+                                                    <p className="text-[10px] text-gray-400 px-2 py-2">No attendees for this event.</p>
+                                                ) : (
+                                                    <ul className="max-h-40 overflow-auto divide-y divide-gray-50">
+                                                        {reviewNowCandidates.map((c) => {
+                                                            const checked = reviewNowUsers.some((u) => u.user_id === c.user_id);
+                                                            return (
+                                                                <li key={c.user_id}>
+                                                                    <label
+                                                                        className={`flex items-center gap-2 px-2 py-1 text-[11px] ${c.already_rated ? 'text-gray-300' : 'text-gray-700 hover:bg-gray-50 cursor-pointer'}`}
+                                                                        title={c.already_rated ? 'Already rated — will be skipped' : undefined}
+                                                                    >
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            disabled={c.already_rated}
+                                                                            checked={checked}
+                                                                            onChange={() => {
+                                                                                setReviewNowMessage('');
+                                                                                setReviewNowUsers((prev) =>
+                                                                                    prev.some((u) => u.user_id === c.user_id)
+                                                                                        ? prev.filter((u) => u.user_id !== c.user_id)
+                                                                                        : [...prev, c],
+                                                                                );
+                                                                            }}
+                                                                        />
+                                                                        <span className="min-w-0 flex-1 truncate">
+                                                                            {c.name || c.handle || c.email}
+                                                                            <span className="text-gray-400"> · {c.email}</span>
+                                                                        </span>
+                                                                        {c.already_rated && <span className="text-[9px] text-gray-400">rated</span>}
+                                                                    </label>
+                                                                </li>
+                                                            );
+                                                        })}
+                                                    </ul>
+                                                )}
+                                            </div>
+                                        )}
+                                        <div className="flex items-center gap-2">
+                                            <label className="flex items-center gap-1 text-[10px] text-gray-500" htmlFor="review-now-resend" title="Re-send email/push even to users already prompted for this event">
+                                                <input
+                                                    id="review-now-resend"
+                                                    type="checkbox"
+                                                    checked={reviewNowResend}
+                                                    onChange={(e) => setReviewNowResend(e.target.checked)}
+                                                />
+                                                Resend
+                                            </label>
+                                            <button
+                                                type="button"
+                                                onClick={handleSendReviewPromptNow}
+                                                disabled={!reviewNowEvent || reviewNowUsers.length === 0 || reviewNowBusy}
+                                                className="ml-auto text-[11px] px-2.5 py-1 rounded bg-emerald-600 text-white disabled:bg-gray-300 hover:bg-emerald-700"
+                                            >
+                                                {reviewNowBusy ? 'Sending…' : `Send now${reviewNowUsers.length ? ` (${reviewNowUsers.length})` : ''}`}
+                                            </button>
+                                        </div>
+                                        {reviewNowMessage && (
+                                            <div className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 p-2">
+                                                {reviewNowMessage}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
                                 {/* Activity digest */}
                                 <div className="border border-gray-100 p-3 space-y-3">
                                     <div className="flex items-center justify-between">
@@ -2011,6 +2407,11 @@ export default function Admin() {
             <DuplicatesPanel
                 isOpen={duplicatesPanelOpen}
                 onClose={() => setDuplicatesPanelOpen(false)}
+                onOpenEvent={(id) => setAdminDetailEventId(id)}
+            />
+            <SeriesPanel
+                isOpen={seriesPanelOpen}
+                onClose={() => setSeriesPanelOpen(false)}
                 onOpenEvent={(id) => setAdminDetailEventId(id)}
             />
             <ConfirmDialog

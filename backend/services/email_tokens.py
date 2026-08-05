@@ -12,7 +12,7 @@ old email must keep working. Categories map to a boolean User column:
 * ``social_activity``  -> ``email_social_activity_enabled``
 * ``interest_matches`` -> ``email_interest_matches_enabled``
 * ``promo_codes``      -> ``email_promo_codes_enabled``
-
+* ``review_prompt``    -> ``email_review_prompt_enabled``* ``milestone``         -> ``email_milestone_unlocked_enabled``
 Legacy category ``activity`` remains accepted for one release so
 unsubscribe links in already-delivered emails continue to work; it maps
 to both feature-specific email flags (social + interest) to preserve the
@@ -35,6 +35,8 @@ UNSUBSCRIBE_CATEGORIES: dict[str, tuple[str, ...]] = {
     "social_activity": ("email_social_activity_enabled",),
     "interest_matches": ("email_interest_matches_enabled",),
     "promo_codes": ("email_promo_codes_enabled",),
+    "review_prompt": ("email_review_prompt_enabled",),
+    "milestone": ("email_milestone_unlocked_enabled",),
     # Legacy alias — kept for one release so old unsubscribe links keep
     # working. Silences both feature-specific email digests.
     "activity": (

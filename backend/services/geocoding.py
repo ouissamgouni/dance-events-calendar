@@ -14,6 +14,9 @@ _geocoder = Nominatim(user_agent="movida", timeout=5)
 # Cache only successful geocoding results (failures are retried on next sync)
 _cache: dict[str, tuple[float, float]] = {}
 
+# Cache successful reverse-geocoding results, keyed by rounded coordinates.
+_reverse_cache: dict[str, tuple[Optional[str], Optional[str], Optional[str]]] = {}
+
 # Circuit breaker: skip Nominatim after too many consecutive failures
 _MAX_CONSECUTIVE_FAILURES = 5
 _CIRCUIT_COOLDOWN = 300  # seconds to wait before retrying after circuit opens
@@ -176,6 +179,128 @@ def search_locations(query: str, limit: int = 5) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Reverse geocoding: coordinates -> structured place (city / country)
+# ---------------------------------------------------------------------------
+
+_Place = tuple[Optional[str], Optional[str], Optional[str]]
+
+# Google address_component types to consult for the "city", best first.
+_GOOGLE_CITY_TYPES = (
+    "locality",
+    "postal_town",
+    "administrative_area_level_2",
+    "administrative_area_level_1",
+)
+
+
+def _parse_google_place(raw: dict) -> Optional[_Place]:
+    components = raw.get("address_components") or []
+    by_type: dict[str, tuple[Optional[str], Optional[str]]] = {}
+    for comp in components:
+        for t in comp.get("types", []):
+            by_type.setdefault(t, (comp.get("long_name"), comp.get("short_name")))
+    city = None
+    for t in _GOOGLE_CITY_TYPES:
+        if t in by_type:
+            city = by_type[t][0]
+            break
+    country = country_code = None
+    if "country" in by_type:
+        country = by_type["country"][0]
+        short = by_type["country"][1]
+        country_code = short.upper() if short else None
+    if not city and not country:
+        return None
+    return city, country, country_code
+
+
+def _parse_nominatim_place(address: dict) -> Optional[_Place]:
+    city = (
+        address.get("city")
+        or address.get("town")
+        or address.get("village")
+        or address.get("municipality")
+        or address.get("county")
+    )
+    country = address.get("country")
+    code = address.get("country_code")
+    country_code = code.upper() if code else None
+    if not city and not country:
+        return None
+    return city, country, country_code
+
+
+def _reverse_google(latitude: float, longitude: float) -> Optional[_Place]:
+    geocoder = _get_google_geocoder()
+    if geocoder is None:
+        return None
+    try:
+        result = geocoder.reverse((latitude, longitude), exactly_one=True)
+        if result and getattr(result, "raw", None):
+            return _parse_google_place(result.raw)
+    except Exception as exc:
+        logger.debug(
+            "Google reverse geocoding failed for (%s, %s): %s",
+            latitude,
+            longitude,
+            exc,
+        )
+    return None
+
+
+def _reverse_nominatim(latitude: float, longitude: float) -> Optional[_Place]:
+    with _lock:
+        if _consecutive_failures >= _MAX_CONSECUTIVE_FAILURES:
+            if time.monotonic() < _circuit_open_until:
+                return None
+            logger.info("Geocoding circuit breaker reset, retrying")
+            _reset_circuit_unlocked()
+    _throttle()
+    try:
+        result = _geocoder.reverse((latitude, longitude), exactly_one=True, language="en")
+        if result and getattr(result, "raw", None):
+            place = _parse_nominatim_place(result.raw.get("address") or {})
+            _record_success()
+            return place
+        logger.warning(
+            "Reverse geocoding returned no result for (%s, %s)", latitude, longitude
+        )
+        return None
+    except (GeocoderTimedOut, GeocoderServiceError) as e:
+        logger.warning(
+            "Reverse geocoding failed for (%s, %s): %s", latitude, longitude, e
+        )
+        _record_failure()
+        return None
+    except Exception:
+        logger.exception(
+            "Unexpected reverse geocoding error for (%s, %s)", latitude, longitude
+        )
+        _record_failure()
+        return None
+
+
+def reverse_geocode(latitude: float, longitude: float) -> Optional[_Place]:
+    """Resolve coordinates to a structured place.
+
+    Returns ``(city, country, country_code)`` (any element may be ``None``) or
+    ``None`` if neither provider could resolve a place. Google is tried first
+    (generous quota), then Nominatim (throttled, circuit-broken). Successful
+    lookups are cached by rounded coordinates.
+    """
+    key = f"{round(latitude, 4)},{round(longitude, 4)}"
+    cached = _reverse_cache.get(key)
+    if cached is not None:
+        return cached
+    place = _reverse_google(latitude, longitude)
+    if place is None:
+        place = _reverse_nominatim(latitude, longitude)
+    if place is not None:
+        _reverse_cache[key] = place
+    return place
+
+
+# ---------------------------------------------------------------------------
 # Nominatim internals (circuit breaker + throttle)
 # ---------------------------------------------------------------------------
 
@@ -269,6 +394,7 @@ def _reset_state():
         _circuit_open_until = 0.0
         _last_request_time = 0.0
     _cache.clear()
+    _reverse_cache.clear()
     # Reset lazy Google geocoder so tests that patch the env var take effect
     with _google_lock:
         _google_geocoder = None

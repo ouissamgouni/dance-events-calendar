@@ -1,0 +1,72 @@
+# event-review-prompt cast. Alice has the email review-prompt channel
+# ON; Bob has it OFF as a negative probe (user-level opt-out must
+# suppress the email even though the admin gate is on). Carol has it ON
+# too, but already rated the event (see db-events.yaml `ratings:`) so
+# she must be excluded entirely.
+#
+# Friends social proof: Alice follows Carol, Dan, Erin and Flo (see
+# db-follows.yaml). Carol/Dan/Erin left non-anonymous reviews and Flo an
+# anonymous one, so Alice's prompt uses the social-proof variant across
+# email + in-app ("Carol, Dan +2 others shared their experience …"). Gina
+# has email ON but follows no one who reviewed → generic variant probe.
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    account_visibility: public
+    email_review_prompt_enabled: true
+    push_review_prompt_enabled: false
+
+  # Negative probe: opt-out.
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+    account_visibility: public
+    email_review_prompt_enabled: false
+    push_review_prompt_enabled: false
+
+  # Negative probe: already rated. Also a non-anonymous friend reviewer
+  # Alice follows → contributes the first name in Alice's social proof.
+  - email: carol@example.com
+    name: Carol Nguyen
+    handle: carol
+    account_visibility: public
+    email_review_prompt_enabled: true
+    push_review_prompt_enabled: false
+
+  # Friend reviewers (already rated → excluded from their own prompt).
+  - email: dan@example.com
+    name: Dan Silva
+    handle: dan
+    account_visibility: public
+    email_review_prompt_enabled: false
+    push_review_prompt_enabled: false
+
+  - email: erin@example.com
+    name: Erin Costa
+    handle: erin
+    account_visibility: public
+    email_review_prompt_enabled: false
+    push_review_prompt_enabled: false
+
+  # Anonymous friend reviewer → counted in "+N others" but never named.
+  - email: flo@example.com
+    name: Flo Mendes
+    handle: flo
+    account_visibility: public
+    email_review_prompt_enabled: false
+    push_review_prompt_enabled: false
+
+  # Generic-variant probe: email ON, attended, not rated, follows no one
+  # who reviewed → plain "How was it?" copy (no social proof).
+  - email: gina@example.com
+    name: Gina Lopes
+    handle: gina
+    account_visibility: public
+    email_review_prompt_enabled: true
+    push_review_prompt_enabled: false

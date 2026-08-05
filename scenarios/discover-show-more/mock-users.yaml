@@ -1,0 +1,85 @@
+# Discover "show more / shuffle / invite" scenario.
+#
+# A single mutual friend (alice) follows a large candidate pool
+# (pop01..pop15). Because the pool (15) exceeds one page on both
+# surfaces (/discover page size 12, My network page size 6), the
+# "Show more" and "Shuffle" controls become exercisable, and the
+# "Invite a friend" CTA is always present as the can't-find-people
+# escape hatch.
+#
+# All candidates share the same rank signals (1 mutual witness, 0
+# subscribers), so the deterministic order is handle ascending:
+# pop01, pop02, ..., pop15.
+users:
+  - email: viewer@example.com
+    name: Vera Viewer
+    handle: viewer
+    account_visibility: public
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    account_visibility: public
+  - email: pop01@example.com
+    name: Popular One
+    handle: pop01
+    account_visibility: public
+  - email: pop02@example.com
+    name: Popular Two
+    handle: pop02
+    account_visibility: public
+  - email: pop03@example.com
+    name: Popular Three
+    handle: pop03
+    account_visibility: public
+  - email: pop04@example.com
+    name: Popular Four
+    handle: pop04
+    account_visibility: public
+  - email: pop05@example.com
+    name: Popular Five
+    handle: pop05
+    account_visibility: public
+  - email: pop06@example.com
+    name: Popular Six
+    handle: pop06
+    account_visibility: public
+  - email: pop07@example.com
+    name: Popular Seven
+    handle: pop07
+    account_visibility: public
+  - email: pop08@example.com
+    name: Popular Eight
+    handle: pop08
+    account_visibility: public
+  - email: pop09@example.com
+    name: Popular Nine
+    handle: pop09
+    account_visibility: public
+  - email: pop10@example.com
+    name: Popular Ten
+    handle: pop10
+    account_visibility: public
+  - email: pop11@example.com
+    name: Popular Eleven
+    handle: pop11
+    account_visibility: public
+  - email: pop12@example.com
+    name: Popular Twelve
+    handle: pop12
+    account_visibility: public
+  - email: pop13@example.com
+    name: Popular Thirteen
+    handle: pop13
+    account_visibility: public
+  - email: pop14@example.com
+    name: Popular Fourteen
+    handle: pop14
+    account_visibility: public
+  - email: pop15@example.com
+    name: Popular Fifteen
+    handle: pop15
+    account_visibility: public
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin
+    account_visibility: public

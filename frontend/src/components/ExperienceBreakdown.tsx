@@ -1,0 +1,165 @@
+import type { EventRatingAggregate } from '../types';
+import type { ReactNode } from 'react';
+import { SENTIMENTS } from '../utils/reviewSentiment';
+import ExperienceMoodBox from './ExperienceMoodBox';
+
+/** Map a 1–5 aspect average to the matching mood (Amazing→5 … Bad→1). */
+export const aspectMood = (avg: number) => SENTIMENTS[Math.min(4, Math.max(0, 5 - Math.round(avg)))];
+
+interface Props {
+    aggregate: EventRatingAggregate;
+    /** Human labels for aspect slugs (from the aspect tag groups). */
+    aspectLabels?: Record<string, string>;
+    /** When set (series roll-up), the headline reads "Based on N editions · M
+     * reviews" instead of just the review count. */
+    editionCount?: number;
+    /** Optional content rendered directly under the "Show mood breakdown"
+     * toggle (e.g. an edition's "Typical experience" card). */
+    slotAfterMoodBreakdown?: ReactNode;
+    /** When provided, replaces the default overall-mood headline (e.g. an
+     * upcoming edition shows the series' "Typical experience" box instead of
+     * presenting the pooled mood as if it were this edition's own). */
+    moodHeadline?: ReactNode;
+}
+
+/**
+ * Public "Community Experience" breakdown. Leads with an overall-mood headline
+ * (label + "X% rated it Great or Amazing" + review count), then the community
+ * summary (People appreciated / Good to know / Best suited for) and a per-aspect
+ * "Ratings by area" breakdown last. The numeric mood distribution collapses
+ * behind a `<details>`. Renders nothing when there is no structured data yet.
+ */
+export default function ExperienceBreakdown({ aggregate, aspectLabels = {}, editionCount, slotAfterMoodBreakdown, moodHeadline }: Props) {
+    const sentimentTotal = Object.values(aggregate.sentiment_distribution).reduce(
+        (a, b) => a + (b ?? 0),
+        0,
+    );
+    const aspects = aggregate.aspects ?? [];
+    const appreciated = aggregate.top_positive_tags ?? [];
+    const mentioned = aggregate.top_negative_tags ?? [];
+    const recommendedFor = aggregate.top_audience_tags ?? [];
+
+    if (
+        !sentimentTotal &&
+        aspects.length === 0 &&
+        appreciated.length === 0 &&
+        mentioned.length === 0 &&
+        recommendedFor.length === 0
+    ) {
+        return null;
+    }
+
+    const aspectLabel = (slug: string) =>
+        aspectLabels[slug] ?? slug.replace(/(^|[-_])(\w)/g, (_, __, c) => ` ${c.toUpperCase()}`).trim();
+
+    return (
+        <div className="space-y-4">
+            {/* Overall-mood headline: icon + label + percentage on one line.
+                An upcoming edition passes its series' "Typical experience" box as
+                `moodHeadline` to replace this, since the pooled mood isn't this
+                specific edition's own. */}
+            {moodHeadline !== undefined ? (
+                moodHeadline
+            ) : (
+                <ExperienceMoodBox
+                    label="Overall experience"
+                    displayState={aggregate.display_state}
+                    emoji={aspectMood(aggregate.average_mood).emoji}
+                    moodLabel={aggregate.mood_label}
+                    positivePercentage={aggregate.positive_percentage ?? 0}
+                    subline={editionCount != null
+                        ? `Based on ${editionCount} edition${editionCount === 1 ? '' : 's'} · ${aggregate.count} review${aggregate.count === 1 ? '' : 's'}`
+                        : `Based on ${aggregate.count} review${aggregate.count === 1 ? '' : 's'}`}
+                />
+            )}
+
+            {/* Numeric mood breakdown — collapsed by default, directly under the headline */}
+            {sentimentTotal > 0 && (
+                <details className="text-xs">
+                    <summary className="cursor-pointer text-[9px] font-semibold uppercase tracking-wide text-slate-500 select-none">
+                        Show mood breakdown
+                    </summary>
+                    <div className="space-y-1 mt-1.5">
+                        {SENTIMENTS.map((s) => {
+                            const count = aggregate.sentiment_distribution[s.value] ?? 0;
+                            const pct = sentimentTotal > 0 ? Math.round((count / sentimentTotal) * 100) : 0;
+                            return (
+                                <div key={s.value} className="flex items-center gap-2 text-xs">
+                                    <span className="w-28 shrink-0 text-slate-600">{s.emoji} {s.label}</span>
+                                    <div className="flex-1 h-2 bg-slate-200 overflow-hidden">
+                                        <div className="h-full bg-sky-500" style={{ width: `${pct}%` }} />
+                                    </div>
+                                    <span className="w-8 text-right text-slate-500 tabular-nums">{count}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </details>
+            )}
+
+            {slotAfterMoodBreakdown}
+
+            {/* Community summary — each group on one horizontally scrollable line */}
+            {(appreciated.length > 0 || mentioned.length > 0 || recommendedFor.length > 0) && (
+                <div className="space-y-3 border-t border-slate-100 pt-4">
+                    {appreciated.length > 0 && (
+                        <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">People appreciated</div>
+                            <div className="flex gap-1.5 overflow-x-auto pb-1">
+                                {appreciated.map((t) => (
+                                    <span key={t.tag_id} className="shrink-0 whitespace-nowrap rounded-full bg-green-50 text-green-800 px-2 py-0.5 text-[11px]">
+                                        {t.label} ({t.count})
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {mentioned.length > 0 && (
+                        <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Good to know</div>
+                            <div className="flex gap-1.5 overflow-x-auto pb-1">
+                                {mentioned.map((t) => (
+                                    <span key={t.tag_id} className="shrink-0 whitespace-nowrap rounded-full bg-orange-50 text-orange-800 px-2 py-0.5 text-[11px]">
+                                        {t.label} ({t.count})
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {recommendedFor.length > 0 && (
+                        <div>
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Best suited for</div>
+                            <div className="flex gap-1.5 overflow-x-auto pb-1">
+                                {recommendedFor.map((t) => (
+                                    <span key={t.tag_id} className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 text-slate-600 px-2 py-0.5 text-[11px]">
+                                        {t.label} ({t.count})
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* By aspect — one horizontally scrollable line of badges */}
+            {aspects.length > 0 && (
+                <div className="border-t border-slate-100 pt-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Ratings by area</div>
+                    <div className="flex gap-1.5 overflow-x-auto pb-1">
+                        {aspects.map((a) => {
+                            const m = aspectMood(a.average);
+                            return (
+                                <span
+                                    key={a.aspect_slug}
+                                    className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 text-slate-700 px-2 py-0.5 text-[11px]"
+                                >
+                                    {aspectLabel(a.aspect_slug)} {m.emoji} {m.label} ({a.count})
+                                </span>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}

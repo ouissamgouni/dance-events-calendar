@@ -1,0 +1,94 @@
+base_week: 0
+events:
+  # ── Series A: 3 weekly occurrences, same calendar, same title/location.
+  # The full scan (title similarity + same calendar + occurrence gap >=20h)
+  # should group all 3 into one pending series. ───────────────────────────
+  - id: series-a-w1
+    calendar_id: tango-collective
+    title: Friday Night Milonga at Session Latina
+    description: Weekly tango milonga. Beginners welcome from 20:00, social from 21:00.
+    location: Session Latina, 8 Rue de Charonne, 75011 Paris, France
+    latitude: 48.8544
+    longitude: 2.3778
+    start: w1 Fri 20:00
+    end: w1 Fri 23:30
+    price_is_free: true
+
+  - id: series-a-w2
+    calendar_id: tango-collective
+    title: Friday Night Milonga at Session Latina
+    description: Weekly tango milonga. Beginners welcome from 20:00, social from 21:00.
+    location: Session Latina, 8 Rue de Charonne, 75011 Paris, France
+    latitude: 48.8544
+    longitude: 2.3778
+    start: w2 Fri 20:00
+    end: w2 Fri 23:30
+    price_is_free: true
+
+  - id: series-a-w3
+    calendar_id: tango-collective
+    title: Friday Night Milonga at Session Latina
+    description: Weekly tango milonga. Beginners welcome from 20:00, social from 21:00.
+    location: Session Latina, 8 Rue de Charonne, 75011 Paris, France
+    latitude: 48.8544
+    longitude: 2.3778
+    start: w3 Fri 20:00
+    end: w3 Fri 23:30
+    price_is_free: true
+
+  # ── Same title/venue but a DIFFERENT calendar — must never be grouped
+  # with Series A. Proves series detection is scoped per-calendar. ───────
+  - id: series-a-decoy-other-calendar
+    calendar_id: other-calendar
+    title: Friday Night Milonga at Session Latina
+    description: Cross-posted listing from a community aggregator.
+    location: Session Latina, 8 Rue de Charonne, 75011 Paris, France
+    latitude: 48.8544
+    longitude: 2.3778
+    start: w1 Fri 20:00
+    end: w1 Fri 23:30
+    price_is_free: true
+
+  # ── Manual-only pair: same real recurring event (same calendar, 7 days
+  # apart), but titles are deliberately too dissimilar for the automatic
+  # similarity check — only catchable via the admin's manual
+  # POST /api/admin/series/manual grouping action. ────────────────────────
+  - id: manual-b1
+    calendar_id: tango-collective
+    title: Kizomba Fusion Night - Session Latina
+    description: Kizomba and Afro-fusion night with resident DJs.
+    location: Session Latina, 8 Rue de Charonne, 75011 Paris, France
+    latitude: 48.8544
+    longitude: 2.3778
+    start: w1 Sun 20:00
+    end: w1 Mon 00:00
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+
+  - id: manual-b2
+    calendar_id: tango-collective
+    title: Monthly Kiz and Afro Social
+    description: Monthly kizomba and afro social, same venue as always.
+    location: Session Latina, 8 Rue de Charonne, 75011 Paris, France
+    latitude: 48.8544
+    longitude: 2.3778
+    start: w2 Sun 20:00
+    end: w2 Mon 00:00
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+
+  # ── Unique one-off — must never appear in any series ────────────────────
+  - id: unique-solo
+    calendar_id: tango-collective
+    title: One-Time Salsa Congress Closing Party
+    description: Special one-off closing party, not a recurring event.
+    location: Grande Halle de la Villette, 211 Av. Jean Jaurès, 75019 Paris, France
+    latitude: 48.8924
+    longitude: 2.3904
+    start: w4 Sat 22:00
+    end: w5 Sun 02:00
+    price_is_free: false
+    price_min: 25
+    price_currency: EUR

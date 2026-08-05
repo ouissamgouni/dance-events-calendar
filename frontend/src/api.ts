@@ -1,4 +1,4 @@
-import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide, DuplicateGroup, DuplicateGroupListResponse, DuplicateScanLogEntry, DuplicateScanLogListResponse } from './types';
+import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, PendingReview, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide, DuplicateGroup, DuplicateGroupListResponse, DuplicateScanLogEntry, DuplicateScanLogListResponse, SeriesGroup, SeriesGroupListResponse, SeriesScanLogEntry, SeriesScanLogListResponse, SeriesRatingRollup, PassportResponse, PassportTimelineResponse, PassportMapEvent, SharedPassportResponse } from './types';
 import type { DateRangePresetKey } from './utils/dateRangePresets';
 
 declare const __VITE_API_URL__: string;
@@ -248,6 +248,23 @@ export interface SiteSettings {
      * before the rest collapse behind a "Discover more" link to "For
      * you". 1-50, client default 10. */
     interest_match_max_events_per_email?: number;
+    /** Master switch for post-event "how was it?" review-prompt
+     * notifications (Event Quality Layer Phase 3). */
+    review_prompt_enabled?: boolean;
+    /** Hours after an event's end before the review prompt fires. 1-720,
+     * client default 3. */
+    review_prompt_delay_hours?: number;
+    /** How far past the delay window review_prompt_service scans for newly
+     * eligible events each tick. 1-720, client default 24. */
+    review_prompt_lookback_hours?: number;
+    /** How far back attended-but-unreviewed events surface in the "Share
+     * your experience" trail on the "For you" page. 1-3650, client default
+     * 180 (about 6 months). */
+    for_you_review_window_days?: number;
+    /** Minimum reviews before an event/series shows a computed "Overall
+     * Mood" headline label; below this the UI shows an "Early feedback"
+     * state. 1-1000, client default 3. */
+    review_mood_headline_min_reviews?: number;
 }
 
 export async function fetchSettings(): Promise<SiteSettings> {
@@ -366,6 +383,47 @@ export async function sendDigestNow(
     return parseJsonResponse<DigestSendNowResponse>(res, 'Failed to send digest now');
 }
 
+export interface ReviewPromptSendNowResponse {
+    emailed: number;
+    pushed: number;
+    in_app_created: number;
+    results: ForceSendUserResult[];
+}
+
+export async function sendReviewPromptNow(
+    eventId: string,
+    userIds: string[],
+    resend?: boolean,
+): Promise<ReviewPromptSendNowResponse> {
+    const body: Record<string, unknown> = { event_id: eventId, user_ids: userIds };
+    if (resend) body.resend = true;
+    const res = await fetch(`${BASE}/admin/notifications/review-prompt/send-now`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(body),
+    });
+    return parseJsonResponse<ReviewPromptSendNowResponse>(res, 'Failed to send review prompt now');
+}
+
+export interface ReviewPromptCandidate {
+    user_id: string;
+    email: string;
+    name: string | null;
+    handle: string | null;
+    already_rated: boolean;
+}
+
+export async function fetchReviewPromptCandidates(
+    eventId: string,
+): Promise<ReviewPromptCandidate[]> {
+    const res = await fetch(
+        `${BASE}/admin/events/${encodeURIComponent(eventId)}/review-prompt-candidates`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<ReviewPromptCandidate[]>(res, 'Failed to load attendees');
+}
+
 export interface NotificationToggleCountEntry {
     email: number;
     push: number;
@@ -376,6 +434,7 @@ export interface NotificationToggleCounts {
     interest_match: NotificationToggleCountEntry;
     event_reminders: NotificationToggleCountEntry;
     activity_digest: NotificationToggleCountEntry;
+    review_prompt: NotificationToggleCountEntry;
 }
 
 export async function fetchNotificationToggleCounts(): Promise<NotificationToggleCounts> {
@@ -383,7 +442,7 @@ export async function fetchNotificationToggleCounts(): Promise<NotificationToggl
     return parseJsonResponse<NotificationToggleCounts>(res, 'Failed to fetch notification toggle counts');
 }
 
-export type NotificationLogType = 'interest_match' | 'activity_digest' | 'event_reminder';
+export type NotificationLogType = 'interest_match' | 'activity_digest' | 'event_reminder' | 'review_prompt';
 export type NotificationLogChannel = 'app' | 'email' | 'push';
 
 export interface NotificationLogEntry {
@@ -586,6 +645,10 @@ export interface AuthUser {
     push_interest_matches_enabled?: boolean;
     email_promo_codes_enabled?: boolean;
     push_promo_codes_enabled?: boolean;
+    email_review_prompt_enabled?: boolean;
+    push_review_prompt_enabled?: boolean;
+    email_milestone_unlocked_enabled?: boolean;
+    push_milestone_unlocked_enabled?: boolean;
     /** Legacy four-flag aliases returned for one release so older
      *  clients keep working. Derived from the six new flags on the
      *  server (see PHASE_G_NOTIFICATION_GATING.md §G.9). */
@@ -765,6 +828,10 @@ export interface NotificationPreferences {
     push_interest_matches_enabled: boolean;
     email_promo_codes_enabled: boolean;
     push_promo_codes_enabled: boolean;
+    email_review_prompt_enabled: boolean;
+    push_review_prompt_enabled: boolean;
+    email_milestone_unlocked_enabled: boolean;
+    push_milestone_unlocked_enabled: boolean;
     /** Legacy mirror kept for one release. */
     reminder_email_enabled: boolean;
     activity_email_enabled: boolean;
@@ -783,6 +850,10 @@ export interface UpdateNotificationPreferencesPayload {
     push_interest_matches_enabled?: boolean;
     email_promo_codes_enabled?: boolean;
     push_promo_codes_enabled?: boolean;
+    email_review_prompt_enabled?: boolean;
+    push_review_prompt_enabled?: boolean;
+    email_milestone_unlocked_enabled?: boolean;
+    push_milestone_unlocked_enabled?: boolean;
     /** Legacy aliases accepted for one release — server writes through
      *  to the corresponding new flags. */
     reminder_email_enabled?: boolean;
@@ -984,6 +1055,9 @@ export type ShareAudience = Visibility;
  * (``share_audience`` / ``audience``) remains independent. */
 export type AccountVisibility = 'public' | 'friends';
 
+// Dance Passport sharing (Phase 2): who may view the profile passport tab.
+export type PassportVisibility = 'public' | 'friends' | 'private';
+
 export interface ProfileCalendarItem {
     event: CalendarEvent;
     intent: 'going' | 'saved' | 'both';
@@ -1042,6 +1116,16 @@ export interface PublicProfile {
     // Phase E (E10): viewer's friends who follow this verified organizer.
     // 0 for non-organizers, anonymous viewers, and self-views.
     mutual_friends_who_follow?: number;
+    // Dance Passport sharing (Phase 2). ``passport_visibility`` echoes the
+    // owner's setting; ``can_view_passport`` is evaluated for the viewer so
+    // the client shows/hides the profile "Dance Passport" tab.
+    passport_visibility?: PassportVisibility;
+    can_view_passport?: boolean;
+    // Owner-only per-section share toggles (only meaningful for is_self).
+    passport_show_badges?: boolean;
+    passport_show_cities?: boolean;
+    passport_show_countries?: boolean;
+    passport_show_timeline?: boolean;
 }
 
 export interface FollowUser {
@@ -1089,6 +1173,25 @@ export async function fetchPublicProfile(handle: string): Promise<PublicProfile>
     );
     if (res.status === 404) throw new Error('User not found');
     return parseJsonResponse<PublicProfile>(res, 'Failed to fetch profile');
+}
+
+/**
+ * Relationship-checked Dance Passport for the profile "Dance Passport" tab.
+ * Backend returns 404 when the viewer isn't allowed to see it (private, or
+ * friends-only without a mutual follow).
+ */
+export async function fetchProfilePassport(
+    handle: string,
+): Promise<SharedPassportResponse> {
+    const res = await fetch(
+        `${BASE}/social/users/${encodeURIComponent(handle)}/passport`,
+        { credentials: 'include' },
+    );
+    if (res.status === 404) throw new Error('Passport not found');
+    return parseJsonResponse<SharedPassportResponse>(
+        res,
+        'Failed to fetch passport',
+    );
 }
 
 export async function followUser(handle: string): Promise<FollowAction> {
@@ -1571,7 +1674,9 @@ export type NotificationKind =
     | 'promo_code_added'
     | 'organizer_claim_decided'
     | 'event_reminder'
-    | 'interest_event';
+    | 'event_review_prompt'
+    | 'interest_event'
+    | 'milestone_unlocked';
 
 export interface NotificationActor {
     handle: string;
@@ -1594,6 +1699,9 @@ export interface NotificationItem {
      *  for `interest_event` rows (comma-joined when multiple profiles
      *  matched). Null for kinds that don't use it. */
     context: string | null;
+    /** Milestone key for `milestone_unlocked` rows (links to the passport).
+     *  Null for kinds that don't use it. */
+    subject_key?: string | null;
     created_at: string;
     read_at: string | null;
 }
@@ -1945,6 +2053,11 @@ export async function updateMyVisibility(
         account_visibility: AccountVisibility;
         share_attendance_default_audience: ShareAudience;
         show_in_suggestions: boolean;
+        passport_visibility: PassportVisibility;
+        passport_show_badges: boolean;
+        passport_show_cities: boolean;
+        passport_show_countries: boolean;
+        passport_show_timeline: boolean;
     }>,
 ): Promise<PublicProfile> {
     const res = await fetch(`${BASE}/social/me/visibility`, {
@@ -2085,6 +2198,11 @@ export interface UserSearchResponse {
     items: UserSearchResult[];
 }
 
+export interface SuggestedUsersResponse {
+    items: UserSearchResult[];
+    total: number;
+}
+
 export async function searchUsers(
     q: string,
     opts?: { limit?: number },
@@ -2118,16 +2236,17 @@ export async function fetchCurators(
 }
 
 export async function fetchSuggestedUsers(
-    opts?: { limit?: number },
-): Promise<UserSearchResponse> {
+    opts?: { limit?: number; offset?: number },
+): Promise<SuggestedUsersResponse> {
     const sp = new URLSearchParams();
     if (opts?.limit) sp.set('limit', String(opts.limit));
+    if (opts?.offset) sp.set('offset', String(opts.offset));
     const qs = sp.toString();
     const res = await fetch(
         `${BASE}/social/discover/suggested${qs ? `?${qs}` : ''}`,
         { credentials: 'include' },
     );
-    return parseJsonResponse<UserSearchResponse>(
+    return parseJsonResponse<SuggestedUsersResponse>(
         res,
         'Failed to fetch suggested users',
     );
@@ -3051,7 +3170,7 @@ export async function deleteUserData(deviceId: string): Promise<{ deleted: Recor
 // --- Tags ---
 
 export async function fetchTagGroups(
-    params?: { startDate?: string; endDate?: string; scope?: 'event' | 'review'; onboarding?: boolean },
+    params?: { startDate?: string; endDate?: string; scope?: 'event' | 'aspect' | 'audience' | 'review'; onboarding?: boolean },
     opts?: { fresh?: boolean },
 ): Promise<TagGroup[]> {
     const qs = new URLSearchParams();
@@ -3219,7 +3338,7 @@ export async function fetchAdminTagGroups(): Promise<AdminTagGroup[]> {
     return res.json();
 }
 
-export async function createTagGroup(data: { label: string; color?: string; onboarding_eligible?: boolean }): Promise<TagGroup> {
+export async function createTagGroup(data: { label: string; color?: string; onboarding_eligible?: boolean; scope?: 'event' | 'aspect' | 'audience' | 'review'; condition_tag_slugs?: string[] | null }): Promise<TagGroup> {
     const res = await fetch(`${BASE}/admin/tags/groups`, {
         method: 'POST',
         headers: adminJsonHeaders,
@@ -3230,7 +3349,7 @@ export async function createTagGroup(data: { label: string; color?: string; onbo
     return res.json();
 }
 
-export async function updateTagGroup(groupId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean; onboarding_eligible?: boolean }): Promise<TagGroup> {
+export async function updateTagGroup(groupId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean; onboarding_eligible?: boolean; scope?: 'event' | 'aspect' | 'audience' | 'review'; condition_tag_slugs?: string[] | null }): Promise<TagGroup> {
     const res = await fetch(`${BASE}/admin/tags/groups/${groupId}`, {
         method: 'PATCH',
         headers: adminJsonHeaders,
@@ -3241,7 +3360,7 @@ export async function updateTagGroup(groupId: number, data: { label?: string; co
     return res.json();
 }
 
-export async function createTag(data: { group_id: number; label: string; color?: string }): Promise<Tag> {
+export async function createTag(data: { group_id: number; label: string; color?: string; polarity?: 'positive' | 'negative' | null }): Promise<Tag> {
     const res = await fetch(`${BASE}/admin/tags`, {
         method: 'POST',
         headers: adminJsonHeaders,
@@ -3252,7 +3371,7 @@ export async function createTag(data: { group_id: number; label: string; color?:
     return res.json();
 }
 
-export async function updateTag(tagId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean; is_hero_filter?: boolean; hero_ordinal?: number | null; group_id?: number }): Promise<Tag> {
+export async function updateTag(tagId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean; is_hero_filter?: boolean; hero_ordinal?: number | null; group_id?: number; polarity?: 'positive' | 'negative' | null }): Promise<Tag> {
     const res = await fetch(`${BASE}/admin/tags/${tagId}`, {
         method: 'PATCH',
         headers: adminJsonHeaders,
@@ -3397,8 +3516,31 @@ export async function deleteMyRating(eventId: string): Promise<void> {
     if (!res.ok && res.status !== 204) throw new Error('Failed to delete rating');
 }
 
+// Reading ratings/reviews requires a signed-in user (same as submitting one)
+// — anonymous callers get a 401, which these functions translate into an
+// empty/no-data result rather than throwing, so read-only UI (aggregates,
+// review lists) degrades gracefully for signed-out visitors.
 export async function fetchRatingAggregate(eventId: string): Promise<EventRatingAggregate> {
-    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/rating`);
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/rating`, {
+        credentials: 'include',
+    });
+    if (res.status === 401) {
+        return {
+            event_id: eventId,
+            count: 0,
+            sentiment_distribution: {},
+            aspects: [],
+            top_positive_tags: [],
+            top_negative_tags: [],
+            top_audience_tags: [],
+            average_mood: 0,
+            positive_percentage: 0,
+            neutral_percentage: 0,
+            negative_percentage: 0,
+            mood_label: null,
+            display_state: 'none',
+        };
+    }
     return parseJsonResponse<EventRatingAggregate>(res, 'Failed to fetch rating aggregate');
 }
 
@@ -3408,22 +3550,68 @@ export async function fetchRatingAggregates(eventIds: string[]): Promise<EventRa
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ event_ids: eventIds }),
+        credentials: 'include',
     });
+    if (res.status === 401) return [];
     return parseJsonResponse<EventRatingAggregate[]>(res, 'Failed to fetch rating aggregates');
+}
+
+/** Cross-edition rating roll-up for the resolved series this event belongs to,
+ * or ``null`` when the event isn't part of a resolved series (or the caller
+ * isn't signed in). */
+export async function fetchEventSeriesRollup(
+    eventId: string,
+): Promise<SeriesRatingRollup | null> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/series`, {
+        credentials: 'include',
+    });
+    if (res.status === 401) return null;
+    return parseJsonResponse<SeriesRatingRollup | null>(
+        res,
+        'Failed to fetch event series roll-up',
+    );
+}
+
+export async function fetchSeriesRollup(seriesId: number): Promise<SeriesRatingRollup | null> {
+    const res = await fetch(`${BASE}/series/${encodeURIComponent(String(seriesId))}`, {
+        credentials: 'include',
+    });
+    if (res.status === 401) return null;
+    return parseJsonResponse<SeriesRatingRollup>(res, 'Failed to fetch series roll-up');
 }
 
 export async function fetchEventReviews(
     eventId: string,
-    opts?: { limit?: number; offset?: number; sort?: 'recent' | 'highest' | 'lowest'; minStars?: number },
+    opts?: { limit?: number; offset?: number; sort?: 'recent' | 'positive' | 'critical' },
 ): Promise<EventReviewsList> {
     const sp = new URLSearchParams();
     if (opts?.limit != null) sp.set('limit', String(opts.limit));
     if (opts?.offset != null) sp.set('offset', String(opts.offset));
     if (opts?.sort) sp.set('sort', opts.sort);
-    if (opts?.minStars != null) sp.set('min_stars', String(opts.minStars));
     const qs = sp.toString();
-    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/reviews${qs ? `?${qs}` : ''}`);
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/reviews${qs ? `?${qs}` : ''}`, {
+        credentials: 'include',
+    });
+    if (res.status === 401) return { items: [], total: 0 };
     return parseJsonResponse<EventReviewsList>(res, 'Failed to fetch reviews');
+}
+
+/** Reviews pooled across every edition of a resolved series (newest-first by
+ * default). Each item carries its own edition so a review can link back to it. */
+export async function fetchSeriesReviews(
+    seriesId: number,
+    opts?: { limit?: number; offset?: number; sort?: 'recent' | 'positive' | 'critical' },
+): Promise<EventReviewsList> {
+    const sp = new URLSearchParams();
+    if (opts?.limit != null) sp.set('limit', String(opts.limit));
+    if (opts?.offset != null) sp.set('offset', String(opts.offset));
+    if (opts?.sort) sp.set('sort', opts.sort);
+    const qs = sp.toString();
+    const res = await fetch(`${BASE}/series/${encodeURIComponent(String(seriesId))}/reviews${qs ? `?${qs}` : ''}`, {
+        credentials: 'include',
+    });
+    if (res.status === 401) return { items: [], total: 0 };
+    return parseJsonResponse<EventReviewsList>(res, 'Failed to fetch series reviews');
 }
 
 export async function fetchMyRatings(): Promise<MyRating[]> {
@@ -3431,9 +3619,96 @@ export async function fetchMyRatings(): Promise<MyRating[]> {
     return parseJsonResponse<MyRating[]>(res, 'Failed to fetch my ratings');
 }
 
-export async function fetchReviewTagGroup(): Promise<TagGroup | null> {
-    const groups = await fetchTagGroups({ scope: 'review' });
-    return groups.find((g) => g.slug === 'review-tags') ?? null;
+export async function fetchMyPendingReviews(): Promise<PendingReview[]> {
+    const res = await fetch(`${BASE}/users/me/pending-reviews`, { credentials: 'include' });
+    return parseJsonResponse<PendingReview[]>(res, 'Failed to fetch pending reviews');
+}
+
+export async function fetchPassport(): Promise<PassportResponse> {
+    const res = await fetch(`${BASE}/passport`, { credentials: 'include' });
+    return parseJsonResponse<PassportResponse>(res, 'Failed to fetch passport');
+}
+
+export async function fetchPassportEvents(): Promise<PassportMapEvent[]> {
+    const res = await fetch(`${BASE}/passport/events`, { credentials: 'include' });
+    return parseJsonResponse<PassportMapEvent[]>(res, 'Failed to fetch passport events');
+}
+
+export async function fetchPassportTimeline(
+    offset = 0,
+    limit = 20,
+): Promise<PassportTimelineResponse> {
+    const params = new URLSearchParams([
+        ['offset', String(offset)],
+        ['limit', String(limit)],
+    ]);
+    const res = await fetch(`${BASE}/passport/timeline?${params}`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<PassportTimelineResponse>(res, 'Failed to fetch passport timeline');
+}
+
+export async function ackPassportMilestones(keys: string[]): Promise<{ acknowledged: number }> {
+    const res = await fetch(`${BASE}/passport/milestones/ack`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ keys }),
+    });
+    return parseJsonResponse<{ acknowledged: number }>(res, 'Failed to acknowledge milestones');
+}
+
+export async function createPassportShare(
+    opts?: { require_signin?: boolean }
+): Promise<{ token: string; require_signin: boolean }> {
+    const res = await fetch(`${BASE}/passport/share`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ require_signin: opts?.require_signin ?? false }),
+    });
+    return parseJsonResponse<{ token: string; require_signin: boolean }>(
+        res,
+        'Failed to create passport share link'
+    );
+}
+
+/** The caller's current passport share link, or null when not shared. */
+export async function fetchPassportShare(): Promise<{ token: string; require_signin: boolean } | null> {
+    const res = await fetch(`${BASE}/passport/share`, { credentials: 'include' });
+    return parseJsonResponse<{ token: string; require_signin: boolean } | null>(
+        res,
+        'Failed to load passport share link'
+    );
+}
+
+/** Stop sharing: revoke the current passport link (subsequent create mints a new one). */
+export async function revokePassportShare(): Promise<void> {
+    const res = await fetch(`${BASE}/passport/share`, {
+        method: 'DELETE',
+        credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to stop sharing passport');
+}
+
+export async function fetchSharedPassport(token: string): Promise<SharedPassportResponse> {
+    const res = await fetch(`${BASE}/passport/shared/${encodeURIComponent(token)}`, {
+        credentials: 'include',
+    });
+    if (res.status === 401) {
+        throw new Error('SIGNIN_REQUIRED');
+    }
+    return parseJsonResponse<SharedPassportResponse>(res, 'Failed to load shared passport');
+}
+
+/** Aspect groups (scope='aspect') drive the adaptive review flow's aspect picker. */
+export async function fetchAspectTagGroups(): Promise<TagGroup[]> {
+    return fetchTagGroups({ scope: 'aspect' });
+}
+
+/** The recommendation-audience group (scope='audience'), if configured. */
+export async function fetchAudienceTagGroups(): Promise<TagGroup[]> {
+    return fetchTagGroups({ scope: 'audience' });
 }
 
 // Admin
@@ -3592,8 +3867,10 @@ export interface EventSearchResult {
 export async function searchEvents(
     q: string,
     limit = 10,
+    includePast = false,
+    excludeAttended = false,
 ): Promise<EventSearchResult[]> {
-    const qs = `?q=${encodeURIComponent(q)}&limit=${limit}`;
+    const qs = `?q=${encodeURIComponent(q)}&limit=${limit}${includePast ? '&include_past=true' : ''}${excludeAttended ? '&exclude_attended=true' : ''}`;
     const res = await fetch(`${BASE}/events/search${qs}`, {
         credentials: 'include',
     });
@@ -3725,4 +4002,82 @@ export async function fetchEventDuplicateCandidates(
         credentials: 'include',
     });
     return parseJsonResponse<DuplicateGroupListResponse>(res, 'Failed to fetch duplicate candidates');
+}
+
+// --- Admin: event series grouping ---
+
+export async function fetchSeriesGroups(status?: string): Promise<SeriesGroupListResponse> {
+    const qs = status ? `?status=${status}` : '';
+    const res = await fetch(`${BASE}/admin/series${qs}`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<SeriesGroupListResponse>(res, 'Failed to fetch series groups');
+}
+
+export async function fetchSeriesScanHistory(): Promise<SeriesScanLogListResponse> {
+    const res = await fetch(`${BASE}/admin/series/history`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<SeriesScanLogListResponse>(res, 'Failed to fetch scan history');
+}
+
+export async function triggerSeriesScan(): Promise<SeriesScanLogEntry> {
+    const res = await fetch(`${BASE}/admin/series/scan`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return parseJsonResponse<SeriesScanLogEntry>(res, 'Failed to trigger series scan');
+}
+
+export async function groupEventsAsSeries(
+    eventIds: string[],
+    canonicalTitle?: string,
+): Promise<SeriesGroup> {
+    const res = await fetch(`${BASE}/admin/series/manual`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ event_ids: eventIds, canonical_title: canonicalTitle }),
+    });
+    return parseJsonResponse<SeriesGroup>(res, 'Failed to group events as series');
+}
+
+export async function approveSeriesGroup(
+    seriesId: number,
+    canonicalTitle?: string,
+): Promise<SeriesGroup> {
+    const res = await fetch(`${BASE}/admin/series/${seriesId}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ canonical_title: canonicalTitle }),
+    });
+    return parseJsonResponse<SeriesGroup>(res, 'Failed to approve series');
+}
+
+export async function dismissSeriesGroup(seriesId: number): Promise<SeriesGroup> {
+    const res = await fetch(`${BASE}/admin/series/${seriesId}/dismiss`, {
+        method: 'POST',
+        credentials: 'include',
+    });
+    return parseJsonResponse<SeriesGroup>(res, 'Failed to dismiss series');
+}
+
+export async function splitSeriesMember(seriesId: number, eventId: string): Promise<SeriesGroup> {
+    const res = await fetch(`${BASE}/admin/series/${seriesId}/split`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ event_id: eventId }),
+    });
+    return parseJsonResponse<SeriesGroup>(res, 'Failed to split event from series');
+}
+
+export async function fetchEventSeriesCandidates(
+    eventId: string,
+): Promise<SeriesGroupListResponse> {
+    const res = await fetch(`${BASE}/admin/events/${eventId}/series`, {
+        credentials: 'include',
+    });
+    return parseJsonResponse<SeriesGroupListResponse>(res, 'Failed to fetch series candidates');
 }

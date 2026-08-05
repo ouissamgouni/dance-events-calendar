@@ -323,7 +323,7 @@ def _render_terse(report: dict) -> str:
     if stats.get("skipped") == "locked":
         lines.append("  SKIPPED: advisory lock held by another instance")
     else:
-        for phase in ("reminders", "interest", "activity"):
+        for phase in ("reminders", "interest", "activity", "review_prompt"):
             v = stats.get(phase)
             if v is not None:
                 lines.append(f"  {phase:<9}: {v}")
@@ -431,12 +431,15 @@ def _render_text(report: dict) -> str:
         r = stats.get("reminders")
         i = stats.get("interest")
         a = stats.get("activity")
+        rp = stats.get("review_prompt")
         if r is not None:
             lines.append(f"  reminders : {r}")
         if i is not None:
             lines.append(f"  interest  : {i}")
         if a is not None:
             lines.append(f"  activity  : {a}")
+        if rp is not None:
+            lines.append(f"  review_prompt : {rp}")
         if only != "all":
             lines.append(
                 f"             (--only {only}: other phases skipped in this run)"
@@ -461,9 +464,7 @@ def _render_text(report: dict) -> str:
             f"→ recipient not in their {diag['digest_schedule']!r} local slot; "
             "re-run at their next scheduled time or pass --immediate-emails"
         )
-        lines.append(
-            f"    - wrong weekday           : {diag['waiting_wrong_weekday']}"
-        )
+        lines.append(f"    - wrong weekday           : {diag['waiting_wrong_weekday']}")
         lines.append(
             f"    - before scheduled time   : {diag['waiting_before_scheduled_time']}"
         )

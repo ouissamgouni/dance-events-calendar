@@ -1,0 +1,212 @@
+test_plan:
+  name: "Dance Passport — journey, sharing & profile visibility"
+  description: |
+    Feature-level acceptance plan for the Dance Passport. It is written around
+    what a dancer can DO and what they should SEE, independent of any specific
+    layout, wording or implementation detail.
+
+    The passport aggregates a dancer's PAST attended ("Going") events into a
+    private journey: headline counts (events / cities / countries), collections
+    of visited cities and countries, a chronological timeline, and a grid of
+    achievement milestones. On top of that private view, a dancer can:
+      - control who sees their passport on their public profile
+        (Anyone / Friends / Only me) and which sections are shared,
+      - share a link to a read-only summary, optionally restricted to
+        signed-in viewers,
+      - let viewers follow them straight from the shared/profile passport.
+
+    Seeded dancers (sign in at /login via the dev "Sign in as ..." buttons):
+      - Alba (alba) — rich journey: 13 attended events, 11 cities, 7 countries,
+        3 international, 10 approved reviews. Passport visibility: PUBLIC.
+      - Bram (bram) — borderline: 10 attended events, 9 cities, 5 countries,
+        10 reviews. Passport visibility: FRIENDS-ONLY. Mutual friend of Alba.
+      - Nadia (nadia) — minimal: 1 attended event, 0 reviews. Passport
+        visibility: PRIVATE.
+      - Felix — Going only on a FUTURE event (empty passport).
+      - Bea — signed in but never Going (empty passport).
+      - Milestone "cusp" users (each one attend away from a milestone):
+        Dana (24/25 events), Elio (4/5 cities), Sami (2/3 countries),
+        Ines (0 international).
+
+    Relationships (db-follows.yaml): Alba <-> Bram are mutual friends.
+    Privacy invariants baked into the seed: a future event never counts, an
+    anonymous-device attendance never leaks into anyone's passport, and a
+    null-geo event counts toward the event total but toward no city/country.
+
+  steps:
+    # ── Journey & aggregation ───────────────────────────────────
+    - id: 1
+      title: "A dancer sees their own journey"
+      description: >
+        As a signed-in dancer I open my Dance Passport and review the story of
+        the past events I attended. Sign in as Alba and open the Dance
+        Passport.
+      expected: >
+        The passport is owner-only (signed-out visitors are prompted to sign
+        in). Alba sees her headline counts (13 events, 11 cities, 7 countries),
+        her cities and countries collections, a newest-first timeline of her
+        attended events, and her review count (10 — a rejected review is not
+        counted). Duplicate cities collapse to one entry with a count; the
+        null-geo event is counted as an event but shown in no city/country.
+      verification: "Passport aggregates only past personal attendance."
+
+    - id: 2
+      title: "Only real, past, personal attendance counts"
+      description: >
+        As a dancer I trust my passport reflects only events I actually
+        attended in the past. Compare Alba's rich journey with Felix (future
+        RSVP only) and Bea (never Going); confirm no user's passport includes
+        the anonymous-only event.
+      expected: >
+        Felix and Bea both see an empty passport (0 events / 0 cities /
+        0 countries). Alba's upcoming/future RSVP never appears. The
+        anonymous-device event and its city never appear in any dancer's
+        passport.
+      verification: "Future, anonymous and non-Going events are excluded."
+
+    # ── Milestones ──────────────────────────────────────────────
+    - id: 3
+      title: "Milestones celebrate progress once"
+      description: >
+        As a dancer I unlock achievement badges as my journey grows and I'm
+        congratulated the first time each unlocks. Open Alba's passport on her
+        first visit, then revisit; compare with Nadia (single event).
+      expected: >
+        Unlocked milestones show as earned badges; still-locked ones show a
+        progress fraction toward their goal. Newly-unlocked milestones are
+        celebrated exactly once on first view and never again on revisit.
+        Alba lights up many badges; Nadia has only the first-event badge lit.
+      verification: "Celebration fires once per milestone."
+
+    - id: 4
+      title: "A milestone unlocks live when the dancer qualifies"
+      description: >
+        As a dancer sitting one event short of a milestone, marking one more
+        past event as Going unlocks it immediately. For each cusp user (Dana →
+        25th event, Elio → 5th city, Sami → 3rd country, Ines → first
+        international), mark Going on the one spare past event that crosses the
+        threshold and reopen the passport.
+      expected: >
+        Each user starts with the target milestone locked one short of its
+        threshold. After the single extra attendance the matching badge
+        unlocks and is celebrated once; unrelated milestones are unaffected.
+      verification: "Threshold crossing unlocks the matching badge live."
+
+    - id: 5
+      title: "Milestone unlocks notify per the dancer's channel settings"
+      description: >
+        As a dancer I'm notified when I unlock a milestone, respecting my
+        email/push preferences. After a cusp user unlocks a milestone, let the
+        notification dispatch run, then check the notifications panel and
+        Settings → Notifications.
+      expected: >
+        Each unlock produces exactly one in-app notification (no duplicates on
+        re-run) that links back to the passport. Email and push honour the
+        per-user toggles (Dana: push only; Elio: in-app only; Sami/Ines: both).
+        A "Dance Passport achievements" preference row is available with email
+        and push switches.
+      verification: "One in-app notification; email/push honour toggles."
+
+    # ── Public profile visibility ───────────────────────────────
+    - id: 6
+      title: "Dance Passport leads the public profile"
+      description: >
+        As someone viewing another dancer's profile, the Dance Passport is the
+        first thing I see when I'm allowed to. Open Alba's public profile (she
+        is PUBLIC) and note the tab order.
+      expected: >
+        "Dance Passport" is the first profile tab and is selected by default.
+        For Alba it shows her shared passport (the sections she opted to
+        share), with her stats, badges and softened timeline.
+      verification: "Dance Passport is the first, default profile tab."
+
+    - id: 7
+      title: "Friends-only passport is gated by friendship"
+      description: >
+        As a dancer I can restrict my passport to friends, and only friends can
+        open it from my profile. Open Bram's profile (FRIENDS-ONLY passport)
+        first as Alba (his mutual friend), then as Nadia (not his friend), then
+        signed out.
+      expected: >
+        The "Dance Passport" tab is always present. Alba (a friend) sees Bram's
+        passport. Nadia and signed-out visitors instead see a clear message
+        that Bram shares his Dance Passport with friends only and that they can
+        follow each other to view it — his stats and journey are not exposed.
+      verification: "Only mutual friends can open a friends-only passport."
+
+    - id: 8
+      title: "Private passport stays private on the profile"
+      description: >
+        As a dancer with a private passport, no one but me sees it on my
+        profile. Open Nadia's profile (PRIVATE passport) as any other dancer,
+        then as Nadia herself.
+      expected: >
+        Other viewers see a message that Nadia keeps her Dance Passport
+        private, with no stats or journey data. Nadia herself sees her full
+        passport on her own profile tab.
+      verification: "Private passport is visible only to its owner."
+
+    # ── Sharing ─────────────────────────────────────────────────
+    - id: 9
+      title: "Sharing settings live behind 'Share my passport'"
+      description: >
+        As a dancer I decide who can see my passport and what it includes at
+        the moment I choose to share it. As Alba, open the Dance Passport and
+        choose "Share" to open the sharing dialog. Change the
+        audience (Anyone / Friends / Only me), toggle which sections are shared
+        (badges, cities, countries, timeline), then reopen the dialog / a
+        profile view to confirm.
+      expected: >
+        The sharing controls are not shown on the passport page until the
+        dialog is opened. Audience and section changes are saved and take
+        effect for profile viewers and share links: hidden sections stop
+        appearing; setting the audience to "Only me" removes the passport from
+        the public profile while the owner still sees it privately.
+      verification: "Audience & section choices persist and take effect."
+
+    - id: 10
+      title: "Sharing produces a link (optionally sign-in gated)"
+      description: >
+        As a dancer I share a read-only summary of my passport, and I can
+        require viewers to be signed in. In the sharing dialog choose "Anyone
+        with the link" and share — a /shared/passport/<token> link is produced
+        (via the native share sheet or copied). Open it signed out. Then
+        reshare with "Only signed-in dancers" and open the link signed out
+        again, then signed in.
+      expected: >
+        The link opens a read-only summary showing only the dancer's first
+        name, the shared sections and stats/badges — never the exact venues,
+        map coordinates, email or full name. With "Anyone with the link" a
+        signed-out viewer sees the passport. With "Only signed-in dancers" a
+        signed-out viewer is asked to sign in and only sees it after signing
+        in. An unknown/removed link shows an unavailable message.
+      verification: "Link is read-only; sign-in gating is enforced."
+
+    - id: 11
+      title: "Shared timelines reveal city, not venue"
+      description: >
+        As a dancer sharing my timeline, viewers see where in the world I
+        danced but not the precise venues. With the timeline section shared,
+        view Alba's timeline via her profile tab and via a share link, and
+        compare with her own private passport timeline.
+      expected: >
+        On her own passport Alba sees full event detail. On shared/profile
+        views the timeline shows city-level locations only (e.g. "Paris,
+        France") with no exact venue and no map pin coordinates for those
+        timeline entries.
+      verification: "Shared timeline shows city only, no venue or coordinates."
+
+    - id: 12
+      title: "Viewers can follow from a shared passport"
+      description: >
+        As someone impressed by a dancer's passport, I can follow them right
+        there. Open Alba's shared link and profile passport as: a signed-in
+        dancer who doesn't follow her, a signed-in dancer who already follows
+        her, Alba herself, and a signed-out visitor.
+      expected: >
+        A non-following signed-in viewer gets a Follow action that, once used,
+        reflects the new following (or pending) state. An already-following
+        viewer sees a following indicator, not another Follow action. Alba sees
+        no follow control on her own passport. A signed-out visitor is invited
+        to sign in to follow.
+      verification: "Follow CTA adapts to viewer state; owner sees none."

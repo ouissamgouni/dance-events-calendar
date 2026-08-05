@@ -8,6 +8,7 @@ import {
     rejectRating,
     rejectTagSuggestion,
 } from '../api';
+import { SENTIMENT_META } from '../utils/reviewSentiment';
 
 interface Props {
     rating: AdminRating;
@@ -114,7 +115,7 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
                             <p className="text-[11px] text-slate-500 mt-0.5">{rating.event_title || rating.event_id}</p>
                         </div>
                         <div className="flex items-center gap-2">
-                            {statusBadge(rating.status)}
+                            {statusBadge(rating.comment_status)}
                             <button
                                 onClick={onClose}
                                 aria-label="Close"
@@ -125,12 +126,19 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
                         </div>
                     </div>
 
-                    {/* Stars */}
+                    {/* Overall sentiment */}
                     <div className="flex items-center gap-2">
-                        <span className="text-slate-700 text-base tracking-tight">
-                            {'★'.repeat(rating.stars)}{'☆'.repeat(5 - rating.stars)}
-                        </span>
-                        <span className="text-xs text-slate-500">{rating.stars}/5</span>
+                        {rating.overall_sentiment && (
+                            <span className="text-sm text-slate-700">
+                                {SENTIMENT_META[rating.overall_sentiment].emoji}{' '}
+                                {SENTIMENT_META[rating.overall_sentiment].label}
+                            </span>
+                        )}
+                        {rating.status === 'rejected' && (
+                            <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 border border-slate-300 bg-slate-100 text-slate-600">
+                                review hidden
+                            </span>
+                        )}
                         {rating.auto_flagged && (
                             <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 border border-amber-200 bg-amber-50 text-amber-700">
                                 ⚠ auto-flagged
@@ -138,25 +146,49 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
                         )}
                     </div>
 
+                    {/* Aspect ratings */}
+                    {Object.keys(rating.aspect_scores).length > 0 && (
+                        <div>
+                            <label className="block text-xs font-medium text-slate-600 mb-1">Aspect ratings</label>
+                            <div className="flex flex-wrap gap-1.5">
+                                {Object.entries(rating.aspect_scores).map(([slug, score]) => (
+                                    <span key={slug} className="px-1.5 py-0.5 text-[10px] bg-slate-50 text-slate-700 border border-slate-200">
+                                        {slug}: {score}/5
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Comment */}
                     {rating.comment && (
                         <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Comment</label>
+                            <label className="block text-xs font-medium text-slate-600 mb-1">
+                                Comment <span className="font-normal text-slate-400">({rating.comment_status})</span>
+                            </label>
                             <p className="text-xs text-slate-800 bg-slate-50 border border-slate-200 p-2 whitespace-pre-wrap">
                                 {rating.comment}
                             </p>
                         </div>
                     )}
 
-                    {/* Review tags */}
-                    {rating.review_tags.length > 0 && (
+                    {/* Aspect + audience tags */}
+                    {(rating.aspect_tags.length > 0 || rating.audience_tags.length > 0) && (
                         <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Review tags</label>
+                            <label className="block text-xs font-medium text-slate-600 mb-1">Tags</label>
                             <div className="flex flex-wrap gap-1">
-                                {rating.review_tags.map((t) => (
+                                {rating.aspect_tags.map((t) => (
                                     <span
-                                        key={t.id}
-                                        className="px-1.5 py-0.5 text-[10px] bg-sky-50 text-sky-700 border border-sky-200"
+                                        key={`a-${t.id}`}
+                                        className={`px-1.5 py-0.5 text-[10px] border ${t.polarity === 'negative' ? 'bg-slate-100 text-slate-600 border-slate-300' : 'bg-sky-50 text-sky-700 border-sky-200'}`}
+                                    >
+                                        {t.label}
+                                    </span>
+                                ))}
+                                {rating.audience_tags.map((t) => (
+                                    <span
+                                        key={`u-${t.id}`}
+                                        className="px-1.5 py-0.5 text-[10px] bg-white text-slate-600 border border-slate-300"
                                     >
                                         {t.label}
                                     </span>
@@ -211,17 +243,17 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
                     <div className="flex gap-2">
                         <button
                             onClick={handleApprove}
-                            disabled={submitting || rating.status === 'approved'}
+                            disabled={submitting || rating.comment_status !== 'pending'}
                             className="flex-1 bg-sky-600 text-white text-xs px-3 py-1.5 hover:bg-sky-700 disabled:opacity-50"
                         >
-                            Approve
+                            Approve comment
                         </button>
                         <button
                             onClick={handleReject}
-                            disabled={submitting || rating.status === 'rejected'}
+                            disabled={submitting || rating.comment_status === 'rejected'}
                             className="flex-1 border border-slate-300 text-slate-700 text-xs px-3 py-1.5 hover:bg-slate-50 disabled:opacity-50"
                         >
-                            Reject
+                            Reject comment
                         </button>
                         <button
                             onClick={onClose}

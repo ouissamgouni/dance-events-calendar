@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import type { CalendarEvent } from '../types';
-import { fetchEventsByIds } from '../api';
+import type { CalendarEvent, PendingReview } from '../types';
+import { fetchEventsByIds, fetchMyPendingReviews } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { usePreferences } from '../context/PreferencesContext';
 import { useSavedEvents } from '../context/SavedEventsContext';
@@ -15,6 +15,7 @@ import { isTrendingScore } from '../utils/trending';
 import ExplorerNav from '../components/ExplorerNav';
 import YourNextEventsRail from '../components/YourNextEventsRail';
 import RailEventCard from '../components/RailEventCard';
+import ShareExperienceCard from '../components/ShareExperienceCard';
 import PeopleYouMayKnowCard from '../components/PeopleYouMayKnowCard';
 
 const DISPLAY_CAP = 5;
@@ -242,6 +243,27 @@ export default function ForYouPage() {
         return rawYourNextEvents.filter((e) => ids.has(e.event_id));
     }, [user, yourNextEventIds, rawYourNextEvents]);
 
+    // "Share your experience": past events the viewer attended but hasn't
+    // reviewed yet (server applies the admin-configurable recency window).
+    const [pendingReviews, setPendingReviews] = useState<PendingReview[]>([]);
+    useEffect(() => {
+        if (!user) return;
+        let cancelled = false;
+        fetchMyPendingReviews()
+            .then((rows) => {
+                if (!cancelled) setPendingReviews(rows);
+            })
+            .catch(() => {
+                /* keep previous list on fetch error */
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [user]);
+    const handleReviewed = useCallback((eventId: string) => {
+        setPendingReviews((prev) => prev.filter((r) => r.event_id !== eventId));
+    }, []);
+
     const handleEventClick = useCallback((evt: CalendarEvent) => {
         markSeen(evt.event_id);
         trackView(evt.event_id, 'for-you');
@@ -351,6 +373,22 @@ export default function ForYouPage() {
                             unseenStateEnabled={unseenStateEnabled}
                             followingBadgeEnabled={followingBadgeEnabled}
                         />
+                        {pendingReviews.length > 0 && (
+                            <section data-testid="for-you-share-your-experience">
+                                <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                                    <span>Share your experience</span>
+                                </div>
+                                <div className="flex gap-2 overflow-x-auto px-2 py-2" aria-label="Share your experience">
+                                    {pendingReviews.map((review) => (
+                                        <ShareExperienceCard
+                                            key={review.event_id}
+                                            review={review}
+                                            onReviewed={handleReviewed}
+                                        />
+                                    ))}
+                                </div>
+                            </section>
+                        )}
                         <PeopleYouMayKnowCard variant="trail" />
                         <LensTrail
                             title="New"

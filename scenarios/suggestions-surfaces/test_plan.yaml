@@ -69,6 +69,10 @@ test_plan:
         curator-paris. Every row has a blue Follow button. /discover must not
         show only curators when graph candidates exist. hiddenpop and
         curator-hidden must not appear.
+        Because the pool here fits one page, no "Show more" and no "Shuffle"
+        control is shown, but the "Can't find them? Invite a friend" escape-hatch
+        CTA is always present directly under the search box (pagination/shuffle
+        coverage lives in the discover-show-more scenario).
 
     - id: 4
       title: "Follow action removes rows consistently"

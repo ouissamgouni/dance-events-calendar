@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { blockEvent, dismissDuplicateGroup, fetchAdminEvent, fetchEventDuplicateCandidates, keepDuplicateEvent, unblockEvent, updateEvent } from '../api';
 import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
 import AdminEventDetailContent from './AdminEventDetailContent';
+import EventReviewsSection from './EventReviewsSection';
 import EventMap from './EventMap';
 import type { CalendarEvent, DuplicateGroup } from '../types';
 
@@ -281,6 +282,10 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                 onFieldSave={handleFieldSave}
                                 onTagsUpdated={handleTagsUpdated}
                                 compact
+                            />
+                            <EventReviewsSection
+                                eventId={event.event_id}
+                                isPast={new Date(event.end).getTime() < Date.now()}
                             />
                             {!duplicatesLoading && duplicateGroups.length > 0 && (
                                 <div className="mt-4 border border-amber-200 bg-amber-50 overflow-hidden">

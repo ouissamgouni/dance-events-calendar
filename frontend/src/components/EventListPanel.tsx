@@ -313,19 +313,30 @@ export function EventListCard({
                         )
                     )}
                     {event.tags?.length > 0 && (
-                        <div className="mt-1">
-                            <TagBadges
-                                tags={event.tags}
-                                maxVisible={tagsAsBadge ? 4 : tagsPerCard}
-                                forceBadge={tagsAsBadge}
-                            />
+                        <div className="mt-1 flex items-center justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                                <TagBadges
+                                    tags={event.tags}
+                                    maxVisible={tagsAsBadge ? 4 : tagsPerCard}
+                                    forceBadge={tagsAsBadge}
+                                />
+                            </div>
+                            {showRatings && (
+                                <RateEventButton
+                                    eventId={event.event_id}
+                                    appearance="count"
+                                    size="sm"
+                                    stopPropagation
+                                    className="shrink-0"
+                                />
+                            )}
                         </div>
                     )}
                     <div className="mt-1 flex flex-wrap items-center gap-2">
 
                     </div>
                     <div className="event-card-actions absolute top-0 right-0 flex items-center gap-1.5">
-                        <ActionCountCluster eventId={event.event_id} showRatings={!!showRatings} isSavedFlag={isSavedFlag} />
+                        <ActionCountCluster eventId={event.event_id} isSavedFlag={isSavedFlag} />
                     </div>
                 </div>
             </div>
@@ -806,7 +817,7 @@ export default function EventListPanel({
  * number is the attendance summary — `AttendeeAvatarStack` shows *who*,
  * not *how many*.
  */
-function ActionCountCluster({ eventId, showRatings, isSavedFlag }: { eventId: string; showRatings: boolean; isSavedFlag: boolean }) {
+function ActionCountCluster({ eventId, isSavedFlag }: { eventId: string; isSavedFlag: boolean }) {
     const summary = useAttendanceSummary(eventId);
     const savedCount = summary?.total_saved ?? 0;
     const goingCount = summary?.total_going ?? 0;
@@ -839,14 +850,6 @@ function ActionCountCluster({ eventId, showRatings, isSavedFlag }: { eventId: st
                     </span>
                 )}
             </span>
-            {showRatings && (
-                <RateEventButton
-                    eventId={eventId}
-                    appearance="icon"
-                    size="sm"
-                    stopPropagation
-                />
-            )}
         </>
     );
 }

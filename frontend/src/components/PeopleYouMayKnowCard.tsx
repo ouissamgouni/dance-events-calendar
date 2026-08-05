@@ -29,18 +29,26 @@ interface PeopleYouMayKnowCardProps {
 
 export default function PeopleYouMayKnowCard({ variant = 'list', onResult }: PeopleYouMayKnowCardProps) {
     const [items, setItems] = useState<FoFSuggestionItem[] | null>(null);
+    const [total, setTotal] = useState(0);
+    const [loadedCount, setLoadedCount] = useState(0);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [pending, setPending] = useState<string | null>(null);
+    const pageSize = variant === 'trail' ? 12 : 6;
 
     const load = useCallback(async () => {
         try {
-            const r = await fetchMySuggestions({ limit: variant === 'trail' ? 12 : 6 });
+            const r = await fetchMySuggestions({ limit: pageSize });
             setItems(r.items);
+            setTotal(r.total);
+            setLoadedCount(r.items.length);
             onResult?.(r.items);
         } catch {
             setItems([]);
+            setTotal(0);
+            setLoadedCount(0);
             onResult?.([]);
         }
-    }, [variant, onResult]);
+    }, [pageSize, onResult]);
 
     useEffect(() => {
         void load();
@@ -48,6 +56,18 @@ export default function PeopleYouMayKnowCard({ variant = 'list', onResult }: Peo
         window.addEventListener('network:changed', onChanged);
         return () => window.removeEventListener('network:changed', onChanged);
     }, [load]);
+
+    const loadMore = useCallback(async () => {
+        setLoadingMore(true);
+        try {
+            const r = await fetchMySuggestions({ limit: pageSize, offset: loadedCount });
+            setItems((prev) => [...(prev ?? []), ...r.items]);
+            setTotal(r.total);
+            setLoadedCount((c) => c + r.items.length);
+        } finally {
+            setLoadingMore(false);
+        }
+    }, [pageSize, loadedCount]);
 
     const onFollow = useCallback(async (handle: string) => {
         setPending(handle);
@@ -211,6 +231,16 @@ export default function PeopleYouMayKnowCard({ variant = 'list', onResult }: Peo
                     );
                 })}
             </ul>
+            {loadedCount < total && (
+                <button
+                    type="button"
+                    onClick={() => void loadMore()}
+                    disabled={loadingMore}
+                    className="mt-3 w-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    {loadingMore ? 'Loading…' : 'Show more'}
+                </button>
+            )}
         </section>
     );
 }

@@ -18,7 +18,7 @@ import {
  * that flips all six channel flags to false in a single PATCH.
  */
 
-type FeatureKey = 'event_reminders' | 'social_activity' | 'interest_matches' | 'promo_codes';
+type FeatureKey = 'event_reminders' | 'social_activity' | 'interest_matches' | 'promo_codes' | 'review_prompt' | 'milestone_unlocked';
 type Channel = 'email' | 'push';
 type FlagKey =
     | 'email_event_reminders_enabled'
@@ -28,7 +28,11 @@ type FlagKey =
     | 'push_social_activity_enabled'
     | 'push_interest_matches_enabled'
     | 'email_promo_codes_enabled'
-    | 'push_promo_codes_enabled';
+    | 'push_promo_codes_enabled'
+    | 'email_review_prompt_enabled'
+    | 'push_review_prompt_enabled'
+    | 'email_milestone_unlocked_enabled'
+    | 'push_milestone_unlocked_enabled';
 
 const FEATURES: {
     key: FeatureKey;
@@ -59,6 +63,18 @@ const FEATURES: {
             label: 'Promo codes',
             description: 'When a promo code is approved for an event you saved.',
             anchor: 'notify-promo-codes',
+        },
+        {
+            key: 'review_prompt',
+            label: 'Rate your experience',
+            description: "After events I've RSVP'd to, ask how it went.",
+            anchor: 'notify-review-prompt',
+        },
+        {
+            key: 'milestone_unlocked',
+            label: 'Dance Passport achievements',
+            description: 'When you unlock new milestones and achievements.',
+            anchor: 'notify-milestone-unlocked',
         },
     ];
 

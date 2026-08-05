@@ -1,0 +1,16 @@
+# Friends graph for the Dance Passport sharing scenario.
+#
+# A mutual (reciprocal) follow makes two users "friends". This lets the
+# friends-only passport visibility be exercised end-to-end:
+#   - Alba <-> Bram are mutual friends, so Alba can open Bram's profile
+#     "Dance Passport" tab (Bram's passport_visibility is "friends").
+#   - Nadia is NOT Bram's friend, so she sees the friends-only placeholder
+#     on Bram's passport tab.
+#
+# See backend/db/seed.py::_seed_follows for the format. Users are referenced
+# by email or handle (both defined in mock-users.yaml).
+follows:
+  - follower: alba@example.com
+    followee: bram@example.com
+  - follower: bram@example.com
+    followee: alba@example.com

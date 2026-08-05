@@ -283,6 +283,16 @@ export default function UserSearchBox() {
                             See more on Discover →
                         </Link>
                     )}
+                    {!loading && term.length >= 2 && results.length === 0 && (
+                        <Link
+                            to="/invite"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={reset}
+                            className="block px-3 py-2 text-xs text-blue-600 hover:bg-slate-50 border-t border-slate-100"
+                        >
+                            Can’t find them? Invite a friend →
+                        </Link>
+                    )}
                 </div>
             )}
         </div>

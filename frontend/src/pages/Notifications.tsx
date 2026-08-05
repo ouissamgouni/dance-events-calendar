@@ -379,6 +379,57 @@ function NotificationRow({
             </li>
         );
     }
+    if (item.kind === 'event_review_prompt') {
+        return (
+            <li
+                className={`flex items-start gap-3 px-3 py-3 ${isUnread ? 'bg-blue-50/40' : 'bg-white'}`}
+            >
+                <div className="w-8 h-8 rounded-full bg-violet-100 text-violet-600 flex items-center justify-center" aria-hidden="true">
+                    ⭐
+                </div>
+                <button
+                    type="button"
+                    onClick={() => {
+                        if (isUnread) onMarkRead();
+                        navigate(`/event/${item.event_id}?rate=1#community`);
+                    }}
+                    className="min-w-0 flex-1 text-left"
+                >
+                    <p className="text-sm text-slate-700">
+                        {item.context ? (
+                            <span className="text-slate-500"><span className="font-medium text-slate-700">{item.context}</span> shared their experience at</span>
+                        ) : (
+                            <span className="text-slate-500">How was it? Rate your experience at</span>
+                        )}{' '}
+                        <span className="font-medium text-slate-900">
+                            {item.event_title || 'an event'}
+                        </span>
+                    </p>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                        {formatRelative(item.created_at)}
+                    </p>
+                </button>
+                {isUnread ? (
+                    <button
+                        type="button"
+                        onClick={onMarkRead}
+                        disabled={busy}
+                        className="shrink-0 text-xs text-slate-500 hover:text-blue-600 disabled:opacity-50"
+                    >
+                        {busy ? '…' : 'Mark read'}
+                    </button>
+                ) : (
+                    <span
+                        className="shrink-0 text-xs text-slate-300"
+                        aria-label="Read"
+                        title="Read"
+                    >
+                        ●
+                    </span>
+                )}
+            </li>
+        );
+    }
     return (
         <li
             className={`flex items-start gap-3 px-3 py-3 ${isUnread ? 'bg-blue-50/40' : 'bg-white'}`}

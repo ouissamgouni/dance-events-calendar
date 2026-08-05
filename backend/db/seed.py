@@ -20,6 +20,10 @@ from backend.db.models import (
     EventLinkClick,
     EventPromoCode,
     EventRating,
+    EventRatingAspectScore,
+    EventRatingAspectTag,
+    EventSeries,
+    EventSeriesMember,
     EventTag,
     EventView,
     OrganizerClaim,
@@ -36,6 +40,7 @@ from backend.db.models import (
     UserInterestProfileTag,
     UserSavedEvent,
 )
+from backend.services.experience_aspects import SENTIMENT_TO_SCORE
 from backend.services.follows import (
     ensure_approved_follow_with_subscription,
     ensure_calendar_subscription,
@@ -126,6 +131,7 @@ class DatabaseSeeder:
         self._seed_events(scenario_dir / "db-events.yaml")
         self._seed_event_tags(scenario_dir / "db-events.yaml")
         self._seed_tag_suggestions(scenario_dir / "db-events.yaml")
+        self._seed_event_series(scenario_dir / "db-events.yaml")
         self._seed_tracking(scenario_dir / "db-tracking.yaml")
         self._seed_users(scenario_file_with_default(scenario_dir, "mock-users.yaml"))
         self._seed_generated_events(scenario_dir / "generated-events.yaml")
@@ -203,13 +209,14 @@ class DatabaseSeeder:
             enabled = group_data.get("enabled", True)
             onboarding_eligible = group_data.get("onboarding_eligible", False)
             scope = group_data.get("scope", "event")
-            if scope not in ("event", "review"):
+            if scope not in ("event", "aspect", "audience", "review"):
                 logger.warning(
                     "Tag group %s has invalid scope %r; defaulting to 'event'",
                     slug,
                     scope,
                 )
                 scope = "event"
+            condition_tag_slugs = group_data.get("condition_tag_slugs") or None
 
             if group:
                 group.label = label
@@ -219,6 +226,7 @@ class DatabaseSeeder:
                 group.enabled = enabled
                 group.onboarding_eligible = onboarding_eligible
                 group.scope = scope
+                group.condition_tag_slugs = condition_tag_slugs
                 self.session.add(group)
                 logger.info("Updated tag group: %s", slug)
             else:
@@ -231,6 +239,7 @@ class DatabaseSeeder:
                     enabled=enabled,
                     onboarding_eligible=onboarding_eligible,
                     scope=scope,
+                    condition_tag_slugs=condition_tag_slugs,
                 )
                 self.session.add(group)
                 self.session.flush()
@@ -256,6 +265,15 @@ class DatabaseSeeder:
                 tag_enabled = tag_data.get("enabled", True)
                 tag_is_hero = tag_data.get("is_hero_filter", False)
                 tag_hero_ordinal = tag_data.get("hero_ordinal", None)
+                tag_polarity = tag_data.get("polarity")
+                if tag_polarity not in (None, "positive", "negative"):
+                    logger.warning(
+                        "Tag %s/%s has invalid polarity %r; ignoring",
+                        slug,
+                        tag_slug,
+                        tag_polarity,
+                    )
+                    tag_polarity = None
 
                 if tag:
                     tag.label = tag_label
@@ -264,6 +282,7 @@ class DatabaseSeeder:
                     tag.enabled = tag_enabled
                     tag.is_hero_filter = tag_is_hero
                     tag.hero_ordinal = tag_hero_ordinal
+                    tag.polarity = tag_polarity
                     self.session.add(tag)
                 else:
                     tag = Tag(
@@ -275,6 +294,7 @@ class DatabaseSeeder:
                         enabled=tag_enabled,
                         is_hero_filter=tag_is_hero,
                         hero_ordinal=tag_hero_ordinal,
+                        polarity=tag_polarity,
                     )
                     self.session.add(tag)
                     self.session.flush()
@@ -547,6 +567,11 @@ class DatabaseSeeder:
                 existing.location = evt_data.get("location")
                 existing.latitude = evt_data.get("latitude", existing.latitude)
                 existing.longitude = evt_data.get("longitude", existing.longitude)
+                existing.city = evt_data.get("city", existing.city)
+                existing.country = evt_data.get("country", existing.country)
+                existing.country_code = evt_data.get(
+                    "country_code", existing.country_code
+                )
                 existing.start = start
                 existing.end = end
                 existing.all_day = evt_data.get("all_day", False)
@@ -580,6 +605,9 @@ class DatabaseSeeder:
                         location=evt_data.get("location"),
                         latitude=evt_data.get("latitude"),
                         longitude=evt_data.get("longitude"),
+                        city=evt_data.get("city"),
+                        country=evt_data.get("country"),
+                        country_code=evt_data.get("country_code"),
                         start=start,
                         end=end,
                         all_day=evt_data.get("all_day", False),
@@ -761,6 +789,63 @@ class DatabaseSeeder:
                 free_text,
             )
 
+    def _seed_event_series(self, path: Path) -> None:
+        """Pre-seed EventSeries + EventSeriesMember rows from db-events.yaml.
+
+        Each entry under the top-level ``event_series:`` list may specify:
+          - canonical_title (required) — label shown on the series card
+          - status: pending | resolved | dismissed (default resolved)
+          - source: auto | manual (default manual)
+          - members: [event_id, ...] (required, references seeded events)
+
+        Idempotent: skips creating a series when one with the same
+        ``canonical_title`` already exists.
+        """
+        if not path.exists():
+            return
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+        rows = data.get("event_series") or []
+        if not rows:
+            return
+
+        seeded = 0
+        for entry in rows:
+            if not isinstance(entry, dict):
+                continue
+            title = (entry.get("canonical_title") or "").strip()
+            members = entry.get("members") or []
+            if not title or not members:
+                continue
+
+            existing = self.session.exec(
+                select(EventSeries).where(EventSeries.canonical_title == title)
+            ).first()
+            if existing:
+                continue
+
+            status = entry.get("status") or "resolved"
+            source = entry.get("source") or "manual"
+            now = datetime.utcnow()
+            series = EventSeries(
+                status=status,
+                source=source,
+                canonical_title=title,
+                resolved_at=now if status == "resolved" else None,
+                resolved_by_admin="seed" if status == "resolved" else None,
+            )
+            self.session.add(series)
+            self.session.flush()
+
+            for event_id in members:
+                self.session.add(
+                    EventSeriesMember(series_id=series.id, event_id=event_id)
+                )
+            seeded += 1
+
+        if seeded:
+            logger.info("Seeded %d EventSeries rows", seeded)
+
     def _seed_users(self, path: Path) -> None:
         """Pre-create mock User rows from scenarios/<name>/mock-users.yaml.
 
@@ -844,6 +929,21 @@ class DatabaseSeeder:
                 "push_event_reminders_enabled",
                 "push_social_activity_enabled",
                 "push_interest_matches_enabled",
+                # Event Quality Layer P3 — post-event review-prompt toggles.
+                "email_review_prompt_enabled",
+                "push_review_prompt_enabled",
+                # Dance Passport Phase C — milestone-unlock toggles.
+                "email_milestone_unlocked_enabled",
+                "push_milestone_unlocked_enabled",
+                # Dance Passport sharing — passport visibility + per-section
+                # share toggles so scenarios can exercise the profile
+                # "Dance Passport" tab (viewable / friends-only / private) and
+                # the sharing settings dialog.
+                "passport_visibility",
+                "passport_show_badges",
+                "passport_show_cities",
+                "passport_show_countries",
+                "passport_show_timeline",
                 # Phase G — onboarding state. See ``auto_onboard`` handling
                 # below for the scenario-wide default when these are omitted.
                 "onboarded_at",
@@ -1692,13 +1792,19 @@ class DatabaseSeeder:
         Each entry can specify:
           - event_id (required)
           - email (optional, looked up to a user_id)
-          - stars (1..5, required)
+          - overall_sentiment: amazing | great | okay | disappointing | bad
+            (required; internal ``stars`` is derived via SENTIMENT_TO_SCORE)
           - comment (optional)
-          - review_tag_slugs (list of "review-tags:slug")
-          - status: pending | approved | rejected (default approved)
+          - comment_status: none | pending | approved | rejected
+            (default: approved when a comment is present, else none)
+          - aspect_scores: {music: 1..5, venue: 1..5, ...} (optional)
+          - aspect_tags: ["music:great-dj", "venue:slippery-floor"] — aspect
+            group-prefixed tag slugs (optional)
+          - audience_tags: ["audience:beginners", ...] (optional)
+          - status: approved | rejected (default approved)
           - is_anonymous: bool
           - admin_notes: str (optional)
-        Idempotent: skips if a row already exists for the same (event_id, user_id|email|comment-hash).
+        Idempotent: skips if a row already exists for the same (event_id, user_id).
         """
         if not path.exists():
             return
@@ -1714,8 +1820,11 @@ class DatabaseSeeder:
             if not isinstance(entry, dict):
                 continue
             event_id = entry.get("event_id")
-            stars = entry.get("stars")
-            if not event_id or not stars:
+            sentiment = entry.get("overall_sentiment")
+            if not event_id or not sentiment:
+                continue
+            if sentiment not in SENTIMENT_TO_SCORE:
+                logger.warning("Unknown overall_sentiment '%s'", sentiment)
                 continue
             email = (entry.get("email") or "").strip().lower() or None
             user_id = None
@@ -1742,13 +1851,27 @@ class DatabaseSeeder:
                 if existing:
                     continue
 
-            review_tag_ids: list[int] = []
-            for slug in entry.get("review_tag_slugs") or []:
+            aspect_tag_pairs: list[tuple[int, str]] = []
+            for slug in entry.get("aspect_tags") or []:
                 tid = tag_lookup.get(slug)
                 if tid:
-                    review_tag_ids.append(tid)
+                    aspect_tag_pairs.append((tid, slug.split(":", 1)[0]))
                 else:
-                    logger.warning("Unknown review tag slug '%s'", slug)
+                    logger.warning("Unknown aspect tag slug '%s'", slug)
+
+            audience_tag_ids: list[int] = []
+            for slug in entry.get("audience_tags") or []:
+                tid = tag_lookup.get(slug)
+                if tid:
+                    audience_tag_ids.append(tid)
+                else:
+                    logger.warning("Unknown audience tag slug '%s'", slug)
+
+            comment = entry.get("comment")
+            has_comment = bool(comment and str(comment).strip())
+            comment_status = entry.get("comment_status") or (
+                "approved" if has_comment else "none"
+            )
 
             status = entry.get("status") or "approved"
             now = datetime.utcnow()
@@ -1756,17 +1879,35 @@ class DatabaseSeeder:
                 id=uuid4(),
                 event_id=event_id,
                 user_id=user_id,
-                stars=int(stars),
-                comment=entry.get("comment"),
-                review_tag_ids=review_tag_ids,
+                stars=SENTIMENT_TO_SCORE[sentiment],
+                overall_sentiment=sentiment,
+                comment=comment,
+                comment_status=comment_status,
+                audience_tag_ids=audience_tag_ids or None,
                 is_anonymous=bool(entry.get("is_anonymous", False)),
                 status=status,
                 admin_notes=entry.get("admin_notes"),
-                reviewed_at=now if status != "pending" else None,
-                reviewed_by=("seed" if status != "pending" else None),
+                reviewed_at=now if comment_status in ("approved", "rejected") else None,
+                reviewed_by=(
+                    "seed" if comment_status in ("approved", "rejected") else None
+                ),
                 created_at=now,
             )
             self.session.add(rating)
+            self.session.flush()
+
+            for slug, score in (entry.get("aspect_scores") or {}).items():
+                self.session.add(
+                    EventRatingAspectScore(
+                        rating_id=rating.id, aspect_slug=slug, score=int(score)
+                    )
+                )
+            for tid, aspect_slug in aspect_tag_pairs:
+                self.session.add(
+                    EventRatingAspectTag(
+                        rating_id=rating.id, aspect_slug=aspect_slug, tag_id=tid
+                    )
+                )
 
             seeded += 1
         if seeded:

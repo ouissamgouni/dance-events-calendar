@@ -235,7 +235,13 @@ def run_notification_dispatch_once(force_activity_digest: bool = False) -> dict:
     """
     # Imported lazily to keep scheduler import-light and avoid any import
     # cycle with the email/notification services.
-    from backend.services import activity_email, interest_notification_service, reminder_service
+    from backend.services import (
+        activity_email,
+        interest_notification_service,
+        milestone_notification_service,
+        reminder_service,
+        review_prompt_service,
+    )
 
     _log_effective_gates()
 
@@ -252,6 +258,16 @@ def run_notification_dispatch_once(force_activity_digest: bool = False) -> dict:
         except Exception:
             logger.exception("Reminder generation failed")
             stats["reminders"] = {"error": True}
+        try:
+            stats["review_prompt"] = review_prompt_service.run_once()
+        except Exception:
+            logger.exception("Review prompt generation failed")
+            stats["review_prompt"] = {"error": True}
+        try:
+            stats["milestone"] = milestone_notification_service.run_once()
+        except Exception:
+            logger.exception("Milestone notification generation failed")
+            stats["milestone"] = {"error": True}
         try:
             # Runs before the activity digest so newly created interest_event
             # rows are picked up by the same tick's digest below.

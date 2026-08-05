@@ -236,6 +236,8 @@ def _unsubscribe_footer(user_id, category: str, label: str) -> str:
         "social_activity": "notify-social-activity",
         "interest_matches": "notify-interest-matches",
         "promo_codes": "notify-promo-codes",
+        "review_prompt": "notify-review-prompt",
+        "milestone": "notify-milestone-unlocked",
         "activity": "notifications",
     }.get(category, "notifications")
     settings = f"{app}/account#{fragment}"
@@ -285,7 +287,7 @@ def _engagement_ctas_html(notifications_href: str) -> str:
         </td>
         <td style="padding-right:16px">{_icon_link_row("share.png", "Invite a friend", f"{app}/invite")}</td>
         <td style="padding-right:16px">{_icon_link_row("save-pink.png", "Install Movida", f"{app}/install")}</td>
-        <td>{_icon_link_row("setting.png", "Notifications Settings", notifications_href)}</td>
+        <td>{_icon_link_row("setting.png", "Settings", notifications_href)}</td>
       </tr>
     </table>
     """
@@ -389,6 +391,102 @@ def send_event_reminder_email(user, event, when_label: str) -> bool:
     footer = _unsubscribe_footer(user.id, "reminder", "event reminders")
     html = _email_shell("See you on the dance floor 💃", body, footer)
     return _send_email(user.email, subject, html, "event reminder")
+
+
+def send_event_review_prompt_email(user, event, friend_proof=None) -> bool:
+    """Email a user a nudge to rate an event they went to, some hours after
+    it ended (see ``services/review_prompt_service.py``).
+
+    ``friend_proof`` is an optional pre-formatted names phrase (e.g. "Laura
+    and Marc" or "Laura, Marc +3 others"); when present the copy switches to
+    the friends' social-proof variant ("… shared their experience — share
+    yours") instead of the generic nudge.
+    """
+    if not user.email:
+        return False
+    app = get_public_app_url()
+    event_url = f"{app}/event/{escape(str(event.event_id))}?rate=1#community"
+    title = escape(event.title or "the event")
+    title_link = (
+        f'<a href="{event_url}" style="color:#1d4ed8;text-decoration:none">{title}</a>'
+    )
+    if friend_proof:
+        who = escape(friend_proof)
+        subject = f"{friend_proof} shared their experience at {event.title or 'your event'} — share yours"
+        heading = "Your friends shared their experience 💃"
+        lede = f"<p><strong>{who}</strong> shared their experience of:</p>"
+        tagline = "Add yours to help others discover great nights out."
+    else:
+        subject = f"How was {event.title or 'your event'}?"
+        heading = "How was your night? 💃"
+        lede = "<p>You went to:</p>"
+        tagline = "Share a quick rating to help others discover great nights out."
+    body = f"""
+    {lede}
+    <p style="font-size:18px;font-weight:600;margin:8px 0">{title_link}</p>
+    <p style="color:#374151;margin:4px 0">{tagline}</p>
+    <p style="margin:20px 0">
+      <a href="{event_url}"
+                 style="background:#3b82f6;color:#fff;text-decoration:none;
+                                padding:10px 18px;display:inline-block">
+        Share your experience
+      </a>
+    </p>
+    {_engagement_ctas_html(f"{app}/account#notifications")}
+    """
+    footer = _unsubscribe_footer(user.id, "review_prompt", "review prompts")
+    html = _email_shell(heading, body, footer)
+    return _send_email(user.email, subject, html, "review prompt")
+
+
+def send_milestones_unlocked_email(user, milestones) -> bool:
+    """Email a user that they unlocked one or more Dance Passport milestones
+    (see ``services/milestone_notification_service.py``). ``milestones`` is a
+    non-empty list of ``passport.Milestone``; multiple unlocked in the same
+    dispatch pass are combined into a single email instead of one per milestone.
+    """
+    if not user.email or not milestones:
+        return False
+    app = get_public_app_url()
+    passport_url = f"{app}/passport"
+    if len(milestones) == 1:
+        m = milestones[0]
+        subject = f"Milestone unlocked: {m.name}"
+        intro = "<p>You just unlocked a new Dance Passport milestone:</p>"
+        items = (
+            f'<p style="font-size:22px;margin:8px 0">{m.icon} '
+            f"<strong>{escape(m.name)}</strong></p>"
+            f'<p style="color:#374151;margin:4px 0">{escape(m.description)}</p>'
+        )
+    else:
+        subject = f"You unlocked {len(milestones)} milestones! 🎉"
+        intro = "<p>You just unlocked new Dance Passport milestones:</p>"
+        items = "".join(
+            f'<p style="font-size:20px;margin:12px 0 2px">{m.icon} '
+            f"<strong>{escape(m.name)}</strong></p>"
+            f'<p style="color:#374151;margin:0 0 4px">{escape(m.description)}</p>'
+            for m in milestones
+        )
+    body = f"""
+    {intro}
+    {items}
+    <p style="margin:20px 0">
+      <a href="{passport_url}"
+                 style="background:#3b82f6;color:#fff;text-decoration:none;
+                                padding:10px 18px;display:inline-block">
+        View your passport
+      </a>
+    </p>
+    {_engagement_ctas_html(f"{app}/account#notify-milestone-unlocked")}
+    """
+    footer = _unsubscribe_footer(user.id, "milestone", "achievement updates")
+    heading = (
+        "New milestone unlocked 🎉"
+        if len(milestones) == 1
+        else "New milestones unlocked 🎉"
+    )
+    html = _email_shell(heading, body, footer)
+    return _send_email(user.email, subject, html, "milestone unlocked")
 
 
 def send_promo_code_added_email(user, event, promo) -> bool:

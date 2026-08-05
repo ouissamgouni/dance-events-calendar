@@ -1,0 +1,59 @@
+# Focused review-prompt fixture — one past event pinned to *last* week's
+# Wednesday (w-1). Using the previous week (rather than "w0 Wed", the
+# current week's Wednesday) guarantees the event has already happened no
+# matter which day of the current week the scenario is (re)seeded on —
+# a "w0 Wed" event can still be in the future (seeded Mon/Tue) or already
+# outside review_prompt_service's lookback window (seeded Thu-Sun), which
+# silently yields zero prompts. REVIEW_PROMPT_DELAY_HOURS/LOOKBACK_HOURS in
+# config.env are widened (96h / 240h) to always bracket "last Wednesday,
+# 08:00" regardless of today's weekday.
+base_week: 0
+events:
+  - id: ev-past
+    calendar_id: salsa-cal-001
+    title: Rooftop Salsa Social — Rate Me!
+    description: "Past event used to validate the post-event review-prompt nudge."
+    location: "Skybar, Lisbon, Portugal"
+    latitude: 38.7139
+    longitude: -9.1394
+    start: w-1 Wed 05:00
+    end: w-1 Wed 08:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:international
+
+ratings:
+  # Carol already rated this event → review_prompt_service must skip her
+  # entirely (no in-app row, no email), regardless of her toggles. She is
+  # also a friend Alice follows → the first name in Alice's social proof.
+  - event_id: ev-past
+    email: carol@example.com
+    overall_sentiment: amazing
+    comment: "Amazing night, already left my review!"
+    status: approved
+
+  # Dan is a non-anonymous friend reviewer Alice follows → second name.
+  - event_id: ev-past
+    email: dan@example.com
+    overall_sentiment: amazing
+    comment: "Best floor in Lisbon!"
+    status: approved
+
+  # Erin's rating is approved but her comment is still pending moderation —
+  # a non-rejected rating still counts as "shared their experience", so she
+  # is folded into the "+N others" tail (only 2 names are ever spelled out).
+  - event_id: ev-past
+    email: erin@example.com
+    overall_sentiment: great
+    comment: "Great DJ set."
+    comment_status: pending
+    status: approved
+
+  # Flo reviewed anonymously → cannot be named, but still counts toward the
+  # "+N others" total (Alice's proof becomes "Carol, Dan +2 others").
+  - event_id: ev-past
+    email: flo@example.com
+    overall_sentiment: amazing
+    is_anonymous: true
+    status: approved

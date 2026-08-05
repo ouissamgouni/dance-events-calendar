@@ -226,6 +226,37 @@ class TestDatabaseSeeder:
         assert user.share_attendance_default is True
         assert user.share_attendance_default_audience == "public"
 
+    def test_seed_mock_user_review_prompt_flags(self, tmp_path, monkeypatch):
+        """Event Quality Layer P3 — per-user review-prompt notification
+        flags from mock-users.yaml must actually reach the seeded User
+        row (regression: these keys were missing from the allow-list, so
+        scenario fixtures setting them were silently ignored).
+        """
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir(parents=True)
+        (scenario_dir / "mock-users.yaml").write_text(
+            "users:\n"
+            "  - email: bob@example.com\n"
+            "    name: Bob\n"
+            "    email_review_prompt_enabled: false\n"
+            "    push_review_prompt_enabled: false\n"
+        )
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            DatabaseSeeder(session).seed(scenario_dir)
+            user = session.exec(
+                select(User).where(User.email == "bob@example.com")
+            ).first()
+
+        assert user is not None
+        assert user.email_review_prompt_enabled is False
+        assert user.push_review_prompt_enabled is False
+
     def test_seed_mock_users_auto_onboard_by_default(self, tmp_path, monkeypatch):
         """Phase G — scenarios that don't set ``auto_onboard`` (the vast
         majority) auto-stamp mock users as already onboarded so the

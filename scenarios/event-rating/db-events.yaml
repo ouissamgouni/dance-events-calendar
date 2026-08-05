@@ -1,171 +1,372 @@
 base_week: 0
 events:
-- id: evt-rating-001
-  calendar_id: rating-cal-001
-  title: Salsa Social — Rate Me!
-  description: |
-    Test event for the rating feature. Submit a star rating, comment, and review tags.
-    The dance floor is open from the first beat to the last.
-    All skill levels are welcome — no partner or prior experience needed.
-    Expect a warm, inclusive crowd of local and visiting dancers.
-    The venue features a full bar, cloakroom, and water stations throughout.
-    Dress smart-casual; smooth-soled dance shoes strongly recommended.
-    Follow the organiser's social pages for last-minute updates and playlists.
-  location: Test Venue, Paris, France
-  latitude: 48.8566
-  longitude: 2.3522
-  start: w0 Fri 21:00
-  end: w0 Sat 01:00
-  price_is_free: true
-  tags:
-  - format:social
-  - dance-style:salsa
-  - reach:local
-- id: evt-rating-002
-  calendar_id: rating-cal-001
-  title: Bachata Workshop — Rate Me!
-  description: |
-    Another test event for ratings. Try the Help-improve-this-event suggest-tags flow embedded in the rating modal.
-    Each session is broken into clear, manageable steps with individual feedback.
-    The instructor will address both leading and following roles equally.
-    Comfortable dance shoes with a smooth, non-rubber sole are essential.
-    No prior partner is required — participants rotate throughout the session.
-    Water and light refreshments are provided during breaks.
-    Spaces are strictly limited to maintain a high quality of teaching.
-    Video recording of the technique segments is encouraged for personal review.
-    A brief Q&A with the instructor follows each teaching block.
-    Check the event page for warm-up videos and preparation tips in advance.
-    Book early — this event has sold out in previous editions.
-  location: Test Venue 2, Berlin, Germany
-  latitude: 52.52
-  longitude: 13.405
-  start: w0 Sat 14:00
-  end: w0 Sat 17:00
-  price_is_free: false
-  price_min: 20
-  price_currency: EUR
-  tags:
-  - format:workshop
-  - dance-style:bachata
-  - reach:regional
-- id: evt-rating-003
-  calendar_id: rating-cal-001
-  title: Kizomba Class — No Reviews Yet
-  description: |
-    Use this event to verify the empty-reviews state in the EventReviewsSection.
-    Each session is broken into clear, manageable steps with individual feedback.
-    The instructor will address both leading and following roles equally.
-    Comfortable dance shoes with a smooth, non-rubber sole are essential.
-    No prior partner is required — participants rotate throughout the session.
-    Water and light refreshments are provided during breaks.
-    Spaces are strictly limited to maintain a high quality of teaching.
-    Video recording of the technique segments is encouraged for personal review.
-    A brief Q&A with the instructor follows each teaching block.
-    Check the event page for warm-up videos and preparation tips in advance.
-    Book early — this event has sold out in previous editions.
-  location: Test Venue 3, Madrid, Spain
-  latitude: 40.42
-  longitude: -3.7038
-  start: w0 Sun 19:00
-  end: w0 Sun 21:00
-  price_is_free: false
-  price_min: 12
-  price_currency: EUR
-  tags:
-  - format:class
-  - dance-style:kizomba
-  - reach:international
+  - id: evt-rating-001
+    calendar_id: rating-cal-001
+    title: Salsa Social — Rate Me!
+    description: |
+      Test event for the rating feature. Submit a star rating, comment, and review tags.
+      The dance floor is open from the first beat to the last.
+      All skill levels are welcome — no partner or prior experience needed.
+      Expect a warm, inclusive crowd of local and visiting dancers.
+      The venue features a full bar, cloakroom, and water stations throughout.
+      Dress smart-casual; smooth-soled dance shoes strongly recommended.
+      Follow the organiser's social pages for last-minute updates and playlists.
+    location: Test Venue, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w-1 Fri 21:00
+    end: w-1 Sat 01:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+  - id: evt-rating-002
+    calendar_id: rating-cal-001
+    title: Bachata Workshop — Rate Me!
+    description: |
+      Another test event for ratings. Try the Help-improve-this-event suggest-tags flow embedded in the rating modal.
+      Each session is broken into clear, manageable steps with individual feedback.
+      The instructor will address both leading and following roles equally.
+      Comfortable dance shoes with a smooth, non-rubber sole are essential.
+      No prior partner is required — participants rotate throughout the session.
+      Water and light refreshments are provided during breaks.
+      Spaces are strictly limited to maintain a high quality of teaching.
+      Video recording of the technique segments is encouraged for personal review.
+      A brief Q&A with the instructor follows each teaching block.
+      Check the event page for warm-up videos and preparation tips in advance.
+      Book early — this event has sold out in previous editions.
+    location: Test Venue 2, Berlin, Germany
+    latitude: 52.52
+    longitude: 13.405
+    start: w-1 Sat 14:00
+    end: w-1 Sat 17:00
+    price_is_free: false
+    price_min: 20
+    price_currency: EUR
+    tags:
+      - format:workshop
+      - dance-style:bachata
+      - reach:regional
+  - id: evt-rating-003
+    calendar_id: rating-cal-001
+    title: Kizomba Class — No Reviews Yet
+    description: |
+      Use this event to verify the empty-reviews state in the EventReviewsSection.
+      Each session is broken into clear, manageable steps with individual feedback.
+      The instructor will address both leading and following roles equally.
+      Comfortable dance shoes with a smooth, non-rubber sole are essential.
+      No prior partner is required — participants rotate throughout the session.
+      Water and light refreshments are provided during breaks.
+      Spaces are strictly limited to maintain a high quality of teaching.
+      Video recording of the technique segments is encouraged for personal review.
+      A brief Q&A with the instructor follows each teaching block.
+      Check the event page for warm-up videos and preparation tips in advance.
+      Book early — this event has sold out in previous editions.
+    location: Test Venue 3, Madrid, Spain
+    latitude: 40.42
+    longitude: -3.7038
+    start: w-1 Sun 19:00
+    end: w-1 Sun 21:00
+    price_is_free: false
+    price_min: 12
+    price_currency: EUR
+    tags:
+      - format:class
+      - dance-style:kizomba
+      - reach:international
+  - id: evt-rating-series-1
+    calendar_id: rating-cal-001
+    title: Tuesday Salsa Night — Week 1
+    description: |
+      First occurrence of the weekly Tuesday Salsa Night. Part of a resolved
+      event series so the Community Experience roll-up can be exercised.
+      All levels welcome; smooth-soled shoes recommended.
+    location: Milonga Hall, Lisbon, Portugal
+    latitude: 38.7223
+    longitude: -9.1393
+    start: w-2 Tue 20:00
+    end: w-2 Tue 23:30
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+  - id: evt-rating-series-3
+    calendar_id: rating-cal-001
+    title: Tuesday Salsa Night — Upcoming
+    description: |
+      Upcoming occurrence of the weekly Tuesday Salsa Night. Not yet happened,
+      so it cannot be reviewed — the review section shows the series' Typical
+      Experience instead and the Rate button is disabled.
+      All levels welcome; smooth-soled shoes recommended.
+    location: Milonga Hall, Lisbon, Portugal
+    latitude: 38.7223
+    longitude: -9.1393
+    start: w2 Tue 20:00
+    end: w2 Tue 23:30
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+  - id: evt-rating-series-4
+    calendar_id: rating-cal-001
+    title: Tuesday Salsa Night — Early Edition
+    description: |
+      An older, past occurrence of the weekly Tuesday Salsa Night that never
+      received any reviews. Used to verify the empty-past state: "No reviews for
+      this edition yet" shown alongside the series' Typical Experience card.
+      All levels welcome; smooth-soled shoes recommended.
+    location: Milonga Hall, Lisbon, Portugal
+    latitude: 38.7223
+    longitude: -9.1393
+    start: w-3 Tue 20:00
+    end: w-3 Tue 23:30
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+  - id: evt-rating-series-2
+    calendar_id: rating-cal-001
+    title: Tuesday Salsa Night — Week 2
+    description: |
+      Second occurrence of the weekly Tuesday Salsa Night. Same series as
+      Week 1, used to verify cross-edition aggregation on the series page.
+      All levels welcome; smooth-soled shoes recommended.
+    location: Milonga Hall, Lisbon, Portugal
+    latitude: 38.7223
+    longitude: -9.1393
+    start: w-1 Tue 20:00
+    end: w-1 Tue 23:30
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
 tag_suggestions:
-- event_id: evt-rating-001
-  free_text: live-band
-  status: pending
-  device_id: seed-device-rating
+  - event_id: evt-rating-001
+    free_text: live-band
+    status: pending
+    device_id: seed-device-rating
 ratings:
-- event_id: evt-rating-001
-  email: alice@example.com
-  stars: 5
-  comment: Amazing night, top DJ and friendly crowd. Highly recommended.
-  review_tag_slugs:
-  - review-tags:great-music
-  - review-tags:friendly-crowd
-  status: approved
-- event_id: evt-rating-001
-  email: bruno@example.com
-  stars: 4
-  comment: Great atmosphere but a bit crowded after 11pm.
-  review_tag_slugs:
-  - review-tags:crowded
-  - review-tags:good-venue
-  status: approved
-- event_id: evt-rating-001
-  email: chloe@example.com
-  stars: 5
-  comment: Authentic Cuban vibe, loved every minute.
-  review_tag_slugs:
-  - review-tags:authentic
-  status: approved
-- event_id: evt-rating-001
-  email: dimitri@example.com
-  stars: 3
-  comment: Music was good but the venue is loud and small.
-  review_tag_slugs:
-  - review-tags:loud
-  status: approved
-- event_id: evt-rating-001
-  email: elena@example.com
-  stars: 4
-  comment: Beginner-friendly intro lesson before the social. Very welcoming.
-  review_tag_slugs:
-  - review-tags:beginner-friendly
-  status: approved
-- event_id: evt-rating-001
-  email: rater@example.com
-  stars: 5
-  comment: Best salsa social in town!
-  review_tag_slugs:
-  - review-tags:great-music
-  status: approved
-  is_anonymous: true
-- event_id: evt-rating-001
-  email: dev-user@example.com
-  stars: 4
-  comment: Solid evening. Drinks a bit pricey.
-  review_tag_slugs:
-  - review-tags:overpriced
-  status: approved
-- event_id: evt-rating-001
-  email: admin@example.com
-  stars: 2
-  comment: Sound system kept cutting out, hope it gets fixed for next time.
-  status: pending
-- event_id: evt-rating-001
-  stars: 1
-  comment: spam spam spam buy crypto now
-  status: rejected
-  admin_notes: Spam content.
-- event_id: evt-rating-002
-  email: alice@example.com
-  stars: 5
-  comment: Excellent workshop, learnt a lot of new patterns.
-  review_tag_slugs:
-  - review-tags:beginner-friendly
-  status: approved
-- event_id: evt-rating-002
-  email: bruno@example.com
-  stars: 4
-  comment: Good content but a bit pricey for the duration.
-  review_tag_slugs:
-  - review-tags:overpriced
-  status: approved
-- event_id: evt-rating-002
-  email: chloe@example.com
-  stars: 4
-  comment: Great teacher, friendly group.
-  review_tag_slugs:
-  - review-tags:friendly-crowd
-  status: approved
-- event_id: evt-rating-002
-  email: dimitri@example.com
-  stars: 3
-  comment: Decent workshop but room was crowded.
-  status: pending
+  - event_id: evt-rating-001
+    email: alice@example.com
+    overall_sentiment: amazing
+    comment: Amazing night, top DJ and friendly crowd. Highly recommended.
+    aspect_scores:
+      music: 5
+      atmosphere: 5
+    aspect_tags:
+      - music:great-dj
+      - atmosphere:friendly-crowd
+    audience_tags:
+      - audience:meet-new-people
+    comment_status: approved
+    status: approved
+  - event_id: evt-rating-001
+    email: bruno@example.com
+    overall_sentiment: great
+    comment: Great atmosphere but a bit crowded after 11pm.
+    aspect_scores:
+      atmosphere: 4
+      venue-quality: 3
+    aspect_tags:
+      - atmosphere:friendly-crowd
+      - venue-quality:crowded
+      - venue-quality:great-dance-floor
+    comment_status: approved
+    status: approved
+  - event_id: evt-rating-001
+    email: chloe@example.com
+    overall_sentiment: amazing
+    comment: Authentic Cuban vibe, loved every minute.
+    aspect_scores:
+      atmosphere: 5
+    aspect_tags:
+      - atmosphere:great-atmosphere
+    comment_status: approved
+    status: approved
+  - event_id: evt-rating-001
+    email: dimitri@example.com
+    overall_sentiment: okay
+    comment: Music was good but the venue is loud and small.
+    aspect_scores:
+      music: 3
+      venue-quality: 2
+    aspect_tags:
+      - music:too-loud
+      - venue-quality:poor-ventilation
+    comment_status: approved
+    status: approved
+  - event_id: evt-rating-001
+    email: elena@example.com
+    overall_sentiment: great
+    comment: Beginner-friendly intro lesson before the social. Very welcoming.
+    aspect_scores:
+      atmosphere: 4
+    aspect_tags:
+      - atmosphere:friendly-crowd
+    audience_tags:
+      - audience:beginners
+    comment_status: approved
+    status: approved
+  - event_id: evt-rating-001
+    email: rater@example.com
+    overall_sentiment: amazing
+    comment: Best salsa social in town!
+    aspect_scores:
+      music: 5
+    aspect_tags:
+      - music:great-dj
+    comment_status: approved
+    status: approved
+    is_anonymous: true
+  - event_id: evt-rating-001
+    email: dev-user@example.com
+    overall_sentiment: great
+    comment: Solid evening. Drinks a bit pricey.
+    aspect_scores:
+      value: 3
+    aspect_tags:
+      - value:overpriced
+    comment_status: approved
+    status: approved
+  - event_id: evt-rating-001
+    email: admin@example.com
+    overall_sentiment: disappointing
+    comment: Sound system kept cutting out, hope it gets fixed for next time.
+    aspect_scores:
+      music: 2
+    aspect_tags:
+      - music:songs-repeated
+    comment_status: pending
+    status: approved
+  - event_id: evt-rating-001
+    overall_sentiment: bad
+    comment: spam spam spam buy crypto now
+    comment_status: rejected
+    status: rejected
+    admin_notes: Spam content.
+  - event_id: evt-rating-002
+    email: alice@example.com
+    overall_sentiment: amazing
+    comment: Excellent workshop, learnt a lot of new patterns.
+    aspect_scores:
+      workshop: 5
+    aspect_tags:
+      - workshop:clear-explanations
+    audience_tags:
+      - audience:beginners
+    comment_status: approved
+    status: approved
+  - event_id: evt-rating-002
+    email: bruno@example.com
+    overall_sentiment: great
+    comment: Good content but a bit pricey for the duration.
+    aspect_scores:
+      workshop: 4
+      value: 3
+    aspect_tags:
+      - value:overpriced
+    comment_status: approved
+    status: approved
+  - event_id: evt-rating-002
+    email: chloe@example.com
+    overall_sentiment: great
+    comment: Great teacher, friendly group.
+    aspect_scores:
+      workshop: 4
+    aspect_tags:
+      - workshop:good-pacing
+    audience_tags:
+      - audience:advanced
+    comment_status: approved
+    status: approved
+  - event_id: evt-rating-002
+    email: dimitri@example.com
+    overall_sentiment: okay
+    comment: Decent workshop but room was crowded.
+    aspect_scores:
+      workshop: 3
+    comment_status: pending
+    status: approved
+  # --- Tuesday Milonga series: Week 1 (evt-rating-series-1) ---
+  - event_id: evt-rating-series-1
+    email: alice@example.com
+    overall_sentiment: amazing
+    comment: Beautiful floor and a warm crowd — my new Tuesday ritual.
+    aspect_scores:
+      atmosphere: 5
+      venue-quality: 5
+    aspect_tags:
+      - atmosphere:friendly-crowd
+      - venue-quality:great-dance-floor
+    audience_tags:
+      - audience:meet-new-people
+    comment_status: approved
+    status: approved
+  - event_id: evt-rating-series-1
+    email: bruno@example.com
+    overall_sentiment: great
+    comment: Lovely music selection, though it got busy late on.
+    aspect_scores:
+      music: 4
+      venue-quality: 3
+    aspect_tags:
+      - music:great-dj
+      - venue-quality:crowded
+    comment_status: approved
+    status: approved
+  - event_id: evt-rating-series-1
+    email: chloe@example.com
+    overall_sentiment: great
+    comment: Friendly regulars, easy to find a dance.
+    aspect_scores:
+      atmosphere: 4
+    aspect_tags:
+      - atmosphere:friendly-crowd
+    comment_status: approved
+    status: approved
+  # --- Tuesday Milonga series: Week 2 (evt-rating-series-2) ---
+  - event_id: evt-rating-series-2
+    email: dimitri@example.com
+    overall_sentiment: great
+    comment: Consistently good — same great DJ as last week.
+    aspect_scores:
+      music: 4
+      atmosphere: 4
+    aspect_tags:
+      - music:great-dj
+      - atmosphere:friendly-crowd
+    comment_status: approved
+    status: approved
+  - event_id: evt-rating-series-2
+    email: elena@example.com
+    overall_sentiment: okay
+    comment: A bit quieter this week and the room felt stuffy.
+    aspect_scores:
+      atmosphere: 3
+      venue-quality: 2
+    aspect_tags:
+      - venue-quality:poor-ventilation
+    comment_status: approved
+    status: approved
+event_series:
+  - canonical_title: Tuesday Salsa Night
+    status: resolved
+    source: manual
+    members:
+      - evt-rating-series-4
+      - evt-rating-series-1
+      - evt-rating-series-2
+      - evt-rating-series-3

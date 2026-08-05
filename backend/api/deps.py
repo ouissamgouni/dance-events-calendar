@@ -294,6 +294,36 @@ def can_view(
     return is_mutual_follow(session, viewer.id, owner.id)
 
 
+def can_view_passport(
+    session: Session,
+    viewer: User | None,
+    owner: User,
+) -> bool:
+    """Return True if ``viewer`` may see ``owner``'s Dance Passport.
+
+    Governed by ``owner.passport_visibility`` (independent from
+    ``account_visibility``):
+
+    - ``public``  — anyone (including anonymous) may view.
+    - ``friends`` — only the owner and their mutual follows.
+    - ``private`` — the owner only.
+
+    Callers should respond with **404** (not 403) when this returns False so
+    the passport's existence isn't leaked.
+    """
+    if viewer is not None and viewer.id == owner.id:
+        return True
+    visibility = getattr(owner, "passport_visibility", None) or "friends"
+    if visibility == "public":
+        return True
+    if visibility == "private":
+        return False
+    # 'friends' — requires authenticated viewer with mutual follow.
+    if viewer is None:
+        return False
+    return is_mutual_follow(session, viewer.id, owner.id)
+
+
 def _audience_passes(
     session: Session,
     viewer: User | None,

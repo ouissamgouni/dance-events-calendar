@@ -1,0 +1,569 @@
+# Dance Passport scenario — a rich, retrospective dance journey.
+#
+# Events are PAST (w-N relative dates) so they count toward the passport,
+# plus one FUTURE event (must NOT count) and one NULL-geo event (counts as an
+# event but not toward cities/countries). city/country/country_code are seeded
+# directly so no live geocoding is needed. tags.yaml is intentionally omitted
+# so the scenario inherits the default taxonomy (which includes the ``reach``
+# group with ``international`` used by the "first international" milestone).
+base_week: 0
+events:
+  # --- alba's journey: 11 distinct cities across 7 countries ---
+  - id: evt-dp-01
+    calendar_id: passport-cal-001
+    title: Paris Salsa Social
+    description: Weekly salsa social in the heart of Paris.
+    location: Studio Harmonic, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    city: Paris
+    country: France
+    country_code: FR
+    start: w-1 Fri 21:00
+    end: w-1 Sat 01:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: evt-dp-02
+    calendar_id: passport-cal-001
+    title: Paris Bachata Night
+    description: Second Paris event — same city, to exercise city de-duplication.
+    location: Le Cabaret Sauvage, Paris, France
+    latitude: 48.8895
+    longitude: 2.3900
+    city: Paris
+    country: France
+    country_code: FR
+    start: w-2 Sat 21:00
+    end: w-2 Sun 01:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local
+
+  - id: evt-dp-03
+    calendar_id: passport-cal-001
+    title: Lyon Salsa Marathon
+    description: All-night salsa in Lyon.
+    location: Salle des Fêtes, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-3 Sat 20:00
+    end: w-3 Sun 02:00
+    price_is_free: false
+    price_min: 15
+    price_currency: EUR
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:regional
+
+  - id: evt-dp-04
+    calendar_id: passport-cal-001
+    title: Berlin International Bachata Festival
+    description: A flagship international festival — drives the first-international milestone.
+    location: Estrel Congress Center, Berlin, Germany
+    latitude: 52.5200
+    longitude: 13.4050
+    city: Berlin
+    country: Germany
+    country_code: DE
+    start: w-5 Sat 19:00
+    end: w-5 Sun 04:00
+    price_is_free: false
+    price_min: 60
+    price_currency: EUR
+    tags:
+      - format:festival
+      - dance-style:bachata
+      - reach:international
+
+  - id: evt-dp-05
+    calendar_id: passport-cal-001
+    title: Munich Kizomba Evening
+    description: Smooth kizomba social in Munich.
+    location: Tanzschule, Munich, Germany
+    latitude: 48.1351
+    longitude: 11.5820
+    city: Munich
+    country: Germany
+    country_code: DE
+    start: w-6 Fri 20:00
+    end: w-6 Sat 00:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:kizomba
+      - reach:regional
+
+  - id: evt-dp-06
+    calendar_id: passport-cal-001
+    title: Madrid International Salsa Congress
+    description: Second international event.
+    location: IFEMA, Madrid, Spain
+    latitude: 40.4168
+    longitude: -3.7038
+    city: Madrid
+    country: Spain
+    country_code: ES
+    start: w-8 Sat 18:00
+    end: w-8 Sun 03:00
+    price_is_free: false
+    price_min: 55
+    price_currency: EUR
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: evt-dp-07
+    calendar_id: passport-cal-001
+    title: Barcelona Zouk Social
+    description: Brazilian zouk by the beach.
+    location: Sala Apolo, Barcelona, Spain
+    latitude: 41.3851
+    longitude: 2.1734
+    city: Barcelona
+    country: Spain
+    country_code: ES
+    start: w-9 Sat 21:00
+    end: w-9 Sun 01:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:zouk
+      - reach:local
+
+  - id: evt-dp-08
+    calendar_id: passport-cal-001
+    title: Lisbon Bachata Sunset
+    description: Bachata with a view over the Tagus.
+    location: LX Factory, Lisbon, Portugal
+    latitude: 38.7223
+    longitude: -9.1393
+    city: Lisbon
+    country: Portugal
+    country_code: PT
+    start: w-10 Sun 19:00
+    end: w-10 Sun 23:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:regional
+
+  - id: evt-dp-09
+    calendar_id: passport-cal-001
+    title: Rome Salsa Night
+    description: Salsa cubana under Roman skies.
+    location: Villa Ada, Rome, Italy
+    latitude: 41.9028
+    longitude: 12.4964
+    city: Rome
+    country: Italy
+    country_code: IT
+    start: w-12 Fri 21:00
+    end: w-12 Sat 01:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: evt-dp-10
+    calendar_id: passport-cal-001
+    title: Milan Kizomba Social
+    description: Kizomba social in Milan.
+    location: Tunnel Club, Milan, Italy
+    latitude: 45.4642
+    longitude: 9.1900
+    city: Milan
+    country: Italy
+    country_code: IT
+    start: w-13 Sat 21:00
+    end: w-13 Sun 01:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:kizomba
+      - reach:regional
+
+  - id: evt-dp-11
+    calendar_id: passport-cal-001
+    title: London International Salsa Weekender
+    description: Third international event.
+    location: Bloomsbury Ballroom, London, United Kingdom
+    latitude: 51.5072
+    longitude: -0.1276
+    city: London
+    country: United Kingdom
+    country_code: GB
+    start: w-14 Sat 19:00
+    end: w-14 Sun 03:00
+    price_is_free: false
+    price_min: 45
+    price_currency: GBP
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: evt-dp-12
+    calendar_id: passport-cal-001
+    title: Amsterdam Bachata Social
+    description: Bachata by the canals.
+    location: Panama, Amsterdam, Netherlands
+    latitude: 52.3676
+    longitude: 4.9041
+    city: Amsterdam
+    country: Netherlands
+    country_code: NL
+    start: w-16 Fri 20:00
+    end: w-16 Sat 00:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local
+
+  # --- edge case: a past attended event with NULL geo. Counts as an event
+  # but NOT toward cities/countries. ---
+  - id: evt-dp-nullgeo
+    calendar_id: passport-cal-001
+    title: Underground Salsa (location TBA)
+    description: A pop-up social with no fixed venue — no city/country/lat/lng.
+    start: w-4 Sat 22:00
+    end: w-4 Sun 02:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  # --- negative: FUTURE event. future_only user is Going but it must NOT
+  # count toward any passport (start is in the future). ---
+  - id: evt-dp-future
+    calendar_id: passport-cal-001
+    title: Upcoming Paris Salsa Gala
+    description: A future event — RSVPs here must not appear in the passport.
+    location: Grand Palais, Paris, France
+    latitude: 48.8661
+    longitude: 2.3125
+    city: Paris
+    country: France
+    country_code: FR
+    start: w2 Sat 21:00
+    end: w2 Sun 01:00
+    price_is_free: false
+    price_min: 30
+    price_currency: EUR
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  # --- edge case: an event attended ONLY by an anonymous device (no user).
+  # Must never leak into any user's passport. ---
+  - id: evt-dp-anon
+    calendar_id: passport-cal-001
+    title: Nice Beach Salsa
+    description: Attended only by an anonymous device — must be excluded from passports.
+    location: Promenade des Anglais, Nice, France
+    latitude: 43.7102
+    longitude: 7.2620
+    city: Nice
+    country: France
+    country_code: FR
+    start: w-7 Sat 20:00
+    end: w-7 Sat 23:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  # --- Milestone-testing pool (Phase B/D) -----------------------------------
+  # Extra PAST "volume" events in Warsaw so a cusp user can sit at exactly
+  # 24 attended events; the 25th (evt-vol-13, the "spare") is left un-attended
+  # so a tester can mark Going on it and watch the "Dedicated" (events_25)
+  # milestone unlock live. All past, all in one city (only the event *count*
+  # matters for the volume milestone).
+  - id: evt-vol-01
+    calendar_id: passport-cal-001
+    title: Warsaw Salsa Vol. 1
+    location: Klub Tango, Warsaw, Poland
+    latitude: 52.2297
+    longitude: 21.0122
+    city: Warsaw
+    country: Poland
+    country_code: PL
+    start: w-17 Sat 20:00
+    end: w-17 Sat 23:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-vol-02
+    calendar_id: passport-cal-001
+    title: Warsaw Salsa Vol. 2
+    location: Klub Tango, Warsaw, Poland
+    latitude: 52.2297
+    longitude: 21.0122
+    city: Warsaw
+    country: Poland
+    country_code: PL
+    start: w-18 Sat 20:00
+    end: w-18 Sat 23:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-vol-03
+    calendar_id: passport-cal-001
+    title: Warsaw Salsa Vol. 3
+    location: Klub Tango, Warsaw, Poland
+    latitude: 52.2297
+    longitude: 21.0122
+    city: Warsaw
+    country: Poland
+    country_code: PL
+    start: w-19 Sat 20:00
+    end: w-19 Sat 23:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-vol-04
+    calendar_id: passport-cal-001
+    title: Warsaw Salsa Vol. 4
+    location: Klub Tango, Warsaw, Poland
+    latitude: 52.2297
+    longitude: 21.0122
+    city: Warsaw
+    country: Poland
+    country_code: PL
+    start: w-20 Sat 20:00
+    end: w-20 Sat 23:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-vol-05
+    calendar_id: passport-cal-001
+    title: Warsaw Salsa Vol. 5
+    location: Klub Tango, Warsaw, Poland
+    latitude: 52.2297
+    longitude: 21.0122
+    city: Warsaw
+    country: Poland
+    country_code: PL
+    start: w-21 Sat 20:00
+    end: w-21 Sat 23:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-vol-06
+    calendar_id: passport-cal-001
+    title: Warsaw Salsa Vol. 6
+    location: Klub Tango, Warsaw, Poland
+    latitude: 52.2297
+    longitude: 21.0122
+    city: Warsaw
+    country: Poland
+    country_code: PL
+    start: w-22 Sat 20:00
+    end: w-22 Sat 23:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-vol-07
+    calendar_id: passport-cal-001
+    title: Warsaw Salsa Vol. 7
+    location: Klub Tango, Warsaw, Poland
+    latitude: 52.2297
+    longitude: 21.0122
+    city: Warsaw
+    country: Poland
+    country_code: PL
+    start: w-23 Sat 20:00
+    end: w-23 Sat 23:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-vol-08
+    calendar_id: passport-cal-001
+    title: Warsaw Salsa Vol. 8
+    location: Klub Tango, Warsaw, Poland
+    latitude: 52.2297
+    longitude: 21.0122
+    city: Warsaw
+    country: Poland
+    country_code: PL
+    start: w-24 Sat 20:00
+    end: w-24 Sat 23:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-vol-09
+    calendar_id: passport-cal-001
+    title: Warsaw Salsa Vol. 9
+    location: Klub Tango, Warsaw, Poland
+    latitude: 52.2297
+    longitude: 21.0122
+    city: Warsaw
+    country: Poland
+    country_code: PL
+    start: w-25 Sat 20:00
+    end: w-25 Sat 23:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-vol-10
+    calendar_id: passport-cal-001
+    title: Warsaw Salsa Vol. 10
+    location: Klub Tango, Warsaw, Poland
+    latitude: 52.2297
+    longitude: 21.0122
+    city: Warsaw
+    country: Poland
+    country_code: PL
+    start: w-26 Sat 20:00
+    end: w-26 Sat 23:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-vol-11
+    calendar_id: passport-cal-001
+    title: Warsaw Salsa Vol. 11
+    location: Klub Tango, Warsaw, Poland
+    latitude: 52.2297
+    longitude: 21.0122
+    city: Warsaw
+    country: Poland
+    country_code: PL
+    start: w-27 Sat 20:00
+    end: w-27 Sat 23:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-vol-12
+    calendar_id: passport-cal-001
+    title: Warsaw Salsa Vol. 12
+    location: Klub Tango, Warsaw, Poland
+    latitude: 52.2297
+    longitude: 21.0122
+    city: Warsaw
+    country: Poland
+    country_code: PL
+    start: w-28 Sat 20:00
+    end: w-28 Sat 23:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  # The "spare" 25th event — intentionally left un-attended by cusp-dedicated
+  # so a tester can mark Going and unlock the Dedicated milestone.
+  - id: evt-vol-13
+    calendar_id: passport-cal-001
+    title: Warsaw Salsa Vol. 13 (spare — mark Going to hit 25)
+    location: Klub Tango, Warsaw, Poland
+    latitude: 52.2297
+    longitude: 21.0122
+    city: Warsaw
+    country: Poland
+    country_code: PL
+    start: w-29 Sat 20:00
+    end: w-29 Sat 23:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+
+# alba writes >=10 reviews (drives reviews_written + first_review / reviews_10).
+ratings:
+  - event_id: evt-dp-01
+    email: alba@example.com
+    overall_sentiment: amazing
+    comment: Best Friday salsa in Paris!
+    status: approved
+  - event_id: evt-dp-02
+    email: alba@example.com
+    overall_sentiment: great
+    comment: Lovely bachata crowd.
+    status: approved
+  - event_id: evt-dp-03
+    email: alba@example.com
+    overall_sentiment: amazing
+    comment: Danced until sunrise in Lyon.
+    status: approved
+  - event_id: evt-dp-04
+    email: alba@example.com
+    overall_sentiment: amazing
+    comment: Berlin festival was unreal.
+    status: approved
+  - event_id: evt-dp-05
+    email: alba@example.com
+    overall_sentiment: great
+    comment: Smooth kizomba vibes.
+    status: approved
+  - event_id: evt-dp-06
+    email: alba@example.com
+    overall_sentiment: amazing
+    comment: Madrid congress top tier.
+    status: approved
+  - event_id: evt-dp-07
+    email: alba@example.com
+    overall_sentiment: great
+    comment: Zouk by the sea, perfect.
+    status: approved
+  - event_id: evt-dp-08
+    email: alba@example.com
+    overall_sentiment: great
+    comment: Lisbon sunset bachata.
+    status: approved
+  - event_id: evt-dp-09
+    email: alba@example.com
+    overall_sentiment: amazing
+    comment: Roma salsa cubana!
+    status: approved
+  - event_id: evt-dp-10
+    email: alba@example.com
+    overall_sentiment: great
+    comment: Milan kizomba social.
+    status: approved
+  # A rejected review must NOT count toward reviews_written.
+  - event_id: evt-dp-11
+    email: alba@example.com
+    overall_sentiment: bad
+    comment: (rejected — should not count)
+    status: rejected
+  # borderline writes exactly 10 approved reviews.
+  - event_id: evt-dp-01
+    email: borderline@example.com
+    overall_sentiment: great
+    status: approved
+  - event_id: evt-dp-02
+    email: borderline@example.com
+    overall_sentiment: great
+    status: approved
+  - event_id: evt-dp-03
+    email: borderline@example.com
+    overall_sentiment: great
+    status: approved
+  - event_id: evt-dp-04
+    email: borderline@example.com
+    overall_sentiment: great
+    status: approved
+  - event_id: evt-dp-05
+    email: borderline@example.com
+    overall_sentiment: great
+    status: approved
+  - event_id: evt-dp-06
+    email: borderline@example.com
+    overall_sentiment: great
+    status: approved
+  - event_id: evt-dp-07
+    email: borderline@example.com
+    overall_sentiment: great
+    status: approved
+  - event_id: evt-dp-08
+    email: borderline@example.com
+    overall_sentiment: great
+    status: approved
+  - event_id: evt-dp-09
+    email: borderline@example.com
+    overall_sentiment: great
+    status: approved
+  - event_id: evt-dp-10
+    email: borderline@example.com
+    overall_sentiment: great
+    status: approved
+  # novice writes zero reviews (first_review locked).

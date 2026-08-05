@@ -30,11 +30,14 @@ const Admin = lazy(() => import('./pages/Admin'));
 const Login = lazy(() => import('./pages/Login'));
 const Account = lazy(() => import('./pages/Account'));
 const EventDetailPage = lazy(() => import('./pages/EventDetailPage'));
+const SeriesPage = lazy(() => import('./pages/SeriesPage'));
 const MyCalendar = lazy(() => import('./pages/MyCalendar'));
+const PassportPage = lazy(() => import('./pages/PassportPage'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const DiscoverPage = lazy(() => import('./pages/DiscoverPage'));
 const SharedCalendarPage = lazy(() => import('./pages/SharedCalendarPage'));
+const SharedPassportPage = lazy(() => import('./pages/SharedPassportPage'));
 const Privacy = lazy(() => import('./pages/Privacy'));
 const OnboardingPreferences = lazy(() => import('./pages/OnboardingPreferences'));
 const OnboardingLocal = lazy(() => import('./pages/OnboardingLocal'));
@@ -145,9 +148,19 @@ function AppShell() {
                 <Route path="/calendar" element={<Home />} />
                 <Route path="/for-you" element={<ForYouPage />} />
                 <Route path="/event/:eventId" element={<EventDetailPage />} />
+                <Route path="/series/:seriesId" element={<SeriesPage />} />
                 <Route path="/my-calendar" element={<MyCalendar />} />
                 <Route path="/my-calendar/subscriptions" element={<MyCalendar />} />
+                <Route
+                  path="/passport"
+                  element={
+                    <ProtectedRoute>
+                      <PassportPage />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="/shared/:token" element={<SharedCalendarPage />} />
+                <Route path="/shared/passport/:token" element={<SharedPassportPage />} />
                 <Route path="/privacy" element={<Privacy />} />
                 <Route path="/install" element={<InstallPage />} />
                 <Route path="/invite" element={<InvitePage />} />

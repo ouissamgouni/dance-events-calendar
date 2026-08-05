@@ -1,27 +1,134 @@
-import { useEffect, useState, useCallback } from 'react';
-import { fetchEventReviews, fetchRatingAggregate, fetchTagGroups } from '../api';
-import type { EventRatingAggregate, EventReviewPublic, Tag } from '../types';
-import RatingStars from './RatingStars';
-import RatingDistribution from './RatingDistribution';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { Link, useLocation } from 'react-router-dom';
+import { fetchAspectTagGroups, fetchEventReviews, fetchEventSeriesRollup, fetchRatingAggregate, fetchSeriesReviews } from '../api';
+import { useAuth } from '../context/AuthContext';
+import { useRatingAggregate } from '../context/RatingAggregatesContext';
+import type { EventRatingAggregate, EventReviewPublic, SeriesRatingRollup, TagGroup } from '../types';
+import ExperienceBreakdown from './ExperienceBreakdown';
+import TypicalExperienceCard from './TypicalExperienceCard';
+import { seriesToAggregate } from '../hooks/useCommunityExperience';
+import { SENTIMENT_META } from '../utils/reviewSentiment';
+
+/** Max tags shown on a compact review card before the rest collapse into "+N more". */
+const CARD_TAGS_SHOWN = 5;
+
+type CardTag = { key: string; label: string; cls: string };
+
+/** Flatten a review's aspect + audience tags into renderable pills (aspect tags
+ * colored by polarity, audience tags neutral). */
+function cardTags(r: EventReviewPublic): CardTag[] {
+    const aspect = r.aspect_tags.map((t) => ({
+        key: `a-${t.id}`,
+        label: t.label,
+        cls: t.polarity === 'negative' ? 'bg-orange-50 text-orange-800' : 'bg-green-50 text-green-800',
+    }));
+    const audience = r.audience_tags.map((t) => ({
+        key: `u-${t.id}`,
+        label: t.label,
+        cls: 'bg-slate-100 text-slate-600',
+    }));
+    return [...aspect, ...audience];
+}
+
+/** Full review popover — shows the complete feedback (all tags + comment). */
+function ReviewDetailModal({ review, onClose }: { review: EventReviewPublic; onClose: () => void }) {
+    const meta = review.overall_sentiment ? SENTIMENT_META[review.overall_sentiment] : null;
+    const initials =
+        review.reviewer_label.trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || '?';
+    const tags = cardTags(review);
+    return createPortal(
+        <div
+            className="fixed inset-0 z-[1100] bg-slate-900/50 flex items-center justify-center p-4"
+            onClick={onClose}
+        >
+            <div
+                className="bg-white shadow-lg w-full max-w-sm max-h-[85vh] overflow-y-auto border border-slate-200 p-4 space-y-3"
+                onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Review details"
+            >
+                <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-600">
+                            {initials}
+                        </span>
+                        <div className="min-w-0">
+                            <div className="text-sm font-semibold text-slate-900 truncate">{review.reviewer_label}</div>
+                            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                                {meta && <span>{meta.emoji} {meta.label}</span>}
+                                {meta && <span className="text-slate-300">·</span>}
+                                <span>{new Date(review.created_at).toLocaleDateString()}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        aria-label="Close"
+                        className="shrink-0 text-slate-400 hover:text-slate-600 text-xl leading-none"
+                    >
+                        ×
+                    </button>
+                </div>
+                {review.comment && (
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap break-words">{review.comment}</p>
+                )}
+                {tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                        {tags.map((t) => (
+                            <span key={t.key} className={`rounded-full px-2 py-0.5 text-[11px] ${t.cls}`}>
+                                {t.label}
+                            </span>
+                        ))}
+                    </div>
+                )}
+                <Link
+                    to={`/event/${review.event_id}`}
+                    className="inline-block text-[9px] font-medium text-sky-600 hover:text-sky-700"
+                >
+                    From {review.event_title} →
+                </Link>
+            </div>
+        </div>,
+        document.body,
+    );
+}
 
 interface Props {
     eventId: string;
+    /** Whether the edition has already taken place. Upcoming editions can't be
+     * reviewed, so their section shows the series' typical experience instead of
+     * a review list. Defaults to true (treat as reviewable) when unknown. */
+    isPast?: boolean;
     /** Notifies parent when aggregate count is known (so the rate button can highlight). */
     onAggregateLoaded?: (agg: EventRatingAggregate | null) => void;
+    /** Called when user clicks "Be the first to review" in the empty state. Allows parent to open the review form. */
+    onOpenReviewForm?: () => void;
+    /** Bump this to a new value (e.g. a counter) whenever the current user's rating changed
+     * elsewhere on the page, so the aggregate + review list reload without a full remount. */
+    refreshToken?: number;
 }
 
 const PAGE_SIZE = 5;
 
-export default function EventReviewsSection({ eventId, onAggregateLoaded }: Props) {
+export default function EventReviewsSection({ eventId, isPast = true, onAggregateLoaded, onOpenReviewForm, refreshToken }: Props) {
+    const { user } = useAuth();
+    const location = useLocation();
+    // Review count is public — surface it to signed-out visitors from the shared
+    // (count-only) aggregate cache so the gated section can still show "N reviews".
+    const anonAggregate = useRatingAggregate(eventId);
     const [aggregate, setAggregate] = useState<EventRatingAggregate | null>(null);
     const [reviews, setReviews] = useState<EventReviewPublic[]>([]);
     const [loading, setLoading] = useState(false);
     const [hasMore, setHasMore] = useState(false);
-    const [sort, setSort] = useState<'recent' | 'highest' | 'lowest'>('recent');
-    const [filterStars, setFilterStars] = useState<number | null>(null);
-    const [reviewTags, setReviewTags] = useState<Tag[]>([]);
+    const [sort, setSort] = useState<'recent' | 'positive' | 'critical'>('recent');
+    const [aspectGroups, setAspectGroups] = useState<TagGroup[]>([]);
+    const [series, setSeries] = useState<SeriesRatingRollup | null>(null);
+    const [expandedReview, setExpandedReview] = useState<EventReviewPublic | null>(null);
 
     const loadAggregate = useCallback(() => {
+        if (!user) return;
         fetchRatingAggregate(eventId)
             .then((a) => {
                 setAggregate(a);
@@ -31,31 +138,54 @@ export default function EventReviewsSection({ eventId, onAggregateLoaded }: Prop
                 setAggregate(null);
                 onAggregateLoaded?.(null);
             });
-    }, [eventId, onAggregateLoaded]);
+    }, [eventId, onAggregateLoaded, user]);
 
     useEffect(() => {
         loadAggregate();
     }, [loadAggregate]);
 
     useEffect(() => {
-        fetchTagGroups()
-            .then((groups) => {
-                const g = groups.find((x) => x.slug === 'review-tags');
-                setReviewTags(g?.tags ?? []);
-            })
-            .catch(() => setReviewTags([]));
+        if (!user) { setSeries(null); return; }
+        let cancelled = false;
+        fetchEventSeriesRollup(eventId)
+            .then((s) => { if (!cancelled) setSeries(s); })
+            .catch(() => { if (!cancelled) setSeries(null); });
+        return () => { cancelled = true; };
+    }, [eventId, user]);
+
+    useEffect(() => {
+        fetchAspectTagGroups()
+            .then(setAspectGroups)
+            .catch(() => setAspectGroups([]));
     }, []);
+
+    const aspectLabels = useMemo(
+        () => Object.fromEntries(aspectGroups.map((g) => [g.slug, g.label])),
+        [aspectGroups],
+    );
+
+    const typicalCard = series ? <TypicalExperienceCard series={series} /> : null;
+
+    // An upcoming edition that belongs to a series with past feedback shows the
+    // full cross-edition experience (pooled breakdown + reviews from every
+    // edition) instead of its own empty review list.
+    const crossEdition = !isPast && series != null && series.total_review_count > 0;
+
+    const seriesAggregate: EventRatingAggregate | null = useMemo(
+        () => (series ? seriesToAggregate(series) : null),
+        [series],
+    );
+
+    const effectiveAggregate = crossEdition ? seriesAggregate : aggregate;
 
     const loadPage = useCallback(
         async (offset: number, replace: boolean) => {
+            if (!user) { setReviews([]); setHasMore(false); return; }
             setLoading(true);
             try {
-                const res = await fetchEventReviews(eventId, {
-                    sort,
-                    minStars: filterStars ?? undefined,
-                    limit: PAGE_SIZE,
-                    offset,
-                });
+                const res = crossEdition && series
+                    ? await fetchSeriesReviews(series.series_id, { sort, limit: PAGE_SIZE, offset })
+                    : await fetchEventReviews(eventId, { sort, limit: PAGE_SIZE, offset });
                 setReviews((prev) => (replace ? res.items : [...prev, ...res.items]));
                 setHasMore(offset + res.items.length < res.total);
             } catch {
@@ -65,114 +195,198 @@ export default function EventReviewsSection({ eventId, onAggregateLoaded }: Prop
                 setLoading(false);
             }
         },
-        [eventId, sort, filterStars],
+        [eventId, sort, user, crossEdition, series],
     );
 
     useEffect(() => {
         loadPage(0, true);
     }, [loadPage]);
 
-    const tagLabel = (id: number) => reviewTags.find((t) => t.id === id)?.label ?? `Tag #${id}`;
+    // Reload the aggregate + first page whenever the parent bumps refreshToken
+    // (e.g. right after the current user submits/edits/deletes their review).
+    const lastRefreshToken = useRef(refreshToken);
+    useEffect(() => {
+        if (refreshToken === undefined) return;
+        if (lastRefreshToken.current === refreshToken) return;
+        lastRefreshToken.current = refreshToken;
+        loadAggregate();
+        loadPage(0, true);
+    }, [refreshToken, loadAggregate, loadPage]);
 
-    if (!aggregate || aggregate.count === 0) {
+    // Signed-out visitors: report the public review count so the parent (rate
+    // button highlight / anchor) stays in sync even though content is gated.
+    useEffect(() => {
+        if (user) return;
+        onAggregateLoaded?.(anonAggregate);
+    }, [user, anonAggregate, onAggregateLoaded]);
+
+    if (!user) {
+        const count = anonAggregate?.count ?? 0;
+        // Nothing to gate behind sign-in when the event has no reviews yet.
+        if (count === 0) return null;
         return (
-            <section className="mt-4 border-t border-slate-200 pt-3">
-                <h3 className="text-xs font-semibold text-slate-700 mb-1.5 uppercase tracking-wide">Reviews</h3>
+            <section className="mt-4 border-t border-slate-200 pt-3 space-y-2">
+                <h3 className="text-base font-bold text-slate-900">
+                    Community Experience{' '}
+                    <span className="text-sm font-normal tabular-nums text-slate-500">
+                        · {count} review{count === 1 ? '' : 's'}
+                    </span>
+                </h3>
                 <p className="text-[11px] text-slate-500">
-                    No reviews yet. Be the first to rate this event!
+                    <Link
+                        to={`/login?next=${encodeURIComponent(`${location.pathname}${location.search}#community`)}`}
+                        className="text-sky-600 hover:text-sky-700 font-medium"
+                    >
+                        Sign in
+                    </Link>{' '}
+                    to see and leave reviews for this event.
                 </p>
             </section>
         );
     }
 
-    return (
-        <section className="mt-4 border-t border-slate-200 pt-3 space-y-3 max-w-full overflow-hidden">
-            <h3 className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Reviews</h3>
-            <div className="flex flex-col sm:flex-row gap-3">
-                <div className="sm:w-32 flex-shrink-0 text-center">
-                    <div className="text-2xl font-semibold text-slate-800 tabular-nums leading-none">
-                        {aggregate.average.toFixed(1)}
-                    </div>
-                    <div className="mt-0.5"><RatingStars value={aggregate.average} size="sm" /></div>
-                    <div className="text-[10px] text-slate-500 mt-0.5">
-                        {aggregate.count} review{aggregate.count !== 1 ? 's' : ''}
-                    </div>
-                </div>
-                <div className="flex-1 min-w-0">
-                    <RatingDistribution
-                        distribution={aggregate.distribution}
-                        total={aggregate.count}
-                        onFilterStars={setFilterStars}
-                        activeStars={filterStars}
-                    />
-                </div>
-            </div>
+    if (!effectiveAggregate || effectiveAggregate.count === 0) {
+        // Upcoming editions can't be reviewed — surface the series' typical
+        // experience (if any) so the section is never empty.
+        if (!isPast) {
+            return (
+                <section className="mt-4 border-t border-slate-200 pt-3 space-y-2">
+                    <h3 className="text-base font-bold text-slate-900">Community Experience</h3>
+                    {typicalCard}
+                    <p className="text-[11px] text-slate-500">
+                        Reviews open after the event takes place.
+                    </p>
+                </section>
+            );
+        }
+        return (
+            <section className="mt-4 border-t border-slate-200 pt-3 space-y-2">
+                <h3 className="text-base font-bold text-slate-900">Community Experience</h3>
+                <p className="text-[11px] text-slate-500">
+                    No reviews for this edition yet.{' '}
+                    {onOpenReviewForm ? (
+                        <button
+                            onClick={onOpenReviewForm}
+                            className="text-sky-600 hover:text-sky-700 font-medium"
+                        >
+                            Be the first to leave one!
+                        </button>
+                    ) : (
+                        <span>Be the first to leave one!</span>
+                    )}
+                </p>
+                {typicalCard}
+            </section>
+        );
+    }
 
-            <div className="flex items-center gap-2 text-[11px]">
+    return (
+        <section className="mt-4 border-t border-slate-200 pt-3 space-y-4 max-w-full overflow-hidden">
+            <h3 className="text-base font-bold text-slate-900">
+                Community Experience <span className="font-medium text-slate-400">({effectiveAggregate.count})</span>
+            </h3>
+
+
+            <ExperienceBreakdown
+                aggregate={effectiveAggregate}
+                aspectLabels={aspectLabels}
+                editionCount={crossEdition && series ? series.reviewed_edition_count : undefined}
+                slotAfterMoodBreakdown={crossEdition ? null : typicalCard}
+                moodHeadline={crossEdition ? typicalCard : undefined}
+            />
+
+            <div className="flex items-center gap-2 text-[11px] border-t border-slate-200 pt-4">
                 <label className="text-slate-500">Sort:</label>
                 <select
                     value={sort}
-                    onChange={(e) => setSort(e.target.value as 'recent' | 'highest' | 'lowest')}
+                    onChange={(e) => setSort(e.target.value as 'recent' | 'positive' | 'critical')}
                     className="border border-slate-300 px-1.5 py-0.5 text-[11px] bg-white"
                 >
                     <option value="recent">Most recent</option>
-                    <option value="highest">Highest rated</option>
-                    <option value="lowest">Lowest rated</option>
+                    <option value="positive">Most positive</option>
+                    <option value="critical">Most critical</option>
                 </select>
-                {filterStars != null && (
-                    <button
-                        onClick={() => setFilterStars(null)}
-                        className="bg-sky-50 text-sky-700 border border-sky-200 px-2 py-0.5 hover:bg-sky-100"
-                    >
-                        ★ {filterStars}+ ✕
-                    </button>
-                )}
             </div>
 
-            <div className="max-h-72 overflow-y-auto pr-1 -mr-1">
-                <ul className="space-y-2">
-                    {reviews.map((r) => (
-                        <li key={r.id} className="border border-slate-200 bg-slate-50 p-2">
-                            <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                    <RatingStars value={r.stars} size="sm" />
-                                    <span className="text-[11px] font-medium text-slate-700 truncate">{r.reviewer_label}</span>
+            <div className="max-w-full overflow-x-auto pb-2 -mx-1 px-1">
+                <div className="flex gap-4 divide-x divide-slate-200">
+                    {reviews.map((r) => {
+                        const meta = r.overall_sentiment ? SENTIMENT_META[r.overall_sentiment] : null;
+                        const initials =
+                            r.reviewer_label
+                                .trim()
+                                .split(/\s+/)
+                                .map((w) => w[0])
+                                .slice(0, 2)
+                                .join('')
+                                .toUpperCase() || '?';
+                        const tags = cardTags(r);
+                        const shown = tags.slice(0, CARD_TAGS_SHOWN);
+                        const extra = tags.length - shown.length;
+                        return (
+                            <div key={r.id} className="w-56 shrink-0 space-y-1.5 pl-4 first:pl-0">
+                                <div className="flex items-center gap-2">
+                                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[11px] font-semibold text-slate-600">
+                                        {initials}
+                                    </span>
+                                    <span className="text-sm font-medium text-slate-800 truncate">{r.reviewer_label}</span>
                                 </div>
-                                <span className="text-[10px] text-slate-400 shrink-0">
-                                    {new Date(r.created_at).toLocaleDateString()}
-                                </span>
+                                <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                                    {meta && <span title={meta.label}>{meta.emoji} {meta.label}</span>}
+                                    {meta && <span className="text-slate-300">·</span>}
+                                    <span>{new Date(r.created_at).toLocaleDateString()}</span>
+                                </div>
+                                {r.comment && (
+                                    <p className="text-xs text-slate-700 whitespace-pre-wrap break-words">{r.comment}</p>
+                                )}
+                                {tags.length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {shown.map((t) => (
+                                            <span key={t.key} className={`rounded-full px-2 py-0.5 text-[11px] ${t.cls}`}>
+                                                {t.label}
+                                            </span>
+                                        ))}
+                                        {extra > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setExpandedReview(r)}
+                                                className="rounded-full bg-slate-100 text-slate-500 px-2 py-0.5 text-[11px] hover:bg-slate-200"
+                                            >
+                                                +{extra} more
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                                {r.event_id !== eventId && (
+                                    <Link
+                                        to={`/event/${r.event_id}`}
+                                        className="inline-block text-[9px] font-medium text-sky-600 hover:text-sky-700"
+                                    >
+                                        From {r.event_title} →
+                                    </Link>
+                                )}
                             </div>
-                            {r.comment && (
-                                <p className="mt-1 text-[11px] text-slate-700 whitespace-pre-wrap break-words">{r.comment}</p>
-                            )}
-                            {r.review_tags.length > 0 && (
-                                <div className="mt-1 flex flex-wrap gap-1">
-                                    {r.review_tags.map((t) => (
-                                        <span
-                                            key={t.id}
-                                            className="bg-sky-50 text-sky-700 border border-sky-200 px-1.5 py-0.5 text-[10px]"
-                                        >
-                                            {tagLabel(t.id)}
-                                        </span>
-                                    ))}
-                                </div>
-                            )}
-                        </li>
-                    ))}
+                        );
+                    })}
                     {reviews.length === 0 && !loading && (
-                        <li className="text-[11px] text-slate-500">No reviews match this filter.</li>
+                        <div className="text-xs text-slate-500">No reviews to show.</div>
                     )}
-                </ul>
-                {hasMore && (
-                    <button
-                        onClick={() => loadPage(reviews.length, false)}
-                        disabled={loading}
-                        className="mt-2 text-[11px] text-sky-700 hover:text-sky-900 font-medium"
-                    >
-                        {loading ? 'Loading…' : 'Load more reviews'}
-                    </button>
-                )}
+                    {hasMore && (
+                        <button
+                            onClick={() => loadPage(reviews.length, false)}
+                            disabled={loading}
+                            className="shrink-0 self-center pl-4 text-xs text-sky-700 hover:text-sky-900 font-medium whitespace-nowrap"
+                        >
+                            {loading ? 'Loading…' : 'Load more'}
+                        </button>
+                    )}
+                </div>
             </div>
+
+            {expandedReview && (
+                <ReviewDetailModal review={expandedReview} onClose={() => setExpandedReview(null)} />
+            )}
+
         </section>
     );
 }

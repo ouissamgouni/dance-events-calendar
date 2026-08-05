@@ -108,6 +108,15 @@ export default function DiscoverPage() {
                     autoFocus
                     className="w-full text-sm border border-slate-200 px-3 py-2 focus:outline-none focus:border-blue-500"
                 />
+                <p className="mt-2 text-xs text-slate-500">
+                    Can’t find them?{' '}
+                    <Link
+                        to="/invite"
+                        className="font-semibold text-blue-600 hover:text-blue-700"
+                    >
+                        Invite a friend →
+                    </Link>
+                </p>
                 <div className="mt-4">
                     {trimmedQ.length === 0 ? null : trimmedQ.length < 2 ? (
                         <p className="text-xs text-slate-500">
@@ -164,16 +173,24 @@ function AnonDiscoverHint() {
 }
 
 function DefaultDiscoverSections() {
+    const PAGE = 12;
     const [suggestedUsers, setSuggestedUsers] = useState<UserSearchResult[] | null>(null);
+    const [total, setTotal] = useState(0);
+    const [viewStart, setViewStart] = useState(0);
+    const [loadedEnd, setLoadedEnd] = useState(0);
     const [pendingFollow, setPendingFollow] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+    const [busy, setBusy] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
-        fetchSuggestedUsers({ limit: 12 })
+        fetchSuggestedUsers({ limit: PAGE })
             .then((suggested) => {
                 if (cancelled) return;
                 setSuggestedUsers(suggested.items);
+                setTotal(suggested.total);
+                setViewStart(0);
+                setLoadedEnd(suggested.items.length);
             })
             .catch(() => {
                 if (!cancelled) setSuggestedUsers([]);
@@ -199,6 +216,34 @@ function DefaultDiscoverSections() {
         }
     }
 
+    // Rotate the window to the next page, wrapping to the start once the pool
+    // is exhausted, so repeat clicks keep surfacing different people.
+    async function handleShuffle() {
+        const nextStart = viewStart + PAGE >= total ? 0 : viewStart + PAGE;
+        setBusy(true);
+        try {
+            const r = await fetchSuggestedUsers({ limit: PAGE, offset: nextStart });
+            setSuggestedUsers(r.items);
+            setTotal(r.total);
+            setViewStart(nextStart);
+            setLoadedEnd(nextStart + r.items.length);
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    async function handleShowMore() {
+        setBusy(true);
+        try {
+            const r = await fetchSuggestedUsers({ limit: PAGE, offset: loadedEnd });
+            setSuggestedUsers((prev) => [...(prev ?? []), ...r.items]);
+            setTotal(r.total);
+            setLoadedEnd((e) => e + r.items.length);
+        } finally {
+            setBusy(false);
+        }
+    }
+
     const suggestions = suggestedUsers ?? [];
 
     if (loading) {
@@ -211,51 +256,59 @@ function DefaultDiscoverSections() {
                 <p className="text-sm text-slate-600">
                     Search by name or handle, or visit your network to follow people you know.
                 </p>
-                <Link
-                    to="/account#network"
-                    className="inline-block mt-2 text-xs font-semibold text-blue-600 hover:text-blue-700"
-                >
-                    Open my network
-                </Link>
+                <div className="mt-2 flex flex-wrap gap-3">
+                    <Link
+                        to="/account#network"
+                        className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                    >
+                        Open my network
+                    </Link>
+                </div>
             </section>
         );
     }
 
+    const canShuffle = total > PAGE;
+    const canShowMore = loadedEnd < total;
+
     return (
         <div className="space-y-6">
-            <UserSection
-                title="Suggestions"
-                description="People followed by your network and curated accounts you may want to follow."
-                users={suggestions}
-                onFollow={(handle) => void handleFollow(handle)}
-                pendingFollow={pendingFollow}
-            />
+            <section>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                    <h2 className="text-base font-semibold text-slate-900">
+                        Suggestions
+                    </h2>
+                    {canShuffle && (
+                        <button
+                            type="button"
+                            onClick={() => void handleShuffle()}
+                            disabled={busy}
+                            className="text-xs font-semibold text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Shuffle
+                        </button>
+                    )}
+                </div>
+                <p className="text-xs text-slate-500 mb-3">
+                    People followed by your network and curated accounts you may want to follow.
+                </p>
+                <UserGrid
+                    users={suggestions}
+                    onFollow={(handle) => void handleFollow(handle)}
+                    pendingFollow={pendingFollow}
+                />
+                {canShowMore && (
+                    <button
+                        type="button"
+                        onClick={() => void handleShowMore()}
+                        disabled={busy}
+                        className="mt-4 w-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {busy ? 'Loading…' : 'Show more'}
+                    </button>
+                )}
+            </section>
         </div>
-    );
-}
-
-function UserSection({
-    title,
-    description,
-    users,
-    onFollow,
-    pendingFollow,
-}: {
-    title: string;
-    description: string;
-    users: DiscoverUser[];
-    onFollow?: (handle: string) => void;
-    pendingFollow?: string | null;
-}) {
-    if (users.length === 0) return null;
-    return (
-        <section>
-            <h2 className="text-base font-semibold text-slate-900 mb-2">
-                {title}
-            </h2>
-            <p className="text-xs text-slate-500 mb-3">{description}</p>
-            <UserGrid users={users} onFollow={onFollow} pendingFollow={pendingFollow} />
-        </section>
     );
 }
 

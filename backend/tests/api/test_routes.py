@@ -168,6 +168,11 @@ class TestSettingsEndpoint:
         assert "web_push_enabled" in body
         assert body["reminder_lead_hours"] == 24
         assert body["activity_digest_schedule"] == "tue,fri @ 09:00"
+        assert body["review_prompt_enabled"] is True
+        assert body["review_prompt_delay_hours"] == 3
+        assert body["review_prompt_lookback_hours"] == 24
+        assert body["for_you_review_window_days"] == 180
+        assert body["review_mood_headline_min_reviews"] == 3
 
     def test_admin_can_update_notification_gates(self, sqlite_client):
         client, engine = sqlite_client
@@ -180,6 +185,11 @@ class TestSettingsEndpoint:
                 "web_push_enabled": True,
                 "reminder_lead_hours": 6,
                 "activity_digest_schedule": "mon,thu @ 18:30",
+                "review_prompt_enabled": False,
+                "review_prompt_delay_hours": 5,
+                "review_prompt_lookback_hours": 48,
+                "for_you_review_window_days": 365,
+                "review_mood_headline_min_reviews": 8,
             },
         )
         assert resp.status_code == 200, resp.text
@@ -190,6 +200,11 @@ class TestSettingsEndpoint:
         assert body["web_push_enabled"] is True
         assert body["reminder_lead_hours"] == 6
         assert body["activity_digest_schedule"] == "mon,thu @ 18:30"
+        assert body["review_prompt_enabled"] is False
+        assert body["review_prompt_delay_hours"] == 5
+        assert body["review_prompt_lookback_hours"] == 48
+        assert body["for_you_review_window_days"] == 365
+        assert body["review_mood_headline_min_reviews"] == 8
 
         with Session(engine) as session:
             assert session.get(SiteSetting, "event_reminders_enabled").value == "false"
@@ -199,11 +214,53 @@ class TestSettingsEndpoint:
                 session.get(SiteSetting, "activity_digest_schedule").value
                 == "mon,thu @ 18:30"
             )
-
+            assert session.get(SiteSetting, "review_prompt_enabled").value == "false"
+            assert session.get(SiteSetting, "review_prompt_delay_hours").value == "5"
+            assert (
+                session.get(SiteSetting, "review_prompt_lookback_hours").value == "48"
+            )
+            assert session.get(SiteSetting, "for_you_review_window_days").value == "365"
+            assert (
+                session.get(SiteSetting, "review_mood_headline_min_reviews").value
+                == "8"
+            )
         # GET reflects the persisted values.
         body = client.get("/api/settings").json()
         assert body["event_reminders_enabled"] is False
         assert body["activity_digest_schedule"] == "mon,thu @ 18:30"
+        assert body["review_prompt_enabled"] is False
+        assert body["review_prompt_delay_hours"] == 5
+        assert body["review_prompt_lookback_hours"] == 48
+
+    def test_admin_cannot_set_invalid_review_prompt_delay_hours(self, sqlite_client):
+        client, _engine = sqlite_client
+        assert (
+            client.put(
+                "/api/settings", json={"review_prompt_delay_hours": 0}
+            ).status_code
+            == 422
+        )
+        assert (
+            client.put(
+                "/api/settings", json={"review_prompt_delay_hours": 721}
+            ).status_code
+            == 422
+        )
+
+    def test_admin_cannot_set_invalid_review_prompt_lookback_hours(self, sqlite_client):
+        client, _engine = sqlite_client
+        assert (
+            client.put(
+                "/api/settings", json={"review_prompt_lookback_hours": 0}
+            ).status_code
+            == 422
+        )
+        assert (
+            client.put(
+                "/api/settings", json={"review_prompt_lookback_hours": 721}
+            ).status_code
+            == 422
+        )
 
     def test_admin_cannot_set_invalid_reminder_lead_hours(self, sqlite_client):
         client, _engine = sqlite_client

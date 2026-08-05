@@ -422,3 +422,139 @@ def test_my_friends_only_returns_mutuals(client, session):
     handles = {item["handle"] for item in body["items"]}
     assert handles == {"bob"}
     assert body["total"] == 1
+
+
+# --- Profile Dance Passport tab (Phase 2) -----------------------------------
+
+
+def _set_passport(session: Session, email: str, **fields) -> None:
+    user = session.exec(select(User).where(User.email == email)).one()
+    for k, v in fields.items():
+        setattr(user, k, v)
+    session.add(user)
+    session.commit()
+
+
+def test_public_profile_echoes_passport_visibility_and_can_view(client, session):
+    _make_user(session, "alice@example.com", "alice", account_visibility="public")
+    _set_passport(session, "alice@example.com", passport_visibility="public")
+    body = client.get("/api/social/users/alice").json()
+    assert body["passport_visibility"] == "public"
+    assert body["can_view_passport"] is True
+
+
+def test_profile_passport_public_is_visible_to_anon(client, session):
+    _make_user(session, "alice@example.com", "alice", account_visibility="public")
+    _set_passport(session, "alice@example.com", passport_visibility="public")
+    r = client.get("/api/social/users/alice/passport")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    # Full display name on the profile surface (not first-name-only).
+    assert body["display_name"] == "Alice"
+    assert "stats" in body and "sections" in body
+
+
+def test_profile_passport_friends_default_hidden_from_stranger(client, session):
+    _make_user(
+        session, "alice@example.com", "alice"
+    )  # passport_visibility defaults friends
+    _make_user(session, "bob@example.com", "bob")
+    _login(client, "bob@example.com")
+    r = client.get("/api/social/users/alice/passport")
+    assert r.status_code == 404
+
+
+def test_profile_passport_friends_visible_to_mutual(client, session):
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    _follow(session, alice, bob)
+    _follow(session, bob, alice)
+    _login(client, "bob@example.com")
+    r = client.get("/api/social/users/alice/passport")
+    assert r.status_code == 200, r.text
+    assert client.get("/api/social/users/alice").json()["can_view_passport"] is True
+
+
+def test_profile_passport_private_only_self(client, session):
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    _follow(session, alice, bob)
+    _follow(session, bob, alice)
+    _set_passport(session, "alice@example.com", passport_visibility="private")
+    # Even a mutual friend cannot see a private passport.
+    _login(client, "bob@example.com")
+    assert client.get("/api/social/users/alice/passport").status_code == 404
+    # The owner always can.
+    _logout(client)
+    _login(client, "alice@example.com")
+    assert client.get("/api/social/users/alice/passport").status_code == 200
+
+
+def test_profile_passport_respects_section_toggles(client, session):
+    _make_user(session, "alice@example.com", "alice", account_visibility="public")
+    _set_passport(
+        session,
+        "alice@example.com",
+        passport_visibility="public",
+        passport_show_badges=False,
+        passport_show_timeline=True,
+    )
+    body = client.get("/api/social/users/alice/passport").json()
+    assert "milestones" not in body["sections"]
+    assert "timeline" in body["sections"]
+
+
+def test_profile_passport_exposes_follow_fields(client, session):
+    """Profile passport carries handle + viewer relationship for the Follow CTA."""
+    _make_user(session, "alice@example.com", "alice", account_visibility="public")
+    _set_passport(session, "alice@example.com", passport_visibility="public")
+    _make_user(session, "bob@example.com", "bob")
+    _login(client, "bob@example.com")
+
+    body = client.get("/api/social/users/alice/passport").json()
+
+    assert body["handle"] == "alice"
+    assert body["is_self"] is False
+    assert body["is_following"] is False
+
+
+def test_profile_passport_is_following_true_after_follow(client, session):
+    alice = _make_user(
+        session, "alice@example.com", "alice", account_visibility="public"
+    )
+    _set_passport(session, "alice@example.com", passport_visibility="public")
+    bob = _make_user(session, "bob@example.com", "bob")
+    _follow(session, bob, alice)  # bob -> alice (approved)
+    _login(client, "bob@example.com")
+
+    body = client.get("/api/social/users/alice/passport").json()
+
+    assert body["is_following"] is True
+
+
+def test_profile_passport_is_self_for_owner(client, session):
+    _make_user(session, "alice@example.com", "alice", account_visibility="public")
+    _set_passport(session, "alice@example.com", passport_visibility="public")
+    _login(client, "alice@example.com")
+
+    body = client.get("/api/social/users/alice/passport").json()
+
+    assert body["is_self"] is True
+
+
+def test_update_visibility_persists_passport_fields(client, session):
+    _make_user(session, "alice@example.com", "alice")
+    _login(client, "alice@example.com")
+    r = client.patch(
+        "/api/social/me/visibility",
+        json={
+            "passport_visibility": "private",
+            "passport_show_timeline": True,
+            "passport_show_cities": False,
+        },
+    )
+    assert r.status_code == 200, r.text
+    user = session.exec(select(User).where(User.email == "alice@example.com")).one()
+    assert user.passport_visibility == "private"
+    assert user.passport_show_timeline is True
+    assert user.passport_show_cities is False

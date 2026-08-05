@@ -1,3 +1,9 @@
+/** Overall experience sentiment (5-point scale). No overall star is shown. */
+export type ReviewSentiment = 'amazing' | 'great' | 'okay' | 'disappointing' | 'bad';
+
+/** Tag-group scope: taxonomy/filter tags vs review vocabularies. */
+export type TagScope = 'event' | 'aspect' | 'audience' | 'review';
+
 export interface Tag {
     id: number;
     slug: string;
@@ -7,6 +13,9 @@ export interface Tag {
     group_slug: string;
     group_label: string;
     group_color: string | null;
+    group_scope?: TagScope;
+    /** For aspect-scoped tags: whether the tag reads as positive or negative. */
+    polarity?: 'positive' | 'negative' | null;
     event_count?: number;
     enabled: boolean;
     is_hero_filter: boolean;
@@ -22,7 +31,9 @@ export interface TagGroup {
     allow_multiple: boolean;
     enabled: boolean;
     onboarding_eligible: boolean;
-    scope?: 'event' | 'review';
+    scope?: TagScope;
+    /** For aspect groups: only offered when the event carries one of these tags. */
+    condition_tag_slugs?: string[] | null;
     tags: Tag[];
 }
 
@@ -269,6 +280,48 @@ export interface DuplicateScanLogListResponse {
     total: number;
 }
 
+// --- Event series grouping ---------------------------------------------------
+
+export interface SeriesEventSummary {
+    event_id: string;
+    title: string;
+    start: string;
+    end: string;
+    calendar_id: string;
+    location: string | null;
+}
+
+export interface SeriesGroup {
+    id: number;
+    status: 'pending' | 'resolved' | 'dismissed';
+    source: 'auto' | 'manual';
+    canonical_title: string;
+    created_at: string;
+    resolved_at: string | null;
+    events: SeriesEventSummary[];
+}
+
+export interface SeriesGroupListResponse {
+    items: SeriesGroup[];
+    total: number;
+}
+
+export interface SeriesScanLogEntry {
+    id: number;
+    scan_type: 'incremental' | 'full' | 'manual';
+    triggered_by_event_id: string | null;
+    started_at: string;
+    finished_at: string | null;
+    candidates_found: number;
+    groups_created: number;
+    status: string;
+}
+
+export interface SeriesScanLogListResponse {
+    items: SeriesScanLogEntry[];
+    total: number;
+}
+
 export interface CalendarSetting {
     calendar_id: string;
     name: string;
@@ -426,9 +479,14 @@ export interface RatingTagSuggestionInline {
 }
 
 export interface FeedbackSubmissionCreate {
-    stars: number;
+    overall_sentiment: ReviewSentiment;
+    /** aspect_slug -> 1-5 score. Only aspects the reviewer chose to rate. */
+    aspect_scores: Record<string, number>;
+    /** Aspect-scoped review tag ids (from scope='aspect' groups). */
+    aspect_tag_ids: number[];
+    /** Recommendation-audience tag ids (from the scope='audience' group). */
+    audience_tag_ids: number[];
     comment?: string;
-    review_tag_ids: number[];
     is_anonymous: boolean;
     tag_suggestions: RatingTagSuggestionInline[];
     website?: string; // honeypot
@@ -437,11 +495,15 @@ export interface FeedbackSubmissionCreate {
 export interface EventRating {
     id: string;
     event_id: string;
-    stars: number;
+    overall_sentiment: ReviewSentiment | null;
+    aspect_scores: Record<string, number>;
+    aspect_tag_ids: number[];
+    audience_tag_ids: number[];
     comment: string | null;
-    review_tag_ids: number[];
+    /** Moderation state of the free-text comment only. */
+    comment_status: 'none' | 'pending' | 'approved' | 'rejected';
     is_anonymous: boolean;
-    status: 'pending' | 'approved' | 'rejected';
+    status: 'approved' | 'rejected';
     created_at: string;
     updated_at: string;
 }
@@ -453,18 +515,79 @@ export interface FeedbackSubmissionResponse {
     message: string;
 }
 
-export interface EventRatingAggregate {
-    event_id: string;
+export interface TopReviewTag {
+    tag_id: number;
+    slug: string;
+    label: string;
+    count: number;
+    aspect_slug?: string | null;
+}
+
+export interface AspectAggregate {
+    aspect_slug: string;
     average: number;
     count: number;
-    distribution: Record<number, number>;
+}
+
+export interface EventRatingAggregate {
+    event_id: string;
+    count: number;
+    /** Populated only by the single-event endpoint; empty on the batch endpoint. */
+    sentiment_distribution: Partial<Record<ReviewSentiment, number>>;
+    aspects: AspectAggregate[];
+    top_positive_tags: TopReviewTag[];
+    top_negative_tags: TopReviewTag[];
+    top_audience_tags: TopReviewTag[];
+    /** Overall-mood figures. Percentages are unrounded 0-100 (round for display). */
+    average_mood: number;
+    positive_percentage: number;
+    neutral_percentage: number;
+    negative_percentage: number;
+    /** Public headline label — null until the review count clears the admin threshold. */
+    mood_label: string | null;
+    /** 'none' (no reviews) | 'early' (below threshold) | 'full' (label shown). */
+    display_state: 'none' | 'early' | 'full';
+}
+
+export interface SeriesEditionSummary {
+    event_id: string;
+    title: string;
+    start: string;
+    end: string | null;
+    review_count: number;
+    average_mood: number;
+    positive_percentage: number;
+    mood_label: string | null;
+    display_state: 'none' | 'early' | 'full';
+}
+
+export interface SeriesRatingRollup {
+    series_id: number;
+    canonical_title: string;
+    edition_count: number;
+    reviewed_edition_count: number;
+    total_review_count: number;
+    average_mood: number;
+    positive_percentage: number;
+    mood_label: string | null;
+    display_state: 'none' | 'early' | 'full';
+    sentiment_distribution: Partial<Record<ReviewSentiment, number>>;
+    aspects: AspectAggregate[];
+    top_positive_tags: TopReviewTag[];
+    top_negative_tags: TopReviewTag[];
+    top_audience_tags: TopReviewTag[];
+    editions: SeriesEditionSummary[];
 }
 
 export interface EventReviewPublic {
     id: string;
-    stars: number;
+    event_id: string;
+    event_title: string;
+    event_start: string;
+    overall_sentiment: ReviewSentiment | null;
     comment: string | null;
-    review_tags: Tag[];
+    aspect_tags: Tag[];
+    audience_tags: Tag[];
     reviewer_label: string;
     created_at: string;
 }
@@ -481,9 +604,12 @@ export interface AdminRating {
     user_email: string | null;
     user_display_name: string | null;
     is_anonymous: boolean;
-    stars: number;
+    overall_sentiment: ReviewSentiment | null;
+    aspect_scores: Record<string, number>;
+    aspect_tags: Tag[];
+    audience_tags: Tag[];
     comment: string | null;
-    review_tags: Tag[];
+    comment_status: 'none' | 'pending' | 'approved' | 'rejected';
     feedback_submission_id: string | null;
     linked_tag_suggestion_ids: number[];
     status: 'pending' | 'approved' | 'rejected';
@@ -509,11 +635,123 @@ export interface MyRating {
     event_id: string;
     event_title: string | null;
     event_start: string | null;
-    stars: number;
+    overall_sentiment: ReviewSentiment | null;
+    aspect_scores: Record<string, number>;
+    aspect_tag_ids: number[];
+    audience_tag_ids: number[];
     comment: string | null;
-    review_tag_ids: number[];
+    comment_status: 'none' | 'pending' | 'approved' | 'rejected';
     is_anonymous: boolean;
-    status: 'pending' | 'approved' | 'rejected';
+    status: 'approved' | 'rejected';
     created_at: string;
     updated_at: string;
+}
+
+export interface PendingReview {
+    event_id: string;
+    event_title: string | null;
+    event_start: string | null;
+    event_end: string | null;
+    /** Social proof line ("Laura", "Laura and Marc", "Laura, Marc +3 others")
+     * for followed users who already reviewed; null when no nameable proof. */
+    friend_proof: string | null;
+}
+
+export interface PassportStats {
+    total_events_attended: number;
+    cities_visited: number;
+    countries_visited: number;
+    reviews_written: number;
+    styles_danced: number;
+    longest_month_streak: number;
+    events_last_30_days: number;
+    avg_gap_days: number | null;
+    first_event_date: string | null;
+    member_since: string;
+}
+
+export interface PassportCityCollection {
+    city: string;
+    country: string | null;
+    count: number;
+    latitude: number | null;
+    longitude: number | null;
+}
+
+export interface PassportCountryCollection {
+    country: string;
+    count: number;
+}
+
+export interface PassportCollections {
+    cities: PassportCityCollection[];
+    countries: PassportCountryCollection[];
+}
+
+export interface PassportMapEvent extends CalendarEvent {
+    city: string | null;
+    country: string | null;
+}
+
+export interface PassportMilestone {
+    key: string;
+    name: string;
+    description: string;
+    icon: string;
+    category: string;
+    threshold: number;
+    unit: string;
+    progress: number;
+    unlocked: boolean;
+    is_new: boolean;
+    unlocked_at: string | null;
+}
+
+export interface PassportResponse {
+    stats: PassportStats;
+    collections: PassportCollections;
+    milestones: PassportMilestone[];
+}
+
+export type PassportSection = 'milestones' | 'timeline' | 'cities' | 'countries';
+
+export interface SharedPassportResponse {
+    display_name: string | null;
+    stats: PassportStats;
+    collections: PassportCollections;
+    milestones: PassportMilestone[];
+    events: PassportMapEvent[];
+    // Sections the owner opted to share; pass straight to PassportView.
+    sections: PassportSection[];
+    // Populated only when 'timeline' is in `sections`.
+    timeline_items: PassportTimelineItem[];
+    timeline_markers: PassportTimelineMarker[];
+    // Follow CTA context: owner handle + viewer relationship.
+    handle: string | null;
+    is_self: boolean;
+    is_following: boolean;
+}
+
+export interface PassportTimelineItem {
+    event_id: string;
+    title: string;
+    start: string;
+    location: string | null;
+    city: string | null;
+    country: string | null;
+    latitude: number | null;
+    longitude: number | null;
+}
+
+export interface PassportTimelineMarker {
+    key: string;
+    name: string;
+    icon: string;
+    date: string;
+}
+
+export interface PassportTimelineResponse {
+    items: PassportTimelineItem[];
+    markers: PassportTimelineMarker[];
+    total: number;
 }

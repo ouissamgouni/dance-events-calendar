@@ -1,0 +1,128 @@
+test_plan:
+  name: "Event Series — Admin Series Review Workflow"
+  description: >
+    Verify the admin "Series" panel end-to-end: on-demand fuzzy detection of
+    recurring events within the same calendar, per-series approval (which
+    groups occurrences WITHOUT hiding or blocking any of them — unlike
+    duplicate resolution), group dismissal ("not a series", sticky across
+    future scans), splitting a single occurrence off an approved/pending
+    series, the scan history log, and manual grouping via the admin API for
+    pairs the similarity check can't catch.
+
+    Uses 2 calendars: "tango-collective" (the recurring organizer feed) and
+    "other-calendar" (a decoy proving series grouping never crosses
+    calendars). Seeded events:
+      - Series A (series-a-w1/w2/w3): 3 weekly occurrences, identical title
+        and venue, same calendar — auto-detectable by the fuzzy scan.
+      - series-a-decoy-other-calendar: same title/venue as Series A but in
+        a different calendar — must NEVER be grouped with Series A.
+      - manual-b1 / manual-b2: same real recurring event, same calendar,
+        7 days apart, but titles are deliberately too dissimilar for the
+        automatic similarity check — only groupable via the admin's manual
+        "group as series" API action.
+      - unique-solo: a one-off event with no recurrence — must never appear
+        in any group.
+
+  preconditions:
+    - "task start:scenario SCENARIO=event-series"
+    - "task db:up && task db:migrate"
+    - "settings.yaml seeds series_auto_detect_enabled: false — series are only found via the manual 'Scan now' action or the manual grouping API, not automatically during sync."
+    - "Signed in as admin (Dev Mock)."
+
+  steps:
+    # ── Sync brings events in with no series groups yet (auto-detect off) ──
+    - id: 1
+      title: "Sync brings in 7 events, no series groups yet"
+      description: >
+        Trigger a manual sync from the admin Calendars panel (or
+        POST /api/admin/sync). Then open the admin "Series" panel.
+      expected: >
+        GET /api/events returns 7 upcoming events. The "Series" button in
+        the admin action bar shows no pending-count badge. The Pending tab
+        of the Series panel is empty.
+
+    # ── Manual full scan finds Series A only ────────────────────────────
+    - id: 2
+      title: "'Scan now' groups the 3 Series A occurrences, ignoring the decoy and the manual-only pair"
+      description: >
+        In the Series panel, click "Scan now".
+      expected: >
+        POST /api/admin/series/scan runs a full scan. One pending series
+        group appears in the Pending tab containing all three
+        "Friday Night Milonga at Session Latina" occurrences
+        (series-a-w1, series-a-w2, series-a-w3), sorted by start date.
+        (Internally the scan records 3 pairwise candidates and 2
+        group-membership writes, since the 3rd pair chains onto the group
+        the first two pairs already created — the panel always shows a
+        single group either way.)
+        series-a-decoy-other-calendar does NOT appear in this group or any
+        other (different calendar). manual-b1 ("Kizomba Fusion Night -
+        Session Latina") and manual-b2 ("Monthly Kiz and Afro Social") do
+        not appear in any group — their titles are too dissimilar for the
+        automatic check. unique-solo does not appear either. The Series
+        button badge now shows "1".
+
+    - id: 3
+      title: "History tab logs the full scan"
+      description: "Switch to the History tab in the Series panel."
+      expected: >
+        The most recent entry shows scan_type "full", status "completed",
+        "3 candidates found, 2 group(s) created", and a finished timestamp.
+
+    # ── Approve resolves the group WITHOUT hiding any member ────────────
+    - id: 4
+      title: "'Approve series' resolves the group and keeps every occurrence visible"
+      description: >
+        In the Pending tab, click "Approve series" on the Series A group.
+      expected: >
+        POST /api/admin/series/{id}/approve returns the group with status
+        "resolved". The group moves from Pending to the Resolved tab. All
+        three occurrences (series-a-w1/w2/w3) remain visible and unblocked
+        in GET /api/events — unlike duplicate "Keep", approving a series
+        never hides or blocks any member. The Series button badge drops
+        to "0".
+
+    - id: 5
+      title: "Re-scanning does not recreate the resolved group"
+      description: "Click 'Scan now' again in the Series panel."
+      expected: >
+        The Pending tab remains empty afterwards — the three Series A
+        events already co-occurred in a resolved group, so the scan does
+        not recreate a duplicate pending group for the same set. The
+        History tab shows a second "full" scan entry.
+
+    # ── Manual grouping catches the dissimilar-title pair ───────────────
+    - id: 6
+      title: "Manual grouping (admin API) groups the dissimilar-title pair"
+      description: >
+        Since manual-b1 and manual-b2 have titles too dissimilar for the
+        fuzzy scan, group them via
+        POST /api/admin/series/manual with
+        {"event_ids": ["manual-b1", "manual-b2"], "canonical_title": "Kizomba/Afro Social"}.
+      expected: >
+        A new series group is created with source "manual", status
+        "pending", canonical_title "Kizomba/Afro Social", containing both
+        events. It now appears in the Series panel's Pending tab.
+
+    # ── Split removes one occurrence from a group without deleting it ───
+    - id: 7
+      title: "'Split off' removes a single occurrence from the manual group"
+      description: >
+        In the Pending tab, on the manual "Kizomba/Afro Social" group,
+        click "Split off" next to manual-b2.
+      expected: >
+        POST /api/admin/series/{id}/split removes manual-b2 from the
+        group (the group now shows only manual-b1). manual-b2 itself is
+        NOT deleted or hidden — it remains a normal visible event in
+        GET /api/events, just no longer associated with any series.
+
+    # ── Dismiss keeps events untouched and is sticky ────────────────────
+    - id: 8
+      title: "'Not a series — dismiss' keeps the remaining group's event untouched"
+      description: >
+        On the remaining pending group (now just manual-b1), click
+        "Not a series — dismiss".
+      expected: >
+        POST /api/admin/series/{id}/dismiss returns status "dismissed".
+        The group moves to the Resolved tab. manual-b1 remains visible
+        and unaffected in GET /api/events.

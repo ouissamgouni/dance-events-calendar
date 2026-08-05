@@ -49,6 +49,9 @@ test_plan:
         on Discover" row is still visible while suggestions are shown. The
         ordinary verified organizer and curator-hidden are NOT in this
         Suggestions section.
+        Below the "See more on Discover" row, a "Can't find them? Invite a
+        friend" link is shown (because the search returned no user matches)
+        and navigates to /invite.
         Clicking a curator row navigates to /u/{handle}, and the public
         profile renders normally.
 
@@ -64,9 +67,10 @@ test_plan:
         calls GET /api/social/search/users?q=zzzz. If the normal search
         returns no users, the page renders a "Suggestions" subsection backed
         by GET /api/social/curators?limit=12. It includes curator-bachata and
-        curator-paris, but not curator-hidden. This mirrors the header
-        no-result fallback while keeping personalized graph suggestions
-        auth-only.
+        curator-paris, but not curator-hidden. A "Can't find them? Invite a
+        friend" link sits directly under the /discover search box and is always
+        visible (it navigates to /invite). This mirrors the header no-result
+        fallback while keeping personalized graph suggestions auth-only.
 
     - id: 4
       title: "Signed-in account menu exposes Find people"
