@@ -278,7 +278,7 @@ function EventPopupContent({ event, followingCount, showFollowingOverlay, showRa
                 ) : (
                     <div className="flex items-center gap-1">
                         <SaveEventButton eventId={event.event_id} appearance="icon" size="sm" stopPropagation />
-                        <GoingButton eventId={event.event_id} appearance="icon" size="sm" stopPropagation />
+                        <GoingButton eventId={event.event_id} appearance="icon" size="sm" stopPropagation isPast={isPast} />
                     </div>
                 )}
                 <Link

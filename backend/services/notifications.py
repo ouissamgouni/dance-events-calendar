@@ -16,12 +16,14 @@ notification rows land atomically with the source-of-truth row.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlmodel import Session, or_, select
 
 from backend.api.deps import can_view, is_mutual_follow
 from backend.db.models import (
+    CachedEvent,
     CalendarSubscription,
     Notification,
     User,
@@ -47,6 +49,18 @@ FOLLOW_REQUEST = "follow_request"
 FOLLOW_REQUEST_APPROVED = "follow_request_approved"
 
 
+def _event_is_past(session: Session, event_id: str) -> bool:
+    """True when the event has already ended (end < now, naive UTC).
+
+    Unknown events (no CachedEvent row) are treated as not-past so we
+    preserve the existing fan-out behaviour.
+    """
+    end = session.exec(
+        select(CachedEvent.end).where(CachedEvent.event_id == event_id)
+    ).first()
+    return end is not None and end < datetime.utcnow()
+
+
 def _fan_out(
     session: Session,
     actor: User,
@@ -63,6 +77,10 @@ def _fan_out(
     ``public`` delivers to all eligible subscribers.
     """
     if audience == "private":
+        return 0
+    # Marking a past event (already ended) as attended must not notify
+    # followers — it isn't live activity worth surfacing.
+    if _event_is_past(session, event_id):
         return 0
     rows = session.exec(
         select(CalendarSubscription, User)

@@ -303,14 +303,14 @@ export default function EventDetailPage() {
                                     px-6 matches EventDetailContent's wrapper so this section visually aligns
                                     with the promo-codes section rendered just above (inside EventDetailContent). */}
                                 <div className="px-6 pb-3">
-                                    <InterestSection eventId={event.event_id} eventTitle={event.title} />
+                                    <InterestSection eventId={event.event_id} eventTitle={event.title} isPast={isPast} />
                                 </div>
 
                                 {/* Actions bar — primary CTA (Going) is visually emphasised; the
                                     rest are secondary. A sticky mobile bar mirrors the primary
                                     action so users don't have to scroll back up to convert. */}
                                 <div className="border-t border-slate-100 px-4 py-3 flex items-center gap-2 flex-wrap">
-                                    <GoingButton eventId={event.event_id} appearance="pill" />
+                                    <GoingButton eventId={event.event_id} appearance="pill" isPast={isPast} />
                                     <SaveEventButton eventId={event.event_id} appearance="pill" />
                                     <ShareButton
                                         eventId={event.event_id}
@@ -380,7 +380,7 @@ export default function EventDetailPage() {
                     reachable without scrolling. Hidden on lg+ where the
                     in-card action bar is visible alongside the description. */}
                 <div className="lg:hidden fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur px-3 py-2 shadow-[0_-2px_8px_rgba(0,0,0,0.04)] flex items-center gap-2 overflow-x-auto">
-                    <GoingButton eventId={event.event_id} appearance="pill" />
+                    <GoingButton eventId={event.event_id} appearance="pill" isPast={isPast} />
                     <SaveEventButton eventId={event.event_id} appearance="pill" />
                     {showRatings && (
                         // No autoOpenToken here: the in-card RateEventButton above already

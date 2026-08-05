@@ -126,6 +126,7 @@ function AppShell() {
               <ExplorerEventSearch
                 compact
                 onDark
+                pastToggle
                 onSelectEvent={(eventId) => navigate(`/event/${eventId}`)}
                 triggerLabel="Search events"
               />

@@ -93,7 +93,7 @@ export default function RailEventCard({
                     onClick={(e) => e.stopPropagation()}
                 >
                     <SaveEventButton eventId={event.event_id} appearance="icon" size="sm" stopPropagation />
-                    <GoingButton eventId={event.event_id} appearance="icon" size="sm" stopPropagation />
+                    <GoingButton eventId={event.event_id} appearance="icon" size="sm" stopPropagation isPast={new Date(event.end).getTime() < Date.now()} />
                 </div>
             )}
             <button

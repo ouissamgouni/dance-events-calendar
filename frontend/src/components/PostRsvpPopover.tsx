@@ -25,6 +25,8 @@ interface Props {
     variant: PostRsvpVariant;
     /** User display name; only used when variant === 'signed-in-default-share'. */
     userName?: string | null;
+    /** When true, the event has already ended — headline uses past tense. */
+    isPast?: boolean;
     onClose: () => void;
     onShare: () => void;
     /** Current visibility for this RSVP. When provided (signed-in), the
@@ -50,6 +52,7 @@ export default function PostRsvpPopover({
     anchorRef,
     variant,
     userName,
+    isPast = false,
     onClose,
     onShare,
     audience,
@@ -107,8 +110,8 @@ export default function PostRsvpPopover({
     // the toast stays one row tall on mobile.
     const headline =
         variant === 'anon' || !userName
-            ? "You're going!"
-            : `Going as ${userName}`;
+            ? (isPast ? 'You attended!' : "You're going!")
+            : `${isPast ? 'Attended' : 'Going'} as ${userName}`;
 
     const showPicker = !!audience && !!onAudienceChange && variant !== 'anon';
 
@@ -119,7 +122,7 @@ export default function PostRsvpPopover({
             role="dialog"
             aria-label="You're going"
             style={{ position: 'fixed', top: pos.top, left: pos.left, width: POPOVER_WIDTH }}
-            className="z-[9000] border border-slate-200 bg-white p-2 shadow-xl text-left"
+            className="z-[12000] border border-slate-200 bg-white p-2 shadow-xl text-left"
         >
             <div className="flex items-center gap-1.5 pr-4">
                 <span aria-hidden className="text-sm leading-none">🎉</span>

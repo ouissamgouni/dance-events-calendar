@@ -210,6 +210,37 @@ def test_going_with_share_publicly_fans_out_to_subscribers(client, session):
     assert notifs[0].read_at is None
 
 
+def test_going_past_event_does_not_fan_out(client, session):
+    # Marking an already-ended event as attended must not notify followers.
+    _make_calendar(session)
+    past = CachedEvent(
+        event_id="ev-past",
+        calendar_id="cal-test",
+        title="Salsa Night",
+        start=datetime.utcnow() - timedelta(days=1, hours=2),
+        end=datetime.utcnow() - timedelta(days=1),
+        all_day=False,
+    )
+    session.add(past)
+    session.commit()
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    _subscribe(session, bob, alice)
+
+    _login(client, "alice@example.com")
+    r = client.post(
+        "/api/track/event-attendance",
+        json={
+            "event_id": "ev-past",
+            "device_id": "dev-alice",
+            "action": "going",
+            "share_publicly": True,
+        },
+    )
+    assert r.status_code == 201, r.text
+    assert _count_notifs(session, bob) == 0
+
+
 def test_going_without_share_publicly_does_not_fan_out(client, session):
     _make_calendar(session)
     _make_event(session, "ev-1")
@@ -251,7 +282,9 @@ def test_anonymous_going_does_not_fan_out(client, session):
     assert _count_notifs(session, bob) == 0
 
 
-def test_signed_in_suggestion_submit_creates_live_event_and_going_fanout(client, session):
+def test_signed_in_suggestion_submit_creates_live_event_and_going_fanout(
+    client, session
+):
     _make_user(session, "admin@example.com", "admin")
     alice = _make_user(session, "alice@example.com", "alice")
     bob = _make_user(session, "bob@example.com", "bob")
@@ -268,8 +301,8 @@ def test_signed_in_suggestion_submit_creates_live_event_and_going_fanout(client,
             "location": "Berlin Center",
             "latitude": 52.52,
             "longitude": 13.405,
-            "start": "2026-07-01T20:00:00",
-            "end": "2026-07-01T23:00:00",
+            "start": "2026-09-01T20:00:00",
+            "end": "2026-09-01T23:00:00",
             "going": True,
             "going_audience": "friends",
         },
