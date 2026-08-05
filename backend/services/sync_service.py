@@ -30,6 +30,7 @@ def compute_content_hash(title: str, start: datetime, location: str | None) -> s
 
 from backend.services.calendar.base import BaseCalendarService
 from backend.services.duplicate_detection import maybe_detect_duplicates_for_event
+from backend.services.series_detection import maybe_detect_series_for_event
 from backend.services.pipeline.base import EnrichmentPipeline
 from backend.services.pipeline.stages.geocoding import GeocodingStage
 from backend.services.pipeline.stages.link_extraction import LinkExtractionStage
@@ -543,6 +544,7 @@ class SyncService:
         # setting is on.
         for event_id in duplicate_scan_event_ids:
             maybe_detect_duplicates_for_event(session, event_id)
+            maybe_detect_series_for_event(session, event_id)
 
         logger.info(
             "Synced calendar %s: %d upserted, %d deleted, %d duplicates merged",

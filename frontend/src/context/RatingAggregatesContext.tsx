@@ -47,6 +47,8 @@ export function RatingAggregatesProvider({ children }: { children: ReactNode }) 
     const register = useCallback((eventId: string) => {
         const prev = refCountRef.current.get(eventId) ?? 0;
         refCountRef.current.set(eventId, prev + 1);
+        // Review counts are public (available to anonymous visitors too), so
+        // fetch whenever an aggregate isn't cached yet regardless of auth.
         if (!cacheRef.current.has(eventId)) {
             pendingRef.current.add(eventId);
             scheduleFlush();

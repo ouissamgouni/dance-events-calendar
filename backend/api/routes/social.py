@@ -28,6 +28,7 @@ from backend.api.deps import (
     _audience_passes,
     can_view,
     can_view_event_in_calendar,
+    can_view_passport,
     get_current_user_optional,
     is_mutual_follow,
     require_admin,
@@ -36,6 +37,7 @@ from backend.api.deps import (
 from backend.api.event_serializer import serialize_events
 from backend.api.rate_limit import client_ip
 from backend.api.routes.auth import purge_user_account
+from backend.api.routes.passport import build_shared_passport
 from backend.services.email import send_install_app_invitation_email
 from backend.api.schemas import (
     AdminBlockedUser,
@@ -69,6 +71,7 @@ from backend.api.schemas import (
     PublicProfileResponse,
     ReferralResponse,
     ShareSourceResponse,
+    SharedPassportResponse,
     SubscribedEventItem,
     SubscribedEventListResponse,
     SubscribedEventVia,
@@ -703,10 +706,52 @@ def get_public_profile(
             if (viewer is not None and not is_self and target.is_verified_organizer)
             else 0
         ),
+        passport_visibility=getattr(target, "passport_visibility", "friends"),
+        can_view_passport=can_view_passport(session, viewer, target),
+        passport_show_badges=(
+            bool(getattr(target, "passport_show_badges", True)) if is_self else True
+        ),
+        passport_show_cities=(
+            bool(getattr(target, "passport_show_cities", True)) if is_self else True
+        ),
+        passport_show_countries=(
+            bool(getattr(target, "passport_show_countries", True)) if is_self else True
+        ),
+        passport_show_timeline=(
+            bool(getattr(target, "passport_show_timeline", False)) if is_self else False
+        ),
     )
 
 
 # --- Follow / Unfollow -------------------------------------------------------
+
+
+@router.get(
+    "/users/{handle}/passport",
+    response_model=SharedPassportResponse,
+)
+def get_profile_passport(
+    handle: str,
+    session: Session = Depends(get_session),
+    viewer: User | None = Depends(get_current_user_optional),
+) -> SharedPassportResponse:
+    """Relationship-checked Dance Passport for the profile "Dance Passport" tab.
+
+    Gated by ``owner.passport_visibility`` (public | friends | private) via
+    ``can_view_passport``. Responds 404 when the viewer isn't allowed so the
+    passport's existence isn't leaked. Only the owner-opted sections are
+    populated. Unlike the anonymous share link, the full display name is used
+    since the viewer is already on the owner's profile.
+    """
+    target = _resolve_handle(session, handle)
+    if not can_view_passport(session, viewer, target):
+        raise HTTPException(status_code=404, detail="Passport not found")
+    display_name = target.display_name or (
+        f"@{target.handle}" if target.handle else None
+    )
+    return build_shared_passport(
+        session, target, display_name=display_name, viewer=viewer
+    )
 
 
 @router.post(
@@ -1443,6 +1488,17 @@ def update_visibility(
             payload.share_attendance_default_audience == "public"
         )
         viewer.share_attendance_default_set_by_user = True
+    # Dance Passport sharing (Phase 2): visibility + per-section toggles.
+    if payload.passport_visibility is not None:
+        viewer.passport_visibility = payload.passport_visibility
+    if payload.passport_show_badges is not None:
+        viewer.passport_show_badges = payload.passport_show_badges
+    if payload.passport_show_cities is not None:
+        viewer.passport_show_cities = payload.passport_show_cities
+    if payload.passport_show_countries is not None:
+        viewer.passport_show_countries = payload.passport_show_countries
+    if payload.passport_show_timeline is not None:
+        viewer.passport_show_timeline = payload.passport_show_timeline
     session.add(viewer)
     session.commit()
     session.refresh(viewer)
@@ -2102,6 +2158,11 @@ def list_curators(
     )
 
 
+# Upper bound on the discovery suggestion pool that ``offset`` can page
+# through — keeps per-candidate ranking queries bounded.
+_MAX_DISCOVER_POOL = 60
+
+
 @router.get(
     "/discover/suggested",
     response_model=SuggestedUsersResponse,
@@ -2110,6 +2171,7 @@ def list_curators(
 def discover_suggested(
     request: Request,
     limit: int = Query(default=10, ge=1, le=25),
+    offset: int = Query(default=0, ge=0),
     session: Session = Depends(get_session),
     viewer: User | None = Depends(get_current_user_optional),
 ):
@@ -2120,11 +2182,15 @@ def discover_suggested(
     already follow/subscribe to. Ranked by count of distinct intermediaries
     then by absolute subscribers count as a tiebreak.
 
+    ``offset`` pages through the ranked pool so the client can "show more";
+    ``total`` in the response is the pool size. Curator top-up only fills the
+    first page (offset 0) for cold-start viewers.
+
     Anonymous viewers receive an empty list — discovery is intentionally
     a logged-in surface; anon users use ``/users/search`` instead.
     """
     if viewer is None:
-        return SuggestedUsersResponse(items=[])
+        return SuggestedUsersResponse(items=[], total=0)
 
     # Viewer's "network" = anyone they follow OR are subscribed to.
     network_ids: set[UUID] = set()
@@ -2144,11 +2210,12 @@ def discover_suggested(
         curators = _curator_users(
             session,
             viewer,
-            limit=limit,
+            limit=_MAX_DISCOVER_POOL,
             exclude_followed=True,
             exclude_subscribed=True,
         )
         sub_ids = _viewer_subscription_ids(session, viewer)
+        page = curators[offset : offset + limit]
         return SuggestedUsersResponse(
             items=[
                 _user_to_search_result(
@@ -2158,8 +2225,9 @@ def discover_suggested(
                     subscriber_ids=sub_ids,
                     source="curator",
                 )
-                for u in curators
-            ]
+                for u in page
+            ],
+            total=len(curators),
         )
 
     # People followed or subscribed to by the viewer's network. Exclude users
@@ -2196,13 +2264,12 @@ def discover_suggested(
         for user_id, intermediary_ids in candidate_intermediaries.items()
     }
     # Rank by intermediary count desc, then by absolute subscriber count
-    # desc as a tiebreak. ``_subscribers_count`` is cheap (one query per
-    # candidate) and the result set is bounded by ``limit`` * a small
-    # multiplier.
+    # desc as a tiebreak. Materialize up to a bounded pool so ``offset``
+    # can page through the ranked list.
     ranked_ids = sorted(
         candidate_scores,
         key=lambda user_id: (-candidate_scores[user_id], str(user_id)),
-    )[: max(limit * 3, limit)]
+    )[:_MAX_DISCOVER_POOL]
 
     candidates = (
         list(
@@ -2224,7 +2291,8 @@ def discover_suggested(
             (u.handle or ""),
         )
     )
-    candidates = candidates[:limit]
+    total = len(candidates)
+    page = candidates[offset : offset + limit]
 
     sub_ids = _viewer_subscription_ids(session, viewer)
     items = [
@@ -2235,9 +2303,11 @@ def discover_suggested(
             subscriber_ids=sub_ids,
             source="network",
         )
-        for u in candidates
+        for u in page
     ]
-    if len(items) < limit:
+    # Curator top-up only fills the first page for cold-start viewers whose
+    # network yields fewer than a full page of suggestions.
+    if offset == 0 and len(items) < limit:
         curators = _curator_users(
             session,
             viewer,
@@ -2256,7 +2326,7 @@ def discover_suggested(
             )
             for u in curators
         )
-    return SuggestedUsersResponse(items=items)
+    return SuggestedUsersResponse(items=items, total=total)
 
 
 # --- Admin: verified-organizer toggle ----------------------------------------

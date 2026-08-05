@@ -13,6 +13,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from backend.api.rate_limit import client_ip
 from backend.api.routes.admin import router as admin_router
 from backend.api.routes.admin_duplicates import router as admin_duplicates_router
+from backend.api.routes.admin_series import router as admin_series_router
 from backend.api.routes.attendance import router as attendance_router
 from backend.api.routes.auth import router as auth_router
 from backend.api.routes.config import router as config_router
@@ -28,6 +29,7 @@ from backend.api.routes.social import router as social_router
 from backend.api.routes.suggestions import router as suggestions_router
 from backend.api.routes.promo_codes import router as promo_codes_router
 from backend.api.routes.organizer_claims import router as organizer_claims_router
+from backend.api.routes.passport import router as passport_router
 from backend.api.routes.tags import router as tags_router
 from backend.api.routes.tracking import router as tracking_router
 from backend.api.schemas import HealthResponse
@@ -185,6 +187,7 @@ app.include_router(attendance_router)
 app.include_router(sharing_router)
 app.include_router(admin_router)
 app.include_router(admin_duplicates_router)
+app.include_router(admin_series_router)
 app.include_router(settings_router)
 app.include_router(config_router)
 app.include_router(suggestions_router)
@@ -196,6 +199,7 @@ app.include_router(social_router)
 app.include_router(notifications_router)
 app.include_router(push_router)
 app.include_router(interest_profiles_router)
+app.include_router(passport_router)
 
 
 @app.get("/health", response_model=HealthResponse)

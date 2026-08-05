@@ -1,0 +1,20 @@
+# Follow graph for the review-prompt social-proof variant.
+#
+# A "friend" for the review-prompt copy is anyone the RECIPIENT follows
+# (one-directional, approved). Alice follows the four users who reviewed
+# ev-past, so her prompt switches to the social-proof variant:
+#   Carol + Dan  (named, non-anonymous)  → spelled out
+#   Erin         (named, comment pending) → folded into "+N others"
+#   Flo          (anonymous)              → counted in "+N others", never named
+# → "Carol, Dan +2 others shared their experience …"
+#
+# Gina follows no one who reviewed → she still gets the generic prompt.
+follows:
+  - follower: alice
+    followee: carol
+  - follower: alice
+    followee: dan
+  - follower: alice
+    followee: erin
+  - follower: alice
+    followee: flo

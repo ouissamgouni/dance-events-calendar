@@ -85,7 +85,7 @@ test_plan:
         anchor), followed immediately by three smaller plain links (not
         buttons, `font-size:12px`), each prefixed with its icon: "Invite a
         friend" (share.png) links to `{app}/invite`; "Install Movida"
-        (save-pink.png) links to `{app}/install`; "Notifications Settings"
+        (save-pink.png) links to `{app}/install`; "Settings"
         (setting.png) links to `{app}/account#notifications` (the
         "Notifications & email" section). `{app}` is the scenario's actual
         assigned frontend origin (dynamic port), not a hardcoded

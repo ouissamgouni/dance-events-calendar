@@ -1,0 +1,58 @@
+# Mock users pre-seeded for the Dance Passport scenario.
+# At /login, dev mode renders one "Sign in as <Name>" button per entry.
+users:
+  # Primary rich journey: 13 attended events (11 distinct cities, 7 countries,
+  # 3 international, 4 dance styles, 10 approved reviews).
+  # Passport is PUBLIC so anyone can view her profile "Dance Passport" tab and
+  # her share link resolves for signed-out viewers.
+  - email: alba@example.com
+    name: Alba (rich journey)
+    handle: alba
+    account_visibility: public
+    passport_visibility: public
+    passport_show_timeline: true
+  # Exactly-at-threshold journey: 10 attended events, 9 cities, 5 countries,
+  # 10 reviews. Passport is FRIENDS-ONLY — Alba (a mutual friend, see
+  # db-follows.yaml) can view it; strangers see the friends-only placeholder.
+  - email: borderline@example.com
+    name: Bram (borderline)
+    handle: bram
+    account_visibility: public
+    passport_visibility: friends
+    passport_show_timeline: true
+  # Minimal journey: exactly 1 attended event, 0 reviews. Passport is PRIVATE —
+  # only Nadia herself can see it; every other viewer sees the private message.
+  - email: novice@example.com
+    name: Nadia (novice)
+    handle: nadia
+    account_visibility: public
+    passport_visibility: private
+  # Negative: only Going on a FUTURE event -> 0 attended.
+  - email: future-only@example.com
+    name: Felix (future only)
+  # Negative: signed in but never marked Going -> empty passport.
+  - email: bystander@example.com
+    name: Bea (bystander)
+  # --- Milestone-testing "cusp" users: each sits exactly one attend away from
+  # a specific milestone, so a tester can mark Going on one more past event and
+  # watch that milestone unlock live (with the celebration toast). ---
+  # 24 attended events -> mark Going on evt-vol-13 to unlock Dedicated (25).
+  - email: cusp-dedicated@example.com
+    name: Dana (24/25 events → Dedicated)
+    # Phase C: email off, push on — exercises per-channel milestone gating.
+    email_milestone_unlocked_enabled: false
+    push_milestone_unlocked_enabled: true
+  # 4 distinct cities -> mark Going on a 5th-city event to unlock Explorer.
+  - email: cusp-explorer@example.com
+    name: Elio (4/5 cities → Explorer)
+    # Phase C: both channels off — in-app milestone notification only.
+    email_milestone_unlocked_enabled: false
+    push_milestone_unlocked_enabled: false
+  # 2 countries -> mark Going on a 3rd-country event to unlock Passport Stamped.
+  - email: cusp-stamped@example.com
+    name: Sami (2/3 countries → Passport Stamped)
+  # Only local events -> mark Going on an international event to unlock Border Crosser.
+  - email: cusp-international@example.com
+    name: Ines (0 intl → Border Crosser)
+  - email: admin@example.com # matches ADMIN_EMAIL -> admin
+    name: Dev Admin

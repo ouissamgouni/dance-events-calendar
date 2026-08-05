@@ -43,6 +43,7 @@ VALID_KINDS = {
     "promo_code_approved",
     "promo_code_rejected",
     "promo_code_added",
+    "milestone_unlocked",
 }
 
 
@@ -113,6 +114,7 @@ def _hydrate(
                     is_following=bool(a and a.id in following_ids),
                 ),
                 context=r.context,
+                subject_key=r.subject_key,
                 created_at=_as_utc(r.created_at),
                 read_at=_as_utc(r.read_at),
             )

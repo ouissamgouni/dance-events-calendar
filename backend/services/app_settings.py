@@ -73,6 +73,18 @@ def get_event_reminders_enabled(session: Optional[Session] = None) -> bool:
     return loader.get_event_reminders_enabled()
 
 
+def get_milestone_notifications_enabled(session: Optional[Session] = None) -> bool:
+    s, opened = _open_session(session)
+    try:
+        override = _get_bool_row(s, "milestone_notifications_enabled")
+    finally:
+        if opened:
+            s.close()
+    if override is not None:
+        return override
+    return True
+
+
 def get_activity_digest_email_enabled(session: Optional[Session] = None) -> bool:
     s, opened = _open_session(session)
     try:
@@ -83,6 +95,66 @@ def get_activity_digest_email_enabled(session: Optional[Session] = None) -> bool
     if override is not None:
         return override
     return loader.get_activity_digest_email_enabled()
+
+
+def get_review_prompt_enabled(session: Optional[Session] = None) -> bool:
+    s, opened = _open_session(session)
+    try:
+        override = _get_bool_row(s, "review_prompt_enabled")
+    finally:
+        if opened:
+            s.close()
+    if override is not None:
+        return override
+    return loader.get_review_prompt_enabled()
+
+
+def get_review_prompt_delay_hours(session: Optional[Session] = None) -> int:
+    s, opened = _open_session(session)
+    try:
+        override = _get_int_row(s, "review_prompt_delay_hours")
+    finally:
+        if opened:
+            s.close()
+    if override is not None and override > 0:
+        return override
+    return loader.get_review_prompt_delay_hours()
+
+
+def get_review_prompt_lookback_hours(session: Optional[Session] = None) -> int:
+    s, opened = _open_session(session)
+    try:
+        override = _get_int_row(s, "review_prompt_lookback_hours")
+    finally:
+        if opened:
+            s.close()
+    if override is not None and override > 0:
+        return override
+    return loader.get_review_prompt_lookback_hours()
+
+
+def get_for_you_review_window_days(session: Optional[Session] = None) -> int:
+    s, opened = _open_session(session)
+    try:
+        override = _get_int_row(s, "for_you_review_window_days")
+    finally:
+        if opened:
+            s.close()
+    if override is not None and override > 0:
+        return override
+    return loader.get_for_you_review_window_days()
+
+
+def get_review_mood_headline_min_reviews(session: Optional[Session] = None) -> int:
+    s, opened = _open_session(session)
+    try:
+        override = _get_int_row(s, "review_mood_headline_min_reviews")
+    finally:
+        if opened:
+            s.close()
+    if override is not None and override > 0:
+        return override
+    return loader.get_review_mood_headline_min_reviews()
 
 
 def get_interest_match_notifications_enabled(session: Optional[Session] = None) -> bool:

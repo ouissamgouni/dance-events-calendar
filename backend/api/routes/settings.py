@@ -213,8 +213,20 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         interest_match_max_events_per_email=app_settings.get_interest_match_max_events_per_email(
             session
         ),
+        review_prompt_enabled=app_settings.get_review_prompt_enabled(session),
+        review_prompt_delay_hours=app_settings.get_review_prompt_delay_hours(session),
+        review_prompt_lookback_hours=app_settings.get_review_prompt_lookback_hours(
+            session
+        ),
+        for_you_review_window_days=app_settings.get_for_you_review_window_days(session),
+        review_mood_headline_min_reviews=app_settings.get_review_mood_headline_min_reviews(
+            session
+        ),
         duplicate_auto_detect_enabled=_get_bool_setting(
             session, "duplicate_auto_detect_enabled"
+        ),
+        series_auto_detect_enabled=_get_bool_setting(
+            session, "series_auto_detect_enabled"
         ),
     )
 
@@ -388,6 +400,13 @@ def update_settings(
             body.duplicate_auto_detect_enabled,
         )
 
+    if body.series_auto_detect_enabled is not None:
+        _set_bool_setting(
+            session,
+            "series_auto_detect_enabled",
+            body.series_auto_detect_enabled,
+        )
+
     if body.for_you_rail_enabled is not None:
         _set_bool_setting(session, "for_you_rail_enabled", body.for_you_rail_enabled)
 
@@ -464,6 +483,53 @@ def update_settings(
             row = SiteSetting(
                 key="interest_match_max_events_per_email",
                 value=str(body.interest_match_max_events_per_email),
+            )
+        session.add(row)
+
+    if body.review_prompt_enabled is not None:
+        _set_bool_setting(session, "review_prompt_enabled", body.review_prompt_enabled)
+
+    if body.review_prompt_delay_hours is not None:
+        row = session.get(SiteSetting, "review_prompt_delay_hours")
+        if row:
+            row.value = str(body.review_prompt_delay_hours)
+        else:
+            row = SiteSetting(
+                key="review_prompt_delay_hours",
+                value=str(body.review_prompt_delay_hours),
+            )
+        session.add(row)
+
+    if body.review_prompt_lookback_hours is not None:
+        row = session.get(SiteSetting, "review_prompt_lookback_hours")
+        if row:
+            row.value = str(body.review_prompt_lookback_hours)
+        else:
+            row = SiteSetting(
+                key="review_prompt_lookback_hours",
+                value=str(body.review_prompt_lookback_hours),
+            )
+        session.add(row)
+
+    if body.for_you_review_window_days is not None:
+        row = session.get(SiteSetting, "for_you_review_window_days")
+        if row:
+            row.value = str(body.for_you_review_window_days)
+        else:
+            row = SiteSetting(
+                key="for_you_review_window_days",
+                value=str(body.for_you_review_window_days),
+            )
+        session.add(row)
+
+    if body.review_mood_headline_min_reviews is not None:
+        row = session.get(SiteSetting, "review_mood_headline_min_reviews")
+        if row:
+            row.value = str(body.review_mood_headline_min_reviews)
+        else:
+            row = SiteSetting(
+                key="review_mood_headline_min_reviews",
+                value=str(body.review_mood_headline_min_reviews),
             )
         session.add(row)
 

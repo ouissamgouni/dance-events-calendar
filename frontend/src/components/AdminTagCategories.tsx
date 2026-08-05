@@ -22,6 +22,7 @@ export default function AdminTagCategories() {
     const [groups, setGroups] = useState<AdminTagGroup[]>([]);
     const [loading, setLoading] = useState(true);
     const [newGroupLabel, setNewGroupLabel] = useState('');
+    const [newGroupScope, setNewGroupScope] = useState<'event' | 'aspect' | 'audience'>('event');
     const [addingGroup, setAddingGroup] = useState(false);
     const [newTagInputs, setNewTagInputs] = useState<Record<number, string>>({});
     const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
@@ -51,7 +52,9 @@ export default function AdminTagCategories() {
         if (!label) return;
         setAddingGroup(false);
         setNewGroupLabel('');
-        await createTagGroup({ label });
+        const scope = newGroupScope;
+        setNewGroupScope('event');
+        await createTagGroup({ label, scope });
         load();
     };
 
@@ -84,6 +87,29 @@ export default function AdminTagCategories() {
             })),
         );
         await updateTag(tagId, { enabled });
+    };
+
+    const handleTogglePolarity = async (tag: AdminTag) => {
+        const next: 'positive' | 'negative' = tag.polarity === 'negative' ? 'positive' : 'negative';
+        setGroups((prev) =>
+            prev.map((g) => ({
+                ...g,
+                tags: g.tags.map((t) => (t.id === tag.id ? { ...t, polarity: next } : t)),
+            })),
+        );
+        await updateTag(tag.id, { polarity: next });
+    };
+
+    const handleConditionSave = async (groupId: number, raw: string) => {
+        const slugs = raw
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean);
+        const value = slugs.length > 0 ? slugs : null;
+        setGroups((prev) =>
+            prev.map((g) => (g.id === groupId ? { ...g, condition_tag_slugs: value } : g)),
+        );
+        await updateTagGroup(groupId, { condition_tag_slugs: value });
     };
 
     const handleToggleHero = async (tag: AdminTag) => {
@@ -259,6 +285,16 @@ export default function AdminTagCategories() {
                             placeholder="Category name"
                             className="border border-gray-300 px-2 py-0.5 text-[11px] text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 w-32"
                         />
+                        <select
+                            value={newGroupScope}
+                            onChange={(e) => setNewGroupScope(e.target.value as 'event' | 'aspect' | 'audience')}
+                            className="border border-gray-300 px-1 py-0.5 text-[10px] text-gray-700 bg-white focus:outline-none"
+                            title="Category scope"
+                        >
+                            <option value="event">Event</option>
+                            <option value="aspect">Aspect</option>
+                            <option value="audience">Audience</option>
+                        </select>
                         <button
                             onClick={handleAddGroup}
                             disabled={!newGroupLabel.trim()}
@@ -383,7 +419,28 @@ export default function AdminTagCategories() {
                                                 {group.label}
                                             </span>
                                         )}
+                                        {(group.scope ?? 'event') !== 'event' && (
+                                            <span className="text-[9px] font-semibold uppercase px-1 py-0.5 border border-gray-300 bg-white/70 text-gray-500 shrink-0">
+                                                {group.scope}
+                                            </span>
+                                        )}
                                     </div>
+
+                                    {(group.scope ?? 'event') === 'aspect' && (
+                                        <div className="px-3 py-1.5 border-b border-gray-100/60 flex items-center gap-1.5">
+                                            <label className="text-[9px] font-medium uppercase tracking-wide text-gray-400 shrink-0">
+                                                Show when
+                                            </label>
+                                            <input
+                                                type="text"
+                                                defaultValue={(group.condition_tag_slugs ?? []).join(', ')}
+                                                onBlur={(e) => handleConditionSave(group.id, e.target.value)}
+                                                placeholder="always (e.g. format:workshop)"
+                                                className="flex-1 min-w-0 border border-gray-300 px-1.5 py-0.5 text-[10px] text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                title="Comma-separated group:tag slugs. Empty = always offered."
+                                            />
+                                        </div>
+                                    )}
 
                                     {/* Tags */}
                                     <div className="px-3 py-2">
@@ -451,6 +508,16 @@ export default function AdminTagCategories() {
                                                     >
                                                         {tag.enabled ? '●' : '○'}
                                                     </button>
+                                                    {(group.scope ?? 'event') === 'aspect' && (
+                                                        <button
+                                                            onClick={() => handleTogglePolarity(tag)}
+                                                            className="ml-0.5 hover:opacity-80 transition text-[10px] leading-none"
+                                                            title={`Polarity: ${tag.polarity ?? 'positive'} (click to toggle)`}
+                                                            aria-label={`Toggle polarity, currently ${tag.polarity ?? 'positive'}`}
+                                                        >
+                                                            {tag.polarity === 'negative' ? '−' : '+'}
+                                                        </button>
+                                                    )}
                                                     <button
                                                         onClick={() => setSynonymsOpenTagId(
                                                             synonymsOpenTagId === tag.id ? null : tag.id,

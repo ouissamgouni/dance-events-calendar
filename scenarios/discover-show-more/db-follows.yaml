@@ -1,0 +1,41 @@
+# Follow graph for the discover show-more / shuffle scenario.
+#
+# viewer <-> alice are mutual friends. alice follows all 15 candidates,
+# so each candidate has exactly one mutual witness (alice). viewer does
+# not follow any candidate, so all 15 are suggestable on both /discover
+# and Account -> My network -> Suggestions.
+follows:
+  - follower: viewer
+    followee: alice
+  - follower: alice
+    followee: viewer
+  - follower: alice
+    followee: pop01
+  - follower: alice
+    followee: pop02
+  - follower: alice
+    followee: pop03
+  - follower: alice
+    followee: pop04
+  - follower: alice
+    followee: pop05
+  - follower: alice
+    followee: pop06
+  - follower: alice
+    followee: pop07
+  - follower: alice
+    followee: pop08
+  - follower: alice
+    followee: pop09
+  - follower: alice
+    followee: pop10
+  - follower: alice
+    followee: pop11
+  - follower: alice
+    followee: pop12
+  - follower: alice
+    followee: pop13
+  - follower: alice
+    followee: pop14
+  - follower: alice
+    followee: pop15

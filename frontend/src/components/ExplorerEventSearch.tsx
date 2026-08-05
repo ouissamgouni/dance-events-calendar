@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { searchEvents, type EventSearchResult } from '../api';
 import type { CalendarEvent } from '../types';
+import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { EventListCard } from './EventListPanel';
 
 interface ExplorerEventSearchProps {
@@ -9,6 +11,10 @@ interface ExplorerEventSearchProps {
     compact?: boolean;
     onDark?: boolean;
     className?: string;
+    /** Render a smaller trigger button (used inline in the passport Timeline tab). */
+    small?: boolean;
+    /** Search past events (start in the past) instead of upcoming ones. */
+    includePast?: boolean;
 }
 
 function useDebounced<T>(value: T, ms: number): T {
@@ -46,12 +52,28 @@ function toSearchCardEvent(row: EventSearchResult): CalendarEvent {
     };
 }
 
+/** Date with the year, so past events are unambiguous in the results list. */
+function formatPastDate(iso: string | null): string {
+    if (!iso) return '';
+    try {
+        return new Date(iso).toLocaleDateString(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+        });
+    } catch {
+        return '';
+    }
+}
+
 export default function ExplorerEventSearch({
     onSelectEvent,
     triggerLabel = 'Search events',
     compact = false,
     onDark = false,
     className = '',
+    small = false,
+    includePast = false,
 }: ExplorerEventSearchProps) {
     const [open, setOpen] = useState(false);
     const [q, setQ] = useState('');
@@ -63,6 +85,7 @@ export default function ExplorerEventSearch({
     const triggerRef = useRef<HTMLButtonElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const debounced = useDebounced(q, 250);
+    const { isAttending } = useAttendingEvents();
 
     useEffect(() => {
         if (!open || !compact) return;
@@ -109,7 +132,7 @@ export default function ExplorerEventSearch({
         }
         let cancelled = false;
         setLoading(true);
-        searchEvents(term, 8)
+        searchEvents(term, 25, includePast, includePast)
             .then((rows) => {
                 if (cancelled) return;
                 setResults(rows);
@@ -126,9 +149,16 @@ export default function ExplorerEventSearch({
         return () => {
             cancelled = true;
         };
-    }, [debounced, open]);
+    }, [debounced, open, includePast]);
 
     const term = q.trim();
+
+    // In past-event (passport) mode, only offer events the viewer hasn't
+    // already added to their passport.
+    const visibleResults = useMemo(
+        () => (includePast ? results.filter((r) => !isAttending(r.event_id)) : results),
+        [results, includePast, isAttending],
+    );
 
     const reset = () => {
         setOpen(false);
@@ -151,7 +181,7 @@ export default function ExplorerEventSearch({
         }
         if (event.key === 'ArrowDown') {
             event.preventDefault();
-            setActiveIdx((idx) => Math.min(results.length - 1, idx + 1));
+            setActiveIdx((idx) => Math.min(visibleResults.length - 1, idx + 1));
             return;
         }
         if (event.key === 'ArrowUp') {
@@ -159,9 +189,9 @@ export default function ExplorerEventSearch({
             setActiveIdx((idx) => Math.max(0, idx - 1));
             return;
         }
-        if (event.key === 'Enter' && activeIdx >= 0 && results[activeIdx]) {
+        if (event.key === 'Enter' && activeIdx >= 0 && visibleResults[activeIdx]) {
             event.preventDefault();
-            selectEvent(results[activeIdx].event_id);
+            selectEvent(visibleResults[activeIdx].event_id);
         }
     };
 
@@ -182,10 +212,12 @@ export default function ExplorerEventSearch({
                     ? 'inline-flex items-center justify-center w-7 h-7 text-white hover:text-gray-200 transition'
                     : compact
                         ? 'inline-flex h-6 w-6 items-center justify-center border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition'
-                        : 'inline-flex items-center justify-center gap-1.5 whitespace-nowrap border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition'}
+                        : small
+                            ? 'inline-flex items-center justify-center gap-1 whitespace-nowrap border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 transition'
+                            : 'inline-flex items-center justify-center gap-1.5 whitespace-nowrap border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition'}
                 data-testid="explorer-event-search-trigger"
             >
-                <img src="/search.png" alt="" aria-hidden="true" className={onDark ? 'h-4 w-4 invert' : 'h-4 w-4'} />
+                <img src="/search.png" alt="" aria-hidden="true" className={onDark ? 'h-4 w-4 invert' : small ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
                 {!compact && !onDark && <span>{triggerLabel}</span>}
             </button>
             {open && (
@@ -210,8 +242,8 @@ export default function ExplorerEventSearch({
                                 value={q}
                                 onChange={(event) => setQ(event.target.value)}
                                 onKeyDown={onKeyDown}
-                                placeholder="Search upcoming events by title"
-                                aria-label="Search upcoming events by title"
+                                placeholder={includePast ? 'Search past events by title' : 'Search upcoming events by title'}
+                                aria-label={includePast ? 'Search past events by title' : 'Search upcoming events by title'}
                                 className="w-full bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
                             />
                         </div>
@@ -219,18 +251,50 @@ export default function ExplorerEventSearch({
                     <div className="max-h-80 overflow-auto bg-slate-50 px-2 py-1.5">
                         {term.length < 2 && (
                             <div className="bg-white p-3 text-xs text-slate-500">
-                                Type at least 2 letters to find upcoming events.
+                                Type at least 2 letters to find {includePast ? 'past' : 'upcoming'} events.
                             </div>
                         )}
                         {term.length >= 2 && loading && (
                             <div className="bg-white p-3 text-xs text-slate-500">Searching…</div>
                         )}
-                        {term.length >= 2 && !loading && results.length === 0 && (
+                        {term.length >= 2 && !loading && visibleResults.length === 0 && (
                             <div className="bg-white p-3 text-xs text-slate-500">
-                                No upcoming events match “{term}”.
+                                No {includePast ? 'past' : 'upcoming'} events match “{term}”.
+                                {includePast && (
+                                    <>
+                                        {' '}
+                                        <Link
+                                            to="/calendar"
+                                            onClick={reset}
+                                            className="font-medium text-blue-600 hover:underline"
+                                        >
+                                            Browse the calendar
+                                        </Link>{' '}
+                                        to find past events with filters.
+                                    </>
+                                )}
                             </div>
                         )}
-                        {results.map((row, index) => {
+                        {visibleResults.map((row, index) => {
+                            if (includePast) {
+                                const when = formatPastDate(row.start);
+                                return (
+                                    <button
+                                        key={row.event_id}
+                                        type="button"
+                                        onClick={() => selectEvent(row.event_id)}
+                                        data-testid={`explorer-event-search-result-${index}`}
+                                        className={`mb-1.5 flex w-full flex-col items-start gap-0.5 border bg-white px-3 py-2 text-left last:mb-0 hover:bg-slate-50 ${index === activeIdx ? 'border-blue-300 ring-2 ring-blue-300' : 'border-slate-200'}`}
+                                    >
+                                        <span className="text-sm font-medium text-slate-900">{row.title}</span>
+                                        {(when || row.location) && (
+                                            <span className="text-xs text-slate-500">
+                                                {[when, row.location].filter(Boolean).join(' · ')}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            }
                             const event = toSearchCardEvent(row);
                             return (
                                 <div

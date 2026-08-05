@@ -661,3 +661,52 @@ def test_discover_suggested_excludes_opted_out_network_candidates(client, sessio
     handles = [u["handle"] for u in body["items"]]
     assert "hidden" not in handles
     assert "visible" in handles
+
+
+def test_discover_suggested_paginates_with_offset_and_total(client, session):
+    # viewer follows alice; alice follows 15 candidates. The pool is paged
+    # via limit/offset and ``total`` reflects the full pool.
+    viewer = _make_user(session, "viewer@example.com", "viewer")
+    alice = _make_user(session, "alice@example.com", "alice")
+    _follow(session, viewer, alice)
+    candidates = [
+        _make_user(session, f"pop{i:02d}@example.com", f"pop{i:02d}")
+        for i in range(1, 16)
+    ]
+    for c in candidates:
+        _follow(session, alice, c)
+
+    _login(client, "viewer@example.com")
+
+    page1 = client.get("/api/social/discover/suggested?limit=12").json()
+    assert page1["total"] == 15
+    assert len(page1["items"]) == 12
+    assert [u["handle"] for u in page1["items"]] == [
+        f"pop{i:02d}" for i in range(1, 13)
+    ]
+
+    page2 = client.get("/api/social/discover/suggested?limit=12&offset=12").json()
+    assert page2["total"] == 15
+    assert [u["handle"] for u in page2["items"]] == ["pop13", "pop14", "pop15"]
+
+    # Pages do not overlap.
+    p1 = {u["handle"] for u in page1["items"]}
+    p2 = {u["handle"] for u in page2["items"]}
+    assert p1.isdisjoint(p2)
+
+
+def test_discover_suggested_curator_only_pool_reports_total(client, session):
+    _make_user(session, "viewer@example.com", "viewer")
+    for i in range(1, 4):
+        _make_user(
+            session,
+            f"curator{i}@example.com",
+            f"curator{i}",
+            is_admin_managed=True,
+        )
+
+    _login(client, "viewer@example.com")
+    body = client.get("/api/social/discover/suggested?limit=2").json()
+    assert body["total"] == 3
+    assert len(body["items"]) == 2
+    assert all(u["source"] == "curator" for u in body["items"])

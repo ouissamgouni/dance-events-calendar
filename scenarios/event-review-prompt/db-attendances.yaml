@@ -1,0 +1,41 @@
+attendances:
+  # Alice went → gets the review prompt (email opted in).
+  - event_id: ev-past
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+
+  # Bob went → in-app row only (email opted out).
+  - event_id: ev-past
+    email: bob@example.com
+    share_publicly: true
+    share_audience: public
+
+  # Carol went too, but already rated the event → excluded entirely.
+  - event_id: ev-past
+    email: carol@example.com
+    share_publicly: true
+    share_audience: public
+
+  # Friend reviewers went and already rated → excluded from their own
+  # prompt; they exist here so their reviews power Alice's social proof.
+  - event_id: ev-past
+    email: dan@example.com
+    share_publicly: true
+    share_audience: public
+
+  - event_id: ev-past
+    email: erin@example.com
+    share_publicly: true
+    share_audience: public
+
+  - event_id: ev-past
+    email: flo@example.com
+    share_publicly: true
+    share_audience: public
+
+  # Gina went → gets a GENERIC review prompt (email on, no friend reviews).
+  - event_id: ev-past
+    email: gina@example.com
+    share_publicly: true
+    share_audience: public

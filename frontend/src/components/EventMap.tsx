@@ -8,7 +8,8 @@ import 'leaflet.markercluster';
 import type { CalendarEvent } from '../types';
 import SaveEventButton from './SaveEventButton';
 import GoingButton from './GoingButton';
-import RateEventButton from './RateEventButton';
+import { aspectMood } from './ExperienceBreakdown';
+import { useCommunityExperience } from '../hooks/useCommunityExperience';
 import TagBadges from './TagBadges';
 import AttendeeAvatarStack, { PEOPLE_ICON_PATH } from './AttendeeAvatarStack';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
@@ -205,6 +206,10 @@ interface Props {
     /** Per-render override for the trending overlay on map pins. Defaults to true and
      * has no effect when the site-wide ``trendingEnabled`` flag is off. */
     showTrendingOverlay?: boolean;
+    /** Render popups with only name/date/location/details link — no Save,
+     * Going, ratings, tags, or avatar overlays. Used by the Dance Passport
+     * map where actions would be out of place. */
+    minimalPopup?: boolean;
 }
 
 interface PopupPortal {
@@ -215,7 +220,7 @@ interface PopupPortal {
     showFollowingOverlay: boolean;
 }
 
-function EventPopupContent({ event, followingCount, showFollowingOverlay, showRatings, detailLinkSource, formatDate, onEventClick, onMarkSeen }: {
+function EventPopupContent({ event, followingCount, showFollowingOverlay, showRatings, detailLinkSource, formatDate, onEventClick, onMarkSeen, active, minimalPopup }: {
     event: CalendarEvent;
     followingCount: number;
     showFollowingOverlay: boolean;
@@ -224,7 +229,15 @@ function EventPopupContent({ event, followingCount, showFollowingOverlay, showRa
     formatDate: (event: CalendarEvent) => string;
     onEventClick?: (event: CalendarEvent) => void;
     onMarkSeen?: (eventId: string) => void;
+    active: boolean;
+    minimalPopup?: boolean;
 }) {
+    // Every marker mounts its popup eagerly, so only fetch the experience for
+    // the popup that's actually open (``active``) to avoid a request per pin.
+    const isPast = new Date(event.end).getTime() < Date.now();
+    const { crossEdition, aggregate } = useCommunityExperience(event.event_id, isPast, !minimalPopup && showRatings && active);
+    const hasReviews = !!aggregate && aggregate.count > 0 && aggregate.display_state !== 'none';
+
     return (
         <div className="space-y-1.5 text-xs min-w-[180px]">
             <p
@@ -237,21 +250,37 @@ function EventPopupContent({ event, followingCount, showFollowingOverlay, showRa
             {event.location && (
                 <p className="text-slate-600">📍 {event.location}</p>
             )}
-            {followingCount > 0 && (
+            {!minimalPopup && followingCount > 0 && (
                 <AttendeeAvatarStack
                     eventId={event.event_id}
                     friendsPreview={showFollowingOverlay ? event.following_friends_preview : undefined}
                 />
             )}
-            {event.tags?.length > 0 && (
+            {!minimalPopup && event.tags?.length > 0 && (
                 <TagBadges tags={event.tags} maxVisible={3} />
             )}
-            <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-                <div className="flex items-center gap-1">
-                    <SaveEventButton eventId={event.event_id} appearance="icon" size="sm" stopPropagation />
-                    <GoingButton eventId={event.event_id} appearance="icon" size="sm" stopPropagation />
-                    {showRatings && <RateEventButton eventId={event.event_id} appearance="icon" size="sm" stopPropagation />}
+            {!minimalPopup && showRatings && hasReviews && (
+                <div className="text-slate-700">
+                    {aggregate.display_state === 'full' && aggregate.mood_label ? (
+                        <span>
+                            {aspectMood(aggregate.average_mood).emoji}{' '}
+                            {crossEdition ? `Usually ${aggregate.mood_label.toLowerCase()}` : aggregate.mood_label}{' '}
+                            ({aggregate.count})
+                        </span>
+                    ) : (
+                        <span className="text-slate-500">Early feedback ({aggregate.count})</span>
+                    )}
                 </div>
+            )}
+            <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                {minimalPopup ? (
+                    <span />
+                ) : (
+                    <div className="flex items-center gap-1">
+                        <SaveEventButton eventId={event.event_id} appearance="icon" size="sm" stopPropagation />
+                        <GoingButton eventId={event.event_id} appearance="icon" size="sm" stopPropagation />
+                    </div>
+                )}
                 <Link
                     to={`/event/${event.event_id}${detailLinkSource ? `?src=${detailLinkSource}` : ''}`}
                     className="text-[10px] font-medium text-blue-500 hover:text-blue-600"
@@ -617,6 +646,7 @@ function MarkerClusterLayer({
     onMarkerSelect,
     onMarkSeen,
     disablePopups,
+    minimalPopup,
 }: {
     events: CalendarEvent[];
     hoveredEventId?: string | null;
@@ -639,9 +669,11 @@ function MarkerClusterLayer({
     onMarkerSelect?: (event: CalendarEvent) => void;
     onMarkSeen?: (eventId: string) => void;
     disablePopups?: boolean;
+    minimalPopup?: boolean;
 }) {
     const map = useMap();
     const [popupPortals, setPopupPortals] = useState<PopupPortal[]>([]);
+    const [openEventId, setOpenEventId] = useState<string | null>(null);
 
     useEffect(() => {
         const clusterGroup = L.markerClusterGroup({
@@ -681,10 +713,12 @@ function MarkerClusterLayer({
                 && score >= popularityThreshold
                 && topScores.includes(score);
             const totalGoing = event.going_count ?? 0;
-            const decorations: PinDecorations = { trending, followingCount, newEvent, totalGoing };
-            const isHovered = hoveredEventId === event.event_id;
+            // minimalPopup (Dance Passport) renders plain discs with no signal badges.
+            const decorations: PinDecorations = minimalPopup
+                ? {}
+                : { trending, followingCount, newEvent, totalGoing };
             const marker = L.marker([event.latitude!, event.longitude!], {
-                icon: isHovered ? makeHighlightedIcon(eventColorBarColor, decorations) : makeColoredIcon(eventColorBarColor, decorations),
+                icon: makeColoredIcon(eventColorBarColor, decorations),
             });
             let popupHost: HTMLDivElement | null = null;
             if (!disablePopups) {
@@ -693,6 +727,8 @@ function MarkerClusterLayer({
             }
             marker.on('mouseover', () => onEventHover?.(event.event_id));
             marker.on('mouseout', () => onEventHover?.(null));
+            marker.on('popupopen', () => setOpenEventId(event.event_id));
+            marker.on('popupclose', () => setOpenEventId((id) => (id === event.event_id ? null : id)));
             marker.on('click', () => {
                 onMarkSeen?.(event.event_id);
                 onMarkerSelect?.(event);
@@ -718,7 +754,35 @@ function MarkerClusterLayer({
             markerRefs.current.clear();
             setPopupPortals([]);
         };
-    }, [clusterGroupRef, detailLinkSource, disablePopups, eventColorBarColor, events, followingBadgeEnabled, formatDate, hoveredEventId, markerRefs, newEventIds, onEventClick, onEventHover, onMarkerSelect, onMarkSeen, popularityThreshold, showFollowingBadgeOverlay, showRatings, showTrendingOverlay, topScores, trendingEnabled, unseenStateEnabled]);
+    }, [clusterGroupRef, detailLinkSource, disablePopups, eventColorBarColor, events, followingBadgeEnabled, formatDate, markerRefs, minimalPopup, newEventIds, onEventClick, onEventHover, onMarkerSelect, onMarkSeen, popularityThreshold, showFollowingBadgeOverlay, showRatings, showTrendingOverlay, topScores, trendingEnabled, unseenStateEnabled]);
+
+    // Swap the hovered marker's icon in place (highlighted vs normal) without
+    // rebuilding the whole layer. Rebuilding on every hover change (as the
+    // effect above used to do, via a `hoveredEventId` dependency) tore down
+    // and recreated every marker — including the one whose popup was open —
+    // which made popups disappear as soon as the mouse moved off the pin.
+    useEffect(() => {
+        events.forEach((event) => {
+            const marker = markerRefs.current.get(event.event_id);
+            if (!marker) return;
+            const showFollowingOverlay = followingBadgeEnabled && showFollowingBadgeOverlay;
+            const followingCount = showFollowingOverlay ? (event.following_friend_count ?? 0) : 0;
+            const newEvent = unseenStateEnabled && !!newEventIds?.has(event.event_id);
+            const score = event.popularity_score ?? 0;
+            const trending = trendingEnabled
+                && showTrendingOverlay
+                && score >= popularityThreshold
+                && topScores.includes(score);
+            const totalGoing = event.going_count ?? 0;
+            const decorations: PinDecorations = minimalPopup
+                ? {}
+                : { trending, followingCount, newEvent, totalGoing };
+            const isHovered = hoveredEventId === event.event_id;
+            marker.setIcon(isHovered ? makeHighlightedIcon(eventColorBarColor, decorations) : makeColoredIcon(eventColorBarColor, decorations));
+        });
+    }, [hoveredEventId, events, eventColorBarColor, followingBadgeEnabled, showFollowingBadgeOverlay, unseenStateEnabled, minimalPopup, newEventIds, trendingEnabled, showTrendingOverlay, popularityThreshold, topScores, markerRefs]);
+
+
 
     return (
         <>
@@ -732,6 +796,8 @@ function MarkerClusterLayer({
                     formatDate={formatDate}
                     onEventClick={onEventClick}
                     onMarkSeen={onMarkSeen}
+                    active={openEventId === portal.event.event_id}
+                    minimalPopup={minimalPopup}
                 />,
                 portal.host,
                 portal.key,
@@ -740,7 +806,7 @@ function MarkerClusterLayer({
     );
 }
 
-export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, preserveViewport, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true }: Props) {
+export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, preserveViewport, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true, minimalPopup = false }: Props) {
     const { showRatings, eventColorBarColor, followingBadgeEnabled, unseenStateEnabled, trendingEnabled, trendingTopN, trendingTopPercent } = useFeatureFlags();
     const markerRefs = useRef(new Map<string, L.Marker>());
     const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
@@ -888,6 +954,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
                 onMarkerSelect={onMarkerSelect}
                 onMarkSeen={onMarkSeen}
                 disablePopups={disablePopups}
+                minimalPopup={minimalPopup}
             />
         </MapContainer>
     );

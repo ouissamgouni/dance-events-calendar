@@ -19,6 +19,8 @@ class TagResponse(BaseModel):
     group_slug: str
     group_label: str
     group_color: Optional[str] = None
+    group_scope: str = "event"
+    polarity: Optional[str] = None
     event_count: Optional[int] = None
     enabled: bool = True
     is_hero_filter: bool = False
@@ -596,6 +598,16 @@ class CreateShareTokenRequest(BaseModel):
 
 class ShareTokenResponse(BaseModel):
     token: str
+    # Phase 3 per-share option: when True the link only resolves for a
+    # signed-in viewer. Echoed so the share dialog can reflect current state.
+    require_signin: bool = False
+
+
+class CreatePassportShareRequest(BaseModel):
+    """Optional body for POST /api/passport/share — sets the per-share
+    "signed-in only" option when (re)minting the link."""
+
+    require_signin: bool = False
 
 
 class SharedCalendarResponse(BaseModel):
@@ -729,11 +741,31 @@ class SiteSettingsResponse(BaseModel):
     # Max matched events shown inline in an interest-match digest email
     # before the rest collapse behind a "Discover more" link to "For you".
     interest_match_max_events_per_email: int = 10
+    # Master switch for post-event "how was it?" review-prompt notifications
+    # (Event Quality Layer Phase 3).
+    review_prompt_enabled: bool = True
+    # Hours after an event's end before the review prompt fires.
+    review_prompt_delay_hours: int = 3
+    # How far past the delay window review_prompt_service scans for newly
+    # eligible events each tick (widen for scenarios/tests using a fixed
+    # past-dated fixture; see backend/services/review_prompt_service.py).
+    review_prompt_lookback_hours: int = 24
+    # How far back attended-but-unreviewed events surface in the "Share your
+    # experience" trail on the "For you" page. Default 180 (about 6 months).
+    for_you_review_window_days: int = 180
+    # Minimum reviews before an event/series shows a computed "Overall Mood"
+    # headline label; below this the UI shows an "Early feedback" state.
+    review_mood_headline_min_reviews: int = 3
     # When True, saving/syncing an event automatically runs the near-duplicate
     # detection scan for it (see backend/services/duplicate_detection.py).
     # The admin Duplicates panel and manual "Scan now"/"Flag as duplicates"
     # actions are always available regardless of this flag.
     duplicate_auto_detect_enabled: bool = False
+    # When True, saving/syncing an event automatically runs the fuzzy
+    # series-detection scan for it (see backend/services/series_detection.py).
+    # The admin Series panel and manual "Scan now"/"Group as series" actions
+    # are always available regardless of this flag.
+    series_auto_detect_enabled: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -838,6 +870,35 @@ class DigestSendNowResponse(BaseModel):
     results: list[ForceSendUserResult]
 
 
+class ReviewPromptSendNowRequest(BaseModel):
+    # The event whose post-event review prompt should be force-sent.
+    event_id: str
+    user_ids: list[UUID] = Field(..., min_length=1, max_length=50)
+    # When true, re-send email/push even to users already prompted for this
+    # event; otherwise only channels that haven't fired yet are sent.
+    resend: bool = False
+
+
+class ReviewPromptSendNowResponse(BaseModel):
+    emailed: int
+    pushed: int
+    in_app_created: int
+    results: list[ForceSendUserResult]
+    # Per-user status is one of: "sent" | "already_sent" | "skipped_disabled"
+    # | "skipped_not_found" | "skipped_not_attended" | "skipped_already_rated".
+
+
+class ReviewPromptCandidate(BaseModel):
+    # An attendee of a given event, offered as a force-send target. Only
+    # users who RSVP'd "Going" appear; ``already_rated`` flags those who
+    # have since reviewed (the force-send would skip them).
+    user_id: UUID
+    email: str
+    name: Optional[str] = None
+    handle: Optional[str] = None
+    already_rated: bool = False
+
+
 class NotificationToggleCountEntry(BaseModel):
     email: int = 0
     push: int = 0
@@ -848,6 +909,7 @@ class NotificationToggleCountsResponse(BaseModel):
     interest_match: NotificationToggleCountEntry
     event_reminders: NotificationToggleCountEntry
     activity_digest: NotificationToggleCountEntry
+    review_prompt: NotificationToggleCountEntry
 
 
 class SiteSettingsUpdateRequest(BaseModel):
@@ -899,7 +961,13 @@ class SiteSettingsUpdateRequest(BaseModel):
     interest_match_max_events_per_email: Optional[int] = Field(
         default=None, ge=1, le=50
     )
+    review_prompt_enabled: Optional[bool] = None
+    review_prompt_delay_hours: Optional[int] = Field(default=None, ge=1, le=720)
+    review_prompt_lookback_hours: Optional[int] = Field(default=None, ge=1, le=720)
+    for_you_review_window_days: Optional[int] = Field(default=None, ge=1, le=3650)
+    review_mood_headline_min_reviews: Optional[int] = Field(default=None, ge=1, le=1000)
     duplicate_auto_detect_enabled: Optional[bool] = None
+    series_auto_detect_enabled: Optional[bool] = None
 
 
 class EventUpdateRequest(BaseModel):
@@ -1061,6 +1129,7 @@ class TagGroupResponse(BaseModel):
     enabled: bool = True
     onboarding_eligible: bool = False
     scope: str = "event"
+    condition_tag_slugs: Optional[list[str]] = None
     tags: list[TagResponse] = []
 
 
@@ -1071,9 +1140,13 @@ class TagGroupCreate(BaseModel):
     onboarding_eligible: bool = False
     scope: Optional[str] = Field(
         default="event",
-        pattern="^(event|review)$",
-        description="'event' for taxonomy/filter tags, 'review' for review-only aspect tags",
+        pattern="^(event|aspect|audience|review)$",
+        description=(
+            "'event' for taxonomy/filter tags, 'aspect' for review aspect groups "
+            "(polarised tags), 'audience' for recommendation-audience tags"
+        ),
     )
+    condition_tag_slugs: Optional[list[str]] = None
 
 
 class TagGroupUpdate(BaseModel):
@@ -1083,7 +1156,10 @@ class TagGroupUpdate(BaseModel):
     color: Optional[str] = None
     enabled: Optional[bool] = None
     onboarding_eligible: Optional[bool] = None
-    scope: Optional[str] = Field(default=None, pattern="^(event|review)$")
+    scope: Optional[str] = Field(
+        default=None, pattern="^(event|aspect|audience|review)$"
+    )
+    condition_tag_slugs: Optional[list[str]] = None
 
 
 class TagCreate(BaseModel):
@@ -1091,6 +1167,7 @@ class TagCreate(BaseModel):
     label: str = Field(..., min_length=1, max_length=100)
     slug: Optional[str] = Field(default=None, max_length=100)
     color: Optional[str] = None
+    polarity: Optional[str] = Field(default=None, pattern="^(positive|negative)$")
 
 
 class TagUpdate(BaseModel):
@@ -1101,6 +1178,7 @@ class TagUpdate(BaseModel):
     is_hero_filter: Optional[bool] = None
     hero_ordinal: Optional[int] = None
     group_id: Optional[int] = None
+    polarity: Optional[str] = Field(default=None, pattern="^(positive|negative)$")
 
 
 class EventTagAssignment(BaseModel):
@@ -1260,6 +1338,62 @@ class ManualDuplicateGroupRequest(BaseModel):
     event_ids: list[str] = Field(..., min_length=2, max_length=20)
 
 
+# --- Admin: event series grouping & fuzzy detection ---
+
+
+class SeriesEventSummary(BaseModel):
+    event_id: str
+    title: str
+    start: datetime
+    end: datetime
+    calendar_id: str
+    location: Optional[str] = None
+
+
+class SeriesGroupResponse(BaseModel):
+    id: int
+    status: str  # pending | resolved | dismissed
+    source: str  # auto | manual
+    canonical_title: str = ""
+    created_at: datetime
+    resolved_at: Optional[datetime] = None
+    events: list[SeriesEventSummary] = []
+
+
+class SeriesGroupListResponse(BaseModel):
+    items: list[SeriesGroupResponse]
+    total: int
+
+
+class SeriesScanLogEntry(BaseModel):
+    id: int
+    scan_type: str  # incremental | full | manual
+    triggered_by_event_id: Optional[str] = None
+    started_at: datetime
+    finished_at: Optional[datetime] = None
+    candidates_found: int = 0
+    groups_created: int = 0
+    status: str
+
+
+class SeriesScanLogListResponse(BaseModel):
+    items: list[SeriesScanLogEntry]
+    total: int
+
+
+class ManualSeriesGroupRequest(BaseModel):
+    event_ids: list[str] = Field(..., min_length=2, max_length=20)
+    canonical_title: Optional[str] = Field(default=None, max_length=200)
+
+
+class SeriesApproveRequest(BaseModel):
+    canonical_title: Optional[str] = Field(default=None, max_length=200)
+
+
+class SeriesSplitRequest(BaseModel):
+    event_id: str
+
+
 class FilterOption(BaseModel):
     value: str
     label: str
@@ -1336,11 +1470,26 @@ class TagSuggestionInline(BaseModel):
 
 
 class FeedbackSubmissionCreate(BaseModel):
-    """Unified envelope: rating + optional related tag suggestions."""
+    """Adaptive review envelope: structured signals + optional tag suggestions.
 
-    stars: int = Field(..., ge=1, le=5)
-    comment: Optional[str] = Field(default=None, max_length=2000)
-    review_tag_ids: list[int] = Field(default_factory=list, max_length=10)
+    Structured data (sentiment, aspect scores/tags, audience) counts live; only
+    the free-text ``comment`` is moderated. The internal ``stars`` value is
+    derived server-side from ``overall_sentiment`` (see
+    backend/services/experience_aspects.py SENTIMENT_TO_SCORE) and is used only
+    to order reviews — no overall star is shown to users.
+    """
+
+    overall_sentiment: str = Field(
+        ..., pattern="^(amazing|great|okay|disappointing|bad)$"
+    )
+    # aspect_slug -> 1-5 score, e.g. {"music": 5, "venue": 2}. Validated
+    # server-side against the live scope='aspect' groups; unknown slugs rejected.
+    aspect_scores: dict[str, int] = Field(default_factory=dict)
+    # Aspect-scoped review tag ids (from scope='aspect' groups).
+    aspect_tag_ids: list[int] = Field(default_factory=list, max_length=40)
+    # Recommendation-audience tag ids (from the scope='audience' group).
+    audience_tag_ids: list[int] = Field(default_factory=list, max_length=20)
+    comment: Optional[str] = Field(default=None, max_length=300)
     is_anonymous: bool = False
     tag_suggestions: list[TagSuggestionInline] = Field(
         default_factory=list, max_length=10
@@ -1351,9 +1500,12 @@ class FeedbackSubmissionCreate(BaseModel):
 class EventRatingResponse(BaseModel):
     id: UUID
     event_id: str
-    stars: int
+    overall_sentiment: Optional[str] = None
+    aspect_scores: dict[str, int] = Field(default_factory=dict)
+    aspect_tag_ids: list[int] = []
+    audience_tag_ids: list[int] = []
     comment: Optional[str] = None
-    review_tag_ids: list[int] = []
+    comment_status: str = "none"
     is_anonymous: bool = False
     status: str
     created_at: datetime
@@ -1364,23 +1516,103 @@ class FeedbackSubmissionResponse(BaseModel):
     feedback_submission_id: UUID
     rating: EventRatingResponse
     tag_suggestion_ids: list[int] = []
-    message: str = "Thanks for your feedback! Your review is being checked by our team."
+    message: str = "Thanks for your feedback!"
+
+
+class TopReviewTag(BaseModel):
+    tag_id: int
+    slug: str
+    label: str
+    count: int
+    aspect_slug: Optional[str] = None
+
+
+class AspectAggregate(BaseModel):
+    aspect_slug: str
+    average: float = 0.0
+    count: int = 0
 
 
 class EventRatingAggregate(BaseModel):
     event_id: str
-    average: float = 0.0
     count: int = 0
-    distribution: dict[int, int] = Field(default_factory=dict)
+    # Populated for the single-event aggregate endpoint; the batch endpoint
+    # (used for lightweight "Reviews" card badges) leaves these at defaults.
+    sentiment_distribution: dict[str, int] = Field(default_factory=dict)
+    aspects: list[AspectAggregate] = Field(default_factory=list)
+    top_positive_tags: list[TopReviewTag] = Field(default_factory=list)
+    top_negative_tags: list[TopReviewTag] = Field(default_factory=list)
+    top_audience_tags: list[TopReviewTag] = Field(default_factory=list)
+    # Overall-mood figures (see services/experience_aspects.compute_mood_metrics).
+    # Percentages are unrounded 0-100; the client rounds for display.
+    average_mood: float = 0.0
+    positive_percentage: float = 0.0
+    neutral_percentage: float = 0.0
+    negative_percentage: float = 0.0
+    # Public headline label — null until ``count`` clears the admin threshold.
+    mood_label: Optional[str] = None
+    # ``none`` (no reviews) | ``early`` (below threshold) | ``full`` (label shown).
+    display_state: str = "none"
+
+
+class SeriesEditionSummary(BaseModel):
+    """One edition (member event) within a series roll-up, newest-first."""
+
+    event_id: str
+    title: str
+    start: datetime
+    end: Optional[datetime] = None
+    review_count: int = 0
+    average_mood: float = 0.0
+    positive_percentage: float = 0.0
+    mood_label: Optional[str] = None
+    display_state: str = "none"
+
+
+class SeriesRatingRollup(BaseModel):
+    """Cross-edition rating roll-up for a resolved event series.
+
+    The mood *headline* (``average_mood`` / ``positive_percentage`` / label) is
+    the unweighted mean of each reviewed edition's figures (edition-fair, so one
+    large edition can't dominate a permanent score). Everything else
+    (``sentiment_distribution``, ``aspects``, tag lists) is pooled across all
+    editions, and the display gate uses the pooled ``total_review_count``.
+    """
+
+    series_id: int
+    canonical_title: str
+    edition_count: int = 0
+    reviewed_edition_count: int = 0
+    total_review_count: int = 0
+    average_mood: float = 0.0
+    positive_percentage: float = 0.0
+    mood_label: Optional[str] = None
+    display_state: str = "none"
+    sentiment_distribution: dict[str, int] = Field(default_factory=dict)
+    aspects: list[AspectAggregate] = Field(default_factory=list)
+    top_positive_tags: list[TopReviewTag] = Field(default_factory=list)
+    top_negative_tags: list[TopReviewTag] = Field(default_factory=list)
+    top_audience_tags: list[TopReviewTag] = Field(default_factory=list)
+    editions: list[SeriesEditionSummary] = Field(default_factory=list)
 
 
 class EventReviewPublic(BaseModel):
-    """Approved review shown publicly on the event detail page."""
+    """Review shown publicly on the event detail page.
+
+    Structured fields are always shown; ``comment`` is included only when its
+    ``comment_status`` is 'approved'. The edition reference (``event_id`` /
+    ``event_title`` / ``event_start``) lets aggregated views link a review back
+    to the specific edition it belongs to.
+    """
 
     id: UUID
-    stars: int
+    event_id: str
+    event_title: str
+    event_start: datetime
+    overall_sentiment: Optional[str] = None
     comment: Optional[str] = None
-    review_tags: list[TagResponse] = []
+    aspect_tags: list[TagResponse] = []
+    audience_tags: list[TagResponse] = []
     reviewer_label: str  # display name, "Anonymous", or initials
     created_at: datetime
 
@@ -1401,9 +1633,12 @@ class AdminRatingResponse(BaseModel):
     user_email: Optional[str] = None
     user_display_name: Optional[str] = None
     is_anonymous: bool = False
-    stars: int
+    overall_sentiment: Optional[str] = None
+    aspect_scores: dict[str, int] = Field(default_factory=dict)
+    aspect_tags: list[TagResponse] = []
+    audience_tags: list[TagResponse] = []
     comment: Optional[str] = None
-    review_tags: list[TagResponse] = []
+    comment_status: str = "none"
     feedback_submission_id: Optional[UUID] = None
     linked_tag_suggestion_ids: list[int] = []
     status: str
@@ -1437,13 +1672,29 @@ class MyRatingResponse(BaseModel):
     event_id: str
     event_title: Optional[str] = None
     event_start: Optional[datetime] = None
-    stars: int
+    overall_sentiment: Optional[str] = None
+    aspect_scores: dict[str, int] = Field(default_factory=dict)
+    aspect_tag_ids: list[int] = []
+    audience_tag_ids: list[int] = []
     comment: Optional[str] = None
-    review_tag_ids: list[int] = []
+    comment_status: str = "none"
     is_anonymous: bool = False
     status: str
     created_at: datetime
     updated_at: datetime
+
+
+class PendingReviewResponse(BaseModel):
+    """An event the viewer attended (RSVP'd Going, now in the past) but hasn't
+    reviewed yet — one card in the "Share your experience" For-you trail."""
+
+    event_id: str
+    event_title: Optional[str] = None
+    event_start: Optional[datetime] = None
+    event_end: Optional[datetime] = None
+    # Social proof line ("Laura", "Laura and Marc", "Laura, Marc +3 others")
+    # for followed users who already reviewed; None when no nameable proof.
+    friend_proof: Optional[str] = None
 
 
 # --- Social / friends graph (Phase A) ----------------------------------------
@@ -1536,6 +1787,18 @@ class PublicProfileResponse(BaseModel):
     # for anonymous viewers, and for self-views. Lets the client render a
     # "Followed by @alice +N of your friends" trust pill.
     mutual_friends_who_follow: int = 0
+    # Dance Passport sharing (Phase 2). ``passport_visibility`` echoes the
+    # owner's setting (public | friends | private); ``can_view_passport`` is
+    # evaluated for the requester so the client can show/hide the profile
+    # "Dance Passport" tab without leaking passport data.
+    passport_visibility: str = "friends"
+    can_view_passport: bool = False
+    # Owner-only per-section share toggles (populated only for ``is_self``;
+    # left at defaults for other viewers). Drive the settings UI on /passport.
+    passport_show_badges: bool = True
+    passport_show_cities: bool = True
+    passport_show_countries: bool = True
+    passport_show_timeline: bool = False
 
 
 class FollowUserResponse(BaseModel):
@@ -1631,6 +1894,15 @@ class UpdateVisibilityRequest(BaseModel):
         default=None, pattern="^(public|friends|private)$"
     )
     show_in_suggestions: Optional[bool] = None
+    # Dance Passport sharing (Phase 2): who may see the profile passport tab
+    # and which optional sections are exposed. Stats are always shown.
+    passport_visibility: Optional[str] = Field(
+        default=None, pattern="^(public|friends|private)$"
+    )
+    passport_show_badges: Optional[bool] = None
+    passport_show_cities: Optional[bool] = None
+    passport_show_countries: Optional[bool] = None
+    passport_show_timeline: Optional[bool] = None
 
 
 class UpdateSocialLinksRequest(BaseModel):
@@ -1729,6 +2001,7 @@ class NotificationItem(BaseModel):
     event_start: Optional[datetime] = None
     actor: NotificationActor
     context: Optional[str] = None
+    subject_key: Optional[str] = None
     created_at: datetime
     read_at: Optional[datetime] = None
 
@@ -2029,9 +2302,13 @@ class SuggestedUsersResponse(BaseModel):
 
     Empty for anonymous viewers. Signed-in viewers receive graph suggestions
     when available, with curator fallback/top-up for cold-start discovery.
+
+    ``total`` is the size of the pageable suggestion pool (excluding
+    first-page curator top-up), so the client can offer "show more".
     """
 
     items: list[UserSearchResult]
+    total: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -2195,3 +2472,121 @@ class RedeemShareFollowResponse(BaseModel):
 
     sharer_handle: Optional[str] = None
     follow_created: bool = False
+
+
+class PassportStats(BaseModel):
+    total_events_attended: int
+    cities_visited: int
+    countries_visited: int
+    reviews_written: int
+    styles_danced: int
+    longest_month_streak: int
+    events_last_30_days: int
+    avg_gap_days: Optional[float] = None
+    first_event_date: Optional[datetime] = None
+    member_since: datetime
+
+
+class PassportCityCollection(BaseModel):
+    city: str
+    country: Optional[str] = None
+    count: int
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+class PassportCountryCollection(BaseModel):
+    country: str
+    count: int
+
+
+class PassportCollections(BaseModel):
+    cities: list[PassportCityCollection] = []
+    countries: list[PassportCountryCollection] = []
+
+
+class PassportMapEvent(EventResponse):
+    city: Optional[str] = None
+    country: Optional[str] = None
+
+
+class PassportMilestone(BaseModel):
+    key: str
+    name: str
+    description: str
+    icon: str
+    category: str
+    threshold: int
+    unit: str
+    progress: int
+    unlocked: bool
+    is_new: bool
+    unlocked_at: Optional[datetime] = None
+
+
+class PassportResponse(BaseModel):
+    stats: PassportStats
+    collections: PassportCollections
+    milestones: list[PassportMilestone] = []
+
+
+class PassportTimelineItem(BaseModel):
+    event_id: str
+    title: str
+    start: datetime
+    location: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+class PassportTimelineMarker(BaseModel):
+    key: str
+    name: str
+    icon: str
+    date: datetime
+
+
+class SharedPassportResponse(BaseModel):
+    """Public, read-only Dance Passport — the same surface the owner sees,
+    minus the private timeline.
+
+    Reuses the owner-facing stat/collection/milestone/event schemas so the
+    frontend can render a single shared ``PassportView`` component. Never
+    exposes the owner's email or full name (only a first-name/handle display
+    name) and omits the private timeline.
+    """
+
+    display_name: Optional[str] = None
+    stats: PassportStats
+    collections: PassportCollections
+    milestones: list[PassportMilestone] = []
+    events: list[PassportMapEvent] = []
+    # Sections the owner has opted to share (subset of milestones/timeline/
+    # cities/countries). The client passes this straight to PassportView.
+    sections: list[str] = []
+    # Populated only when 'timeline' is in ``sections``.
+    timeline_items: list[PassportTimelineItem] = []
+    timeline_markers: list[PassportTimelineMarker] = []
+    # Phase 3 Follow CTA: owner handle + the viewer's relationship so the
+    # shared/profile passport can render a Follow button (or a sign-in
+    # prompt for anonymous viewers). ``handle`` may be None for handleless
+    # legacy accounts.
+    handle: Optional[str] = None
+    is_self: bool = False
+    is_following: bool = False
+
+
+class AckMilestonesRequest(BaseModel):
+    keys: list[str]
+
+
+class AckMilestonesResponse(BaseModel):
+    acknowledged: int
+
+
+class PassportTimelineResponse(BaseModel):
+    items: list[PassportTimelineItem] = []
+    markers: list[PassportTimelineMarker] = []
+    total: int

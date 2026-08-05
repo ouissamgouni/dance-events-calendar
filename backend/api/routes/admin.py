@@ -43,6 +43,9 @@ from backend.api.schemas import (
     NotificationToggleCountEntry,
     NotificationToggleCountsResponse,
     PaginatedEventsResponse,
+    ReviewPromptCandidate,
+    ReviewPromptSendNowRequest,
+    ReviewPromptSendNowResponse,
     SyncJobListResponse,
     SyncJobStartRequest,
     SyncLogResponse,
@@ -60,6 +63,7 @@ from backend.db.models import (
     EventAttendance,
     EventLinkClick,
     EventExport,
+    EventRating,
     EventSave,
     EventTag,
     EventView,
@@ -73,6 +77,7 @@ from backend.db.models import (
     UserEventAttendance,
 )
 from backend.services.duplicate_detection import maybe_detect_duplicates_for_event
+from backend.services.series_detection import maybe_detect_series_for_event
 from backend.services.geocoding import geocode_location, search_locations
 from backend.services.sync_job_service import SyncJobStatus, get_sync_job_service
 from backend.services.sync_service import SyncService
@@ -627,6 +632,22 @@ def notifications_effective_config(
             app_settings._get_str_row(session, "activity_digest_schedule") is not None,
             app_settings.DEFAULT_DIGEST_SCHEDULE,
         ),
+        "review_prompt_enabled": _entry(
+            app_settings.get_review_prompt_enabled(session),
+            app_settings._get_bool_row(session, "review_prompt_enabled") is not None,
+            loader.get_review_prompt_enabled(),
+        ),
+        "review_prompt_delay_hours": _entry(
+            app_settings.get_review_prompt_delay_hours(session),
+            app_settings._get_int_row(session, "review_prompt_delay_hours") is not None,
+            loader.get_review_prompt_delay_hours(),
+        ),
+        "for_you_review_window_days": _entry(
+            app_settings.get_for_you_review_window_days(session),
+            app_settings._get_int_row(session, "for_you_review_window_days")
+            is not None,
+            loader.get_for_you_review_window_days(),
+        ),
         # Env-only (no DB override support): the in-app scheduler loop and
         # its tick cadence, which only take effect on process restart.
         "notification_scheduler_enabled": {
@@ -707,6 +728,10 @@ def notification_toggle_counts(
             email=_count(User.email_social_activity_enabled == True),  # noqa: E712
             push=_count(User.push_social_activity_enabled == True),  # noqa: E712
         ),
+        review_prompt=NotificationToggleCountEntry(
+            email=_count(User.email_review_prompt_enabled == True),  # noqa: E712
+            push=_count(User.push_review_prompt_enabled == True),  # noqa: E712
+        ),
     )
 
 
@@ -717,11 +742,13 @@ def notification_toggle_counts(
 def _notification_kinds_by_type() -> dict[str, list[str]]:
     from backend.services import activity_email
     from backend.services.reminder_service import EVENT_REMINDER
+    from backend.services.review_prompt_service import EVENT_REVIEW_PROMPT
 
     kinds_by_type: dict[str, list[str]] = {
         "interest_match": [],
         "activity_digest": [],
         "event_reminder": [EVENT_REMINDER],
+        "review_prompt": [EVENT_REVIEW_PROMPT],
     }
     for kind, feature in activity_email.FEATURE_BY_KIND.items():
         if feature == "interest_matches":
@@ -1009,6 +1036,213 @@ def digest_send_now(
         digests_sent=stats.get("digests", 0),
         pushes_sent=stats.get("pushed", 0),
         stamped=stats.get("stamped", 0),
+        results=results,
+    )
+
+
+@router.get(
+    "/events/{event_id}/review-prompt-candidates",
+    response_model=list[ReviewPromptCandidate],
+)
+def review_prompt_candidates(
+    event_id: str,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """List the attendees of an event as force-send targets.
+
+    Only users who RSVP'd "Going" are returned (device-only anonymous rows
+    are excluded); ``already_rated`` flags those who have since reviewed so
+    the admin UI can grey them out.
+    """
+    event = session.get(CachedEvent, event_id)
+    if event is None or event.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    attendee_ids = set(
+        session.exec(
+            select(UserEventAttendance.user_id)
+            .where(UserEventAttendance.event_id == event_id)
+            .where(UserEventAttendance.user_id.is_not(None))  # type: ignore[union-attr]
+        ).all()
+    )
+    if not attendee_ids:
+        return []
+    users = session.exec(
+        select(User)
+        .where(User.id.in_(attendee_ids))  # type: ignore[union-attr]
+        .where(User.deleted_at.is_(None))  # type: ignore[union-attr]
+    ).all()
+    rated = set(
+        session.exec(
+            select(EventRating.user_id)
+            .where(EventRating.event_id == event_id)
+            .where(EventRating.user_id.in_(attendee_ids))  # type: ignore[union-attr]
+        ).all()
+    )
+    candidates = [
+        ReviewPromptCandidate(
+            user_id=u.id,
+            email=u.email,
+            name=u.display_name,
+            handle=u.handle,
+            already_rated=u.id in rated,
+        )
+        for u in users
+    ]
+    candidates.sort(key=lambda c: (c.already_rated, c.email.casefold()))
+    return candidates
+
+
+@router.post(
+    "/notifications/review-prompt/send-now",
+    response_model=ReviewPromptSendNowResponse,
+)
+def review_prompt_send_now(
+    body: ReviewPromptSendNowRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    """Admin override: send the post-event review prompt for a specific event
+    to hand-picked attendees right now, bypassing the delay/lookback window.
+
+    Only users who actually RSVP'd "Going" and haven't rated the event yet are
+    eligible; per-channel opt-outs are respected. A user already prompted for
+    this event is skipped unless ``resend`` is set. When friends of the
+    recipient have already reviewed the event, the social-proof variant of the
+    copy is used across all three channels.
+    """
+    from datetime import datetime
+    from backend.services.review_prompt_service import (
+        EVENT_REVIEW_PROMPT,
+        friend_review_proof,
+        proof_phrase,
+        review_prompt_push_copy,
+    )
+    from backend.services.email import send_event_review_prompt_email
+    from backend.services.push_service import send_push
+    from backend.services.notification_delivery import record_delivery
+
+    event = session.get(CachedEvent, body.event_id)
+    if event is None or event.deleted_at is not None:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    users = {
+        u.id: u
+        for u in session.exec(
+            select(User).where(User.id.in_(body.user_ids))  # type: ignore[union-attr]
+        ).all()
+    }
+    attended = set(
+        session.exec(
+            select(UserEventAttendance.user_id)
+            .where(UserEventAttendance.event_id == body.event_id)
+            .where(UserEventAttendance.user_id.in_(body.user_ids))  # type: ignore[union-attr]
+        ).all()
+    )
+    rated = set(
+        session.exec(
+            select(EventRating.user_id)
+            .where(EventRating.event_id == body.event_id)
+            .where(EventRating.user_id.in_(body.user_ids))  # type: ignore[union-attr]
+        ).all()
+    )
+
+    results: list[ForceSendUserResult] = []
+    emailed = pushed = in_app_created = 0
+    stamp_now = datetime.utcnow()
+
+    for uid in body.user_ids:
+        user = users.get(uid)
+        if user is None or user.deleted_at is not None:
+            results.append(
+                ForceSendUserResult(user_id=uid, email="", status="skipped_not_found")
+            )
+            continue
+        if uid not in attended:
+            results.append(
+                ForceSendUserResult(
+                    user_id=uid, email=user.email, status="skipped_not_attended"
+                )
+            )
+            continue
+        if uid in rated:
+            results.append(
+                ForceSendUserResult(
+                    user_id=uid, email=user.email, status="skipped_already_rated"
+                )
+            )
+            continue
+        if not (user.email_review_prompt_enabled or user.push_review_prompt_enabled):
+            results.append(
+                ForceSendUserResult(
+                    user_id=uid, email=user.email, status="skipped_disabled"
+                )
+            )
+            continue
+
+        notif = session.exec(
+            select(Notification)
+            .where(Notification.recipient_user_id == uid)
+            .where(Notification.kind == EVENT_REVIEW_PROMPT)
+            .where(Notification.actor_user_id == uid)
+            .where(Notification.event_id == body.event_id)
+        ).first()
+        proof = friend_review_proof(session, uid, body.event_id)
+        phrase = proof_phrase(proof) if proof else None
+        created = notif is None
+        if notif is None:
+            notif = Notification(
+                recipient_user_id=uid,
+                actor_user_id=uid,  # self: no external actor
+                kind=EVENT_REVIEW_PROMPT,
+                event_id=body.event_id,
+                context=phrase,
+            )
+            session.add(notif)
+            session.flush()
+            record_delivery(session, notif.id, "app")
+            in_app_created += 1
+        elif phrase and notif.context != phrase:
+            notif.context = phrase
+
+        did_send = False
+        if user.email_review_prompt_enabled and (
+            body.resend or notif.emailed_at is None
+        ):
+            if send_event_review_prompt_email(user, event, friend_proof=phrase):
+                notif.emailed_at = stamp_now
+                record_delivery(session, notif.id, "email", stamp_now)
+                emailed += 1
+                did_send = True
+        if user.push_review_prompt_enabled and (body.resend or notif.pushed_at is None):
+            push_title, push_body = review_prompt_push_copy(event.title, phrase)
+            delivered = send_push(
+                uid,
+                title=push_title,
+                body=push_body,
+                url=f"/event/{body.event_id}?rate=1#community",
+                tag=f"review-prompt:{body.event_id}",
+            )
+            if delivered:
+                notif.pushed_at = stamp_now
+                record_delivery(session, notif.id, "push", stamp_now)
+                pushed += delivered
+                did_send = True
+        session.add(notif)
+        results.append(
+            ForceSendUserResult(
+                user_id=uid,
+                email=user.email,
+                status="sent" if (created or did_send) else "already_sent",
+            )
+        )
+
+    session.commit()
+    return ReviewPromptSendNowResponse(
+        emailed=emailed,
+        pushed=pushed,
+        in_app_created=in_app_created,
         results=results,
     )
 
@@ -1572,6 +1806,7 @@ def update_event(
     # ``duplicate_auto_detect_enabled`` site setting is on.
     if title_or_start_changed:
         maybe_detect_duplicates_for_event(session, event_id)
+        maybe_detect_series_for_event(session, event_id)
 
     cal = session.get(CalendarSetting, event.calendar_id)
     event_tags = get_event_tags(session, [event_id])

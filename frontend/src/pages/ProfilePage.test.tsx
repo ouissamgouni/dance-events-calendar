@@ -72,3 +72,97 @@ describe('ProfilePage follow flow', () => {
         await waitFor(() => expect(screen.getByText('login page')).toBeInTheDocument())
     })
 })
+
+describe('ProfilePage Dance Passport tab', () => {
+    const passportBody = {
+        display_name: 'Test Org',
+        stats: {
+            total_events_attended: 7,
+            cities_visited: 2,
+            countries_visited: 1,
+            reviews_written: 0,
+            styles_danced: 1,
+            longest_month_streak: 1,
+            events_last_30_days: 0,
+            avg_gap_days: null,
+            first_event_date: '2024-01-01T00:00:00',
+            member_since: '2024-01-01T00:00:00',
+        },
+        collections: { cities: [], countries: [] },
+        milestones: [],
+        events: [],
+        sections: ['milestones', 'cities', 'countries'],
+        timeline_items: [],
+        timeline_markers: [],
+        handle: 'testorg',
+        is_self: false,
+        is_following: false,
+    }
+
+    it('shows the Dance Passport as the first tab when viewable', async () => {
+        server.use(
+            http.get('*/api/social/users/:handle', ({ params }) =>
+                HttpResponse.json(
+                    makeProfile({
+                        handle: String(params.handle),
+                        can_view_passport: true,
+                        passport_visibility: 'public',
+                    }),
+                ),
+            ),
+            http.get('*/api/social/users/:handle/passport', () =>
+                HttpResponse.json(passportBody),
+            ),
+        )
+
+        renderProfile()
+
+        // Passport is the default (first) tab, so its stats render immediately.
+        await waitFor(() =>
+            expect(screen.getByText('7')).toBeInTheDocument(),
+        )
+    })
+
+    it('shows a placeholder on the passport tab when not viewable', async () => {
+        server.use(
+            http.get('*/api/social/users/:handle', ({ params }) =>
+                HttpResponse.json(
+                    makeProfile({
+                        handle: String(params.handle),
+                        can_view_passport: false,
+                        passport_visibility: 'private',
+                    }),
+                ),
+            ),
+        )
+
+        renderProfile()
+
+        // Tab is always present now; content shows a visibility-aware message.
+        await screen.findByRole('button', { name: 'Dance Passport' })
+        expect(
+            screen.getByText(/keeps their Dance Passport private/i),
+        ).toBeInTheDocument()
+    })
+
+    it('shows a friends-only placeholder on the passport tab', async () => {
+        server.use(
+            http.get('*/api/social/users/:handle', ({ params }) =>
+                HttpResponse.json(
+                    makeProfile({
+                        handle: String(params.handle),
+                        can_view_passport: false,
+                        passport_visibility: 'friends',
+                    }),
+                ),
+            ),
+        )
+
+        renderProfile()
+
+        await screen.findByRole('button', { name: 'Dance Passport' })
+        expect(
+            screen.getByText(/shares their Dance Passport with friends only/i),
+        ).toBeInTheDocument()
+    })
+})

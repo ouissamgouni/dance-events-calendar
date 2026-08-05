@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useRatingAggregate, useInvalidateRatingAggregate } from '../context/RatingAggregatesContext';
@@ -9,7 +9,7 @@ import { trackRatingModalOpened, type RatingEntryPoint } from '../utils/tracking
 
 interface Props {
     eventId: string;
-    appearance?: 'icon' | 'pill';
+    appearance?: 'icon' | 'pill' | 'count';
     size?: 'sm' | 'md';
     stopPropagation?: boolean;
     className?: string;
@@ -19,6 +19,18 @@ interface Props {
     onRatingChanged?: (rating: EventRating | null) => void;
     /** Where in the UI this button lives — used as the Umami `entry_point` property. */
     entryPoint?: RatingEntryPoint;
+    /** Bump this to a new value (e.g. a counter) to request the modal open — unlike a
+     * boolean, a changing number reliably reopens the modal even if the previous
+     * value was already "truthy" (e.g. clicking "Be the first to review" twice). */
+    autoOpenToken?: number;
+    /** When true, this is on the event detail page and should open a modal. When false/absent, should link to event detail page with community anchor. */
+    isEventDetailPage?: boolean;
+    /** When false, hides the numeric review count (used where the count is shown elsewhere, e.g. the Community Experience summary). Defaults to true. */
+    showCount?: boolean;
+    /** Whether the edition has already taken place. Upcoming editions can't be
+     * reviewed, so the button renders disabled with an explanatory tooltip.
+     * Defaults to true (reviewable) when unknown. */
+    isPast?: boolean;
 }
 
 export default function RateEventButton({
@@ -31,6 +43,10 @@ export default function RateEventButton({
     eventHasReviews = false,
     onRatingChanged,
     entryPoint,
+    autoOpenToken,
+    isEventDetailPage,
+    showCount = true,
+    isPast = true,
 }: Props) {
     const { user } = useAuth();
     const location = useLocation();
@@ -42,14 +58,41 @@ export default function RateEventButton({
     const [showSignIn, setShowSignIn] = useState(false);
     const [localRating, setLocalRating] = useState<EventRating | null>(initialRating);
 
+    // Auto-detect if on event detail page by checking pathname
+    const isOnEventDetailPage = isEventDetailPage !== undefined
+        ? isEventDetailPage
+        : location.pathname.startsWith(`/event/${eventId}`);
+
+    // Fires only on actual *changes* of autoOpenToken (not on mount unless a
+    // token was already provided at mount) so repeated requests to open the
+    // modal — e.g. clicking "Be the first to review" more than once — always
+    // work, even if the modal was closed in between.
+    const lastAutoOpenToken = useRef(autoOpenToken);
+    useEffect(() => {
+        if (autoOpenToken === undefined) return;
+        if (lastAutoOpenToken.current === autoOpenToken) return;
+        // Don't mark the token as handled until a signed-in user is actually
+        // available — auth resolves asynchronously, so if this effect first
+        // fires before it does, we must retry once `user` becomes truthy
+        // rather than silently dropping the auto-open request.
+        if (!user) return;
+        lastAutoOpenToken.current = autoOpenToken;
+        trackRatingModalOpened(entryPoint ?? 'notification', !!myRatingFromCtx);
+        setOpen(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [autoOpenToken, user]);
+
     // Prefer context (loaded once for signed-in user) over local/initial state.
     const myRating: EventRating | null = myRatingFromCtx
         ? {
             id: myRatingFromCtx.id,
             event_id: myRatingFromCtx.event_id,
-            stars: myRatingFromCtx.stars,
+            overall_sentiment: myRatingFromCtx.overall_sentiment,
+            aspect_scores: myRatingFromCtx.aspect_scores,
+            aspect_tag_ids: myRatingFromCtx.aspect_tag_ids,
+            audience_tag_ids: myRatingFromCtx.audience_tag_ids,
             comment: myRatingFromCtx.comment,
-            review_tag_ids: myRatingFromCtx.review_tag_ids,
+            comment_status: myRatingFromCtx.comment_status,
             is_anonymous: myRatingFromCtx.is_anonymous,
             status: myRatingFromCtx.status,
             created_at: myRatingFromCtx.created_at,
@@ -59,20 +102,21 @@ export default function RateEventButton({
 
     const iconSizeClass = size === 'sm' ? 'w-3 h-3' : 'w-4 h-4';
     const hasRated = !!myRating;
-    const status = myRating?.status;
     const aggCount = aggregate?.count ?? 0;
-    const aggAvg = aggregate?.average ?? 0;
     const hasAggregate = aggCount > 0;
     // `eventHasReviews` kept for backward-compat but aggregate from context is the source of truth.
     void eventHasReviews;
-    const dotColor =
-        status === 'approved'
-            ? 'bg-sky-500'
-            : status === 'rejected'
-                ? 'bg-slate-400'
-                : status === 'pending'
-                    ? 'bg-amber-400'
-                    : '';
+    // The reviewer's free-text comment is the only moderated part; surface its state subtly.
+    const commentStatus = myRating?.comment_status;
+    const dotColor = hasRated
+        ? commentStatus === 'pending'
+            ? 'bg-amber-400'
+            : 'bg-sky-500'
+        : '';
+
+    // Read-only "count" appearance (event cards / map popups): just a comment
+    // icon + review count, no CTA affordance. Nothing to show without reviews.
+    if (appearance === 'count' && !hasAggregate) return null;
 
     const handleClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -81,7 +125,7 @@ export default function RateEventButton({
             setShowSignIn((s) => !s);
             return;
         }
-        trackRatingModalOpened(entryPoint ?? appearance, !!myRating);
+        trackRatingModalOpened(entryPoint ?? (appearance === 'count' ? 'icon' : appearance), !!myRating);
         setOpen(true);
     };
 
@@ -98,24 +142,89 @@ export default function RateEventButton({
         onRatingChanged?.(next);
     };
 
-    const fillColor = hasAggregate || hasRated ? '#f59e0b' : 'none';
-    const strokeColor = hasAggregate || hasRated ? '#d97706' : 'currentColor';
+    const fillColor = hasAggregate || hasRated ? '#0ea5e9' : 'none';
+    const strokeColor = hasAggregate || hasRated ? '#0284c7' : 'currentColor';
 
-    const StarIcon = (
+    // Speech-bubble "reviews" icon — no stars are shown anywhere.
+    const ReviewIcon = (
         <svg viewBox="0 0 20 20" className={iconSizeClass} fill={fillColor} stroke={strokeColor} strokeWidth={1.5} style={{ pointerEvents: 'none' }}>
-            <path d="M10 1.6l2.6 5.3 5.9.9-4.3 4.2 1 5.9L10 15.1 4.8 17.9l1-5.9L1.5 7.8l5.9-.9L10 1.6z" />
+            <path d="M3 4.5h14v9H8.5L5 16.5V13.5H3z" strokeLinejoin="round" />
         </svg>
     );
 
     const tooltip = hasAggregate
         ? hasRated
-            ? `Rated ${aggAvg.toFixed(1)} from ${aggCount} review${aggCount !== 1 ? 's' : ''} — edit your rating (${status})`
-            : `Rated ${aggAvg.toFixed(1)} from ${aggCount} review${aggCount !== 1 ? 's' : ''}`
+            ? `${aggCount} review${aggCount !== 1 ? 's' : ''} — edit your review`
+            : `${aggCount} review${aggCount !== 1 ? 's' : ''} — add yours`
         : hasRated
-            ? `Edit your rating (${status})`
-            : 'Rate this event';
+            ? 'Edit your review'
+            : 'Be the first to review';
 
-    const scoreText = hasAggregate ? aggAvg.toFixed(1) : null;
+    const countText = showCount && hasAggregate ? String(aggCount) : null;
+
+    // Common content for both button and link
+    const buttonContent = appearance === 'pill' ? (
+        <>
+            <span className="relative inline-flex">
+                {ReviewIcon}
+                {dotColor && <span className={`absolute -top-0.5 -right-0.5 w-1.5 h-1.5 ${dotColor}`} />}
+            </span>
+            {countText
+                ? (
+                    <span className="tabular-nums">
+                        Reviews <span className="text-slate-400">({countText})</span>
+                        {hasRated && commentStatus === 'pending' && (
+                            <span className="ml-1.5 pl-1.5 border-l border-amber-300 text-[11px] text-amber-700">
+                                Your comment pending
+                            </span>
+                        )}
+                    </span>
+                )
+                : hasRated
+                    ? (commentStatus === 'pending' ? 'Comment pending' : 'Your review')
+                    : 'Review'}
+        </>
+    ) : appearance === 'count' ? (
+        <>
+            <span className={`tabular-nums font-medium text-slate-500 ${size === 'sm' ? 'text-[10px]' : 'text-xs'}`}>{aggCount}</span>
+            <img src="/message.png" alt="" aria-hidden="true" className={iconSizeClass} />
+        </>
+    ) : (
+        <>
+            {ReviewIcon}
+            {countText && (
+                <span className={`tabular-nums font-medium text-slate-700 ${size === 'sm' ? 'text-[10px]' : 'text-xs'}`}>{countText}</span>
+            )}
+            {dotColor && <span className={`absolute top-0 right-0 w-1.5 h-1.5 ${dotColor}`} />}
+        </>
+    );
+
+    const buttonClasses = appearance === 'pill'
+        ? `text-xs px-3 py-1 transition flex items-center gap-1.5 border ${hasAggregate || hasRated ? 'text-sky-700 bg-sky-50 border-sky-200 hover:bg-sky-100' : 'text-slate-600 bg-white border-slate-300 hover:bg-slate-50'} ${className}`.trim()
+        : appearance === 'count'
+            ? `inline-flex items-center gap-1 text-slate-500 hover:text-slate-700 ${className}`.trim()
+            : `transition relative inline-flex items-center gap-0.5 ${size === 'sm' ? 'p-1' : 'p-1.5'} ${hasAggregate || hasRated ? 'text-sky-600 hover:text-sky-700' : 'text-slate-300 hover:text-slate-500'} ${className}`.trim();
+
+    // Upcoming editions can't be reviewed — hide the button entirely (except the
+    // read-only "count" appearance, which is naturally empty).
+    if (!isPast && appearance !== 'count') {
+        return null;
+    }
+
+    // If not on event detail page, render as a link to the event detail page with community anchor
+    if (!isOnEventDetailPage) {
+        return (
+            <span className="relative inline-flex" onMouseDown={stop} onPointerDown={stop} onClick={stop}>
+                <Link
+                    to={`/event/${eventId}#community`}
+                    title={tooltip}
+                    className={buttonClasses}
+                >
+                    {buttonContent}
+                </Link>
+            </span>
+        );
+    }
 
     const button =
         appearance === 'pill' ? (
@@ -125,27 +234,10 @@ export default function RateEventButton({
                 onMouseDown={stop}
                 onPointerDown={stop}
                 title={tooltip}
-                className={`text-xs px-3 py-1 transition flex items-center gap-1.5 border ${hasAggregate || hasRated ? 'text-amber-700 bg-amber-50 border-amber-200 hover:bg-amber-100' : 'text-slate-600 bg-white border-slate-300 hover:bg-slate-50'} ${className}`.trim()}
+                className={buttonClasses}
                 aria-label={tooltip}
             >
-                <span className="relative inline-flex">
-                    {StarIcon}
-                    {dotColor && <span className={`absolute -top-0.5 -right-0.5 w-1.5 h-1.5 ${dotColor}`} />}
-                </span>
-                {scoreText
-                    ? (
-                        <span className="tabular-nums">
-                            {scoreText} <span className="text-slate-400">({aggCount})</span>
-                            {hasRated && (status === 'pending' || status === 'rejected') && (
-                                <span className="ml-1.5 pl-1.5 border-l border-amber-300 text-[11px] text-amber-700">
-                                    {status === 'pending' ? 'Your review pending' : 'Your review rejected'}
-                                </span>
-                            )}
-                        </span>
-                    )
-                    : hasRated
-                        ? (status === 'pending' ? 'Pending review' : status === 'rejected' ? 'Rating rejected' : null)
-                        : 'Rate'}
+                {buttonContent}
             </button>
         ) : (
             <button
@@ -154,14 +246,10 @@ export default function RateEventButton({
                 onMouseDown={stop}
                 onPointerDown={stop}
                 title={tooltip}
-                className={`transition relative inline-flex items-center gap-0.5 ${size === 'sm' ? 'p-1' : 'p-1.5'} ${hasAggregate || hasRated ? 'text-amber-600 hover:text-amber-700' : 'text-slate-300 hover:text-slate-500'} ${className}`.trim()}
+                className={buttonClasses}
                 aria-label={tooltip}
             >
-                {StarIcon}
-                {scoreText && (
-                    <span className={`tabular-nums font-medium text-slate-700 ${size === 'sm' ? 'text-[10px]' : 'text-xs'}`}>{scoreText}</span>
-                )}
-                {dotColor && <span className={`absolute top-0 right-0 w-1.5 h-1.5 ${dotColor}`} />}
+                {buttonContent}
             </button>
         );
 
@@ -178,7 +266,7 @@ export default function RateEventButton({
                     <p className="text-slate-500 mt-1">Share your feedback and help others find great events.</p>
                     <div className="mt-2 flex gap-2">
                         <Link
-                            to={`/login?next=${encodeURIComponent(location.pathname + location.search)}`}
+                            to={`/login?next=${encodeURIComponent(location.pathname + location.search + location.hash)}`}
                             className="flex-1 text-center bg-sky-600 text-white px-2 py-1 hover:bg-sky-700"
                         >
                             Sign in

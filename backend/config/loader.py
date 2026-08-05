@@ -210,6 +210,54 @@ def get_activity_digest_email_enabled() -> bool:
     return True if parsed is None else parsed
 
 
+def get_review_prompt_enabled() -> bool:
+    """Master switch for post-event review-prompt generation + emails. Default True."""
+    parsed = _parse_bool(os.getenv("REVIEW_PROMPT_ENABLED"))
+    return True if parsed is None else parsed
+
+
+def get_review_prompt_delay_hours() -> int:
+    """Hours after an event's end to send the review prompt. Default 3."""
+    raw = os.getenv("REVIEW_PROMPT_DELAY_HOURS", "3")
+    try:
+        return max(1, int(raw))
+    except (TypeError, ValueError):
+        return 3
+
+
+def get_review_prompt_lookback_hours() -> int:
+    """How far past the delay window review_prompt_service scans each tick.
+
+    Default 24. Widen via env for scenarios/tests seeding a fixed past event
+    that may end up more than a day past the delay window (e.g. a
+    week/weekday-anchored fixture re-seeded on different days).
+    """
+    raw = os.getenv("REVIEW_PROMPT_LOOKBACK_HOURS", "24")
+    try:
+        return max(1, int(raw))
+    except (TypeError, ValueError):
+        return 24
+
+
+def get_for_you_review_window_days() -> int:
+    """How far back attended-but-unreviewed events surface in the "Share your
+    experience" trail on the "For you" page. Default 180 (about 6 months)."""
+    raw = os.getenv("FOR_YOU_REVIEW_WINDOW_DAYS", "180")
+    try:
+        return max(1, int(raw))
+    except (TypeError, ValueError):
+        return 180
+
+
+def get_review_mood_headline_min_reviews() -> int:
+    """Min reviews before a computed Overall Mood headline label shows. Default 3."""
+    raw = os.getenv("REVIEW_MOOD_HEADLINE_MIN_REVIEWS", "3")
+    try:
+        return max(1, int(raw))
+    except (TypeError, ValueError):
+        return 3
+
+
 def get_web_push_enabled() -> bool:
     """Master switch for web-push delivery. Default False (needs VAPID keys)."""
     parsed = _parse_bool(os.getenv("WEB_PUSH_ENABLED"))

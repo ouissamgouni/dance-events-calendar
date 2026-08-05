@@ -1,0 +1,113 @@
+test_plan:
+  name: "Discover — Show more / Shuffle / Invite"
+  description: >
+    Covers the pagination, shuffle, and invite escape-hatch controls on
+    the people-discovery surfaces. The seeded pool has 15 friend-of-friend
+    candidates (pop01..pop15), all with one mutual witness (alice), so both
+    /discover (page size 12) and Account -> My network -> Suggestions (page
+    size 6) expose "Show more". /discover additionally exposes "Shuffle",
+    and both no-results/empty states expose an "Invite a friend" CTA.
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=discover-show-more"
+    - >
+      Cast: viewer is mutual friends with alice; alice follows pop01..pop15.
+      viewer follows none of the candidates. Deterministic suggestion order
+      is handle ascending: pop01, pop02, ..., pop15.
+    - >
+      If the onboarding gate appears for viewer, click Skip/Done once before
+      testing.
+    - >
+      Cookie banner: accept Personalization so /api/auth/* and /api/social/*
+      calls are not blocked by consent.
+
+  steps:
+    - id: 1
+      title: "/discover shows the first page with Show more + Shuffle"
+      description: >
+        Sign in as Vera Viewer. Open /discover with an empty search box.
+      expected: >
+        The page calls GET /api/social/discover/suggested?limit=12 and returns
+        `total: 15` with the first 12 rows pop01..pop12 in order. A "Shuffle"
+        button appears next to the "Suggestions" heading (because total 15 >
+        page size 12) and a "Show more" button appears below the grid (because
+        12 loaded < 15 total). A "Can't find them? Invite a friend" CTA is shown
+        directly under the search box and stays visible in every state.
+
+    - id: 2
+      title: "Show more appends the remaining candidates"
+      description: >
+        Click "Show more".
+      expected: >
+        The page calls GET /api/social/discover/suggested?limit=12&offset=12
+        and appends pop13, pop14, pop15 to the existing grid (now 15 rows). The
+        "Show more" button disappears because all 15 candidates are loaded.
+        No duplicate rows appear.
+
+    - id: 3
+      title: "Shuffle rotates the visible window"
+      description: >
+        Reload /discover (empty search). Click "Shuffle" once.
+      expected: >
+        The first click calls GET
+        /api/social/discover/suggested?limit=12&offset=12 and REPLACES the grid
+        with the next window pop13, pop14, pop15 (3 rows). Clicking "Shuffle"
+        again wraps back to offset 0 and shows pop01..pop12 (because
+        12 + 12 >= 15). Each click surfaces a different set; no network follow
+        state is lost.
+
+    - id: 4
+      title: "My network Suggestions paginates in pages of 6"
+      description: >
+        Open /account#network and select the Suggestions tab.
+      expected: >
+        The UI calls GET /api/social/me/suggestions?limit=6 and returns
+        `total: 15` with rows pop01..pop06, each showing "Followed by @alice".
+        A "Show more" button is shown. Clicking it calls
+        GET /api/social/me/suggestions?limit=6&offset=6 and appends
+        pop07..pop12; a second click (offset 12) appends pop13..pop15 and then
+        the button disappears (all 15 loaded).
+
+    - id: 5
+      title: "Follow from a paginated list removes only that row"
+      description: >
+        With the full My network Suggestions list loaded (15 rows), click
+        Follow on pop07.
+      expected: >
+        POST /api/social/users/pop07/follow succeeds and only the pop07 row is
+        removed. The remaining rows keep their order and no duplicate or
+        skipped rows appear from the earlier pagination.
+
+    - id: 6
+      title: "Header search no-results offers Invite a friend"
+      description: >
+        In the header search box, type a term that matches nobody, e.g.
+        "zznobody".
+      expected: >
+        GET /api/social/search/users?q=zznobody returns no items. The dropdown
+        shows "No users match "zznobody"." followed by a
+        "Can't find them? Invite a friend" link that navigates to /invite.
+
+    - id: 7
+      title: "/discover invite CTA stays visible even with search results"
+      description: >
+        On /discover, first type "pop" (which matches many users), then type
+        "zznobody" (which matches nobody).
+      expected: >
+        The "Can't find them? Invite a friend" link sits directly under the
+        search box and is visible in BOTH cases — while GET
+        /api/social/search/users?q=pop returns result rows AND while
+        q=zznobody returns no items ("No users match "zznobody"."). The link
+        navigates to /invite.
+
+    - id: 8
+      title: "Show more / Shuffle hidden when the pool fits one page"
+      description: >
+        Follow enough candidates (or reason about a small pool) so that fewer
+        than 12 suggestions remain, then reload /discover.
+      expected: >
+        When the remaining `total` is <= the page size, GET
+        /api/social/discover/suggested?limit=12 returns all remaining rows with
+        no "Show more" button and no "Shuffle" button. The "Can't find them?
+        Invite a friend" CTA under the search box remains visible regardless of
+        pool size.

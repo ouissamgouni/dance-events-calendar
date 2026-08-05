@@ -1,0 +1,161 @@
+test_plan:
+  name: "Post-event review prompt — Phase 3"
+  description: >
+    Verify review_prompt_service end-to-end: an in-app "how was it?" row
+    is created for every attendee of a past event, a review-prompt email
+    is sent only to attendees with the email channel enabled, and
+    attendees who already rated the event are skipped entirely. Also
+    verifies the friends' social-proof variant (email + in-app copy change
+    to "<names> shared their experience …" when people the recipient
+    follows have reviewed) and the admin "send now" force-send override.
+
+  preconditions:
+    - "Start Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`"
+    - >-
+      Start scenario:
+      `SCENARIO=event-review-prompt RESET=1 task start:scenario`
+    - "Open the Mailpit inbox at http://127.0.0.1:8025 and clear existing messages."
+
+  cast:
+    - "Alice — email_review_prompt ON, not rated, follows Carol/Dan/Erin/Flo → in-app row + FRIEND-variant email."
+    - "Bob   — email_review_prompt OFF, not rated, no follows → generic in-app row only."
+    - "Gina  — email_review_prompt ON, not rated, no relevant follows → generic in-app row + generic email."
+    - "Carol — email_review_prompt ON, but ALREADY rated (non-anon) → skipped; her name seeds Alice's proof."
+    - "Dan   — already rated (non-anon) → skipped; second name in Alice's proof."
+    - "Erin  — already rated (approved rating, pending comment) → skipped; folded into Alice's '+N others'."
+    - "Flo   — already rated ANONYMOUSLY → skipped; counted in Alice's '+N others' but never named."
+
+  steps:
+    - id: 1
+      title: "Trigger one dispatch tick"
+      description: >
+        `SCENARIO=event-review-prompt task notify:trigger:scenario`
+      expected: >
+        Stats include `review_prompt: {"prompts": 3, "emailed": 2, "pushed": 0}`
+        (Alice + Bob + Gina get in-app rows; Alice + Gina get emails; Bob is
+        email-opted-out; Carol/Dan/Erin/Flo are skipped because they already
+        rated `ev-past`).
+
+    - id: 2
+      title: "Email delivery matrix + social-proof variant"
+      description: >
+        Filter Mailpit by recipient address.
+      expected: >
+        Alice receives ONE email whose subject is the FRIEND variant —
+        "Movida: Carol, Dan +2 others shared their experience at Rooftop Salsa
+        Social — Rate Me! — share yours" — with body copy "Carol, Dan +2
+        others shared their experience of: …". Gina receives ONE GENERIC email
+        "Movida: How was Rooftop Salsa Social — Rate Me!?". Both link to
+        `/event/ev-past?rate=1#community` and carry an unsubscribe link.
+        Bob, Carol, Dan, Erin and Flo each receive 0 emails.
+
+    - id: 3
+      title: "In-app row — social proof vs generic"
+      description: >
+        Sign in as Alice (dev login), open the bell / Notifications page.
+      expected: >
+        Alice's row reads "Carol, Dan +2 others shared their experience at
+        Rooftop Salsa Social — Rate Me!". Signed in as Bob or Gina the row
+        reads the generic "How was it? Share your experience at …" (neither
+        follows a reviewer). Clicking any row navigates to
+        `/event/ev-past?rate=1#community`, scrolls to Community Experience,
+        and opens the Rate modal.
+
+    - id: 4
+      title: "Carol sees nothing"
+      description: >
+        Sign in as Carol, open Notifications.
+      expected: >
+        No "How was it?" row for `ev-past` — she already rated it.
+
+    - id: 5
+      title: "Idempotent on re-trigger"
+      description: >
+        Run `SCENARIO=event-review-prompt task notify:trigger:scenario`
+        a second time.
+      expected: >
+        Stats show `review_prompt: {"prompts": 0}` — no duplicate rows or
+        emails are created.
+
+    - id: 6
+      title: "Notification settings toggle"
+      description: >
+        Sign in as Bob, go to Account → Notifications & email. Find the
+        "Rate your experience" row and flip the email switch on.
+      expected: >
+        Switch flips on and persists (reload the page to confirm). Re-running
+        step 1's trigger after this emails Bob too, as long as he still
+        hasn't rated `ev-past` — the service backfills the email on the
+        in-app prompt already created for him rather than requiring a brand
+        new prompt.
+
+    - id: 7
+      title: "Admin config — global toggle + delay"
+      description: >
+        Sign in as Admin, go to Admin → Configuration → Notifications tab
+        (or the corresponding config section). Find "Review prompt".
+      expected: >
+        Toggle and "Delay after event ends (hours)" input are visible,
+        matching the pattern of "Event reminders". Toggling it off and
+        back on persists across reload.
+
+    - id: 8
+      title: "Signed-out deep link redirects to login and back"
+      description: >
+        Sign out, then open the review-prompt link/email URL directly
+        (`/event/ev-past?rate=1#community`).
+      expected: >
+        The app redirects to `/login?next=%2Fevent%2Fev-past%3Frate%3D1%23community`
+        (or equivalent encoding) instead of showing the event page. After
+        signing in, the app returns to `/event/ev-past?rate=1#community`,
+        scrolls to Community Experience, and auto-opens the Rate modal —
+        same end result as step 3, just via a login detour.
+
+    - id: 9
+      title: "Reading reviews requires sign-in"
+      description: >
+        Signed out, visit an event page with existing reviews (e.g.
+        `/event/ev-past#community`) and separately a series roll-up page
+        (`/series/{id}`) for a series with reviews.
+      expected: >
+        Neither the star rating aggregate, the review list, nor the series
+        roll-up numbers are visible while signed out. The event page's
+        Community Experience section shows a "Sign in to see and leave
+        reviews for this event" prompt instead of any review content or
+        counts; the series page redirects to `/login?next=...`. Backend
+        endpoints `GET /api/events/{id}/rating`, `GET /api/events/{id}/reviews`,
+        `GET /api/events/{id}/series`, `GET /api/series/{id}`, and
+        `POST /api/events/ratings/aggregate` all return 401 for anonymous
+        requests (same as submitting a review). Signing in reveals the
+        reviews/ratings immediately without a page reload.
+
+    - id: 10
+      title: "Admin force-send — past-event picker + attendee-scoped list"
+      description: >
+        Sign in as Admin → Configuration → Notifications, find "Review
+        prompt → Send now". Type "Rooftop" in the event picker and select
+        `Rooftop Salsa Social — Rate Me!` (a PAST event — the picker searches
+        past events too). The user list below then loads only that event's
+        attendees. Tick Bob and Gina and click "Send now". (Clear Mailpit
+        first.)
+      expected: >
+        Selecting the event loads an Attendees list containing exactly the
+        RSVP'd users (Alice, Bob, Gina + Carol/Dan/Erin/Flo). Carol, Dan,
+        Erin and Flo are greyed out with a "rated" tag and cannot be checked
+        (they already rated). Admin does NOT appear — never RSVP'd. After
+        sending to Bob + Gina: Bob → `skipped_disabled` (email + push both
+        off); Gina → `sent`. Gina's generic review-prompt email is the only
+        new message in Mailpit. The banner summarises counts (e.g. "1 of 2
+        user(s) sent …; 1 skipped.").
+
+    - id: 11
+      title: "Admin force-send — resend friend variant to Alice"
+      description: >
+        In the same "Send now" box, re-select `Rooftop Salsa Social — Rate
+        Me!`, check only Alice in the attendee list, tick "Resend", and click
+        "Send now". (Alice was already emailed in step 1.)
+      expected: >
+        Alice → `sent`; without "Resend" she would be `already_sent`. The
+        re-sent email is the FRIEND variant ("Carol, Dan +2 others shared
+        their experience …") because Alice follows the four reviewers —
+        confirming force-send reuses the same social-proof copy as the tick.

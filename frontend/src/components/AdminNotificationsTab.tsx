@@ -145,6 +145,7 @@ export default function AdminNotificationsTab() {
                         <option value="interest_match">Interest match</option>
                         <option value="activity_digest">Activity digest</option>
                         <option value="event_reminder">Reminder</option>
+                        <option value="review_prompt">Review prompt</option>
                     </select>
                 </label>
                 <label className="flex items-center gap-1.5">

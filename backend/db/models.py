@@ -84,6 +84,19 @@ class User(SQLModel, table=True):
     # (``UserEventAttendance.share_audience`` / ``UserSavedEvent.audience``).
     account_visibility: str = Field(default="public", max_length=16, nullable=False)
     show_in_suggestions: bool = Field(default=True, nullable=False)
+    # --- Dance Passport sharing (Phase 2) ---
+    # Who may view this user's Dance Passport on their public profile
+    # (/u/{handle} "Dance Passport" tab). Independent from
+    # ``account_visibility``: ``public`` (anyone) | ``friends`` (mutual
+    # follows + self) | ``private`` (self only). Defaults to friends.
+    passport_visibility: str = Field(default="friends", max_length=16, nullable=False)
+    # Per-section opt-in for the shared/profile passport. Stats are always
+    # shown; these gate the optional sections. Timeline is off by default —
+    # it is the most granular / location-revealing surface.
+    passport_show_badges: bool = Field(default=True, nullable=False)
+    passport_show_cities: bool = Field(default=True, nullable=False)
+    passport_show_countries: bool = Field(default=True, nullable=False)
+    passport_show_timeline: bool = Field(default=False, nullable=False)
     # Admin-granted credibility badge surfaced on the public profile.
     is_verified_organizer: bool = Field(default=False, nullable=False)
     # Phase: admin-curated lists. When True the account is operated by
@@ -163,6 +176,15 @@ class User(SQLModel, table=True):
     # ``_fan_out_saved_event_promo_code``).
     email_promo_codes_enabled: bool = Field(default=True, nullable=False)
     push_promo_codes_enabled: bool = Field(default=True, nullable=False)
+    # Post-event "how was it?" review nudge (Event Quality Layer Phase 3;
+    # see services/review_prompt_service.py).
+    email_review_prompt_enabled: bool = Field(default=True, nullable=False)
+    push_review_prompt_enabled: bool = Field(default=True, nullable=False)
+    # Dance Passport milestone/achievement unlocks (see
+    # services/milestone_notification_service.py). In-app is always on (like
+    # every other category); these two gate email/push only.
+    email_milestone_unlocked_enabled: bool = Field(default=True, nullable=False)
+    push_milestone_unlocked_enabled: bool = Field(default=True, nullable=False)
     # --- Interest Profiles & Interest-Event Notifications ---
     # Optional "home" location, used as the default center for radius-based
     # interest profiles. Nullable until the user sets it via preferences.
@@ -332,6 +354,12 @@ class CachedEvent(SQLModel, table=True):
     longitude: Optional[float] = Field(default=None)
     geocode_query: Optional[str] = Field(default=None)
     geocode_provider: Optional[str] = Field(default=None)
+    # Structured place, derived from reverse-geocoding lat/lng (see
+    # backend/services/geocoding.py). Powers the Dance Passport city/country
+    # stats and collections; NULL when geocoding could not resolve them.
+    city: Optional[str] = Field(default=None)
+    country: Optional[str] = Field(default=None)
+    country_code: Optional[str] = Field(default=None, max_length=2)
     price_min: Optional[float] = Field(default=None)
     price_max: Optional[float] = Field(default=None)
     price_currency: Optional[str] = Field(default=None)
@@ -417,6 +445,64 @@ class EventDuplicateScanLog(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     scan_type: str = Field(default="incremental")  # incremental|full|manual_pair
+    triggered_by_event_id: Optional[str] = Field(default=None)
+    triggered_by_admin: Optional[str] = Field(default=None, max_length=255)
+    started_at: datetime = Field(default_factory=datetime.utcnow)
+    finished_at: Optional[datetime] = Field(default=None)
+    candidates_found: int = Field(default=0)
+    groups_created: int = Field(default=0)
+    status: str = Field(default="running")  # running|completed|failed
+
+
+class EventSeries(SQLModel, table=True):
+    """A cluster of CachedEvent rows suspected of being the same recurring
+    event (e.g. a weekly milonga) at different occurrences.
+
+    Unlike ``EventDuplicateGroup``, grouping into a series never hides or
+    blocks any member — every occurrence stays independently visible and
+    bookable; the group only records that they belong to the same series
+    for cross-occurrence aggregation (Phase 5) and admin bookkeeping.
+    ``status`` moves from ``pending`` to either ``resolved`` (an admin
+    approved the grouping) or ``dismissed`` (an admin decided it's not
+    actually a series). Once a pair of events has been recorded together
+    in any series (regardless of status), the detection scan skips
+    recreating a group for that pair — this is what makes resolved/
+    dismissed decisions sticky.
+    """
+
+    __tablename__ = "event_series"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    status: str = Field(default="pending", index=True)  # pending|resolved|dismissed
+    source: str = Field(default="auto")  # auto|manual
+    # Admin-editable label shown in the panel and (Phase 5) on the series
+    # aggregate card. Defaults to the first member's title at creation time.
+    canonical_title: str = Field(default="", max_length=200)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    resolved_at: Optional[datetime] = Field(default=None)
+    resolved_by_admin: Optional[str] = Field(default=None, max_length=255)
+
+
+class EventSeriesMember(SQLModel, table=True):
+    """Maps a CachedEvent to the series it belongs to."""
+
+    __tablename__ = "event_series_members"
+    __table_args__ = (
+        UniqueConstraint("series_id", "event_id", name="uq_series_event"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    series_id: int = Field(foreign_key="event_series.id", index=True)
+    event_id: str = Field(foreign_key="cached_events.event_id", index=True)
+
+
+class EventSeriesScanLog(SQLModel, table=True):
+    """Audit trail of series-detection scans (incremental/full/manual)."""
+
+    __tablename__ = "event_series_scan_log"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    scan_type: str = Field(default="incremental")  # incremental|full|manual
     triggered_by_event_id: Optional[str] = Field(default=None)
     triggered_by_admin: Optional[str] = Field(default=None, max_length=255)
     started_at: datetime = Field(default_factory=datetime.utcnow)
@@ -512,6 +598,29 @@ class ShareToken(SQLModel, table=True):
     user_id: Optional[UUID] = Field(
         default=None, foreign_key="users.id", unique=True, index=True
     )
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class PassportShareToken(SQLModel, table=True):
+    """Opt-in public share link for a user's Dance Passport summary card.
+
+    One row per user. The token resolves to a public, read-only summary
+    (stats + unlocked badges only) — never the private timeline or event
+    data. Kept separate from ``share_tokens`` so a passport link can never
+    be used to read the owner's saved/going calendar feed.
+    """
+
+    __tablename__ = "passport_share_tokens"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    token: str = Field(unique=True, index=True)
+    user_id: UUID = Field(
+        foreign_key="users.id", unique=True, index=True, nullable=False
+    )
+    # Per-share option: when True the link only resolves for a signed-in
+    # viewer (``/shared/{token}`` returns 401 for anonymous). Default False
+    # keeps the classic "anyone with the link" behavior.
+    require_signin: bool = Field(default=False, nullable=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -762,12 +871,19 @@ class TagGroup(SQLModel, table=True):
     allow_multiple: bool = Field(default=True)
     enabled: bool = Field(default=True)
     onboarding_eligible: bool = Field(default=False)
-    # Scope separates first-class event taxonomy from review-only aspect tags.
-    # 'event' = appears in explorer filter, event tag pills, suggestion form.
-    # 'review' = appears in rate-event modal and review-list filter chips only.
-    # Mirrors the two-namespace pattern used by Google/Yelp/Airbnb (place
-    # attributes vs review aspects). Enforced in routes + suggestion validation.
+    # Scope separates first-class event taxonomy from review-only vocabularies.
+    # 'event'    = explorer filter, event tag pills, suggestion form.
+    # 'aspect'   = a rateable review aspect (music/venue/...); its tags carry a
+    #              polarity and appear under that aspect in the review flow.
+    # 'audience' = "who would enjoy this" recommendation tags.
+    # 'review'   = legacy flat review tags (superseded by aspect/audience).
+    # Mirrors the two-namespace pattern used by Google/Yelp/Airbnb.
     scope: str = Field(default="event", index=True)
+    # For scope='aspect' groups only: the aspect is offered in the review flow
+    # only when the event carries one of these tag slugs (e.g. the "workshop"
+    # aspect is gated on ['format:workshop', 'format:class']). NULL/empty =
+    # always shown.
+    condition_tag_slugs: Optional[list] = Field(default=None, sa_column=Column(JSON))
     # Guards system-relied-upon groups (e.g. "reach", used by
     # interest_notification_service) from admin delete/slug-change.
     protected: bool = Field(default=False)
@@ -789,6 +905,10 @@ class Tag(SQLModel, table=True):
     enabled: bool = Field(default=True)
     is_hero_filter: bool = Field(default=False)
     hero_ordinal: Optional[int] = Field(default=None)
+    # For tags in scope='aspect' groups: 'positive' | 'negative'. Drives the
+    # both-polarity ordering in the review flow and the community summary
+    # (loved vs mentioned). NULL for event/audience tags.
+    polarity: Optional[str] = Field(default=None)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     group: Optional[TagGroup] = Relationship(back_populates="tags")
@@ -911,7 +1031,12 @@ class TagSuggestion(SQLModel, table=True):
 
 
 class EventRating(SQLModel, table=True):
-    """User rating + review for an event. Pre-moderated by admin."""
+    """User review for an event (adaptive review system).
+
+    Structured signals (overall_sentiment, per-aspect stars, aspect tags,
+    audience tags) count live as soon as they are submitted. Only the
+    free-text ``comment`` is moderated (``comment_status``).
+    """
 
     __tablename__ = "event_ratings"
     __table_args__ = (
@@ -925,18 +1050,31 @@ class EventRating(SQLModel, table=True):
     # Nullable so account deletion can soft-anonymise (ON DELETE SET NULL on FK).
     user_id: Optional[UUID] = Field(default=None, foreign_key="users.id", index=True)
 
+    # Internal 1-5 score derived from ``overall_sentiment`` (see
+    # backend/services/experience_aspects.py SENTIMENT_TO_SCORE). Used only for
+    # ordering reviews; no overall star is ever shown to users.
     stars: int = Field(ge=1, le=5)
     comment: Optional[str] = Field(default=None, sa_column=Column(Text))
-    review_tag_ids: Optional[list] = Field(default=None, sa_column=Column(JSON))
     is_anonymous: bool = Field(default=False)
+
+    # Headline sentiment (amazing|great|okay|disappointing|bad). Required by the
+    # API; nullable at the column level only for defensive backfill.
+    overall_sentiment: Optional[str] = Field(default=None, max_length=20)
+    # Recommendation-audience tag ids (from the ``audience`` tag group).
+    audience_tag_ids: Optional[list] = Field(default=None, sa_column=Column(JSON))
 
     # Groups together the rating and any tag-suggestions submitted in the same
     # feedback envelope so the admin UI can show them together while still
     # moderating each independently.
     feedback_submission_id: Optional[UUID] = Field(default=None, index=True)
 
-    # Workflow
-    status: str = Field(default="pending", index=True)  # pending | approved | rejected
+    # Workflow. Structured data counts live; ``status`` only flips to
+    # ``rejected`` when an admin removes an abusive review wholesale.
+    status: str = Field(default="approved", index=True)  # approved | rejected
+    # Free-text comment moderation, independent of ``status``: a comment is
+    # shown publicly only once ``comment_status == 'approved'``.
+    #   none = no comment; pending = awaiting moderation; approved | rejected.
+    comment_status: str = Field(default="none", index=True)
     admin_notes: Optional[str] = Field(default=None, sa_column=Column(Text))
     reviewed_at: Optional[datetime] = Field(default=None)
     reviewed_by: Optional[str] = Field(default=None)
@@ -948,6 +1086,47 @@ class EventRating(SQLModel, table=True):
 
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class EventRatingAspectScore(SQLModel, table=True):
+    """Per-aspect (music/crowd/floor/atmosphere...) star score for one rating.
+
+    A normalized child table keyed by ``aspect_slug`` (see
+    backend/services/experience_aspects.py) rather than one column per
+    aspect, so adding a new aspect needs no migration.
+    """
+
+    __tablename__ = "event_rating_aspect_scores"
+    __table_args__ = (
+        UniqueConstraint(
+            "rating_id", "aspect_slug", name="uq_event_rating_aspect_score"
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    rating_id: UUID = Field(foreign_key="event_ratings.id", index=True)
+    aspect_slug: str = Field(max_length=32)
+    score: int = Field(ge=1, le=5)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class EventRatingAspectTag(SQLModel, table=True):
+    """A single aspect-scoped review tag chosen for one rating.
+
+    ``aspect_slug`` is denormalized (equals the parent aspect ``TagGroup``
+    slug) so aggregation can group tag counts by aspect without a join.
+    """
+
+    __tablename__ = "event_rating_aspect_tags"
+    __table_args__ = (
+        UniqueConstraint("rating_id", "tag_id", name="uq_event_rating_aspect_tag"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    rating_id: UUID = Field(foreign_key="event_ratings.id", index=True)
+    aspect_slug: str = Field(max_length=32)
+    tag_id: int = Field(foreign_key="tags.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class EventAttendance(SQLModel, table=True):
@@ -1155,6 +1334,7 @@ class Notification(SQLModel, table=True):
             "kind",
             "actor_user_id",
             "event_id",
+            "subject_key",
             name="uq_notification_dedupe",
         ),
     )
@@ -1186,6 +1366,12 @@ class Notification(SQLModel, table=True):
     # label(s) (comma-joined) so the digest/in-app renderers can say
     # "matched your <label> alert" without a second lookup.
     context: Optional[str] = Field(default=None, max_length=200)
+    # Secondary dedupe discriminator for kinds whose actor is the recipient
+    # themselves and which carry no ``event_id`` (e.g. ``milestone_unlocked``
+    # stores the milestone key here). Part of ``uq_notification_dedupe`` so
+    # distinct milestones don't collide on the (recipient, kind, actor,
+    # event_id) tuple. NULL for kinds that don't need it.
+    subject_key: Optional[str] = Field(default=None, max_length=64, index=True)
 
 
 class NotificationDelivery(SQLModel, table=True):
@@ -1240,3 +1426,24 @@ class PushSubscription(SQLModel, table=True):
     auth: str = Field(max_length=255)
     user_agent: Optional[str] = Field(default=None, max_length=400)
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class UserMilestone(SQLModel, table=True):
+    """A Dance Passport achievement a user has unlocked.
+
+    One row per (user, milestone_key). ``unlocked_at`` is stamped once when the
+    milestone is first satisfied; ``seen_at`` is set when the user acknowledges
+    the celebration toast (NULL means "new — show the toast"). The catalog of
+    valid ``milestone_key`` values lives in ``backend/services/passport.py``.
+    """
+
+    __tablename__ = "user_milestones"
+    __table_args__ = (
+        UniqueConstraint("user_id", "milestone_key", name="uq_user_milestone_user_key"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: UUID = Field(foreign_key="users.id", index=True, nullable=False)
+    milestone_key: str = Field(max_length=48, nullable=False)
+    unlocked_at: datetime = Field(default_factory=datetime.utcnow)
+    seen_at: Optional[datetime] = Field(default=None)

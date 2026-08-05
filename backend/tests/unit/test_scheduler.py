@@ -139,6 +139,14 @@ class TestScheduler:
                 return_value={"reminders": 2, "emailed": 1, "pushed": 1},
             ),
             patch(
+                "backend.services.review_prompt_service.run_once",
+                return_value={"prompts": 1, "emailed": 1, "pushed": 0},
+            ),
+            patch(
+                "backend.services.milestone_notification_service.run_once",
+                return_value={"milestones": 1, "emailed": 1, "pushed": 0},
+            ),
+            patch(
                 "backend.services.interest_notification_service.run_once",
                 return_value={"candidates": 4, "created": 1},
             ),
@@ -151,6 +159,8 @@ class TestScheduler:
 
         assert stats == {
             "reminders": {"reminders": 2, "emailed": 1, "pushed": 1},
+            "review_prompt": {"prompts": 1, "emailed": 1, "pushed": 0},
+            "milestone": {"milestones": 1, "emailed": 1, "pushed": 0},
             "interest": {"candidates": 4, "created": 1},
             "activity": {"digests": 3, "pushed": 2},
         }
@@ -160,6 +170,14 @@ class TestScheduler:
             patch(
                 "backend.services.reminder_service.run_once",
                 side_effect=RuntimeError("reminders blew up"),
+            ),
+            patch(
+                "backend.services.review_prompt_service.run_once",
+                return_value={"prompts": 0},
+            ),
+            patch(
+                "backend.services.milestone_notification_service.run_once",
+                return_value={"milestones": 0, "emailed": 0, "pushed": 0},
             ),
             patch(
                 "backend.services.interest_notification_service.run_once",
@@ -173,5 +191,6 @@ class TestScheduler:
             stats = run_notification_dispatch_once()
 
         assert stats["reminders"] == {"error": True}
+        assert stats["review_prompt"] == {"prompts": 0}
         assert stats["interest"] == {"candidates": 0, "created": 0}
         assert stats["activity"] == {"digests": 1}

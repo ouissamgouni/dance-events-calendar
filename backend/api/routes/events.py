@@ -834,30 +834,54 @@ def search_events(
     request: Request,
     q: str = Query(..., min_length=2, max_length=120),
     limit: int = Query(default=10, ge=1, le=25),
+    include_past: bool = Query(default=False),
+    exclude_attended: bool = Query(default=False),
     session: Session = Depends(get_session),
+    current_user: Optional[User] = Depends(get_current_user_optional),
 ):
-    """Lightweight public title typeahead for upcoming events.
+    """Lightweight public title typeahead for events.
 
-    Returns up to ``limit`` upcoming (non-deleted, non-hidden) events
-    matching ``q`` against ``title`` (case-insensitive substring).
-    Backs both the organizer event-claim picker and the public explorer
-    event finder. Payload is intentionally minimal:
+    Returns up to ``limit`` (non-deleted, non-hidden) events matching ``q``
+    against ``title`` (case-insensitive substring). By default only
+    *upcoming* events are returned (the public explorer + organizer
+    event-claim picker); pass ``include_past=true`` to also match events
+    that have already started (used by the admin review-prompt force-send,
+    which targets events that have ended). Payload is intentionally minimal:
     ``{event_id, title, start, location}``.
+
+    When ``exclude_attended`` is set for an authenticated caller (the passport
+    "add a past event" picker), events the user has already logged as attended
+    are filtered out *before* the limit is applied, so a non-attended match is
+    never hidden behind the caller's already-attended events.
     """
     needle = q.strip()
     if not needle:
         return []
     like = f"%{needle}%"
     now = datetime.now(UTC).replace(tzinfo=None)
-    rows = session.exec(
+    stmt = (
         select(CachedEvent)
         .where(CachedEvent.deleted_at.is_(None))  # type: ignore[union-attr]
         .where(CachedEvent.is_hidden.is_(False))  # type: ignore[union-attr]
-        .where(CachedEvent.start >= now)
         .where(col(CachedEvent.title).ilike(like))
-        .order_by(col(CachedEvent.start).asc())
-        .limit(limit)
-    ).all()
+    )
+    if exclude_attended and current_user is not None:
+        attended_ids = session.exec(
+            select(UserEventAttendance.event_id).where(
+                UserEventAttendance.user_id == current_user.id
+            )
+        ).all()
+        if attended_ids:
+            stmt = stmt.where(col(CachedEvent.event_id).not_in(attended_ids))
+    if include_past:
+        # Most-recent-first so recently-ended events (the review-prompt
+        # targets) surface at the top of the typeahead.
+        stmt = stmt.order_by(col(CachedEvent.start).desc())
+    else:
+        stmt = stmt.where(CachedEvent.start >= now).order_by(
+            col(CachedEvent.start).asc()
+        )
+    rows = session.exec(stmt.limit(limit)).all()
     return [
         {
             "event_id": e.event_id,

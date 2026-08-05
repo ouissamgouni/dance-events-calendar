@@ -1,0 +1,265 @@
+# Pre-seeded "Going" state driving each user's passport.
+#
+# Audiences are mixed (public/friends/private) for alba — the passport is
+# self-only, so ALL audiences must count for her. An anonymous device-only
+# attendance on evt-dp-anon must NOT leak into any user's passport.
+attendances:
+  # --- alba: 13 past events (all 12 geo events + the null-geo event) ---
+  - event_id: evt-dp-01
+    email: alba@example.com
+    share_audience: public
+  - event_id: evt-dp-02
+    email: alba@example.com
+    share_audience: friends
+  - event_id: evt-dp-03
+    email: alba@example.com
+    share_audience: private
+  - event_id: evt-dp-04
+    email: alba@example.com
+    share_audience: public
+  - event_id: evt-dp-05
+    email: alba@example.com
+    share_audience: friends
+  - event_id: evt-dp-06
+    email: alba@example.com
+    share_audience: private
+  - event_id: evt-dp-07
+    email: alba@example.com
+    share_audience: public
+  - event_id: evt-dp-08
+    email: alba@example.com
+    share_audience: friends
+  - event_id: evt-dp-09
+    email: alba@example.com
+    share_audience: public
+  - event_id: evt-dp-10
+    email: alba@example.com
+    share_audience: private
+  - event_id: evt-dp-11
+    email: alba@example.com
+    share_audience: public
+  - event_id: evt-dp-12
+    email: alba@example.com
+    share_audience: friends
+  - event_id: evt-dp-nullgeo
+    email: alba@example.com
+    share_audience: private
+
+  # --- borderline: exactly 10 attended events (evt-dp-01..10) ---
+  - event_id: evt-dp-01
+    email: borderline@example.com
+    share_audience: private
+  - event_id: evt-dp-02
+    email: borderline@example.com
+    share_audience: private
+  - event_id: evt-dp-03
+    email: borderline@example.com
+    share_audience: private
+  - event_id: evt-dp-04
+    email: borderline@example.com
+    share_audience: private
+  - event_id: evt-dp-05
+    email: borderline@example.com
+    share_audience: private
+  - event_id: evt-dp-06
+    email: borderline@example.com
+    share_audience: private
+  - event_id: evt-dp-07
+    email: borderline@example.com
+    share_audience: private
+  - event_id: evt-dp-08
+    email: borderline@example.com
+    share_audience: private
+  - event_id: evt-dp-09
+    email: borderline@example.com
+    share_audience: private
+  - event_id: evt-dp-10
+    email: borderline@example.com
+    share_audience: private
+
+  # --- novice: exactly 1 attended event ---
+  - event_id: evt-dp-01
+    email: novice@example.com
+    share_audience: public
+
+  # --- future-only: Going on a FUTURE event only (must NOT count) ---
+  - event_id: evt-dp-future
+    email: future-only@example.com
+    share_audience: public
+
+  # --- cusp-dedicated: exactly 24 attended events (evt-dp-01..12 + evt-vol-01..12).
+  # evt-vol-13 is the un-attended "spare" — mark Going on it to reach 25 and
+  # unlock the "Dedicated" milestone. ---
+  - {
+      event_id: evt-dp-01,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-dp-02,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-dp-03,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-dp-04,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-dp-05,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-dp-06,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-dp-07,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-dp-08,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-dp-09,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-dp-10,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-dp-11,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-dp-12,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-vol-01,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-vol-02,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-vol-03,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-vol-04,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-vol-05,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-vol-06,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-vol-07,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-vol-08,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-vol-09,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-vol-10,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-vol-11,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-vol-12,
+      email: cusp-dedicated@example.com,
+      share_audience: private,
+    }
+
+  # --- cusp-explorer: 4 distinct cities (Paris, Lyon, Rome, Amsterdam), all
+  # non-international. Spare 5th-city event = evt-dp-08 (Lisbon) -> Explorer. ---
+  - {
+      event_id: evt-dp-01,
+      email: cusp-explorer@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-dp-03,
+      email: cusp-explorer@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-dp-09,
+      email: cusp-explorer@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-dp-12,
+      email: cusp-explorer@example.com,
+      share_audience: private,
+    }
+
+  # --- cusp-stamped: 2 countries (France, Netherlands). Spare 3rd-country
+  # event = evt-dp-09 (Italy) -> Passport Stamped. ---
+  - {
+      event_id: evt-dp-01,
+      email: cusp-stamped@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-dp-12,
+      email: cusp-stamped@example.com,
+      share_audience: private,
+    }
+
+  # --- cusp-international: only local events, no international yet. Spare
+  # international event = evt-dp-11 (London) -> Border Crosser. ---
+  - {
+      event_id: evt-dp-01,
+      email: cusp-international@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-dp-09,
+      email: cusp-international@example.com,
+      share_audience: private,
+    }
+
+  # --- anonymous device-only attendance (no user) — must be excluded ---
+  - event_id: evt-dp-anon
+    device_id: seed-anon-passport-1

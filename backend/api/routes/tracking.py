@@ -3,6 +3,8 @@ from slowapi import Limiter
 from backend.api.rate_limit import client_ip
 from sqlmodel import Session, select
 
+import logging
+
 from backend.api.anon_id import get_or_set_anon_id
 from backend.api.deps import get_current_user_optional
 from backend.api.schemas import (
@@ -28,11 +30,14 @@ from backend.db.models import (
     ShareToken,
 )
 from backend.services.ip_geolocation import geolocate_ip
+from backend.services import milestone_notification_service
 from backend.services.notifications import fan_out_going, withdraw_going
 
 router = APIRouter(prefix="/api", tags=["tracking"])
 
 limiter = Limiter(key_func=client_ip)
+
+logger = logging.getLogger(__name__)
 
 
 def _is_admin(user: User | None) -> bool:
@@ -256,6 +261,9 @@ def track_event_attendance(
 
     # Maintain materialized state table.
     if payload.action == "going":
+        # Set when an authenticated user's *new* Going row is inserted below, so
+        # we can fire an immediate milestone check after commit.
+        newly_going_user_id = None
         if user_id is not None:
             existing = session.exec(
                 select(UserEventAttendance)
@@ -334,6 +342,8 @@ def track_event_attendance(
                 )
             )
             share_publicly_after = bool(share_publicly)
+            if user_id is not None:
+                newly_going_user_id = user_id
 
         # Phase C: fan out to subscribers when the row ends up shared
         # (public or friends) AND the actor is authenticated. Audience
@@ -404,6 +414,20 @@ def track_event_attendance(
             withdraw_going(session, current_user, payload.event_id)
 
     session.commit()
+    # A newly-logged attendance may unlock a Dance Passport milestone; fire its
+    # in-app notification/email/push straight away (the scheduler is only a
+    # safety net). Runs on the request session and never breaks tracking.
+    if (
+        payload.action == "going"
+        and newly_going_user_id is not None
+        and current_user is not None
+    ):
+        try:
+            milestone_notification_service.notify_milestones_for_user(
+                session, current_user
+            )
+        except Exception:  # noqa: BLE001 — notification is best-effort
+            logger.warning("Immediate milestone notify failed", exc_info=True)
     return {"status": "tracked"}
 
 

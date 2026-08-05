@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { fetchEvent, updateEvent, fetchTagGroups } from '../api';
 import { useAuth } from '../context/AuthContext';
@@ -22,11 +22,12 @@ import type { CalendarEvent, TagGroup } from '../types';
 export default function EventDetailPage() {
     const { eventId } = useParams<{ eventId: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
     const [searchParams] = useSearchParams();
     const [event, setEvent] = useState<CalendarEvent | null>(null);
     const [error, setError] = useState(false);
     const [loading, setLoading] = useState(true);
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     const { showRatings } = useFeatureFlags();
 
     // Edit mode — admin must explicitly activate inline editing
@@ -42,6 +43,60 @@ export default function EventDetailPage() {
     const [savingTitle, setSavingTitle] = useState(false);
     const [reviewCount, setReviewCount] = useState(0);
     const titleCancelledRef = useRef(false);
+
+    // Auto-open review modal when user clicks "Be the first to review" or arrives via ?rate=1.
+    // A counter (not a boolean) so repeated requests to open the modal — e.g. clicking
+    // "Be the first to review" again after closing it — reliably reopen it.
+    const [reviewOpenToken, setReviewOpenToken] = useState(0);
+    // Bumped whenever the current user's rating changes, so EventReviewsSection
+    // reloads its aggregate + review list without a full remount.
+    const [reviewsRefreshToken, setReviewsRefreshToken] = useState(0);
+
+    // `?rate=1` arrives from a review-prompt notification ("how was it?")
+    // — auto-open the Rate modal once the event (and RateEventButton) has
+    // mounted, then drop the param from the URL so it doesn't reopen on
+    // refresh/back-navigation. Captured once via ref since `event` loads
+    // asynchronously and we must not lose the flag before it's read below.
+    // Bumping the token must wait until `event` is loaded: while it's still
+    // null this page renders a "Loading…" placeholder and RateEventButton
+    // isn't mounted yet, so its `autoOpenToken` ref would initialize to the
+    // already-bumped value and never see a "change" to react to.
+    const autoOpenRatingRef = useRef(searchParams.get('rate') === '1');
+    useEffect(() => {
+        if (!autoOpenRatingRef.current || !event || authLoading) return;
+        if (!user) {
+            // Not signed in yet (e.g. clicked a review-prompt email/push
+            // link cold) — send to login, then bounce straight back to this
+            // exact review URL (incl. `?rate=1#community`) once authenticated.
+            const returnTo = `${location.pathname}${location.search}${location.hash}`;
+            navigate(`/login?next=${encodeURIComponent(returnTo)}`, { replace: true });
+            return;
+        }
+        autoOpenRatingRef.current = false;
+        setReviewOpenToken((t) => t + 1);
+        const next = new URLSearchParams(searchParams);
+        next.delete('rate');
+        // `setSearchParams` navigates to a bare "?search" string and drops
+        // any existing hash (e.g. `#community`), so restore it explicitly.
+        const nextSearch = next.toString();
+        navigate(
+            { pathname: location.pathname, search: nextSearch ? `?${nextSearch}` : '', hash: location.hash },
+            { replace: true },
+        );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [event, user, authLoading]);
+
+
+    // Scroll to the community reviews section when arriving via a
+    // `#community` link (e.g. clicking a Review button on a card, modal, or
+    // map pin elsewhere in the app). React Router doesn't auto-scroll to
+    // hash targets on client-side navigation, so this handles it manually
+    // once the event (and the section) has rendered.
+    useEffect(() => {
+        if (location.hash !== '#community' || !event) return;
+        const el = document.getElementById('community');
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, [location.hash, event]);
 
     // Capture `?ref=share&src=` from the URL so any subsequent RSVP on
     // this event can be attributed back to the originating share_code.
@@ -122,6 +177,7 @@ export default function EventDetailPage() {
     const formatTime = (d: Date) =>
         d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
     const end = new Date(event.end);
+    const isPast = end.getTime() < Date.now();
 
     const pageTitle = `${event.title} — ${formatDate(start)}`;
     const pageDescription = [
@@ -261,7 +317,7 @@ export default function EventDetailPage() {
                                         title={event.title}
                                         url={shareUrl}
                                     />
-                                    {showRatings && <RateEventButton eventId={event.event_id} appearance="pill" eventHasReviews={reviewCount > 0} />}
+                                    {showRatings && <RateEventButton eventId={event.event_id} appearance="pill" eventHasReviews={reviewCount > 0} autoOpenToken={reviewOpenToken} entryPoint="notification" isEventDetailPage showCount={false} isPast={isPast} onRatingChanged={() => setReviewsRefreshToken((t) => t + 1)} />}
                                     {!editMode && (
                                         <button
                                             onClick={() => {
@@ -303,8 +359,8 @@ export default function EventDetailPage() {
                                     )}
                                 </div>
                                 {showRatings && (
-                                    <div className="px-6 pb-5">
-                                        <EventReviewsSection eventId={event.event_id} onAggregateLoaded={(a) => setReviewCount(a?.count ?? 0)} />
+                                    <div id="community" className="px-6 pb-5">
+                                        <EventReviewsSection eventId={event.event_id} isPast={isPast} onAggregateLoaded={(a) => setReviewCount(a?.count ?? 0)} onOpenReviewForm={() => setReviewOpenToken((t) => t + 1)} refreshToken={reviewsRefreshToken} />
                                     </div>
                                 )}
                             </article>
@@ -327,7 +383,11 @@ export default function EventDetailPage() {
                     <GoingButton eventId={event.event_id} appearance="pill" />
                     <SaveEventButton eventId={event.event_id} appearance="pill" />
                     {showRatings && (
-                        <RateEventButton eventId={event.event_id} appearance="pill" eventHasReviews={reviewCount > 0} />
+                        // No autoOpenToken here: the in-card RateEventButton above already
+                        // handles auto-open (e.g. from a review-prompt email/push deep
+                        // link) — both instances share state via context, so giving both
+                        // the token would open two stacked modals at once.
+                        <RateEventButton eventId={event.event_id} appearance="pill" eventHasReviews={reviewCount > 0} isEventDetailPage showCount={false} isPast={isPast} onRatingChanged={() => setReviewsRefreshToken((t) => t + 1)} />
                     )}
                     <ShareButton
                         eventId={event.event_id}

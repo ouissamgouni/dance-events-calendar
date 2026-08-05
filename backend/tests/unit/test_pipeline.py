@@ -196,10 +196,14 @@ class TestEnrichmentPipeline:
 @pytest.mark.unit
 class TestGeocodingStage:
     @patch(
+        "backend.services.pipeline.stages.geocoding.reverse_geocode",
+        return_value=None,
+    )
+    @patch(
         "backend.services.pipeline.stages.geocoding.geocode_candidates",
         return_value=((48.86, 2.35), "Paris", "nominatim"),
     )
-    def test_geocodes_event_with_location(self, mock_geo):
+    def test_geocodes_event_with_location(self, mock_geo, _mock_reverse):
         from backend.services.pipeline.stages.geocoding import GeocodingStage
 
         stage = GeocodingStage()
@@ -222,6 +226,25 @@ class TestGeocodingStage:
 
         assert stage.process(event) is False
 
+    @patch(
+        "backend.services.pipeline.stages.geocoding.reverse_geocode",
+        return_value=("Paris", "France", "FR"),
+    )
+    def test_reverse_geocodes_coordinates_into_place(self, _mock_reverse):
+        from backend.services.pipeline.stages.geocoding import GeocodingStage
+
+        stage = GeocodingStage()
+        event = _make_event(location="Paris")
+        event.latitude = 48.86
+        event.longitude = 2.35
+
+        # Has coords but no country yet -> should reverse-geocode.
+        assert stage.should_process(event) is True
+        assert stage.process(event) is True
+        assert event.city == "Paris"
+        assert event.country == "France"
+        assert event.country_code == "FR"
+
     def test_skips_event_without_location(self):
         from backend.services.pipeline.stages.geocoding import GeocodingStage
 
@@ -238,6 +261,7 @@ class TestGeocodingStage:
         event = _make_event(location="Paris")
         event.latitude = 48.86
         event.longitude = 2.35
+        event.country = "France"
 
         assert stage.should_process(event) is False
 

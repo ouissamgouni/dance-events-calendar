@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
+    fetchProfilePassport,
     fetchPublicProfile,
     fetchUserCalendar,
     fetchUserSuggested,
@@ -13,7 +14,8 @@ import {
     type ProfileEventListResponse,
     type PublicProfile,
 } from '../api';
-import type { CalendarEvent } from '../types';
+import PassportView from '../components/PassportView';
+import type { CalendarEvent, SharedPassportResponse } from '../types';
 
 /**
  * Public profile page at /u/{handle}.
@@ -514,10 +516,11 @@ function SocialLinks({ profile }: { profile: PublicProfile }) {
     );
 }
 
-type TabKey = 'calendar' | 'suggested';
+type TabKey = 'calendar' | 'suggested' | 'passport';
 const TAB_LABELS: Record<TabKey, string> = {
     calendar: 'Calendar',
     suggested: 'Suggested',
+    passport: 'Dance Passport',
 };
 
 type CalendarChip = 'all' | 'going' | 'saved';
@@ -528,19 +531,40 @@ const CALENDAR_CHIP_LABELS: Record<CalendarChip, string> = {
 };
 
 function ProfileTabs({ profile }: { profile: PublicProfile }) {
-    const [active, setActive] = useState<TabKey>('calendar');
-    // Single account-level gate ("public" | "friends") now controls all
-    // tabs that surface owner activity. Suggested is always public.
-    const canSee =
+    const [active, setActive] = useState<TabKey>('passport');
+    // "Dance Passport" leads and is always present; its own visibility is
+    // governed by ``passport_visibility`` (surfaced as ``can_view_passport``),
+    // independent of the account-level gate on Calendar. Suggested is public.
+    const tabs: TabKey[] = ['passport', 'calendar', 'suggested'];
+
+    // Account-level gate ("public" | "friends") controls the owner-activity
+    // tabs. Suggested is always public. The passport tab has its own gate
+    // (``can_view_passport``) handled below.
+    const canSeeAccount =
         profile.is_self ||
         active === 'suggested' ||
         profile.account_visibility === 'public' ||
         (profile.account_visibility === 'friends' && profile.is_friend);
 
+    let content: React.ReactNode;
+    if (active === 'passport') {
+        content = profile.can_view_passport ? (
+            <PassportTabContent handle={profile.handle} />
+        ) : (
+            <PassportTabPlaceholder
+                visibility={profile.passport_visibility ?? 'friends'}
+            />
+        );
+    } else if (!canSeeAccount) {
+        content = <PrivateTabPlaceholder visibility={profile.account_visibility} />;
+    } else {
+        content = <ProfileTabContent handle={profile.handle} tab={active} />;
+    }
+
     return (
         <div className="border border-slate-200 bg-white">
             <div className="flex border-b border-slate-200">
-                {(Object.keys(TAB_LABELS) as TabKey[]).map((k) => (
+                {tabs.map((k) => (
                     <button
                         key={k}
                         type="button"
@@ -556,20 +580,49 @@ function ProfileTabs({ profile }: { profile: PublicProfile }) {
                     </button>
                 ))}
             </div>
-            <div className="p-4">
-                {!canSee ? (
-                    <PrivateTabPlaceholder visibility={profile.account_visibility} />
-                ) : (
-                    <ProfileTabContent handle={profile.handle} tab={active} />
-                )}
-            </div>
+            <div className="p-4">{content}</div>
         </div>
     );
 }
 
 function ProfileTabContent({ handle, tab }: { handle: string; tab: TabKey }) {
     if (tab === 'calendar') return <CalendarTabContent handle={handle} />;
+    if (tab === 'passport') return <PassportTabContent handle={handle} />;
     return <SuggestedTabContent handle={handle} />;
+}
+
+function PassportTabContent({ handle }: { handle: string }) {
+    const [data, setData] = useState<SharedPassportResponse | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- per-tab fetch lifecycle
+        setLoading(true);
+        setError(null);
+        fetchProfilePassport(handle)
+            .then((res) => { if (!cancelled) setData(res); })
+            .catch((err: unknown) => {
+                if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load');
+            })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    }, [handle]);
+
+    if (loading && !data) return <div className="text-sm text-slate-500 p-2">Loading…</div>;
+    if (error) return <div className="text-sm text-slate-500 p-2">{error}</div>;
+    if (!data) return null;
+    return (
+        <PassportView
+            data={data}
+            title="Dance Passport"
+            sections={data.sections}
+            timelineItems={data.timeline_items}
+            timelineMarkers={data.timeline_markers}
+            mapEvents={data.events}
+        />
+    );
 }
 
 function SuggestedTabContent({ handle }: { handle: string }) {
@@ -802,6 +855,27 @@ function MutualSubscribersLine({
             )}{' '}
             you know.
         </p>
+    );
+}
+
+function PassportTabPlaceholder({ visibility }: { visibility: string }) {
+    const message =
+        visibility === 'private'
+            ? 'This dancer keeps their Dance Passport private.'
+            : 'This dancer shares their Dance Passport with friends only. Follow each other to view.';
+    return (
+        <div className="text-slate-500">
+            <div className="inline-flex items-center gap-2 text-slate-600">
+                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path
+                        fillRule="evenodd"
+                        d="M10 1a4 4 0 0 0-4 4v3H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-1V5a4 4 0 0 0-4-4Zm-2 7V5a2 2 0 1 1 4 0v3H8Z"
+                        clipRule="evenodd"
+                    />
+                </svg>
+                <span>{message}</span>
+            </div>
+        </div>
     );
 }
 

@@ -33,12 +33,19 @@ from backend.db.database import get_session  # noqa: E402
 from backend.db.models import (  # noqa: E402
     CachedEvent,
     CalendarSetting,
+    EventRating,
     Notification,
     PushSubscription,
     User,
     UserEventAttendance,
+    UserFollow,
 )
-from backend.services import activity_email, push_service, reminder_service  # noqa: E402
+from backend.services import (
+    activity_email,
+    push_service,
+    reminder_service,
+    review_prompt_service,
+)  # noqa: E402
 from backend.services import scheduler as scheduler_module  # noqa: E402
 
 
@@ -288,6 +295,574 @@ def test_reminder_excludes_deleted_user(session, monkeypatch):
     _going(session, ghost, "ev-soon")
 
     assert reminder_service.run_once() == {"reminders": 0}
+
+
+# --- Review prompts ----------------------------------------------------------
+
+
+def test_review_prompt_created_for_ended_going_event(session, monkeypatch):
+    sent: list = []
+    monkeypatch.setattr(
+        review_prompt_service,
+        "send_event_review_prompt_email",
+        lambda u, e, friend_proof=None: sent.append(e.event_id) or True,
+    )
+    monkeypatch.setattr(review_prompt_service, "send_push", lambda *a, **k: 0)
+
+    alice = _make_user(session, "alice@example.com", "alice")
+    # Ended 4h ago — past the default 3h delay.
+    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _going(session, alice, "ev-past")
+
+    stats = review_prompt_service.run_once()
+    assert stats["prompts"] == 1
+    assert sent == ["ev-past"]
+
+    notifs = session.exec(
+        select(Notification).where(Notification.kind == "event_review_prompt")
+    ).all()
+    assert len(notifs) == 1
+    assert notifs[0].recipient_user_id == alice.id
+    assert notifs[0].actor_user_id == alice.id  # self-actor
+    assert notifs[0].event_id == "ev-past"
+
+
+def test_review_prompt_is_idempotent(session, monkeypatch):
+    monkeypatch.setattr(
+        review_prompt_service, "send_event_review_prompt_email", lambda *a, **k: True
+    )
+    monkeypatch.setattr(review_prompt_service, "send_push", lambda *a, **k: 0)
+
+    alice = _make_user(session, "alice@example.com", "alice")
+    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _going(session, alice, "ev-past")
+
+    assert review_prompt_service.run_once()["prompts"] == 1
+    # Second pass finds the existing prompt and creates nothing.
+    assert review_prompt_service.run_once() == {"prompts": 0}
+    notifs = session.exec(
+        select(Notification).where(Notification.kind == "event_review_prompt")
+    ).all()
+    assert len(notifs) == 1
+
+
+def test_review_prompt_skips_already_rated(session, monkeypatch):
+    sent: list = []
+    monkeypatch.setattr(
+        review_prompt_service,
+        "send_event_review_prompt_email",
+        lambda u, e, friend_proof=None: sent.append(e.event_id) or True,
+    )
+    monkeypatch.setattr(review_prompt_service, "send_push", lambda *a, **k: 0)
+
+    alice = _make_user(session, "alice@example.com", "alice")
+    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _going(session, alice, "ev-past")
+    session.add(
+        EventRating(
+            event_id="ev-past",
+            user_id=alice.id,
+            stars=5,
+            status="approved",
+        )
+    )
+    session.commit()
+
+    assert review_prompt_service.run_once() == {"prompts": 0}
+    assert sent == []
+
+
+def test_review_prompt_email_optout_keeps_inapp(session, monkeypatch):
+    sent: list = []
+    monkeypatch.setattr(
+        review_prompt_service,
+        "send_event_review_prompt_email",
+        lambda u, e, friend_proof=None: sent.append(e) or True,
+    )
+    monkeypatch.setattr(review_prompt_service, "send_push", lambda *a, **k: 0)
+
+    alice = _make_user(
+        session, "alice@example.com", "alice", email_review_prompt_enabled=False
+    )
+    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _going(session, alice, "ev-past")
+
+    stats = review_prompt_service.run_once()
+    assert stats["prompts"] == 1
+    assert sent == []  # email suppressed
+    assert (
+        len(
+            session.exec(
+                select(Notification).where(Notification.kind == "event_review_prompt")
+            ).all()
+        )
+        == 1
+    )
+
+
+def test_review_prompt_backfills_email_after_toggle(session, monkeypatch):
+    """A user who opted out of email at prompt-creation time and later
+    flips the toggle on should still get the email on a later tick, as
+    long as they haven't rated the event and no email has gone out yet."""
+    sent: list = []
+    monkeypatch.setattr(
+        review_prompt_service,
+        "send_event_review_prompt_email",
+        lambda u, e, friend_proof=None: sent.append(e.event_id) or True,
+    )
+    monkeypatch.setattr(review_prompt_service, "send_push", lambda *a, **k: 0)
+
+    bob = _make_user(
+        session, "bob@example.com", "bob", email_review_prompt_enabled=False
+    )
+    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _going(session, bob, "ev-past")
+
+    # First tick: in-app prompt created, no email (opted out).
+    stats = review_prompt_service.run_once()
+    assert stats == {"prompts": 1, "emailed": 0, "pushed": 0}
+    assert sent == []
+
+    # Bob flips the toggle on, still hasn't rated the event.
+    bob.email_review_prompt_enabled = True
+    session.add(bob)
+    session.commit()
+
+    # Second tick: no new in-app row, but the backfill email goes out.
+    stats = review_prompt_service.run_once()
+    assert stats == {"prompts": 0, "emailed": 1, "pushed": 0}
+    assert sent == ["ev-past"]
+
+    notifs = session.exec(
+        select(Notification).where(Notification.kind == "event_review_prompt")
+    ).all()
+    assert len(notifs) == 1
+    assert notifs[0].emailed_at is not None
+
+    # Third tick: already emailed, nothing left to do.
+    sent.clear()
+    assert review_prompt_service.run_once() == {"prompts": 0}
+    assert sent == []
+
+
+def test_review_prompt_no_backfill_once_rated(session, monkeypatch):
+    """Once the user rates the event, a later toggle flip must not
+    resurrect the prompt for that event."""
+    sent: list = []
+    monkeypatch.setattr(
+        review_prompt_service,
+        "send_event_review_prompt_email",
+        lambda u, e, friend_proof=None: sent.append(e.event_id) or True,
+    )
+    monkeypatch.setattr(review_prompt_service, "send_push", lambda *a, **k: 0)
+
+    bob = _make_user(
+        session, "bob@example.com", "bob", email_review_prompt_enabled=False
+    )
+    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _going(session, bob, "ev-past")
+
+    assert review_prompt_service.run_once()["prompts"] == 1
+
+    session.add(
+        EventRating(event_id="ev-past", user_id=bob.id, stars=5, status="approved")
+    )
+    session.commit()
+
+    bob.email_review_prompt_enabled = True
+    session.add(bob)
+    session.commit()
+
+    assert review_prompt_service.run_once() == {"prompts": 0}
+    assert sent == []
+
+
+def test_review_prompt_excludes_too_recent_hidden_and_deleted(session, monkeypatch):
+    monkeypatch.setattr(
+        review_prompt_service, "send_event_review_prompt_email", lambda *a, **k: True
+    )
+    monkeypatch.setattr(review_prompt_service, "send_push", lambda *a, **k: 0)
+
+    alice = _make_user(session, "alice@example.com", "alice")
+    # Ended too recently — still inside the configured delay window.
+    _make_event(session, "ev-just-ended", start=datetime.utcnow() - timedelta(hours=1))
+    _going(session, alice, "ev-just-ended")
+    # Hidden event — excluded.
+    _make_event(
+        session,
+        "ev-hidden",
+        start=datetime.utcnow() - timedelta(hours=6),
+        is_hidden=True,
+    )
+    _going(session, alice, "ev-hidden")
+    # Soft-deleted event — excluded.
+    _make_event(
+        session,
+        "ev-deleted",
+        start=datetime.utcnow() - timedelta(hours=6),
+        deleted_at=datetime.utcnow(),
+    )
+    _going(session, alice, "ev-deleted")
+
+    assert review_prompt_service.run_once() == {"prompts": 0}
+
+
+def test_review_prompt_lookback_hours_widens_scan_window(session, monkeypatch):
+    """An event that ended just past the DEFAULT 24h lookback (delay+lookback)
+    is skipped, but is picked up once REVIEW_PROMPT_LOOKBACK_HOURS is widened
+    to cover it — proves the lookback window is actually configurable and not
+    a hardcoded constant."""
+    monkeypatch.setattr(
+        review_prompt_service, "send_event_review_prompt_email", lambda *a, **k: True
+    )
+    monkeypatch.setattr(review_prompt_service, "send_push", lambda *a, **k: 0)
+
+    alice = _make_user(session, "alice@example.com", "alice")
+    # Default delay=3h + lookback=24h => window covers events whose `end`
+    # is [3h, 27h] ago. `start` is 30h ago and `_make_event` sets
+    # `end = start + 2h`, so this event's `end` is 28h ago — just outside
+    # the default window.
+    _make_event(session, "ev-old", start=datetime.utcnow() - timedelta(hours=30))
+    _going(session, alice, "ev-old")
+
+    assert review_prompt_service.run_once() == {"prompts": 0}
+
+    monkeypatch.setattr(
+        "backend.config.loader.get_review_prompt_lookback_hours", lambda: 48
+    )
+    stats = review_prompt_service.run_once()
+    assert stats["prompts"] == 1
+
+
+# --- Review-prompt friend social proof --------------------------------------
+
+
+def _follow(
+    session: Session, follower: User, followee: User, *, status: str = "approved"
+) -> None:
+    session.add(
+        UserFollow(follower_id=follower.id, followee_id=followee.id, status=status)
+    )
+    session.commit()
+
+
+def _rate(
+    session: Session,
+    user: User,
+    event_id: str,
+    *,
+    stars: int = 5,
+    status: str = "approved",
+    is_anonymous: bool = False,
+) -> None:
+    session.add(
+        EventRating(
+            event_id=event_id,
+            user_id=user.id,
+            stars=stars,
+            status=status,
+            is_anonymous=is_anonymous,
+        )
+    )
+    session.commit()
+
+
+def test_friend_review_proof_names_and_others(session):
+    alice = _make_user(session, "alice@example.com", "alice")
+    carol = _make_user(session, "carol@example.com", "carol")
+    dan = _make_user(session, "dan@example.com", "dan")
+    erin = _make_user(session, "erin@example.com", "erin")
+    flo = _make_user(session, "flo@example.com", "flo")
+    _make_event(session, "ev1", start=datetime.utcnow() - timedelta(hours=6))
+    for reviewer in (carol, dan, erin, flo):
+        _follow(session, alice, reviewer)
+    _rate(session, carol, "ev1")
+    _rate(session, dan, "ev1")
+    _rate(session, erin, "ev1")
+    _rate(session, flo, "ev1", is_anonymous=True)  # anon: counts, no name
+
+    proof = review_prompt_service.friend_review_proof(session, alice.id, "ev1")
+    assert proof is not None
+    # Named reviewers sorted case-insensitively, truncated to _MAX_PROOF_NAMES.
+    assert proof.names == ["Carol", "Dan"]
+    # 1 remaining named (Erin) + 1 anonymous (Flo) fold into "+2 others".
+    assert proof.others == 2
+    assert review_prompt_service.proof_phrase(proof) == "Carol, Dan +2 others"
+
+
+def test_friend_review_proof_none_when_only_anon_or_rejected(session):
+    alice = _make_user(session, "alice@example.com", "alice")
+    carol = _make_user(session, "carol@example.com", "carol")
+    dan = _make_user(session, "dan@example.com", "dan")
+    _make_event(session, "ev1", start=datetime.utcnow() - timedelta(hours=6))
+    _follow(session, alice, carol)
+    _follow(session, alice, dan)
+    _rate(session, carol, "ev1", is_anonymous=True)  # no name
+    _rate(session, dan, "ev1", status="rejected")  # excluded entirely
+
+    assert review_prompt_service.friend_review_proof(session, alice.id, "ev1") is None
+
+
+def test_friend_review_proof_is_directional(session):
+    """Only the recipient's own outgoing follows count — a follower who
+    reviewed the event does not produce social proof for the recipient."""
+    alice = _make_user(session, "alice@example.com", "alice")
+    carol = _make_user(session, "carol@example.com", "carol")
+    _make_event(session, "ev1", start=datetime.utcnow() - timedelta(hours=6))
+    # Carol follows Alice (reverse direction), and Carol reviewed the event.
+    _follow(session, carol, alice)
+    _rate(session, carol, "ev1")
+
+    assert review_prompt_service.friend_review_proof(session, alice.id, "ev1") is None
+
+
+def test_friend_review_proof_ignores_pending_follows(session):
+    alice = _make_user(session, "alice@example.com", "alice")
+    carol = _make_user(session, "carol@example.com", "carol")
+    _make_event(session, "ev1", start=datetime.utcnow() - timedelta(hours=6))
+    _follow(session, alice, carol, status="pending")
+    _rate(session, carol, "ev1")
+
+    assert review_prompt_service.friend_review_proof(session, alice.id, "ev1") is None
+
+
+def test_proof_phrase_variants():
+    FriendProof = review_prompt_service.FriendProof
+    proof_phrase = review_prompt_service.proof_phrase
+    assert proof_phrase(FriendProof(names=["Laura"], others=0)) == "Laura"
+    assert (
+        proof_phrase(FriendProof(names=["Laura", "Marc"], others=0)) == "Laura and Marc"
+    )
+    assert (
+        proof_phrase(FriendProof(names=["Laura", "Marc"], others=3))
+        == "Laura, Marc +3 others"
+    )
+    assert proof_phrase(FriendProof(names=["Laura"], others=1)) == "Laura +1 other"
+
+
+def test_run_once_sets_friend_context_and_email_variant(session, monkeypatch):
+    captured: list = []
+    monkeypatch.setattr(
+        review_prompt_service,
+        "send_event_review_prompt_email",
+        lambda u, e, friend_proof=None: captured.append(friend_proof) or True,
+    )
+    monkeypatch.setattr(review_prompt_service, "send_push", lambda *a, **k: 0)
+
+    alice = _make_user(session, "alice@example.com", "alice")
+    carol = _make_user(session, "carol@example.com", "carol")
+    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _going(session, alice, "ev-past")
+    _follow(session, alice, carol)
+    _rate(session, carol, "ev-past")
+
+    assert review_prompt_service.run_once()["prompts"] == 1
+    assert captured == ["Carol"]
+
+    notif = session.exec(
+        select(Notification)
+        .where(Notification.recipient_user_id == alice.id)
+        .where(Notification.kind == review_prompt_service.EVENT_REVIEW_PROMPT)
+    ).first()
+    assert notif is not None
+    assert notif.context == "Carol"
+
+
+# --- Admin force-send review prompt -----------------------------------------
+
+
+def test_review_prompt_send_now_per_user_statuses(client, session, monkeypatch):
+    emailed: list = []
+    monkeypatch.setattr(
+        "backend.services.email.send_event_review_prompt_email",
+        lambda u, e, friend_proof=None: emailed.append((u.email, friend_proof)) or True,
+    )
+    monkeypatch.setattr("backend.services.push_service.send_push", lambda *a, **k: 0)
+
+    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    gina = _make_user(
+        session,
+        "gina@example.com",
+        "gina",
+        push_review_prompt_enabled=False,
+    )
+    bob = _make_user(
+        session,
+        "bob@example.com",
+        "bob",
+        email_review_prompt_enabled=False,
+        push_review_prompt_enabled=False,
+    )
+    carol = _make_user(session, "carol@example.com", "carol")
+    ned = _make_user(session, "ned@example.com", "ned")
+    for u in (gina, bob, carol):
+        _going(session, u, "ev-past")
+    # ned attends nothing; carol already rated.
+    _rate(session, carol, "ev-past")
+
+    _login(client, "admin@example.com")
+    r = client.post(
+        "/api/admin/notifications/review-prompt/send-now",
+        json={
+            "event_id": "ev-past",
+            "user_ids": [str(gina.id), str(bob.id), str(carol.id), str(ned.id)],
+        },
+    )
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["emailed"] == 1
+    assert data["in_app_created"] == 1  # only gina gets an in-app prompt
+    status_by_email = {row["email"]: row["status"] for row in data["results"]}
+    assert status_by_email["gina@example.com"] == "sent"
+    assert status_by_email["bob@example.com"] == "skipped_disabled"
+    assert status_by_email["carol@example.com"] == "skipped_already_rated"
+    assert status_by_email["ned@example.com"] == "skipped_not_attended"
+    assert emailed == [("gina@example.com", None)]
+
+
+def test_review_prompt_send_now_resend(client, session, monkeypatch):
+    emailed: list = []
+    monkeypatch.setattr(
+        "backend.services.email.send_event_review_prompt_email",
+        lambda u, e, friend_proof=None: emailed.append(u.email) or True,
+    )
+    monkeypatch.setattr("backend.services.push_service.send_push", lambda *a, **k: 0)
+
+    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    alice = _make_user(
+        session, "alice@example.com", "alice", push_review_prompt_enabled=False
+    )
+    _going(session, alice, "ev-past")
+    _login(client, "admin@example.com")
+
+    def _send(resend: bool):
+        return client.post(
+            "/api/admin/notifications/review-prompt/send-now",
+            json={
+                "event_id": "ev-past",
+                "user_ids": [str(alice.id)],
+                "resend": resend,
+            },
+        ).json()
+
+    first = _send(False)
+    assert first["emailed"] == 1
+    assert first["results"][0]["status"] == "sent"
+
+    again = _send(False)
+    assert again["emailed"] == 0
+    assert again["results"][0]["status"] == "already_sent"
+
+    resent = _send(True)
+    assert resent["emailed"] == 1
+    assert resent["results"][0]["status"] == "sent"
+    assert emailed == ["alice@example.com", "alice@example.com"]
+
+
+def test_review_prompt_send_now_friend_variant(client, session, monkeypatch):
+    emailed: list = []
+    monkeypatch.setattr(
+        "backend.services.email.send_event_review_prompt_email",
+        lambda u, e, friend_proof=None: emailed.append(friend_proof) or True,
+    )
+    monkeypatch.setattr("backend.services.push_service.send_push", lambda *a, **k: 0)
+
+    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    alice = _make_user(
+        session, "alice@example.com", "alice", push_review_prompt_enabled=False
+    )
+    carol = _make_user(session, "carol@example.com", "carol")
+    _going(session, alice, "ev-past")
+    _follow(session, alice, carol)
+    _rate(session, carol, "ev-past")
+    _login(client, "admin@example.com")
+
+    r = client.post(
+        "/api/admin/notifications/review-prompt/send-now",
+        json={"event_id": "ev-past", "user_ids": [str(alice.id)]},
+    )
+    assert r.status_code == 200, r.text
+    assert emailed == ["Carol"]
+    notif = session.exec(
+        select(Notification)
+        .where(Notification.recipient_user_id == alice.id)
+        .where(Notification.kind == review_prompt_service.EVENT_REVIEW_PROMPT)
+    ).first()
+    assert notif is not None
+    assert notif.context == "Carol"
+
+
+def test_review_prompt_send_now_requires_admin(client, session):
+    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    plain = _make_user(session, "plain@example.com", "plain")
+    _login(client, "plain@example.com")
+    r = client.post(
+        "/api/admin/notifications/review-prompt/send-now",
+        json={"event_id": "ev-past", "user_ids": [str(plain.id)]},
+    )
+    assert r.status_code == 403
+
+
+def test_review_prompt_send_now_missing_event(client, session):
+    _login(client, "admin@example.com")
+    r = client.post(
+        "/api/admin/notifications/review-prompt/send-now",
+        json={
+            "event_id": "does-not-exist",
+            "user_ids": ["00000000-0000-0000-0000-000000000001"],
+        },
+    )
+    assert r.status_code == 404
+
+
+def test_review_prompt_candidates_lists_only_attendees(client, session):
+    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    gina = _make_user(session, "gina@example.com", "gina")
+    carol = _make_user(session, "carol@example.com", "carol")
+    _make_user(session, "ned@example.com", "ned")  # not an attendee
+    _going(session, gina, "ev-past")
+    _going(session, carol, "ev-past")
+    _rate(session, carol, "ev-past")  # attended AND rated
+
+    _login(client, "admin@example.com")
+    r = client.get("/api/admin/events/ev-past/review-prompt-candidates")
+    assert r.status_code == 200, r.text
+    rows = {row["email"]: row for row in r.json()}
+    assert set(rows) == {"gina@example.com", "carol@example.com"}  # ned excluded
+    assert rows["gina@example.com"]["already_rated"] is False
+    assert rows["carol@example.com"]["already_rated"] is True
+
+
+def test_review_prompt_candidates_requires_admin(client, session):
+    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _make_user(session, "plain@example.com", "plain")
+    _login(client, "plain@example.com")
+    r = client.get("/api/admin/events/ev-past/review-prompt-candidates")
+    assert r.status_code == 403
+
+
+def test_review_prompt_candidates_missing_event(client, session):
+    _login(client, "admin@example.com")
+    r = client.get("/api/admin/events/nope/review-prompt-candidates")
+    assert r.status_code == 404
+
+
+def test_search_events_include_past(client, session):
+    _make_event(
+        session,
+        "ev-past",
+        start=datetime.utcnow() - timedelta(days=3),
+        title="Rooftop Salsa Social",
+    )
+    # Default search excludes past events.
+    r = client.get("/api/events/search?q=Rooftop")
+    assert r.status_code == 200
+    assert r.json() == []
+    # include_past surfaces it.
+    r = client.get("/api/events/search?q=Rooftop&include_past=true")
+    assert r.status_code == 200
+    ids = [e["event_id"] for e in r.json()]
+    assert "ev-past" in ids
 
 
 # --- Activity digest emails -------------------------------------------------
@@ -635,6 +1210,32 @@ def test_get_me_returns_all_six_new_flags(client, session):
     ):
         assert key in me, f"missing {key} in GET /me"
         assert me[key] is True
+
+
+def test_patch_review_prompt_flags_persists(client, session):
+    """Review-prompt flags (Phase 3) PATCH through and round-trip in GET /me."""
+    alice = _make_user(session, "alice@example.com", "alice")
+    _login(client, "alice@example.com")
+
+    r = client.patch(
+        "/api/auth/notification-preferences",
+        json={
+            "email_review_prompt_enabled": False,
+            "push_review_prompt_enabled": False,
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["email_review_prompt_enabled"] is False
+    assert r.json()["push_review_prompt_enabled"] is False
+
+    session.expire_all()
+    refreshed = session.get(User, alice.id)
+    assert refreshed.email_review_prompt_enabled is False
+    assert refreshed.push_review_prompt_enabled is False
+
+    me = client.get("/api/auth/me").json()
+    assert me["email_review_prompt_enabled"] is False
+    assert me["push_review_prompt_enabled"] is False
 
 
 def test_unsubscribe_token_flips_flag(client, session):

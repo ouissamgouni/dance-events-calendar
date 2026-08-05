@@ -141,6 +141,55 @@ describe('NotificationsPanel (event reminders)', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
+  it('renders the milestone unlocked row copy and routes to the passport on click', async () => {
+    server.use(
+      http.get('*/api/notifications', () =>
+        HttpResponse.json({
+          items: [
+            {
+              id: 44,
+              kind: 'milestone_unlocked',
+              event_id: null,
+              event_title: null,
+              event_start: null,
+              context: 'City Hopper',
+              subject_key: 'cities_10',
+              actor: {
+                handle: 'alice',
+                display_name: 'Alice',
+                avatar_url: null,
+                is_verified_organizer: false,
+              },
+              created_at: '2026-06-25T10:00:00Z',
+              read_at: null,
+            },
+          ],
+          total: 1,
+          unread_count: 1,
+          limit: 20,
+          offset: 0,
+        }),
+      ),
+    )
+
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+
+    render(
+      <MemoryRouter>
+        <NotificationsPanel open onClose={onClose} />
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText(/milestone unlocked/i)).toBeInTheDocument()
+    expect(screen.getByText(/city hopper/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /milestone unlocked/i }))
+
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/passport'))
+    expect(onClose).toHaveBeenCalled()
+  })
+
   it('marks everything read as soon as the panel opens (view = read)', async () => {
     server.use(
       http.get('*/api/notifications', () =>

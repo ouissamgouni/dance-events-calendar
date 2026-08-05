@@ -201,7 +201,7 @@ export function trackLogout(): void {
 
 // ── Rating funnel (Umami only — DB rows live in event_ratings) ───────────
 
-export type RatingEntryPoint = 'detail' | 'list' | 'map' | 'icon' | 'pill';
+export type RatingEntryPoint = 'detail' | 'list' | 'map' | 'icon' | 'pill' | 'notification' | 'for-you-share-experience';
 
 export function trackRatingModalOpened(entryPoint: RatingEntryPoint, isEdit: boolean): void {
     if (!readConsent().analytics) return;
@@ -209,17 +209,19 @@ export function trackRatingModalOpened(entryPoint: RatingEntryPoint, isEdit: boo
 }
 
 export function trackRatingSubmitted(props: {
-    stars: number;
+    sentiment: string;
     commentLength: number;
-    tagCount: number;
+    aspectCount: number;
+    audienceCount: number;
     isAnonymous: boolean;
     isEdit: boolean;
 }): void {
     if (!readConsent().analytics) return;
     umamiTrack('rating_submitted', {
-        stars: props.stars,
+        sentiment: props.sentiment,
         comment_length: commentLengthBucket(props.commentLength),
-        tag_count: props.tagCount,
+        aspect_count: props.aspectCount,
+        audience_count: props.audienceCount,
         is_anonymous: props.isAnonymous,
         is_edit: props.isEdit,
     });

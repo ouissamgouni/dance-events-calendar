@@ -3,6 +3,7 @@ import type { AdminRating } from '../types';
 import { fetchAdminRatings } from '../api';
 import RatingReviewModal from './RatingReviewModal';
 import AdminEventDetailPanel from './AdminEventDetailPanel';
+import { SENTIMENT_META } from '../utils/reviewSentiment';
 
 interface Props {
     isOpen: boolean;
@@ -10,7 +11,7 @@ interface Props {
     onCountChange: (pendingCount: number) => void;
 }
 
-const TABS = ['all', 'pending', 'approved', 'rejected'] as const;
+const TABS = ['pending', 'approved', 'rejected'] as const;
 type Tab = typeof TABS[number];
 
 const PAGE_SIZES = [25, 50, 100] as const;
@@ -30,7 +31,7 @@ export default function FeedbackPanel({ isOpen, onClose, onCountChange }: Props)
         setLoading(true);
         try {
             const res = await fetchAdminRatings({
-                status: activeTab === 'all' ? undefined : activeTab,
+                status: activeTab,
                 page,
                 pageSize: pageSize,
             });
@@ -176,9 +177,11 @@ export default function FeedbackPanel({ isOpen, onClose, onCountChange }: Props)
                                                 </button>
                                             </div>
                                             <div className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-500">
-                                                <span className="text-slate-700 font-semibold tracking-tight">
-                                                    {'★'.repeat(r.stars)}{'☆'.repeat(5 - r.stars)}
-                                                </span>
+                                                {r.overall_sentiment && (
+                                                    <span className="text-slate-700" title={SENTIMENT_META[r.overall_sentiment].label}>
+                                                        {SENTIMENT_META[r.overall_sentiment].emoji}
+                                                    </span>
+                                                )}
                                                 <span className="truncate">
                                                     {r.is_anonymous ? 'Anonymous' : (r.user_email || r.user_display_name || 'Unknown')}
                                                 </span>

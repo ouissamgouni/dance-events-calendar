@@ -1,10 +1,33 @@
 test_plan:
-  name: "Rate Event — critical path"
+  name: "Rate Event — adaptive review critical path"
   description: |
-    Verify the Rate Event feature end-to-end. The scenario pre-seeds three
-    events and 13 ratings (8 approved + 1 pending + 1 rejected on
-    evt-rating-001; 3 approved + 1 pending on evt-rating-002; none on
-    evt-rating-003) so most steps just require checking what's already there.
+    Verify the adaptive Rate Event feature end-to-end. The scenario pre-seeds
+    events and their reviews: three standalone PAST events (8 approved-comment
+    + 1 pending-comment + 1 rejected on evt-rating-001; 3 approved + 1 pending
+    on evt-rating-002; none on evt-rating-003) plus a resolved "Tuesday Salsa
+    Night" event series with four editions — evt-rating-series-4 (past, no
+    reviews), evt-rating-series-1 (past, 3 reviews), evt-rating-series-2 (past,
+    2 reviews) and evt-rating-series-3 (UPCOMING, no reviews) — so the
+    cross-edition Typical Experience roll-up, the upcoming-edition and
+    empty-past-edition states can all be exercised.
+
+    Reviews only exist for editions that have already taken place. An UPCOMING
+    event can never be reviewed: its Rate button is shown disabled. When the
+    edition belongs to a series with past feedback, its review section shows the
+    full cross-edition experience (pooled breakdown + reviews from every edition,
+    each linking back to its own edition); otherwise it shows the series' Typical
+    Experience card.
+
+    No star average is shown publicly — only a "Reviews" badge with a count and
+    a "Community Experience" section. That section leads with an overall mood
+    headline (a qualitative label such as "Highly enjoyed" once enough reviews
+    exist, or "Early feedback" + "{N}% rated it Great or Amazing" below the
+    headline threshold), then "People appreciated" (positive tags),
+    "Good to know" (negative tags), "Best suited for" (audience tags) and
+    finally a "Ratings by area" per-aspect star list. Stars appear ONLY
+    inside the rating modal (per-aspect) and in the admin tools. Only the
+    free-text comment is moderated (comment_status); all structured data counts
+    live immediately.
 
     Sign-in tip: at /login, dev mode shows one button per mock user. Use
     "Dev Admin" for admin steps and any other user (e.g. "Sam Rater") for
@@ -12,152 +35,275 @@ test_plan:
 
   steps:
     - id: 1
-      title: "Star icon — signed-out sign-in popover"
+      title: "Reviews badge — signed-out sign-in popover"
       description: |
         Sign out (top-right). On the home page, find the event card
-        "Salsa Social — Rate Me!" and click the small star icon on the card.
+        "Salsa Social — Rate Me!" and click the "Reviews" badge on the card.
       expected: |
-        A small popover opens beside the star with "Sign in to rate" and a
-        "Sign in" button. The map / event card is NOT highlighted and the
-        event detail page does NOT open.
+        A small popover opens beside the badge with "Sign in to rate" and a
+        "Sign in" button. The card does NOT navigate and the event detail
+        page does NOT open.
 
     - id: 2
-      title: "Star icon — sober styling"
+      title: "Reviews badge — sober styling, no star average"
       description: |
-        Inspect the rating star icon on cards (Salsa Social — Rate Me!) and
-        on the detail page (open evt-rating-001). It should be small and
-        sober: light sky-blue / slate, square corners, no bright amber/red.
+        Inspect the Reviews badge on cards (Salsa Social — Rate Me!) and on
+        the detail page (open evt-rating-001). It shows a speech-bubble icon
+        and a review count — never an overall star average.
       expected: |
-        Star icons are visually small (≈12px on cards) and use slate / sky
-        colours. No rounded pills or bright orange/red anywhere in the
-        rating UI.
+        The badge is small and sober (slate / sky, square corners). No
+        overall "★ 4.4" average anywhere. A small amber dot appears only when
+        the current user's own comment is pending.
 
     - id: 3
-      title: "Submit a rating as a signed-in user"
+      title: "Adaptive submit — positive path"
       description: |
         Sign in as "Sam Rater". Open evt-rating-003 (Kizomba Class — No
-        Reviews Yet). Click "Rate" → choose 4 stars, write a 30+ char
-        comment, pick one review tag, submit.
+        Reviews Yet). Click "Rate" → pick "Amazing". Aspect chips unfold with
+        the prompt "What made it great?". Select Music, give it 5 stars, tap
+        a positive tag; select Atmosphere, 4 stars. Optionally expand "Who
+        would enjoy this event?" and pick Beginners. Leave the comment empty.
+        Submit.
       expected: |
-        A "Thanks for your feedback!" confirmation appears. After closing,
-        the Rate pill changes to "Pending review" with a small amber dot,
-        and tooltip reads "Edit your rating (pending)".
+        Only the sentiment step is required — Submit is enabled once "Amazing"
+        is chosen. Positive aspect tags render with a light-green background
+        and negative ones with a light-orange background. A "Thanks for your
+        feedback!" confirmation appears. The Reviews badge count for the event
+        increments immediately (structured data is live). No comment ⇒ no
+        pending dot.
 
     - id: 4
-      title: "Edit your pending rating"
+      title: "Adaptive submit — critical path with comment moderation"
       description: |
-        Still signed in as Sam Rater on evt-rating-003, click the
-        "Pending review" pill again.
+        Still as Sam Rater, open evt-rating-003 and edit your review: change
+        sentiment to "Disappointing" (prompt becomes "What disappointed
+        you?"), add a comment ≥ a few words, submit.
       expected: |
-        The same Rate modal reopens pre-filled with your stars, comment,
-        review tag and identity. Title says "Edit your rating". You can
-        update or Delete it.
+        Submission succeeds. Because a comment was added, the Reviews badge
+        shows a small amber dot ("comment pending review"). The structured
+        aspects still count live in the breakdown; only the comment awaits
+        moderation.
 
     - id: 5
-      title: "Aggregate display + distribution + filter"
+      title: "Edit pre-fills the adaptive flow"
       description: |
-        Open evt-rating-001 (Salsa Social — Rate Me!). Look at the Reviews
-        section.
+        Still on evt-rating-003, click "Rate" again.
       expected: |
-        Average shown ≈ 4.4 with 7 reviews (the rejected and pending rows
-        are excluded). Distribution histogram visible with 5★ majority.
-        Clicking a star bar filters the list to ratings ≥ that threshold;
-        clicking the "★ N+ ✕" pill clears the filter.
+        The modal reopens titled "Edit your review", pre-filled with your
+        sentiment, selected aspects + star scores, aspect tags, audience tags
+        and comment. You can update or Delete it.
 
     - id: 6
-      title: "Sort + pagination of reviews"
+      title: "Community Experience on a reviewed event"
       description: |
-        On evt-rating-001 still, change "Sort:" to "Highest rated" then to
-        "Lowest rated". Scroll the reviews list.
+        Open evt-rating-001 (Salsa Social — Rate Me!). Look at the
+        "Community Experience" section.
       expected: |
-        Order changes accordingly. The reviews list is scrollable inside its
-        own container (max-height) and shows a "Load more reviews" button if
-        more than 5 are present. Fonts are small (≈11px) and no horizontal
-        overflow.
+        Header reads "Community Experience (N)" (rejected rows excluded). The
+        section leads with an overall mood headline (a qualitative label such
+        as "Highly enjoyed", or "Early feedback" with "{N}% rated it Great or
+        Amazing" when below the headline threshold), then "People appreciated"
+        (positive tags, green chips), "Good to know" (negative tags, orange
+        chips), "Best suited for" (audience tags) and finally a
+        "Ratings by area" list with per-aspect stars + counts (e.g. Music,
+        Atmosphere, Venue). A collapsible "Mood breakdown" reveals the numeric
+        positive/neutral/negative split. No overall star average.
 
     - id: 7
-      title: "Empty state"
+      title: "Sort reviews"
       description: |
-        Open evt-rating-003 (Kizomba Class) BEFORE step 3 (or in a fresh
-        scenario reset). If you already submitted a rating in step 3, look
-        instead at any unsigned event with no approved reviews.
+        On evt-rating-001, change "Sort:" between Most recent / Most positive
+        / Most critical. Scroll the reviews list.
       expected: |
-        Reviews section shows "No reviews yet. Be the first to rate this
-        event!" with no histogram.
+        Order changes accordingly. Each review shows a sentiment emoji +
+        reviewer label + date, the comment (if approved), and polarity-colored
+        aspect tags plus audience tags. The list scrolls in its own container
+        and shows "Load more reviews" when > 5 exist. No horizontal overflow.
 
     - id: 8
+      title: "Empty state"
+      description: |
+        Open evt-rating-003 (Kizomba Class) in a fresh scenario reset (before
+        step 3).
+      expected: |
+        Reviews section shows "No reviews yet. Be the first to review this
+        event!" with no breakdown.
+
+    - id: 9
       title: "Anonymous reviewer label"
       description: |
         On evt-rating-001 reviews list, find the review by "Sam Rater"
-        (5★, "Best salsa social in town!") which was submitted with the
+        ("Amazing", "Best salsa social in town!") which was submitted with the
         Anonymous toggle on.
       expected: |
         Reviewer label shows "Anonymous" — never the email or name.
 
-    - id: 9
-      title: "Admin Feedback panel — pending row visible"
-      description: |
-        Sign in as Dev Admin. Click the bell / "Feedback & Reviews" button
-        (top right of admin toolbar). The Feedback drawer opens on the
-        Pending tab.
-      expected: |
-        At least 2 pending rows are visible (admin@example.com 2★ on Salsa
-        Social, and dimitri@example.com 3★ on Bachata Workshop, plus any
-        you submitted in step 3). Each row shows the event title, a small
-        "View event" link below it, the stars, the reviewer label, comment
-        snippet and a small slate "PENDING" badge. No bright amber/green/red.
-
     - id: 10
-      title: "Admin Feedback panel — open + approve"
+      title: "Admin Feedback panel — pending comment queue"
       description: |
-        Click the dimitri@example.com 3★ pending row on Bachata Workshop.
-        The review modal opens. Approve it.
+        Sign in as Dev Admin. Open the "Feedback & Reviews" drawer. It opens
+        on the Pending tab (tabs are Pending / Approved / Rejected — these are
+        comment-moderation states).
       expected: |
-        Modal is small (max-md), white with thin slate border, square
-        corners. Approve button is sky-600 (sober). After clicking
-        Approve, status badge flips to APPROVED. Re-open evt-rating-002 in
-        a normal user tab → the new review now appears in the public list,
-        the count went from 3 → 4.
+        Pending rows show only reviews whose COMMENT awaits moderation
+        (admin@example.com "Disappointing" on Salsa Social, and
+        dimitri@example.com "Okay" on Bachata Workshop, plus any comment you
+        submitted). Each row shows the event title, a "View event" link, the
+        sentiment emoji, reviewer label, comment snippet and a slate "PENDING"
+        badge. Structured-only reviews (no comment) never appear here.
 
     - id: 11
-      title: "Review tags stay scoped to the reviews list (no leakage to event tags)"
+      title: "Admin review modal — approve comment"
       description: |
-        On evt-rating-001 the seeded approved reviews carry several
-        review-tags (e.g. "Great music", "Friendly crowd", "Crowded",
-        "Authentic"). Open the event detail page and look at the event's
-        tag pills row, then look at the Reviews section filter chips.
+        Click the dimitri@example.com pending row on Bachata Workshop. The
+        review modal opens showing the sentiment, aspect ratings, aspect +
+        audience tags and the comment (marked pending). Click "Approve
+        comment".
       expected: |
-        The event's first-class tag pills (format / dance-style) are
-        unchanged — review-tags do NOT appear there. The review-tags ARE
-        visible inside the Reviews section as filter chips that narrow
-        the review list. Going back to the home filter, the explorer
-        shows no review-tag pill in the available filters.
+        Modal is small (max-md), white with thin slate border. "Approve
+        comment" is sky-600. After approving, the comment_status badge flips
+        to APPROVED. Re-open evt-rating-002 as a normal user → the comment now
+        appears in that review; the structured aggregate count was already
+        live.
 
     - id: 12
-      title: "Card click does NOT bleed into rating click"
+      title: "Admin can manage aspect / audience taxonomy"
       description: |
-        On the home page, click directly on a card's star icon (Salsa
-        Social — Rate Me!).
+        As Dev Admin, open the Tag Categories admin panel. Note the Aspect
+        groups (Music, Atmosphere, Venue, Value, Workshop) carry an "ASPECT"
+        badge and the Audience group carries an "AUDIENCE" badge. On an aspect
+        tag, toggle its polarity (+/−). On the Workshop aspect, note the
+        "Show when" condition (format:workshop). Add a new aspect tag.
       expected: |
-        Only the rate-popover (or modal if signed in) opens. The card
-        itself does not navigate to the event detail page and the map
-        marker does not flash highlight.
+        Polarity toggles persist. The Workshop aspect only offers itself in
+        the rating modal for events tagged format:workshop (evt-rating-002),
+        not for the salsa social (evt-rating-001). New aspect tags appear in
+        the rating modal's aspect block.
 
     - id: 13
+      title: "Review tags stay scoped to reviews (no leakage to event tags)"
+      description: |
+        On evt-rating-001 the seeded reviews carry aspect + audience tags
+        (e.g. "Great DJs", "Friendly crowd", "Too crowded"). Open the event
+        detail page: look at the event's first-class tag pills, then the
+        Reviews breakdown.
+      expected: |
+        The event's tag pills (format / dance-style / reach) are unchanged —
+        aspect/audience tags do NOT appear there. They ARE visible inside the
+        Reviews section (breakdown + per-review chips). The explorer filter
+        shows no aspect/audience pill.
+
+    - id: 14
+      title: "Card click does NOT bleed into badge click"
+      description: |
+        On the home page, click directly on a card's Reviews badge (Salsa
+        Social — Rate Me!).
+      expected: |
+        Only the sign-in popover (or rate modal if signed in) opens. The card
+        does not navigate to the event detail page.
+
+    - id: 15
       title: "show_ratings flag OFF hides the surfaces"
       description: |
         As Dev Admin, open Settings, toggle "Show ratings" OFF. Reload the
-        home page and an event detail page (any).
+        home page and an event detail page.
       expected: |
-        Star icons disappear from event cards / detail page, and the
-        Reviews section is no longer rendered. Toggle back ON to restore.
+        Reviews badges disappear from cards / detail page, and the Reviews
+        section is no longer rendered. Toggle back ON to restore.
 
-    - id: 14
-      title: "Account deletion soft-anonymises ratings"
+    - id: 16
+      title: "Account deletion soft-anonymises reviews"
       description: |
-        As any non-admin user with a rating, go to /account → Delete
-        account. Confirm.
+        As any non-admin user with a review, go to /account → Delete account.
+        Confirm.
       expected: |
-        You are logged out. As an admin, find the rating you just
-        submitted in the Feedback panel: reviewer label is "Anonymous"
-        (user_id removed). The aggregate count for the event is unchanged.
+        You are logged out. As an admin, find the review you submitted in the
+        Feedback panel: reviewer label is "Anonymous" (user_id removed). The
+        aggregate count for the event is unchanged.
+
+    - id: 17
+      title: "Changing mood resets the review in progress"
+      description: |
+        Sign in as "Sam Rater". Open evt-rating-003 and click "Rate". Pick
+        "Amazing", select an aspect with stars + a positive tag, expand the
+        audience block and pick an option, and type a comment. Now change the
+        headline mood to "Okay".
+      expected: |
+        Switching the headline mood clears the in-progress review — selected
+        aspects, per-aspect stars, aspect tags, audience tags and the comment
+        all reset, exactly as if a brand-new review were starting for the
+        newly chosen mood. Re-selecting the same mood does nothing.
+
+    - id: 18
+      title: "Mood headline threshold gates the qualitative label"
+      description: |
+        As Dev Admin, open Settings → "Review prompt" card and set
+        "Mood headline threshold (reviews)" to a value above evt-rating-002's
+        review count (e.g. 8), save, then reopen evt-rating-002's
+        Community Experience section. Lower it back to 3 and reopen.
+      expected: |
+        Above the threshold the headline shows "Early feedback" plus
+        "{N}% rated it Great or Amazing" (no qualitative band label). With the
+        threshold at 3, the qualitative label (e.g. "Highly enjoyed") returns.
+        The setting persists across reloads.
+
+    - id: 19
+      title: "Series roll-up — cross-edition Community Experience"
+      description: |
+        Open evt-rating-series-1 (Tuesday Salsa Night). In this edition's own
+        Community Experience, directly under the "Show mood breakdown" toggle a
+        "Typical experience" card summarises the whole series with a
+        "See other editions →" link. Click it to open /series/<id>.
+      expected: |
+        The Typical experience card sits under the edition's mood average (just
+        below "Show mood breakdown"), not at the very bottom of the section.
+        The series page ("Tuesday Salsa Night") shows a combined Typical /
+        Community Experience computed across the reviewed editions: an overall
+        mood headline with edition + review counts ("Based on N editions · M
+        reviews"), pooled People appreciated / Good to know / Best suited for
+        chips and a Ratings-by-area list. Below it, each edition is listed
+        newest-first by date with its own mini mood summary (emoji + label +
+        review count), each linking back to that edition's event page.
+
+    - id: 20
+      title: "Upcoming edition — full cross-edition experience, review button hidden"
+      description: |
+        Open evt-rating-series-3 (Tuesday Salsa Night — Upcoming), which has
+        not yet taken place. Look at the Rate button and the review section.
+      expected: |
+        The Rate button is hidden entirely (not shown, not just disabled) since
+        an upcoming event can't be reviewed yet. Because the series has past
+        feedback, the review section shows the FULL cross-edition experience
+        (not just a summary): a note that this edition hasn't taken place yet,
+        the series' "Typical experience" box used as the overall-mood headline
+        ("Usually <mood>" + "See other editions →"), the pooled
+        series breakdown (People appreciated / Good to know / Best suited for,
+        Ratings by area) and the individual reviews pooled across every edition
+
+    - id: 21
+      title: "Empty past edition — no reviews + Typical Experience"
+      description: |
+        Open evt-rating-series-4 (Tuesday Salsa Night — Early Edition), a past
+        edition of the series that received no reviews.
+      expected: |
+        The review section shows "No reviews for this edition yet. Be the first
+        to leave one!" with an enabled Rate button (the event is past), and
+        BELOW it the series' "Typical experience" card. The section is never
+        left empty.
+
+    - id: 22
+      title: "Compact summary in the event modal and map popup"
+      description: |
+        Open evt-rating-001 from the calendar/explorer so the event MODAL (or
+        card popover) opens — not the full detail page. Then switch to the Map
+        view and open the same event's marker popup.
+      expected: |
+        The modal shows ONLY the "Overall experience" mood box (label + mood +
+        "{N}% rated it Great or Amazing" + "Based on N reviews") with a
+        "See full details →" link in the bottom-right corner — no review list,
+        no per-aspect breakdown. For an upcoming edition with series history the
+        box is instead labelled "Typical experience" ("Usually <mood>"). The
+        map popup shows a single review line ("<emoji> <mood> (N)", e.g.
+        "😊 Usually well received (5)", N = review count) with the "Details →"
+        link in the bottom-right corner. Both link through to the full
+        Community Experience section on the event page.

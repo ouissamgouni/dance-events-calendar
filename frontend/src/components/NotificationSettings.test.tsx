@@ -59,14 +59,16 @@ describe('NotificationSettings', () => {
     await waitFor(() => expect(container).toBeEmptyDOMElement())
   })
 
-  it('renders the 4x2 feature x channel matrix', async () => {
+  it('renders the 6x2 feature x channel matrix', async () => {
     renderSignedIn()
-    // Eight switches: four features x two channels.
+    // Twelve switches: six features x two channels.
     for (const feature of [
       'Event reminders',
       'Friends & social',
       'Interest matches',
       'Promo codes',
+      'Rate your experience',
+      'Dance Passport achievements',
     ]) {
       expect(
         await screen.findByRole('switch', { name: `${feature} \u2014 email` }),
@@ -133,6 +135,10 @@ describe('NotificationSettings', () => {
         push_interest_matches_enabled: false,
         email_promo_codes_enabled: false,
         push_promo_codes_enabled: false,
+        email_review_prompt_enabled: false,
+        push_review_prompt_enabled: false,
+        email_milestone_unlocked_enabled: false,
+        push_milestone_unlocked_enabled: false,
       }),
     )
   })
