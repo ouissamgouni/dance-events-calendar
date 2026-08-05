@@ -211,8 +211,8 @@ tag_groups:
   # high-level-dancers / social-atmosphere / live-band) was a mix of
   # subjective experience tags and one factual property. Following the
   # event-vs-review scope split:
-  #   - the subjective ones moved to the review-tags group below
-  #     (great-music, crowded, spacious, high-level-dancers, great-vibe);
+  #   - the subjective ones moved to the review aspect groups below
+  #     (scope: aspect — music / atmosphere / venue-quality / …);
   #   - live-band (a factual property organisers can declare) moved to
   #     the venue group above.
   # Keeping subjective qualities out of the event taxonomy prevents
@@ -319,7 +319,7 @@ tag_groups:
       - { slug: small-event, label: Small event }
       - { slug: large-event, label: Large event }
 
-  - slug: venue
+  - slug: venue-quality
     label: 🏛 Venue
     ordinal: 102
     allow_multiple: true
