@@ -2,8 +2,9 @@
  * Service-worker registration.
  *
  * Registered from {@link main} after the window `load` event so SW setup never
- * competes with first paint. The SW (public/sw.js) powers PWA installability,
- * an offline app-shell fallback, and web-push delivery.
+ * competes with first paint. The SW (public/sw.js) powers PWA installability
+ * and web-push delivery. It deliberately does not cache the navigation HTML,
+ * which embeds per-deploy hashed asset URLs and would break on the next release.
  *
  * No-ops when the browser lacks Service Worker support (older browsers, some
  * in-app webviews) so callers can invoke it unconditionally.
