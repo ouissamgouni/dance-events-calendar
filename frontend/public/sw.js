@@ -28,6 +28,17 @@ self.addEventListener('activate', (event) => {
                     .map((k) => caches.delete(k)),
             );
             await self.clients.claim();
+            // Recovery kill-switch: reload any window still displaying a stale
+            // document served by a previous (shell-caching) worker so it
+            // re-fetches fresh HTML pointing at current hashed assets. Runs at
+            // most once per client — activate only fires when a *new* worker
+            // version takes over, so this cannot loop on normal launches.
+            const windows = await self.clients.matchAll({ type: 'window' });
+            for (const client of windows) {
+                if ('navigate' in client) {
+                    client.navigate(client.url).catch(() => undefined);
+                }
+            }
         })(),
     );
 });
