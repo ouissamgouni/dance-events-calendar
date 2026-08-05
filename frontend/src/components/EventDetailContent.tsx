@@ -12,8 +12,7 @@ import EventTagEditor from './EventTagEditor';
 import LocationBadge from './LocationBadge';
 import SaveEventButton from './SaveEventButton';
 import GoingButton from './GoingButton';
-import AttendeeList from './AttendeeList';
-import GoingWedge from './GoingWedge';
+import InterestSection from './InterestSection';
 import RateEventButton from './RateEventButton';
 import CommunityExperienceSummary from './CommunityExperienceSummary';
 import TagBadges from './TagBadges';
@@ -648,27 +647,16 @@ export default function EventDetailContent({
                 />
             )}
 
-            {/* Who's going */}
-            {showActions && (
-                <div className="border-t border-slate-100 pt-3">
-                    <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">
-                        Who's going
-                    </h3>
-                    <AttendeeList eventId={event.event_id} expanded />
-                </div>
-            )}
-
-            {/* Phase E (E5) — friends / FoF social-proof wedge.
-                Renders nothing for anon viewers and nothing when all
-                three buckets are empty, so it's safe to mount
-                unconditionally alongside AttendeeList. */}
-            {showActions && <GoingWedge eventId={event.event_id} />}
+            {/* Interest — merged "who's going" + "who you know going" (same
+                section as the event detail page; deduped across friends /
+                FoF / public so attendees never appear twice). */}
+            {showActions && <InterestSection eventId={event.event_id} eventTitle={event.title} isPast={new Date(event.end).getTime() < Date.now()} />}
 
             {/* Action bar */}
             {showActions && (
                 <div className="border-t border-slate-100 pt-3 flex items-center gap-2 flex-wrap">
                     <SaveEventButton eventId={event.event_id} appearance="pill" />
-                    <GoingButton eventId={event.event_id} appearance="pill" />
+                    <GoingButton eventId={event.event_id} appearance="pill" isPast={new Date(event.end).getTime() < Date.now()} />
                     {showRatings && <RateEventButton eventId={event.event_id} appearance="pill" isEventDetailPage showCount={false} isPast={new Date(event.end).getTime() < Date.now()} />}
                     <ShareButton
                         eventId={event.event_id}

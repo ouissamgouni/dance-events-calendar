@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { CalendarEvent, TagGroup } from '../types';
-import { fetchEvents, fetchSettings, fetchTagGroups, fetchMyFollowing, fetchInterestSummary } from '../api';
+import { fetchEvent, fetchEvents, fetchSettings, fetchTagGroups, fetchMyFollowing, fetchInterestSummary } from '../api';
 import type { FollowUser, InterestSummaryItem } from '../api';
 import { trackView } from '../utils/tracking';
 import { useAuth } from '../context/AuthContext';
@@ -1032,21 +1032,37 @@ export default function Home() {
         setSelectedEvent(evt);
     }, []);
 
-    // Explorer list panel click — carries source through URL query param
+    // Explorer list panel click — opens the centered event modal (same as
+    // My Calendar) instead of navigating to the full event page.
     const handleExplorerListEventClick = useCallback((evt: CalendarEvent) => {
         markSeen(evt.event_id);
-        navigate(`/event/${evt.event_id}?src=explorer-list`);
-    }, [navigate, markSeen]);
+        trackView(evt.event_id, 'explorer-list');
+        setSelectedEventRect(null);
+        setSelectedEventSource('explorer-list');
+        setSelectedEvent(evt);
+    }, [markSeen]);
 
-    // Explorer map marker click — carries source through URL query param
+    // Explorer map marker/popup click — opens the event modal.
     const handleExplorerMapEventClick = useCallback((evt: CalendarEvent) => {
         markSeen(evt.event_id);
-        navigate(`/event/${evt.event_id}?src=explorer-map`);
-    }, [navigate, markSeen]);
+        trackView(evt.event_id, 'explorer-map');
+        setSelectedEventRect(null);
+        setSelectedEventSource('explorer-map');
+        setSelectedEvent(evt);
+    }, [markSeen]);
 
+    // Explorer search selection — only carries an event id, so resolve the
+    // full event before opening the modal.
     const handleExplorerSearchEventClick = useCallback((eventId: string) => {
         markSeen(eventId);
-        navigate(`/event/${eventId}?src=explorer-search`);
+        fetchEvent(eventId)
+            .then((evt) => {
+                trackView(eventId, 'explorer-search');
+                setSelectedEventRect(null);
+                setSelectedEventSource('explorer-search');
+                setSelectedEvent(evt);
+            })
+            .catch(() => { navigate(`/event/${eventId}?src=explorer-search`); });
     }, [navigate, markSeen]);
 
     const handleExplorerMapMarkerSelect = useCallback((evt: CalendarEvent) => {
@@ -1769,8 +1785,8 @@ export default function Home() {
                 )}
             </main>
 
-            {/* Overlay modal — calendar mode mobile only */}
-            {selectedEvent && viewMode === 'calendar' && !isDesktop && (
+            {/* Overlay modal — calendar mode mobile + explorer (both breakpoints) */}
+            {selectedEvent && (viewMode === 'explorer' || (viewMode === 'calendar' && !isDesktop)) && (
                 <EventModal
                     event={selectedEvent}
                     onClose={handleCloseModal}

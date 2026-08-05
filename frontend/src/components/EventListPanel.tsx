@@ -336,7 +336,7 @@ export function EventListCard({
 
                     </div>
                     <div className="event-card-actions absolute top-0 right-0 flex items-center gap-1.5">
-                        <ActionCountCluster eventId={event.event_id} isSavedFlag={isSavedFlag} />
+                        <ActionCountCluster eventId={event.event_id} isSavedFlag={isSavedFlag} isPast={new Date(event.end).getTime() < Date.now()} />
                     </div>
                 </div>
             </div>
@@ -817,7 +817,7 @@ export default function EventListPanel({
  * number is the attendance summary — `AttendeeAvatarStack` shows *who*,
  * not *how many*.
  */
-function ActionCountCluster({ eventId, isSavedFlag }: { eventId: string; isSavedFlag: boolean }) {
+function ActionCountCluster({ eventId, isSavedFlag, isPast = false }: { eventId: string; isSavedFlag: boolean; isPast?: boolean }) {
     const summary = useAttendanceSummary(eventId);
     const savedCount = summary?.total_saved ?? 0;
     const goingCount = summary?.total_going ?? 0;
@@ -843,9 +843,10 @@ function ActionCountCluster({ eventId, isSavedFlag }: { eventId: string; isSaved
                     appearance="icon"
                     size="sm"
                     stopPropagation
+                    isPast={isPast}
                 />
                 {goingCount > 0 && (
-                    <span className="text-[11px] text-emerald-700 -ml-0.5 mr-1 tabular-nums" aria-label={`${goingCount} going`}>
+                    <span className="text-[11px] text-emerald-700 -ml-0.5 mr-1 tabular-nums" aria-label={`${goingCount} ${isPast ? 'attended' : 'going'}`}>
                         {goingCount}
                     </span>
                 )}

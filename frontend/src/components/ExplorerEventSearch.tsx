@@ -15,6 +15,9 @@ interface ExplorerEventSearchProps {
     small?: boolean;
     /** Search past events (start in the past) instead of upcoming ones. */
     includePast?: boolean;
+    /** Render an "Include past" checkbox that lets the user opt past events
+     *  into the results (used by the header search). */
+    pastToggle?: boolean;
 }
 
 function useDebounced<T>(value: T, ms: number): T {
@@ -74,6 +77,7 @@ export default function ExplorerEventSearch({
     className = '',
     small = false,
     includePast = false,
+    pastToggle = false,
 }: ExplorerEventSearchProps) {
     const [open, setOpen] = useState(false);
     const [q, setQ] = useState('');
@@ -81,6 +85,10 @@ export default function ExplorerEventSearch({
     const [loading, setLoading] = useState(false);
     const [activeIdx, setActiveIdx] = useState(-1);
     const [compactPanelTop, setCompactPanelTop] = useState(64);
+    const [pastChecked, setPastChecked] = useState(false);
+    // Passport mode (`includePast`) always includes past + excludes attended;
+    // the header checkbox only opts past events in, without hiding attended.
+    const effectiveIncludePast = includePast || pastChecked;
     const containerRef = useRef<HTMLDivElement>(null);
     const triggerRef = useRef<HTMLButtonElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -132,7 +140,7 @@ export default function ExplorerEventSearch({
         }
         let cancelled = false;
         setLoading(true);
-        searchEvents(term, 25, includePast, includePast)
+        searchEvents(term, 25, effectiveIncludePast, includePast)
             .then((rows) => {
                 if (cancelled) return;
                 setResults(rows);
@@ -149,7 +157,7 @@ export default function ExplorerEventSearch({
         return () => {
             cancelled = true;
         };
-    }, [debounced, open, includePast]);
+    }, [debounced, open, effectiveIncludePast, includePast]);
 
     const term = q.trim();
 
@@ -223,29 +231,43 @@ export default function ExplorerEventSearch({
             {open && (
                 <div className={panelClassName} style={panelStyle}>
                     <div className="border-b border-slate-200 p-2">
-                        <div className="flex items-center gap-2 border border-slate-300 bg-white px-2 py-1.5">
-                            <svg
-                                viewBox="0 0 20 20"
-                                fill="currentColor"
-                                className="h-4 w-4 text-slate-400"
-                                aria-hidden="true"
-                            >
-                                <path
-                                    fillRule="evenodd"
-                                    clipRule="evenodd"
-                                    d="M9 3a6 6 0 1 0 3.873 10.59l3.768 3.768a1 1 0 0 0 1.415-1.415l-3.769-3.768A6 6 0 0 0 9 3Zm-4 6a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z"
+                        <div className="flex items-center gap-2">
+                            {pastToggle && (
+                                <label className="flex items-center gap-1 text-xs text-slate-600 whitespace-nowrap select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={pastChecked}
+                                        onChange={(event) => setPastChecked(event.target.checked)}
+                                        className="h-3.5 w-3.5"
+                                        data-testid="explorer-event-search-include-past"
+                                    />
+                                    Include past
+                                </label>
+                            )}
+                            <div className="flex flex-1 items-center gap-2 border border-slate-300 bg-white px-2 py-1.5">
+                                <svg
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                    className="h-4 w-4 text-slate-400"
+                                    aria-hidden="true"
+                                >
+                                    <path
+                                        fillRule="evenodd"
+                                        clipRule="evenodd"
+                                        d="M9 3a6 6 0 1 0 3.873 10.59l3.768 3.768a1 1 0 0 0 1.415-1.415l-3.769-3.768A6 6 0 0 0 9 3Zm-4 6a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z"
+                                    />
+                                </svg>
+                                <input
+                                    ref={inputRef}
+                                    type="text"
+                                    value={q}
+                                    onChange={(event) => setQ(event.target.value)}
+                                    onKeyDown={onKeyDown}
+                                    placeholder={effectiveIncludePast ? 'Search past events by title' : 'Search upcoming events by title'}
+                                    aria-label={effectiveIncludePast ? 'Search past events by title' : 'Search upcoming events by title'}
+                                    className="w-full bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
                                 />
-                            </svg>
-                            <input
-                                ref={inputRef}
-                                type="text"
-                                value={q}
-                                onChange={(event) => setQ(event.target.value)}
-                                onKeyDown={onKeyDown}
-                                placeholder={includePast ? 'Search past events by title' : 'Search upcoming events by title'}
-                                aria-label={includePast ? 'Search past events by title' : 'Search upcoming events by title'}
-                                className="w-full bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
-                            />
+                            </div>
                         </div>
                     </div>
                     <div className="max-h-80 overflow-auto bg-slate-50 px-2 py-1.5">
@@ -259,8 +281,8 @@ export default function ExplorerEventSearch({
                         )}
                         {term.length >= 2 && !loading && visibleResults.length === 0 && (
                             <div className="bg-white p-3 text-xs text-slate-500">
-                                No {includePast ? 'past' : 'upcoming'} events match “{term}”.
-                                {includePast && (
+                                No {effectiveIncludePast ? 'past' : 'upcoming'} events match “{term}”.
+                                {effectiveIncludePast && (
                                     <>
                                         {' '}
                                         <Link
@@ -276,7 +298,7 @@ export default function ExplorerEventSearch({
                             </div>
                         )}
                         {visibleResults.map((row, index) => {
-                            if (includePast) {
+                            if (effectiveIncludePast) {
                                 const when = formatPastDate(row.start);
                                 return (
                                     <button

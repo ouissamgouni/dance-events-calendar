@@ -52,7 +52,7 @@ export default function EventDetailsPanel({
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                     <SaveEventButton eventId={event.event_id} appearance="icon" />
-                    <GoingButton eventId={event.event_id} appearance="icon" />
+                    <GoingButton eventId={event.event_id} appearance="icon" isPast={new Date(event.end).getTime() < Date.now()} />
                     {onHide && (
                         <button
                             onClick={onHide}

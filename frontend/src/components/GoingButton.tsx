@@ -25,6 +25,8 @@ interface Props {
     prominent?: boolean;
     stopPropagation?: boolean;
     className?: string;
+    /** When true, the event has already ended — labels use past tense ("Attended"). */
+    isPast?: boolean;
 }
 
 /** Heroicons hand-raised — outline when not going, solid when going */
@@ -107,6 +109,7 @@ export default function GoingButton({
     prominent = false,
     stopPropagation = false,
     className = '',
+    isPast = false,
 }: Props) {
     const { isAttending, toggleAttending, setAudience, getAudience } = useAttendingEvents();
     const { user, refreshUser } = useAuth();
@@ -263,7 +266,10 @@ export default function GoingButton({
     };
 
     const iconSizeClass = size === 'sm' ? 'w-4 h-4' : 'w-5 h-5';
-    const tooltip = going ? 'Not going' : "I'm going";
+    const goingLabel = isPast ? 'Attended' : 'Going';
+    const markLabel = isPast ? 'I attended' : "I'm going";
+    const unmarkLabel = isPast ? "Didn't attend" : 'Not going';
+    const tooltip = going ? unmarkLabel : markLabel;
 
     /**
      * Surface the unified post-RSVP popover. Fires every time the user
@@ -324,6 +330,7 @@ export default function GoingButton({
             anchorRef={triggerRef}
             variant={postRsvpVariant}
             userName={user?.name ?? null}
+            isPast={isPast}
             onClose={dismissPostRsvp}
             onShare={shareEventNow}
             audience={user ? getAudience(eventId) : undefined}
@@ -361,7 +368,7 @@ export default function GoingButton({
             role="dialog"
             aria-label="Attendance visibility"
             style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left, width: POPOVER_WIDTH }}
-            className="z-[9000] border border-slate-200 bg-white p-3 shadow-xl text-left"
+            className="z-[12000] border border-slate-200 bg-white p-3 shadow-xl text-left"
         >
             <p className="text-xs font-medium text-slate-800 mb-2">
                 {popoverKind === 'confirm' ? "You're going!" : 'Edit visibility'}
@@ -424,7 +431,7 @@ export default function GoingButton({
                         }}
                         className="text-xs px-2 py-1 text-rose-600 hover:bg-rose-50"
                     >
-                        Not going
+                        {unmarkLabel}
                     </button>
                 ) : (
                     <span />
@@ -444,7 +451,7 @@ export default function GoingButton({
                                 onClick={confirmGoing}
                                 className="text-xs px-3 py-1 bg-blue-500 text-white hover:bg-blue-600"
                             >
-                                I'm going
+                                {markLabel}
                             </button>
                         </>
                     ) : (
@@ -481,7 +488,7 @@ export default function GoingButton({
                         className="text-xs px-3 py-1 transition flex items-center gap-1.5 hover:bg-emerald-200"
                     >
                         <RaisedHandIcon solid className="w-3.5 h-3.5" />
-                        Going
+                        {goingLabel}
                     </button>
                     <button
                         type="button"
@@ -515,7 +522,7 @@ export default function GoingButton({
                         solid={going}
                         className={prominent && !going ? 'w-4 h-4' : 'w-3.5 h-3.5'}
                     />
-                    {going ? 'Going' : "I'm going"}
+                    {going ? goingLabel : markLabel}
                 </button>
                 {popover}
                 {postRsvpNode}

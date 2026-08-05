@@ -36,6 +36,8 @@ import { useAttendanceInvalidationKey } from '../context/AttendanceSummariesCont
 interface Props {
     eventId: string;
     eventTitle: string;
+    /** When true, the event has already ended — labels use past tense ("attended"). */
+    isPast?: boolean;
 }
 
 const FRIENDS_INLINE_CAP = 6;
@@ -322,7 +324,7 @@ function OtherChip({ a, isSelf = false }: { a: Attendee; isSelf?: boolean }) {
 // Main section
 // ---------------------------------------------------------------------------
 
-export default function InterestSection({ eventId, eventTitle }: Props) {
+export default function InterestSection({ eventId, eventTitle, isPast = false }: Props) {
     const { user } = useAuth();
     const invalidationKey = useAttendanceInvalidationKey(eventId);
     const [summary, setSummary] = useState<AttendanceSummary | null>(null);
@@ -473,10 +475,10 @@ export default function InterestSection({ eventId, eventTitle }: Props) {
                 <div className="mb-2">{Header}</div>
                 {!collapsed && (
                     <>
-                        <CountsRow summary={summary} />
+                        <CountsRow summary={summary} isPast={isPast} />
                         {summary.total_going > 0 && (
                             <div className="text-slate-500 mt-1">
-                                Sign in to see who's going.
+                                {isPast ? 'Sign in to see who attended.' : "Sign in to see who's going."}
                             </div>
                         )}
                     </>
@@ -502,18 +504,18 @@ export default function InterestSection({ eventId, eventTitle }: Props) {
             {Header}
             {!collapsed && (
                 <>
-                    <CountsRow summary={summary} />
+                    <CountsRow summary={summary} isPast={isPast} />
 
                     {isEmpty ? (
                         <div className="text-[11px] text-slate-500">
                             No one has shared their name yet — be the first by marking
-                            yourself going publicly.
+                            yourself {isPast ? 'attended' : 'going'} publicly.
                         </div>
                     ) : (
                         <>
                             {friends.length > 0 && (
                                 <BucketRow
-                                    label="★ Friends going"
+                                    label={isPast ? '★ Friends attended' : '★ Friends going'}
                                     testid="interest-friends"
                                     count={friends.length}
                                 >
@@ -537,7 +539,7 @@ export default function InterestSection({ eventId, eventTitle }: Props) {
                             )}
                             {others.length > 0 && (
                                 <BucketRow
-                                    label="· Also going"
+                                    label={isPast ? '· Also attended' : '· Also going'}
                                     testid="interest-others"
                                     count={others.length}
                                 >
@@ -577,6 +579,7 @@ export default function InterestSection({ eventId, eventTitle }: Props) {
                     others={others}
                     anonymousTail={anonymousTail}
                     selfUserId={user.user_id}
+                    isPast={isPast}
                     onClose={() => setModalOpen(false)}
                 />
             )}
@@ -588,11 +591,11 @@ export default function InterestSection({ eventId, eventTitle }: Props) {
 // Small bits
 // ---------------------------------------------------------------------------
 
-function CountsRow({ summary }: { summary: AttendanceSummary }) {
+function CountsRow({ summary, isPast = false }: { summary: AttendanceSummary; isPast?: boolean }) {
     return (
         <div className="text-xs text-slate-600 flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <span>
-                <span className="font-medium">{summary.total_going}</span> going
+                <span className="font-medium">{summary.total_going}</span> {isPast ? 'attended' : 'going'}
             </span>
             <span className="text-slate-300">·</span>
             <span>
@@ -636,6 +639,7 @@ function GoingModal({
     others,
     anonymousTail,
     selfUserId,
+    isPast = false,
     onClose,
 }: {
     eventTitle: string;
@@ -644,6 +648,7 @@ function GoingModal({
     others: Attendee[];
     anonymousTail: number;
     selfUserId: string | undefined;
+    isPast?: boolean;
     onClose: () => void;
 }) {
     useEffect(() => {
@@ -662,7 +667,7 @@ function GoingModal({
             <div
                 role="dialog"
                 aria-modal="true"
-                aria-label={`Going to ${eventTitle}`}
+                aria-label={`${isPast ? 'Attended' : 'Going to'} ${eventTitle}`}
                 onClick={(e) => e.stopPropagation()}
                 className="bg-white border border-slate-200 shadow-lg w-full sm:max-w-md max-h-[80vh] flex flex-col text-xs"
                 data-testid="interest-modal"
@@ -670,7 +675,7 @@ function GoingModal({
                 <div className="flex items-start justify-between p-3 border-b border-slate-200">
                     <div className="min-w-0">
                         <h2 className="text-sm font-semibold text-slate-800 truncate">
-                            Going to "{eventTitle}"
+                            {isPast ? 'Attended' : 'Going to'} "{eventTitle}"
                         </h2>
                     </div>
                     <button
@@ -685,9 +690,9 @@ function GoingModal({
 
                 <div className="overflow-y-auto flex-1">
                     <ModalSection
-                        label="★ Friends going"
+                        label={isPast ? '★ Friends attended' : '★ Friends going'}
                         count={friends.length}
-                        emptyCopy="No friends going yet."
+                        emptyCopy={isPast ? 'No friends attended yet.' : 'No friends going yet.'}
                     >
                         {friends.map((a) => (
                             <ModalRow
@@ -707,7 +712,7 @@ function GoingModal({
                     <ModalSection
                         label="· Friends of friends"
                         count={fofs.length}
-                        emptyCopy="No friends of friends going yet."
+                        emptyCopy={isPast ? 'No friends of friends attended yet.' : 'No friends of friends going yet.'}
                     >
                         {fofs.map((a) => (
                             <ModalRow
@@ -735,7 +740,7 @@ function GoingModal({
                     </ModalSection>
 
                     <ModalSection
-                        label="· Also going"
+                        label={isPast ? '· Also attended' : '· Also going'}
                         count={others.length}
                         emptyCopy="No other public attendees yet."
                     >
@@ -759,7 +764,7 @@ function GoingModal({
                         })}
                         {anonymousTail > 0 && (
                             <li className="px-3 py-2 text-[11px] text-slate-500">
-                                +{anonymousTail} anonymous public going
+                                +{anonymousTail} anonymous public {isPast ? 'attended' : 'going'}
                             </li>
                         )}
                     </ModalSection>
