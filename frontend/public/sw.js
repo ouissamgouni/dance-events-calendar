@@ -1,58 +1,34 @@
 /*
  * Movida service worker.
  *
- * Two jobs:
- *   1. PWA installability + a lightweight offline app-shell fallback so the
- *      installed app opens even with no network. We deliberately do NOT
- *      precache hashed build assets here (that needs build-time injection);
- *      installability only requires a registered SW with a fetch handler plus
- *      a manifest carrying 192/512 maskable icons.
- *   2. Web-push delivery (reminders + friend/event activity) via the `push`
- *      and `notificationclick` handlers below. The backend signs payloads
- *      with VAPID; see backend/services/push_service.py.
+ * Job: web-push delivery (reminders + friend/event activity) via the `push`
+ * and `notificationclick` handlers below. The backend signs payloads with
+ * VAPID; see backend/services/push_service.py.
  *
- * Versioned cache name — bump SHELL_CACHE to invalidate the app-shell entry
- * on breaking changes.
+ * We deliberately do NOT cache the navigation HTML shell. The built index.html
+ * embeds hashed asset URLs (/assets/index-<hash>.js) that rotate on every
+ * deploy; serving a cached shell would point the app at assets that no longer
+ * exist → a blank/unstyled PWA. The SPA is always fetched fresh from the edge.
  */
-const SHELL_CACHE = 'movida-shell-v1';
-const APP_SHELL = '/';
 
-self.addEventListener('install', (event) => {
-    // Warm the navigation fallback so the first offline load still renders.
-    event.waitUntil(
-        caches
-            .open(SHELL_CACHE)
-            .then((cache) => cache.add(APP_SHELL))
-            .catch(() => undefined),
-    );
+self.addEventListener('install', () => {
+    // Take over as soon as the new worker is installed so cache-purging in
+    // `activate` (below) runs promptly for users on a stale worker.
     self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         (async () => {
+            // Purge any legacy app-shell caches left by older SW versions.
             const keys = await caches.keys();
             await Promise.all(
                 keys
-                    .filter((k) => k.startsWith('movida-shell-') && k !== SHELL_CACHE)
+                    .filter((k) => k.startsWith('movida-shell-'))
                     .map((k) => caches.delete(k)),
             );
             await self.clients.claim();
         })(),
-    );
-});
-
-self.addEventListener('fetch', (event) => {
-    const { request } = event;
-    // Only handle top-level navigations; let everything else hit the network
-    // normally (API calls, hashed assets, cross-origin Google/CDN requests).
-    if (request.mode !== 'navigate') return;
-    event.respondWith(
-        fetch(request).catch(async () => {
-            const cache = await caches.open(SHELL_CACHE);
-            const cached = await cache.match(APP_SHELL);
-            return cached || Response.error();
-        }),
     );
 });
 

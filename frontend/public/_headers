@@ -1,0 +1,11 @@
+# Cloudflare Pages custom headers.
+# https://developers.cloudflare.com/pages/configuration/headers/
+
+# Never HTTP-cache the service worker or the app manifest so a new deploy's
+# worker is picked up immediately (otherwise browsers may reuse a stale sw.js
+# for up to 24h and users stay on an old worker after a release).
+/sw.js
+  Cache-Control: no-cache
+
+/manifest.json
+  Cache-Control: no-cache
