@@ -55,7 +55,7 @@ def _no_send(monkeypatch):
     """Stub email/push so run_once never touches the network by default."""
     monkeypatch.setattr(
         milestone_notification_service,
-        "send_milestone_unlocked_email",
+        "send_milestones_unlocked_email",
         lambda *a, **k: True,
     )
     monkeypatch.setattr(milestone_notification_service, "send_push", lambda *a, **k: 0)
@@ -156,13 +156,40 @@ def test_distinct_milestones_get_distinct_notifications(session):
     assert {"first_event", "events_10"} <= keys
 
 
+def test_multiple_milestones_combined_into_one_email(session, monkeypatch):
+    """Two milestones unlocked in the same pass send a single combined email."""
+    calls: list = []
+    monkeypatch.setattr(
+        milestone_notification_service,
+        "send_milestones_unlocked_email",
+        lambda u, ms: calls.append([m.key for m in ms]) or True,
+    )
+    monkeypatch.setattr(milestone_notification_service, "send_push", lambda *a, **k: 0)
+    fran = _make_user(session, "fran@example.com", "fran")
+    for i in range(10):
+        _attend_past_event(session, fran, f"fev-{i}", days_ago=100 - i)
+
+    stats = milestone_notification_service.run_once()
+    assert stats["milestones"] == 2
+    assert stats["emailed"] == 2
+    # A single email call covering both milestones.
+    assert len(calls) == 1
+    assert set(calls[0]) == {"first_event", "events_10"}
+    # Both notification rows stamped emailed_at by the one send.
+    notifs = session.exec(
+        select(Notification).where(Notification.kind == "milestone_unlocked")
+    ).all()
+    assert len(notifs) == 2
+    assert all(n.emailed_at is not None for n in notifs)
+
+
 def test_email_gated_off_still_creates_in_app(session, monkeypatch):
     emailed: list = []
     pushed: list = []
     monkeypatch.setattr(
         milestone_notification_service,
-        "send_milestone_unlocked_email",
-        lambda u, m: emailed.append(m.key) or True,
+        "send_milestones_unlocked_email",
+        lambda u, ms: emailed.extend(m.key for m in ms) or True,
     )
     monkeypatch.setattr(
         milestone_notification_service,
@@ -196,8 +223,8 @@ def test_email_backfilled_after_toggle_flip(session, monkeypatch):
     emailed: list = []
     monkeypatch.setattr(
         milestone_notification_service,
-        "send_milestone_unlocked_email",
-        lambda u, m: emailed.append(m.key) or True,
+        "send_milestones_unlocked_email",
+        lambda u, ms: emailed.extend(m.key for m in ms) or True,
     )
     monkeypatch.setattr(milestone_notification_service, "send_push", lambda *a, **k: 0)
     erin = _make_user(

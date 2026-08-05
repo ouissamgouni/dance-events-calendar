@@ -42,7 +42,7 @@ from backend.db.models import (
     UserEventAttendance,
     UserMilestone,
 )
-from backend.services.email import send_milestone_unlocked_email
+from backend.services.email import send_milestones_unlocked_email
 from backend.services.notification_delivery import record_delivery
 from backend.services.push_service import send_push
 
@@ -179,14 +179,20 @@ def _dispatch_channels(to_email, to_push, notif_ids, session=None) -> tuple[int,
     are written on it; otherwise (scheduler path) a fresh engine session is
     opened so the main pass isn't held open during slow SMTP/webpush I/O.
     """
+    # Combine all milestones a user unlocked this pass into one email.
+    by_user: dict = {}
+    for user, milestone in to_email:
+        by_user.setdefault(user.id, (user, []))[1].append(milestone)
+
     emailed = 0
     emailed_ids: list[int] = []
-    for user, milestone in to_email:
-        if send_milestone_unlocked_email(user, milestone):
-            emailed += 1
-            nid = notif_ids.get((user.id, milestone.key))
-            if nid is not None:
-                emailed_ids.append(nid)
+    for user, milestones in by_user.values():
+        if send_milestones_unlocked_email(user, milestones):
+            emailed += len(milestones)
+            for milestone in milestones:
+                nid = notif_ids.get((user.id, milestone.key))
+                if nid is not None:
+                    emailed_ids.append(nid)
 
     pushed = 0
     pushed_ids: list[int] = []

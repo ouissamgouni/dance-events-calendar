@@ -439,21 +439,37 @@ def send_event_review_prompt_email(user, event, friend_proof=None) -> bool:
     return _send_email(user.email, subject, html, "review prompt")
 
 
-def send_milestone_unlocked_email(user, milestone) -> bool:
-    """Email a user that they unlocked a Dance Passport milestone (see
-    ``services/milestone_notification_service.py``). ``milestone`` is a
-    ``passport.Milestone``."""
-    if not user.email:
+def send_milestones_unlocked_email(user, milestones) -> bool:
+    """Email a user that they unlocked one or more Dance Passport milestones
+    (see ``services/milestone_notification_service.py``). ``milestones`` is a
+    non-empty list of ``passport.Milestone``; multiple unlocked in the same
+    dispatch pass are combined into a single email instead of one per milestone.
+    """
+    if not user.email or not milestones:
         return False
     app = get_public_app_url()
     passport_url = f"{app}/passport"
-    name = escape(milestone.name)
-    description = escape(milestone.description)
-    subject = f"Milestone unlocked: {milestone.name}"
+    if len(milestones) == 1:
+        m = milestones[0]
+        subject = f"Milestone unlocked: {m.name}"
+        intro = "<p>You just unlocked a new Dance Passport milestone:</p>"
+        items = (
+            f'<p style="font-size:22px;margin:8px 0">{m.icon} '
+            f"<strong>{escape(m.name)}</strong></p>"
+            f'<p style="color:#374151;margin:4px 0">{escape(m.description)}</p>'
+        )
+    else:
+        subject = f"You unlocked {len(milestones)} milestones! 🎉"
+        intro = "<p>You just unlocked new Dance Passport milestones:</p>"
+        items = "".join(
+            f'<p style="font-size:20px;margin:12px 0 2px">{m.icon} '
+            f"<strong>{escape(m.name)}</strong></p>"
+            f'<p style="color:#374151;margin:0 0 4px">{escape(m.description)}</p>'
+            for m in milestones
+        )
     body = f"""
-    <p>You just unlocked a new Dance Passport milestone:</p>
-    <p style="font-size:22px;margin:8px 0">{milestone.icon} <strong>{name}</strong></p>
-    <p style="color:#374151;margin:4px 0">{description}</p>
+    {intro}
+    {items}
     <p style="margin:20px 0">
       <a href="{passport_url}"
                  style="background:#3b82f6;color:#fff;text-decoration:none;
@@ -464,7 +480,12 @@ def send_milestone_unlocked_email(user, milestone) -> bool:
     {_engagement_ctas_html(f"{app}/account#notify-milestone-unlocked")}
     """
     footer = _unsubscribe_footer(user.id, "milestone", "achievement updates")
-    html = _email_shell("New milestone unlocked 🎉", body, footer)
+    heading = (
+        "New milestone unlocked 🎉"
+        if len(milestones) == 1
+        else "New milestones unlocked 🎉"
+    )
+    html = _email_shell(heading, body, footer)
     return _send_email(user.email, subject, html, "milestone unlocked")
 
 
