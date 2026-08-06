@@ -68,6 +68,36 @@ LOCATION_SIMILARITY_THRESHOLD = 0.6
 _WHITESPACE_RE = re.compile(r"\s+")
 
 
+class SeriesMembershipConflict(ValueError):
+    """One or more events already belong to a series — the single-membership
+    invariant (an event is in at most one series) would be violated."""
+
+    def __init__(self, conflicts: dict[str, int]) -> None:
+        self.conflicts = conflicts  # event_id -> existing series_id
+        super().__init__("One or more events already belong to a series")
+
+
+def _series_ids_for_events(session: Session, event_ids: list[str]) -> dict[str, int]:
+    """Map each of ``event_ids`` that is already a series member to its series id."""
+    if not event_ids:
+        return {}
+    rows = session.exec(
+        select(EventSeriesMember.event_id, EventSeriesMember.series_id).where(
+            EventSeriesMember.event_id.in_(event_ids)
+        )
+    ).all()
+    return {event_id: series_id for event_id, series_id in rows}
+
+
+def _series_of(session: Session, event_id: str) -> EventSeries | None:
+    member = session.exec(
+        select(EventSeriesMember).where(EventSeriesMember.event_id == event_id)
+    ).first()
+    if member is None:
+        return None
+    return session.get(EventSeries, member.series_id)
+
+
 def _normalize(text: str) -> str:
     return _WHITESPACE_RE.sub(" ", (text or "").strip().lower())
 
@@ -158,18 +188,21 @@ def _add_to_series_or_create(
     if _existing_pair_recorded(session, event_id, matched_event_id):
         return None
 
-    # Join an existing pending series containing either event, if any.
-    existing_member = session.exec(
-        select(EventSeriesMember).where(
-            EventSeriesMember.event_id.in_([event_id, matched_event_id])
-        )
-    ).first()
+    series_a = _series_of(session, event_id)
+    series_b = _series_of(session, matched_event_id)
+
+    # Single-membership invariant: an event belongs to at most one series,
+    # so never span two series or disturb a resolved/dismissed membership.
+    if series_a is not None and series_b is not None:
+        return None
 
     series: EventSeries | None = None
-    if existing_member is not None:
-        candidate_series = session.get(EventSeries, existing_member.series_id)
-        if candidate_series is not None and candidate_series.status == "pending":
-            series = candidate_series
+    if series_a is not None and series_a.status == "pending":
+        series = series_a
+    elif series_b is not None and series_b.status == "pending":
+        series = series_b
+    elif series_a is not None or series_b is not None:
+        return None
 
     if series is None:
         series = EventSeries(
@@ -179,13 +212,7 @@ def _add_to_series_or_create(
         session.flush()  # assign series.id
 
     for eid in (event_id, matched_event_id):
-        already = session.exec(
-            select(EventSeriesMember).where(
-                EventSeriesMember.series_id == series.id,
-                EventSeriesMember.event_id == eid,
-            )
-        ).first()
-        if not already:
+        if _series_of(session, eid) is None:
             session.add(EventSeriesMember(series_id=series.id, event_id=eid))
 
     return series
@@ -308,8 +335,11 @@ def create_manual_series(
     triggered_by_admin: str | None = None,
 ) -> EventSeries:
     """Admin-initiated ad-hoc grouping ("Group as series" bulk action).
-    Always creates a new series — manual grouping is intentional, not
-    deduped against prior decisions."""
+    Creates a new series. Rejects events that already belong to a series
+    (single-membership invariant)."""
+    conflicts = _series_ids_for_events(session, event_ids)
+    if conflicts:
+        raise SeriesMembershipConflict(conflicts)
     title = canonical_title or ""
     if not title and event_ids:
         first = session.get(CachedEvent, event_ids[0])
@@ -329,6 +359,39 @@ def create_manual_series(
         groups_created=1,
     )
     session.add(log)
+    session.commit()
+    session.refresh(series)
+    return series
+
+
+def add_events_to_series(
+    session: Session,
+    series_id: int,
+    event_ids: list[str],
+) -> EventSeries:
+    """Append events to an existing series. Rejects the whole operation if
+    any event already belongs to a series (single-membership invariant)."""
+    series = session.get(EventSeries, series_id)
+    if series is None:
+        raise ValueError("Series not found")
+    conflicts = _series_ids_for_events(session, event_ids)
+    if conflicts:
+        raise SeriesMembershipConflict(conflicts)
+    for event_id in event_ids:
+        session.add(EventSeriesMember(series_id=series.id, event_id=event_id))
+    session.commit()
+    session.refresh(series)
+    return series
+
+
+def rename_series(
+    session: Session, series_id: int, canonical_title: str
+) -> EventSeries:
+    series = session.get(EventSeries, series_id)
+    if series is None:
+        raise ValueError("Series not found")
+    series.canonical_title = canonical_title
+    session.add(series)
     session.commit()
     session.refresh(series)
     return series
@@ -374,14 +437,11 @@ def dismiss_series(
     return series
 
 
-def split_member(session: Session, series_id: int, event_id: str) -> EventSeries:
-    """Remove a single occurrence from a series ("Split off" action) —
-    the event itself is untouched, only its series membership is removed.
-    The pair recorded against the OTHER remaining members is intentionally
-    left in place via ``EventSeriesMember`` history semantics: since the
-    member row is deleted, a future scan CAN recreate a pairing for this
-    event against the remaining members (this is desired — a wrongly
-    grouped one-off shouldn't permanently block a legitimate later match)."""
+def split_member(session: Session, series_id: int, event_id: str) -> EventSeries | None:
+    """Remove a single occurrence from a series ("Split off"/"Remove"). The
+    event itself is untouched, only its series membership is removed. When
+    fewer than two members remain the series is hard-deleted (a series of
+    one is meaningless); returns None in that case, else the series."""
     series = session.get(EventSeries, series_id)
     if series is None:
         raise ValueError("Series not found")
@@ -394,14 +454,30 @@ def split_member(session: Session, series_id: int, event_id: str) -> EventSeries
     if member is None:
         raise ValueError("Event is not a member of this series")
     session.delete(member)
+    session.flush()
+    remaining = session.exec(
+        select(EventSeriesMember).where(EventSeriesMember.series_id == series_id)
+    ).all()
+    if len(remaining) < 2:
+        for row in remaining:
+            session.delete(row)
+        session.flush()  # remove member rows before the parent series (FK)
+        session.delete(series)
+        session.commit()
+        return None
     session.commit()
     session.refresh(series)
     return series
 
 
-def get_series_for_event(session: Session, event_id: str) -> list[EventSeries]:
-    """Pending series (if any) that include this event — used by the
-    admin event-detail panel's "Part of a series" section."""
+def get_series_for_event(
+    session: Session,
+    event_id: str,
+    statuses: tuple[str, ...] = ("pending",),
+) -> list[EventSeries]:
+    """Series (in the given statuses) that include this event — used by the
+    admin event-detail panel's "Part of a series" section. Defaults to
+    pending-only; the detail route also includes resolved membership."""
     series_ids = session.exec(
         select(EventSeriesMember.series_id).where(
             EventSeriesMember.event_id == event_id
@@ -412,6 +488,6 @@ def get_series_for_event(session: Session, event_id: str) -> list[EventSeries]:
     return session.exec(
         select(EventSeries).where(
             EventSeries.id.in_(series_ids),
-            EventSeries.status == "pending",
+            EventSeries.status.in_(statuses),
         )
     ).all()

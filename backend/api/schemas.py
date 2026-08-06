@@ -1394,6 +1394,19 @@ class SeriesSplitRequest(BaseModel):
     event_id: str
 
 
+class SeriesAddMembersRequest(BaseModel):
+    event_ids: list[str] = Field(..., min_length=1, max_length=20)
+
+
+class SeriesRenameRequest(BaseModel):
+    canonical_title: str = Field(..., max_length=200)
+
+
+class SeriesSplitResponse(BaseModel):
+    dissolved: bool = False
+    series: Optional[SeriesGroupResponse] = None
+
+
 class FilterOption(BaseModel):
     value: str
     label: str

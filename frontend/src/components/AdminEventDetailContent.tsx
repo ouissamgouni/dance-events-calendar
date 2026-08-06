@@ -307,6 +307,231 @@ export default function AdminEventDetailContent({
                 )}
             </div>
 
+            {/* Location */}
+            {editingField === 'location' ? (
+                <div className="space-y-1.5">
+                    <AddressAutocomplete
+                        value={editValue}
+                        onChange={(v) => { setEditValue(v); setEditLocationDirty(true); }}
+                        onSelect={(s: GeocodeSuggestion) => {
+                            setEditValue(s.display_name);
+                            setEditLocationLat(s.latitude);
+                            setEditLocationLng(s.longitude);
+                            setEditLocationDirty(false);
+                        }}
+                    />
+                    {saveError && <p className="text-[10px] text-red-500 mt-1">{saveError}</p>}
+                    <div className="flex gap-2">
+                        <button
+                            disabled={saving}
+                            onClick={() => {
+                                const changes: Partial<CalendarEvent> = { location: editValue || null };
+                                if (!editLocationDirty) {
+                                    changes.latitude = editLocationLat ?? undefined;
+                                    changes.longitude = editLocationLng ?? undefined;
+                                }
+                                saveField(changes);
+                            }}
+                            className="text-[11px] font-medium px-2.5 py-1 bg-rose-500 text-white rounded hover:bg-rose-600 disabled:opacity-50 transition"
+                        >{saving ? 'Saving…' : 'Save'}</button>
+                        <button onClick={cancelEdit} className="text-[11px] text-slate-500 hover:text-slate-700 px-2">Cancel</button>
+                    </div>
+                </div>
+            ) : event.location ? (
+                <div className="group relative cursor-pointer" onClick={startLocationEdit}>
+                    <p className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 transition">
+                        <span className="mt-0.5 flex items-center gap-1">
+                            📍
+                            <LocationBadge size="sm" location={event.location} latitude={event.latitude} longitude={event.longitude} />
+                        </span>
+                        <span className="flex-1">{event.location}</span>
+                        <button
+                            onClick={async (e) => {
+                                e.stopPropagation();
+                                if (retryingGeo) return;
+                                setRetryingGeo(true);
+                                setRetryGeoMsg(null);
+                                try {
+                                    const r = await retryGeocodingSingle(event.event_id);
+                                    setRetryGeoMsg(
+                                        r.geocoded > 0 ? '✓ geocoded' :
+                                            r.failed > 0 ? '✗ still no match' : 'no change',
+                                    );
+                                    if (r.geocoded > 0) onTagsUpdated?.();
+                                } catch {
+                                    setRetryGeoMsg('error');
+                                } finally {
+                                    setRetryingGeo(false);
+                                    setTimeout(() => setRetryGeoMsg(null), 4000);
+                                }
+                            }}
+                            disabled={retryingGeo}
+                            title="Retry geocoding"
+                            className="shrink-0 self-start text-[10px] font-medium px-1.5 py-0.5 border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 transition"
+                        >{retryingGeo ? '…' : retryGeoMsg ?? '↻ Retry geoloc'}</button>
+                    </p>
+                    <EditHint />
+                </div>
+            ) : (
+                <div
+                    className="cursor-pointer text-[11px] text-slate-400 hover:text-slate-600 border border-dashed border-slate-200 rounded-lg px-3 py-2 transition"
+                    onClick={startLocationEdit}
+                >+ Add location</div>
+            )}
+
+            {/* Tags (collapsible, auto-saves on toggle) */}
+            <div className="border border-slate-200 rounded-lg bg-slate-50 overflow-hidden">
+                <button
+                    type="button"
+                    onClick={() => setTagsExpanded((v) => !v)}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 transition"
+                >
+                    <span className="text-slate-400 text-[10px]">{tagsExpanded ? '▾' : '▸'}</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Tags</span>
+                    {!tagsExpanded && event.tags?.length > 0 && (
+                        <span className="flex-1 min-w-0">
+                            <TagBadges tags={event.tags} maxVisible={event.tags.length} forceBadge forceColored />
+                        </span>
+                    )}
+                    {!tagsExpanded && (!event.tags || event.tags.length === 0) && (
+                        <span className="text-[11px] text-slate-400 italic">none</span>
+                    )}
+                </button>
+                {tagsExpanded && (
+                    <div className="border-t border-slate-200 bg-white max-h-72 overflow-y-auto p-3">
+                        <InlineTagsPicker
+                            eventId={event.event_id}
+                            currentTags={event.tags || []}
+                            onUpdated={() => onTagsUpdated?.()}
+                        />
+                    </div>
+                )}
+            </div>
+
+            {/* Auto-generated tag suggestions (heuristic; admin approves/rejects). */}
+            <AdminAutoTagSuggestions
+                eventId={event.event_id}
+                onApproved={() => onTagsUpdated?.()}
+            />
+
+            {/* Description */}
+            {editingField === 'description' ? (
+                <div>
+                    <textarea
+                        autoFocus
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onBlur={() => handleTextBlur('description', editValue)}
+                        onKeyDown={(e) => { if (e.key === 'Escape') { cancelledRef.current = true; cancelEdit(); } }}
+                        rows={6}
+                        className={`w-full border border-slate-300 rounded p-2 leading-relaxed text-slate-600 resize-y focus:outline-none focus:ring-1 focus:ring-rose-300 ${compact ? 'text-xs' : 'text-sm'}`}
+                    />
+                    {saving && <p className="text-[10px] text-slate-400 mt-1">Saving…</p>}
+                    {saveError && <p className="text-[10px] text-red-500 mt-1">{saveError}</p>}
+                </div>
+            ) : event.description ? (
+                <div
+                    className="group relative cursor-text rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 hover:bg-slate-100 transition"
+                    onClick={() => startEdit('description', event.description ?? '')}
+                >
+                    <ExpandableDescription text={event.description} compact={compact} />
+                    <EditHint />
+                </div>
+            ) : (
+                <div
+                    className="cursor-pointer text-[11px] text-slate-400 hover:text-slate-600 border border-dashed border-slate-200 rounded-lg px-3 py-2 transition"
+                    onClick={() => startEdit('description', '')}
+                >+ Add description</div>
+            )}
+
+            {/* Links */}
+            {editingField === 'links' ? (
+                <div className="space-y-2 border-t border-slate-100 pt-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Links</p>
+                    <div className="rounded-lg bg-slate-50 p-3 border border-slate-200 space-y-2">
+                        {editLinks.map((link, i) => (
+                            <div key={i} className="flex gap-1.5">
+                                <input
+                                    type="url"
+                                    value={link.url}
+                                    onChange={(e) => setEditLinks((prev) => prev.map((l, j) => j === i ? { ...l, url: e.target.value } : l))}
+                                    placeholder="https://…"
+                                    className="flex-1 rounded border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
+                                />
+                                <input
+                                    type="text"
+                                    value={link.label}
+                                    onChange={(e) => setEditLinks((prev) => prev.map((l, j) => j === i ? { ...l, label: e.target.value } : l))}
+                                    placeholder="Label"
+                                    className="w-20 rounded border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setEditLinks((prev) => prev.filter((_, j) => j !== i))}
+                                    className="text-slate-400 hover:text-red-500 px-1 text-sm leading-none"
+                                >✕</button>
+                            </div>
+                        ))}
+                        {editLinks.length < 5 && (
+                            <button
+                                type="button"
+                                onClick={() => setEditLinks((prev) => [...prev, { url: '', label: '' }])}
+                                className="text-[11px] text-slate-500 hover:text-slate-700"
+                            >+ Add link</button>
+                        )}
+                        {saveError && <p className="text-[10px] text-red-500">{saveError}</p>}
+                        <div className="flex gap-2 pt-1">
+                            <button
+                                disabled={saving}
+                                onClick={() => {
+                                    const links = editLinks
+                                        .filter((l) => l.url.trim())
+                                        .map((l) => ({ url: l.url.trim(), label: l.label.trim() || null }));
+                                    saveField({ links });
+                                }}
+                                className="text-[11px] font-medium px-2.5 py-1 bg-rose-500 text-white rounded hover:bg-rose-600 disabled:opacity-50 transition"
+                            >{saving ? 'Saving…' : 'Save'}</button>
+                            <button onClick={cancelEdit} className="text-[11px] text-slate-500 hover:text-slate-700 px-2">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            ) : structuredLinks ? (
+                <div
+                    className="space-y-1.5 border-t border-slate-100 pt-3 group relative cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded transition"
+                    onClick={() => { setEditLinks(structuredLinks.map((l) => ({ url: l.url, label: l.label ?? '' }))); setEditingField('links'); }}
+                >
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Links</p>
+                    <div className="flex flex-wrap gap-1.5">
+                        {structuredLinks.map((link, i) => (
+                            <a
+                                key={i}
+                                href={link.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 transition"
+                            >🔗 {link.label || deriveLinkLabel(link.url)}</a>
+                        ))}
+                    </div>
+                    <EditHint />
+                </div>
+            ) : fallbackLinks.length > 0 ? (
+                <div
+                    className="space-y-1.5 border-t border-slate-100 pt-3 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded transition"
+                    onClick={() => { setEditLinks(fallbackLinks.map((url) => ({ url, label: '' }))); setEditingField('links'); }}
+                >
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Links (from description)</p>
+                    {fallbackLinks.map((url) => (
+                        <span key={url} className="block text-slate-600 text-xs truncate">{url}</span>
+                    ))}
+                </div>
+            ) : (
+                <div
+                    className="cursor-pointer text-[11px] text-slate-400 hover:text-slate-600 border border-dashed border-slate-200 rounded px-3 py-1.5 transition w-fit"
+                    onClick={() => { setEditLinks([]); setEditingField('links'); }}
+                >+ Add links</div>
+            )}
+
             {/* Price (collapsible: price settings + section visibility override) */}
             <div className="border border-slate-200 rounded-lg bg-slate-50 overflow-hidden">
                 <div className="w-full flex items-center gap-2 px-3 py-1.5">
@@ -430,113 +655,6 @@ export default function AdminEventDetailContent({
                 )}
             </div>
 
-            {/* Location */}
-            {editingField === 'location' ? (
-                <div className="space-y-1.5">
-                    <AddressAutocomplete
-                        value={editValue}
-                        onChange={(v) => { setEditValue(v); setEditLocationDirty(true); }}
-                        onSelect={(s: GeocodeSuggestion) => {
-                            setEditValue(s.display_name);
-                            setEditLocationLat(s.latitude);
-                            setEditLocationLng(s.longitude);
-                            setEditLocationDirty(false);
-                        }}
-                    />
-                    {saveError && <p className="text-[10px] text-red-500 mt-1">{saveError}</p>}
-                    <div className="flex gap-2">
-                        <button
-                            disabled={saving}
-                            onClick={() => {
-                                const changes: Partial<CalendarEvent> = { location: editValue || null };
-                                if (!editLocationDirty) {
-                                    changes.latitude = editLocationLat ?? undefined;
-                                    changes.longitude = editLocationLng ?? undefined;
-                                }
-                                saveField(changes);
-                            }}
-                            className="text-[11px] font-medium px-2.5 py-1 bg-rose-500 text-white rounded hover:bg-rose-600 disabled:opacity-50 transition"
-                        >{saving ? 'Saving…' : 'Save'}</button>
-                        <button onClick={cancelEdit} className="text-[11px] text-slate-500 hover:text-slate-700 px-2">Cancel</button>
-                    </div>
-                </div>
-            ) : event.location ? (
-                <div className="group relative cursor-pointer" onClick={startLocationEdit}>
-                    <p className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 transition">
-                        <span className="mt-0.5 flex items-center gap-1">
-                            📍
-                            <LocationBadge size="sm" location={event.location} latitude={event.latitude} longitude={event.longitude} />
-                        </span>
-                        <span className="flex-1">{event.location}</span>
-                        <button
-                            onClick={async (e) => {
-                                e.stopPropagation();
-                                if (retryingGeo) return;
-                                setRetryingGeo(true);
-                                setRetryGeoMsg(null);
-                                try {
-                                    const r = await retryGeocodingSingle(event.event_id);
-                                    setRetryGeoMsg(
-                                        r.geocoded > 0 ? '✓ geocoded' :
-                                            r.failed > 0 ? '✗ still no match' : 'no change',
-                                    );
-                                    if (r.geocoded > 0) onTagsUpdated?.();
-                                } catch {
-                                    setRetryGeoMsg('error');
-                                } finally {
-                                    setRetryingGeo(false);
-                                    setTimeout(() => setRetryGeoMsg(null), 4000);
-                                }
-                            }}
-                            disabled={retryingGeo}
-                            title="Retry geocoding"
-                            className="shrink-0 self-start text-[10px] font-medium px-1.5 py-0.5 border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 transition"
-                        >{retryingGeo ? '…' : retryGeoMsg ?? '↻ Retry geoloc'}</button>
-                    </p>
-                    <EditHint />
-                </div>
-            ) : (
-                <div
-                    className="cursor-pointer text-[11px] text-slate-400 hover:text-slate-600 border border-dashed border-slate-200 rounded-lg px-3 py-2 transition"
-                    onClick={startLocationEdit}
-                >+ Add location</div>
-            )}
-
-            {/* Tags (collapsible, auto-saves on toggle) */}
-            <div className="border border-slate-200 rounded-lg bg-slate-50 overflow-hidden">
-                <button
-                    type="button"
-                    onClick={() => setTagsExpanded((v) => !v)}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 transition"
-                >
-                    <span className="text-slate-400 text-[10px]">{tagsExpanded ? '▾' : '▸'}</span>
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Tags</span>
-                    {!tagsExpanded && event.tags?.length > 0 && (
-                        <span className="flex-1 min-w-0">
-                            <TagBadges tags={event.tags} maxVisible={event.tags.length} forceBadge forceColored />
-                        </span>
-                    )}
-                    {!tagsExpanded && (!event.tags || event.tags.length === 0) && (
-                        <span className="text-[11px] text-slate-400 italic">none</span>
-                    )}
-                </button>
-                {tagsExpanded && (
-                    <div className="border-t border-slate-200 bg-white max-h-72 overflow-y-auto p-3">
-                        <InlineTagsPicker
-                            eventId={event.event_id}
-                            currentTags={event.tags || []}
-                            onUpdated={() => onTagsUpdated?.()}
-                        />
-                    </div>
-                )}
-            </div>
-
-            {/* Auto-generated tag suggestions (heuristic; admin approves/rejects). */}
-            <AdminAutoTagSuggestions
-                eventId={event.event_id}
-                onApproved={() => onTagsUpdated?.()}
-            />
-
             {/* Promo codes (admin moderation + section visibility override) */}
             <AdminEventPromoCodes
                 eventId={event.event_id}
@@ -544,124 +662,6 @@ export default function AdminEventDetailContent({
                 overrideDisabled={saving}
                 onOverrideChange={(v) => saveField({ show_promo_override: v })}
             />
-
-            {/* Description */}
-            {editingField === 'description' ? (
-                <div>
-                    <textarea
-                        autoFocus
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        onBlur={() => handleTextBlur('description', editValue)}
-                        onKeyDown={(e) => { if (e.key === 'Escape') { cancelledRef.current = true; cancelEdit(); } }}
-                        rows={6}
-                        className={`w-full border border-slate-300 rounded p-2 leading-relaxed text-slate-600 resize-y focus:outline-none focus:ring-1 focus:ring-rose-300 ${compact ? 'text-xs' : 'text-sm'}`}
-                    />
-                    {saving && <p className="text-[10px] text-slate-400 mt-1">Saving…</p>}
-                    {saveError && <p className="text-[10px] text-red-500 mt-1">{saveError}</p>}
-                </div>
-            ) : event.description ? (
-                <div
-                    className="group relative cursor-text rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 hover:bg-slate-100 transition"
-                    onClick={() => startEdit('description', event.description ?? '')}
-                >
-                    <ExpandableDescription text={event.description} compact={compact} />
-                    <EditHint />
-                </div>
-            ) : (
-                <div
-                    className="cursor-pointer text-[11px] text-slate-400 hover:text-slate-600 border border-dashed border-slate-200 rounded-lg px-3 py-2 transition"
-                    onClick={() => startEdit('description', '')}
-                >+ Add description</div>
-            )}
-
-            {/* Links */}
-            {editingField === 'links' ? (
-                <div className="space-y-2 border-t border-slate-100 pt-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Links</p>
-                    <div className="rounded-lg bg-slate-50 p-3 border border-slate-200 space-y-2">
-                        {editLinks.map((link, i) => (
-                            <div key={i} className="flex gap-1.5">
-                                <input
-                                    type="url"
-                                    value={link.url}
-                                    onChange={(e) => setEditLinks((prev) => prev.map((l, j) => j === i ? { ...l, url: e.target.value } : l))}
-                                    placeholder="https://…"
-                                    className="flex-1 rounded border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
-                                />
-                                <input
-                                    type="text"
-                                    value={link.label}
-                                    onChange={(e) => setEditLinks((prev) => prev.map((l, j) => j === i ? { ...l, label: e.target.value } : l))}
-                                    placeholder="Label"
-                                    className="w-20 rounded border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setEditLinks((prev) => prev.filter((_, j) => j !== i))}
-                                    className="text-slate-400 hover:text-red-500 px-1 text-sm leading-none"
-                                >✕</button>
-                            </div>
-                        ))}
-                        {editLinks.length < 5 && (
-                            <button
-                                type="button"
-                                onClick={() => setEditLinks((prev) => [...prev, { url: '', label: '' }])}
-                                className="text-[11px] text-slate-500 hover:text-slate-700"
-                            >+ Add link</button>
-                        )}
-                        {saveError && <p className="text-[10px] text-red-500">{saveError}</p>}
-                        <div className="flex gap-2 pt-1">
-                            <button
-                                disabled={saving}
-                                onClick={() => {
-                                    const links = editLinks
-                                        .filter((l) => l.url.trim())
-                                        .map((l) => ({ url: l.url.trim(), label: l.label.trim() || null }));
-                                    saveField({ links });
-                                }}
-                                className="text-[11px] font-medium px-2.5 py-1 bg-rose-500 text-white rounded hover:bg-rose-600 disabled:opacity-50 transition"
-                            >{saving ? 'Saving…' : 'Save'}</button>
-                            <button onClick={cancelEdit} className="text-[11px] text-slate-500 hover:text-slate-700 px-2">Cancel</button>
-                        </div>
-                    </div>
-                </div>
-            ) : structuredLinks ? (
-                <div
-                    className="space-y-1.5 border-t border-slate-100 pt-3 group relative cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded transition"
-                    onClick={() => { setEditLinks(structuredLinks.map((l) => ({ url: l.url, label: l.label ?? '' }))); setEditingField('links'); }}
-                >
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Links</p>
-                    <div className="flex flex-wrap gap-1.5">
-                        {structuredLinks.map((link, i) => (
-                            <a
-                                key={i}
-                                href={link.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 transition"
-                            >🔗 {link.label || deriveLinkLabel(link.url)}</a>
-                        ))}
-                    </div>
-                    <EditHint />
-                </div>
-            ) : fallbackLinks.length > 0 ? (
-                <div
-                    className="space-y-1.5 border-t border-slate-100 pt-3 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded transition"
-                    onClick={() => { setEditLinks(fallbackLinks.map((url) => ({ url, label: '' }))); setEditingField('links'); }}
-                >
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Links (from description)</p>
-                    {fallbackLinks.map((url) => (
-                        <span key={url} className="block text-slate-600 text-xs truncate">{url}</span>
-                    ))}
-                </div>
-            ) : (
-                <div
-                    className="cursor-pointer text-[11px] text-slate-400 hover:text-slate-600 border border-dashed border-slate-200 rounded px-3 py-1.5 transition w-fit"
-                    onClick={() => { setEditLinks([]); setEditingField('links'); }}
-                >+ Add links</div>
-            )}
         </div>
     );
 }

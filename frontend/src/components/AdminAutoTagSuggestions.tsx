@@ -44,10 +44,12 @@ export default function AdminAutoTagSuggestions({ eventId, onApproved, onChanged
         try {
             // Show all pending suggestions for this event — user-submitted as
             // well as heuristic auto-suggestions — so the admin reviews
-            // everything in one place.
+            // everything in one place. Include past events: the admin opened
+            // this specific event, so its suggestions must show regardless of date.
             const rows = await fetchAdminTagSuggestions({
                 status: 'pending',
                 eventId,
+                includePast: true,
             });
             setSuggestions(rows);
             return rows;

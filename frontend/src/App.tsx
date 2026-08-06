@@ -11,7 +11,6 @@ import { AttendingEventsProvider } from './context/AttendingEventsContext';
 import { AttendanceSummariesProvider } from './context/AttendanceSummariesContext';
 import { RatingAggregatesProvider } from './context/RatingAggregatesContext';
 import { MyRatingsProvider } from './context/MyRatingsContext';
-import { AdminPrefsProvider } from './context/AdminPrefsContext';
 import { PwaInstallProvider } from './context/PwaInstallContext';
 import { QaTestPlanProvider, useQaPinnedWidth } from './components/QaTestPlanPanel';
 import { StatusBar } from './components/StatusBar';
@@ -63,13 +62,11 @@ export default function App() {
                 <RatingAggregatesProvider>
                   <MyRatingsProvider>
                     <AttendingEventsProvider>
-                      <AdminPrefsProvider>
-                        <PwaInstallProvider>
-                          <QaTestPlanProvider>
-                            <AppShell />
-                          </QaTestPlanProvider>
-                        </PwaInstallProvider>
-                      </AdminPrefsProvider>
+                      <PwaInstallProvider>
+                        <QaTestPlanProvider>
+                          <AppShell />
+                        </QaTestPlanProvider>
+                      </PwaInstallProvider>
                     </AttendingEventsProvider>
                   </MyRatingsProvider>
                 </RatingAggregatesProvider>

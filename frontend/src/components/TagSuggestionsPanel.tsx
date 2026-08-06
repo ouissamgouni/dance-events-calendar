@@ -77,7 +77,7 @@ export default function TagSuggestionsPanel({ isOpen, onClose, onCountChange }: 
         setLoading(true);
         try {
             const [s, g] = await Promise.all([
-                fetchAdminTagSuggestions(),
+                fetchAdminTagSuggestions({ includePast: true }),
                 fetchTagGroups(),
             ]);
             setSuggestions(s);

@@ -9,6 +9,8 @@ import {
 } from '../api';
 import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
 import type { SeriesGroup, SeriesScanLogEntry } from '../types';
+import SeriesGroupCard from './SeriesGroupCard';
+import SeriesDetailPanel from './SeriesDetailPanel';
 
 interface Props {
     isOpen: boolean;
@@ -18,30 +20,27 @@ interface Props {
 
 const TABS = ['pending', 'resolved', 'history'] as const;
 type Tab = typeof TABS[number];
-
-function statusBadge(status: string) {
-    const colors: Record<string, string> = {
-        pending: 'bg-amber-100 text-amber-700',
-        resolved: 'bg-emerald-100 text-emerald-700',
-        dismissed: 'bg-slate-200 text-slate-700',
-    };
-    return (
-        <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 ${colors[status] ?? 'bg-gray-100 text-gray-600'}`}>
-            {status}
-        </span>
-    );
-}
+const PAGE_SIZE = 25;
 
 export default function SeriesPanel({ isOpen, onClose, onOpenEvent }: Props) {
     const [activeTab, setActiveTab] = useState<Tab>('pending');
     const [groups, setGroups] = useState<SeriesGroup[]>([]);
+    const [total, setTotal] = useState(0);
     const [history, setHistory] = useState<SeriesScanLogEntry[]>([]);
     const [loading, setLoading] = useState(false);
     const [acting, setActing] = useState<number | null>(null);
     const [scanning, setScanning] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [q, setQ] = useState('');
+    const [debouncedQ, setDebouncedQ] = useState('');
+    const [detailSeries, setDetailSeries] = useState<SeriesGroup | null>(null);
 
-    const load = () => {
+    useEffect(() => {
+        const t = setTimeout(() => setDebouncedQ(q), 250);
+        return () => clearTimeout(t);
+    }, [q]);
+
+    const load = (offset = 0, append = false) => {
         setLoading(true);
         setError(null);
         if (activeTab === 'history') {
@@ -51,8 +50,11 @@ export default function SeriesPanel({ isOpen, onClose, onOpenEvent }: Props) {
                 .finally(() => setLoading(false));
             return;
         }
-        fetchSeriesGroups(activeTab)
-            .then((res) => setGroups(res.items))
+        fetchSeriesGroups(activeTab, { q: debouncedQ || undefined, limit: PAGE_SIZE, offset })
+            .then((res) => {
+                setGroups((prev) => (append ? [...prev, ...res.items] : res.items));
+                setTotal(res.total);
+            })
             .catch((e) => setError(e instanceof Error ? e.message : 'Failed to load'))
             .finally(() => setLoading(false));
     };
@@ -61,7 +63,7 @@ export default function SeriesPanel({ isOpen, onClose, onOpenEvent }: Props) {
         if (!isOpen) return;
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen, activeTab]);
+    }, [isOpen, activeTab, debouncedQ]);
 
     const scanNow = async () => {
         setScanning(true);
@@ -75,6 +77,16 @@ export default function SeriesPanel({ isOpen, onClose, onOpenEvent }: Props) {
         } finally {
             setScanning(false);
         }
+    };
+
+    // Apply an updated series (or removal when null) coming from the detail panel.
+    const applyChange = (seriesId: number, updated: SeriesGroup | null) => {
+        setGroups((prev) => {
+            if (!updated || (activeTab === 'pending' && updated.status !== 'pending')) {
+                return prev.filter((g) => g.id !== seriesId);
+            }
+            return prev.map((g) => (g.id === seriesId ? updated : g));
+        });
     };
 
     const approve = async (seriesId: number) => {
@@ -114,8 +126,13 @@ export default function SeriesPanel({ isOpen, onClose, onOpenEvent }: Props) {
     const split = async (seriesId: number, eventId: string) => {
         setActing(seriesId);
         try {
-            const updated = await splitSeriesMember(seriesId, eventId);
-            setGroups((prev) => prev.map((g) => (g.id === seriesId ? updated : g)));
+            const res = await splitSeriesMember(seriesId, eventId);
+            if (res.dissolved || !res.series) {
+                setGroups((prev) => prev.filter((g) => g.id !== seriesId));
+            } else {
+                const series = res.series;
+                setGroups((prev) => prev.map((g) => (g.id === seriesId ? series : g)));
+            }
             notifyAdminDataChanged();
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to split event from series');
@@ -168,6 +185,18 @@ export default function SeriesPanel({ isOpen, onClose, onOpenEvent }: Props) {
                     ))}
                 </div>
 
+                {activeTab !== 'history' && (
+                    <div className="px-4 py-2 border-b border-slate-100">
+                        <input
+                            type="text"
+                            value={q}
+                            onChange={(e) => setQ(e.target.value)}
+                            placeholder="Search series by title…"
+                            className="w-full text-xs border border-slate-300 px-2 py-1"
+                        />
+                    </div>
+                )}
+
                 {error && (
                     <div className="px-4 py-2 text-xs text-red-600 border-b border-red-200 bg-red-50">
                         {error}
@@ -205,75 +234,64 @@ export default function SeriesPanel({ isOpen, onClose, onOpenEvent }: Props) {
                     ) : (
                         <ul className="divide-y divide-slate-100">
                             {groups.map((g) => (
-                                <li key={g.id} className="p-3">
-                                    <div className="flex items-center gap-2 flex-wrap mb-2">
-                                        {statusBadge(g.status)}
-                                        <span className="text-[10px] uppercase text-slate-400">{g.source}</span>
-                                        <span className="font-medium text-xs text-slate-700">{g.canonical_title}</span>
-                                        <span className="text-[10px] text-slate-400">
-                                            {new Date(g.created_at).toLocaleString()}
-                                        </span>
-                                    </div>
-                                    <ul className="space-y-1.5">
-                                        {g.events.map((ev) => (
-                                            <li
-                                                key={ev.event_id}
-                                                className="flex items-start justify-between gap-3 border border-slate-100 bg-slate-50 px-2 py-1.5"
-                                            >
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        {onOpenEvent ? (
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => onOpenEvent(ev.event_id)}
-                                                                className="font-medium text-blue-600 hover:underline text-left text-xs"
-                                                            >
-                                                                {ev.title}
-                                                            </button>
-                                                        ) : (
-                                                            <span className="font-medium text-xs">{ev.title}</span>
-                                                        )}
-                                                    </div>
-                                                    <div className="mt-0.5 text-[10px] text-slate-500">
-                                                        {new Date(ev.start).toLocaleString()} — {ev.event_id}
-                                                    </div>
-                                                </div>
-                                                {g.status === 'pending' && (
-                                                    <button
-                                                        disabled={acting === g.id}
-                                                        onClick={() => split(g.id, ev.event_id)}
-                                                        className="text-[11px] text-slate-500 hover:text-slate-700 px-2 py-1 disabled:opacity-50 shrink-0"
-                                                    >
-                                                        Split off
-                                                    </button>
-                                                )}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                    {g.status === 'pending' && (
-                                        <div className="mt-2 flex items-center gap-2">
+                                activeTab === 'resolved' ? (
+                                    <li key={g.id} className="px-3 py-2">
+                                        <button
+                                            onClick={() => setDetailSeries(g)}
+                                            className="text-left text-xs text-blue-600 hover:underline"
+                                        >
+                                            {g.canonical_title}{' '}
+                                            <span className="text-slate-400">({g.events.length})</span>
+                                        </button>
+                                    </li>
+                                ) : (
+                                    <li key={g.id} className="p-3">
+                                        <div className="flex justify-end mb-1">
                                             <button
-                                                disabled={acting === g.id}
-                                                onClick={() => approve(g.id)}
-                                                className="text-[11px] bg-blue-500 text-white px-2 py-1 hover:bg-blue-600 disabled:opacity-50"
+                                                onClick={() => setDetailSeries(g)}
+                                                className="text-[11px] text-blue-600 hover:underline"
                                             >
-                                                Approve series
-                                            </button>
-                                            <button
-                                                disabled={acting === g.id}
-                                                onClick={() => dismiss(g.id)}
-                                                className="text-[11px] text-slate-500 hover:text-slate-700 px-2 py-1 disabled:opacity-50"
-                                            >
-                                                Not a series — dismiss
+                                                Details
                                             </button>
                                         </div>
-                                    )}
-                                </li>
+                                        <SeriesGroupCard
+                                            group={g}
+                                            acting={acting === g.id}
+                                            onApprove={() => approve(g.id)}
+                                            onDismiss={() => dismiss(g.id)}
+                                            onRemove={g.status === 'pending' ? (eventId) => split(g.id, eventId) : undefined}
+                                            onOpenEvent={onOpenEvent}
+                                        />
+                                    </li>
+                                )
                             ))}
+                            {groups.length < total && (
+                                <li className="p-3 text-center">
+                                    <button
+                                        disabled={loading}
+                                        onClick={() => load(groups.length, true)}
+                                        className="text-[11px] text-blue-600 hover:underline disabled:opacity-50"
+                                    >
+                                        {loading ? 'Loading…' : `Load more (${total - groups.length})`}
+                                    </button>
+                                </li>
+                            )}
                         </ul>
                     )}
                 </div>
             </div>
+
+            {detailSeries && (
+                <SeriesDetailPanel
+                    series={detailSeries}
+                    onClose={() => setDetailSeries(null)}
+                    onChanged={(updated) => {
+                        applyChange(detailSeries.id, updated);
+                        setDetailSeries(updated);
+                    }}
+                    onOpenEvent={onOpenEvent}
+                />
+            )}
         </div>
     );
 }

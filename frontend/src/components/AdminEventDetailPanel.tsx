@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { blockEvent, dismissDuplicateGroup, fetchAdminEvent, fetchEventDuplicateCandidates, keepDuplicateEvent, unblockEvent, updateEvent } from '../api';
+import { blockEvent, dismissDuplicateGroup, fetchAdminEvent, fetchEventDuplicateCandidates, keepDuplicateEvent, unblockEvent, updateEvent, fetchEventSeriesCandidates, splitSeriesMember, addEventsToSeries, fetchSeriesGroups } from '../api';
 import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
 import AdminEventDetailContent from './AdminEventDetailContent';
 import EventReviewsSection from './EventReviewsSection';
 import EventMap from './EventMap';
-import type { CalendarEvent, DuplicateGroup } from '../types';
+import type { CalendarEvent, DuplicateGroup, SeriesGroup } from '../types';
 
 interface Props {
     eventId: string | null;
@@ -32,6 +32,16 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
     const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[]>([]);
     const [duplicatesLoading, setDuplicatesLoading] = useState(false);
     const [duplicateActing, setDuplicateActing] = useState<number | null>(null);
+
+    // Series membership
+    const [seriesGroups, setSeriesGroups] = useState<SeriesGroup[]>([]);
+    const [seriesLoading, setSeriesLoading] = useState(false);
+    const [seriesActing, setSeriesActing] = useState(false);
+    const [addSeriesOpen, setAddSeriesOpen] = useState(false);
+    const [seriesSearch, setSeriesSearch] = useState('');
+    const [seriesSearchResults, setSeriesSearchResults] = useState<SeriesGroup[]>([]);
+    const [seriesSearchLoading, setSeriesSearchLoading] = useState(false);
+    const [communityExpanded, setCommunityExpanded] = useState(false);
 
     const isOpen = eventId !== null;
 
@@ -61,6 +71,21 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
             .then((res) => setDuplicateGroups(res.items))
             .catch(() => setDuplicateGroups([]))
             .finally(() => setDuplicatesLoading(false));
+    }, [eventId]);
+
+    useEffect(() => {
+        if (!eventId) {
+            setSeriesGroups([]);
+            setAddSeriesOpen(false);
+            setSeriesSearch('');
+            setSeriesSearchResults([]);
+            return;
+        }
+        setSeriesLoading(true);
+        fetchEventSeriesCandidates(eventId)
+            .then((res) => setSeriesGroups(res.items))
+            .catch(() => setSeriesGroups([]))
+            .finally(() => setSeriesLoading(false));
     }, [eventId]);
 
     // Keyboard close
@@ -165,6 +190,44 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
         }
     };
 
+    const handleRemoveFromSeries = async (seriesId: number) => {
+        if (!eventId) return;
+        setSeriesActing(true);
+        try {
+            await splitSeriesMember(seriesId, eventId);
+            setSeriesGroups((prev) => prev.filter((g) => g.id !== seriesId));
+            notifyAdminDataChanged();
+        } finally {
+            setSeriesActing(false);
+        }
+    };
+
+    const runSeriesSearch = async () => {
+        setSeriesSearchLoading(true);
+        try {
+            const res = await fetchSeriesGroups('all', { q: seriesSearch.trim() || undefined, limit: 20 });
+            const memberSeriesIds = new Set(seriesGroups.map((g) => g.id));
+            setSeriesSearchResults(res.items.filter((s) => !memberSeriesIds.has(s.id)));
+        } finally {
+            setSeriesSearchLoading(false);
+        }
+    };
+
+    const handleAddToSeries = async (seriesId: number) => {
+        if (!eventId) return;
+        setSeriesActing(true);
+        try {
+            const updated = await addEventsToSeries(seriesId, [eventId]);
+            setSeriesGroups([updated]);
+            setAddSeriesOpen(false);
+            setSeriesSearch('');
+            setSeriesSearchResults([]);
+            notifyAdminDataChanged();
+        } finally {
+            setSeriesActing(false);
+        }
+    };
+
     const handleTitleBlur = async () => {
         if (titleCancelledRef.current) { titleCancelledRef.current = false; return; }
         if (!event || titleValue === event.title) { setEditingTitle(false); return; }
@@ -223,6 +286,11 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                             </p>
                         )}
                         <p className="text-[10px] text-gray-400 mt-0.5 uppercase tracking-wide">Event detail · admin</p>
+                        {event && (
+                            <p className="text-[10px] text-gray-400 mt-0.5 font-mono truncate" title={event.event_id}>
+                                ID: {event.event_id}
+                            </p>
+                        )}
                         {event && (
                             <div className="flex gap-1 mt-1">
                                 {event.is_blocked && (
@@ -283,10 +351,6 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                 onTagsUpdated={handleTagsUpdated}
                                 compact
                             />
-                            <EventReviewsSection
-                                eventId={event.event_id}
-                                isPast={new Date(event.end).getTime() < Date.now()}
-                            />
                             {!duplicatesLoading && duplicateGroups.length > 0 && (
                                 <div className="mt-4 border border-amber-200 bg-amber-50 overflow-hidden">
                                     <p className="px-3 py-2 text-[10px] font-semibold text-amber-800 uppercase tracking-wide">
@@ -333,6 +397,87 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                     </ul>
                                 </div>
                             )}
+                            {!seriesLoading && (
+                                <div className="mt-4 border border-teal-200 bg-teal-50 overflow-hidden">
+                                    <p className="px-3 py-2 text-[10px] font-semibold text-teal-800 uppercase tracking-wide">
+                                        Series
+                                    </p>
+                                    {seriesGroups.length > 0 ? (
+                                        <ul className="divide-y divide-teal-100">
+                                            {seriesGroups.map((g) => (
+                                                <li key={g.id} className="px-3 py-2">
+                                                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                                                        <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 bg-teal-100 text-teal-700">
+                                                            {g.status}
+                                                        </span>
+                                                        <span className="font-medium text-xs text-slate-700">{g.canonical_title}</span>
+                                                        <span className="text-[10px] text-slate-500">{g.events.length} event(s)</span>
+                                                    </div>
+                                                    <button
+                                                        disabled={seriesActing}
+                                                        onClick={() => handleRemoveFromSeries(g.id)}
+                                                        className="text-[11px] text-teal-700 hover:text-teal-900 px-2 py-1 disabled:opacity-50"
+                                                    >
+                                                        Remove from series
+                                                    </button>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <div className="px-3 py-2">
+                                            {!addSeriesOpen ? (
+                                                <button
+                                                    onClick={() => { setAddSeriesOpen(true); setSeriesSearch(''); setSeriesSearchResults([]); }}
+                                                    className="text-[11px] bg-teal-600 text-white px-2 py-1 hover:bg-teal-700"
+                                                >
+                                                    Add to series
+                                                </button>
+                                            ) : (
+                                                <div className="space-y-2">
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="text"
+                                                            value={seriesSearch}
+                                                            onChange={(e) => setSeriesSearch(e.target.value)}
+                                                            onKeyDown={(e) => { if (e.key === 'Enter') runSeriesSearch(); }}
+                                                            placeholder="Search series by title…"
+                                                            className="flex-1 text-xs border border-slate-300 px-2 py-1"
+                                                        />
+                                                        <button
+                                                            onClick={runSeriesSearch}
+                                                            disabled={seriesSearchLoading}
+                                                            className="text-[11px] bg-teal-600 text-white px-2.5 py-1 hover:bg-teal-700 disabled:opacity-50"
+                                                        >
+                                                            {seriesSearchLoading ? 'Searching…' : 'Search'}
+                                                        </button>
+                                                    </div>
+                                                    {seriesSearchResults.length > 0 && (
+                                                        <div className="max-h-40 overflow-y-auto border border-slate-200 bg-white">
+                                                            {seriesSearchResults.map((s) => (
+                                                                <button
+                                                                    key={s.id}
+                                                                    onClick={() => handleAddToSeries(s.id)}
+                                                                    disabled={seriesActing}
+                                                                    className="flex w-full items-center justify-between gap-2 border-b border-slate-100 px-2 py-1.5 text-left last:border-b-0 hover:bg-teal-50 disabled:opacity-50"
+                                                                >
+                                                                    <span className="min-w-0 flex-1 truncate text-[11px] text-slate-700">{s.canonical_title}</span>
+                                                                    <span className="text-[10px] text-slate-400">{s.events.length} · {s.status}</span>
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    <button
+                                                        onClick={() => { setAddSeriesOpen(false); setSeriesSearch(''); setSeriesSearchResults([]); }}
+                                                        className="text-[10px] text-slate-500 hover:text-slate-700"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                             <div className="mt-4 border border-gray-200 overflow-hidden">
                                 {event.latitude != null && event.longitude != null ? (
                                     <div className="h-[300px]">
@@ -346,6 +491,24 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                                 ? 'This event has a location text but is not geocoded yet.'
                                                 : 'This event has no location set yet.'}
                                         </p>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="mt-4 border border-slate-200 overflow-hidden">
+                                <button
+                                    type="button"
+                                    onClick={() => setCommunityExpanded((v) => !v)}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-slate-50 transition"
+                                >
+                                    <span className="text-slate-400 text-[10px]">{communityExpanded ? '▾' : '▸'}</span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Community Experience</span>
+                                </button>
+                                {communityExpanded && (
+                                    <div className="border-t border-slate-200 px-3 pb-3">
+                                        <EventReviewsSection
+                                            eventId={event.event_id}
+                                            isPast={new Date(event.end).getTime() < Date.now()}
+                                        />
                                     </div>
                                 )}
                             </div>

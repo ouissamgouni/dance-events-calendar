@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { CalendarEvent } from '../types';
+import type { CalendarEvent, SeriesGroup, DuplicateGroup } from '../types';
 import type {
     EventFilterParams,
     EventFilterOptionsResponse,
@@ -17,11 +17,22 @@ import {
     adminBulkEngagement,
     fetchAdminUsers,
     flagEventsAsDuplicates,
+    keepDuplicateEvent,
+    dismissDuplicateGroup,
+    groupEventsAsSeries,
+    addEventsToSeries,
+    approveSeriesGroup,
+    dismissSeriesGroup,
+    splitSeriesMember,
+    fetchSeriesGroups,
 } from '../api';
 import type { AdminTagGroup, AdminBulkEngagementKind, AdminBulkEngagementAudience, AdminUserRow } from '../api';
 import LocationBadge from './LocationBadge';
 import AdminEventDetailPanel from './AdminEventDetailPanel';
-import { useAdminPrefs } from '../context/AdminPrefsContext';
+import TagsPicker from './TagsPicker';
+import SeriesGroupCard from './SeriesGroupCard';
+import DuplicateGroupCard from './DuplicateGroupCard';
+import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
 
 export type EventsPanelPreset = 'all' | 'pending' | 'ungeolocated';
 
@@ -66,6 +77,19 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
     const [tagGroups, setTagGroups] = useState<AdminTagGroup[]>([]);
     const [bulkTagPickerOpen, setBulkTagPickerOpen] = useState(false);
     const [bulkTagIds, setBulkTagIds] = useState<number[]>([]);
+    // Inline result cards for series grouping / duplicate flagging. They stay
+    // visible until the admin resolves (approve/keep) or dismisses them.
+    const [seriesGroupResult, setSeriesGroupResult] = useState<SeriesGroup | null>(null);
+    const [duplicateGroupResult, setDuplicateGroupResult] = useState<DuplicateGroup | null>(null);
+    const [inlineActing, setInlineActing] = useState(false);
+    // Add-to-existing-series picker state.
+    const [addSeriesPickerOpen, setAddSeriesPickerOpen] = useState(false);
+    const [seriesSearch, setSeriesSearch] = useState('');
+    const [seriesSearchResults, setSeriesSearchResults] = useState<SeriesGroup[]>([]);
+    const [seriesSearchLoading, setSeriesSearchLoading] = useState(false);
+    // Inline "group as series" title entry (prompts are disallowed in this app).
+    const [seriesTitlePickerOpen, setSeriesTitlePickerOpen] = useState(false);
+    const [seriesTitleDraft, setSeriesTitleDraft] = useState('');
     // Curate-to-lists dialog state. Targets are admin-managed users.
     const [curatePickerOpen, setCuratePickerOpen] = useState(false);
     const [managedUsers, setManagedUsers] = useState<AdminUserRow[]>([]);
@@ -73,15 +97,11 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
     const [curateKind, setCurateKind] = useState<AdminBulkEngagementKind>('save');
     const [curateAudience, setCurateAudience] = useState<AdminBulkEngagementAudience | ''>('');
     const [selectedVisibility, setSelectedVisibility] = useState<'hidden' | 'blocked' | ''>('');
-    // Hide past events by default; toggle (here or in the admin header) to
-    // include them. Mirrors the global admin pref so all panels stay in sync.
-    const { includePast, setIncludePast } = useAdminPrefs();
-    const hidePast = !includePast;
-    const setHidePast = (value: boolean | ((prev: boolean) => boolean)) => {
-        const next = typeof value === 'function' ? (value as (p: boolean) => boolean)(hidePast) : value;
-        setIncludePast(!next);
-    };
+    // Hide past events by default; toggle to include them. Local to this panel
+    // so the Events and Pending Review panels filter independently.
+    const [hidePast, setHidePast] = useState(true);
     const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+    const seriesSearchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
     // Build filter params from current state
     const buildParams = useCallback(
@@ -144,8 +164,7 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
             setBulkTagPickerOpen(false);
             setBulkTagIds([]);
             setSelectedCurateHandles(new Set());
-            // Don't reset hidePast here — it's now driven by the global
-            // admin pref so reopening the panel respects the user's choice.
+            setHidePast(true);
         }
     }, [isOpen, preset, initialCalendarId]);
 
@@ -182,6 +201,24 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
         };
     }, [search]);
 
+    // Auto-suggest existing series as the admin types (>= 3 chars), debounced.
+    useEffect(() => {
+        if (!addSeriesPickerOpen) return;
+        const term = seriesSearch.trim();
+        if (term.length < 3) return;
+        if (seriesSearchTimer.current) clearTimeout(seriesSearchTimer.current);
+        seriesSearchTimer.current = setTimeout(() => {
+            setSeriesSearchLoading(true);
+            fetchSeriesGroups('all', { q: term, limit: 20 })
+                .then((res) => setSeriesSearchResults(res.items))
+                .catch(() => setSeriesSearchResults([]))
+                .finally(() => setSeriesSearchLoading(false));
+        }, 250);
+        return () => {
+            if (seriesSearchTimer.current) clearTimeout(seriesSearchTimer.current);
+        };
+    }, [seriesSearch, addSeriesPickerOpen]);
+
     const totalPages = Math.ceil(total / PAGE_SIZE);
 
     const handleSelectAll = () => {
@@ -208,12 +245,6 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
         } finally {
             setBusy('');
         }
-    };
-
-    const handleToggleBulkTag = (tagId: number) => {
-        setBulkTagIds((prev) =>
-            prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
-        );
     };
 
     const handleToggleCurateHandle = (handle: string) => {
@@ -324,12 +355,134 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
         if (selectedIds.size < 2) return;
         setBusy('bulk-flag-duplicates');
         try {
-            await flagEventsAsDuplicates([...selectedIds]);
+            const group = await flagEventsAsDuplicates([...selectedIds]);
+            setDuplicateGroupResult(group);
+            setSeriesGroupResult(null);
             setMessage(`Flagged ${selectedIds.size} event(s) as duplicates.`);
             setSelectedIds(new Set());
             setAllMatchingSelected(false);
+            notifyAdminDataChanged();
         } catch (e) {
             setMessage(e instanceof Error ? e.message : 'Failed to flag events as duplicates.');
+        } finally {
+            setBusy('');
+        }
+    };
+
+    const handleKeepDuplicate = async (keepEventId: string) => {
+        if (!duplicateGroupResult) return;
+        setInlineActing(true);
+        try {
+            await keepDuplicateEvent(duplicateGroupResult.id, keepEventId);
+            setDuplicateGroupResult(null);
+            notifyAdminDataChanged();
+            loadEvents();
+        } catch (e) {
+            setMessage(e instanceof Error ? e.message : 'Failed to keep event.');
+        } finally {
+            setInlineActing(false);
+        }
+    };
+
+    const handleDismissDuplicate = async () => {
+        if (!duplicateGroupResult) return;
+        setInlineActing(true);
+        try {
+            await dismissDuplicateGroup(duplicateGroupResult.id);
+            setDuplicateGroupResult(null);
+            notifyAdminDataChanged();
+        } catch (e) {
+            setMessage(e instanceof Error ? e.message : 'Failed to dismiss group.');
+        } finally {
+            setInlineActing(false);
+        }
+    };
+
+    const handleGroupAsSeries = async () => {
+        if (selectedIds.size < 2 || selectedIds.size > 20) return;
+        const firstTitle = events.find((e) => selectedIds.has(e.event_id))?.title ?? '';
+        setSeriesTitleDraft(firstTitle);
+        setSeriesTitlePickerOpen(true);
+    };
+
+    const handleConfirmGroupAsSeries = async () => {
+        if (selectedIds.size < 2 || selectedIds.size > 20) return;
+        setBusy('bulk-series');
+        try {
+            const group = await groupEventsAsSeries([...selectedIds], seriesTitleDraft.trim() || undefined);
+            setSeriesGroupResult(group);
+            setDuplicateGroupResult(null);
+            setSeriesTitlePickerOpen(false);
+            setSeriesTitleDraft('');
+            setMessage(`Grouped ${group.events.length} event(s) as a series.`);
+            setSelectedIds(new Set());
+            setAllMatchingSelected(false);
+            notifyAdminDataChanged();
+        } catch (e) {
+            setMessage(e instanceof Error ? e.message : 'Failed to group events as series.');
+        } finally {
+            setBusy('');
+        }
+    };
+
+    const handleApproveInlineSeries = async () => {
+        if (!seriesGroupResult) return;
+        setInlineActing(true);
+        try {
+            await approveSeriesGroup(seriesGroupResult.id);
+            setSeriesGroupResult(null);
+            notifyAdminDataChanged();
+        } catch (e) {
+            setMessage(e instanceof Error ? e.message : 'Failed to approve series.');
+        } finally {
+            setInlineActing(false);
+        }
+    };
+
+    const handleDismissInlineSeries = async () => {
+        if (!seriesGroupResult) return;
+        setInlineActing(true);
+        try {
+            await dismissSeriesGroup(seriesGroupResult.id);
+            setSeriesGroupResult(null);
+            notifyAdminDataChanged();
+        } catch (e) {
+            setMessage(e instanceof Error ? e.message : 'Failed to dismiss series.');
+        } finally {
+            setInlineActing(false);
+        }
+    };
+
+    const handleSplitInlineSeries = async (eventId: string) => {
+        if (!seriesGroupResult) return;
+        setInlineActing(true);
+        try {
+            const res = await splitSeriesMember(seriesGroupResult.id, eventId);
+            setSeriesGroupResult(res.dissolved ? null : res.series);
+            notifyAdminDataChanged();
+        } catch (e) {
+            setMessage(e instanceof Error ? e.message : 'Failed to remove event from series.');
+        } finally {
+            setInlineActing(false);
+        }
+    };
+
+    const handleAddToSeries = async (seriesId: number) => {
+        if (selectedIds.size === 0) return;
+        setBusy('bulk-add-series');
+        try {
+            const group = await addEventsToSeries(seriesId, [...selectedIds]);
+            setSeriesGroupResult(group);
+            setDuplicateGroupResult(null);
+            setAddSeriesPickerOpen(false);
+            setSeriesSearch('');
+            setSeriesSearchResults([]);
+            setMessage(`Added ${selectedIds.size} event(s) to "${group.canonical_title}".`);
+            setSelectedIds(new Set());
+            setAllMatchingSelected(false);
+            notifyAdminDataChanged();
+        } catch (e) {
+            setMessage(e instanceof Error ? e.message : 'Failed to add events to series.');
         } finally {
             setBusy('');
         }
@@ -495,13 +648,13 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                             {/* Hide past events toggle */}
                             <button
                                 onClick={() => { setHidePast((v) => !v); setPage(0); }}
-                                className={`text-[10px] font-medium px-2 py-0.5 border transition ${hidePast
+                                className={`text-[10px] font-medium px-2 py-0.5 border transition ${!hidePast
                                     ? 'bg-blue-50 border-blue-300 text-blue-700'
                                     : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
                                     }`}
-                                title={hidePast ? 'Currently hiding past events. Click to include them.' : 'Currently including past events. Click to hide.'}
+                                title={hidePast ? 'Past events hidden. Click to show them.' : 'Including past events. Click to hide them.'}
                             >
-                                {hidePast ? 'Hide past' : 'Include past'}
+                                {hidePast ? 'Show past' : 'Hide past'}
                             </button>
 
                             {/* Visibility pills */}
@@ -717,22 +870,14 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                 {bulkTagPickerOpen && (
                     <div className="px-4 py-2.5 border-t border-blue-200 bg-white shrink-0">
                         <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide mb-2">Assign tags to {selectedIds.size} event(s)</p>
-                        <div className="flex flex-wrap gap-1 mb-2">
-                            {tagGroups.filter((g) => g.enabled).map((group) =>
-                                group.tags.filter((t) => t.enabled).map((tag) => (
-                                    <button
-                                        key={tag.id}
-                                        onClick={() => handleToggleBulkTag(tag.id)}
-                                        className={`text-[10px] px-2 py-0.5 border transition ${bulkTagIds.includes(tag.id)
-                                            ? 'bg-blue-600 border-blue-600 text-white'
-                                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                                            }`}
-                                        style={bulkTagIds.includes(tag.id) && tag.color ? { backgroundColor: tag.color, borderColor: tag.color } : {}}
-                                    >
-                                        {tag.label}
-                                    </button>
-                                ))
-                            )}
+                        <div className="mb-2 max-h-64 overflow-y-auto">
+                            <TagsPicker
+                                tagGroups={tagGroups}
+                                value={{ selectedTagIds: bulkTagIds, freeTexts: {} }}
+                                onChange={(next) => setBulkTagIds(next.selectedTagIds)}
+                                searchable
+                                allowFreeText={false}
+                            />
                         </div>
                         <div className="flex gap-2">
                             <button
@@ -749,6 +894,124 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                                 Cancel
                             </button>
                         </div>
+                    </div>
+                )}
+
+                {/* Group-as-series title entry */}
+                {seriesTitlePickerOpen && (
+                    <div className="px-4 py-2.5 border-t border-teal-200 bg-white shrink-0 space-y-2">
+                        <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">
+                            Group {selectedIds.size} event(s) into a series
+                        </p>
+                        <input
+                            type="text"
+                            value={seriesTitleDraft}
+                            onChange={(e) => setSeriesTitleDraft(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleConfirmGroupAsSeries(); }}
+                            placeholder="Series title"
+                            className="w-full text-[11px] border border-gray-300 px-2 py-1"
+                        />
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleConfirmGroupAsSeries}
+                                disabled={!!busy}
+                                className="text-[10px] font-medium px-2.5 py-1 bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50 transition"
+                            >
+                                {busy === 'bulk-series' ? 'Grouping…' : 'Create series'}
+                            </button>
+                            <button
+                                onClick={() => { setSeriesTitlePickerOpen(false); setSeriesTitleDraft(''); }}
+                                className="text-[10px] text-gray-500 hover:text-gray-700"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Add-to-series picker */}
+                {addSeriesPickerOpen && (
+                    <div className="px-4 py-2.5 border-t border-purple-200 bg-white shrink-0 space-y-2">
+                        <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">
+                            Add {selectedIds.size} event(s) to an existing series
+                        </p>
+                        <input
+                            type="text"
+                            value={seriesSearch}
+                            onChange={(e) => setSeriesSearch(e.target.value)}
+                            placeholder="Search series by title…"
+                            className="w-full text-[11px] border border-gray-300 px-2 py-1"
+                        />
+                        {seriesSearch.trim().length >= 3 && (
+                            <div className="max-h-40 overflow-y-auto border border-gray-200 bg-white">
+                                {seriesSearchLoading ? (
+                                    <p className="px-2 py-2 text-[10px] text-gray-500">Searching…</p>
+                                ) : seriesSearchResults.length === 0 ? (
+                                    <p className="px-2 py-2 text-[10px] text-gray-500">No series found.</p>
+                                ) : seriesSearchResults.map((s) => (
+                                    <button
+                                        key={s.id}
+                                        onClick={() => handleAddToSeries(s.id)}
+                                        disabled={!!busy}
+                                        className="flex w-full items-center justify-between gap-2 border-b border-gray-100 px-2 py-1.5 text-left last:border-b-0 hover:bg-purple-50 disabled:opacity-50"
+                                    >
+                                        <span className="min-w-0 flex-1 truncate text-[11px] text-gray-700">{s.canonical_title}</span>
+                                        <span className="text-[10px] text-gray-400">{s.events.length} event(s) · {s.status}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        <button
+                            onClick={() => { setAddSeriesPickerOpen(false); setSeriesSearch(''); setSeriesSearchResults([]); }}
+                            className="text-[10px] text-gray-500 hover:text-gray-700"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                )}
+
+                {/* Inline series-group result card */}
+                {seriesGroupResult && (
+                    <div className="px-4 py-2.5 border-t border-emerald-200 bg-emerald-50/40 shrink-0">
+                        <div className="flex items-center justify-between mb-2">
+                            <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">Series created</p>
+                            <button
+                                onClick={() => setSeriesGroupResult(null)}
+                                className="text-[10px] text-gray-400 hover:text-gray-600"
+                            >
+                                Hide
+                            </button>
+                        </div>
+                        <SeriesGroupCard
+                            group={seriesGroupResult}
+                            acting={inlineActing}
+                            onApprove={handleApproveInlineSeries}
+                            onDismiss={handleDismissInlineSeries}
+                            onRemove={handleSplitInlineSeries}
+                            onOpenEvent={(id) => setAdminDetailEventId(id)}
+                        />
+                    </div>
+                )}
+
+                {/* Inline duplicate-group result card */}
+                {duplicateGroupResult && (
+                    <div className="px-4 py-2.5 border-t border-orange-200 bg-orange-50/40 shrink-0">
+                        <div className="flex items-center justify-between mb-2">
+                            <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">Flagged as duplicates</p>
+                            <button
+                                onClick={() => setDuplicateGroupResult(null)}
+                                className="text-[10px] text-gray-400 hover:text-gray-600"
+                            >
+                                Hide
+                            </button>
+                        </div>
+                        <DuplicateGroupCard
+                            group={duplicateGroupResult}
+                            acting={inlineActing}
+                            onKeep={handleKeepDuplicate}
+                            onDismiss={handleDismissDuplicate}
+                            onOpenEvent={(id) => setAdminDetailEventId(id)}
+                        />
                     </div>
                 )}
 
@@ -878,6 +1141,22 @@ export default function EventsPanel({ isOpen, onClose, preset, initialCalendarId
                             title="Flag the selected events as duplicates of each other. Review and pick which to keep in the Duplicates panel."
                         >
                             {busy === 'bulk-flag-duplicates' ? 'Flagging…' : 'Flag as Duplicates'}
+                        </button>
+                        <button
+                            onClick={handleGroupAsSeries}
+                            disabled={!!busy || selectedIds.size < 2 || selectedIds.size > 20}
+                            className="text-[10px] font-medium px-2 py-1 bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50 transition"
+                            title="Group the selected events (2–20) into a single event series."
+                        >
+                            {busy === 'bulk-series' ? 'Grouping…' : 'Group as Series'}
+                        </button>
+                        <button
+                            onClick={() => { setAddSeriesPickerOpen((o) => !o); setSeriesSearch(''); setSeriesSearchResults([]); }}
+                            disabled={!!busy || selectedIds.size < 1 || selectedIds.size > 20}
+                            className="text-[10px] font-medium px-2 py-1 bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 transition"
+                            title="Add the selected events to an existing series."
+                        >
+                            Add to Series
                         </button>
                         <button
                             onClick={() => { setSelectedIds(new Set()); setAllMatchingSelected(false); setBulkTagPickerOpen(false); }}

@@ -96,7 +96,10 @@ describe('SeriesPanel', () => {
                 HttpResponse.json({ items: [group], total: 1 }),
             ),
             http.post('*/api/admin/series/1/split', () =>
-                HttpResponse.json({ ...group, events: [group.events[0]] }),
+                HttpResponse.json({
+                    dissolved: false,
+                    series: { ...group, events: [group.events[0]] },
+                }),
             ),
         )
 
@@ -105,7 +108,7 @@ describe('SeriesPanel', () => {
 
         await screen.findAllByText('Weekly Salsa Social')
 
-        const splitButtons = screen.getAllByRole('button', { name: 'Split off' })
+        const splitButtons = screen.getAllByRole('button', { name: 'Remove' })
         await user.click(splitButtons[1])
 
         await waitFor(() => expect(notifyAdminDataChangedMock).toHaveBeenCalled())

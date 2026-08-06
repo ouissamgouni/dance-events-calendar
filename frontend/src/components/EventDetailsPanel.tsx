@@ -45,7 +45,7 @@ export default function EventDetailsPanel({
                     </h2>
                     <Link
                         to={`/event/${event.event_id}${source ? `?src=${source}` : ''}`}
-                        className="text-xs text-rose-500 hover:text-rose-700 hover:underline mt-0.5 inline-block"
+                        className="text-xs text-blue-600 hover:text-blue-700 hover:underline mt-0.5 inline-block"
                     >
                         See full details →
                     </Link>

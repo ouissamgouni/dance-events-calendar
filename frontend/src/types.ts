@@ -306,6 +306,11 @@ export interface SeriesGroupListResponse {
     total: number;
 }
 
+export interface SeriesSplitResponse {
+    dissolved: boolean;
+    series: SeriesGroup | null;
+}
+
 export interface SeriesScanLogEntry {
     id: number;
     scan_type: 'incremental' | 'full' | 'manual';
