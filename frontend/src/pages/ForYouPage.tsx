@@ -239,8 +239,17 @@ export default function ForYouPage() {
     const yourNextEvents = useMemo(() => {
         if (!user || yourNextEventIds.length === 0) return [];
         const ids = new Set(yourNextEventIds);
-        return rawYourNextEvents.filter((e) => ids.has(e.event_id));
-    }, [user, yourNextEventIds, rawYourNextEvents]);
+        const attendingSet = new Set(attendingEventIds);
+        return rawYourNextEvents
+            .filter((e) => ids.has(e.event_id))
+            // Events the viewer is going to lead the rail; saved-only trail after.
+            .sort((a, b) => {
+                const aGoing = attendingSet.has(a.event_id);
+                const bGoing = attendingSet.has(b.event_id);
+                if (aGoing !== bGoing) return aGoing ? -1 : 1;
+                return new Date(a.start).getTime() - new Date(b.start).getTime();
+            });
+    }, [user, yourNextEventIds, rawYourNextEvents, attendingEventIds]);
 
     // "Share your experience": past events the viewer attended but hasn't
     // reviewed yet (server applies the admin-configurable recency window).
@@ -335,10 +344,10 @@ export default function ForYouPage() {
                             contextLabel="following & friends going event"
                             headerRight={(
                                 <Link
-                                    to="/my-calendar/subscriptions"
+                                    to="/tribe/calendars"
                                     className="text-[11px] font-semibold text-blue-600 hover:text-blue-700"
                                 >
-                                    See in calendar
+                                    See in explorer
                                 </Link>
                             )}
                             emptyContent={(
@@ -346,7 +355,7 @@ export default function ForYouPage() {
                                     <>
                                         <p className="mb-2">You&apos;re not following anyone yet.</p>
                                         <Link
-                                            to="/discover"
+                                            to="/tribe/discover"
                                             className="inline-flex items-center bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
                                         >
                                             Build your tribe
@@ -385,7 +394,6 @@ export default function ForYouPage() {
                                 </div>
                             </section>
                         )}
-                        <PeopleYouMayKnowCard variant="trail" />
                         <LensTrail
                             title="New"
                             testId="for-you-new"
@@ -406,6 +414,7 @@ export default function ForYouPage() {
                             unseenStateEnabled={unseenStateEnabled}
                             followingBadgeEnabled={followingBadgeEnabled}
                         />
+                        <PeopleYouMayKnowCard variant="trail" />
                     </div>
                 )}
             </main>

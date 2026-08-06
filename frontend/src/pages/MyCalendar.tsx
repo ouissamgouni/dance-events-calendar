@@ -39,7 +39,7 @@ function downloadBlob(blob: Blob, filename: string) {
 export default function MyCalendar() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { savedEventIds, savedCount, isSaved, clearAll } = useSavedEvents();
+    const { savedEventIds, savedCount, isSaved } = useSavedEvents();
     const { attendingEventIds, attendingCount, isAttending } = useAttendingEvents();
     const { showPrices, showPopularity, popularityThreshold } = useFeatureFlags();
     const { user, loading: authLoading } = useAuth();
@@ -72,7 +72,7 @@ export default function MyCalendar() {
         try { window.localStorage.setItem('myCalendar.signInNudge.dismissed', '1'); } catch { /* ignore quota */ }
     }, []);
 
-    const isSubscriptionsRoute = location.pathname === '/my-calendar/subscriptions';
+    const isSubscriptionsRoute = location.pathname === '/tribe/calendars';
     const activeView: 'mine' | 'subs' = isSubscriptionsRoute ? 'subs' : 'mine';
 
     const allEventIds = useMemo(
@@ -90,7 +90,7 @@ export default function MyCalendar() {
 
     useEffect(() => {
         if (isSubscriptionsRoute && !authLoading && !user) {
-            navigate(`/login?next=${encodeURIComponent('/my-calendar/subscriptions')}`, { replace: true });
+            navigate(`/login?next=${encodeURIComponent('/tribe/calendars')}`, { replace: true });
         }
     }, [authLoading, isSubscriptionsRoute, navigate, user]);
 
@@ -276,11 +276,6 @@ export default function MyCalendar() {
     const mapEvents = eventsForList.length > 0 ? eventsForList : stableEmptyEvents;
     const activeLoading = activeView === 'subs' ? subsLoading && subsEvents.length === 0 : loading;
 
-    const handleBack = () => {
-        if (window.history.length > 1) navigate(-1);
-        else navigate('/');
-    };
-
     return (
         <div className="min-h-screen bg-[#f8fafc]">
             <main className="mx-auto max-w-7xl px-4 py-4">
@@ -291,7 +286,7 @@ export default function MyCalendar() {
                             You&apos;ve already added {allEventIds.length} event{allEventIds.length === 1 ? '' : 's'}. Sign in to keep them synced across devices and ready to share.
                         </p>
                         <Link
-                            to={`/login?next=${encodeURIComponent('/my-calendar')}`}
+                            to={`/login?next=${encodeURIComponent('/mine/calendar')}`}
                             className="shrink-0 bg-blue-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-blue-600 transition"
                         >
                             Sign in
@@ -306,43 +301,6 @@ export default function MyCalendar() {
                         </button>
                     </div>
                 )}
-
-                <div className="mb-4 border-b border-slate-200 flex items-center justify-between gap-1">
-                    <div className="flex items-center gap-1">
-                        {user && subsCalendars.length > 0 ? (
-                            ([
-                                { key: 'mine' as const, label: 'My events' },
-                                {
-                                    key: 'subs' as const,
-                                    label: `From people I follow${subsCalendars.length > 0 ? ` (${subsCalendars.length})` : ''}`,
-                                },
-                            ]).map((t) => (
-                                <button
-                                    key={t.key}
-                                    type="button"
-                                    onClick={() => navigate(t.key === 'subs' ? '/my-calendar/subscriptions' : '/my-calendar')}
-                                    className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition ${activeView === t.key
-                                        ? 'border-blue-500 text-blue-600'
-                                        : 'border-transparent text-slate-500 hover:text-slate-700'
-                                        }`}
-                                >
-                                    {t.label}
-                                </button>
-                            ))
-                        ) : (
-                            <span className="px-3 py-2 text-sm font-medium border-b-2 border-blue-500 -mb-px text-blue-600">
-                                My events
-                            </span>
-                        )}
-                    </div>
-                    <button
-                        type="button"
-                        onClick={handleBack}
-                        className="shrink-0 text-sm text-slate-600 hover:underline"
-                    >
-                        ← Back
-                    </button>
-                </div>
 
                 {activeView === 'mine' && allEventIds.length > 0 && (
                     <div className="mb-4 flex flex-wrap items-center gap-1.5">
@@ -427,7 +385,7 @@ export default function MyCalendar() {
                         <button
                             onClick={handleShare}
                             disabled={shareStatus === 'loading'}
-                            className="shrink-0 bg-blue-500 px-2 py-1 text-xs text-white hover:bg-blue-600 transition disabled:opacity-50 inline-flex items-center gap-1"
+                            className="shrink-0 border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-50 transition disabled:opacity-50 inline-flex items-center gap-1"
                         >
                             {shareStatus === 'copied' ? (
                                 <>✓ Link copied!</>
@@ -442,12 +400,16 @@ export default function MyCalendar() {
                                 </>
                             )}
                         </button>
-                        <button
-                            onClick={clearAll}
-                            className="shrink-0 border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 transition"
-                        >
-                            Clear all
-                        </button>
+                        {!activeLoading && pastEventIds.size > 0 && (
+                            <button
+                                onClick={() => setShowPastEvents((v) => !v)}
+                                className="shrink-0 border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 transition"
+                            >
+                                {showPastEvents
+                                    ? 'Hide past events'
+                                    : `Show ${pastEventIds.size} past event${pastEventIds.size !== 1 ? 's' : ''}`}
+                            </button>
+                        )}
                     </div>
                 )}
 
@@ -529,7 +491,7 @@ export default function MyCalendar() {
                                     key={f}
                                     onClick={() => setActiveFilter(f)}
                                     className={`px-2 py-0.5 text-[11px] font-medium leading-5 border transition ${activeFilter === f
-                                        ? 'bg-blue-500 border-blue-500 text-white'
+                                        ? 'bg-blue-100 border-blue-200 text-blue-700'
                                         : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500'
                                         }`}
                                 >
@@ -540,18 +502,6 @@ export default function MyCalendar() {
                     </div>
                 )}
 
-                {!activeLoading && activeView === 'mine' && pastEventIds.size > 0 && (
-                    <div className="mb-3">
-                        <button
-                            onClick={() => setShowPastEvents((v) => !v)}
-                            className="text-xs text-slate-500 hover:text-slate-700 underline underline-offset-2 transition"
-                        >
-                            {showPastEvents
-                                ? 'Hide past events'
-                                : `Show ${pastEventIds.size} past event${pastEventIds.size !== 1 ? 's' : ''}`}
-                        </button>
-                    </div>
-                )}
 
                 {activeLoading && (
                     <p className="text-center text-slate-400 py-12">Loading your events…</p>
@@ -576,25 +526,42 @@ export default function MyCalendar() {
                 )}
 
                 {!activeLoading && activeView === 'subs' && !subsLoading && subsEvents.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-20 text-center">
-                        <p className="text-slate-600 text-lg font-medium">
-                            No upcoming events from your subscriptions
-                        </p>
-                        <p className="text-slate-400 text-sm mt-1">
-                            {subsHandleFilters.length > 0
-                                ? 'Those people have no matching upcoming events yet.'
-                                : 'When the calendars you subscribe to publish events, they’ll show up here.'}
-                        </p>
-                        {subsHandleFilters.length > 0 && (
-                            <button
-                                type="button"
-                                onClick={() => setSubsHandleFilters([])}
-                                className="mt-4 text-xs text-blue-600 hover:underline"
+                    subsCalendars.length === 0 && subsHandleFilters.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-center">
+                            <p className="text-slate-600 text-lg font-medium">
+                                Build your tribe
+                            </p>
+                            <p className="text-slate-400 text-sm mt-1">
+                                Follow other dancers to see the events they’re going to and saving.
+                            </p>
+                            <Link
+                                to="/tribe/discover"
+                                className="mt-6 inline-flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold px-5 py-2 shadow-sm transition"
                             >
-                                Show all subscriptions
-                            </button>
-                        )}
-                    </div>
+                                Discover people →
+                            </Link>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-20 text-center">
+                            <p className="text-slate-600 text-lg font-medium">
+                                No upcoming events from your subscriptions
+                            </p>
+                            <p className="text-slate-400 text-sm mt-1">
+                                {subsHandleFilters.length > 0
+                                    ? 'Those people have no matching upcoming events yet.'
+                                    : 'When the calendars you subscribe to publish events, they’ll show up here.'}
+                            </p>
+                            {subsHandleFilters.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSubsHandleFilters([])}
+                                    className="mt-4 text-xs text-blue-600 hover:underline"
+                                >
+                                    Show all subscriptions
+                                </button>
+                            )}
+                        </div>
+                    )
                 )}
 
                 {!activeLoading && (
@@ -613,6 +580,7 @@ export default function MyCalendar() {
                                         showPopularity={showPopularity}
                                         sortBy={sortBy}
                                         onSortChange={setSortBy}
+                                        orderByFollows={activeView === 'subs'}
                                     />
                                 </div>
                             </div>
@@ -635,6 +603,7 @@ export default function MyCalendar() {
                                     showPopularity={showPopularity}
                                     sortBy={sortBy}
                                     onSortChange={setSortBy}
+                                    orderByFollows={activeView === 'subs'}
                                 />
                             </div>
                         </div>

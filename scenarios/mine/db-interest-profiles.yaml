@@ -1,0 +1,14 @@
+# Seeds my Interest Profile so /mine/profiles (Discovery Profiles) shows a
+# real, editable profile from first sign-in — Salsa + Bachata across the
+# default "Europe & nearby" area, matches disabled by default.
+interest_profiles:
+  - user: me@example.com
+    label: "Salsa + Bachata (Europe & nearby)"
+    min_lat: 24
+    min_lng: -18
+    max_lat: 69
+    max_lng: 50
+    dance_tags: ["dance-style:salsa", "dance-style:bachata"]
+    reach_tags: []
+    matches_enabled: false
+    is_active: true

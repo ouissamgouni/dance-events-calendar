@@ -1,0 +1,69 @@
+# Mock users for the "tribe" scenario — the social /tribe hub (Following
+# Calendars, Activity, Discover, Network, Following Reviews).
+#
+#   * me     — the POV account. Follows alice/bob/carla (mutual friends)
+#     and dave (one-way). Receives new_follower + new_friend +
+#     subscription_going notifications (see db-follows.yaml /
+#     db-attendances.yaml emit_notifications).
+#   * alice, bob, carla — mutual friends of me. Each RSVPs to an upcoming
+#     event (feeds Following Calendars + subscription_going) and writes a
+#     public review (feeds Following Reviews).
+#   * dave   — one-way followee of me (I follow, no follow-back). RSVPs to
+#     an upcoming event; writes an ANONYMOUS review that must be EXCLUDED
+#     from Following Reviews.
+#   * erin   — follows me (one-way, no follow-back) → new_follower for me.
+#   * frank  — pending inbound follow request → appears in the Network
+#     requests panel.
+#   * grace  — followed by alice + bob (my friends) but not by me →
+#     friend-of-friend suggestion on Discover.
+#   * admin  — matches ADMIN_EMAIL.
+users:
+  - email: me@example.com
+    name: Mateo (me)
+    handle: me
+    account_visibility: public
+  - {
+      email: alice@example.com,
+      name: Alice Rivera,
+      handle: alice,
+      account_visibility: public,
+    }
+  - {
+      email: bob@example.com,
+      name: Bob Njoroge,
+      handle: bob,
+      account_visibility: public,
+    }
+  - {
+      email: carla@example.com,
+      name: Carla Duarte,
+      handle: carla,
+      account_visibility: public,
+    }
+  - {
+      email: dave@example.com,
+      name: Dave Larsen,
+      handle: dave,
+      account_visibility: public,
+    }
+  - {
+      email: erin@example.com,
+      name: Erin Walsh,
+      handle: erin,
+      account_visibility: public,
+    }
+  - {
+      email: frank@example.com,
+      name: Frank Dubois,
+      handle: frank,
+      account_visibility: public,
+    }
+  - {
+      email: grace@example.com,
+      name: Grace Okoro,
+      handle: grace,
+      account_visibility: public,
+    }
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

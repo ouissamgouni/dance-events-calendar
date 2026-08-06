@@ -3621,6 +3621,22 @@ export async function fetchSeriesReviews(
     return parseJsonResponse<EventReviewsList>(res, 'Failed to fetch series reviews');
 }
 
+/** Reviews written by people the viewer follows (newest-first). Non-anonymous
+ * approved/pending reviews from approved follow edges only. */
+export async function fetchFollowingReviews(
+    opts?: { limit?: number; offset?: number },
+): Promise<EventReviewsList> {
+    const sp = new URLSearchParams();
+    if (opts?.limit != null) sp.set('limit', String(opts.limit));
+    if (opts?.offset != null) sp.set('offset', String(opts.offset));
+    const qs = sp.toString();
+    const res = await fetch(`${BASE}/users/me/following-reviews${qs ? `?${qs}` : ''}`, {
+        credentials: 'include',
+    });
+    if (res.status === 401) return { items: [], total: 0 };
+    return parseJsonResponse<EventReviewsList>(res, 'Failed to fetch following reviews');
+}
+
 export async function fetchMyRatings(): Promise<MyRating[]> {
     const res = await fetch(`${BASE}/users/me/ratings`, { credentials: 'include' });
     return parseJsonResponse<MyRating[]>(res, 'Failed to fetch my ratings');

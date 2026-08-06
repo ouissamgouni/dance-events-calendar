@@ -1,0 +1,35 @@
+# Pre-seeded follow graph for the "tribe" scenario.
+#
+# emit_notifications: true fires new_follower (for every approved followee)
+# and new_friend (for mutual pairs), mirroring the HTTP follow route — so my
+# Activity feed has assertable rows on first sign-in.
+#
+#   Mutual friends of me (→ new_friend + new_follower, + calendar
+#   subscriptions feeding Following Calendars):
+#     me <-> alice, me <-> bob, me <-> carla
+#   One-way: I follow dave (subscription, no follow-back):
+#     me -> dave
+#   One-way inbound: erin follows me (→ new_follower for me):
+#     erin -> me
+#   Pending inbound request (Network requests panel):
+#     frank -> me (status: pending)
+#   Friend-of-friend for Discover (alice + bob follow grace; I do not):
+#     alice -> grace, bob -> grace
+emit_notifications: true
+follows:
+  # --- mutual friendships of me ---
+  - { follower: me, followee: alice }
+  - { follower: alice, followee: me }
+  - { follower: me, followee: bob }
+  - { follower: bob, followee: me }
+  - { follower: me, followee: carla }
+  - { follower: carla, followee: me }
+  # --- one-way: I follow dave, no follow-back ---
+  - { follower: me, followee: dave }
+  # --- one-way inbound: erin follows me ---
+  - { follower: erin, followee: me }
+  # --- pending inbound request ---
+  - { follower: frank, followee: me, status: pending }
+  # --- friend-of-friend candidate for Discover (not followed by me) ---
+  - { follower: alice, followee: grace }
+  - { follower: bob, followee: grace }

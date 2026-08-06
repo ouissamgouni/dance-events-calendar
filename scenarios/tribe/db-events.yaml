@@ -1,0 +1,344 @@
+# Events for the "tribe" scenario.
+#
+# Four UPCOMING events (w+N) that my followees RSVP to — they feed
+# Following Calendars (/tribe/calendars) and the subscription_going
+# Activity notifications. Four PAST events (w-N) are the subjects of the
+# Following Reviews (three public, one anonymous that must be excluded).
+base_week: 0
+events:
+  # ── Upcoming (Following Calendars + subscription_going) ──────────
+  - id: evt-tribe-u01
+    calendar_id: tribe-cal-001
+    title: Paris Friday Salsa Social
+    description: Weekly salsa social — alice is going.
+    location: Studio Harmonic, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    city: Paris
+    country: France
+    country_code: FR
+    start: w1 Fri 21:00
+    end: w1 Sat 01:00
+    price_is_free: true
+    tags:
+      [
+        dance-style:salsa,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        reach:local,
+      ]
+
+  - id: evt-tribe-u02
+    calendar_id: tribe-cal-001
+    title: Madrid Bachata Night
+    description: Sensual bachata night — bob is going.
+    location: Sala Rossa, Madrid, Spain
+    latitude: 40.4168
+    longitude: -3.7038
+    city: Madrid
+    country: Spain
+    country_code: ES
+    start: w2 Sat 20:00
+    end: w2 Sun 00:00
+    price_is_free: false
+    price_min: 12
+    price_currency: EUR
+    tags:
+      [
+        dance-style:bachata,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        reach:regional,
+      ]
+
+  - id: evt-tribe-u03
+    calendar_id: tribe-cal-001
+    title: Berlin Salsa Rooftop
+    description: Rooftop salsa — carla is going.
+    location: Klunkerkranich, Berlin, Germany
+    latitude: 52.5200
+    longitude: 13.4050
+    city: Berlin
+    country: Germany
+    country_code: DE
+    start: w1 Sat 20:00
+    end: w1 Sun 00:00
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+    tags:
+      [
+        dance-style:salsa,
+        format:social,
+        level:all-levels,
+        venue:rooftop,
+        reach:local,
+      ]
+
+  - id: evt-tribe-u04
+    calendar_id: tribe-cal-001
+    title: Lyon Bachata Practica
+    description: Structured practica — dave is going.
+    location: Salle Rameau, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w3 Fri 21:00
+    end: w3 Sat 01:00
+    price_is_free: true
+    tags:
+      [
+        dance-style:bachata,
+        format:practice,
+        level:all-levels,
+        venue:indoor,
+        reach:regional,
+      ]
+
+  # ── Upcoming spread across the next ~6 months (international + local) ──
+  - id: evt-tribe-u05
+    calendar_id: tribe-cal-001
+    title: Barcelona International Salsa Congress
+    description: Flagship international weekend — alice is going.
+    location: Hotel Front Marítim, Barcelona, Spain
+    latitude: 41.3874
+    longitude: 2.1686
+    city: Barcelona
+    country: Spain
+    country_code: ES
+    start: w6 Sat 19:00
+    end: w7 Sun 03:00
+    price_is_free: false
+    price_min: 60
+    price_currency: EUR
+    tags:
+      [
+        dance-style:salsa,
+        format:festival,
+        level:all-levels,
+        venue:indoor,
+        reach:international,
+      ]
+
+  - id: evt-tribe-u06
+    calendar_id: tribe-cal-001
+    title: Lisbon Bachata Festival
+    description: Sensual bachata weekend by the Tagus — bob is going.
+    location: Centro de Congressos, Lisbon, Portugal
+    latitude: 38.7223
+    longitude: -9.1393
+    city: Lisbon
+    country: Portugal
+    country_code: PT
+    start: w10 Sat 18:00
+    end: w11 Sun 02:00
+    price_is_free: false
+    price_min: 50
+    price_currency: EUR
+    tags:
+      [
+        dance-style:bachata,
+        format:festival,
+        level:all-levels,
+        venue:indoor,
+        reach:international,
+      ]
+
+  - id: evt-tribe-u07
+    calendar_id: tribe-cal-001
+    title: Rome Sunday Salsa Social
+    description: Neighbourhood salsa social — carla is going.
+    location: Villaggio Globale, Rome, Italy
+    latitude: 41.9028
+    longitude: 12.4964
+    city: Rome
+    country: Italy
+    country_code: IT
+    start: w14 Sun 20:00
+    end: w15 Mon 00:00
+    price_is_free: true
+    tags:
+      [
+        dance-style:salsa,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        reach:local,
+      ]
+
+  - id: evt-tribe-u08
+    calendar_id: tribe-cal-001
+    title: Vienna Kizomba Night
+    description: Smooth kizomba social — dave is going.
+    location: Sargfabrik, Vienna, Austria
+    latitude: 48.2082
+    longitude: 16.3738
+    city: Vienna
+    country: Austria
+    country_code: AT
+    start: w20 Fri 20:00
+    end: w20 Sat 00:00
+    price_is_free: false
+    price_min: 15
+    price_currency: EUR
+    tags:
+      [
+        dance-style:kizomba,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        reach:regional,
+      ]
+
+  # ── Past (subjects of Following Reviews) ─────────────────────────
+  - id: evt-tribe-p01
+    calendar_id: tribe-cal-001
+    title: Paris Salsa Marathon (past)
+    description: All-night salsa — alice reviewed this.
+    location: Cabaret Sauvage, Paris, France
+    latitude: 48.8931
+    longitude: 2.3894
+    city: Paris
+    country: France
+    country_code: FR
+    start: w-1 Sat 21:00
+    end: w-2 Sun 03:00
+    price_is_free: false
+    price_min: 15
+    price_currency: EUR
+    tags:
+      [
+        dance-style:salsa,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        reach:local,
+      ]
+
+  - id: evt-tribe-p02
+    calendar_id: tribe-cal-001
+    title: Madrid Bachata Festival (past)
+    description: Weekend festival — bob reviewed this.
+    location: IFEMA, Madrid, Spain
+    latitude: 40.4168
+    longitude: -3.7038
+    city: Madrid
+    country: Spain
+    country_code: ES
+    start: w-2 Sat 18:00
+    end: w-3 Sun 02:00
+    price_is_free: false
+    price_min: 45
+    price_currency: EUR
+    tags:
+      [
+        dance-style:bachata,
+        format:festival,
+        level:all-levels,
+        venue:indoor,
+        reach:international,
+      ]
+
+  - id: evt-tribe-p03
+    calendar_id: tribe-cal-001
+    title: Berlin Salsa Congress (past)
+    description: International congress — carla reviewed this.
+    location: Estrel Congress Center, Berlin, Germany
+    latitude: 52.5200
+    longitude: 13.4050
+    city: Berlin
+    country: Germany
+    country_code: DE
+    start: w-1 Sat 19:00
+    end: w-2 Sun 03:00
+    price_is_free: false
+    price_min: 55
+    price_currency: EUR
+    tags:
+      [
+        dance-style:salsa,
+        format:festival,
+        level:all-levels,
+        venue:indoor,
+        reach:international,
+      ]
+
+  - id: evt-tribe-p04
+    calendar_id: tribe-cal-001
+    title: Lyon Bachata Social (past)
+    description: Social — dave reviewed this ANONYMOUSLY (excluded from feed).
+    location: Salle Rameau, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-2 Fri 21:00
+    end: w-3 Sat 01:00
+    price_is_free: true
+    tags:
+      [
+        dance-style:bachata,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        reach:regional,
+      ]
+
+# --- Following Reviews source. alice/bob/carla are my followees and post
+#     public (non-anonymous) reviews → they appear. dave is my followee but
+#     posts ANONYMOUSLY → excluded from the Following Reviews feed. ---
+ratings:
+  - event_id: evt-tribe-p01
+    email: alice@example.com
+    overall_sentiment: amazing
+    comment: "Best marathon of the year — DJs were on fire."
+    aspect_scores: { music: 5, atmosphere: 5 }
+    aspect_tags:
+      - music:great-dj
+      - atmosphere:high-energy
+    audience_tags:
+      - audience:late-night-dancers
+    comment_status: approved
+    status: approved
+    is_anonymous: false
+
+  - event_id: evt-tribe-p02
+    email: bob@example.com
+    overall_sentiment: great
+    comment: "Huge festival, great workshops, a bit pricey."
+    aspect_scores: { music: 4, atmosphere: 4, value: 3 }
+    aspect_tags:
+      - atmosphere:international-crowd
+      - value:overpriced
+    audience_tags:
+      - audience:workshop-lovers
+    comment_status: approved
+    status: approved
+    is_anonymous: false
+
+  - event_id: evt-tribe-p03
+    email: carla@example.com
+    overall_sentiment: okay
+    comment: "Good line-up but the main room was overcrowded."
+    aspect_scores: { music: 4, atmosphere: 3, venue-quality: 2 }
+    aspect_tags:
+      - venue-quality:crowded
+      - music:good-variety
+    audience_tags:
+      - audience:advanced
+    comment_status: approved
+    status: approved
+    is_anonymous: false
+
+  - event_id: evt-tribe-p04
+    email: dave@example.com
+    overall_sentiment: great
+    comment: "Fun social — anonymous review, must not surface in the feed."
+    comment_status: approved
+    status: approved
+    is_anonymous: true

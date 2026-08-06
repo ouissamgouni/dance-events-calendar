@@ -1,0 +1,7 @@
+# Saved (not going) events for me. One upcoming saved event populates the
+# "Saved" count in My Events and the Overview "Continue planning" rail.
+saves:
+  - { event_id: evt-mine-u01, email: me@example.com, audience: public }
+  - { event_id: evt-mine-u04, email: me@example.com, audience: public }
+  - { event_id: evt-mine-u06, email: me@example.com, audience: public }
+  - { event_id: evt-mine-u08, email: me@example.com, audience: public }

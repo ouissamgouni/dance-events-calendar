@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
     fetchFriendsLeaderboard,
@@ -10,11 +10,9 @@ import {
     unfollowUser,
     type FollowList,
     type FollowUser,
-    type FoFSuggestionItem,
     type FriendsLeaderboardResponse,
     type LeaderboardPeriod,
 } from '../api';
-import PeopleYouMayKnowCard from './PeopleYouMayKnowCard';
 import FollowRequestsPanel from './FollowRequestsPanel';
 import { ConfirmDialog } from './AppDialog';
 /**
@@ -27,10 +25,9 @@ import { ConfirmDialog } from './AppDialog';
  * audience tiers across the app.
  */
 
-type Tab = 'suggestions' | 'followers' | 'following' | 'friends' | 'leaderboard';
+type Tab = 'followers' | 'following' | 'friends' | 'leaderboard';
 
 const TAB_LABELS: Record<Tab, string> = {
-    suggestions: 'Suggestions',
     followers: 'Followers',
     following: 'Following',
     friends: 'Friends',
@@ -38,20 +35,11 @@ const TAB_LABELS: Record<Tab, string> = {
 };
 
 export default function NetworkPanel() {
-    const [tab, setTab] = useState<Tab>('suggestions');
-    // Tracks whether the viewer has explicitly clicked a tab — once true,
-    // the suggestions-empty fallback below no longer overrides their choice.
-    const tabManuallySelectedRef = useRef(false);
+    const [tab, setTab] = useState<Tab>('followers');
     const handleTabClick = useCallback((t: Tab) => {
-        tabManuallySelectedRef.current = true;
         setTab(t);
     }, []);
-    const handleSuggestionsResult = useCallback((items: FoFSuggestionItem[]) => {
-        if (!tabManuallySelectedRef.current && items.length === 0) {
-            setTab((current) => (current === 'suggestions' ? 'followers' : current));
-        }
-    }, []);
-    const [data, setData] = useState<Record<Exclude<Tab, 'leaderboard' | 'suggestions'>, FollowList | null>>({
+    const [data, setData] = useState<Record<Exclude<Tab, 'leaderboard'>, FollowList | null>>({
         friends: null,
         followers: null,
         following: null,
@@ -60,7 +48,6 @@ export default function NetworkPanel() {
         friends: null,
         followers: null,
         following: null,
-        suggestions: null,
         leaderboard: null,
     });
     // Phase E (E9): leaderboard state lives separately because its row
@@ -72,7 +59,7 @@ export default function NetworkPanel() {
     // in `data` so an eager count fetch never poisons `data[tab]` with a
     // truncated 1-item list that the full-list effect below then mistakes
     // for "already loaded" and skips re-fetching.
-    const [counts, setCounts] = useState<Record<Exclude<Tab, 'leaderboard' | 'suggestions'>, number | null>>({
+    const [counts, setCounts] = useState<Record<Exclude<Tab, 'leaderboard'>, number | null>>({
         friends: null,
         followers: null,
         following: null,
@@ -140,7 +127,6 @@ export default function NetworkPanel() {
                 cancelled = true;
             };
         }
-        if (tab === 'suggestions') return; // PYM card owns its own fetch
         // If data already has items (full list), don't re-fetch
         if (data[tab] !== null && data[tab].items.length > 0) return;
         let cancelled = false;
@@ -166,7 +152,7 @@ export default function NetworkPanel() {
         };
     }, [tab, data, leaderboard, leaderboardPeriod]);
 
-    const current = tab === 'leaderboard' || tab === 'suggestions' ? null : data[tab];
+    const current = tab === 'leaderboard' ? null : data[tab];
     const error = errors[tab];
     const [pending, setPending] = useState<string | null>(null);
     const [removeTarget, setRemoveTarget] = useState<FollowUser | null>(null);
@@ -234,9 +220,6 @@ export default function NetworkPanel() {
             id="network"
             className="border border-slate-200 bg-white p-4 mb-3 scroll-mt-4"
         >
-            <h2 className="text-sm font-semibold text-slate-900 mb-2">
-                My network
-            </h2>
             <FollowRequestsPanel />
             <div
                 role="tablist"
@@ -246,7 +229,7 @@ export default function NetworkPanel() {
                 {(Object.keys(TAB_LABELS) as Tab[]).map((t) => {
                     const active = t === tab;
                     const count =
-                        t === 'leaderboard' || t === 'suggestions' ? undefined : data[t]?.total ?? counts[t] ?? undefined;
+                        t === 'leaderboard' ? undefined : data[t]?.total ?? counts[t] ?? undefined;
                     return (
                         <button
                             key={t}
@@ -273,11 +256,6 @@ export default function NetworkPanel() {
             <div className="max-h-80 overflow-y-auto">
                 {error ? (
                     <p className="text-xs text-red-600">{error}</p>
-                ) : tab === 'suggestions' ? (
-                    // Phase E (E4): friend-of-friend / popular accounts the
-                    // viewer might want to follow. The PYM card owns its
-                    // own data fetch + Follow buttons so we just drop it in.
-                    <PeopleYouMayKnowCard onResult={handleSuggestionsResult} />
                 ) : tab === 'leaderboard' ? (
                     <LeaderboardView
                         period={leaderboardPeriod}

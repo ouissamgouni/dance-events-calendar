@@ -26,7 +26,7 @@ export function StatusBar() {
   const [collapsed, setCollapsed] = useState(false);
 
   const env = appInfo?.environment ?? 'prod';
-  const isProd = env === 'prod';
+  const isProd = env === 'prod' || env === 'production';
   const dotColor = getEnvDotColor(env);
   const hasQa = (appInfo?.qa_scenarios?.length ?? 0) > 0 && !isProd;
 

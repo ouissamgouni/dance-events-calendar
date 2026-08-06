@@ -70,7 +70,7 @@ export default function HeaderUserMenu({ className }: { className?: string }) {
                 >
                     {user ? (
                         <>
-                            <Link to="/passport" role="menuitem" className={itemClass}>
+                            <Link to="/mine/passport" role="menuitem" className={itemClass}>
                                 <img src="/passport.png" alt="" aria-hidden="true" className={iconClass} />
                                 Dance Passport
                             </Link>

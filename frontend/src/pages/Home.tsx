@@ -1247,7 +1247,7 @@ export default function Home() {
                 <div className="flex items-center justify-between">
                     <h3 id="filter-sheet-following-heading" className="filter-sheet-section-title">Following</h3>
                     <Link
-                        to="/my-calendar/subscriptions"
+                        to="/tribe/calendars"
                         className="text-xs text-blue-600 hover:underline"
                         onClick={() => setFilterSheetOpen(false)}
                     >
@@ -1978,7 +1978,7 @@ function InterestFilterChips({
                     <span className="hidden sm:inline">Filter by following</span>
                 </span>
                 <span>You're not following anyone yet.</span>
-                <Link to="/discover" className="text-blue-600 hover:underline">
+                <Link to="/tribe/discover" className="text-blue-600 hover:underline">
                     Build your tribe →
                 </Link>
             </div>
@@ -2013,7 +2013,7 @@ function InterestFilterChips({
     // Always shown alongside the inlined filters below.
     const shortcutLink = (
         <Link
-            to={signedIn ? '/my-calendar/subscriptions' : `/login?next=${encodeURIComponent('/my-calendar/subscriptions')}`}
+            to={signedIn ? '/tribe/calendars' : `/login?next=${encodeURIComponent('/tribe/calendars')}`}
             data-testid="follows-shortcut"
             aria-label="Open the calendar from people I follow"
             title="Open the calendar from people I follow"

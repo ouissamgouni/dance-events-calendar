@@ -1,0 +1,4 @@
+calendars:
+  - id: "mine-cal-001"
+    name: "Salsa"
+    color: "#e11d48"

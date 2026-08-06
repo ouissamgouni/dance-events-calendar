@@ -32,14 +32,14 @@ describe('BottomNav', () => {
         expect(screen.getByRole('link', { name: 'Mine' })).not.toHaveAttribute('aria-current')
     })
 
-    it('marks Mine active on /my-calendar but not Tribe', () => {
-        renderAt('/my-calendar')
+    it('marks Mine active on /mine but not Tribe', () => {
+        renderAt('/mine')
         expect(screen.getByRole('link', { name: 'Mine' })).toHaveAttribute('aria-current', 'page')
         expect(screen.getByRole('link', { name: 'Tribe' })).not.toHaveAttribute('aria-current')
     })
 
-    it('marks Tribe active on the subscriptions route', () => {
-        renderAt('/my-calendar/subscriptions')
+    it('marks Tribe active on the tribe route', () => {
+        renderAt('/tribe')
         expect(screen.getByRole('link', { name: 'Tribe' })).toHaveAttribute('aria-current', 'page')
         expect(screen.getByRole('link', { name: 'Mine' })).not.toHaveAttribute('aria-current')
     })

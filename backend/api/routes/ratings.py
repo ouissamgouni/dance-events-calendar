@@ -70,6 +70,7 @@ from backend.db.models import (
     TagGroup,
     TagSuggestion,
     User,
+    UserFollow,
 )
 from backend.services.app_settings import (
     get_for_you_review_window_days,
@@ -1030,6 +1031,56 @@ def list_series_reviews(
             select(CachedEvent).where(col(CachedEvent.event_id).in_(event_ids))
         ).all()
     }
+    items = _reviews_to_public(session, rows, events_by_id)
+
+    return EventReviewsListResponse(items=items, total=int(total or 0))
+
+
+@router.get("/api/users/me/following-reviews", response_model=EventReviewsListResponse)
+def list_following_reviews(
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+):
+    """Reviews written by people the viewer follows, newest-first.
+
+    Only non-anonymous, non-rejected reviews from approved follow edges are
+    surfaced (an anonymous review from a followee reveals nothing useful).
+    """
+    followee_ids = session.exec(
+        select(UserFollow.followee_id).where(
+            UserFollow.follower_id == user.id,
+            UserFollow.status == "approved",
+        )
+    ).all()
+    if not followee_ids:
+        return EventReviewsListResponse(items=[], total=0)
+
+    base = select(EventRating).where(
+        col(EventRating.user_id).in_(followee_ids),
+        EventRating.status != "rejected",
+        col(EventRating.is_anonymous).is_(False),
+    )
+
+    total = session.exec(select(func.count()).select_from(base.subquery())).one()
+    if isinstance(total, tuple):
+        total = total[0]
+
+    base = base.order_by(col(EventRating.created_at).desc())
+    rows = session.exec(base.offset(offset).limit(limit)).all()
+
+    event_ids = list({r.event_id for r in rows})
+    events_by_id = (
+        {
+            ev.event_id: ev
+            for ev in session.exec(
+                select(CachedEvent).where(col(CachedEvent.event_id).in_(event_ids))
+            ).all()
+        }
+        if event_ids
+        else {}
+    )
     items = _reviews_to_public(session, rows, events_by_id)
 
     return EventReviewsListResponse(items=items, total=int(total or 0))

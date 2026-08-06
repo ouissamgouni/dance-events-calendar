@@ -1,4 +1,4 @@
-import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
+import { Routes, Route, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { ConsentProvider } from './context/ConsentContext';
@@ -46,6 +46,12 @@ const ReferralLanding = lazy(() => import('./pages/ReferralLanding'));
 const ForYouPage = lazy(() => import('./pages/ForYouPage'));
 const InstallPage = lazy(() => import('./pages/InstallPage'));
 const InvitePage = lazy(() => import('./pages/InvitePage'));
+const MineHub = lazy(() => import('./pages/MineHub'));
+const NetworkPage = lazy(() => import('./pages/NetworkPage'));
+const FollowingReviewsPage = lazy(() => import('./pages/FollowingReviewsPage'));
+const MyReviewsPage = lazy(() => import('./pages/MyReviewsPage'));
+const DiscoveryProfilesPage = lazy(() => import('./pages/DiscoveryProfilesPage'));
+const SectionLayout = lazy(() => import('./components/SectionTabs'));
 import OnboardingGate from './components/OnboardingGate';
 import UserSearchBox from './components/UserSearchBox';
 import ExplorerEventSearch from './components/ExplorerEventSearch';
@@ -153,16 +159,35 @@ function AppShell() {
                 <Route path="/for-you" element={<ForYouPage />} />
                 <Route path="/event/:eventId" element={<EventDetailPage />} />
                 <Route path="/series/:seriesId" element={<SeriesPage />} />
-                <Route path="/my-calendar" element={<MyCalendar />} />
-                <Route path="/my-calendar/subscriptions" element={<MyCalendar />} />
-                <Route
-                  path="/passport"
-                  element={
-                    <ProtectedRoute>
-                      <PassportPage />
-                    </ProtectedRoute>
-                  }
-                />
+                <Route path="/tribe" element={<SectionLayout section="tribe" />}>
+                  <Route index element={<Navigate to="/tribe/calendars" replace />} />
+                  <Route path="calendars" element={<MyCalendar />} />
+                  <Route
+                    path="activity"
+                    element={
+                      <ProtectedRoute>
+                        <Notifications socialOnly />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path="discover" element={<DiscoverPage />} />
+                  <Route path="network" element={<NetworkPage />} />
+                  <Route path="reviews" element={<FollowingReviewsPage />} />
+                </Route>
+                <Route path="/mine" element={<SectionLayout section="mine" />}>
+                  <Route index element={<MineHub />} />
+                  <Route path="calendar" element={<MyCalendar />} />
+                  <Route
+                    path="passport"
+                    element={
+                      <ProtectedRoute>
+                        <PassportPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route path="reviews" element={<MyReviewsPage />} />
+                  <Route path="profiles" element={<DiscoveryProfilesPage />} />
+                </Route>
                 <Route path="/shared/:token" element={<SharedCalendarPage />} />
                 <Route path="/shared/passport/:token" element={<SharedPassportPage />} />
                 <Route path="/privacy" element={<Privacy />} />
@@ -179,7 +204,6 @@ function AppShell() {
                   }
                 />
                 <Route path="/u/:handle" element={<ProfilePage />} />
-                <Route path="/discover" element={<DiscoverPage />} />
                 <Route
                   path="/admin"
                   element={

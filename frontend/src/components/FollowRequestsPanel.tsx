@@ -86,9 +86,9 @@ export default function FollowRequestsPanel() {
     return (
         <section
             data-testid="follow-requests-panel"
-            className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3"
+            className="mb-4 border border-blue-200 bg-blue-50 p-3"
         >
-            <h3 className="text-sm font-semibold text-amber-900 mb-2">
+            <h3 className="text-sm font-semibold text-slate-800 mb-2">
                 Follow requests ({items.length})
             </h3>
             <ul className="space-y-2">
@@ -105,20 +105,20 @@ export default function FollowRequestsPanel() {
                                 className="h-8 w-8 rounded-full object-cover"
                             />
                         ) : (
-                            <div className="h-8 w-8 rounded-full bg-amber-200" />
+                            <div className="h-8 w-8 rounded-full bg-slate-200" />
                         )}
                         <Link
                             to={`/u/${it.handle}`}
-                            className="flex-1 text-sm text-amber-900 hover:underline"
+                            className="flex-1 text-sm text-slate-800 hover:underline"
                         >
                             {it.display_name || `@${it.handle}`}
-                            <span className="ml-1 text-amber-700">@{it.handle}</span>
+                            <span className="ml-1 text-slate-500">@{it.handle}</span>
                         </Link>
                         <button
                             type="button"
                             disabled={busy === it.handle}
                             onClick={() => void onApprove(it.handle)}
-                            className="px-2 py-1 text-xs font-medium bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
+                            className="px-2 py-1 text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
                             data-testid={`approve-${it.handle}`}
                         >
                             Approve
@@ -127,7 +127,7 @@ export default function FollowRequestsPanel() {
                             type="button"
                             disabled={busy === it.handle}
                             onClick={() => void onDecline(it.handle)}
-                            className="px-2 py-1 text-xs font-medium border border-amber-300 text-amber-900 rounded hover:bg-amber-100 disabled:opacity-50"
+                            className="px-2 py-1 text-xs font-medium border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                             data-testid={`decline-${it.handle}`}
                         >
                             Decline

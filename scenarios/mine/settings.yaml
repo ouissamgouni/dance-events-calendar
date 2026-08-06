@@ -1,0 +1,3 @@
+# Ratings must be visible for My Reviews and review prompts to render.
+settings:
+  show_ratings: true
