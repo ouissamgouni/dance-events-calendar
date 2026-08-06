@@ -112,7 +112,7 @@ function AppShell() {
     <NotificationsProvider>
       <>
         <div
-          className="flex flex-col h-screen"
+          className="flex flex-col h-dvh"
           style={qaPinnedWidth ? { marginRight: qaPinnedWidth, transition: 'margin-right 0.2s ease' } : { transition: 'margin-right 0.2s ease' }}
         >
           <div className="flex items-center justify-between bg-slate-900 px-4 py-1.5">

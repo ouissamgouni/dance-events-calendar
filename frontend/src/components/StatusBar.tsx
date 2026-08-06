@@ -30,6 +30,10 @@ export function StatusBar() {
   const dotColor = getEnvDotColor(env);
   const hasQa = (appInfo?.qa_scenarios?.length ?? 0) > 0 && !isProd;
 
+  // Hidden by default in prod; opt in with VITE_SHOW_STATUS_BAR=1 for prod debugging.
+  const forceShow = (import.meta.env.VITE_SHOW_STATUS_BAR as string | undefined) === '1';
+  if (isProd && !forceShow) return null;
+
   return (
     <div
       className="shrink-0 bg-gray-100 text-gray-600 border-t border-gray-200 relative flex items-center select-none"
