@@ -16,7 +16,7 @@ export default function BottomNav() {
         <nav
             aria-label="Primary"
             className="md:hidden shrink-0 flex items-stretch border-t border-slate-200 bg-slate-100"
-            style={{ height: 68, paddingBottom: 'env(safe-area-inset-bottom)' }}
+            style={{ height: 'calc(68px + env(safe-area-inset-bottom))', paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
             {NAV_DESTINATIONS.map((dest) => {
                 const active = dest.isActive(pathname);

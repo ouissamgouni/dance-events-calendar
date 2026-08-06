@@ -121,7 +121,10 @@ function AppShell() {
           className="flex flex-col h-dvh"
           style={qaPinnedWidth ? { marginRight: qaPinnedWidth, transition: 'margin-right 0.2s ease' } : { transition: 'margin-right 0.2s ease' }}
         >
-          <div className="flex items-center justify-between bg-slate-900 px-4 py-1.5">
+          <div
+            className="flex items-center justify-between bg-slate-900 px-4 py-1.5"
+            style={{ paddingTop: 'calc(0.375rem + env(safe-area-inset-top))' }}
+          >
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5">
                 <Link to="/" reloadDocument>
