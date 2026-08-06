@@ -1,7 +1,6 @@
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useLayoutEffect, useRef, lazy, Suspense } from 'react';
 import { AuthProvider } from './context/AuthContext';
-import { useAuth } from './context/AuthContext';
 import { ConsentProvider } from './context/ConsentContext';
 import { FeatureFlagsProvider } from './context/FeatureFlagsContext';
 import { NotificationsProvider } from './context/NotificationsContext';
@@ -16,6 +15,8 @@ import { QaTestPlanProvider, useQaPinnedWidth } from './components/QaTestPlanPan
 import { StatusBar } from './components/StatusBar';
 import NotificationBell from './components/NotificationBell';
 import HeaderUserMenu from './components/HeaderUserMenu';
+import DesktopNav from './components/DesktopNav';
+import BottomNav from './components/BottomNav';
 import ProtectedRoute from './components/ProtectedRoute';
 import SignUpBanner from './components/SignUpBanner';
 import ShareReferralBanner from './components/ShareReferralBanner';
@@ -81,11 +82,22 @@ export default function App() {
 
 function AppShell() {
   const { analyticsConsent } = useConsent();
-  const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const qaPinnedWidth = useQaPinnedWidth();
   const mainRef = useRef<HTMLElement | null>(null);
+
+  // Full-screen flows (auth, onboarding) and leaf detail pages (event/series,
+  // admin, notifications, shared views) suppress the primary bottom nav.
+  const hideBottomNav =
+    location.pathname === '/login' ||
+    location.pathname.startsWith('/onboarding/') ||
+    location.pathname.startsWith('/event/') ||
+    location.pathname.startsWith('/series/') ||
+    location.pathname.startsWith('/admin') ||
+    location.pathname.startsWith('/notifications') ||
+    location.pathname.startsWith('/shared/') ||
+    location.pathname === '/account';
 
   useEffect(() => {
     if (analyticsConsent) umamiPageView();
@@ -104,22 +116,16 @@ function AppShell() {
           style={qaPinnedWidth ? { marginRight: qaPinnedWidth, transition: 'margin-right 0.2s ease' } : { transition: 'margin-right 0.2s ease' }}
         >
           <div className="flex items-center justify-between bg-slate-900 px-4 py-1.5">
-            <div className="flex items-center gap-1.5">
-              <Link to="/" reloadDocument>
-                <img src="/movida.png" alt="Movida" className="h-6 w-6" />
-              </Link>
-              <Link to="/" reloadDocument className="text-sm font-bold text-white tracking-tight hover:text-gray-200 transition">Movida</Link>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <Link to="/" reloadDocument>
+                  <img src="/movida.png" alt="Movida" className="h-6 w-6" />
+                </Link>
+                <Link to="/" reloadDocument className="text-sm font-bold text-white tracking-tight hover:text-gray-200 transition">Movida</Link>
+              </div>
+              <DesktopNav />
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
-              {!user && (
-                <Link
-                  to="/?submit=1"
-                  className="text-xs font-medium text-white hover:text-gray-200 transition"
-                >
-                  <span className="sm:hidden">+ Submit</span>
-                  <span className="hidden sm:inline">Submit event</span>
-                </Link>
-              )}
               <ExplorerEventSearch
                 compact
                 onDark
@@ -205,6 +211,7 @@ function AppShell() {
               </a>
             </footer>
           </main>
+          {!hideBottomNav && <BottomNav />}
           <StatusBar />
         </div>
         <InstallPrompt />

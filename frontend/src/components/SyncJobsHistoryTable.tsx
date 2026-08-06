@@ -41,6 +41,7 @@ interface SyncJobsHistoryTableProps {
 }
 
 const PAGE_SIZE = 25;
+const MOBILE_PAGE_SIZE = 5;
 
 function durationLabel(j: SyncJobRecord): string {
     const start = new Date(j.started_at).getTime();
@@ -69,11 +70,30 @@ export default function SyncJobsHistoryTable({ onClose }: SyncJobsHistoryTablePr
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const [page, setPage] = useState(0);
     const [openJobId, setOpenJobId] = useState<string | null>(null);
+    const [isMobile, setIsMobile] = useState(
+        () => typeof window !== 'undefined' && window.innerWidth < 640,
+    );
+
+    useEffect(() => {
+        const mq = window.matchMedia('(max-width: 639px)');
+        const handler = () => setIsMobile(mq.matches);
+        handler();
+        mq.addEventListener('change', handler);
+        return () => mq.removeEventListener('change', handler);
+    }, []);
+
+    const pageSize = isMobile ? MOBILE_PAGE_SIZE : PAGE_SIZE;
+
+    // Reset to the first page when the page size changes (viewport crossed 640px)
+    // so the current offset never lands out of range.
+    useEffect(() => {
+        setPage(0);
+    }, [pageSize]);
 
     const refresh = async () => {
         setLoading(true);
         try {
-            const res = await fetchSyncJobs(PAGE_SIZE, page * PAGE_SIZE);
+            const res = await fetchSyncJobs(pageSize, page * pageSize);
             setJobs(res.items);
             setTotal(res.total);
             setError(null);
@@ -89,7 +109,7 @@ export default function SyncJobsHistoryTable({ onClose }: SyncJobsHistoryTablePr
         const t = setInterval(refresh, 5000);
         return () => clearInterval(t);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page]);
+    }, [page, pageSize]);
 
     const filtered = useMemo(() => {
         if (statusFilter === 'all') return jobs;
@@ -99,7 +119,7 @@ export default function SyncJobsHistoryTable({ onClose }: SyncJobsHistoryTablePr
         return jobs.filter((j) => j.status === statusFilter);
     }, [jobs, statusFilter]);
 
-    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
     return (
         <div className="bg-white border border-gray-200 rounded-lg shadow-sm">

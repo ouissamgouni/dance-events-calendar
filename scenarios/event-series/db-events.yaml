@@ -16,6 +16,7 @@ events:
     start: w1 Fri 20:00
     end: w1 Fri 23:30
     price_is_free: true
+    tags: ["format:social", "level:beginner-friendly", "reach:local"]
 
   - id: series-a-w2
     calendar_id: tango-collective
@@ -27,6 +28,7 @@ events:
     start: w2 Fri 20:00
     end: w2 Fri 23:30
     price_is_free: true
+    tags: ["format:social", "level:beginner-friendly", "reach:local"]
 
   - id: series-a-w3
     calendar_id: tango-collective
@@ -38,6 +40,7 @@ events:
     start: w3 Fri 20:00
     end: w3 Fri 23:30
     price_is_free: true
+    tags: ["format:social", "level:beginner-friendly", "reach:local"]
 
   # ── Same title/venue but a DIFFERENT calendar — must never be grouped
   # with Series A. Proves series detection is scoped per-calendar. ───────
@@ -51,6 +54,7 @@ events:
     start: w1 Fri 20:00
     end: w1 Fri 23:30
     price_is_free: true
+    tags: ["format:social", "level:beginner-friendly", "reach:local"]
 
   # ── Manual-only pair: same real recurring event (same calendar, 7 days
   # apart), but titles are deliberately too dissimilar for the automatic
@@ -68,6 +72,7 @@ events:
     price_is_free: false
     price_min: 10
     price_currency: EUR
+    tags: ["format:social", "dance-style:kizomba", "reach:local"]
 
   - id: manual-b2
     calendar_id: tango-collective
@@ -81,6 +86,7 @@ events:
     price_is_free: false
     price_min: 10
     price_currency: EUR
+    tags: ["format:social", "dance-style:kizomba", "reach:local"]
 
   # ── New occurrences that arrive AFTER Series A is approved. Their titles
   # start deliberately dissimilar from Series A so a "Scan now" does NOT
@@ -99,6 +105,7 @@ events:
     start: w4 Fri 20:00
     end: w4 Fri 23:30
     price_is_free: true
+    tags: ["format:social", "level:beginner-friendly", "reach:local"]
 
   - id: series-a-w5
     calendar_id: tango-collective
@@ -110,6 +117,13 @@ events:
     start: w5 Fri 20:00
     end: w5 Fri 23:30
     price_is_free: true
+    tags:
+      [
+        "format:practice",
+        "format:social",
+        "level:beginner-friendly",
+        "reach:local",
+      ]
 
   # ── Unique one-off — must never appear in any series ────────────────────
   - id: unique-solo
@@ -124,3 +138,4 @@ events:
     price_is_free: false
     price_min: 25
     price_currency: EUR
+    tags: ["format:festival", "dance-style:salsa", "reach:international"]
