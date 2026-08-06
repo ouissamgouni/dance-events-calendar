@@ -72,7 +72,7 @@ export default function SharedCalendarPage() {
                     {!loading && !notFound && events.length > 0 && (
                         <div className="ml-auto">
                             <Link
-                                to="/my-calendar"
+                                to="/mine/calendar"
                                 className="rounded-full bg-rose-50 px-3 py-1 text-xs text-rose-600 hover:bg-rose-100 transition"
                             >
                                 My Calendar →
@@ -85,7 +85,7 @@ export default function SharedCalendarPage() {
                 {!loading && !notFound && (
                     <div className="mb-4 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-500">
                         This is a shared calendar. Save individual events to add them to{' '}
-                        <Link to="/my-calendar" className="text-rose-600 hover:underline">
+                        <Link to="/mine/calendar" className="text-rose-600 hover:underline">
                             your own calendar
                         </Link>
                         .

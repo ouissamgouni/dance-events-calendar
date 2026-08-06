@@ -254,16 +254,9 @@ function DefaultDiscoverSections() {
         return (
             <section className="border border-slate-200 bg-slate-50 p-3">
                 <p className="text-sm text-slate-600">
-                    Search by name or handle, or visit your network to follow people you know.
+                    Search by name or handle, or check the suggested people if any.
                 </p>
-                <div className="mt-2 flex flex-wrap gap-3">
-                    <Link
-                        to="/account#network"
-                        className="text-xs font-semibold text-blue-600 hover:text-blue-700"
-                    >
-                        Open my network
-                    </Link>
-                </div>
+
             </section>
         );
     }

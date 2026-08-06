@@ -74,7 +74,7 @@ export default function RailEventCard({
     const location = shortLocation(event.location);
     const compact = variant === 'compact';
     const showExtras = !compact || compactShowExtras;
-    const cardSize = compact ? 'w-[196px]' : 'w-[212px] min-h-[116px]';
+    const cardSize = compact ? 'w-[208px]' : 'w-[224px]';
 
     const handleMouseEnter = useCallback(() => onHover?.(event.event_id), [onHover, event.event_id]);
     const handleMouseLeave = useCallback(() => onHover?.(null), [onHover]);
@@ -82,7 +82,7 @@ export default function RailEventCard({
     return (
         <div
             // eslint-disable-next-line no-restricted-syntax -- rounded event cards per explicit design request (For you + Trending trails)
-            className={`group relative flex ${cardSize} shrink-0 flex-col rounded-md border border-slate-200 bg-white px-2 py-2 text-left transition hover:bg-slate-50 ${highlighted ? 'ring-1 ring-blue-200' : ''}`}
+            className={`group relative flex ${cardSize} shrink-0 flex-col rounded-md border border-slate-200 bg-white px-2.5 py-2.5 text-left transition hover:bg-slate-50 ${highlighted ? 'ring-1 ring-blue-200' : ''}`}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
         >
@@ -104,7 +104,7 @@ export default function RailEventCard({
                 onBlur={handleMouseLeave}
                 className="flex flex-1 flex-col text-left focus:outline-none focus:ring-2 focus:ring-blue-300"
             >
-                <h3 className={`min-w-0 truncate text-xs font-semibold leading-snug text-slate-900 group-hover:text-blue-700 ${compact ? '' : 'pr-16'}`} title={event.title}>
+                <h3 className={`min-w-0 truncate text-sm font-semibold leading-snug text-slate-900 group-hover:text-blue-700 ${compact ? '' : 'pr-16'}`} title={event.title}>
                     {isNew && (
                         <span
                             // eslint-disable-next-line no-restricted-syntax -- small status dot (new event indicator) — allowed exception per frontend rules
@@ -116,9 +116,9 @@ export default function RailEventCard({
                     {title}
                 </h3>
                 {isTrending && (
-                    <div className="mt-0.5">
+                    <div className="mt-1">
                         <span
-                            className="inline-flex items-center bg-orange-50 px-1.5 py-px text-[10px] font-medium text-orange-400"
+                            className="inline-flex items-center bg-orange-50 px-1.5 py-px text-[11px] font-medium text-orange-400"
                             data-testid="trending-badge"
                             title="Trending"
                         >
@@ -126,8 +126,8 @@ export default function RailEventCard({
                         </span>
                     </div>
                 )}
-                <div className="mt-0.5 flex items-center gap-3">
-                    <span className="truncate text-[11px] font-medium text-slate-600">{startLabel}</span>
+                <div className="mt-1 flex items-center gap-3">
+                    <span className="truncate text-xs font-medium text-slate-600">{startLabel}</span>
                     {extraBadge}
                     <AttendeeAvatarStack
                         eventId={event.event_id}
@@ -136,12 +136,12 @@ export default function RailEventCard({
                     />
                 </div>
                 {location && (
-                    <p className="mt-0.5 truncate text-[10px] text-slate-500" title={event.location ?? undefined}>
+                    <p className="mt-1 truncate text-[11px] text-slate-500" title={event.location ?? undefined}>
                         {location}
                     </p>
                 )}
                 {showExtras && event.tags && event.tags.length > 0 && (
-                    <div className="mt-1">
+                    <div className="mt-1.5">
                         <TagBadges tags={event.tags} maxVisible={tagsPerCard} />
                     </div>
                 )}

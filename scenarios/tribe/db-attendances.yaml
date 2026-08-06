@@ -1,0 +1,31 @@
+# "Going" state for my followees on UPCOMING events. emit_notifications:
+# true runs fan_out_going so I (a subscriber via the seeded follows) receive
+# subscription_going notifications in my Activity feed, and these events
+# surface in Following Calendars (/tribe/calendars).
+emit_notifications: true
+attendances:
+  - {
+      event_id: evt-tribe-u01,
+      email: alice@example.com,
+      share_audience: public,
+    }
+  - { event_id: evt-tribe-u02, email: bob@example.com, share_audience: public }
+  - {
+      event_id: evt-tribe-u03,
+      email: carla@example.com,
+      share_audience: public,
+    }
+  - { event_id: evt-tribe-u04, email: dave@example.com, share_audience: public }
+  # Spread across the next ~6 months so Following Calendars shows a long horizon.
+  - {
+      event_id: evt-tribe-u05,
+      email: alice@example.com,
+      share_audience: public,
+    }
+  - { event_id: evt-tribe-u06, email: bob@example.com, share_audience: public }
+  - {
+      event_id: evt-tribe-u07,
+      email: carla@example.com,
+      share_audience: public,
+    }
+  - { event_id: evt-tribe-u08, email: dave@example.com, share_audience: public }

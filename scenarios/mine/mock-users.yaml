@@ -1,0 +1,47 @@
+# Mock users for the "mine" scenario — the signed-in, personal /mine hub
+# (Overview, My Events, Passport, My Reviews, Discovery Profiles).
+#
+#   * me    — the POV account. Rich retrospective journey (6 past attended
+#     events across 6 cities / 5 countries incl. international) plus a
+#     couple of upcoming saved/going events. Passport is public. Authors
+#     3 approved reviews; 3 attended past events are left unrated so they
+#     surface as pending review prompts.
+#   * nina, omar — mutual friends of me (feed the passport friends count
+#     and the Tribe network). See db-follows.yaml.
+#   * priya — follows me one-way (a follower, no follow-back).
+#   * quinn — pending inbound follow request (Network requests panel).
+#   * admin — matches ADMIN_EMAIL (kept for parity with other scenarios).
+users:
+  - email: me@example.com
+    name: Mia (my journey)
+    handle: me
+    account_visibility: public
+    passport_visibility: public
+    passport_show_timeline: true
+  - {
+      email: nina@example.com,
+      name: Nina Alvarez,
+      handle: nina,
+      account_visibility: public,
+    }
+  - {
+      email: omar@example.com,
+      name: Omar Haddad,
+      handle: omar,
+      account_visibility: public,
+    }
+  - {
+      email: priya@example.com,
+      name: Priya Nair,
+      handle: priya,
+      account_visibility: public,
+    }
+  - {
+      email: quinn@example.com,
+      name: Quinn Lefebvre,
+      handle: quinn,
+      account_visibility: public,
+    }
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

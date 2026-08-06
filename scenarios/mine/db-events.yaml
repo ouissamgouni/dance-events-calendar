@@ -1,0 +1,384 @@
+# Events for the "mine" scenario.
+#
+# Six PAST events (w-N) drive the Dance Passport (6 cities, 5 countries,
+# one international) and are the subjects of My Reviews. Two UPCOMING
+# events (w+N) populate My Events (one saved, one going) and the Overview
+# "Continue planning" rail. city/country/country_code are seeded directly
+# so no live geocoding is needed.
+base_week: 0
+events:
+  # ── Past attended events (feed Passport + My Reviews) ────────────
+  - id: evt-mine-p01
+    calendar_id: mine-cal-001
+    title: Paris Friday Salsa Social
+    description: Weekly salsa social in central Paris.
+    location: Studio Harmonic, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    city: Paris
+    country: France
+    country_code: FR
+    start: w-1 Fri 21:00
+    end: w-1 Sat 01:00
+    price_is_free: true
+    tags:
+      [
+        dance-style:salsa,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        reach:local,
+      ]
+
+  - id: evt-mine-p02
+    calendar_id: mine-cal-001
+    title: Lyon Bachata Night
+    description: Sensual bachata by the Rhône.
+    location: Salle Rameau, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-2 Sat 20:00
+    end: w-3 Sun 00:00
+    price_is_free: false
+    price_min: 12
+    price_currency: EUR
+    tags:
+      [
+        dance-style:bachata,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        reach:regional,
+      ]
+
+  - id: evt-mine-p03
+    calendar_id: mine-cal-001
+    title: Berlin International Salsa Congress
+    description: Flagship international salsa weekend — drives the international milestone.
+    location: Estrel Congress Center, Berlin, Germany
+    latitude: 52.5200
+    longitude: 13.4050
+    city: Berlin
+    country: Germany
+    country_code: DE
+    start: w-4 Sat 19:00
+    end: w-5 Sun 03:00
+    price_is_free: false
+    price_min: 55
+    price_currency: EUR
+    tags:
+      [
+        dance-style:salsa,
+        format:festival,
+        level:all-levels,
+        venue:indoor,
+        reach:international,
+      ]
+
+  - id: evt-mine-p04
+    calendar_id: mine-cal-001
+    title: Madrid Bachata Festival
+    description: A weekend of bachata sensual and moderna in Madrid.
+    location: IFEMA, Madrid, Spain
+    latitude: 40.4168
+    longitude: -3.7038
+    city: Madrid
+    country: Spain
+    country_code: ES
+    start: w-6 Sat 18:00
+    end: w-7 Sun 02:00
+    price_is_free: false
+    price_min: 45
+    price_currency: EUR
+    tags:
+      [
+        dance-style:bachata,
+        format:festival,
+        level:all-levels,
+        venue:indoor,
+        reach:international,
+      ]
+
+  - id: evt-mine-p05
+    calendar_id: mine-cal-001
+    title: London Salsa Marathon
+    description: All-night salsa across two rooms in London.
+    location: Bar Salsa, London, United Kingdom
+    latitude: 51.5074
+    longitude: -0.1278
+    city: London
+    country: United Kingdom
+    country_code: GB
+    start: w-8 Sat 20:00
+    end: w-9 Sun 04:00
+    price_is_free: false
+    price_min: 20
+    price_currency: GBP
+    tags:
+      [
+        dance-style:salsa,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        reach:international,
+      ]
+
+  - id: evt-mine-p06
+    calendar_id: mine-cal-001
+    title: Amsterdam Kizomba Evening
+    description: Smooth kizomba social along the canals.
+    location: Panama, Amsterdam, Netherlands
+    latitude: 52.3676
+    longitude: 4.9041
+    city: Amsterdam
+    country: Netherlands
+    country_code: NL
+    start: w-10 Fri 20:00
+    end: w-11 Sat 00:00
+    price_is_free: true
+    tags:
+      [
+        dance-style:kizomba,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        reach:regional,
+      ]
+
+  # ── Upcoming events (feed My Events + Overview "Continue planning") ──
+  - id: evt-mine-u01
+    calendar_id: mine-cal-001
+    title: Paris Rooftop Salsa (Saved)
+    description: Sunset salsa social — saved, not yet going.
+    location: Le Perchoir, Paris, France
+    latitude: 48.8578
+    longitude: 2.3529
+    city: Paris
+    country: France
+    country_code: FR
+    start: w1 Sat 20:00
+    end: w1 Sun 00:00
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+    tags:
+      [
+        dance-style:salsa,
+        format:social,
+        level:all-levels,
+        venue:rooftop,
+        reach:local,
+      ]
+
+  - id: evt-mine-u02
+    calendar_id: mine-cal-001
+    title: Paris Bachata Social (Going)
+    description: Weekly bachata social — marked going.
+    location: Studio Harmonic, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    city: Paris
+    country: France
+    country_code: FR
+    start: w2 Fri 21:00
+    end: w2 Sat 01:00
+    price_is_free: true
+    tags:
+      [
+        dance-style:bachata,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        reach:local,
+      ]
+
+  # ── Upcoming spread across the next ~6 months (international + local) ──
+  - id: evt-mine-u03
+    calendar_id: mine-cal-001
+    title: Barcelona International Salsa Congress (Going)
+    description: Flagship international weekend — marked going.
+    location: Hotel Front Marítim, Barcelona, Spain
+    latitude: 41.3874
+    longitude: 2.1686
+    city: Barcelona
+    country: Spain
+    country_code: ES
+    start: w5 Sat 19:00
+    end: w6 Sun 03:00
+    price_is_free: false
+    price_min: 60
+    price_currency: EUR
+    tags:
+      [
+        dance-style:salsa,
+        format:festival,
+        level:all-levels,
+        venue:indoor,
+        reach:international,
+      ]
+
+  - id: evt-mine-u04
+    calendar_id: mine-cal-001
+    title: Rome Sunday Salsa Social (Saved)
+    description: Neighbourhood salsa social — saved.
+    location: Villaggio Globale, Rome, Italy
+    latitude: 41.9028
+    longitude: 12.4964
+    city: Rome
+    country: Italy
+    country_code: IT
+    start: w8 Sun 20:00
+    end: w9 Mon 00:00
+    price_is_free: true
+    tags:
+      [
+        dance-style:salsa,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        reach:local,
+      ]
+
+  - id: evt-mine-u05
+    calendar_id: mine-cal-001
+    title: Lisbon Kizomba Festival (Going)
+    description: Kizomba weekend by the Tagus — marked going.
+    location: Centro de Congressos, Lisbon, Portugal
+    latitude: 38.7223
+    longitude: -9.1393
+    city: Lisbon
+    country: Portugal
+    country_code: PT
+    start: w12 Sat 18:00
+    end: w13 Sun 02:00
+    price_is_free: false
+    price_min: 50
+    price_currency: EUR
+    tags:
+      [
+        dance-style:kizomba,
+        format:festival,
+        level:all-levels,
+        venue:indoor,
+        reach:international,
+      ]
+
+  - id: evt-mine-u06
+    calendar_id: mine-cal-001
+    title: Vienna Salsa Weekend (Saved)
+    description: International salsa weekend in Vienna — saved.
+    location: Sargfabrik, Vienna, Austria
+    latitude: 48.2082
+    longitude: 16.3738
+    city: Vienna
+    country: Austria
+    country_code: AT
+    start: w16 Sat 19:00
+    end: w17 Sun 03:00
+    price_is_free: false
+    price_min: 40
+    price_currency: EUR
+    tags:
+      [
+        dance-style:salsa,
+        format:festival,
+        level:all-levels,
+        venue:indoor,
+        reach:international,
+      ]
+
+  - id: evt-mine-u07
+    calendar_id: mine-cal-001
+    title: Prague Friday Salsa Social (Going)
+    description: Friday salsa social in Prague — marked going.
+    location: Salsa Cubana, Prague, Czechia
+    latitude: 50.0755
+    longitude: 14.4378
+    city: Prague
+    country: Czechia
+    country_code: CZ
+    start: w20 Fri 21:00
+    end: w20 Sat 01:00
+    price_is_free: true
+    tags:
+      [
+        dance-style:salsa,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        reach:local,
+      ]
+
+  - id: evt-mine-u08
+    calendar_id: mine-cal-001
+    title: Warsaw Bachata Night (Saved)
+    description: Bachata night in Warsaw — saved.
+    location: Level 27, Warsaw, Poland
+    latitude: 52.2297
+    longitude: 21.0122
+    city: Warsaw
+    country: Poland
+    country_code: PL
+    start: w24 Sat 20:00
+    end: w25 Sun 00:00
+    price_is_free: false
+    price_min: 10
+    price_currency: PLN
+    tags:
+      [
+        dance-style:bachata,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        reach:regional,
+      ]
+
+# --- My Reviews: three approved reviews authored by me. The remaining three
+#     attended past events (p04/p05/p06) are intentionally left unrated so
+#     they surface as pending review prompts (Overview + /mine/reviews). ---
+ratings:
+  - event_id: evt-mine-p01
+    email: me@example.com
+    overall_sentiment: great
+    comment: "Lovely floor and friendly crowd — my go-to Friday social."
+    aspect_scores: { music: 5, atmosphere: 5, venue-quality: 4 }
+    aspect_tags:
+      - music:great-dj
+      - atmosphere:friendly-crowd
+      - venue-quality:great-dance-floor
+    audience_tags:
+      - audience:meet-new-people
+    comment_status: approved
+    status: approved
+    is_anonymous: false
+
+  - event_id: evt-mine-p02
+    email: me@example.com
+    overall_sentiment: amazing
+    comment: "Incredible DJ set. Worth the trip to Lyon."
+    aspect_scores: { music: 5, atmosphere: 4 }
+    aspect_tags:
+      - music:great-playlist
+      - atmosphere:high-energy
+    audience_tags:
+      - audience:music-lovers
+    comment_status: approved
+    status: approved
+    is_anonymous: false
+
+  - event_id: evt-mine-p03
+    email: me@example.com
+    overall_sentiment: okay
+    comment: "Great line-up but far too crowded on the main floor."
+    aspect_scores: { music: 4, atmosphere: 3, venue-quality: 2 }
+    aspect_tags:
+      - venue-quality:crowded
+      - atmosphere:international-crowd
+    audience_tags:
+      - audience:advanced
+    comment_status: approved
+    status: approved
+    is_anonymous: false

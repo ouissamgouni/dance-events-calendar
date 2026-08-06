@@ -10,7 +10,7 @@ import { fetchCurators, searchUsers, type UserSearchResult } from '../api';
  * keep the typical typing burst well under that.
  *
  * Pressing Enter on a result navigates to the public profile; Enter on the
- * input alone routes to ``/discover?q=…`` so the user gets a richer page.
+ * input alone routes to ``/tribe/discover?q=…`` so the user gets a richer page.
  */
 export default function UserSearchBox() {
     const [q, setQ] = useState('');
@@ -123,7 +123,7 @@ export default function UserSearchBox() {
                 navigate(`/u/${menuRows[activeIdx].handle}`);
                 reset();
             } else if (q.trim()) {
-                navigate(`/discover?q=${encodeURIComponent(q.trim())}`);
+                navigate(`/tribe/discover?q=${encodeURIComponent(q.trim())}`);
                 reset();
             }
         }
@@ -228,7 +228,7 @@ export default function UserSearchBox() {
                 <div className="absolute right-0 mt-1 w-64 max-w-[calc(100vw-1rem)] bg-white border border-slate-200 shadow-lg z-50 max-h-80 overflow-auto">
                     {term.length === 0 && (
                         <Link
-                            to="/discover"
+                            to="/tribe/discover"
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={reset}
                             className="block px-3 py-2 hover:bg-slate-50"
@@ -276,7 +276,7 @@ export default function UserSearchBox() {
                     )}
                     {term.length >= 2 && (
                         <Link
-                            to={`/discover?q=${encodeURIComponent(term)}`}
+                            to={`/tribe/discover?q=${encodeURIComponent(term)}`}
                             onClick={reset}
                             className="block px-3 py-2 text-xs text-blue-600 hover:bg-slate-50 border-t border-slate-100"
                         >

@@ -68,6 +68,10 @@ interface EventListPanelProps {
     /** When true, render tags as light-grey badges (max 4) instead of the
      * default plain-text/flag-driven look. Used by the Explorer list. */
     tagsAsBadge?: boolean;
+    /** When true, order the list by how many people are going/saved
+     * (``going_count + saved_count`` desc) instead of date/popularity, and
+     * skip day-group headers. Used by the Tribe (subscriptions) list. */
+    orderByFollows?: boolean;
     /**
      * Fires once per event id when a card has been at least 50% visible
      * inside the list scroller for ~500ms on touch devices (`hover:
@@ -98,6 +102,8 @@ export interface EventListCardProps {
     cardRef?: (el: HTMLDivElement | null) => void;
     /** When true, tags render as light-grey badges (max 4) on this card. */
     tagsAsBadge?: boolean;
+    /** When true, the card gets a muted grey background (past events). */
+    isPast?: boolean;
 }
 
 function PriceBadge({ event }: { event: CalendarEvent }) {
@@ -231,6 +237,7 @@ export function EventListCard({
     onEventHover,
     cardRef,
     tagsAsBadge = false,
+    isPast = false,
 }: EventListCardProps) {
     const { tagsPerCard } = useFeatureFlags();
     const priceVisible = isPriceSectionVisible(event, showPrices);
@@ -249,7 +256,7 @@ export function EventListCard({
                 role="button"
                 tabIndex={0}
                 // eslint-disable-next-line no-restricted-syntax -- rounded event cards per explicit design request (Explorer list)
-                className={`event-card rounded-md${onMap ? '' : ' event-card-offmap'}${isHighlighted ? ' event-card-highlighted' : ''}`}
+                className={`event-card rounded-md${onMap ? '' : ' event-card-offmap'}${isHighlighted ? ' event-card-highlighted' : ''}${isPast ? ' event-card-past' : ''}`}
                 onClick={() => onEventClick(event)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onEventClick(event); } }}
                 onMouseEnter={() => onEventHover?.(event.event_id)}
@@ -369,6 +376,7 @@ export default function EventListPanel({
     gateMoreEventsForAnonymous = false,
     onMarkSeen,
     tagsAsBadge = false,
+    orderByFollows = false,
 }: EventListPanelProps) {
     const { user } = useAuth();
     const { isSaved } = useSavedEvents();
@@ -517,6 +525,13 @@ export default function EventListPanel({
         const aOnMap = isOnMap(a, mapBounds);
         const bOnMap = isOnMap(b, mapBounds);
         if (aOnMap !== bOnMap) return aOnMap ? -1 : 1;
+        if (orderByFollows) {
+            // Most people (follows) going/saved first — mirrors the For You
+            // "Following and friends" trail ordering.
+            const pa = (a.going_count ?? 0) + (a.saved_count ?? 0);
+            const pb = (b.going_count ?? 0) + (b.saved_count ?? 0);
+            if (pa !== pb) return pb - pa;
+        }
         if (sortBy === 'popularity') {
             // popularity_score is the weighted, time-decayed score
             // computed server-side when ``trending_enabled`` is on. When
@@ -658,7 +673,7 @@ export default function EventListPanel({
                                 // When sorting by date, render sticky day-group headers so the
                                 // user can scan the list day-by-day. Past events (when present)
                                 // still get their existing divider above the past block.
-                                const groupByDay = sortBy === 'date';
+                                const groupByDay = sortBy === 'date' && !orderByFollows;
                                 let lastDayKey: string | null = null;
                                 return renderedEvents.map((event, idx) => {
                                     const isHighlighted = hoveredEventId === event.event_id;
@@ -702,6 +717,7 @@ export default function EventListPanel({
                                                     onEventHover={onEventHover}
                                                     cardRef={observeCardForSeen(event.event_id)}
                                                     tagsAsBadge={tagsAsBadge}
+                                                    isPast={isPast}
                                                 />
                                             </Fragment>
                                         );
@@ -732,6 +748,7 @@ export default function EventListPanel({
                                                 onEventHover={onEventHover}
                                                 cardRef={observeCardForSeen(event.event_id)}
                                                 tagsAsBadge={tagsAsBadge}
+                                                isPast={isPast}
                                             />
                                         </Fragment>
                                     );

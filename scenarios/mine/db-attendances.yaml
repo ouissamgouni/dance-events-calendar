@@ -1,0 +1,17 @@
+# "Going" state for me. All six past events count toward the Passport
+# (self-passport counts every audience). One upcoming event (u02) is a
+# future "going" that shows in My Events but must NOT count toward the
+# Passport (start is in the future).
+attendances:
+  - { event_id: evt-mine-p01, email: me@example.com, share_audience: public }
+  - { event_id: evt-mine-p02, email: me@example.com, share_audience: friends }
+  - { event_id: evt-mine-p03, email: me@example.com, share_audience: public }
+  - { event_id: evt-mine-p04, email: me@example.com, share_audience: private }
+  - { event_id: evt-mine-p05, email: me@example.com, share_audience: public }
+  - { event_id: evt-mine-p06, email: me@example.com, share_audience: private }
+  # Upcoming "going" — appears in My Events, excluded from the Passport.
+  - { event_id: evt-mine-u02, email: me@example.com, share_audience: public }
+  # Spread across the next ~6 months (excluded from the Passport).
+  - { event_id: evt-mine-u03, email: me@example.com, share_audience: public }
+  - { event_id: evt-mine-u05, email: me@example.com, share_audience: friends }
+  - { event_id: evt-mine-u07, email: me@example.com, share_audience: public }

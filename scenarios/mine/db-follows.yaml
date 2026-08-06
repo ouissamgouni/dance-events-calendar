@@ -1,0 +1,23 @@
+# Pre-seeded follow graph for the "mine" scenario.
+#
+# Adds friendship data to the personal /mine POV account so the passport
+# friends count and the Tribe network have assertable rows. emit_notifications
+# mirrors the HTTP follow route (new_follower + new_friend).
+#
+#   Mutual friends of me (→ new_friend + new_follower):
+#     me <-> nina, me <-> omar
+#   One-way inbound: priya follows me (→ new_follower for me):
+#     priya -> me
+#   Pending inbound request (Network requests panel):
+#     quinn -> me (status: pending)
+emit_notifications: true
+follows:
+  # --- mutual friendships of me ---
+  - { follower: me, followee: nina }
+  - { follower: nina, followee: me }
+  - { follower: me, followee: omar }
+  - { follower: omar, followee: me }
+  # --- one-way inbound: priya follows me ---
+  - { follower: priya, followee: me }
+  # --- pending inbound request ---
+  - { follower: quinn, followee: me, status: pending }

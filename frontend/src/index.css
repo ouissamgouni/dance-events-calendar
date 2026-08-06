@@ -56,6 +56,8 @@ body {
 
 #root {
   height: 100vh;
+  /* fallback for browsers without dvh */
+  height: 100dvh;
 }
 
 /* ── Leaflet — undo Tailwind preflight on tiles ──── */
@@ -644,6 +646,14 @@ body {
 
 .event-card-highlighted:hover {
   background: rgba(255, 255, 255, 0.8) !important;
+}
+
+.event-card-past {
+  background: #f1f5f9;
+}
+
+.event-card-past:hover {
+  background: #e2e8f0;
 }
 
 .event-card-user-going {

@@ -1,0 +1,3 @@
+# Following Reviews are gated by show_ratings.
+settings:
+  show_ratings: true

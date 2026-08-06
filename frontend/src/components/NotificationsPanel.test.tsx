@@ -186,7 +186,7 @@ describe('NotificationsPanel (event reminders)', () => {
 
     await user.click(screen.getByRole('button', { name: /milestone unlocked/i }))
 
-    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/passport'))
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/mine/passport'))
     expect(onClose).toHaveBeenCalled()
   })
 

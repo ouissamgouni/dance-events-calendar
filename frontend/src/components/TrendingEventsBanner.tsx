@@ -51,7 +51,7 @@ export default function TrendingEventsBanner({
         <section className={className} data-testid="trending-events-banner">
             <button
                 type="button"
-                className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-left text-xs font-semibold text-slate-700 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-left text-sm font-semibold text-slate-700 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-300"
                 aria-expanded={!collapsed}
                 onClick={() => setCollapsed((value) => !value)}
             >

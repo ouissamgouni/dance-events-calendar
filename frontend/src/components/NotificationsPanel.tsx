@@ -83,7 +83,7 @@ export default function NotificationsPanel({
         } else if (item.kind === 'event_review_prompt') {
             navigate(`/event/${item.event_id}?rate=1#community`);
         } else if (item.kind === 'milestone_unlocked') {
-            navigate('/passport');
+            navigate('/mine/passport');
         } else {
             navigate(`/event/${item.event_id}`);
         }

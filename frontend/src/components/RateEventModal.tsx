@@ -174,6 +174,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
     const [aspectGroups, setAspectGroups] = useState<TagGroup[] | null>(null);
     const [audienceGroups, setAudienceGroups] = useState<TagGroup[] | null>(null);
     const [eventTagKeys, setEventTagKeys] = useState<string[]>([]);
+    const [eventTitle, setEventTitle] = useState<string>('');
     const [selectedAspects, setSelectedAspects] = useState<Set<string>>(
         new Set(Object.keys(initialRating?.aspect_scores ?? {})),
     );
@@ -196,7 +197,10 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
         fetchAspectTagGroups().then(setAspectGroups).catch(() => setAspectGroups([]));
         fetchAudienceTagGroups().then(setAudienceGroups).catch(() => setAudienceGroups([]));
         fetchEvent(eventId)
-            .then((ev) => setEventTagKeys(ev.tags.map((t) => `${t.group_slug}:${t.slug}`)))
+            .then((ev) => {
+                setEventTagKeys(ev.tags.map((t) => `${t.group_slug}:${t.slug}`));
+                setEventTitle(ev.title);
+            })
             .catch(() => setEventTagKeys([]));
     }, [eventId]);
 
@@ -516,6 +520,12 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                                     ×
                                 </button>
                             </div>
+
+                            {current.kind === 'intro' && eventTitle && (
+                                <p className="-mt-2 text-xs text-slate-500">
+                                    Rate your experience at {eventTitle}
+                                </p>
+                            )}
 
                             {/* Progress */}
                             <div

@@ -1,0 +1,71 @@
+test_plan:
+  name: "Tribe hub"
+  description: >
+    /tribe is the social hub. It has no landing page — /tribe redirects to
+    the Calendars tab. The tab bar exposes: Calendars (following
+    calendars), Activity (social notifications), Discover (find people),
+    Network (followers/following/friends/requests), Reviews (following
+    reviews). This scenario seeds a POV account (me@example.com) with a
+    small social graph, upcoming RSVPs from followees, and reviews.
+
+  preconditions:
+    - "task start:scenario SCENARIO=tribe"
+    - "Sign in as me@example.com (Mateo)."
+    - "Follows (db-follows.yaml): me <-> alice/bob/carla (mutual); me -> dave (one-way); erin -> me (one-way inbound); frank -> me (pending); alice + bob -> grace (friend-of-friend)."
+
+  steps:
+    - id: 1
+      title: "/tribe redirects to the Calendars tab (no landing page)"
+      description: "Open /tribe (or tap Tribe in the bottom nav)."
+      expected: >
+        The URL settles on /tribe/calendars. A tab bar shows Calendars,
+        Activity, Discover, Network, Reviews. There is no separate Tribe
+        landing page.
+
+    - id: 2
+      title: "Following Calendars shows upcoming events from people I follow"
+      description: "Stay on the Calendars tab (/tribe/calendars)."
+      expected: >
+        Upcoming events my followees are going to appear: Paris (alice),
+        Madrid (bob), Berlin (carla), Lyon (dave). There is NO internal
+        "My events / From people I follow" toggle and NO back button.
+
+    - id: 3
+      title: "Activity shows social notifications only"
+      description: "Open the Activity tab (/tribe/activity)."
+      expected: >
+        The feed shows social notifications: new_friend from alice/bob/
+        carla, new_follower from erin (and alice/bob/carla), and
+        subscription_going as each followee RSVPs to an upcoming event.
+        Non-social notification kinds (reminders/alerts) are not shown.
+
+    - id: 4
+      title: "Discover suggests friend-of-friend people"
+      description: "Open the Discover tab (/tribe/discover)."
+      expected: >
+        Grace is suggested (followed by my friends alice + bob, not yet by
+        me). People I already follow are not suggested.
+
+    - id: 5
+      title: "Network shows my graph and the pending request"
+      description: "Open the Network tab (/tribe/network)."
+      expected: >
+        Following lists alice, bob, carla, dave. Followers list alice,
+        bob, carla, erin. Friends (mutual) list alice, bob, carla. The
+        requests panel shows frank's pending inbound follow request
+        (approve / decline).
+
+    - id: 6
+      title: "Reviews shows non-anonymous reviews from people I follow"
+      description: "Open the Reviews tab (/tribe/reviews)."
+      expected: >
+        Three reviews appear — alice (amazing), bob (great), carla (okay).
+        Dave's review is ANONYMOUS and must NOT appear, even though I
+        follow dave.
+
+    - id: 7
+      title: "The general notifications bell still shows all kinds"
+      description: "Open the bell (/notifications)."
+      expected: >
+        The bell feed includes every notification kind (not just the six
+        social kinds shown under Activity).

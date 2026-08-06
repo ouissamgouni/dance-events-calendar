@@ -17,6 +17,9 @@ interface YourNextEventsRailProps {
     className?: string;
     /** Optional content rendered on the right side of the header, e.g. metrics. */
     headerRight?: ReactNode;
+    /** When provided, the rail renders this message instead of returning null
+     * when there are no events — keeps the trail visible with a CTA. */
+    emptyState?: ReactNode;
 }
 
 const DISPLAY_CAP = 5;
@@ -30,6 +33,7 @@ export default function YourNextEventsRail({
     unseenStateEnabled = false,
     className = '',
     headerRight,
+    emptyState,
 }: YourNextEventsRailProps) {
     // Rails are expanded by default on both mobile and desktop; the
     // header caret still lets the viewer collapse them per session.
@@ -43,13 +47,14 @@ export default function YourNextEventsRail({
         return () => mq.removeEventListener('change', handler);
     }, []);
 
-    if (events.length === 0) return null;
+    if (events.length === 0 && !emptyState) return null;
+    const isEmpty = events.length === 0;
 
     const visibleEvents = events.slice(0, DISPLAY_CAP);
 
     return (
         <section className={className} data-testid="your-next-events-rail">
-            <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700">
+            <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-sm font-semibold text-slate-700">
                 <button
                     type="button"
                     className="flex flex-1 items-center justify-between gap-2 text-left hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-300"
@@ -68,45 +73,53 @@ export default function YourNextEventsRail({
                     </span>
                 </button>
                 <Link
-                    to="/my-calendar"
+                    to="/mine/calendar"
                     className="ml-2 shrink-0 text-[11px] font-semibold text-blue-600 hover:text-blue-700"
                 >
-                    See in calendar
+                    See in explorer
                 </Link>
             </div>
             {!collapsed && (
-                <div className="flex gap-2 overflow-x-auto px-2 py-2" aria-label="Your next events">
-                    {visibleEvents.map((event) => {
-                        const countdown = formatCountdown(event.start, new Date(), isMobile);
-                        const isNew = !!unseenStateEnabled && !!newEventIds?.has(event.event_id);
-                        return (
-                            <RailEventCard
-                                key={event.event_id}
-                                event={event}
-                                onClick={onEventClick}
-                                onHover={onEventHover}
-                                highlighted={hoveredEventId === event.event_id}
-                                isNew={isNew}
-                                contextLabel="your event"
-                                extraBadge={countdown ? (
-                                    <span
-                                        className="inline-flex shrink-0 items-center bg-blue-100 px-1.5 py-px text-[10px] font-semibold text-blue-700"
-                                        data-testid="your-next-events-countdown"
-                                    >
-                                        {countdown}
-                                    </span>
-                                ) : undefined}
-                            />
-                        );
-                    })}
-                    <Link
-                        to="/my-calendar"
-                        className="flex min-h-[72px] w-[110px] shrink-0 items-center justify-center bg-slate-50 text-center text-[11px] font-semibold text-blue-600 transition hover:bg-slate-100 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
-                        data-testid="your-next-events-see-more"
-                    >
-                        See more →
-                    </Link>
-                </div>
+                isEmpty ? (
+                    <div className="px-3 py-6 text-center text-xs text-slate-500" data-testid="your-next-events-empty">
+                        {emptyState}
+                    </div>
+                ) : (
+                    <div className="flex gap-2 overflow-x-auto px-2 py-2" aria-label="Your next events">
+                        {visibleEvents.map((event) => {
+                            const countdown = formatCountdown(event.start, new Date(), isMobile);
+                            const isNew = !!unseenStateEnabled && !!newEventIds?.has(event.event_id);
+                            return (
+                                <RailEventCard
+                                    key={event.event_id}
+                                    event={event}
+                                    onClick={onEventClick}
+                                    onHover={onEventHover}
+                                    highlighted={hoveredEventId === event.event_id}
+                                    isNew={isNew}
+                                    contextLabel="your event"
+                                    extraBadge={countdown ? (
+                                        <span
+                                            className="inline-flex shrink-0 items-center bg-blue-100 px-1.5 py-px text-[10px] font-semibold text-blue-700"
+                                            data-testid="your-next-events-countdown"
+                                        >
+                                            {countdown}
+                                        </span>
+                                    ) : undefined}
+                                />
+                            );
+                        })}
+                        {events.length > DISPLAY_CAP && (
+                            <Link
+                                to="/mine/calendar"
+                                className="flex min-h-[72px] w-[110px] shrink-0 items-center justify-center bg-slate-50 text-center text-[11px] font-semibold text-blue-600 transition hover:bg-slate-100 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                data-testid="your-next-events-see-more"
+                            >
+                                See more →
+                            </Link>
+                        )}
+                    </div>
+                )
             )}
         </section>
     );

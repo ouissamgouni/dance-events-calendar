@@ -1,0 +1,81 @@
+test_plan:
+  name: "Mine hub"
+  description: >
+    /mine is the signed-in personal hub. A tab bar exposes: Overview
+    (landing), My Events, Passport, Reviews, Discovery Profiles. This
+    scenario seeds one rich POV account (me@example.com) with a
+    retrospective dance journey (6 past attended events across 6 cities
+    and 5 countries, one international), 3 authored reviews, 3
+    attended-but-unrated events (pending prompts), a seeded Interest
+    Profile, and 8 upcoming events spread across the next ~6 months
+    around Europe (4 saved, 4 going).
+
+  preconditions:
+    - "task start:scenario SCENARIO=mine"
+    - "Sign in as me@example.com (Mia)."
+
+  steps:
+    - id: 1
+      title: "Overview is the default /mine landing with a tab bar"
+      description: "Open /mine (or tap Mine in the bottom nav)."
+      expected: >
+        The Overview tab renders (no back-and-forth navigation). A tab
+        bar shows Overview, My Events, Passport, Profiles, Reviews — with
+        NO Settings tab. The stats header reads "6 events" prominently
+        with "· 6 cities · 5 countries" in smaller text, and below it a
+        small line "8 events planned · Next: <soonest event> in <n>
+        days/weeks".
+
+    - id: 2
+      title: "Overview surfaces next events, activity, passport and reviews"
+      description: "Inspect the Overview sections."
+      expected: >
+        "Your next events" rail lists the upcoming saved + going events
+        (going first), with a "See more" link only when more than 5
+        exist. A "Friendship activity" section (when present) links to
+        /tribe/activity. A "Your dancer passport" section shows the next
+        milestone card. A "Share your experience" trail prompts reviews
+        for the unrated attended events. Quick links jump to each
+        sub-page (My Events, Passport, Profiles, Reviews, Settings).
+
+    - id: 3
+      title: "My Events lists saved + upcoming going events without sub-tabs"
+      description: "Open the My Events tab (/mine/calendar)."
+      expected: >
+        The calendar shows my 8 upcoming saved + going events across
+        Europe (going first). There is NO internal "My events / From
+        people I follow" toggle and NO back button — the section tab bar
+        is the only navigation.
+
+    - id: 4
+      title: "Passport reflects the seeded journey and unlocked milestones"
+      description: "Open the Passport tab (/mine/passport)."
+      expected: >
+        Stats show 6 events, 6 cities, 5 countries. Unlocked milestones
+        include First Steps (1 event), Explorer (5 cities), Passport
+        Stamped (3 countries), World Dancer (5 countries), Border Crosser
+        (international) and Reviewer (first review). The timeline lists
+        the 6 past events newest-first. The upcoming going event does NOT
+        count.
+
+    - id: 5
+      title: "Reviews shows my three approved reviews"
+      description: "Open the Reviews tab (/mine/reviews)."
+      expected: >
+        Exactly three reviews appear (Paris — great, Lyon — amazing,
+        Berlin — okay), each linking to its event. The three unrated
+        attended events are not listed as authored reviews.
+
+    - id: 6
+      title: "Discovery Profiles shows the seeded interest profile"
+      description: "Open the Profiles tab (/mine/profiles)."
+      expected: >
+        The "Salsa + Bachata (Europe & nearby)" profile is present and
+        editable (dance styles, area, match toggle).
+
+    - id: 7
+      title: "Settings is reachable from Overview quick links, not a tab"
+      description: "From Overview, use the Settings quick link."
+      expected: >
+        Navigates to /account (unchanged Settings page). Its in-page nav
+        bar includes Profile, Notifications and Privacy pills.

@@ -25,15 +25,15 @@ export const NAV_DESTINATIONS: NavDestination[] = [
     {
         id: 'tribe',
         label: 'Tribe',
-        path: '/my-calendar/subscriptions',
+        path: '/tribe',
         icon: '/people-2.png',
-        isActive: (p) => p === '/my-calendar/subscriptions',
+        isActive: (p) => p === '/tribe' || p.startsWith('/tribe/'),
     },
     {
         id: 'mine',
         label: 'Mine',
-        path: '/my-calendar',
+        path: '/mine',
         icon: '/calendar.png',
-        isActive: (p) => p === '/my-calendar',
+        isActive: (p) => p === '/mine' || p.startsWith('/mine/'),
     },
 ];

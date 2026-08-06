@@ -191,7 +191,7 @@ export default function PreferencesSection() {
                 <span className="flex items-center gap-2">
                     <span className="text-slate-400 text-xs" aria-hidden="true">{expanded ? '▾' : '▸'}</span>
                     <h2 className="text-sm font-semibold text-slate-900">
-                        {user ? 'Search Profiles' : 'Preferences'}
+                        {user ? 'Discovery Profiles' : 'Preferences'}
                     </h2>
                 </span>
                 <span className="text-[11px] text-slate-400" role="status" aria-live="polite">
