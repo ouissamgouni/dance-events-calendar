@@ -489,11 +489,12 @@ class EventSeriesMember(SQLModel, table=True):
     __tablename__ = "event_series_members"
     __table_args__ = (
         UniqueConstraint("series_id", "event_id", name="uq_series_event"),
+        UniqueConstraint("event_id", name="uq_event_series_member_event"),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     series_id: int = Field(foreign_key="event_series.id", index=True)
-    event_id: str = Field(foreign_key="cached_events.event_id", index=True)
+    event_id: str = Field(foreign_key="cached_events.event_id")
 
 
 class EventSeriesScanLog(SQLModel, table=True):

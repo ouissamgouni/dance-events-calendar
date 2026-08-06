@@ -1,4 +1,4 @@
-import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, PendingReview, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide, DuplicateGroup, DuplicateGroupListResponse, DuplicateScanLogEntry, DuplicateScanLogListResponse, SeriesGroup, SeriesGroupListResponse, SeriesScanLogEntry, SeriesScanLogListResponse, SeriesRatingRollup, PassportResponse, PassportTimelineResponse, PassportMapEvent, SharedPassportResponse } from './types';
+import type { CalendarEvent, CalendarSetting, AppInfo, TestPlan, EventSuggestionCreate, EventSuggestion, Tag, TagGroup, TagSuggestionCreate, TagSuggestionResponse, TagSuggestionRunResponse, BulkTagSuggestionRunResponse, FeedbackSubmissionCreate, FeedbackSubmissionResponse, EventRating, EventRatingAggregate, EventReviewsList, MyRating, PendingReview, AdminRating, AdminRatingList, Attendee, AttendanceSummary, AttendingEventEntry, SavedEventEntry, PromoCode, PromoCodeAdmin, PromoCodeCreate, PromoCodeUpdate, OrganizerClaim, OrganizerClaimAdmin, OrganizerClaimCreate, OrganizerClaimDecide, DuplicateGroup, DuplicateGroupListResponse, DuplicateScanLogEntry, DuplicateScanLogListResponse, SeriesGroup, SeriesGroupListResponse, SeriesSplitResponse, SeriesScanLogEntry, SeriesScanLogListResponse, SeriesRatingRollup, PassportResponse, PassportTimelineResponse, PassportMapEvent, SharedPassportResponse } from './types';
 import type { DateRangePresetKey } from './utils/dateRangePresets';
 
 declare const __VITE_API_URL__: string;
@@ -46,6 +46,13 @@ const parseJsonResponse = async <T>(res: Response, fallbackMessage: string): Pro
                     if (typeof first?.msg === 'string') detail = first.msg;
                 } else if (typeof errorBody.detail === 'string') {
                     detail = errorBody.detail;
+                } else if (
+                    errorBody.detail &&
+                    typeof errorBody.detail === 'object' &&
+                    typeof (errorBody.detail as { message?: unknown }).message === 'string'
+                ) {
+                    // Structured 409 conflict payloads: ``detail: {message, conflicts}``.
+                    detail = (errorBody.detail as { message: string }).message;
                 } else if (typeof errorBody.message === 'string') {
                     detail = errorBody.message;
                 }
@@ -4006,9 +4013,17 @@ export async function fetchEventDuplicateCandidates(
 
 // --- Admin: event series grouping ---
 
-export async function fetchSeriesGroups(status?: string): Promise<SeriesGroupListResponse> {
-    const qs = status ? `?status=${status}` : '';
-    const res = await fetch(`${BASE}/admin/series${qs}`, {
+export async function fetchSeriesGroups(
+    status?: string,
+    opts?: { q?: string; limit?: number; offset?: number },
+): Promise<SeriesGroupListResponse> {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (opts?.q) params.set('q', opts.q);
+    if (opts?.limit != null) params.set('limit', String(opts.limit));
+    if (opts?.offset != null) params.set('offset', String(opts.offset));
+    const qs = params.toString();
+    const res = await fetch(`${BASE}/admin/series${qs ? `?${qs}` : ''}`, {
         credentials: 'include',
     });
     return parseJsonResponse<SeriesGroupListResponse>(res, 'Failed to fetch series groups');
@@ -4063,14 +4078,43 @@ export async function dismissSeriesGroup(seriesId: number): Promise<SeriesGroup>
     return parseJsonResponse<SeriesGroup>(res, 'Failed to dismiss series');
 }
 
-export async function splitSeriesMember(seriesId: number, eventId: string): Promise<SeriesGroup> {
+export async function splitSeriesMember(
+    seriesId: number,
+    eventId: string,
+): Promise<SeriesSplitResponse> {
     const res = await fetch(`${BASE}/admin/series/${seriesId}/split`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ event_id: eventId }),
     });
-    return parseJsonResponse<SeriesGroup>(res, 'Failed to split event from series');
+    return parseJsonResponse<SeriesSplitResponse>(res, 'Failed to split event from series');
+}
+
+export async function addEventsToSeries(
+    seriesId: number,
+    eventIds: string[],
+): Promise<SeriesGroup> {
+    const res = await fetch(`${BASE}/admin/series/${seriesId}/add`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ event_ids: eventIds }),
+    });
+    return parseJsonResponse<SeriesGroup>(res, 'Failed to add events to series');
+}
+
+export async function renameSeries(
+    seriesId: number,
+    canonicalTitle: string,
+): Promise<SeriesGroup> {
+    const res = await fetch(`${BASE}/admin/series/${seriesId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ canonical_title: canonicalTitle }),
+    });
+    return parseJsonResponse<SeriesGroup>(res, 'Failed to rename series');
 }
 
 export async function fetchEventSeriesCandidates(

@@ -15,6 +15,7 @@ import GoingButton from './GoingButton';
 import InterestSection from './InterestSection';
 import RateEventButton from './RateEventButton';
 import CommunityExperienceSummary from './CommunityExperienceSummary';
+import EventSeriesLink from './EventSeriesLink';
 import TagBadges from './TagBadges';
 import SuggestTagsButton from './SuggestTagsButton';
 import ExpandableDescription from './ExpandableDescription';
@@ -538,6 +539,9 @@ export default function EventDetailContent({
                     + Add description
                 </div>
             ) : null}
+
+            {/* Series membership — links to the recurring series' page. */}
+            <EventSeriesLink eventId={event.event_id} />
 
             {/* Promo codes — collapsible section under the description. */}
             <EventPromoCodes event={event} />

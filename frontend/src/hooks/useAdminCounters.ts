@@ -4,7 +4,6 @@
  * Loads the four counters (pending review, ungeolocated, tag suggestions,
  * feedback) and exposes a `refresh()` callback. Refreshes automatically on:
  *   - Initial mount
- *   - `includePast` admin pref toggle
  *   - Window focus / tab visibility change (cheap when admin tab is open)
  *   - Whenever any code dispatches a `window` `admin:data-changed` CustomEvent
  *     (used by detail panels after save / delete / sync completion)
@@ -16,7 +15,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { fetchAdminOrganizerClaims, fetchAdminPromoCodes, fetchAdminRatings, fetchAdminTagSuggestionCount, fetchDuplicateGroups, fetchEventFilterOptions, fetchSeriesGroups } from '../api';
-import { useAdminPrefs } from '../context/AdminPrefsContext';
 
 export interface AdminCounters {
     pendingReview: number;
@@ -53,14 +51,13 @@ export function notifyAdminDataChanged(): void {
 }
 
 export function useAdminCounters(): { counters: AdminCounters; refresh: () => void } {
-    const { includePast } = useAdminPrefs();
     const [counters, setCounters] = useState<AdminCounters>(ZERO);
 
     const refresh = useCallback(() => {
         // Each call is fire-and-forget; failures keep the last known value
         // rather than zeroing out (avoids the badge flickering to 0 on a
         // transient network blip).
-        fetchEventFilterOptions(includePast ? { include_past: true } : {})
+        fetchEventFilterOptions({})
             .then((opts) => {
                 setCounters((prev) => ({
                     ...prev,
@@ -74,7 +71,7 @@ export function useAdminCounters(): { counters: AdminCounters; refresh: () => vo
 
         fetchAdminTagSuggestionCount({
             status: 'pending',
-            includePast: includePast || undefined,
+            includePast: true,
         })
             .then((count) =>
                 setCounters((prev) => ({ ...prev, tagSuggestions: count })),
@@ -122,9 +119,9 @@ export function useAdminCounters(): { counters: AdminCounters; refresh: () => vo
                 })),
             )
             .catch(() => undefined);
-    }, [includePast]);
+    }, []);
 
-    // Initial load + refresh whenever the include-past pref changes.
+    // Initial load + refresh on demand.
     useEffect(() => {
         refresh();
     }, [refresh]);

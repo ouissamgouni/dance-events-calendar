@@ -15,18 +15,22 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from backend.api.deps import require_admin
 from backend.api.schemas import (
     ManualSeriesGroupRequest,
+    SeriesAddMembersRequest,
     SeriesApproveRequest,
     SeriesEventSummary,
     SeriesGroupListResponse,
     SeriesGroupResponse,
+    SeriesRenameRequest,
     SeriesScanLogEntry,
     SeriesScanLogListResponse,
     SeriesSplitRequest,
+    SeriesSplitResponse,
 )
 from backend.db.database import get_session
 from backend.db.models import (
@@ -36,10 +40,13 @@ from backend.db.models import (
     EventSeriesScanLog,
 )
 from backend.services.series_detection import (
+    SeriesMembershipConflict,
+    add_events_to_series,
     approve_series,
     create_manual_series,
     dismiss_series,
     get_series_for_event,
+    rename_series,
     run_full_scan,
     split_member,
 )
@@ -82,18 +89,47 @@ def _series_to_response(session: Session, series: EventSeries) -> SeriesGroupRes
     )
 
 
+def _conflict_detail(session: Session, exc: SeriesMembershipConflict) -> dict:
+    conflicts = []
+    for event_id, series_id in exc.conflicts.items():
+        series = session.get(EventSeries, series_id)
+        conflicts.append(
+            {
+                "event_id": event_id,
+                "series_id": series_id,
+                "series_title": series.canonical_title if series else "",
+            }
+        )
+    return {
+        "message": "One or more events already belong to a series.",
+        "conflicts": conflicts,
+    }
+
+
 @router.get("/series", response_model=SeriesGroupListResponse)
 def list_series_groups(
     status: str = Query("pending"),
+    q: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
-    stmt = select(EventSeries).order_by(EventSeries.created_at.desc())
+    conditions = []
     if status != "all":
-        stmt = stmt.where(EventSeries.status == status)
-    groups = session.exec(stmt).all()
+        conditions.append(EventSeries.status == status)
+    if q:
+        conditions.append(EventSeries.canonical_title.ilike(f"%{q.strip()}%"))
+
+    count_stmt = select(func.count()).select_from(EventSeries)
+    stmt = select(EventSeries).order_by(EventSeries.created_at.desc())
+    for cond in conditions:
+        count_stmt = count_stmt.where(cond)
+        stmt = stmt.where(cond)
+    total = session.exec(count_stmt).one()
+    groups = session.exec(stmt.offset(offset).limit(limit)).all()
     items = [_series_to_response(session, group) for group in groups]
-    return SeriesGroupListResponse(items=items, total=len(items))
+    return SeriesGroupListResponse(items=items, total=total)
 
 
 @router.get("/series/history", response_model=SeriesScanLogListResponse)
@@ -149,12 +185,52 @@ def group_events_as_series(
     for event_id in body.event_ids:
         if session.get(CachedEvent, event_id) is None:
             raise HTTPException(status_code=404, detail=f"Event {event_id} not found")
-    series = create_manual_series(
-        session,
-        body.event_ids,
-        canonical_title=body.canonical_title,
-        triggered_by_admin=admin.get("email"),
-    )
+    try:
+        series = create_manual_series(
+            session,
+            body.event_ids,
+            canonical_title=body.canonical_title,
+            triggered_by_admin=admin.get("email"),
+        )
+    except SeriesMembershipConflict as exc:
+        raise HTTPException(
+            status_code=409, detail=_conflict_detail(session, exc)
+        ) from exc
+    return _series_to_response(session, series)
+
+
+@router.post("/series/{series_id}/add", response_model=SeriesGroupResponse)
+def add_series_members(
+    series_id: int,
+    body: SeriesAddMembersRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    for event_id in body.event_ids:
+        if session.get(CachedEvent, event_id) is None:
+            raise HTTPException(status_code=404, detail=f"Event {event_id} not found")
+    try:
+        series = add_events_to_series(session, series_id, body.event_ids)
+    except SeriesMembershipConflict as exc:
+        raise HTTPException(
+            status_code=409, detail=_conflict_detail(session, exc)
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return _series_to_response(session, series)
+
+
+@router.patch("/series/{series_id}", response_model=SeriesGroupResponse)
+def rename_series_group(
+    series_id: int,
+    body: SeriesRenameRequest,
+    session: Session = Depends(get_session),
+    _admin: dict = Depends(require_admin),
+):
+    try:
+        series = rename_series(session, series_id, body.canonical_title)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return _series_to_response(session, series)
 
 
@@ -190,7 +266,7 @@ def dismiss_series_group(
     return _series_to_response(session, series)
 
 
-@router.post("/series/{series_id}/split", response_model=SeriesGroupResponse)
+@router.post("/series/{series_id}/split", response_model=SeriesSplitResponse)
 def split_series_member(
     series_id: int,
     body: SeriesSplitRequest,
@@ -201,7 +277,11 @@ def split_series_member(
         series = split_member(session, series_id, body.event_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return _series_to_response(session, series)
+    if series is None:
+        return SeriesSplitResponse(dissolved=True, series=None)
+    return SeriesSplitResponse(
+        dissolved=False, series=_series_to_response(session, series)
+    )
 
 
 @router.get("/events/{event_id}/series", response_model=SeriesGroupListResponse)
@@ -210,6 +290,6 @@ def list_event_series_candidates(
     session: Session = Depends(get_session),
     _admin: dict = Depends(require_admin),
 ):
-    groups = get_series_for_event(session, event_id)
+    groups = get_series_for_event(session, event_id, statuses=("pending", "resolved"))
     items = [_series_to_response(session, group) for group in groups]
     return SeriesGroupListResponse(items=items, total=len(items))

@@ -8,7 +8,9 @@ Covers:
 - POST /api/admin/series/manual (group events as a series)
 - POST /api/admin/series/{series_id}/approve
 - POST /api/admin/series/{series_id}/dismiss
-- POST /api/admin/series/{series_id}/split
+- POST /api/admin/series/{series_id}/split (removes a member; dissolves below two)
+- POST /api/admin/series/{series_id}/add (append members; single-membership guard)
+- PATCH /api/admin/series/{series_id} (rename)
 - GET /api/admin/events/{event_id}/series
 """
 
@@ -92,6 +94,22 @@ def _seed_pair(session: Session) -> None:
     session.commit()
 
 
+def _seed_triple(session: Session) -> None:
+    start = datetime.now(timezone.utc) + timedelta(days=3)
+    events = [
+        CachedEvent(
+            event_id=f"evt-{suffix}",
+            calendar_id="cal-1",
+            title="Weekly Salsa Social",
+            start=start + timedelta(days=7 * i),
+            end=start + timedelta(days=7 * i, hours=3),
+        )
+        for i, suffix in enumerate(("aaa", "bbb", "ccc"))
+    ]
+    session.add_all(events)
+    session.commit()
+
+
 @pytest.mark.unit
 class TestAuthGate:
     @pytest.mark.parametrize(
@@ -103,6 +121,8 @@ class TestAuthGate:
             ("post", "/api/admin/series/1/approve"),
             ("post", "/api/admin/series/1/dismiss"),
             ("post", "/api/admin/series/1/split"),
+            ("post", "/api/admin/series/1/add"),
+            ("patch", "/api/admin/series/1"),
             ("get", "/api/admin/events/evt-aaa/series"),
         ],
     )
@@ -110,6 +130,8 @@ class TestAuthGate:
         _login(client, "civilian@example.com")
         if method == "post":
             r = client.post(path, json={})
+        elif method == "patch":
+            r = client.patch(path, json={})
         else:
             r = client.get(path)
         assert r.status_code == 403
@@ -188,6 +210,22 @@ class TestManualGrouping:
         )
         assert r.status_code == 404
 
+    def test_rejects_event_already_in_a_series(self, client, session):
+        _seed_triple(session)
+        _login(client, "admin@example.com")
+        client.post(
+            "/api/admin/series/manual",
+            json={"event_ids": ["evt-aaa", "evt-bbb"]},
+        )
+
+        r = client.post(
+            "/api/admin/series/manual",
+            json={"event_ids": ["evt-bbb", "evt-ccc"]},
+        )
+        assert r.status_code == 409
+        conflicts = r.json()["detail"]["conflicts"]
+        assert {c["event_id"] for c in conflicts} == {"evt-bbb"}
+
 
 @pytest.mark.unit
 class TestApproveDismissSplit:
@@ -219,7 +257,26 @@ class TestApproveDismissSplit:
         assert r.status_code == 200, r.text
         assert r.json()["status"] == "dismissed"
 
-    def test_split_removes_member(self, client, session):
+    def test_split_removes_member_keeps_series(self, client, session):
+        _seed_triple(session)
+        _login(client, "admin@example.com")
+        r = client.post(
+            "/api/admin/series/manual",
+            json={"event_ids": ["evt-aaa", "evt-bbb", "evt-ccc"]},
+        )
+        series_id = r.json()["id"]
+
+        r = client.post(
+            f"/api/admin/series/{series_id}/split",
+            json={"event_id": "evt-bbb"},
+        )
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["dissolved"] is False
+        event_ids = {e["event_id"] for e in body["series"]["events"]}
+        assert event_ids == {"evt-aaa", "evt-ccc"}
+
+    def test_split_dissolves_series_below_two_members(self, client, session):
         _seed_pair(session)
         _login(client, "admin@example.com")
         client.post("/api/admin/series/scan")
@@ -230,13 +287,99 @@ class TestApproveDismissSplit:
             json={"event_id": "evt-bbb"},
         )
         assert r.status_code == 200, r.text
-        event_ids = {e["event_id"] for e in r.json()["events"]}
-        assert event_ids == {"evt-aaa"}
+        body = r.json()
+        assert body["dissolved"] is True
+        assert body["series"] is None
+        assert (
+            client.get("/api/admin/series", params={"status": "all"}).json()["total"]
+            == 0
+        )
 
     def test_approve_unknown_series_returns_400(self, client, session):
         _login(client, "admin@example.com")
         r = client.post("/api/admin/series/999/approve", json={})
         assert r.status_code == 400
+
+
+@pytest.mark.unit
+class TestAddMembersAndRename:
+    def test_add_appends_events_to_series(self, client, session):
+        _seed_triple(session)
+        _login(client, "admin@example.com")
+        r = client.post(
+            "/api/admin/series/manual",
+            json={"event_ids": ["evt-aaa", "evt-bbb"]},
+        )
+        series_id = r.json()["id"]
+
+        r = client.post(
+            f"/api/admin/series/{series_id}/add",
+            json={"event_ids": ["evt-ccc"]},
+        )
+        assert r.status_code == 200, r.text
+        event_ids = {e["event_id"] for e in r.json()["events"]}
+        assert event_ids == {"evt-aaa", "evt-bbb", "evt-ccc"}
+
+    def test_add_rejects_event_already_in_a_series(self, client, session):
+        _seed_triple(session)
+        start = datetime.now(timezone.utc) + timedelta(days=40)
+        session.add(
+            CachedEvent(
+                event_id="evt-ddd",
+                calendar_id="cal-1",
+                title="Weekly Salsa Social",
+                start=start,
+                end=start + timedelta(hours=3),
+            )
+        )
+        session.commit()
+        _login(client, "admin@example.com")
+        first = client.post(
+            "/api/admin/series/manual",
+            json={"event_ids": ["evt-aaa", "evt-bbb"]},
+        ).json()["id"]
+        client.post(
+            "/api/admin/series/manual",
+            json={"event_ids": ["evt-ccc", "evt-ddd"]},
+        )
+
+        r = client.post(
+            f"/api/admin/series/{first}/add",
+            json={"event_ids": ["evt-ccc"]},
+        )
+        assert r.status_code == 409
+
+    def test_add_unknown_series_returns_404(self, client, session):
+        _seed_triple(session)
+        _login(client, "admin@example.com")
+        r = client.post(
+            "/api/admin/series/999/add",
+            json={"event_ids": ["evt-ccc"]},
+        )
+        assert r.status_code == 404
+
+    def test_rename_updates_title(self, client, session):
+        _seed_pair(session)
+        _login(client, "admin@example.com")
+        series_id = client.post(
+            "/api/admin/series/manual",
+            json={"event_ids": ["evt-aaa", "evt-bbb"]},
+        ).json()["id"]
+
+        r = client.patch(
+            f"/api/admin/series/{series_id}",
+            json={"canonical_title": "Tuesday Milonga"},
+        )
+        assert r.status_code == 200, r.text
+        assert r.json()["canonical_title"] == "Tuesday Milonga"
+
+    def test_rename_unknown_series_returns_404(self, client, session):
+        _login(client, "admin@example.com")
+        r = client.patch(
+            "/api/admin/series/999",
+            json={"canonical_title": "Nope"},
+        )
+        assert r.status_code == 404
 
 
 @pytest.mark.unit

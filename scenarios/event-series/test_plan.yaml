@@ -1,128 +1,179 @@
 test_plan:
-  name: "Event Series — Admin Series Review Workflow"
+  name: "Event Series — detection, grouping & display"
   description: >
-    Verify the admin "Series" panel end-to-end: on-demand fuzzy detection of
-    recurring events within the same calendar, per-series approval (which
-    groups occurrences WITHOUT hiding or blocking any of them — unlike
-    duplicate resolution), group dismissal ("not a series", sticky across
-    future scans), splitting a single occurrence off an approved/pending
-    series, the scan history log, and manual grouping via the admin API for
-    pairs the similarity check can't catch.
+    End-to-end coverage of the event-series feature, functionally:
+      - Detection: the admin "Scan now" fuzzy scan groups recurring
+        occurrences of the same event within one calendar (title + location
+        similarity, occurrence gap), and never groups across calendars.
+      - Manual grouping: pairs the similarity check can't catch are grouped
+        by hand via the bulk "Group as Series" action.
+      - Approve / dismiss: approving resolves a group WITHOUT hiding or
+        blocking any member (unlike duplicate resolution); dismissing marks a
+        group "not a series" and is sticky across future scans.
+      - Removal: a single occurrence can be split off a group; the event
+        itself stays visible and bookable.
+      - Add: an event can be added to an existing (including already-resolved)
+        series either from the event side-panel's "Add to series" search or
+        from the bulk "Add to Series" action.
+      - New occurrence of a resolved series: because an event belongs to at
+        most one series and a resolved series is never disturbed by detection,
+        a fresh matching occurrence is NOT auto-added by a scan — an admin
+        adds it by hand.
+      - Display: the admin event side-panel shows the event id and the series
+        membership; in the user app, an event that belongs to a resolved
+        series shows a "This event belongs to the … series" link that opens
+        the series page.
 
-    Uses 2 calendars: "tango-collective" (the recurring organizer feed) and
-    "other-calendar" (a decoy proving series grouping never crosses
-    calendars). Seeded events:
-      - Series A (series-a-w1/w2/w3): 3 weekly occurrences, identical title
-        and venue, same calendar — auto-detectable by the fuzzy scan.
-      - series-a-decoy-other-calendar: same title/venue as Series A but in
-        a different calendar — must NEVER be grouped with Series A.
-      - manual-b1 / manual-b2: same real recurring event, same calendar,
-        7 days apart, but titles are deliberately too dissimilar for the
-        automatic similarity check — only groupable via the admin's manual
-        "group as series" API action.
-      - unique-solo: a one-off event with no recurrence — must never appear
-        in any group.
+    Data is seeded directly (calendar_service=mock) — the scenario opens with
+    every event already present, no manual sync required. Two calendars are
+    used: "tango-collective" (the recurring organizer feed) and
+    "other-calendar" (a decoy proving grouping never crosses calendars).
+    Seeded events:
+      - series-a-w1/w2/w3: 3 weekly occurrences, identical title and venue,
+        same calendar — auto-detectable by the fuzzy scan.
+      - series-a-decoy-other-calendar: same title/venue as Series A but in a
+        different calendar — must NEVER be grouped with Series A.
+      - series-a-w4 / series-a-w5: two later occurrences whose titles start
+        deliberately dissimilar so the scan ignores them; used to exercise the
+        manual "add to series" (panel search) and bulk "Add to Series" paths.
+      - manual-b1 / manual-b2: the same recurring event 7 days apart, but with
+        titles too dissimilar for the automatic check — only groupable via the
+        bulk "Group as Series" action.
+      - unique-solo: a one-off event — must never appear in any group.
 
   preconditions:
     - "task start:scenario SCENARIO=event-series"
     - "task db:up && task db:migrate"
-    - "settings.yaml seeds series_auto_detect_enabled: false — series are only found via the manual 'Scan now' action or the manual grouping API, not automatically during sync."
+    - "settings.yaml seeds series_auto_detect_enabled: false — series are only found via the manual 'Scan now' action or manual grouping, never automatically."
     - "Signed in as admin (Dev Mock)."
 
   steps:
-    # ── Sync brings events in with no series groups yet (auto-detect off) ──
+    # ── Detection ───────────────────────────────────────────────────────
     - id: 1
-      title: "Sync brings in 7 events, no series groups yet"
+      title: "The 9 events are present with no series groups yet"
       description: >
-        Trigger a manual sync from the admin Calendars panel (or
-        POST /api/admin/sync). Then open the admin "Series" panel.
+        Open the admin events list, then open the "Series" panel from the
+        action bar.
       expected: >
-        GET /api/events returns 7 upcoming events. The "Series" button in
-        the admin action bar shows no pending-count badge. The Pending tab
-        of the Series panel is empty.
+        GET /api/events returns 9 upcoming events. The "Series" button shows
+        no pending-count badge and the Pending tab is empty.
 
-    # ── Manual full scan finds Series A only ────────────────────────────
     - id: 2
-      title: "'Scan now' groups the 3 Series A occurrences, ignoring the decoy and the manual-only pair"
-      description: >
-        In the Series panel, click "Scan now".
+      title: "'Scan now' groups the 3 Series A occurrences only"
+      description: "In the Series panel, click 'Scan now'."
       expected: >
-        POST /api/admin/series/scan runs a full scan. One pending series
-        group appears in the Pending tab containing all three
-        "Friday Night Milonga at Session Latina" occurrences
-        (series-a-w1, series-a-w2, series-a-w3), sorted by start date.
-        (Internally the scan records 3 pairwise candidates and 2
-        group-membership writes, since the 3rd pair chains onto the group
-        the first two pairs already created — the panel always shows a
-        single group either way.)
-        series-a-decoy-other-calendar does NOT appear in this group or any
-        other (different calendar). manual-b1 ("Kizomba Fusion Night -
-        Session Latina") and manual-b2 ("Monthly Kiz and Afro Social") do
-        not appear in any group — their titles are too dissimilar for the
-        automatic check. unique-solo does not appear either. The Series
-        button badge now shows "1".
+        One pending group appears in the Pending tab containing all three
+        "Friday Night Milonga at Session Latina" occurrences (series-a-w1/w2/w3),
+        sorted by start date. series-a-decoy-other-calendar is NOT in it
+        (different calendar). manual-b1, manual-b2 and unique-solo do not
+        appear in any group. The Series button badge shows "1".
 
     - id: 3
-      title: "History tab logs the full scan"
-      description: "Switch to the History tab in the Series panel."
+      title: "History tab logs the scan"
+      description: "Switch to the History tab."
       expected: >
-        The most recent entry shows scan_type "full", status "completed",
-        "3 candidates found, 2 group(s) created", and a finished timestamp.
+        The most recent entry shows scan type "full", status "completed",
+        candidates found / groups created counts, and a finished timestamp.
 
-    # ── Approve resolves the group WITHOUT hiding any member ────────────
+    # ── Approve resolves the group without hiding members ───────────────
     - id: 4
       title: "'Approve series' resolves the group and keeps every occurrence visible"
-      description: >
-        In the Pending tab, click "Approve series" on the Series A group.
+      description: "In the Pending tab, click 'Approve series' on the Series A group."
       expected: >
-        POST /api/admin/series/{id}/approve returns the group with status
-        "resolved". The group moves from Pending to the Resolved tab. All
-        three occurrences (series-a-w1/w2/w3) remain visible and unblocked
-        in GET /api/events — unlike duplicate "Keep", approving a series
-        never hides or blocks any member. The Series button badge drops
-        to "0".
+        The group moves to the Resolved tab with status "resolved". All three
+        occurrences remain visible and unblocked in GET /api/events —
+        approving a series never hides or blocks a member. The badge drops to
+        "0".
 
     - id: 5
       title: "Re-scanning does not recreate the resolved group"
-      description: "Click 'Scan now' again in the Series panel."
+      description: "Click 'Scan now' again."
       expected: >
-        The Pending tab remains empty afterwards — the three Series A
-        events already co-occurred in a resolved group, so the scan does
-        not recreate a duplicate pending group for the same set. The
-        History tab shows a second "full" scan entry.
+        The Pending tab stays empty — the resolved Series A is not recreated.
+        The History tab shows a second "full" scan entry.
 
-    # ── Manual grouping catches the dissimilar-title pair ───────────────
+    # ── Manual grouping (bulk) + removal + dismiss ──────────────────────
     - id: 6
-      title: "Manual grouping (admin API) groups the dissimilar-title pair"
+      title: "Bulk 'Group as Series' catches the dissimilar-title pair"
       description: >
-        Since manual-b1 and manual-b2 have titles too dissimilar for the
-        fuzzy scan, group them via
-        POST /api/admin/series/manual with
-        {"event_ids": ["manual-b1", "manual-b2"], "canonical_title": "Kizomba/Afro Social"}.
+        In the admin events list, select manual-b1 ("Kizomba Fusion Night -
+        Session Latina") and manual-b2 ("Monthly Kiz and Afro Social"), click
+        "Group as Series", enter a title (e.g. "Kizomba/Afro Social") and
+        confirm.
       expected: >
-        A new series group is created with source "manual", status
-        "pending", canonical_title "Kizomba/Afro Social", containing both
-        events. It now appears in the Series panel's Pending tab.
+        A new series group is created (source manual, status pending)
+        containing both events and appears in the Series panel's Pending tab.
 
-    # ── Split removes one occurrence from a group without deleting it ───
     - id: 7
-      title: "'Split off' removes a single occurrence from the manual group"
+      title: "'Remove' splits a single occurrence off the group"
       description: >
-        In the Pending tab, on the manual "Kizomba/Afro Social" group,
-        click "Split off" next to manual-b2.
+        On the manual "Kizomba/Afro Social" group in the Pending tab, click
+        "Remove" next to manual-b2.
       expected: >
-        POST /api/admin/series/{id}/split removes manual-b2 from the
-        group (the group now shows only manual-b1). manual-b2 itself is
-        NOT deleted or hidden — it remains a normal visible event in
-        GET /api/events, just no longer associated with any series.
+        manual-b2 is removed from the group (only manual-b1 remains).
+        manual-b2 is NOT deleted or hidden — it stays a normal visible event
+        in GET /api/events, just no longer in any series.
 
-    # ── Dismiss keeps events untouched and is sticky ────────────────────
     - id: 8
-      title: "'Not a series — dismiss' keeps the remaining group's event untouched"
-      description: >
-        On the remaining pending group (now just manual-b1), click
-        "Not a series — dismiss".
+      title: "'Not a series — dismiss' keeps the remaining event untouched"
+      description: "On the remaining group (just manual-b1), click 'Not a series — dismiss'."
       expected: >
-        POST /api/admin/series/{id}/dismiss returns status "dismissed".
-        The group moves to the Resolved tab. manual-b1 remains visible
-        and unaffected in GET /api/events.
+        The group's status becomes "dismissed" and it moves to the Resolved
+        tab. manual-b1 remains visible in GET /api/events. A later 'Scan now'
+        never recreates this dismissed group (sticky).
+
+    # ── New occurrence of a resolved series is NOT auto-added ────────────
+    - id: 9
+      title: "A re-titled new occurrence is NOT auto-added to the resolved series"
+      description: >
+        Open series-a-w4 ("Guest DJ Takeover Night") in the admin event
+        side-panel, edit its title to "Friday Night Milonga at Session Latina"
+        (matching resolved Series A) and save. Then click 'Scan now'.
+      expected: >
+        series-a-w4 is NOT added to Series A — a resolved series is never
+        disturbed by detection. Series A still shows exactly its 3 members and
+        series-a-w4 stays a normal visible event with no series membership.
+
+    # ── Add to an existing (resolved) series ────────────────────────────
+    - id: 10
+      title: "Add the occurrence to the resolved series via the panel search"
+      description: >
+        In series-a-w4's side-panel Series section, click "Add to series",
+        type part of the resolved series title (e.g. "Milonga") and Search.
+      expected: >
+        The resolved Series A appears in the search results (a RESOLVED series
+        is searchable here, not only pending ones). Selecting it adds
+        series-a-w4 to Series A (now 4 members). The series stays "resolved".
+        All members remain visible in GET /api/events.
+
+    - id: 11
+      title: "Bulk 'Add to Series' adds another occurrence"
+      description: >
+        In the admin events list, select series-a-w5 ("Late Practica and
+        Social"), click "Add to Series", search the Series A title and pick it.
+      expected: >
+        series-a-w5 is added to the resolved Series A (now 5 members) and stays
+        visible in GET /api/events.
+
+    # ── Display: admin side-panel ───────────────────────────────────────
+    - id: 12
+      title: "Admin side-panel shows the event id and series membership"
+      description: "Open any Series A member (e.g. series-a-w1) in the admin event side-panel."
+      expected: >
+        The header shows the event id under the event name. The Series section
+        lists the resolved "Friday Night Milonga at Session Latina" membership
+        with a "Remove from series" action; clicking it removes that occurrence
+        while the event stays visible in GET /api/events.
+
+    # ── Display: user app ───────────────────────────────────────────────
+    - id: 13
+      title: "User app links an event to its series"
+      description: >
+        As a signed-in user, open a Series A member (e.g. series-a-w2) in the
+        calendar event modal, then open its event page (/event/{id}).
+      expected: >
+        Both the modal and the event page show "This event belongs to the
+        Friday Night Milonga at Session Latina series", where the series name
+        is a link to /series/{id}. Clicking it opens the series page
+        (cross-edition roll-up). An event not in a resolved series shows no
+        such link.

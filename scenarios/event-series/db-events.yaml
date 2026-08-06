@@ -1,3 +1,6 @@
+# Seeded directly into the DB (calendar_service=mock) — the scenario opens with
+# these events already present, no manual sync needed. Series detection runs
+# only via the admin "Scan now" action (auto-detect is off in settings.yaml).
 base_week: 0
 events:
   # ── Series A: 3 weekly occurrences, same calendar, same title/location.
@@ -78,6 +81,35 @@ events:
     price_is_free: false
     price_min: 10
     price_currency: EUR
+
+  # ── New occurrences that arrive AFTER Series A is approved. Their titles
+  # start deliberately dissimilar from Series A so a "Scan now" does NOT
+  # group them. Because a resolved series is never disturbed by detection
+  # (single-membership invariant), re-titling one to the milonga title and
+  # re-scanning still does NOT auto-add it — an admin adds it by hand via the
+  # event panel's "Add to series" search (w4) or the bulk "Add to Series"
+  # action (w5). ──────────────────────────────────────────────────────────
+  - id: series-a-w4
+    calendar_id: tango-collective
+    title: Guest DJ Takeover Night
+    description: Weekly tango milonga. Beginners welcome from 20:00, social from 21:00.
+    location: Session Latina, 8 Rue de Charonne, 75011 Paris, France
+    latitude: 48.8544
+    longitude: 2.3778
+    start: w4 Fri 20:00
+    end: w4 Fri 23:30
+    price_is_free: true
+
+  - id: series-a-w5
+    calendar_id: tango-collective
+    title: Late Practica and Social
+    description: Weekly tango milonga. Beginners welcome from 20:00, social from 21:00.
+    location: Session Latina, 8 Rue de Charonne, 75011 Paris, France
+    latitude: 48.8544
+    longitude: 2.3778
+    start: w5 Fri 20:00
+    end: w5 Fri 23:30
+    price_is_free: true
 
   # ── Unique one-off — must never appear in any series ────────────────────
   - id: unique-solo

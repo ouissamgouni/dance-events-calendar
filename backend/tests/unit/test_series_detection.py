@@ -33,6 +33,8 @@ from backend.db.models import (  # noqa: E402
     SiteSetting,
 )
 from backend.services.series_detection import (  # noqa: E402
+    SeriesMembershipConflict,
+    add_events_to_series,
     approve_series,
     create_manual_series,
     detect_series_for_event,
@@ -40,6 +42,7 @@ from backend.services.series_detection import (  # noqa: E402
     find_candidate_matches,
     get_series_for_event,
     maybe_detect_series_for_event,
+    rename_series,
     run_full_scan,
     split_member,
 )
@@ -315,15 +318,30 @@ class TestApproveDismissSplit:
         start = datetime.utcnow() + timedelta(days=3)
         _make_event(session, "evt-a", "Weekly Salsa Social", start)
         _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
-        detect_series_for_event(session, "evt-a")
-        series = session.exec(select(EventSeries)).one()
+        _make_event(session, "evt-c", "Weekly Salsa Social", start + timedelta(days=14))
+        series = create_manual_series(session, ["evt-a", "evt-b", "evt-c"])
 
-        split_member(session, series.id, "evt-b")
+        result = split_member(session, series.id, "evt-b")
 
+        assert result is not None
         members = session.exec(
             select(EventSeriesMember).where(EventSeriesMember.series_id == series.id)
         ).all()
-        assert {m.event_id for m in members} == {"evt-a"}
+        assert {m.event_id for m in members} == {"evt-a", "evt-c"}
+        assert session.get(CachedEvent, "evt-b") is not None
+
+    def test_split_dissolves_series_below_two_members(self, session):
+        start = datetime.utcnow() + timedelta(days=3)
+        _make_event(session, "evt-a", "Weekly Salsa Social", start)
+        _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
+        series = create_manual_series(session, ["evt-a", "evt-b"])
+
+        result = split_member(session, series.id, "evt-b")
+
+        assert result is None
+        assert session.get(EventSeries, series.id) is None
+        assert session.exec(select(EventSeriesMember)).all() == []
+        assert session.get(CachedEvent, "evt-a") is not None
         assert session.get(CachedEvent, "evt-b") is not None
 
     def test_split_unknown_member_raises(self, session):
@@ -359,6 +377,53 @@ class TestManualGroupingAndFullScan:
             select(EventSeriesMember).where(EventSeriesMember.series_id == series.id)
         ).all()
         assert {m.event_id for m in members} == {"evt-a", "evt-b"}
+
+    def test_manual_grouping_rejects_event_already_in_series(self, session):
+        start = datetime.utcnow() + timedelta(days=3)
+        _make_event(session, "evt-a", "Weekly Salsa Social", start)
+        _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
+        _make_event(session, "evt-c", "Weekly Salsa Social", start + timedelta(days=14))
+        create_manual_series(session, ["evt-a", "evt-b"])
+
+        with pytest.raises(SeriesMembershipConflict) as exc:
+            create_manual_series(session, ["evt-b", "evt-c"])
+        assert "evt-b" in exc.value.conflicts
+
+    def test_add_events_to_series_appends_members(self, session):
+        start = datetime.utcnow() + timedelta(days=3)
+        _make_event(session, "evt-a", "Weekly Salsa Social", start)
+        _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
+        _make_event(session, "evt-c", "Weekly Salsa Social", start + timedelta(days=14))
+        series = create_manual_series(session, ["evt-a", "evt-b"])
+
+        add_events_to_series(session, series.id, ["evt-c"])
+
+        members = session.exec(
+            select(EventSeriesMember).where(EventSeriesMember.series_id == series.id)
+        ).all()
+        assert {m.event_id for m in members} == {"evt-a", "evt-b", "evt-c"}
+
+    def test_add_events_to_series_rejects_conflict(self, session):
+        start = datetime.utcnow() + timedelta(days=3)
+        _make_event(session, "evt-a", "Weekly Salsa Social", start)
+        _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
+        _make_event(session, "evt-c", "Weekly Salsa Social", start + timedelta(days=14))
+        _make_event(session, "evt-d", "Weekly Salsa Social", start + timedelta(days=21))
+        series = create_manual_series(session, ["evt-a", "evt-b"])
+        create_manual_series(session, ["evt-c", "evt-d"])
+
+        with pytest.raises(SeriesMembershipConflict):
+            add_events_to_series(session, series.id, ["evt-c"])
+
+    def test_rename_series_updates_title(self, session):
+        start = datetime.utcnow() + timedelta(days=3)
+        _make_event(session, "evt-a", "Weekly Salsa Social", start)
+        _make_event(session, "evt-b", "Weekly Salsa Social", start + timedelta(days=7))
+        series = create_manual_series(session, ["evt-a", "evt-b"])
+
+        updated = rename_series(session, series.id, "Tuesday Milonga")
+
+        assert updated.canonical_title == "Tuesday Milonga"
 
     def test_full_scan_dedups_pairs(self, session):
         start = datetime.utcnow() + timedelta(days=3)
