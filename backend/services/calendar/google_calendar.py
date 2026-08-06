@@ -15,7 +15,43 @@ from backend.services.calendar.base import (
 logger = logging.getLogger(__name__)
 
 # Default per-request socket timeout (seconds). Overridable via env.
-_HTTP_TIMEOUT = float(os.getenv("GOOGLE_CALENDAR_HTTP_TIMEOUT", "60"))
+_HTTP_TIMEOUT = float(os.getenv("GOOGLE_CALENDAR_HTTP_TIMEOUT", "120"))
+# Max retry attempts for transient errors (socket read timeouts, resets).
+_MAX_RETRIES = int(os.getenv("GOOGLE_CALENDAR_MAX_RETRIES", "5"))
+
+
+def _is_transient_error(exc: Exception) -> bool:
+    """True for retryable transient network errors (read timeout, reset, EOF)."""
+    if isinstance(exc, (socket.timeout, TimeoutError)):
+        return True
+    text = str(exc).lower()
+    return (
+        "timed out" in text
+        or "connection reset" in text
+        or "eof occurred" in text
+        or "broken pipe" in text
+    )
+
+
+def _execute_with_retry(request, *, description: str):
+    """Execute a Google API request, retrying transient errors with backoff."""
+    retries = 0
+    while True:
+        try:
+            return request.execute()
+        except Exception as exc:
+            if _is_transient_error(exc) and retries < _MAX_RETRIES:
+                wait = 2**retries
+                logger.warning(
+                    "Transient error on %s (%s), retrying in %ds",
+                    description,
+                    exc,
+                    wait,
+                )
+                time.sleep(wait)
+                retries += 1
+                continue
+            raise
 
 
 class GoogleCalendarService(BaseCalendarService):
@@ -60,7 +96,9 @@ class GoogleCalendarService(BaseCalendarService):
 
     def list_calendars(self) -> list[CalendarInfo]:
         service = self._get_service()
-        result = service.calendarList().list().execute()
+        result = _execute_with_retry(
+            service.calendarList().list(), description="list_calendars"
+        )
         return [
             CalendarInfo(
                 calendar_id=item["id"],
@@ -73,7 +111,10 @@ class GoogleCalendarService(BaseCalendarService):
         """Verify access to a shared calendar by calling calendars().get()."""
         service = self._get_service()
         try:
-            cal = service.calendars().get(calendarId=calendar_id).execute()
+            cal = _execute_with_retry(
+                service.calendars().get(calendarId=calendar_id),
+                description=f"get_calendar_info({calendar_id})",
+            )
             return CalendarInfo(
                 calendar_id=cal["id"],
                 name=cal.get("summary", cal["id"]),
@@ -124,7 +165,7 @@ class GoogleCalendarService(BaseCalendarService):
                 result = service.events().list(**kwargs).execute()
             except socket.timeout:
                 # Read timeout — retry with exponential backoff before giving up
-                if retries < 3:
+                if retries < _MAX_RETRIES:
                     wait = 2**retries
                     logger.warning(
                         "Google Calendar request timed out for %s, retrying in %ds",
@@ -163,7 +204,7 @@ class GoogleCalendarService(BaseCalendarService):
                     "timed out" in error_str.lower()
                     or "connection reset" in error_str.lower()
                     or "eof occurred" in error_str.lower()
-                ) and retries < 3:
+                ) and retries < _MAX_RETRIES:
                     wait = 2**retries
                     logger.warning(
                         "Transient error from Google Calendar (%s), retrying in %ds",
@@ -280,5 +321,8 @@ class GoogleCalendarService(BaseCalendarService):
             body["start"] = {"dateTime": start.isoformat(), "timeZone": "UTC"}
             body["end"] = {"dateTime": end.isoformat(), "timeZone": "UTC"}
 
-        result = service.events().insert(calendarId=calendar_id, body=body).execute()
+        result = _execute_with_retry(
+            service.events().insert(calendarId=calendar_id, body=body),
+            description=f"create_event({calendar_id})",
+        )
         return result["id"]

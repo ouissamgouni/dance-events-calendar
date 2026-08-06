@@ -31,7 +31,6 @@ import SuggestEventModal from '../components/SuggestEventModal';
 import EventAnchoredDetailPanel from '../components/EventAnchoredDetailPanel';
 import { useSeenEvents } from '../hooks/useSeenEvents';
 import TrendingEventsBanner from '../components/TrendingEventsBanner';
-import ExplorerNav from '../components/ExplorerNav';
 import ExplorerEventSearch from '../components/ExplorerEventSearch';
 import { DEFAULT_EXPLORER_PERIOD, getDateRangeForPreset } from '../utils/dateRangePresets';
 import type { DateRangePresetKey } from '../utils/dateRangePresets';
@@ -1414,13 +1413,6 @@ export default function Home() {
     return (
         <div className="min-h-screen bg-[#f8fafc]">
             <main className="mx-auto max-w-7xl px-4 py-2 sm:py-4">
-                {(!loading || initialLoadDone.current) && !error && (
-                    <div className="mb-1 sm:mb-4 flex flex-col gap-2">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <ExplorerNav active="explorer" />
-                        </div>
-                    </div>
-                )}
                 {loading && !initialLoadDone.current && (
                     <div className="flex flex-col items-center justify-center gap-2 py-10 text-slate-400" role="status" aria-live="polite">
                         <div className="h-6 w-6 border-2 border-slate-200 border-t-blue-500 animate-spin" aria-hidden="true" />

@@ -1,19 +1,11 @@
 import { useMemo } from 'react';
-import { Link } from 'react-router-dom';
 import type { CalendarEvent } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { usePreferences } from '../context/PreferencesContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
-import { useForYouLens } from '../hooks/useForYouLens';
-import { useSeenEvents } from '../hooks/useSeenEvents';
+import { useForYouLens } from './useForYouLens';
+import { useSeenEvents } from './useSeenEvents';
 import { DEFAULT_AREA_BBOX } from '../constants/area';
-
-export type ExplorerTab = 'explorer' | 'for-you';
-
-interface ExplorerTabsProps {
-    active: ExplorerTab;
-    className?: string;
-}
 
 function toApiDate(date: Date): string {
     const y = date.getFullYear();
@@ -34,11 +26,11 @@ function eventMatchesAnyTag(event: CalendarEvent, tagIds: number[]): boolean {
 // own full lens fetch) or when the unseen feature flag is off. Applies
 // the exact same filter as the "New" trail on /for-you so the dot
 // doesn't fire for events that would never appear in that trail.
-function useForYouHasNew(active: ExplorerTab): boolean {
+export function useForYouHasNew(activeForYou: boolean): boolean {
     const { user } = useAuth();
     const { prefs } = usePreferences();
     const { unseenStateEnabled } = useFeatureFlags();
-    const enabled = !!user && unseenStateEnabled && active !== 'for-you';
+    const enabled = !!user && unseenStateEnabled && !activeForYou;
     const area = useMemo(() => {
         const src = prefs.area ?? DEFAULT_AREA_BBOX;
         return { min_lat: src.min_lat, min_lng: src.min_lng, max_lat: src.max_lat, max_lng: src.max_lng };
@@ -63,34 +55,4 @@ function useForYouHasNew(active: ExplorerTab): boolean {
         ));
     }, [lens.events, newEventIds, prefs.tagIds]);
     return hasNew;
-}
-
-/**
- * Shared top-level tab switcher used by the Explorer / For you pages so
- * the "which surface am I on" affordance stays consistent across routes.
- * Calendar is now a sub-view of Explorer and lives in a separate sub-
- * toggle rendered by the Explorer page itself, not here.
- */
-export default function ExplorerTabs({ active, className = '' }: ExplorerTabsProps) {
-    const hasNewForYou = useForYouHasNew(active);
-    const tabClass = (tab: ExplorerTab) =>
-        `relative px-3 py-1 text-sm transition ${active === tab
-            ? 'bg-white text-slate-900 font-medium shadow-sm'
-            : 'text-slate-500 hover:text-slate-700'}`;
-    return (
-        <div className={`flex items-center gap-1 bg-slate-200 p-1 shrink-0 w-fit ${className}`} data-testid="explorer-tabs">
-            <Link to="/" className={tabClass('explorer')}>Explorer</Link>
-            <Link to="/for-you" className={tabClass('for-you')}>
-                For you
-                {hasNewForYou && (
-                    <span
-                        // eslint-disable-next-line no-restricted-syntax -- small status dot (new indicator) — allowed exception per frontend rules
-                        className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-blue-500"
-                        aria-label="New items available"
-                        data-testid="for-you-tab-new-dot"
-                    />
-                )}
-            </Link>
-        </div>
-    );
 }

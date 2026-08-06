@@ -3,11 +3,10 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 /**
- * Header account control. When the user is logged out, renders inline
- * **Settings** and **Sign in** links (Settings isn't discoverable behind a
- * generic trigger, so it stays visible). When logged in, collapses to a
- * single first-name button that opens a Settings / My Calendar / Admin /
- * Logout menu.
+ * Header "More" (☰) menu. Holds secondary destinations that don't live in the
+ * primary nav: Dance Passport, Submit Event, Install App, Settings, Logout
+ * (plus Admin for admins, Invite friends). Logged-out users get Submit /
+ * Install / Settings / Sign in.
  */
 export default function HeaderUserMenu({ className }: { className?: string }) {
     const { user, logout } = useAuth();
@@ -32,7 +31,6 @@ export default function HeaderUserMenu({ className }: { className?: string }) {
     }, [location.pathname]);
 
     const isAdminPage = location.pathname.startsWith('/admin');
-    const firstName = user?.name?.split(' ')[0];
 
     const onLogout = async () => {
         setOpen(false);
@@ -43,50 +41,24 @@ export default function HeaderUserMenu({ className }: { className?: string }) {
         }
     };
 
-    if (!user) {
-        return (
-            <div className={'flex items-center gap-3 ' + (className ?? '')}>
-                <Link
-                    to="/account"
-                    aria-label="Settings"
-                    title="Settings"
-                    className="text-xs font-medium text-white hover:text-gray-200 transition inline-flex items-center"
-                >
-                    <img
-                        src="/menu.png"
-                        alt=""
-                        aria-hidden="true"
-                        className="sm:hidden h-4 w-4 object-contain"
-                        style={{ filter: 'brightness(0) invert(1)' }}
-                    />
-                    <span className="hidden sm:inline">Settings</span>
-                </Link>
-                <Link
-                    to="/login"
-                    className="text-xs font-medium text-white hover:text-gray-200 transition"
-                >
-                    Sign in
-                </Link>
-            </div>
-        );
-    }
+    const itemClass = 'flex items-center gap-2.5 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50';
+    const iconClass = 'h-4 w-4 object-contain shrink-0';
 
     return (
         <div ref={ref} className={'relative ' + (className ?? '')}>
             <button
                 type="button"
                 onClick={() => setOpen((v) => !v)}
-                aria-label="Account menu"
+                aria-label="More"
                 aria-haspopup="menu"
                 aria-expanded={open}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-white hover:text-gray-200 transition max-w-[9rem]"
+                className="inline-flex items-center text-white hover:text-gray-200 transition"
             >
-                <span className="truncate">{firstName ?? 'Account'}</span>
                 <img
                     src="/menu.png"
                     alt=""
                     aria-hidden="true"
-                    className="h-4 w-4 object-contain shrink-0"
+                    className="h-5 w-5 object-contain"
                     style={{ filter: 'brightness(0) invert(1)' }}
                 />
             </button>
@@ -94,90 +66,64 @@ export default function HeaderUserMenu({ className }: { className?: string }) {
             {open && (
                 <div
                     role="menu"
-                    className="absolute right-0 mt-1 w-44 bg-white border border-slate-200 shadow-lg z-50 py-1"
+                    className="absolute right-0 mt-1 w-48 bg-white border border-slate-200 shadow-lg z-50 py-1"
                 >
-
-                    <Link
-                        to="/account"
-                        role="menuitem"
-                        className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                    >
-                        Settings
-                    </Link>
-                    <Link
-                        to="/for-you"
-                        role="menuitem"
-                        className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                    >
-                        For You
-                    </Link>
-                    <Link
-                        to="/my-calendar"
-                        role="menuitem"
-                        className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                    >
-                        My Calendar
-                    </Link>
-                    <Link
-                        to="/passport"
-                        role="menuitem"
-                        className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                    >
-                        Dance Passport
-                    </Link>
-                    <Link
-                        to="/my-calendar/subscriptions"
-                        role="menuitem"
-                        className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                    >
-                        My Tribe Events
-                    </Link>
-                    <Link
-                        to="/discover"
-                        role="menuitem"
-                        className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                    >
-                        Find people
-                    </Link>
-                    <Link
-                        to="/invite"
-                        role="menuitem"
-                        className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                    >
-                        Invite friends
-                    </Link>
-                    <Link
-                        to="/?submit=1"
-                        role="menuitem"
-                        onClick={() => setOpen(false)}
-                        className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                    >
-                        Submit event
-                    </Link>
-                    {user.is_admin && (
-                        <Link
-                            to={isAdminPage ? '/' : '/admin'}
-                            role="menuitem"
-                            className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                        >
-                            {isAdminPage ? 'Explorer' : 'Admin'}
-                        </Link>
+                    {user ? (
+                        <>
+                            <Link to="/passport" role="menuitem" className={itemClass}>
+                                <img src="/passport.png" alt="" aria-hidden="true" className={iconClass} />
+                                Dance Passport
+                            </Link>
+                            <div className="my-1 border-t border-slate-100" role="separator" />
+                            <Link to="/?submit=1" role="menuitem" onClick={() => setOpen(false)} className={itemClass}>
+                                <img src="/schedule.png" alt="" aria-hidden="true" className={iconClass} />
+                                Submit Event
+                            </Link>
+                            <Link to="/invite" role="menuitem" className={itemClass}>
+                                <img src="/add-user.png" alt="" aria-hidden="true" className={iconClass} />
+                                Invite friends
+                            </Link>
+                            <Link to="/install" role="menuitem" className={itemClass}>
+                                <img src="/save.png" alt="" aria-hidden="true" className={iconClass} />
+                                Install App
+                            </Link>
+                            <div className="my-1 border-t border-slate-100" role="separator" />
+                            <Link to="/account" role="menuitem" className={itemClass}>
+                                <img src="/setting.png" alt="" aria-hidden="true" className={iconClass} />
+                                Settings
+                            </Link>
+                            {user.is_admin && (
+                                <Link to={isAdminPage ? '/' : '/admin'} role="menuitem" className={itemClass}>
+                                    <img src="/setting.png" alt="" aria-hidden="true" className={iconClass} />
+                                    {isAdminPage ? 'Explore' : 'Admin'}
+                                </Link>
+                            )}
+                            <button type="button" onClick={onLogout} role="menuitem" className={itemClass + ' w-full text-left'}>
+                                <img src="/quit.png" alt="" aria-hidden="true" className={iconClass} />
+                                Logout
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <Link to="/?submit=1" role="menuitem" onClick={() => setOpen(false)} className={itemClass}>
+                                <img src="/schedule.png" alt="" aria-hidden="true" className={iconClass} />
+                                Submit Event
+                            </Link>
+                            <Link to="/install" role="menuitem" className={itemClass}>
+                                <img src="/save.png" alt="" aria-hidden="true" className={iconClass} />
+                                Install App
+                            </Link>
+                            <div className="my-1 border-t border-slate-100" role="separator" />
+                            <Link to="/account" role="menuitem" className={itemClass}>
+                                <img src="/setting.png" alt="" aria-hidden="true" className={iconClass} />
+                                Settings
+                            </Link>
+                            <Link to="/login" role="menuitem" className={itemClass}>
+                                <img src="/login.png" alt="" aria-hidden="true" className={iconClass} />
+                                Sign in
+                            </Link>
+                        </>
                     )}
-                    <Link
-                        to="/install"
-                        role="menuitem"
-                        className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                    >
-                        Install app
-                    </Link>
-                    <button
-                        type="button"
-                        onClick={onLogout}
-                        role="menuitem"
-                        className="block w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 border-t border-slate-100"
-                    >
-                        Logout
-                    </button>
                 </div>
             )}
         </div>

@@ -12,7 +12,6 @@ import { useSeenEvents } from '../hooks/useSeenEvents';
 import { DEFAULT_AREA_BBOX } from '../constants/area';
 import { trackView } from '../utils/tracking';
 import { isTrendingScore } from '../utils/trending';
-import ExplorerNav from '../components/ExplorerNav';
 import YourNextEventsRail from '../components/YourNextEventsRail';
 import RailEventCard from '../components/RailEventCard';
 import ShareExperienceCard from '../components/ShareExperienceCard';
@@ -275,9 +274,6 @@ export default function ForYouPage() {
     return (
         <div className="min-h-screen bg-[#f8fafc]">
             <main className="mx-auto max-w-7xl px-4 py-2 sm:py-4">
-                <div className="mb-3 sm:mb-4 flex flex-wrap items-center gap-2">
-                    <ExplorerNav active="for-you" />
-                </div>
                 {!user ? (
                     <div className="bg-blue-50 border border-blue-100 p-4 text-sm text-slate-700">
                         <p className="mb-2 font-medium text-slate-800">Personalised events for you</p>

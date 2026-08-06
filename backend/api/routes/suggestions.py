@@ -112,7 +112,9 @@ def _upsert_live_event_from_suggestion(
     return cached_event
 
 
-def _apply_suggestion_tags(session: Session, event_id: str, suggested_tag_ids: list[int]) -> None:
+def _apply_suggestion_tags(
+    session: Session, event_id: str, suggested_tag_ids: list[int]
+) -> None:
     for tag_id in suggested_tag_ids:
         tag = session.get(Tag, tag_id)
         if not tag:
@@ -127,7 +129,9 @@ def _apply_suggestion_tags(session: Session, event_id: str, suggested_tag_ids: l
             session.add(EventTag(event_id=event_id, tag_id=tag_id))
 
 
-def _upsert_creator_going(session: Session, actor: User, event_id: str, audience: str) -> None:
+def _upsert_creator_going(
+    session: Session, actor: User, event_id: str, audience: str
+) -> None:
     existing = session.exec(
         select(UserEventAttendance).where(
             UserEventAttendance.user_id == actor.id,
@@ -256,11 +260,21 @@ def submit_suggestion(
             latitude=body.latitude,
             longitude=body.longitude,
         )
-        _apply_suggestion_tags(session, cached_event.event_id, suggestion.suggested_tag_ids or [])
+        _apply_suggestion_tags(
+            session, cached_event.event_id, suggestion.suggested_tag_ids or []
+        )
         if body.going:
-            going_audience = body.going_audience or current_user.share_attendance_default_audience or "friends"
-            _upsert_creator_going(session, current_user, cached_event.event_id, going_audience)
-            fan_out_going(session, current_user, cached_event.event_id, audience=going_audience)
+            going_audience = (
+                body.going_audience
+                or current_user.share_attendance_default_audience
+                or "friends"
+            )
+            _upsert_creator_going(
+                session, current_user, cached_event.event_id, going_audience
+            )
+            fan_out_going(
+                session, current_user, cached_event.event_id, audience=going_audience
+            )
         session.add(suggestion)
         session.commit()
         session.refresh(suggestion)
@@ -551,10 +565,19 @@ def sync_suggestion_to_google(
     if not suggestion.assigned_calendar_id:
         raise HTTPException(status_code=400, detail="No calendar assigned")
 
+    # Prefer the event's current calendar: an admin may have re-assigned it on
+    # the event detail page after approval, and that reassignment updates the
+    # CachedEvent, not the suggestion's approval-time assigned_calendar_id.
+    target_calendar_id = suggestion.assigned_calendar_id
+    if suggestion.created_event_id:
+        cached_event = session.get(CachedEvent, suggestion.created_event_id)
+        if cached_event and cached_event.calendar_id:
+            target_calendar_id = cached_event.calendar_id
+
     calendar_service = request.app.state.calendar_service
     try:
         google_event_id = calendar_service.create_event(
-            calendar_id=suggestion.assigned_calendar_id,
+            calendar_id=target_calendar_id,
             title=suggestion.title,
             description=suggestion.description,
             location=suggestion.location,
@@ -563,6 +586,16 @@ def sync_suggestion_to_google(
             all_day=suggestion.all_day,
         )
     except Exception as exc:
+        message = str(exc)
+        if "requiredAccessLevel" in message or "writer access" in message.lower():
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Cannot sync to calendar '{target_calendar_id}': the app only "
+                    "has read access. Re-assign this event to a calendar the app "
+                    "can write to, then try again."
+                ),
+            ) from exc
         logger.exception("Failed to sync suggestion to Google Calendar")
         raise HTTPException(
             status_code=502, detail=f"Google Calendar error: {exc}"

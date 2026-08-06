@@ -191,6 +191,7 @@ export default function Admin() {
     const [exportStats, setExportStats] = useState<ExportStat[]>([]);
     const [expandedDefaultTagsCalId, setExpandedDefaultTagsCalId] = useState<string | null>(null);
     const [expandedRulesCalId, setExpandedRulesCalId] = useState<string | null>(null);
+    const [openMenuCalId, setOpenMenuCalId] = useState<string | null>(null);
     const [confirmReseedOpen, setConfirmReseedOpen] = useState(false);
     const [tagGroups, setTagGroups] = useState<AdminTagGroup[]>([]);
     const allTags = useMemo<Tag[]>(() => tagGroups.flatMap((g) => g.tags), [tagGroups]);
@@ -1199,7 +1200,7 @@ export default function Admin() {
                             </div>
 
                             {/* Calendar List */}
-                            <div className="flex-1 min-h-0">
+                            <div className="flex-1 min-h-0 max-h-80 overflow-y-auto sm:max-h-none sm:overflow-visible">
                                 {loading ? (
                                     <p className="text-[11px] text-gray-400">Loading…</p>
                                 ) : calendars.length === 0 ? (
@@ -1244,38 +1245,6 @@ export default function Admin() {
                                                     </div>
                                                     <div className="flex items-center gap-1.5 shrink-0">
                                                         <button
-                                                            onClick={() => handleShowCalendarEvents(cal.calendar_id)}
-                                                            className="text-[10px] text-blue-600 hover:text-blue-800 font-medium transition"
-                                                            title="Show all events from this calendar"
-                                                        >
-                                                            Events
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleToggleDefaultTags(cal.calendar_id)}
-                                                            className={`text-[10px] font-medium px-1.5 py-0.5 border transition ${expandedDefaultTagsCalId === cal.calendar_id
-                                                                ? 'bg-violet-50 border-violet-300 text-violet-700'
-                                                                : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
-                                                                }`}
-                                                            title="Configure default tags for new events from this calendar"
-                                                        >
-                                                            Tags
-                                                            {(calendarDefaultTagIds[cal.calendar_id]?.length ?? 0) > 0 && (
-                                                                <span className="ml-1 inline-flex items-center justify-center bg-violet-500 text-white text-[9px] font-semibold px-1 min-w-[14px]">
-                                                                    {calendarDefaultTagIds[cal.calendar_id].length}
-                                                                </span>
-                                                            )}
-                                                        </button>
-                                                        <button
-                                                            onClick={() => setExpandedRulesCalId((prev) => (prev === cal.calendar_id ? null : cal.calendar_id))}
-                                                            className={`text-[10px] font-medium px-1.5 py-0.5 border transition ${expandedRulesCalId === cal.calendar_id
-                                                                ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
-                                                                : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
-                                                                }`}
-                                                            title="Manage per-calendar curation (auto-add events to managed users' lists)"
-                                                        >
-                                                            Curation
-                                                        </button>
-                                                        <button
                                                             onClick={() => handleToggle(cal)}
                                                             className={`text-[10px] font-medium px-2 py-0.5 transition ${cal.enabled
                                                                 ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
@@ -1295,6 +1264,60 @@ export default function Admin() {
                                                         >
                                                             {cal.show_events ? 'Shown' : 'Hidden'}
                                                         </button>
+                                                        <div className="relative">
+                                                            <button
+                                                                onClick={() => setOpenMenuCalId((prev) => (prev === cal.calendar_id ? null : cal.calendar_id))}
+                                                                className={`flex h-5 w-5 items-center justify-center border transition ${openMenuCalId === cal.calendar_id
+                                                                    ? 'bg-gray-100 border-gray-300 text-gray-700'
+                                                                    : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                                                                    }`}
+                                                                title="More actions"
+                                                                aria-label="More actions"
+                                                                aria-haspopup="true"
+                                                                aria-expanded={openMenuCalId === cal.calendar_id}
+                                                            >
+                                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                                                    <circle cx="12" cy="5" r="2" />
+                                                                    <circle cx="12" cy="12" r="2" />
+                                                                    <circle cx="12" cy="19" r="2" />
+                                                                </svg>
+                                                            </button>
+                                                            {openMenuCalId === cal.calendar_id && (
+                                                                <>
+                                                                    <div className="fixed inset-0 z-10" onClick={() => setOpenMenuCalId(null)} />
+                                                                    <div className="absolute right-0 top-full z-20 mt-1 w-40 border border-gray-200 bg-white shadow-lg">
+                                                                        <button
+                                                                            onClick={() => { setOpenMenuCalId(null); handleShowCalendarEvents(cal.calendar_id); }}
+                                                                            className="block w-full px-3 py-1.5 text-left text-[11px] text-gray-700 hover:bg-gray-50"
+                                                                            title="Show all events from this calendar"
+                                                                        >
+                                                                            Events
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => { setOpenMenuCalId(null); handleToggleDefaultTags(cal.calendar_id); }}
+                                                                            className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-[11px] hover:bg-gray-50 ${expandedDefaultTagsCalId === cal.calendar_id ? 'text-violet-700' : 'text-gray-700'
+                                                                                }`}
+                                                                            title="Configure default tags for new events from this calendar"
+                                                                        >
+                                                                            <span>Tags</span>
+                                                                            {(calendarDefaultTagIds[cal.calendar_id]?.length ?? 0) > 0 && (
+                                                                                <span className="ml-2 inline-flex items-center justify-center bg-violet-500 text-white text-[9px] font-semibold px-1 min-w-[14px]">
+                                                                                    {calendarDefaultTagIds[cal.calendar_id].length}
+                                                                                </span>
+                                                                            )}
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => { setOpenMenuCalId(null); setExpandedRulesCalId((prev) => (prev === cal.calendar_id ? null : cal.calendar_id)); }}
+                                                                            className={`block w-full px-3 py-1.5 text-left text-[11px] hover:bg-gray-50 ${expandedRulesCalId === cal.calendar_id ? 'text-indigo-700' : 'text-gray-700'
+                                                                                }`}
+                                                                            title="Manage per-calendar curation (auto-add events to managed users' lists)"
+                                                                        >
+                                                                            Curation
+                                                                        </button>
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 {expandedDefaultTagsCalId === cal.calendar_id && (

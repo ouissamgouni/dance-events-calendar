@@ -8,9 +8,21 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from backend.api.main import app
-from backend.api.deps import require_admin, get_client_ip, create_session_token, get_current_user_optional
+from backend.api.deps import (
+    require_admin,
+    get_client_ip,
+    create_session_token,
+    get_current_user_optional,
+)
 from backend.db.database import get_session
-from backend.db.models import BlockedEvent, CachedEvent, CalendarSetting, EventSuggestion, User, UserEventAttendance
+from backend.db.models import (
+    BlockedEvent,
+    CachedEvent,
+    CalendarSetting,
+    EventSuggestion,
+    User,
+    UserEventAttendance,
+)
 
 
 def _fake_admin():
@@ -162,7 +174,7 @@ class TestSubmitSuggestion:
             added.append(obj)
 
         def mock_get(model, pk):
-            if model is CalendarSetting and pk == 'user-submissions':
+            if model is CalendarSetting and pk == "user-submissions":
                 return None
             if model is CachedEvent:
                 return None
@@ -179,10 +191,10 @@ class TestSubmitSuggestion:
         mock_session.exec = mock_exec
 
         current_user = User(
-            email='alice@example.com',
-            display_name='Alice',
-            provider='google',
-            provider_subject='mock|alice@example.com',
+            email="alice@example.com",
+            display_name="Alice",
+            provider="google",
+            provider_subject="mock|alice@example.com",
         )
 
         app.dependency_overrides[get_session] = lambda: mock_session
@@ -190,27 +202,36 @@ class TestSubmitSuggestion:
 
         client = TestClient(app)
         resp = client.post(
-            '/api/suggestions',
+            "/api/suggestions",
             json={
-                'title': 'Salsa Tuesday',
-                'description': 'Weekly salsa class',
-                'location': 'Studio A',
-                'latitude': 52.52,
-                'longitude': 13.405,
-                'start': '2026-06-15T20:00:00',
-                'end': '2026-06-15T23:00:00',
-                'going': True,
-                'going_audience': 'friends',
-                'submitter_name': 'Alice',
-                'submitter_email': 'alice@example.com',
+                "title": "Salsa Tuesday",
+                "description": "Weekly salsa class",
+                "location": "Studio A",
+                "latitude": 52.52,
+                "longitude": 13.405,
+                "start": "2026-06-15T20:00:00",
+                "end": "2026-06-15T23:00:00",
+                "going": True,
+                "going_audience": "friends",
+                "submitter_name": "Alice",
+                "submitter_email": "alice@example.com",
             },
         )
 
         assert resp.status_code == 201, resp.text
         assert any(isinstance(obj, EventSuggestion) for obj in added)
-        assert any(isinstance(obj, CalendarSetting) and obj.calendar_id == 'user-submissions' for obj in added)
-        assert any(isinstance(obj, CachedEvent) and obj.review_status == 'pending' for obj in added)
-        assert any(isinstance(obj, UserEventAttendance) and obj.share_audience == 'friends' for obj in added)
+        assert any(
+            isinstance(obj, CalendarSetting) and obj.calendar_id == "user-submissions"
+            for obj in added
+        )
+        assert any(
+            isinstance(obj, CachedEvent) and obj.review_status == "pending"
+            for obj in added
+        )
+        assert any(
+            isinstance(obj, UserEventAttendance) and obj.share_audience == "friends"
+            for obj in added
+        )
 
         app.dependency_overrides.clear()
 
@@ -455,10 +476,10 @@ class TestRejectSuggestion:
         app.dependency_overrides.clear()
 
     def test_reject_hides_created_event_and_blocks_reimport(self):
-        suggestion = _make_suggestion(created_event_id='suggestion-live-1')
+        suggestion = _make_suggestion(created_event_id="suggestion-live-1")
         live_event = CachedEvent(
-            event_id='suggestion-live-1',
-            calendar_id='user-submissions',
+            event_id="suggestion-live-1",
+            calendar_id="user-submissions",
             title=suggestion.title,
             start=suggestion.start,
             end=suggestion.end,
@@ -479,7 +500,7 @@ class TestRejectSuggestion:
             return None
 
         def mock_add(obj):
-            store_key = getattr(obj, 'id', None) or getattr(obj, 'event_id', None)
+            store_key = getattr(obj, "id", None) or getattr(obj, "event_id", None)
             if store_key is not None:
                 store[store_key] = obj
 
@@ -495,13 +516,114 @@ class TestRejectSuggestion:
         client = TestClient(app)
         resp = client.post(
             f"/api/admin/suggestions/{suggestion.id}/reject",
-            json={'admin_notes': 'Duplicate event'},
+            json={"admin_notes": "Duplicate event"},
         )
 
         assert resp.status_code == 200, resp.text
-        assert suggestion.status == 'rejected'
+        assert suggestion.status == "rejected"
         assert live_event.is_hidden is True
         assert any(isinstance(obj, BlockedEvent) for obj in store.values())
+
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.unit
+class TestSyncSuggestionToGoogle:
+    def _setup(self, suggestion, live_event):
+        store = {suggestion.id: suggestion}
+        if live_event is not None:
+            store[live_event.event_id] = live_event
+        mock_session = MagicMock(spec=Session)
+
+        def mock_get(model, pk):
+            if model is EventSuggestion:
+                return store.get(pk)
+            if model is CachedEvent:
+                item = store.get(pk)
+                return item if isinstance(item, CachedEvent) else None
+            return None
+
+        mock_session.get = mock_get
+        mock_session.add = MagicMock()
+        mock_session.commit = MagicMock()
+        mock_session.refresh = MagicMock()
+        return mock_session
+
+    def test_sync_uses_events_current_calendar(self):
+        """Sync-back targets the event's live calendar, not the stale
+        approval-time assigned_calendar_id (which may be a read-only source)."""
+        suggestion = _make_suggestion(
+            status="approved",
+            synced_to_google=False,
+            assigned_calendar_id="old-readonly@group.calendar.google.com",
+            created_event_id="ev-1",
+        )
+        live_event = CachedEvent(
+            event_id="ev-1",
+            calendar_id="new-writable@group.calendar.google.com",
+            title=suggestion.title,
+            start=suggestion.start,
+            end=suggestion.end,
+            all_day=False,
+        )
+        mock_session = self._setup(suggestion, live_event)
+
+        mock_service = MagicMock()
+        mock_service.create_event.return_value = "goog-123"
+        app.state.calendar_service = mock_service
+
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[require_admin] = _fake_admin
+
+        client = TestClient(app)
+        resp = client.post(
+            f"/api/admin/suggestions/{suggestion.id}/sync-to-google",
+        )
+
+        assert resp.status_code == 200, resp.text
+        called_calendar = mock_service.create_event.call_args.kwargs["calendar_id"]
+        assert called_calendar == "new-writable@group.calendar.google.com"
+        assert suggestion.synced_to_google is True
+        assert suggestion.google_event_id == "goog-123"
+
+        app.dependency_overrides.clear()
+
+    def test_sync_read_only_calendar_returns_clear_error(self):
+        """A 403 requiredAccessLevel from Google → 422 with an actionable
+        message instead of a raw 502."""
+        suggestion = _make_suggestion(
+            status="approved",
+            synced_to_google=False,
+            assigned_calendar_id="readonly@group.calendar.google.com",
+            created_event_id="ev-2",
+        )
+        live_event = CachedEvent(
+            event_id="ev-2",
+            calendar_id="readonly@group.calendar.google.com",
+            title=suggestion.title,
+            start=suggestion.start,
+            end=suggestion.end,
+            all_day=False,
+        )
+        mock_session = self._setup(suggestion, live_event)
+
+        mock_service = MagicMock()
+        mock_service.create_event.side_effect = Exception(
+            "HttpError 403 requiredAccessLevel: You need to have writer access"
+        )
+        app.state.calendar_service = mock_service
+
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[require_admin] = _fake_admin
+
+        client = TestClient(app)
+        resp = client.post(
+            f"/api/admin/suggestions/{suggestion.id}/sync-to-google",
+        )
+
+        assert resp.status_code == 422, resp.text
+        assert "read access" in resp.json()["detail"].lower()
+        assert suggestion.synced_to_google is False
 
         app.dependency_overrides.clear()
 
