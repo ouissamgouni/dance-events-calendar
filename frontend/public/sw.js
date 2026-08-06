@@ -20,13 +20,12 @@ self.addEventListener('install', () => {
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         (async () => {
-            // Purge any legacy app-shell caches left by older SW versions.
+            // Purge every Cache Storage entry. This SW never populates a cache,
+            // so deleting all of them is safe and reclaims any app-shell cache
+            // left by older (shell-caching) SW versions under an unknown name —
+            // stale shells point at deleted hashed assets → a blank PWA.
             const keys = await caches.keys();
-            await Promise.all(
-                keys
-                    .filter((k) => k.startsWith('movida-shell-'))
-                    .map((k) => caches.delete(k)),
-            );
+            await Promise.all(keys.map((k) => caches.delete(k)));
             await self.clients.claim();
             // Recovery kill-switch: reload any window still displaying a stale
             // document served by a previous (shell-caching) worker so it
