@@ -166,7 +166,7 @@ export default function MineHub() {
                 {/* Your dancer passport */}
                 {milestone && (
                     <section>
-                        <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                        <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-sm font-semibold text-slate-700">
                             <span>Your dancer passport</span>
                             <Link to="/mine/passport" className="text-[11px] font-semibold text-blue-600 hover:text-blue-700">See passport</Link>
                         </div>
@@ -194,7 +194,7 @@ export default function MineHub() {
                 {/* Share your experience */}
                 {pending.length > 0 && (
                     <section data-testid="mine-share-your-experience">
-                        <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                        <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-sm font-semibold text-slate-700">
                             <span>Share your experience</span>
                         </div>
                         <div className="flex gap-2 overflow-x-auto px-2 py-2" aria-label="Share your experience">

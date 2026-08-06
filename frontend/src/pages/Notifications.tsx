@@ -108,26 +108,28 @@ export default function NotificationsPage({ socialOnly = false }: { socialOnly?:
 
     return (
         <div className="max-w-2xl mx-auto px-4 py-6">
-            <div className="flex items-center justify-between mb-4">
-                <h1 className="text-lg font-semibold text-slate-900">
-                    {socialOnly ? 'Activity' : 'Notifications'}
-                    {unreadCount > 0 && (
-                        <span className="ml-2 text-xs text-slate-500 font-normal">
-                            ({unreadCount} unread)
-                        </span>
-                    )}
-                </h1>
-                <button
-                    type="button"
-                    onClick={handleMarkAll}
-                    disabled={busyAll || unreadCount === 0}
-                    className="text-xs text-blue-600 hover:text-blue-700 disabled:text-slate-400 disabled:cursor-not-allowed"
-                >
-                    {busyAll ? 'Marking…' : 'Mark all read'}
-                </button>
-            </div>
+            {!socialOnly && (
+                <div className="flex items-center justify-between mb-4">
+                    <h1 className="text-lg font-semibold text-slate-900">
+                        Notifications
+                        {unreadCount > 0 && (
+                            <span className="ml-2 text-xs text-slate-500 font-normal">
+                                ({unreadCount} unread)
+                            </span>
+                        )}
+                    </h1>
+                    <button
+                        type="button"
+                        onClick={handleMarkAll}
+                        disabled={busyAll || unreadCount === 0}
+                        className="text-xs text-blue-600 hover:text-blue-700 disabled:text-slate-400 disabled:cursor-not-allowed"
+                    >
+                        {busyAll ? 'Marking…' : 'Mark all read'}
+                    </button>
+                </div>
+            )}
 
-            <div className="flex items-center gap-1 mb-3 text-xs">
+            <div className="flex flex-wrap items-center gap-2 mb-3 text-sm">
                 <KindChip
                     label="All"
                     active={filterKind === 'all'}
@@ -217,8 +219,8 @@ function KindChip({
             onClick={onClick}
             className={
                 active
-                    ? 'px-2 py-1 rounded-full bg-slate-900 text-white'
-                    : 'px-2 py-1 rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    ? 'px-3 py-1.5 border border-blue-500 bg-blue-500 text-white'
+                    : 'px-3 py-1.5 border border-slate-200 bg-white text-slate-600 hover:border-blue-500 hover:text-blue-500'
             }
         >
             {label}
@@ -473,7 +475,7 @@ function NotificationRow({
                 }}
                 className="min-w-0 flex-1 text-left"
             >
-                <p className="text-sm text-slate-700">
+                <p className="text-xs text-slate-700">
                     <span className="font-medium text-slate-900">
                         {actorName}
                     </span>

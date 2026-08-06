@@ -54,7 +54,7 @@ export default function YourNextEventsRail({
 
     return (
         <section className={className} data-testid="your-next-events-rail">
-            <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700">
+            <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-sm font-semibold text-slate-700">
                 <button
                     type="button"
                     className="flex flex-1 items-center justify-between gap-2 text-left hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-300"

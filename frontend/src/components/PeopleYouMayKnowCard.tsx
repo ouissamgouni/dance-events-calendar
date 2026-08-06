@@ -87,7 +87,7 @@ export default function PeopleYouMayKnowCard({ variant = 'list', onResult }: Peo
     if (variant === 'trail') {
         return (
             <section data-testid="for-you-build-your-tribe">
-                <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-sm font-semibold text-slate-700">
                     <span>Build your tribe</span>
                 </div>
                 <div className="flex gap-2 overflow-x-auto px-2 py-2" aria-label="Build your tribe">

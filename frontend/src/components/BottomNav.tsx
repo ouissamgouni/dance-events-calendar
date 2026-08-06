@@ -15,7 +15,7 @@ export default function BottomNav() {
     return (
         <nav
             aria-label="Primary"
-            className="md:hidden shrink-0 flex items-stretch border-t border-slate-200 bg-white"
+            className="md:hidden shrink-0 flex items-stretch border-t border-slate-200 bg-slate-100"
             style={{ height: 68, paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
             {NAV_DESTINATIONS.map((dest) => {
