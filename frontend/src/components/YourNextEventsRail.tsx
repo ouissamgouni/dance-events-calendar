@@ -15,8 +15,6 @@ interface YourNextEventsRailProps {
     newEventIds?: Set<string>;
     unseenStateEnabled?: boolean;
     className?: string;
-    /** Optional content rendered on the right side of the header, e.g. metrics. */
-    headerRight?: ReactNode;
     /** When provided, the rail renders this message instead of returning null
      * when there are no events — keeps the trail visible with a CTA. */
     emptyState?: ReactNode;
@@ -32,7 +30,6 @@ export default function YourNextEventsRail({
     newEventIds,
     unseenStateEnabled = false,
     className = '',
-    headerRight,
     emptyState,
 }: YourNextEventsRailProps) {
     // Rails are expanded by default on both mobile and desktop; the
@@ -54,7 +51,7 @@ export default function YourNextEventsRail({
 
     return (
         <section className={className} data-testid="your-next-events-rail">
-            <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-sm font-semibold text-slate-700">
+            <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-base font-semibold text-slate-700">
                 <button
                     type="button"
                     className="flex flex-1 items-center justify-between gap-2 text-left hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-300"
@@ -65,19 +62,16 @@ export default function YourNextEventsRail({
                     <span className="inline-flex items-center gap-1">
                         Your next events
                     </span>
-                    <span className="inline-flex items-center gap-2">
-                        {headerRight && (
-                            <span className="text-[11px] font-medium text-slate-500">{headerRight}</span>
-                        )}
-                        <span aria-hidden="true" className="text-xs text-slate-400">{collapsed ? '+' : '-'}</span>
-                    </span>
+                    <span aria-hidden="true" className="text-xs text-slate-400">{collapsed ? '+' : '-'}</span>
                 </button>
-                <Link
-                    to="/mine/calendar"
-                    className="ml-2 shrink-0 text-[11px] font-semibold text-blue-600 hover:text-blue-700"
-                >
-                    See in explorer
-                </Link>
+                {events.length > 0 && (
+                    <Link
+                        to="/mine/calendar"
+                        className="ml-2 shrink-0 text-[11px] font-semibold text-blue-600 hover:text-blue-700"
+                    >
+                        {events.length} upcoming
+                    </Link>
+                )}
             </div>
             {!collapsed && (
                 isEmpty ? (

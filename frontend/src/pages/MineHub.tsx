@@ -31,8 +31,8 @@ function nextMilestone(milestones: PassportMilestone[]): PassportMilestone | nul
 
 export default function MineHub() {
     const { user } = useAuth();
-    const { savedEventIds, savedCount } = useSavedEvents();
-    const { attendingEventIds, attendingCount } = useAttendingEvents();
+    const { savedEventIds } = useSavedEvents();
+    const { attendingEventIds } = useAttendingEvents();
     const [myEvents, setMyEvents] = useState<CalendarEvent[]>([]);
     const [passport, setPassport] = useState<PassportResponse | null>(null);
     const [pending, setPending] = useState<PendingReview[]>([]);
@@ -154,21 +154,13 @@ export default function MineHub() {
                             and save or mark “I’m going” to build your calendar.
                         </>
                     )}
-                    headerRight={myEvents.length > 0 ? (
-                        <>
-                            <span>{savedCount} saved</span>
-                            <span className="text-slate-300">·</span>
-                            <span>{attendingCount} going</span>
-                        </>
-                    ) : undefined}
                 />
 
                 {/* Your dancer passport */}
                 {milestone && (
                     <section>
-                        <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-sm font-semibold text-slate-700">
+                        <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-base font-semibold text-slate-700">
                             <span>Your dancer passport</span>
-                            <Link to="/mine/passport" className="text-[11px] font-semibold text-blue-600 hover:text-blue-700">See passport</Link>
                         </div>
                         <Link to="/mine/passport" className="mt-2 block border border-slate-200 bg-white p-4 hover:border-blue-300 transition">
                             <div className="flex items-center gap-3">
@@ -194,7 +186,7 @@ export default function MineHub() {
                 {/* Share your experience */}
                 {pending.length > 0 && (
                     <section data-testid="mine-share-your-experience">
-                        <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-sm font-semibold text-slate-700">
+                        <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-base font-semibold text-slate-700">
                             <span>Share your experience</span>
                         </div>
                         <div className="flex gap-2 overflow-x-auto px-2 py-2" aria-label="Share your experience">

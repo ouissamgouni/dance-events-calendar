@@ -17,7 +17,8 @@ function attendedWhen(startIso: string | null): string {
     if (!startIso) return 'recently';
     const start = new Date(startIso);
     const days = Math.floor((Date.now() - start.getTime()) / 86_400_000);
-    if (days <= 1) return 'yesterday';
+    if (days <= 0) return 'today';
+    if (days === 1) return 'yesterday';
     if (days < 7) return `${days} days ago`;
     return `on ${start.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}`;
 }
@@ -43,21 +44,23 @@ export default function ShareExperienceCard({ review, onReviewed }: Props) {
 
     return (
         <div className="flex w-[212px] shrink-0 flex-col justify-between border border-slate-200 bg-white p-2.5 text-xs">
-            <div className="space-y-1">
-                <p className="text-slate-700">
-                    You attended <span className="font-semibold text-slate-900">{title}</span> {attendedWhen(review.event_start)}.
-                </p>
+            <p className="text-slate-700">
+                You attended <span className="font-semibold text-slate-900">{title}</span> {attendedWhen(review.event_start)}.
+            </p>
+            <div className="mt-2 flex items-center justify-between gap-2">
+                <button
+                    type="button"
+                    onClick={handleReviewClick}
+                    className="inline-flex shrink-0 items-center justify-center bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                >
+                    Review
+                </button>
                 {review.friend_proof && (
-                    <p className="text-slate-500">{review.friend_proof} already shared their experience.</p>
+                    <span className="text-right text-[10px] leading-tight text-slate-500">
+                        Reviewed by {review.friend_proof}
+                    </span>
                 )}
             </div>
-            <button
-                type="button"
-                onClick={handleReviewClick}
-                className="mt-2 inline-flex items-center justify-center self-start bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
-            >
-                Review
-            </button>
             {open && (
                 <RateEventModal
                     eventId={review.event_id}
