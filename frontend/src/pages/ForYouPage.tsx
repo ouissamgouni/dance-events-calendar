@@ -71,7 +71,7 @@ function LensTrail(props: LensTrailProps) {
 
     return (
         <section data-testid={testId}>
-            <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-sm font-semibold text-slate-700">
+            <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-base font-semibold text-slate-700">
                 <span>{title}</span>
                 {headerRight}
             </div>
@@ -126,7 +126,7 @@ export default function ForYouPage() {
     const { user } = useAuth();
     const { prefs } = usePreferences();
     const { savedEventIds } = useSavedEvents();
-    const { attendingEventIds, attendingCount } = useAttendingEvents();
+    const { attendingEventIds } = useAttendingEvents();
     const {
         unseenStateEnabled,
         trendingEnabled,
@@ -136,7 +136,6 @@ export default function ForYouPage() {
         trendingTopPercent,
         followingBadgeEnabled,
     } = useFeatureFlags();
-    const { savedCount } = useSavedEvents();
 
     const [hoveredEventId, setHoveredEventId] = useState<string | null>(null);
     const onEventHover = useCallback((id: string | null) => setHoveredEventId(id), []);
@@ -283,6 +282,7 @@ export default function ForYouPage() {
     return (
         <div className="min-h-screen bg-[#f8fafc]">
             <main className="mx-auto max-w-7xl px-4 py-4 sm:py-6">
+                <h1 className="mb-3 text-xl font-semibold text-slate-900">For You</h1>
                 {!user ? (
                     <div className="bg-blue-50 border border-blue-100 p-4 text-sm text-slate-700">
                         <p className="mb-2 font-medium text-slate-800">Personalised events for you</p>
@@ -303,13 +303,6 @@ export default function ForYouPage() {
                             onEventHover={onEventHover}
                             newEventIds={newEventIds}
                             unseenStateEnabled={unseenStateEnabled}
-                            headerRight={(
-                                <>
-                                    <span>{savedCount} saved</span>
-                                    <span className="text-slate-300"> · </span>
-                                    <span>{attendingCount} going</span>
-                                </>
-                            )}
                         />
                         <LensTrail
                             title="You might like"
@@ -380,7 +373,7 @@ export default function ForYouPage() {
                         />
                         {pendingReviews.length > 0 && (
                             <section data-testid="for-you-share-your-experience">
-                                <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-sm font-semibold text-slate-700">
+                                <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-base font-semibold text-slate-700">
                                     <span>Share your experience</span>
                                 </div>
                                 <div className="flex gap-2 overflow-x-auto px-2 py-2" aria-label="Share your experience">

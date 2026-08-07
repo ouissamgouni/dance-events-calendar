@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { NAV_DESTINATIONS } from './navDestinations';
 
 /**
  * Header "More" (☰) menu. Holds secondary destinations that don't live in the
@@ -68,6 +69,21 @@ export default function HeaderUserMenu({ className }: { className?: string }) {
                     role="menu"
                     className="absolute right-0 mt-1 w-48 bg-white border border-slate-200 shadow-lg z-50 py-1"
                 >
+                    <div className="md:hidden">
+                        {NAV_DESTINATIONS.map((dest) => (
+                            <Link
+                                key={dest.id}
+                                to={dest.path}
+                                role="menuitem"
+                                aria-current={dest.isActive(location.pathname) ? 'page' : undefined}
+                                className={itemClass}
+                            >
+                                <img src={dest.icon} alt="" aria-hidden="true" className={iconClass} />
+                                {dest.label}
+                            </Link>
+                        ))}
+                        <div className="my-1 border-t border-slate-100" role="separator" />
+                    </div>
                     {user ? (
                         <>
                             <Link to="/mine/passport" role="menuitem" className={itemClass}>

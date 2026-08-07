@@ -38,7 +38,7 @@ describe('ShareExperienceCard', () => {
         expect(screen.getByText(/You attended/)).toHaveTextContent(
             'You attended Barcelona Thursday Social yesterday.',
         )
-        expect(screen.queryByText(/shared their experience/)).not.toBeInTheDocument()
+        expect(screen.queryByText(/Reviewed by/)).not.toBeInTheDocument()
         expect(screen.getByRole('button', { name: 'Review' })).toBeInTheDocument()
     })
 
@@ -46,7 +46,7 @@ describe('ShareExperienceCard', () => {
         render(
             <ShareExperienceCard review={makeReview({ friend_proof: 'Laura' })} onReviewed={vi.fn()} />,
         )
-        expect(screen.getByText('Laura already shared their experience.')).toBeInTheDocument()
+        expect(screen.getByText('Reviewed by Laura')).toBeInTheDocument()
     })
 
     it('opens the modal and calls onReviewed after submitting', () => {

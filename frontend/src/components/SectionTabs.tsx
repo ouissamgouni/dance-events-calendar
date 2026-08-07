@@ -65,9 +65,11 @@ function SectionTabs({ tabs, pathname, hub }: { tabs: SectionTab[]; pathname: st
 export default function SectionLayout({ section }: { section: SectionKey }) {
     const { pathname } = useLocation();
     const { hub, tabs } = SECTION_CONFIG[section];
+    const title = section === 'tribe' ? 'Your Tribe' : null;
     return (
         <div className="min-h-full bg-[#f8fafc]">
             <div className="border-b border-slate-200 bg-white px-4 pt-1">
+                {title && <h1 className="px-1 pb-1 pt-1 text-xl font-semibold text-slate-900">{title}</h1>}
                 <SectionTabs tabs={tabs} pathname={pathname} hub={hub} />
             </div>
             <Outlet />
