@@ -1,0 +1,41 @@
+# notif-activity-following cast.
+#   Bob   — recipient; social_activity email + push ON. Carol follows
+#           him (new_follower) and he becomes mutual friends with Alice
+#           (new_friend) → in-app rows + push + digest email.
+#   Dave  — recipient with social_activity email + push OFF. Carol also
+#           follows Dave → he gets the in-app row but NO email/push
+#           (per-user opt-out probe).
+#   Alice — actor; mutual friend of Bob (new_friend).
+#   Carol — actor; follows Bob and Dave (new_follower).
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Alice%20Rivera
+
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+    account_visibility: public
+    email_social_activity_enabled: true
+    push_social_activity_enabled: true
+
+  - email: carol@example.com
+    name: Carol Nguyen
+    handle: carol
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Carol%20Nguyen
+
+  # Negative probe — social_activity email + push OFF.
+  - email: dave@example.com
+    name: Dave Owens
+    handle: dave
+    account_visibility: public
+    email_social_activity_enabled: false
+    push_social_activity_enabled: false

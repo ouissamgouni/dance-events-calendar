@@ -1,3 +1,8 @@
+# emit_notifications fires the social_activity fan-out so Bob's digest
+# has a `new_follower` line (carol -> bob) and a `new_friend` line
+# (alice <-> bob mutual), on top of the friends_going / reviews /
+# milestone / interest lines from the other seed files.
+emit_notifications: true
 follows:
   - follower: bob
     followee: alice
@@ -7,8 +12,12 @@ follows:
     status: approved
   # Alice follows Bob back, making them mutual friends — Bob's digest
   # suggestions are now ranked via Alice's network instead of the
-  # empty-mutuals curator fallback.
+  # empty-mutuals curator fallback, and Bob gets a `new_friend` line.
   - follower: alice
+    followee: bob
+    status: approved
+  # Carol follows Bob → Bob's `new_follower` social-activity line.
+  - follower: carol
     followee: bob
     status: approved
   # Alice's network — surfaced as Bob's "People you may want to

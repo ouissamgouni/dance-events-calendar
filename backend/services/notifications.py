@@ -36,6 +36,12 @@ if TYPE_CHECKING:  # pragma: no cover
 
 SUBSCRIPTION_GOING = "subscription_going"
 SUBSCRIPTION_SUGGESTED = "subscription_suggested"
+# A followee dropped a review; fanned out to their subscribers. Reviews
+# only exist on past events, so this bypasses the past-event fan-out guard.
+SUBSCRIPTION_REVIEW = "subscription_review"
+# A followee unlocked a Dance Passport milestone; fanned out to their
+# subscribers. Event-less (keyed by ``subject_key`` = milestone key).
+SUBSCRIPTION_MILESTONE = "subscription_milestone"
 NEW_FOLLOWER = "new_follower"
 NEW_FRIEND = "new_friend"
 # Phase E (E8): pending follow request awaiting approval. The recipient
@@ -64,10 +70,13 @@ def _event_is_past(session: Session, event_id: str) -> bool:
 def _fan_out(
     session: Session,
     actor: User,
-    event_id: str,
+    event_id: str | None,
     kind: str,
     *,
     audience: str = "public",
+    subject_key: str | None = None,
+    context: str | None = None,
+    skip_past_guard: bool = False,
 ) -> int:
     """Common fan-out logic; returns count of notifications inserted.
 
@@ -75,12 +84,20 @@ def _fan_out(
     of the privacy system. ``private`` short-circuits to zero. ``friends``
     only delivers to subscribers who are mutual followers of ``actor``.
     ``public`` delivers to all eligible subscribers.
+
+    ``subject_key`` disambiguates event-less kinds (e.g. milestones) in the
+    dedupe. ``skip_past_guard`` opts out of the past-event guard for kinds
+    that are inherently about past events (reviews) or carry no event.
     """
     if audience == "private":
         return 0
     # Marking a past event (already ended) as attended must not notify
     # followers — it isn't live activity worth surfacing.
-    if _event_is_past(session, event_id):
+    if (
+        not skip_past_guard
+        and event_id is not None
+        and _event_is_past(session, event_id)
+    ):
         return 0
     rows = session.exec(
         select(CalendarSubscription, User)
@@ -89,21 +106,29 @@ def _fan_out(
         .where(CalendarSubscription.notify_new_events == True)  # noqa: E712
     ).all()
 
-    # Pre-fetch existing (recipient, kind, actor, event) tuples so we can
-    # skip duplicates without relying on IntegrityError handling (which is
-    # awkward inside a caller-owned transaction).
+    # Pre-fetch existing (recipient, kind, actor, event, subject_key) tuples
+    # so we can skip duplicates without relying on IntegrityError handling
+    # (which is awkward inside a caller-owned transaction).
     if not rows:
         return 0
     subscriber_ids = [sub.id for _s, sub in rows]
-    existing = set(
-        session.exec(
-            select(Notification.recipient_user_id)
-            .where(Notification.kind == kind)
-            .where(Notification.actor_user_id == actor.id)
-            .where(Notification.event_id == event_id)
-            .where(Notification.recipient_user_id.in_(subscriber_ids))
-        ).all()
+    existing_q = (
+        select(Notification.recipient_user_id)
+        .where(Notification.kind == kind)
+        .where(Notification.actor_user_id == actor.id)
+        .where(Notification.recipient_user_id.in_(subscriber_ids))
     )
+    existing_q = (
+        existing_q.where(Notification.event_id == event_id)
+        if event_id is not None
+        else existing_q.where(Notification.event_id.is_(None))  # type: ignore[union-attr]
+    )
+    existing_q = (
+        existing_q.where(Notification.subject_key == subject_key)
+        if subject_key is not None
+        else existing_q.where(Notification.subject_key.is_(None))  # type: ignore[union-attr]
+    )
+    existing = set(session.exec(existing_q).all())
 
     inserted = 0
     for _sub, subscriber in rows:
@@ -123,6 +148,8 @@ def _fan_out(
             actor_user_id=actor.id,
             kind=kind,
             event_id=event_id,
+            subject_key=subject_key,
+            context=context,
         )
         session.add(notif)
         session.flush()
@@ -145,6 +172,54 @@ def fan_out_going(
     ``UserEventAttendance.share_audience`` matches.
     """
     return _fan_out(session, actor, event_id, SUBSCRIPTION_GOING, audience=audience)
+
+
+def fan_out_review(
+    session: Session,
+    actor: User,
+    event_id: str,
+    *,
+    anonymous: bool = False,
+) -> int:
+    """Notify subscribers that ``actor`` reviewed ``event_id``.
+
+    Reviews only exist on past events, so the past-event guard is skipped.
+    Anonymous reviews still fan out but tag ``context='anon'`` so renderers
+    mask the reviewer's identity.
+    """
+    return _fan_out(
+        session,
+        actor,
+        event_id,
+        SUBSCRIPTION_REVIEW,
+        context="anon" if anonymous else None,
+        skip_past_guard=True,
+    )
+
+
+def fan_out_milestone(
+    session: Session,
+    actor: User,
+    subject_key: str,
+    *,
+    audience: str = "public",
+    context: str | None = None,
+) -> int:
+    """Notify subscribers that ``actor`` unlocked milestone ``subject_key``.
+
+    Event-less; deduped on ``subject_key``. ``audience`` should be derived
+    from the actor's ``passport_visibility`` so private passports don't leak.
+    """
+    return _fan_out(
+        session,
+        actor,
+        None,
+        SUBSCRIPTION_MILESTONE,
+        audience=audience,
+        subject_key=subject_key,
+        context=context,
+        skip_past_guard=True,
+    )
 
 
 def fan_out_suggested(

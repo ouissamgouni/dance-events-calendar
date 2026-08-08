@@ -71,7 +71,7 @@ function LensTrail(props: LensTrailProps) {
 
     return (
         <section data-testid={testId}>
-            <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-base font-semibold text-slate-700">
+            <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-sm font-semibold text-slate-700">
                 <span>{title}</span>
                 {headerRight}
             </div>
@@ -373,7 +373,7 @@ export default function ForYouPage() {
                         />
                         {pendingReviews.length > 0 && (
                             <section data-testid="for-you-share-your-experience">
-                                <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-base font-semibold text-slate-700">
+                                <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-sm font-semibold text-slate-700">
                                     <span>Share your experience</span>
                                 </div>
                                 <div className="flex gap-2 overflow-x-auto px-2 py-2" aria-label="Share your experience">

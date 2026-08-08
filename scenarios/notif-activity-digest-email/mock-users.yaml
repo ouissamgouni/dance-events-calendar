@@ -1,6 +1,7 @@
-# activity-digest-email cast. Bob has email_social_activity ON;
-# Carol has it OFF as a negative probe (user-level opt-out must
-# suppress the email even though the admin gate is on). Bob and Alice
+# activity-digest-email cast. Bob has EVERY `email_*` activity toggle
+# ON (push OFF) so a single digest email folds in one line per feature;
+# Carol has them all OFF as a negative probe (user-level opt-out must
+# suppress the email even though every admin gate is on). Bob and Alice
 # are mutual friends, and Alice follows diego/elena/curator-bachata —
 # this gives Bob a richer, realistic "People you may want to follow"
 # section (3 mutual-friend suggestions) instead of the empty-mutuals
@@ -15,22 +16,39 @@ users:
     name: Alice Rivera
     handle: alice
     account_visibility: public
+    passport_visibility: public
     avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Alice%20Rivera
 
   - email: bob@example.com
     name: Bob Martin
     handle: bob
     account_visibility: public
+    email_friends_going_enabled: true
     email_social_activity_enabled: true
+    email_friend_reviews_enabled: true
+    email_friend_milestones_enabled: true
+    email_interest_matches_enabled: true
+    push_friends_going_enabled: false
     push_social_activity_enabled: false
+    push_friend_reviews_enabled: false
+    push_friend_milestones_enabled: false
+    push_interest_matches_enabled: false
 
-  # Negative probe.
+  # Negative probe — every activity email toggle OFF.
   - email: carol@example.com
     name: Carol Nguyen
     handle: carol
     account_visibility: public
+    email_friends_going_enabled: false
     email_social_activity_enabled: false
+    email_friend_reviews_enabled: false
+    email_friend_milestones_enabled: false
+    email_interest_matches_enabled: false
+    push_friends_going_enabled: false
     push_social_activity_enabled: false
+    push_friend_reviews_enabled: false
+    push_friend_milestones_enabled: false
+    push_interest_matches_enabled: false
 
   # Mutual friends of Alice, surfaced as suggestions in Bob's digest.
   - email: diego@example.com

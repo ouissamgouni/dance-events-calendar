@@ -22,34 +22,49 @@ test_plan:
 
   steps:
     - id: 1
-      title: "Trigger one dispatch tick — matcher creates rows and digests ship immediately"
+      title: "Plain tick — matcher creates rows and ships INSTANT emails"
       description: >
-        `SCENARIO=notif-event-matches-profile-email task notify:trigger:scenario -- --reset-scan --immediate-emails`
-        `--reset-scan` widens the interest-matcher lookback to 24h;
-        `--immediate-emails` passes `force=True` to `activity_email.run_once`
-        so the per-user digest schedule (default tue+fri @ 09:00 local)
-        is bypassed for this run only. Prod behavior is otherwise unchanged.
+        `SCENARIO=notif-event-matches-profile-email task notify:trigger:scenario -- --reset-scan`
+        `--reset-scan` widens the interest-matcher lookback to 24h. No
+        `--immediate-emails`: the tick is NOT forced, so the digest slot
+        is skipped — but settings.yaml enables interest_matches INSTANT
+        email mode, so matched rows email immediately regardless of slot.
       expected: >
         Stats: `interest.created` ≥ 8 (per matcher truth table in
-        db-events.yaml) and `activity.digests` = one entry per user
-        who has at least one interest_event row AND
-        email_interest_matches_enabled=true (Nora, Bob, Carol). No
-        `skipped_off_schedule` rows in the diagnostic (force bypasses
-        the slot check).
+        db-events.yaml) and `activity.instant_emails` = one entry per
+        user who has at least one interest_event row AND
+        email_interest_matches_enabled=true (Nora, Bob, Carol). Each of
+        them receives an INSTANT "Interest matches" email right away
+        (instant_emailed_at stamped). `skipped_off_schedule` may count
+        the digest track (not forced) — that is expected.
 
     - id: 2
-      title: "Email delivery matrix"
+      title: "Forced tick — ships the DIGEST emails"
       description: >
-        Filter Mailpit by recipient address.
+        `SCENARIO=notif-event-matches-profile-email task notify:trigger:scenario -- --immediate-emails`
+        `--immediate-emails` passes `force=True` so the per-user digest
+        schedule is bypassed. Digest mode is still on (default) alongside
+        instant.
       expected: >
-        Nora, Bob, Carol each receive ONE "Interest matches" digest.
-        Dan receives 0 (per-profile matches_enabled=false → 0 rows).
-        Eve receives 0 (user-level email_interest_matches_enabled=false).
+        `activity.digests` = one entry per matched user (Nora, Bob,
+        Carol). Each receives a second, DIGEST "Interest matches" email
+        (emailed_at stamped). No `skipped_off_schedule` (force bypasses
+        the slot check).
 
     - id: 3
+      title: "Email delivery matrix"
+      description: >
+        Filter Mailpit by recipient address across both ticks.
+      expected: >
+        Nora, Bob, Carol each receive TWO "Interest matches" emails — one
+        INSTANT (step 1) and one DIGEST (step 2). Dan receives 0
+        (per-profile matches_enabled=false → 0 rows). Eve receives 0
+        (user-level email_interest_matches_enabled=false).
+
+    - id: 4
       title: "Push channel remains silent"
       description: >
-        Verify no push was attempted.
+        Verify no push was attempted across either tick.
       expected: >
         `activity.pushed=0` in the stats dict — WEB_PUSH_ENABLED is
         false at admin level so send_push short-circuits.

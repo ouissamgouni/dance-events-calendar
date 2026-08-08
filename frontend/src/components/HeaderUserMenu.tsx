@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { firstNameOf } from '../utils/displayName';
 import { NAV_DESTINATIONS } from './navDestinations';
 
 /**
  * Header "More" (☰) menu. Holds secondary destinations that don't live in the
  * primary nav: Dance Passport, Submit Event, Install App, Settings, Logout
- * (plus Admin for admins, Invite friends). Logged-out users get Submit /
- * Install / Settings / Sign in.
+ * (plus Admin for admins, Invite friends). Logged-out users get a dedicated
+ * "Sign in" link beside the burger, whose menu offers Submit / Install /
+ * Settings.
  */
 export default function HeaderUserMenu({ className }: { className?: string }) {
     const { user, logout } = useAuth();
@@ -32,6 +34,7 @@ export default function HeaderUserMenu({ className }: { className?: string }) {
     }, [location.pathname]);
 
     const isAdminPage = location.pathname.startsWith('/admin');
+    const firstName = firstNameOf(user?.name);
 
     const onLogout = async () => {
         setOpen(false);
@@ -46,15 +49,24 @@ export default function HeaderUserMenu({ className }: { className?: string }) {
     const iconClass = 'h-4 w-4 object-contain shrink-0';
 
     return (
-        <div ref={ref} className={'relative ' + (className ?? '')}>
+        <div ref={ref} className={'relative inline-flex items-center gap-2 ' + (className ?? '')}>
+            {!user && (
+                <Link
+                    to="/login"
+                    className="text-sm font-medium text-white hover:text-gray-200 transition"
+                >
+                    Sign in
+                </Link>
+            )}
             <button
                 type="button"
                 onClick={() => setOpen((v) => !v)}
-                aria-label="More"
+                aria-label={user ? `${firstName || 'Account'} account menu` : 'Menu'}
                 aria-haspopup="menu"
                 aria-expanded={open}
-                className="inline-flex items-center text-white hover:text-gray-200 transition"
+                className="inline-flex items-center gap-2 text-white hover:text-gray-200 transition"
             >
+                {user && <span className="text-sm truncate">{firstName || 'Account'}</span>}
                 <img
                     src="/menu.png"
                     alt=""
@@ -67,7 +79,7 @@ export default function HeaderUserMenu({ className }: { className?: string }) {
             {open && (
                 <div
                     role="menu"
-                    className="absolute right-0 mt-1 w-48 bg-white border border-slate-200 shadow-lg z-50 py-1"
+                    className="absolute right-0 top-full mt-1 w-48 bg-white border border-slate-200 shadow-lg z-50 py-1"
                 >
                     <div className="md:hidden">
                         {NAV_DESTINATIONS.map((dest) => (
@@ -133,10 +145,6 @@ export default function HeaderUserMenu({ className }: { className?: string }) {
                             <Link to="/account" role="menuitem" className={itemClass}>
                                 <img src="/setting.png" alt="" aria-hidden="true" className={iconClass} />
                                 Settings
-                            </Link>
-                            <Link to="/login" role="menuitem" className={itemClass}>
-                                <img src="/login.png" alt="" aria-hidden="true" className={iconClass} />
-                                Sign in
                             </Link>
                         </>
                     )}

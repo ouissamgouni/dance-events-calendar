@@ -1,0 +1,21 @@
+# emit_notifications fires notify_new_follower on every approved edge and
+# notify_new_friend on each mutual pair, exactly as the follow HTTP route
+# does.
+#
+#   carol -> bob            new_follower for Bob
+#   alice <-> bob (mutual)  new_friend for Bob AND Alice
+#   carol -> dave           new_follower for Dave (negative probe, OFF)
+emit_notifications: true
+follows:
+  - follower: carol
+    followee: bob
+    status: approved
+  - follower: alice
+    followee: bob
+    status: approved
+  - follower: bob
+    followee: alice
+    status: approved
+  - follower: carol
+    followee: dave
+    status: approved

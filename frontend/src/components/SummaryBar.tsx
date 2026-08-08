@@ -9,6 +9,7 @@ import type { TagGroup } from '../types';
 
 export type InterestSource = 'follows' | 'friends' | null;
 export type InterestKind = 'any' | 'going' | 'saved';
+export type InterestMatch = 'any' | 'all';
 
 export interface SummaryBarProps {
     className?: string;
@@ -46,6 +47,7 @@ export interface SummaryBarProps {
     interestSource: InterestSource;
     interestKind: InterestKind;
     interestUserHandles: string[];
+    interestMatch: InterestMatch;
 
     // Loading: dims the count while a fetch is in flight so users don't
     // misread a stale "0 of 0".
@@ -158,6 +160,7 @@ export default function SummaryBar(props: SummaryBarProps) {
         interestSource,
         interestKind,
         interestUserHandles,
+        interestMatch,
         onOpenFilters,
         activeFilterCount = 0,
         eventSearchTrigger,
@@ -179,13 +182,15 @@ export default function SummaryBar(props: SummaryBarProps) {
     const interestChip = useMemo(() => {
         if (!interestSource && interestKind === 'any' && interestUserHandles.length === 0) return null;
         const parts: string[] = [];
-        if (interestUserHandles.length > 0) parts.push(interestUserHandles.map((h) => `@${h}`).join(', '));
-        else if (interestSource === 'follows') parts.push('People you follow');
+        if (interestUserHandles.length > 0) {
+            const names = interestUserHandles.map((h) => `@${h}`).join(', ');
+            parts.push(interestUserHandles.length > 1 ? `${interestMatch === 'all' ? 'all of' : 'any of'} ${names}` : names);
+        } else if (interestSource === 'follows') parts.push('People you follow');
         else if (interestSource === 'friends') parts.push('Friends');
         if (interestKind === 'going') parts.push('going');
         else if (interestKind === 'saved') parts.push('saved');
         return parts.join(' · ');
-    }, [interestSource, interestKind, interestUserHandles]);
+    }, [interestSource, interestKind, interestUserHandles, interestMatch]);
 
 
     const periodIcon = (

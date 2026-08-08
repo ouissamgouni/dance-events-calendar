@@ -287,7 +287,7 @@ def run_once() -> dict:
             user_id,
             title=push_title,
             body=push_body,
-            url=f"/event/{event_id}?rate=1#community",
+            url=f"/event/{event_id}/review",
             tag=f"review-prompt:{event_id}",
         )
         pushed += delivered

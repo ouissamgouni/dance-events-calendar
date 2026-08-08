@@ -30,8 +30,12 @@ from backend.api.routes import social as social_module  # noqa: E402
 from backend.db.database import get_session  # noqa: E402
 from backend.db.models import (  # noqa: E402
     CalendarSubscription,
+    Tag,
+    TagGroup,
     User,
+    UserEventAttendance,
     UserFollow,
+    UserPreferredTag,
     UserReferral,
 )
 
@@ -430,6 +434,137 @@ def test_e4_fof_suggestions_exclude_opted_out_users(client, session):
     handles = [item["handle"] for item in r.json()["items"]]
     assert "hidden" not in handles
     assert "visible" in handles
+
+
+# --- Blended relevance ranking (mutual + interest + events + activity + pop) --
+
+
+def _make_tag(session: Session, slug: str) -> Tag:
+    """Create (or reuse) a dance-style tag and return it."""
+    grp = session.exec(select(TagGroup).where(TagGroup.slug == "dance-style")).first()
+    if grp is None:
+        grp = TagGroup(slug="dance-style", label="Dance Style")
+        session.add(grp)
+        session.commit()
+        session.refresh(grp)
+    tag = Tag(group_id=grp.id, slug=slug, label=slug.title())
+    session.add(tag)
+    session.commit()
+    session.refresh(tag)
+    return tag
+
+
+def _set_interests(session: Session, user: User, *tags: Tag) -> None:
+    for t in tags:
+        session.add(UserPreferredTag(user_id=user.id, tag_id=t.id))
+    session.commit()
+
+
+def _set_last_visit(session: Session, user: User, when) -> None:
+    user.last_visit_at = when
+    session.add(user)
+    session.commit()
+
+
+def _attend(session: Session, user: User, event_id: str) -> None:
+    session.add(
+        UserEventAttendance(
+            device_id=f"dev-{user.handle}-{event_id}",
+            event_id=event_id,
+            user_id=user.id,
+        )
+    )
+    session.commit()
+
+
+def test_min_max_normalize_edges():
+    from uuid import uuid4 as _uuid4
+
+    assert social_module._min_max_normalize({}) == {}
+    a, b, c = _uuid4(), _uuid4(), _uuid4()
+    # All-equal collapses to 0.0 so a flat signal contributes nothing.
+    assert social_module._min_max_normalize({a: 5.0, b: 5.0}) == {a: 0.0, b: 0.0}
+    out = social_module._min_max_normalize({a: 0.0, b: 5.0, c: 10.0})
+    assert out[a] == 0.0
+    assert out[b] == 0.5
+    assert out[c] == 1.0
+
+
+def test_fof_blend_breaks_mutual_tie_via_interest_and_activity(client, session):
+    """Two candidates tied on mutual-friend count are ordered by the blended
+    score: the one sharing an interest and more recently active wins even
+    though its handle sorts LATER alphabetically (the anti-alphabetical proof).
+    """
+    from datetime import datetime
+
+    salsa = _make_tag(session, "salsa")
+    viewer = _make_user(session, "viewer@example.com", "viewer")
+    _set_interests(session, viewer, salsa)
+    friend = _make_user(session, "alice@example.com", "alice")
+    _mutual(session, viewer, friend)
+    # Both candidates are followed by the same single friend => 1 mutual each.
+    pop3 = _make_user(session, "pop3@example.com", "pop3")  # alphabetically first
+    privatepop = _make_user(session, "privatepop@example.com", "privatepop")
+    _follow(session, friend, pop3)
+    _follow(session, friend, privatepop)
+    # privatepop shares salsa + is more recently active; pop3 has neither.
+    _set_interests(session, privatepop, salsa)
+    _set_last_visit(session, privatepop, datetime(2026, 8, 7, 8, 0, 0))
+    _set_last_visit(session, pop3, datetime(2026, 6, 1, 12, 0, 0))
+
+    _login(client, "viewer@example.com")
+    r = client.get("/api/social/me/suggestions")
+    assert r.status_code == 200, r.text
+    handles = [it["handle"] for it in r.json()["items"]]
+    assert handles == ["privatepop", "pop3"]
+
+
+def test_fof_blend_events_in_common_breaks_tie(client, session):
+    """A shared RSVP (events-in-common) lifts an otherwise-tied candidate."""
+    viewer = _make_user(session, "viewer@example.com", "viewer")
+    friend = _make_user(session, "alice@example.com", "alice")
+    _mutual(session, viewer, friend)
+    cand_a = _make_user(session, "aaa@example.com", "aaa")  # alphabetically first
+    cand_b = _make_user(session, "bbb@example.com", "bbb")
+    _follow(session, friend, cand_a)
+    _follow(session, friend, cand_b)
+    # viewer and cand_b both attend evt-1 => cand_b gets the events signal.
+    _attend(session, viewer, "evt-1")
+    _attend(session, cand_b, "evt-1")
+
+    _login(client, "viewer@example.com")
+    r = client.get("/api/social/me/suggestions")
+    assert r.status_code == 200, r.text
+    handles = [it["handle"] for it in r.json()["items"]]
+    assert handles == ["bbb", "aaa"]
+
+
+def test_fof_blend_keeps_mutual_count_dominant(client, session):
+    """A candidate with more mutual friends still outranks a lower-mutual
+    candidate that has interest/activity boosts (mutual weight dominates)."""
+    from datetime import datetime
+
+    salsa = _make_tag(session, "salsa")
+    viewer = _make_user(session, "viewer@example.com", "viewer")
+    _set_interests(session, viewer, salsa)
+    f1 = _make_user(session, "f1@example.com", "friend1")
+    f2 = _make_user(session, "f2@example.com", "friend2")
+    _mutual(session, viewer, f1)
+    _mutual(session, viewer, f2)
+    high = _make_user(session, "high@example.com", "high")  # 2 mutuals, no boosts
+    low = _make_user(session, "low@example.com", "low")  # 1 mutual, all boosts
+    _follow(session, f1, high)
+    _follow(session, f2, high)
+    _follow(session, f1, low)
+    _set_interests(session, low, salsa)
+    _set_last_visit(session, low, datetime(2026, 8, 7, 8, 0, 0))
+    _set_last_visit(session, high, datetime(2026, 6, 1, 12, 0, 0))
+
+    _login(client, "viewer@example.com")
+    r = client.get("/api/social/me/suggestions")
+    assert r.status_code == 200, r.text
+    handles = [it["handle"] for it in r.json()["items"]]
+    assert handles == ["high", "low"]
 
 
 # --- E7: referrals ----------------------------------------------------------

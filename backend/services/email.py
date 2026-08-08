@@ -405,7 +405,7 @@ def send_event_review_prompt_email(user, event, friend_proof=None) -> bool:
     if not user.email:
         return False
     app = get_public_app_url()
-    event_url = f"{app}/event/{escape(str(event.event_id))}?rate=1#community"
+    event_url = f"{app}/event/{escape(str(event.event_id))}/review"
     title = escape(event.title or "the event")
     title_link = (
         f'<a href="{event_url}" style="color:#1d4ed8;text-decoration:none">{title}</a>'
@@ -448,7 +448,7 @@ def send_milestones_unlocked_email(user, milestones) -> bool:
     if not user.email or not milestones:
         return False
     app = get_public_app_url()
-    passport_url = f"{app}/passport"
+    passport_url = f"{app}/mine/passport"
     if len(milestones) == 1:
         m = milestones[0]
         subject = f"Milestone unlocked: {m.name}"

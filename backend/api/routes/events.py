@@ -255,6 +255,7 @@ def _viewer_followed_ids(session: Session, viewer: Optional[User]) -> list:
 # so the route handler and tests can share the same source of truth.
 INTEREST_SOURCES = ("follows", "friends")
 INTEREST_KINDS = ("any", "going", "saved")
+INTEREST_MATCHES = ("any", "all")
 
 
 def _profiles_filtered_event_ids(
@@ -340,6 +341,7 @@ def _interest_filtered_event_ids(
     interest_source: Optional[str],
     interest_kind: str,
     interest_user_handles: Optional[list[str]],
+    interest_match: str = "any",
 ) -> list[str]:
     """Compute event_ids visible to ``viewer`` via the interest filter.
 
@@ -364,6 +366,12 @@ def _interest_filtered_event_ids(
     ``interest_kind`` selects which row sources contribute: ``going``
     reads ``user_event_attendance``; ``saved`` reads ``user_saved_event``;
     ``any`` UNIONs both.
+
+    ``interest_match`` combines multiple selected people: ``any`` (default)
+    UNIONs their events; ``all`` INTERSECTs them (an event qualifies only
+    when every selected person contributes). AND only applies to an
+    explicit ``interest_user_handles`` selection of two or more visible
+    people; scope-only pools always union.
     """
     # Resolve candidates.
     candidates: list[User] = []
@@ -416,7 +424,9 @@ def _interest_filtered_event_ids(
         if include_saved:
             saved_owner_ids.append(owner.id)
 
-    event_ids: set[str] = set()
+    # Track each visible owner's matching events separately so the caller
+    # can either UNION (any) or INTERSECT (all) across them.
+    per_owner: dict = {oid: set() for oid in owner_by_id}
     if going_owner_ids:
         rows = session.exec(
             select(
@@ -432,7 +442,7 @@ def _interest_filtered_event_ids(
             if owner is None:
                 continue
             if _audience_passes(session, viewer, owner, share_audience or "private"):
-                event_ids.add(event_id)
+                per_owner[owner_id].add(event_id)
     if saved_owner_ids:
         rows = session.exec(
             select(
@@ -448,8 +458,16 @@ def _interest_filtered_event_ids(
             if owner is None:
                 continue
             if _audience_passes(session, viewer, owner, audience or "private"):
-                event_ids.add(event_id)
-    return list(event_ids)
+                per_owner[owner_id].add(event_id)
+
+    # AND only makes sense for an explicit multi-person selection; a
+    # scope-only pool ("anyone I follow") always unions.
+    if interest_match == "all" and interest_user_handles and len(per_owner) > 1:
+        return list(set.intersection(*per_owner.values()))
+    union: set[str] = set()
+    for events in per_owner.values():
+        union |= events
+    return list(union)
 
 
 @router.get("/calendars", response_model=list[CalendarSettingResponse])
@@ -530,6 +548,16 @@ def get_events(
             "404)."
         ),
     ),
+    interest_match: str = Query(
+        "any",
+        description=(
+            "How multiple ``interest_user_handle`` values combine: "
+            "``any`` (default) unions their activity; ``all`` intersects "
+            "it (an event qualifies only when every selected person is "
+            "going/saved). Ignored for a single handle or a scope-only "
+            "pool."
+        ),
+    ),
     profiles: Optional[str] = Query(
         None,
         description=(
@@ -564,6 +592,11 @@ def get_events(
         raise HTTPException(
             status_code=400,
             detail=f"interest_kind must be one of {INTEREST_KINDS}",
+        )
+    if interest_match not in INTEREST_MATCHES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"interest_match must be one of {INTEREST_MATCHES}",
         )
 
     since_date = _get_since_date(session)
@@ -646,6 +679,7 @@ def get_events(
             interest_source=interest_source or "follows",
             interest_kind=interest_kind,
             interest_user_handles=interest_user_handle,
+            interest_match=interest_match,
         )
         if not interest_event_ids:
             # Empty match — short-circuit so we don't pay for any of the

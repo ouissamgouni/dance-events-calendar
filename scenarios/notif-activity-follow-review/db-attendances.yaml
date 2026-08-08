@@ -1,0 +1,17 @@
+# Carol attended ev-past but has NOT rated it → she is the co-attendee
+# who should receive the friend-review row with a "rate this" deep link.
+# Alice's own attendance backs her eligibility to review.
+emit_notifications: false
+attendances:
+  - event_id: ev-past
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-past
+    email: carol@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-anon
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public

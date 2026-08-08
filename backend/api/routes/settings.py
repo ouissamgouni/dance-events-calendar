@@ -186,6 +186,9 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         your_next_events_rail_enabled=_get_bool_setting(
             session, "your_next_events_rail_enabled", default=True
         ),
+        network_going_snapshot_enabled=_get_bool_setting(
+            session, "network_going_snapshot_enabled", default=True
+        ),
         suggest_event_required_dance_group_id=_get_optional_int_setting(
             session, "suggest_event_required_dance_group_id"
         ),
@@ -212,6 +215,36 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         activity_digest_schedule=app_settings.get_activity_digest_schedule(session),
         interest_match_max_events_per_email=app_settings.get_interest_match_max_events_per_email(
             session
+        ),
+        friends_going_email_instant=app_settings.get_feature_email_instant(
+            "friends_going", session
+        ),
+        friends_going_email_digest=app_settings.get_feature_email_digest(
+            "friends_going", session
+        ),
+        social_activity_email_instant=app_settings.get_feature_email_instant(
+            "social_activity", session
+        ),
+        social_activity_email_digest=app_settings.get_feature_email_digest(
+            "social_activity", session
+        ),
+        friend_reviews_email_instant=app_settings.get_feature_email_instant(
+            "friend_reviews", session
+        ),
+        friend_reviews_email_digest=app_settings.get_feature_email_digest(
+            "friend_reviews", session
+        ),
+        friend_milestones_email_instant=app_settings.get_feature_email_instant(
+            "friend_milestones", session
+        ),
+        friend_milestones_email_digest=app_settings.get_feature_email_digest(
+            "friend_milestones", session
+        ),
+        interest_matches_email_instant=app_settings.get_feature_email_instant(
+            "interest_matches", session
+        ),
+        interest_matches_email_digest=app_settings.get_feature_email_digest(
+            "interest_matches", session
         ),
         review_prompt_enabled=app_settings.get_review_prompt_enabled(session),
         review_prompt_delay_hours=app_settings.get_review_prompt_delay_hours(session),
@@ -417,6 +450,13 @@ def update_settings(
             body.your_next_events_rail_enabled,
         )
 
+    if body.network_going_snapshot_enabled is not None:
+        _set_bool_setting(
+            session,
+            "network_going_snapshot_enabled",
+            body.network_going_snapshot_enabled,
+        )
+
     if body.suggest_event_required_dance_group_id is not None:
         row = session.get(SiteSetting, "suggest_event_required_dance_group_id")
         if row:
@@ -456,6 +496,19 @@ def update_settings(
         )
     if body.web_push_enabled is not None:
         _set_bool_setting(session, "web_push_enabled", body.web_push_enabled)
+    for _feature in (
+        "friends_going",
+        "social_activity",
+        "friend_reviews",
+        "friend_milestones",
+        "interest_matches",
+    ):
+        _instant = getattr(body, f"{_feature}_email_instant")
+        if _instant is not None:
+            _set_bool_setting(session, f"{_feature}_email_instant", _instant)
+        _digest = getattr(body, f"{_feature}_email_digest")
+        if _digest is not None:
+            _set_bool_setting(session, f"{_feature}_email_digest", _digest)
     if body.reminder_lead_hours is not None:
         row = session.get(SiteSetting, "reminder_lead_hours")
         if row:

@@ -65,6 +65,128 @@ function AdminInfoTooltip({ label }: { label: string }) {
 const TRENDING_TOOLTIP = 'Final score = (5 x going + 1 x saved + 0.05 x views) / (hours since event row update + 24)^0.4. Going, saved, and views count only inside the trending window; ended events and events below the Going floor score 0. Example: 8 going, 2 saved, 4 views has raw 42.2, then time decay can reduce it to about 3.8.';
 const TRENDING_TOP_PERCENT_TOOLTIP = 'Relative cap for how many eligible visible events get Trending decoration. Effective count = min(Trending top N, ceil(eligible visible events x top % / 100)). Example: with 40 eligible events, top N 5, and top % 10, only min(5, ceil(4)) = 4 events are decorated.';
 
+// Per-feature activity-email card: Instant/Digest delivery toggles plus a
+// scoped "Send now" that replays only this feature's pending notifications.
+function FeatureEmailCard({
+    feature,
+    label,
+    description,
+    emailModes,
+    onEmailModeChange,
+    onMessage,
+}: {
+    feature: string;
+    label: string;
+    description: string;
+    emailModes: Record<string, boolean>;
+    onEmailModeChange: (field: string, value: boolean) => void;
+    onMessage: (msg: string) => void;
+}) {
+    const [users, setUsers] = useState<AdminUserRow[]>([]);
+    const [maxPerUser, setMaxPerUser] = useState<number | undefined>(undefined);
+    const [resend, setResend] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const [localMsg, setLocalMsg] = useState('');
+
+    const send = async () => {
+        if (users.length === 0) return;
+        setBusy(true);
+        try {
+            const res = await sendDigestNow(users.map((u) => u.user_id), maxPerUser, resend, feature);
+            const sent = res.results.filter((r) => r.status === 'sent').length;
+            const msg = `${label} send-now: ${sent} of ${users.length} user(s) delivered `
+                + `(${res.digests_sent} email, ${res.pushes_sent} push).`;
+            setLocalMsg(msg);
+            onMessage(msg);
+            setUsers([]);
+        } catch (e) {
+            const msg = e instanceof Error ? e.message : `Failed to send ${label} now.`;
+            setLocalMsg(msg);
+            onMessage(msg);
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <div className="border border-gray-100 p-3 space-y-3">
+            <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">{label}</span>
+            <p className="text-[10px] text-gray-400">{description}</p>
+            <div className="flex items-center gap-4 border-t border-gray-100 pt-2.5">
+                <span className="text-[11px] font-medium text-gray-700">Email delivery</span>
+                <label className="flex items-center gap-1 text-[10px] text-gray-500">
+                    <input
+                        type="checkbox"
+                        aria-label={`${label} instant email`}
+                        checked={!!emailModes[`${feature}_email_instant`]}
+                        onChange={(e) => onEmailModeChange(`${feature}_email_instant`, e.target.checked)}
+                    />
+                    Instant
+                </label>
+                <label className="flex items-center gap-1 text-[10px] text-gray-500">
+                    <input
+                        type="checkbox"
+                        aria-label={`${label} digest email`}
+                        checked={!!emailModes[`${feature}_email_digest`]}
+                        onChange={(e) => onEmailModeChange(`${feature}_email_digest`, e.target.checked)}
+                    />
+                    Digest
+                </label>
+            </div>
+            <div className="border-t border-gray-100 pt-2.5 space-y-1.5">
+                <div>
+                    <span className="text-[11px] font-medium text-gray-700">Send now</span>
+                    <p className="text-[10px] text-gray-400">
+                        Replay this feature's pending activity for the selected users immediately,
+                        bypassing the schedule and once-per-day dedup gate.
+                    </p>
+                </div>
+                <AdminUserMultiPicker
+                    selected={users}
+                    onChange={(rows) => { setUsers(rows); setLocalMsg(''); }}
+                    placeholder="Search email, handle, or name"
+                />
+                <div className="flex items-center gap-2">
+                    <label className="text-[10px] text-gray-500" htmlFor={`${feature}-now-max`}>Max per user</label>
+                    <input
+                        id={`${feature}-now-max`}
+                        type="number"
+                        min={1}
+                        max={200}
+                        value={maxPerUser ?? ''}
+                        onChange={(e) => setMaxPerUser(e.target.value === '' ? undefined : Number(e.target.value))}
+                        placeholder="all"
+                        className="w-16 text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                    />
+                    <label className="flex items-center gap-1 text-[10px] text-gray-500" htmlFor={`${feature}-now-resend`} title="Force re-sending notifications already emailed/pushed">
+                        <input
+                            id={`${feature}-now-resend`}
+                            type="checkbox"
+                            checked={resend}
+                            onChange={(e) => setResend(e.target.checked)}
+                        />
+                        Resend
+                    </label>
+                    <button
+                        type="button"
+                        onClick={send}
+                        disabled={users.length === 0 || busy}
+                        className="ml-auto text-[11px] px-2.5 py-1 rounded bg-emerald-600 text-white disabled:bg-gray-300 hover:bg-emerald-700"
+                    >
+                        {busy ? 'Sending…' : `Send now${users.length ? ` (${users.length})` : ''}`}
+                    </button>
+                </div>
+                {localMsg && (
+                    <div className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 p-2">
+                        {localMsg}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+
 export default function Admin() {
     const [calendars, setCalendars] = useState<CalendarSetting[]>([]);
     const [loading, setLoading] = useState(true);
@@ -97,6 +219,7 @@ export default function Admin() {
     const [organizerClaimsEnabled, setOrganizerClaimsEnabled] = useState(false);
     const [forYouRailEnabled, setForYouRailEnabled] = useState(false);
     const [yourNextEventsRailEnabled, setYourNextEventsRailEnabled] = useState(false);
+    const [networkGoingSnapshotEnabled, setNetworkGoingSnapshotEnabled] = useState(true);
     // Notification / re-engagement gates. Booleans are master switches
     // that override the corresponding env vars in ``config/loader.py``;
     // ``digestSchedule`` follows the ``dow[,dow] @ HH:MM`` grammar the
@@ -120,16 +243,6 @@ export default function Admin() {
     const [forceSendUsers, setForceSendUsers] = useState<AdminUserRow[]>([]);
     const [forceSendLookbackHours, setForceSendLookbackHours] = useState(24);
     const [forceSendBusy, setForceSendBusy] = useState(false);
-    const [digestNowUsers, setDigestNowUsers] = useState<AdminUserRow[]>([]);
-    const [digestNowBusy, setDigestNowBusy] = useState(false);
-    // Caps how many notifications a single "Send now" folds in per
-    // recipient (most-recent-first); undefined = no cap (send everything
-    // eligible). Load-control knob in place of a time window. By default
-    // only counts pending (not-yet-sent) notifications — check
-    // ``digestNowResend`` to widen the cap to ALL activity and force a
-    // re-send of notifications already delivered.
-    const [digestNowMaxNotifications, setDigestNowMaxNotifications] = useState<number | undefined>(undefined);
-    const [digestNowResend, setDigestNowResend] = useState(false);
     // Manual review-prompt force-send: pick one event + specific attendees
     // and fire the "how was it?" prompt now, bypassing the delay window.
     const [reviewNowEvent, setReviewNowEvent] = useState<EventSearchResult | null>(null);
@@ -144,6 +257,9 @@ export default function Admin() {
     // Max matched events shown inline in an interest-match digest email
     // before the rest collapse behind a "Discover more" link to "For you".
     const [interestMatchMaxEventsPerEmail, setInterestMatchMaxEventsPerEmail] = useState(10);
+    // Per-feature email delivery routing (instant email / batched digest).
+    // Keyed by SiteSetting field name (``<feature>_email_{instant,digest}``).
+    const [emailModes, setEmailModes] = useState<Record<string, boolean>>({});
     // Count of users with each per-feature notification channel toggle on,
     // shown next to the corresponding global gate below.
     const [toggleCounts, setToggleCounts] = useState<NotificationToggleCounts | null>(null);
@@ -197,7 +313,6 @@ export default function Admin() {
     const allTags = useMemo<Tag[]>(() => tagGroups.flatMap((g) => g.tags), [tagGroups]);
     const [calendarDefaultTagIds, setCalendarDefaultTagIds] = useState<Record<string, number[]>>({});
     const [activeConfigTab, setActiveConfigTab] = useState<ConfigurationTab>('events-settings');
-    const [digestNowMessage, setDigestNowMessage] = useState<string>('');
     const [forceSendMessage, setForceSendMessage] = useState<string>('');
     const { tab: tabParam } = useParams<{ tab?: string }>();
     const isValidTab = (t: string | undefined): t is AdminTab =>
@@ -271,6 +386,7 @@ export default function Admin() {
             setOrganizerClaimsEnabled(s.organizer_claims_enabled ?? false);
             setForYouRailEnabled(s.for_you_rail_enabled ?? false);
             setYourNextEventsRailEnabled(s.your_next_events_rail_enabled ?? false);
+            setNetworkGoingSnapshotEnabled(s.network_going_snapshot_enabled ?? true);
             setEventRemindersEnabled(s.event_reminders_enabled ?? true);
             setActivityDigestEmailEnabled(s.activity_digest_email_enabled ?? true);
             setInterestMatchNotifsEnabled(s.interest_match_notifications_enabled ?? true);
@@ -283,6 +399,18 @@ export default function Admin() {
             setForYouReviewWindowDays(s.for_you_review_window_days ?? 180);
             setReviewMoodMinReviews(s.review_mood_headline_min_reviews ?? 3);
             setInterestMatchMaxEventsPerEmail(s.interest_match_max_events_per_email ?? 10);
+            setEmailModes({
+                friends_going_email_instant: s.friends_going_email_instant ?? false,
+                friends_going_email_digest: s.friends_going_email_digest ?? true,
+                social_activity_email_instant: s.social_activity_email_instant ?? false,
+                social_activity_email_digest: s.social_activity_email_digest ?? true,
+                friend_reviews_email_instant: s.friend_reviews_email_instant ?? false,
+                friend_reviews_email_digest: s.friend_reviews_email_digest ?? true,
+                friend_milestones_email_instant: s.friend_milestones_email_instant ?? false,
+                friend_milestones_email_digest: s.friend_milestones_email_digest ?? true,
+                interest_matches_email_instant: s.interest_matches_email_instant ?? false,
+                interest_matches_email_digest: s.interest_matches_email_digest ?? true,
+            });
             setEventColorBarColor(s.event_color_bar_color || '#64748b');
             setTagSortMode(s.tag_sort_mode === 'event_count' ? 'event_count' : 'group');
             setDefaultExplorerPeriod(s.default_explorer_period ?? DEFAULT_EXPLORER_PERIOD);
@@ -614,6 +742,18 @@ export default function Admin() {
         }
     };
 
+    const handleToggleNetworkGoingSnapshot = async () => {
+        const newVal = !networkGoingSnapshotEnabled;
+        setNetworkGoingSnapshotEnabled(newVal);
+        try {
+            await updateSettings({ network_going_snapshot_enabled: newVal });
+            setMessage(`"Your Network" snapshot ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setNetworkGoingSnapshotEnabled(!newVal);
+            setMessage('Failed to update "Your Network" snapshot toggle.');
+        }
+    };
+
     const handleTogglePromoCodes = async () => {
         const newVal = !promoCodesEnabled;
         setPromoCodesEnabled(newVal);
@@ -799,6 +939,17 @@ export default function Admin() {
         }
     };
 
+    const handleEmailModeChange = async (field: string, value: boolean) => {
+        const prev = emailModes[field];
+        setEmailModes((m) => ({ ...m, [field]: value }));
+        try {
+            await updateSettings({ [field]: value } as Record<string, boolean>);
+        } catch {
+            setEmailModes((m) => ({ ...m, [field]: prev }));
+            setMessage('Failed to update email delivery mode.');
+        }
+    };
+
     const handleToggleReviewPrompt = async () => {
         const newVal = !reviewPromptEnabled;
         setReviewPromptEnabled(newVal);
@@ -914,26 +1065,6 @@ export default function Admin() {
             setMessage(msg);
         } finally {
             setForceSendBusy(false);
-        }
-    };
-
-    const handleSendDigestNow = async () => {
-        if (digestNowUsers.length === 0) return;
-        setDigestNowBusy(true);
-        try {
-            const res = await sendDigestNow(digestNowUsers.map((u) => u.user_id), digestNowMaxNotifications, digestNowResend);
-            const sent = res.results.filter((r) => r.status === 'sent').length;
-            const msg = `Digest send-now: ${sent} of ${digestNowUsers.length} user(s) delivered `
-                + `(${res.digests_sent} digest email(s), ${res.pushes_sent} push).`;
-            setDigestNowMessage(msg);
-            setMessage(msg);
-            setDigestNowUsers([]);
-        } catch (e) {
-            const msg = e instanceof Error ? e.message : 'Failed to send digest now.';
-            setDigestNowMessage(msg);
-            setMessage(msg);
-        } finally {
-            setDigestNowBusy(false);
         }
     };
 
@@ -1834,6 +1965,21 @@ export default function Admin() {
                                     </button>
                                 </div>
 
+                                {/* Tribe > Calendars "Your Network" going snapshot */}
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-gray-700">Network going snapshot</span>
+                                        <p className="text-[10px] text-gray-400">Tribe &gt; Calendars header showing upcoming events people you follow are going to</p>
+                                    </div>
+                                    <button
+                                        onClick={handleToggleNetworkGoingSnapshot}
+                                        aria-label="Toggle network going snapshot"
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${networkGoingSnapshotEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                    >
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${networkGoingSnapshotEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                    </button>
+                                </div>
+
                                 {/* User contributions: promo codes */}
                                 <div className="flex items-center justify-between">
                                     <div>
@@ -1914,6 +2060,27 @@ export default function Admin() {
                                             className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                                             aria-label="Max events per interest-match email"
                                         />
+                                    </div>
+                                    <div className="flex items-center gap-4 border-t border-gray-100 pt-2.5">
+                                        <span className="text-[11px] font-medium text-gray-700">Email delivery</span>
+                                        <label className="flex items-center gap-1 text-[10px] text-gray-500">
+                                            <input
+                                                type="checkbox"
+                                                aria-label="Interest matches instant email"
+                                                checked={!!emailModes['interest_matches_email_instant']}
+                                                onChange={(e) => handleEmailModeChange('interest_matches_email_instant', e.target.checked)}
+                                            />
+                                            Instant
+                                        </label>
+                                        <label className="flex items-center gap-1 text-[10px] text-gray-500">
+                                            <input
+                                                type="checkbox"
+                                                aria-label="Interest matches digest email"
+                                                checked={!!emailModes['interest_matches_email_digest']}
+                                                onChange={(e) => handleEmailModeChange('interest_matches_email_digest', e.target.checked)}
+                                            />
+                                            Digest
+                                        </label>
                                     </div>
                                     <div className="border-t border-gray-100 pt-2.5 space-y-1.5">
                                         <div>
@@ -2270,59 +2437,46 @@ export default function Admin() {
                                             aria-label="Digest schedule"
                                         />
                                     </div>
-                                    <div className="border-t border-gray-100 pt-2.5 space-y-1.5">
-                                        <div>
-                                            <span className="text-[11px] font-medium text-gray-700">Send now</span>
-                                            <p className="text-[10px] text-gray-400">
-                                                Ship each selected user's pending activity digest immediately, bypassing the
-                                                schedule and once-per-day dedup gate.
-                                            </p>
-                                        </div>
-                                        <AdminUserMultiPicker
-                                            selected={digestNowUsers}
-                                            onChange={(users) => { setDigestNowUsers(users); setDigestNowMessage(''); }}
-                                            placeholder="Search email, handle, or name"
-                                        />
-                                        <div className="flex items-center gap-2">
-                                            <label className="text-[10px] text-gray-500" htmlFor="digest-now-max">Max per user</label>
-                                            <input
-                                                id="digest-now-max"
-                                                type="number"
-                                                min={1}
-                                                max={200}
-                                                value={digestNowMaxNotifications ?? ''}
-                                                onChange={(e) => setDigestNowMaxNotifications(e.target.value === '' ? undefined : Number(e.target.value))}
-                                                placeholder="all"
-                                                title={digestNowResend
-                                                    ? "Cap on ALL matching activity per recipient (most recent first), including notifications already sent; leave blank to resend everything in range"
-                                                    : "Cap on pending notifications folded into this send (most recent first); leave blank to send everything pending"}
-                                                className="w-16 text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
-                                            />
-                                            <label className="flex items-center gap-1 text-[10px] text-gray-500" htmlFor="digest-now-resend" title="Force re-sending notifications already emailed/pushed, instead of only counting pending ones toward the cap above">
-                                                <input
-                                                    id="digest-now-resend"
-                                                    type="checkbox"
-                                                    checked={digestNowResend}
-                                                    onChange={(e) => setDigestNowResend(e.target.checked)}
-                                                />
-                                                Resend
-                                            </label>
-                                            <button
-                                                type="button"
-                                                onClick={handleSendDigestNow}
-                                                disabled={digestNowUsers.length === 0 || digestNowBusy}
-                                                className="ml-auto text-[11px] px-2.5 py-1 rounded bg-emerald-600 text-white disabled:bg-gray-300 hover:bg-emerald-700"
-                                            >
-                                                {digestNowBusy ? 'Sending…' : `Send now${digestNowUsers.length ? ` (${digestNowUsers.length})` : ''}`}
-                                            </button>
-                                        </div>
-                                        {digestNowMessage && (
-                                            <div className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 p-2">
-                                                {digestNowMessage}
-                                            </div>
-                                        )}
-                                    </div>
+                                    <p className="text-[10px] text-gray-400 border-t border-gray-100 pt-2.5">
+                                        Each activity feature has its own card below with an Instant/Digest
+                                        email toggle and a scoped "Send now". In-app and push are always
+                                        immediate.
+                                    </p>
                                 </div>
+
+                                {/* Per-feature activity email delivery + scoped Send now */}
+                                <FeatureEmailCard
+                                    feature="friends_going"
+                                    label="Friends going"
+                                    description="A friend or follow marks Going to an event."
+                                    emailModes={emailModes}
+                                    onEmailModeChange={handleEmailModeChange}
+                                    onMessage={setMessage}
+                                />
+                                <FeatureEmailCard
+                                    feature="social_activity"
+                                    label="Friends & social"
+                                    description="New followers and friend requests."
+                                    emailModes={emailModes}
+                                    onEmailModeChange={handleEmailModeChange}
+                                    onMessage={setMessage}
+                                />
+                                <FeatureEmailCard
+                                    feature="friend_reviews"
+                                    label="Friend reviews"
+                                    description="A friend or follow shares a review of an event."
+                                    emailModes={emailModes}
+                                    onEmailModeChange={handleEmailModeChange}
+                                    onMessage={setMessage}
+                                />
+                                <FeatureEmailCard
+                                    feature="friend_milestones"
+                                    label="Friend milestones"
+                                    description="A friend or follow reaches a dance-passport milestone."
+                                    emailModes={emailModes}
+                                    onEmailModeChange={handleEmailModeChange}
+                                    onMessage={setMessage}
+                                />
 
                                 {/* Web push */}
                                 <div className="border border-gray-100 p-3 space-y-3">

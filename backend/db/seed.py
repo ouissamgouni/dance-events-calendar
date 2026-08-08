@@ -38,6 +38,7 @@ from backend.db.models import (
     UserFollow,
     UserInterestProfile,
     UserInterestProfileTag,
+    UserPreferredTag,
     UserSavedEvent,
 )
 from backend.services.experience_aspects import SENTIMENT_TO_SCORE
@@ -935,6 +936,14 @@ class DatabaseSeeder:
                 # Dance Passport Phase C — milestone-unlock toggles.
                 "email_milestone_unlocked_enabled",
                 "push_milestone_unlocked_enabled",
+                # Friend-activity notification toggles (friends going /
+                # friend reviews / friend milestones).
+                "email_friends_going_enabled",
+                "push_friends_going_enabled",
+                "email_friend_reviews_enabled",
+                "push_friend_reviews_enabled",
+                "email_friend_milestones_enabled",
+                "push_friend_milestones_enabled",
                 # Dance Passport sharing — passport visibility + per-section
                 # share toggles so scenarios can exercise the profile
                 # "Dance Passport" tab (viewable / friends-only / private) and
@@ -949,6 +958,8 @@ class DatabaseSeeder:
                 "onboarded_at",
                 "onboarding_version",
                 "timezone",
+                # Suggestion-ranking signal: most-recent visit timestamp.
+                "last_visit_at",
                 # Admin overrides for the PWA install / push opt-in banners.
                 # Lets scenarios exercise the "forced" banner state without
                 # a manual admin-panel toggle.
@@ -970,6 +981,10 @@ class DatabaseSeeder:
             raw_installed = user_kwargs.get("installed_at")
             if isinstance(raw_installed, str):
                 user_kwargs["installed_at"] = datetime.fromisoformat(raw_installed)
+            # Same string/datetime normalization for last_visit_at.
+            raw_last_visit = user_kwargs.get("last_visit_at")
+            if isinstance(raw_last_visit, str):
+                user_kwargs["last_visit_at"] = datetime.fromisoformat(raw_last_visit)
             # Phase G — apply the scenario-wide auto-onboard default when
             # the entry didn't explicitly opt in or out. Explicit
             # ``onboarded_at: null`` in yaml means "leave un-onboarded" and
@@ -1011,8 +1026,42 @@ class DatabaseSeeder:
             if user_kwargs.get("is_admin_managed") is True:
                 user_kwargs["share_attendance_default"] = True
                 user_kwargs["share_attendance_default_audience"] = "public"
-            self.session.add(User(**user_kwargs))
+            user_obj = User(**user_kwargs)
+            self.session.add(user_obj)
+            self._seed_user_preferred_tags(user_obj, entry.get("preferred_tags"))
             logger.info("Created mock user: %s", email)
+
+    def _seed_user_preferred_tags(self, user: User, slugs) -> None:
+        """Seed UserPreferredTag rows powering the interest-overlap signal.
+
+        Accepts either ``group:slug`` keys (like event tags) or bare tag
+        slugs (matched by suffix). Unknown slugs are skipped with a warning.
+        """
+        if not slugs:
+            return
+        tag_lookup = self._build_tag_lookup()
+        if not tag_lookup:
+            logger.warning("No tags in DB - skipping preferred_tags for %s", user.email)
+            return
+        suffix_lookup: dict[str, int] = {}
+        for key, tag_id in tag_lookup.items():
+            suffix_lookup.setdefault(key.split(":", 1)[-1], tag_id)
+        seeded = 0
+        for raw in slugs:
+            slug = str(raw).strip()
+            if not slug:
+                continue
+            tag_id = tag_lookup.get(slug) or suffix_lookup.get(slug.split(":", 1)[-1])
+            if tag_id is None:
+                logger.warning(
+                    "Unknown preferred_tag %r for %s - skipped", slug, user.email
+                )
+                continue
+            self.session.add(UserPreferredTag(user_id=user.id, tag_id=tag_id))
+            seeded += 1
+        if seeded:
+            user.preferences_set_at = datetime.utcnow()
+            self.session.add(user)
 
     def _seed_generated_events(self, path: Path) -> None:
         if not path.exists():
@@ -1814,6 +1863,12 @@ class DatabaseSeeder:
         if not rows:
             return
 
+        # When set, freshly-seeded reviews by a user also fan out a
+        # ``subscription_review`` notification to that user's followers,
+        # mirroring the HTTP feedback route (used by the
+        # notif-activity-follow-review scenario).
+        emit_notifications = bool(data.get("emit_notifications", False))
+
         tag_lookup = self._build_tag_lookup()
         seeded = 0
         for entry in rows:
@@ -1908,6 +1963,23 @@ class DatabaseSeeder:
                         rating_id=rating.id, aspect_slug=aspect_slug, tag_id=tid
                     )
                 )
+
+            if emit_notifications and user_id is not None:
+                actor = self.session.get(User, user_id)
+                if actor is not None:
+                    try:
+                        from backend.services.notifications import fan_out_review
+
+                        fan_out_review(
+                            self.session,
+                            actor,
+                            event_id,
+                            anonymous=bool(entry.get("is_anonymous", False)),
+                        )
+                    except Exception:  # best-effort, mirror HTTP route
+                        logger.warning(
+                            "fan_out_review failed for seeded rating", exc_info=True
+                        )
 
             seeded += 1
         if seeded:

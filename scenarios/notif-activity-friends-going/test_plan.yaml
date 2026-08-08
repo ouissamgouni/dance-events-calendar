@@ -1,0 +1,87 @@
+test_plan:
+  name: "Friends going — activity notification"
+  description: >
+    The `friends_going` feature (split apart from `social_activity`):
+    when a friend or follow marks Going to an event, their followers get
+    a `subscription_going` in-app row immediately (plus push when
+    enabled), folded into the batched activity digest email. A recipient
+    who is ALSO going to the same event sees "You and X are going to ..."
+    instead of "X is going to ...".
+
+  preconditions:
+    - "Start Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`"
+    - >-
+      Start scenario:
+      `SCENARIO=notif-activity-friends-going RESET=1 task start:scenario`
+    - "Open the Mailpit inbox at http://127.0.0.1:8025 and clear existing messages."
+    - >-
+      For the push step: in a Chromium browser sign in as Bob
+      (bob@example.com), open /account#notifications and click "Enable
+      push notifications" so a live PushSubscription row is bound to Bob.
+
+  cast:
+    - "Alice — actor; Going ev-friend."
+    - "Bob   — follows Alice; friends_going email + push ON; also Going ev-friend."
+    - "Carol — follows Alice; friends_going email + push OFF; not going."
+    - "Dave  — does NOT follow Alice → negative control."
+
+  steps:
+    - id: 1
+      title: "In-app rows fire for followers, with You-and-X masking"
+      description: >
+        `GET /api/notifications` as Bob and Carol.
+      expected: >
+        Bob has a `subscription_going` row rendered "You and Alice are
+        going to Friday Salsa Social" (Bob is also going). Carol has the
+        same kind of row rendered "Alice is going to Friday Salsa Social"
+        (Carol is not going).
+
+    - id: 2
+      title: "Non-follower gets nothing"
+      description: >
+        `GET /api/notifications` as Dave.
+      expected: >
+        Zero `subscription_going` rows (Dave does not follow Alice).
+
+    - id: 3
+      title: "Actor is not self-notified"
+      description: >
+        `GET /api/notifications` as Alice.
+      expected: >
+        Alice has no `subscription_going` row for her own Going.
+
+    - id: 4
+      title: "Immediate push + instant email to Bob"
+      description: >
+        Trigger a plain dispatch tick:
+        `SCENARIO=notif-activity-friends-going task notify:trigger:scenario`.
+        Neither push nor instant email is gated by the digest schedule;
+        settings.yaml enables friends_going INSTANT email mode.
+      expected: >
+        `activity.pushed` counts Bob's row (pushed_at stamped), and the
+        push body reads "You and Alice are going to Friday Salsa Social".
+        Bob ALSO receives an INSTANT email right away (instant_emailed_at
+        stamped) whose friends-going line reads "You and Alice are going
+        to Friday Salsa Social". Carol (email + push OFF) receives
+        neither.
+
+    - id: 5
+      title: "Digest email on the forced tick"
+      description: >
+        `SCENARIO=notif-activity-friends-going task notify:trigger:scenario -- --immediate-emails`
+        `--immediate-emails` passes `force=True` so the per-user digest
+        schedule is bypassed for this run only. Digest mode is still on
+        (default) alongside instant.
+      expected: >
+        Bob (email ON) receives a second, DIGEST email whose friends-going
+        line reads "You and Alice are going to Friday Salsa Social". Carol
+        (email OFF) receives 0 emails.
+
+    - id: 6
+      title: "Per-feature Send now (admin)"
+      description: >
+        In the admin Notifications tab, open the "Friends going" card and
+        use its "Send now" with Bob selected.
+      expected: >
+        Only Bob's `subscription_going` activity is replayed as an
+        immediate email — other features' pending activity is untouched.

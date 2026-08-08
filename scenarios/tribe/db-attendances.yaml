@@ -29,3 +29,52 @@ attendances:
       share_audience: public,
     }
   - { event_id: evt-tribe-u08, email: dave@example.com, share_audience: public }
+  # ── Multi-goer events: several of my follows/friends RSVP to the same
+  #    event (so the Network snapshot groups names "Alice, Bob, Carla +N"
+  #    and Following Calendars shows shared plans), plus non-followed
+  #    dancers (erin/grace) so public "going" counts reflect others too. ──
+  - { event_id: evt-tribe-u01, email: bob@example.com, share_audience: public }
+  - {
+      event_id: evt-tribe-u01,
+      email: carla@example.com,
+      share_audience: public,
+    }
+  - { event_id: evt-tribe-u01, email: dave@example.com, share_audience: public }
+  - { event_id: evt-tribe-u01, email: erin@example.com, share_audience: public }
+  - {
+      event_id: evt-tribe-u01,
+      email: grace@example.com,
+      share_audience: public,
+    }
+  - { event_id: evt-tribe-u05, email: bob@example.com, share_audience: public }
+  - { event_id: evt-tribe-u05, email: dave@example.com, share_audience: public }
+  - {
+      event_id: evt-tribe-u05,
+      email: grace@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-tribe-u08,
+      email: carla@example.com,
+      share_audience: public,
+    }
+  - { event_id: evt-tribe-u08, email: erin@example.com, share_audience: public }
+  # ── >5 friends on one event (evt-tribe-u09): all six mutual friends RSVP. ──
+  - {
+      event_id: evt-tribe-u09,
+      email: alice@example.com,
+      share_audience: public,
+    }
+  - { event_id: evt-tribe-u09, email: bob@example.com, share_audience: public }
+  - {
+      event_id: evt-tribe-u09,
+      email: carla@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-tribe-u09,
+      email: henry@example.com,
+      share_audience: public,
+    }
+  - { event_id: evt-tribe-u09, email: iris@example.com, share_audience: public }
+  - { event_id: evt-tribe-u09, email: jack@example.com, share_audience: public }

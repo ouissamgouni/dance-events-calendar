@@ -371,6 +371,59 @@ def test_interest_user_handle_respects_visibility(client, session, world):
     assert r.json() == []
 
 
+# --- interest_match (any / all across multiple people) ---------------------
+
+
+def test_interest_match_any_unions_multiple_handles(client, world):
+    """Default ``any`` combines two people as a union of their activity."""
+    _login(client, "alice@example.com")
+    r = client.get(
+        "/api/events",
+        params={
+            "interest_user_handle": ["bob", "carol"],
+            "interest_kind": "any",
+            "interest_match": "any",
+        },
+    )
+    assert r.status_code == 200
+    ids = {e["event_id"] for e in r.json()}
+    # bob -> {evt-going, evt-saved}; carol -> {evt-going}; union.
+    assert ids == {"evt-going", "evt-saved"}
+
+
+def test_interest_match_all_intersects_multiple_handles(client, world):
+    """``all`` returns only events every selected person shares."""
+    _login(client, "alice@example.com")
+    r = client.get(
+        "/api/events",
+        params={
+            "interest_user_handle": ["bob", "carol"],
+            "interest_kind": "any",
+            "interest_match": "all",
+        },
+    )
+    assert r.status_code == 200
+    ids = {e["event_id"] for e in r.json()}
+    # bob -> {evt-going, evt-saved}; carol -> {evt-going}; intersection.
+    assert ids == {"evt-going"}
+
+
+def test_interest_match_all_single_handle_is_noop(client, world):
+    """AND only applies to 2+ people; a single handle is unaffected."""
+    _login(client, "alice@example.com")
+    r = client.get(
+        "/api/events",
+        params={
+            "interest_user_handle": "bob",
+            "interest_kind": "any",
+            "interest_match": "all",
+        },
+    )
+    assert r.status_code == 200
+    ids = {e["event_id"] for e in r.json()}
+    assert ids == {"evt-going", "evt-saved"}
+
+
 # --- Validation ------------------------------------------------------------
 
 
@@ -388,5 +441,14 @@ def test_invalid_interest_kind_returns_400(client, world):
     r = client.get(
         "/api/events",
         params={"interest_source": "friends", "interest_kind": "bogus"},
+    )
+    assert r.status_code == 400
+
+
+def test_invalid_interest_match_returns_400(client, world):
+    _login(client, "alice@example.com")
+    r = client.get(
+        "/api/events",
+        params={"interest_user_handle": "bob", "interest_match": "bogus"},
     )
     assert r.status_code == 400

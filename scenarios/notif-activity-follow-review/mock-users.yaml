@@ -1,0 +1,37 @@
+# notif-activity-follow-review cast.
+#   Alice  — actor (reviews ev-past).
+#   Bob    — follows Alice; friend_reviews email+push ON  → immediate
+#            push + digest email.
+#   Carol  — follows Alice; also a co-attendee of ev-past who has NOT
+#            rated it → gets the in-app row + a "rate this" deep link.
+#            friend_reviews email OFF (in-app/push only).
+#   Dave   — does NOT follow Alice → negative control (no row).
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    account_visibility: public
+
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+    account_visibility: public
+    email_friend_reviews_enabled: true
+    push_friend_reviews_enabled: true
+
+  - email: carol@example.com
+    name: Carol Nguyen
+    handle: carol
+    account_visibility: public
+    email_friend_reviews_enabled: false
+    push_friend_reviews_enabled: false
+
+  - email: dave@example.com
+    name: Dave Owens
+    handle: dave
+    account_visibility: public

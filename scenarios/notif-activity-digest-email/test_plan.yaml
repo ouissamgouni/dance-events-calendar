@@ -1,56 +1,68 @@
 test_plan:
-  name: "Activity digest — email channel"
+  name: "Activity digest — all features in one email"
   description: >
-    (Feature × Channel) truth-table cell. Feature = social-activity
-    digest. Channel = email. Asserts activity_email delivers a
-    digest email to each follower whose `email_social_activity_enabled`
-    toggle is true. In-app rows are created regardless. Push is
-    disabled globally and per-user.
+    Comprehensive digest-email render test. One actor (Alice) generates
+    activity across EVERY feature bucket and a single follower (Bob) with
+    all `email_*` toggles ON receives ONE digest email whose body carries
+    a line for each feature: friends_going (Alice is going),
+    social_activity (a new follower + a new friend), friend_reviews
+    (Alice reviewed an event), friend_milestones (Alice reached a
+    passport milestone) and interest_matches (a new event matched Bob's
+    profile) — plus the "People you may want to follow" suggestions
+    section and the engagement CTA block. Carol (all toggles OFF) is the
+    negative probe. Push is silent (every user has push_* OFF).
 
   preconditions:
     - "Start Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`"
     - >-
       Start scenario:
-      `SCENARIO=activity-digest-email RESET=1 task start:scenario`
+      `SCENARIO=notif-activity-digest-email RESET=1 task start:scenario`
     - "Open the Mailpit inbox at http://127.0.0.1:8025 and clear existing messages."
 
   cast:
-    - "Alice — actor (Going ev-friend); mutual friend of Bob."
-    - "Bob   — follower, email_social_activity ON → expect one digest."
-    - "Carol — follower, email_social_activity OFF → in-app only."
+    - "Alice — actor; Going ev-friend, reviewed ev-review, attended ev-past (milestone). Mutual friend of Bob."
+    - "Bob   — follower with EVERY `email_*` toggle ON → one all-features digest."
+    - "Carol — follower with EVERY `email_*` toggle OFF → in-app only."
     - "diego, elena — followed by Alice; surfaced as Bob's mutual-friend suggestions."
     - "curator-bachata — admin-managed curator, also followed by Alice; surfaced as a third suggestion alongside diego/elena."
 
   steps:
     - id: 1
-      title: "Trigger one dispatch tick — rows are seeded and the digest ships immediately"
+      title: "Trigger one dispatch tick — every feature's rows are seeded and the digest ships"
       description: >
         `SCENARIO=notif-activity-digest-email task notify:trigger:scenario -- --immediate-emails`
         `--immediate-emails` passes `force=True` to
         `activity_email.run_once` so the per-user digest schedule
-        (default tue+fri @ 09:00 local) is bypassed for this run
-        only. Prod behavior is otherwise unchanged.
+        (default tue+fri @ 09:00 local) is bypassed for this run only.
+        The same tick runs the interest matcher and the milestone
+        service, so all five feature kinds are pending by the time the
+        digest is assembled.
       expected: >
-        In-app rows created for Bob and Carol. `activity.digests=1`
-        (Bob only — Carol's user-level `email_social_activity_enabled=false`
-        blocks email delivery). No `skipped_off_schedule` in the
-        diagnostic (force bypasses the slot check).
+        In-app rows created for Bob across all features. `activity.digests=1`
+        (Bob only — Carol's user-level toggles are all false, blocking
+        email delivery). No `skipped_off_schedule` in the diagnostic
+        (force bypasses the slot check).
 
     - id: 2
-      title: "Email delivery matrix"
+      title: "One digest email folds in every feature line"
       description: >
-        Filter Mailpit by recipient address.
+        Open Bob's digest email in Mailpit and read the activity list.
       expected: >
-        Bob receives ONE digest email prefixed with "Movida:" listing
-        Alice's Going activity.
-        Carol receives 0 emails.
+        Bob receives exactly ONE digest email prefixed with "Movida:"
+        containing a line for each feature:
+        friends_going — "Alice is going to Bachata Friendly Social";
+        social_activity — "Carol started following you" and "You and Alice
+        are now friends"; friend_reviews — "Alice shared their experience
+        of Rooftop Salsa Social"; friend_milestones — "Alice reached a
+        milestone: ..."; interest_matches — "International Salsa Congress
+        Paris matched your ... alert". Carol receives 0 emails.
 
     - id: 3
       title: "Push channel remains silent"
       description: >
-        Verify no push attempted.
+        Verify no push attempted (every user has push_* OFF).
       expected: >
-        `activity.pushed=0` — WEB_PUSH_ENABLED is false.
+        `activity.pushed=0`.
 
     - id: 4
       title: "People you may want to follow section"

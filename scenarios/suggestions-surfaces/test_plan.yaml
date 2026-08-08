@@ -5,23 +5,38 @@ test_plan:
     Account -> My network, and /discover. It documents the intended
     differences between surfaces: onboarding is a small beginner-friendly
     list, My network is the pure friend-of-friend graph, /discover starts
-    with graph suggestions and may top up with curators, and search remains
-    separate from ranked suggestions.
+    with graph suggestions and tops up with verified organizers then
+    curators, and search remains separate from ranked suggestions. Ranked
+    surfaces order candidates by a BLENDED relevance score (mutual friends,
+    shared interests, events in common, recent activity, popularity) - NOT
+    alphabetically. When two candidates tie on mutual friends, the secondary
+    signals break the tie. The expanded pool (15 graph candidates) demonstrates
+    pagination controls ("Show more", "Shuffle"), while a thin-network viewer
+    demonstrates the verified-organizer and curator top-up rows.
 
   preconditions:
     - "Run with: task start:scenario SCENARIO=suggestions-surfaces"
     - >
       Cast: newbie is fresh for onboarding. viewer has mutual friends alice,
-      bob, and carol. Their follow overlap creates FoF candidates pop1, pop2,
-      pop3, and friends-only privatepop. hiddenpop is followed by the same
+      bob, and carol. Their follow overlap creates a 15-candidate graph pool:
+      pop1 (3 mutuals), pop2 (2 mutuals), pop3-pop14 (1 mutual each), plus
+      friends-only privatepop (1 mutual). Among the 1-mutual tie, privatepop
+      outranks pop3 due to shared interests and recent activity. The
+      15-candidate pool ensures "Show more" + "Shuffle" on /discover
+      (page 12) and "Show more" on My network (page 6). viewer shares
+      salsa+bachata interests. thinviewer is mutual with dave only (dave
+      follows just pop1/pop2), so /discover surfaces the organizer + curator
+      top-up right after two network rows. hiddenpop is followed by the same
       network but has `show_in_suggestions: false` and must be excluded.
-      salsahub is a verified organizer. curator-bachata and curator-paris are
-      admin-managed fallback/top-up suggestions. curator-hidden is
+      salsahub and afrohub are verified organizers surfaced via the /discover
+      organizer top-up; salsahub leads because it shares salsa with viewer and
+      is more recently active. curator-bachata (shares bachata with viewer) and
+      curator-paris are admin-managed top-up suggestions. curator-hidden is
       admin-managed but opted out. loner has no graph.
     - >
-      For viewer and loner, if the onboarding gate appears, click Skip/Done
-      once before testing My network or /discover. For newbie, keep the gate
-      so the onboarding surface can be tested.
+      For viewer, thinviewer, and loner, if the onboarding gate appears,
+      click Skip/Done once before testing My network or /discover. For newbie,
+      keep the gate so the onboarding surface can be tested.
     - >
       Cookie banner: accept Personalization so /api/auth/* and /api/social/*
       calls are not blocked by consent.
@@ -34,71 +49,107 @@ test_plan:
         /onboarding/follow.
       expected: >
         The page calls GET /api/social/onboarding/suggestions?limit=7. The
-        list is capped to a focused beginner-friendly set. Verified organizer
-        salsahub appears before curator-only accounts. Admin-managed curators
-        such as curator-bachata and curator-paris can appear before the
-        popular tail. Private/friends-only privatepop may appear if ranking
-        and the limit leave room. hiddenpop and curator-hidden never appear
-        because `show_in_suggestions` is false. Every card has a Follow CTA,
-        and Done/Skip completes onboarding without forcing a large selection.
+        list is capped to a focused beginner-friendly set. Verified organizers
+        salsahub and afrohub appear before curator-only accounts, ordered
+        salsahub then afrohub within the organizer tier by blended relevance
+        (salsahub shares salsa with viewer and is more recently active).
+        Admin-managed curators such as curator-bachata and curator-paris can
+        appear before the popular tail, ordered within their tier by blended
+        relevance rather than alphabetically. Private/friends-only privatepop
+        may appear if ranking and the limit leave room. hiddenpop and
+        curator-hidden never appear because `show_in_suggestions` is false.
+        Every card has a Follow CTA, and Done/Skip completes onboarding without
+        forcing a large selection.
 
     - id: 2
-      title: "My network Suggestions is the pure friend graph"
+      title: "My network Suggestions shows paginated FoF results"
       description: >
         Sign in as Vera Viewer. Open /account#network and select the
         Suggestions tab.
       expected: >
-        The UI calls GET /api/social/me/suggestions. The rendered suggestion
-        handles, in order, are pop1, pop2, pop3, privatepop. pop1 shows
-        "Followed by @alice + 2 more", pop2 shows "Followed by @alice + 1
-        more", and pop3/privatepop each show "Followed by @alice".
-        Curator fallback rows are not injected into My network when the friend
-        graph has candidates. viewer, alice, bob, carol, admin, hiddenpop, and
-        curator-hidden are not suggested.
+        The UI calls GET /api/social/me/suggestions?limit=6 and returns the
+        first page with pop1, pop2, privatepop, pop3 (and potentially pop4-pop6
+        depending on ranking signals). pop1 and pop2 lead on mutual-friend count
+        (3 then 2). pop3 and privatepop TIE at 1 mutual, and the blended
+        relevance score breaks the tie: privatepop ranks above pop3 because it
+        shares an interest with viewer and is more recently active - even though
+        "pop3" precedes "privatepop" alphabetically. This ordering is the core
+        proof the ranking is relevance-based, not A-Z. pop1 shows "Followed by
+        @alice + 2 more", pop2 shows "Followed by @alice + 1 more", and
+        pop3/privatepop each show "Followed by @alice". A "Show more" button
+        appears below the first 6 rows (because 15 total > 6 page size). Curator
+        and organizer top-up rows are not injected into My network when the
+        friend graph has candidates. viewer, alice, bob, carol, admin, hiddenpop,
+        and curator-hidden are not suggested.
 
     - id: 3
-      title: "/discover default Suggestions starts with the graph"
+      title: "/discover shows paginated Suggestions with controls"
       description: >
         With Vera Viewer still signed in, open /discover with an empty search
         box.
       expected: >
         The page renders a default section titled "Suggestions" backed by
-        GET /api/social/discover/suggested?limit=12. The first rows are the
-        network candidates from step 2 in the same order: pop1, pop2, pop3,
-        privatepop. Curator top-up rows may follow as curator-bachata and
-        curator-paris. Every row has a blue Follow button. /discover must not
-        show only curators when graph candidates exist. hiddenpop and
-        curator-hidden must not appear.
-        Because the pool here fits one page, no "Show more" and no "Shuffle"
-        control is shown, but the "Can't find them? Invite a friend" escape-hatch
-        CTA is always present directly under the search box (pagination/shuffle
-        coverage lives in the discover-show-more scenario).
+        GET /api/social/discover/suggested?limit=12. The first 12 rows are the
+        top network candidates in blended ranking order: pop1, pop2, privatepop,
+        pop3, then pop4-pop... Each network row shows the same follows-in-common
+        pill as My network ("Followed by @alice + N more"): pop1 shows
+        "Followed by @alice + 2 more", pop2 shows "Followed by @alice + 1 more".
+        Because the pool of 15 network candidates exceeds page size 12, a
+        "Show more" button appears below the first page AND a "Shuffle" button
+        appears next to the Suggestions heading. Clicking "Show more" loads the
+        remaining network rows. viewer's network fills the whole first page, so
+        no organizer/curator top-up rows are injected here (top-up only fills
+        spare slots - see step 3b). Every row has a blue Follow button. hiddenpop
+        and curator-hidden must not appear. The "Can't find them? Invite a
+        friend" escape-hatch CTA is always present directly under the search box.
+
+    - id: "3b"
+      title: "/discover tops up a thin network with organizers then curators"
+      description: >
+        Sign out, then sign in as Tom Thin (thinviewer). Open /discover with an
+        empty search box.
+      expected: >
+        thinviewer's only friend (dave) follows just pop1 and pop2, so the
+        network yields two rows: pop1 then pop2, each showing "Followed by
+        @dave". Because the first page has spare slots, /discover tops up with
+        the verified-organizer tier first - salsahub then afrohub (salsahub
+        leads on blended relevance) - and then the curator tier - curator-bachata
+        then curator-paris. This is the proof that organizers ARE suggested for a
+        signed-in networked viewer, not only during onboarding. salsahub and
+        afrohub show the verified-organizer badge; curator rows show the curator
+        badge. hiddenpop and curator-hidden never appear. No "Show more"/"Shuffle"
+        controls appear because the network pool (2) fits within page size 12.
 
     - id: 4
-      title: "Follow action removes rows consistently"
+      title: "Follow action removes rows consistently across paginated lists"
       description: >
-        From /discover, click Follow on pop1. Then reload /discover and
-        /account#network.
+        Sign back in as Vera Viewer. From /discover, click Follow on pop1. Then
+        reload /discover and /account#network.
       expected: >
         POST /api/social/users/pop1/follow succeeds. /discover removes the row
         immediately after the click. After reload, both surfaces exclude pop1.
-        Account -> My network now shows pop2, pop3, privatepop; /discover now
-        starts with pop2, pop3, privatepop and then any curator top-up rows.
-        This proves both surfaces share the same already-followed exclusion
-        semantics.
+        My network -> Suggestions now shows pop2, privatepop, pop3, pop4... (14
+        remaining candidates); /discover now starts with pop2, privatepop, pop3,
+        pop4... The follows-in-common pills update accordingly (pop2 still leads
+        the tail behind privatepop's tie-break). This proves both surfaces share
+        the same already-followed exclusion semantics and the same blended
+        ordering.
 
     - id: 5
-      title: "Cold-start viewer gets Discover curator fallback"
+      title: "Cold-start viewer gets Discover organizer + curator fallback"
       description: >
         Sign out, then sign in as Leo Loner. Open /account#network ->
         Suggestions, then /discover with an empty search box.
       expected: >
         Because loner has no mutual friends and no outgoing follows, Account
         -> My network -> Suggestions is empty. /discover still renders the
-        default "Suggestions" section with the curator fallback set:
-        curator-bachata and curator-paris, each with a Follow button. It does
-        not show pop1, pop2, pop3, privatepop, hiddenpop, curator-hidden, or
-        admin.
+        default "Suggestions" section with the cold-start fallback: the
+        verified-organizer tier first (salsahub then afrohub), then the curator
+        tier (curator-bachata then curator-paris), each with a Follow button.
+        loner has no interests, so within each tier ranking falls back to
+        activity/popularity then handle order - salsahub leads afrohub (more
+        recent visit) and curator-bachata leads curator-paris. It does not show
+        pop1-pop14, privatepop, hiddenpop, curator-hidden, or admin.
 
     - id: 6
       title: "Search results remain separate from ranked suggestions"

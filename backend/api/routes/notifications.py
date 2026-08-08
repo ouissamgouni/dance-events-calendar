@@ -25,7 +25,13 @@ from backend.api.schemas import (
     UnreadCountResponse,
 )
 from backend.db.database import get_session
-from backend.db.models import CachedEvent, Notification, User, UserFollow
+from backend.db.models import (
+    CachedEvent,
+    Notification,
+    User,
+    UserFollow,
+    UserEventAttendance,
+)
 
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"])
@@ -34,6 +40,8 @@ router = APIRouter(prefix="/api/notifications", tags=["notifications"])
 VALID_KINDS = {
     "subscription_going",
     "subscription_suggested",
+    "subscription_review",
+    "subscription_milestone",
     "new_follower",
     "new_friend",
     "follow_request",
@@ -91,6 +99,23 @@ def _hydrate(
         else {}
     )
 
+    # Which of these events is the viewer also attending? Only needed for
+    # subscription_going rows to render "You and X are going to ...".
+    also_going_event_ids: set = set()
+    going_event_ids = {
+        r.event_id
+        for r in rows
+        if r.kind == "subscription_going" and r.event_id is not None
+    }
+    if viewer_id is not None and going_event_ids:
+        also_going_event_ids = set(
+            session.exec(
+                select(UserEventAttendance.event_id)
+                .where(UserEventAttendance.user_id == viewer_id)
+                .where(col(UserEventAttendance.event_id).in_(going_event_ids))
+            ).all()
+        )
+
     items: list[NotificationItem] = []
     for r in rows:
         a = actors.get(r.actor_user_id)
@@ -115,6 +140,10 @@ def _hydrate(
                 ),
                 context=r.context,
                 subject_key=r.subject_key,
+                also_going=(
+                    r.kind == "subscription_going"
+                    and r.event_id in also_going_event_ids
+                ),
                 created_at=_as_utc(r.created_at),
                 read_at=_as_utc(r.read_at),
             )

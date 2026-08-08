@@ -4,9 +4,11 @@
 #   • `viewer` — mutual friends with alice/bob/carol; sees FoF picks.
 #   • `loner` — has no friends; the FoF card must NOT render for them.
 #
-# Reachable-through-friends candidates: pop1 (3 mutuals), pop2 (2),
-# pop3 (1), and privatepop (1, friends-only but suggestable). hiddenpop
-# is followed by the same graph but opted out of suggestions.
+# Reachable-through-friends candidates: 10 FoF candidates with varying
+# mutual-friend counts: pop1 (3 mutuals), pop2 (2), pop3-pop10 (1 each).
+# privatepop is friends-only but suggestable. hiddenpop is followed by the
+# same graph but opted out of suggestions. This expanded pool ensures enough
+# candidates to demonstrate pagination when combined with multiple surfaces.
 users:
   - email: viewer@example.com
     name: View Erfof
@@ -32,6 +34,27 @@ users:
   - email: popular3@example.com
     name: Popular Three
     handle: pop3
+  - email: popular4@example.com
+    name: Popular Four
+    handle: pop4
+  - email: popular5@example.com
+    name: Popular Five
+    handle: pop5
+  - email: popular6@example.com
+    name: Popular Six
+    handle: pop6
+  - email: popular7@example.com
+    name: Popular Seven
+    handle: pop7
+  - email: popular8@example.com
+    name: Popular Eight
+    handle: pop8
+  - email: popular9@example.com
+    name: Popular Nine
+    handle: pop9
+  - email: popular10@example.com
+    name: Popular Ten
+    handle: pop10
   - email: privatepop@example.com
     name: Private Popular
     handle: privatepop

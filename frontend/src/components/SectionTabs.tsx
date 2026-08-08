@@ -1,4 +1,5 @@
 import { Link, useLocation, Outlet } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export interface SectionTab {
     label: string;
@@ -27,6 +28,17 @@ const SECTION_CONFIG = {
 } as const;
 
 export type SectionKey = keyof typeof SECTION_CONFIG;
+
+const SECTION_GATE: Record<SectionKey, { title: string; body: string }> = {
+    tribe: {
+        title: 'Your Tribe',
+        body: 'Sign in to connect with friends, discover people you may know, and follow their calendars.',
+    },
+    mine: {
+        title: 'Your dance world',
+        body: 'Sign in to track events, unlock passport milestones, and manage your saved and going lists.',
+    },
+};
 
 function SectionTabs({ tabs, pathname, hub }: { tabs: SectionTab[]; pathname: string; hub: string }) {
     return (
@@ -64,8 +76,32 @@ function SectionTabs({ tabs, pathname, hub }: { tabs: SectionTab[]; pathname: st
  */
 export default function SectionLayout({ section }: { section: SectionKey }) {
     const { pathname } = useLocation();
+    const { user, loading } = useAuth();
     const { hub, tabs } = SECTION_CONFIG[section];
     const title = section === 'tribe' ? 'Your Tribe' : null;
+
+    // Whole-section login gate (soft in-page callout). Every /tribe/* and
+    // /mine/* route is signed-in only.
+    if (!loading && !user) {
+        const gate = SECTION_GATE[section];
+        return (
+            <div className="min-h-full bg-[#f8fafc]">
+                <div className="mx-auto max-w-3xl px-4 py-4">
+                    <div className="border border-blue-100 bg-blue-50 p-4 text-sm text-slate-700">
+                        <p className="mb-2 font-medium text-slate-800">{gate.title}</p>
+                        <p className="mb-3 text-slate-600">{gate.body}</p>
+                        <Link
+                            to={`/login?next=${encodeURIComponent(pathname)}`}
+                            className="inline-flex items-center bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                        >
+                            Sign in
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-full bg-[#f8fafc]">
             <div className="border-b border-slate-200 bg-white px-4 pt-1">

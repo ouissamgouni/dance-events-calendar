@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { CalendarEvent, TagGroup } from '../types';
-import { fetchEvent, fetchEvents, fetchSettings, fetchTagGroups, fetchMyFollowing, fetchInterestSummary } from '../api';
-import type { FollowUser, InterestSummaryItem } from '../api';
+import { fetchEvent, fetchEvents, fetchSettings, fetchTagGroups } from '../api';
+import { InterestFilterChips } from '../components/InterestFilter';
 import { trackView } from '../utils/tracking';
 import { useAuth } from '../context/AuthContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
@@ -38,6 +38,7 @@ import type { DateRangePresetKey } from '../utils/dateRangePresets';
 type ViewMode = 'explorer' | 'calendar';
 type InterestSource = 'follows' | 'friends';
 type InterestKind = 'any' | 'going' | 'saved';
+type InterestMatch = 'any' | 'all';
 type ExplorerSort = 'date' | 'popularity';
 
 interface FutureEventBatch {
@@ -51,6 +52,7 @@ interface InitialExplorerState {
     interestSource: InterestSource | null;
     interestKind: InterestKind;
     interestUserHandles: string[];
+    interestMatch: InterestMatch;
     sortBy: ExplorerSort;
 }
 
@@ -99,6 +101,10 @@ function parseInterestKind(value: string | null): InterestKind | null {
     return value === 'any' || value === 'going' || value === 'saved' ? value : null;
 }
 
+function parseInterestMatch(value: string | null): InterestMatch | null {
+    return value === 'any' || value === 'all' ? value : null;
+}
+
 function parseExplorerSort(value: string | null): ExplorerSort | null {
     return value === 'date' || value === 'popularity' ? value : null;
 }
@@ -122,6 +128,7 @@ function readInitialExplorerState(searchParams: URLSearchParams): InitialExplore
         interestSource,
         interestKind: parseInterestKind(searchParams.get('interest_kind')) ?? 'any',
         interestUserHandles,
+        interestMatch: parseInterestMatch(searchParams.get('interest_match')) ?? 'any',
         sortBy: parseExplorerSort(searchParams.get('sort_by')) ?? 'date',
     };
 }
@@ -136,6 +143,7 @@ function writeExplorerStateToSearchParams(
         interestSource: InterestSource | null;
         interestKind: InterestKind;
         interestUserHandles: string[];
+        interestMatch: InterestMatch;
         sortBy: ExplorerSort;
     },
 ) {
@@ -151,11 +159,14 @@ function writeExplorerStateToSearchParams(
     if (interestActive) {
         next.set('interest_source', state.interestSource ?? 'follows');
         next.set('interest_kind', state.interestKind);
+        if (state.interestMatch === 'all') next.set('interest_match', 'all');
+        else next.delete('interest_match');
         next.delete('interest_user_handle');
         for (const h of state.interestUserHandles) next.append('interest_user_handle', h);
     } else {
         next.delete('interest_source');
         next.delete('interest_kind');
+        next.delete('interest_match');
         next.delete('interest_user_handle');
     }
 
@@ -495,6 +506,7 @@ export default function Home() {
     const [interestSource, setInterestSource] = useState<InterestSource | null>(initialExplorerState.interestSource);
     const [interestKind, setInterestKind] = useState<InterestKind>(initialExplorerState.interestKind);
     const [interestUserHandles, setInterestUserHandles] = useState<string[]>(initialExplorerState.interestUserHandles);
+    const [interestMatch, setInterestMatch] = useState<InterestMatch>(initialExplorerState.interestMatch);
     const [selectedExplorerMapEventId, setSelectedExplorerMapEventId] = useState<string | null>(null);
 
     // Calendar mode map bounds (for off-map styling in the calendar grid)
@@ -539,12 +551,13 @@ export default function Home() {
             interestSource,
             interestKind,
             interestUserHandles,
+            interestMatch,
             sortBy,
         });
         if (next.toString() !== searchParams.toString()) {
             setSearchParams(next, { replace: true });
         }
-    }, [activeTagIds, endDate, interestKind, interestSource, interestUserHandles, searchParams, setSearchParams, sortBy, startDate, viewMode]);
+    }, [activeTagIds, endDate, interestKind, interestMatch, interestSource, interestUserHandles, searchParams, setSearchParams, sortBy, startDate, viewMode]);
 
     // Events query source: Explorer pulls the date/interest-filtered set once
     // and applies the active area + tag filters client-side. The live map
@@ -555,7 +568,7 @@ export default function Home() {
     useEffect(() => {
         setLoading(true);
         setError(null);
-        let params: { startDate?: string; endDate?: string; area?: PreferredAreaPayload | null; interestSource?: 'follows' | 'friends'; interestKind?: 'any' | 'going' | 'saved'; interestUserHandles?: string[] } | undefined;
+        let params: { startDate?: string; endDate?: string; area?: PreferredAreaPayload | null; interestSource?: 'follows' | 'friends'; interestKind?: 'any' | 'going' | 'saved'; interestUserHandles?: string[]; interestMatch?: 'any' | 'all' } | undefined;
         const interestActive = interestSource !== null || interestUserHandles.length > 0;
         if (viewMode === 'explorer') {
             // No ``area`` here on purpose — we pull the full date/interest set
@@ -568,6 +581,7 @@ export default function Home() {
                 interestSource: interestActive ? (interestSource ?? 'follows') : undefined,
                 interestKind: interestActive ? interestKind : undefined,
                 interestUserHandles: interestUserHandles.length ? interestUserHandles : undefined,
+                interestMatch: interestActive ? interestMatch : undefined,
             };
         } else if (visibleRange) {
             params = {
@@ -576,6 +590,7 @@ export default function Home() {
                 interestSource: interestActive ? (interestSource ?? 'follows') : undefined,
                 interestKind: interestActive ? interestKind : undefined,
                 interestUserHandles: interestUserHandles.length ? interestUserHandles : undefined,
+                interestMatch: interestActive ? interestMatch : undefined,
             };
         } else {
             // Calendar mode initial load: use same default as explorer
@@ -585,6 +600,7 @@ export default function Home() {
                 interestSource: interestActive ? (interestSource ?? 'follows') : undefined,
                 interestKind: interestActive ? interestKind : undefined,
                 interestUserHandles: interestUserHandles.length ? interestUserHandles : undefined,
+                interestMatch: interestActive ? interestMatch : undefined,
             };
         }
         const tagParams = params?.startDate || params?.endDate ? params : undefined;
@@ -611,7 +627,7 @@ export default function Home() {
                 setLoading(false);
                 initialLoadDone.current = true;
             });
-    }, [viewMode, startDate, endDate, visibleRange, interestSource, interestKind, interestUserHandles, initialUrlHadDateRange]);
+    }, [viewMode, startDate, endDate, visibleRange, interestSource, interestKind, interestUserHandles, interestMatch, initialUrlHadDateRange]);
 
     const handleDateRangeChange = useCallback((start: string, end: string) => {
         userTouchedDateRangeRef.current = true;
@@ -865,6 +881,7 @@ export default function Home() {
                     interestSource: interestActive ? (interestSource ?? 'follows') : undefined,
                     interestKind: interestActive ? interestKind : undefined,
                     interestUserHandles: interestUserHandles.length ? interestUserHandles : undefined,
+                    interestMatch: interestActive ? interestMatch : undefined,
                 });
                 if (cancelled) return;
                 const areaFiltered = effectiveArea
@@ -889,7 +906,7 @@ export default function Home() {
         return () => {
             cancelled = true;
         };
-    }, [viewMode, endDate, interestSource, interestKind, interestUserHandles, effectiveArea, activeTagIds, tagGroups]);
+    }, [viewMode, endDate, interestSource, interestKind, interestUserHandles, interestMatch, effectiveArea, activeTagIds, tagGroups]);
 
     const selectedExplorerMapEvent = useMemo(
         () => explorerMatchingEvents.find((event) => event.event_id === selectedExplorerMapEventId) ?? null,
@@ -1098,6 +1115,7 @@ export default function Home() {
             interestSource: interestActive ? (interestSource ?? 'follows') : undefined,
             interestKind: interestActive ? interestKind : undefined,
             interestUserHandles: interestUserHandles.length ? interestUserHandles : undefined,
+            interestMatch: interestActive ? interestMatch : undefined,
         };
         fetchEvents(params).then(setEvents).catch(() => { });
     }, [viewMode, startDate, endDate, visibleRange, interestKind, interestSource, interestUserHandles]);
@@ -1207,6 +1225,7 @@ export default function Home() {
             interestSource={interestSource}
             interestKind={interestKind}
             interestUserHandles={interestUserHandles}
+            interestMatch={interestMatch}
             onChange={(next) => {
                 bumpAutoFit();
                 if (Object.prototype.hasOwnProperty.call(next, 'source')) {
@@ -1215,6 +1234,9 @@ export default function Home() {
                 }
                 if (Object.prototype.hasOwnProperty.call(next, 'kind')) {
                     setInterestKind(next.kind!);
+                }
+                if (Object.prototype.hasOwnProperty.call(next, 'match')) {
+                    setInterestMatch(next.match!);
                 }
                 if (Object.prototype.hasOwnProperty.call(next, 'userHandles')) {
                     const nextHandles = next.userHandles ?? [];
@@ -1299,6 +1321,7 @@ export default function Home() {
                 interestSource={interestSource}
                 interestKind={interestKind}
                 interestUserHandles={interestUserHandles}
+                interestMatch={interestMatch}
                 onChange={(next) => {
                     bumpAutoFit();
                     if (Object.prototype.hasOwnProperty.call(next, 'source')) {
@@ -1307,6 +1330,9 @@ export default function Home() {
                     }
                     if (Object.prototype.hasOwnProperty.call(next, 'kind')) {
                         setInterestKind(next.kind!);
+                    }
+                    if (Object.prototype.hasOwnProperty.call(next, 'match')) {
+                        setInterestMatch(next.match!);
                     }
                     if (Object.prototype.hasOwnProperty.call(next, 'userHandles')) {
                         const nextHandles = next.userHandles ?? [];
@@ -1344,6 +1370,7 @@ export default function Home() {
                 interestSource={interestSource}
                 interestKind={interestKind}
                 interestUserHandles={interestUserHandles}
+                interestMatch={interestMatch}
                 loading={loading}
                 onOpenFilters={() => setFilterSheetOpen(true)}
                 activeFilterCount={isCal ? calendarActiveFilterCount : activeFilterCount}
@@ -1814,346 +1841,6 @@ export default function Home() {
             >
                 {viewMode === 'calendar' ? renderCalendarFilterControls() : renderFilterControls()}
             </FilterSheet>
-        </div>
-    );
-}
-
-interface InterestFilterChange {
-    source?: 'follows' | 'friends' | null;
-    kind?: 'any' | 'going' | 'saved';
-    userHandles?: string[];
-}
-
-/**
- * Horizontally-scrollable trail of followees/friends matching the active
- * scope + kind, each rendered as a name + matched-event-count checkbox so
- * the viewer can multi-select specific people to narrow the feed to.
- * ``any`` sums going+saved (best-effort — a person who both attends and
- * saved the same event is counted twice; acceptable for this lightweight
- * display count). People with zero matching events are omitted.
- */
-function FollowingPersonRail({
-    scope,
-    kind,
-    selectedHandles,
-    onToggle,
-}: {
-    scope: 'follows' | 'friends';
-    kind: 'any' | 'going' | 'saved';
-    selectedHandles: string[];
-    onToggle: (handle: string) => void;
-}) {
-    const [rows, setRows] = useState<FollowUser[]>([]);
-    const [metrics, setMetrics] = useState<Map<string, InterestSummaryItem>>(new Map());
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        let cancelled = false;
-        setLoading(true);
-        fetchMyFollowing({ limit: 25 })
-            .then((res) => {
-                if (cancelled) return null;
-                const items = scope === 'friends' ? res.items.filter((u) => u.is_friend) : res.items;
-                setRows(items);
-                return fetchInterestSummary(items.map((u) => u.handle));
-            })
-            .then((items) => {
-                if (cancelled || !items) return;
-                const m = new Map<string, InterestSummaryItem>();
-                for (const it of items) m.set(it.handle, it);
-                setMetrics(m);
-            })
-            .catch(() => {
-                if (!cancelled) {
-                    setRows([]);
-                    setMetrics(new Map());
-                }
-            })
-            .finally(() => {
-                if (!cancelled) setLoading(false);
-            });
-        return () => {
-            cancelled = true;
-        };
-    }, [scope]);
-
-    const visible = useMemo(() => {
-        const countFor = (handle: string) => {
-            const m = metrics.get(handle);
-            if (!m) return 0;
-            if (kind === 'going') return m.upcoming_going_visible;
-            if (kind === 'saved') return m.upcoming_saved_visible;
-            return m.upcoming_going_visible + m.upcoming_saved_visible;
-        };
-        return rows
-            .map((user) => ({ user, count: countFor(user.handle) }))
-            .filter(({ count }) => count > 0)
-            .sort((a, b) => b.count - a.count);
-    }, [rows, metrics, kind]);
-
-    if (loading || visible.length === 0) return null;
-
-    return (
-        <div
-            className="flex w-full gap-1.5 overflow-x-auto pb-0.5 sm:gap-2"
-            data-testid="following-person-rail"
-        >
-            {visible.map(({ user, count }) => {
-                const checked = selectedHandles.includes(user.handle);
-                return (
-                    <label
-                        key={user.handle}
-                        className={
-                            'inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap border px-2 py-1 text-xs transition ' +
-                            (checked
-                                ? 'bg-blue-500 border-blue-500 text-white'
-                                : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500')
-                        }
-                    >
-                        <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => onToggle(user.handle)}
-                            className="h-3 w-3 shrink-0 accent-blue-600"
-                            aria-label={`Toggle ${user.display_name || '@' + user.handle}`}
-                        />
-                        <span className="max-w-[8rem] truncate">{user.display_name || `@${user.handle}`}</span>
-                        <span className={checked ? 'text-white/80' : 'text-slate-400'}>{count}</span>
-                    </label>
-                );
-            })}
-        </div>
-    );
-}
-
-function InterestFilterChips({
-    signedIn,
-    followingCount,
-    interestSource,
-    interestKind,
-    interestUserHandles,
-    onChange,
-}: {
-    signedIn: boolean;
-    followingCount?: number;
-    interestSource: 'follows' | 'friends' | null;
-    interestKind: 'any' | 'going' | 'saved';
-    interestUserHandles: string[];
-    onChange: (next: InterestFilterChange) => void;
-}) {
-    // Anonymous users see the inline "Sign in to…" hint when they click
-    // the Following pill (rather than the pill being disabled and the
-    // hint only showing in the post-logout edge case where
-    // interestSource had been left non-null).
-    const [showAnonHint, setShowAnonHint] = useState(false);
-
-    // Filter is only actually applied once the viewer has explicitly
-    // picked a scope or at least one person — nothing is on by default.
-    const filterActive = interestSource !== null || interestUserHandles.length > 0;
-
-    // Nobody to filter by yet — swap the pills for a nudge toward
-    // building a network instead of showing controls with no effect.
-    if (signedIn && followingCount === 0) {
-        return (
-            <div
-                className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500 sm:gap-2"
-                data-testid="following-filter-empty"
-            >
-                <span className="inline-flex shrink-0 items-center gap-1">
-                    <svg
-                        aria-hidden="true"
-                        viewBox="0 0 20 20"
-                        className="h-3.5 w-3.5 shrink-0"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.6"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                    >
-                        <circle cx="7" cy="7" r="3" />
-                        <path d="M2 17c0-2.8 2.2-5 5-5s5 2.2 5 5" />
-                        <circle cx="14" cy="6" r="2.4" />
-                        <path d="M13 12c2.8 0 5 2 5 5" />
-                    </svg>
-                    <span className="hidden sm:inline">Filter by following</span>
-                </span>
-                <span>You're not following anyone yet.</span>
-                <Link to="/tribe/discover" className="text-blue-600 hover:underline">
-                    Build your tribe →
-                </Link>
-            </div>
-        );
-    }
-
-    const handleScopeClick = (scope: 'follows' | 'friends') => {
-        if (!signedIn) {
-            setShowAnonHint((v) => !v);
-            return;
-        }
-        // Switching (or toggling) scope always starts fresh: the person
-        // rail's candidate pool changes with scope (followees vs.
-        // mutual-only), so any previously selected people — and the
-        // going/saved narrowing — are reset rather than silently
-        // carried over to a scope they may not apply to.
-        onChange({ source: interestSource === scope ? null : scope, kind: 'any', userHandles: [] });
-    };
-
-    const handleClear = () => {
-        onChange({ source: null, kind: 'any', userHandles: [] });
-    };
-
-    const handleTogglePerson = (handle: string) => {
-        const next = interestUserHandles.includes(handle)
-            ? interestUserHandles.filter((h) => h !== handle)
-            : [...interestUserHandles, handle];
-        onChange({ userHandles: next });
-    };
-
-    // Quick shortcut to the dedicated "From people I follow" calendar view.
-    // Always shown alongside the inlined filters below.
-    const shortcutLink = (
-        <Link
-            to={signedIn ? '/tribe/calendars' : `/login?next=${encodeURIComponent('/tribe/calendars')}`}
-            data-testid="follows-shortcut"
-            aria-label="Open the calendar from people I follow"
-            title="Open the calendar from people I follow"
-            className="hidden sm:inline-flex items-center px-2 py-1 text-xs border border-slate-200 bg-white text-slate-600 hover:border-blue-500 hover:text-blue-500 transition"
-        >
-            {/* Heroicons calendar outline */}
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" className="w-3.5 h-3.5" aria-hidden="true">
-                <rect x="2.75" y="4.25" width="14.5" height="13" rx="0" />
-                <path d="M2.75 8.25h14.5M6.5 2.75v3M13.5 2.75v3" strokeLinecap="round" />
-            </svg>
-        </Link>
-    );
-
-    // "Any" is no longer a separate pill — it's implied when both Going
-    // and Saved are active. Each pill toggles independently; the last
-    // remaining active pill can't be turned off (at least one must stay
-    // selected) so the filter never degenerates to "nothing".
-    const goingOn = interestKind !== 'saved';
-    const savedOn = interestKind !== 'going';
-    const handleToggleKind = (which: 'going' | 'saved') => {
-        const nextGoing = which === 'going' ? !goingOn : goingOn;
-        const nextSaved = which === 'saved' ? !savedOn : savedOn;
-        if (!nextGoing && !nextSaved) return;
-        onChange({ kind: nextGoing && nextSaved ? 'any' : nextGoing ? 'going' : 'saved' });
-    };
-
-    const kindControls = signedIn && (
-        <div className="flex shrink-0 gap-0.5 border border-slate-200 bg-white">
-            {([['going', goingOn], ['saved', savedOn]] as const).map(([k, on]) => (
-                <button
-                    key={k}
-                    type="button"
-                    onClick={() => handleToggleKind(k)}
-                    className={
-                        'px-1.5 py-0.5 text-[11px] transition sm:px-2 sm:py-1 sm:text-xs ' +
-                        (filterActive && on
-                            ? 'bg-blue-500 text-white'
-                            : 'text-slate-600 hover:text-blue-500')
-                    }
-                    aria-label={k === 'going' ? 'Toggle going activity' : 'Toggle saved activity'}
-                    aria-pressed={filterActive && on}
-                    title={k === 'going' ? 'Going activity' : 'Saved activity'}
-                >
-                    {k === 'going' ? 'Going' : 'Saved'}
-                </button>
-            ))}
-        </div>
-    );
-
-    const anonHint = !signedIn && showAnonHint && (
-        <span className="text-xs text-slate-500">
-            <Link to="/login" className="text-blue-600 hover:underline">
-                Sign in
-            </Link>{' '}
-            to see picks from people you follow.
-        </span>
-    );
-
-
-    const personRail = signedIn && (
-        <FollowingPersonRail
-            scope={interestSource ?? 'follows'}
-            kind={interestKind}
-            selectedHandles={interestUserHandles}
-            onToggle={handleTogglePerson}
-        />
-    );
-
-    // The scope pills are the entry point themselves, always visible on
-    // both surfaces (desktop inline + mobile filter sheet) — no separate
-    // "Filter by following" button needed to reveal them. Nothing is
-    // selected by default; the filter only applies once the viewer picks
-    // a scope (or one or more people from the rail below).
-    return (
-        <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-            <span className="inline-flex shrink-0 items-center gap-1 text-slate-500">
-                <span className="hidden text-xs sm:inline">Filter by following</span>
-                <svg
-                    aria-hidden="true"
-                    viewBox="0 0 20 20"
-                    className="h-3.5 w-3.5 shrink-0"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                >
-                    <circle cx="7" cy="7" r="3" />
-                    <path d="M2 17c0-2.8 2.2-5 5-5s5 2.2 5 5" />
-                    <circle cx="14" cy="6" r="2.4" />
-                    <path d="M13 12c2.8 0 5 2 5 5" />
-                </svg>
-            </span>
-            <div className="flex shrink-0 gap-0.5 border border-slate-200 bg-white">
-                <button
-                    type="button"
-                    onClick={() => handleScopeClick('follows')}
-                    className={
-                        'px-1.5 py-0.5 text-[11px] transition sm:px-2 sm:py-1 sm:text-xs ' +
-                        (interestSource === 'follows'
-                            ? 'bg-blue-500 text-white'
-                            : 'text-slate-600 hover:text-blue-500')
-                    }
-                    aria-label={signedIn ? 'Show all people you follow' : 'Sign in to filter by people you follow'}
-                    aria-pressed={interestSource === 'follows'}
-                    title={signedIn ? 'Everyone you follow (one-way OK)' : 'Sign in to filter by people you follow'}
-                >
-                    All
-                </button>
-                <button
-                    type="button"
-                    onClick={() => handleScopeClick('friends')}
-                    className={
-                        'px-1.5 py-0.5 text-[11px] transition sm:px-2 sm:py-1 sm:text-xs ' +
-                        (interestSource === 'friends'
-                            ? 'bg-blue-500 text-white'
-                            : 'text-slate-600 hover:text-blue-500')
-                    }
-                    aria-label={signedIn ? 'Show mutual friends only' : 'Sign in to filter by people you follow'}
-                    aria-pressed={interestSource === 'friends'}
-                    title={signedIn ? 'Mutual followers only' : 'Sign in to filter by people you follow'}
-                >
-                    Friends
-                </button>
-            </div>
-            {shortcutLink}
-            {kindControls}
-            {filterActive && (
-                <button
-                    type="button"
-                    onClick={handleClear}
-                    className="inline-flex shrink-0 items-center px-2 py-0.5 text-xs text-slate-500 hover:text-blue-500 sm:py-1"
-                    aria-label="Clear the following filter"
-                    title="Clear the following filter"
-                >
-                    ✕
-                </button>
-            )}
-            {anonHint}
-            {personRail}
         </div>
     );
 }

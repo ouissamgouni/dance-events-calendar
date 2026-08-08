@@ -202,22 +202,23 @@ test('clicking a review-prompt notification navigates to the event and auto-open
     // autoOpenToken, so two dialogs (one per layout) can mount — use .first().
     await expect(page.getByRole('dialog', { name: 'Rate this event' }).first()).toBeVisible()
 
-    // The `?rate=1` param is a one-shot trigger — it must not linger in the URL.
-    await expect(page).not.toHaveURL(/rate=1/)
-    // The `#community` anchor is preserved (not stripped alongside `rate=1`)
-    // and the review-prompt notification should land on the reviews section.
+    // The `/review` path is a one-shot trigger — once fired it's rewritten to
+    // the canonical event URL so it doesn't reopen on refresh/back-navigation.
+    await expect(page).not.toHaveURL(/\/review$/)
+    // The URL settles on the `#community` reviews section so closing the modal
+    // leaves the user on the reviews the prompt was nudging them toward.
     await expect(page).toHaveURL(/#community$/)
 })
 
 test('opening a review-prompt link while signed out redirects to login and back to the review URL', async ({ page }) => {
     await mockCommonRoutes(page, { signedIn: false })
 
-    await page.goto(`/event/${EVENT.event_id}?rate=1#community`)
+    await page.goto(`/event/${EVENT.event_id}/review`)
 
     // Not signed in — bounced to login with the original review URL preserved.
     await expect(page).toHaveURL(/\/login\?next=/)
     const url = new URL(page.url())
     expect(decodeURIComponent(url.searchParams.get('next') ?? '')).toBe(
-        `/event/${EVENT.event_id}?rate=1#community`,
+        `/event/${EVENT.event_id}/review`,
     )
 })

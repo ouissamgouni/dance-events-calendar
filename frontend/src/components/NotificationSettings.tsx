@@ -18,7 +18,7 @@ import {
  * that flips all six channel flags to false in a single PATCH.
  */
 
-type FeatureKey = 'event_reminders' | 'social_activity' | 'interest_matches' | 'promo_codes' | 'review_prompt' | 'milestone_unlocked';
+type FeatureKey = 'event_reminders' | 'social_activity' | 'friends_going' | 'friend_reviews' | 'friend_milestones' | 'interest_matches' | 'promo_codes' | 'review_prompt' | 'milestone_unlocked';
 type Channel = 'email' | 'push';
 type FlagKey =
     | 'email_event_reminders_enabled'
@@ -32,7 +32,13 @@ type FlagKey =
     | 'email_review_prompt_enabled'
     | 'push_review_prompt_enabled'
     | 'email_milestone_unlocked_enabled'
-    | 'push_milestone_unlocked_enabled';
+    | 'push_milestone_unlocked_enabled'
+    | 'email_friends_going_enabled'
+    | 'push_friends_going_enabled'
+    | 'email_friend_reviews_enabled'
+    | 'push_friend_reviews_enabled'
+    | 'email_friend_milestones_enabled'
+    | 'push_friend_milestones_enabled';
 
 const FEATURES: {
     key: FeatureKey;
@@ -49,8 +55,26 @@ const FEATURES: {
         {
             key: 'social_activity',
             label: 'Friends & social',
-            description: 'Follows, friend requests, and friends going to events.',
+            description: 'Follows and friend requests.',
             anchor: 'notify-social-activity',
+        },
+        {
+            key: 'friends_going',
+            label: 'Friends going',
+            description: 'When someone you follow is going to an event.',
+            anchor: 'notify-friends-going',
+        },
+        {
+            key: 'friend_reviews',
+            label: 'Friend reviews',
+            description: 'When someone you follow reviews an event.',
+            anchor: 'notify-friend-reviews',
+        },
+        {
+            key: 'friend_milestones',
+            label: 'Friend milestones',
+            description: 'When someone you follow reaches a milestone.',
+            anchor: 'notify-friend-milestones',
         },
         {
             key: 'interest_matches',

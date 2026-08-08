@@ -23,6 +23,9 @@ import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useToast } from '../components/Toast';
 import ExplorerEventSearch from '../components/ExplorerEventSearch';
 import PassportView from '../components/PassportView';
+import PassportShareCard from '../components/PassportShareCard';
+import { scopePassport, type ShareScope } from '../utils/passportScope';
+import { CARD_HEIGHT, CARD_WIDTH, downloadImage, renderCardToBlob, shareImage } from '../utils/passportShareImage';
 import type {
     CalendarEvent,
     PassportMapEvent,
@@ -342,7 +345,7 @@ function SharePassportModal({ handle, onClose }: { handle: string; onClose: () =
     );
 }
 
-/** "Share my passport" trigger that opens the share dialog. */
+/** "Share my passport" trigger that opens the link-sharing dialog. */
 function SharePassportButton({ handle }: { handle: string }) {
     const [open, setOpen] = useState(false);
     return (
@@ -355,6 +358,293 @@ function SharePassportButton({ handle }: { handle: string }) {
                 Share
             </button>
             {open && <SharePassportModal handle={handle} onClose={() => setOpen(false)} />}
+        </>
+    );
+}
+
+const CARD_PREVIEW_SCALE = 0.55;
+
+/**
+ * Dedicated "Share as card" dialog: a live preview of the branded Story card
+ * plus explicit Share (native sheet) and Download actions. Kept separate from
+ * the link-sharing modal because the card is a curated social artefact, not a
+ * privacy control — though it still honours the owner's section toggles and
+ * shares the same public link (so its QR resolves).
+ */
+function SharePassportCardModal({
+    handle,
+    displayName,
+    shareCode,
+    data,
+    mapEvents,
+    onClose,
+}: {
+    handle: string;
+    displayName: string;
+    shareCode: string | null;
+    data: PassportResponse;
+    mapEvents: PassportMapEvent[] | null;
+    onClose: () => void;
+}) {
+    const toast = useToast();
+    const currentYear = new Date().getFullYear();
+    const [scope, setScope] = useState<ShareScope>('all');
+    const [events, setEvents] = useState<PassportMapEvent[] | null>(mapEvents);
+    const [shareUrl, setShareUrl] = useState<string | null>(null);
+    const [sections, setSections] = useState({ badges: true, map: true });
+    const [busy, setBusy] = useState(false);
+    const cardRef = useRef<HTMLDivElement>(null);
+    const canNativeShare =
+        typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+
+    // On open: ensure a public link (so the QR resolves), load the full event
+    // set for the scoped stats/map, and read the owner's section toggles.
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const existing = await fetchPassportShare().catch(() => null);
+                const token = existing?.token ?? (await createPassportShare({ require_signin: false })).token;
+                let url = `${window.location.origin}/shared/passport/${token}`;
+                if (shareCode) {
+                    try {
+                        const u = new URL(url);
+                        u.searchParams.set('ref', 'share');
+                        u.searchParams.set('src', shareCode);
+                        url = u.toString();
+                    } catch {
+                        // keep the plain link
+                    }
+                }
+                const evs = mapEvents ?? (await fetchPassportEvents());
+                const profile = await fetchPublicProfile(handle).catch(() => null);
+                if (cancelled) return;
+                setShareUrl(url);
+                setEvents(evs);
+                if (profile) {
+                    setSections({
+                        badges: profile.passport_show_badges ?? true,
+                        map: profile.passport_show_cities ?? true,
+                    });
+                }
+            } catch {
+                if (!cancelled) {
+                    toast.push({ title: 'Could not prepare the card', variant: 'error' });
+                }
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [handle, shareCode, mapEvents, toast]);
+
+    const scoped = useMemo(
+        () => (events ? scopePassport(events, data.milestones, scope) : null),
+        [events, data.milestones, scope],
+    );
+
+    const filename = `dance-passport-${scope === 'all' ? 'alltime' : scope}.png`;
+
+    const generate = useCallback(async () => {
+        if (!cardRef.current) throw new Error('card not ready');
+        return renderCardToBlob(cardRef.current);
+    }, []);
+
+    const handleShare = useCallback(async () => {
+        setBusy(true);
+        try {
+            const blob = await generate();
+            const result = await shareImage(blob, filename, { title: 'My Dance Passport' });
+            if (result === 'unsupported') {
+                downloadImage(blob, filename);
+                toast.push({ title: 'Image saved', variant: 'success' });
+            }
+        } catch {
+            toast.push({ title: 'Could not create the image', variant: 'error' });
+        } finally {
+            setBusy(false);
+        }
+    }, [generate, filename, toast]);
+
+    const handleDownload = useCallback(async () => {
+        setBusy(true);
+        try {
+            const blob = await generate();
+            downloadImage(blob, filename);
+            toast.push({
+                title: 'Image saved',
+                message: 'Your passport card was downloaded.',
+                variant: 'success',
+            });
+        } catch {
+            toast.push({ title: 'Could not create the image', variant: 'error' });
+        } finally {
+            setBusy(false);
+        }
+    }, [generate, filename, toast]);
+
+    const ready = scoped != null && shareUrl != null;
+
+    return (
+        <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={onClose}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Share your Dance Passport as a card"
+        >
+            <div
+                className="w-full max-w-sm border border-slate-200 bg-white shadow-xl"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                    <h2 className="text-sm font-semibold text-slate-900">Share as card</h2>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        aria-label="Close"
+                        className="text-slate-400 hover:text-slate-600"
+                    >
+                        ✕
+                    </button>
+                </div>
+
+                <div className="space-y-4 px-4 py-4">
+                    <div className="inline-flex border border-slate-300">
+                        <button
+                            type="button"
+                            aria-pressed={scope === 'all'}
+                            onClick={() => setScope('all')}
+                            className={
+                                scope === 'all'
+                                    ? 'bg-blue-500 px-3 py-1.5 text-sm font-medium text-white'
+                                    : 'bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50'
+                            }
+                        >
+                            All time
+                        </button>
+                        <button
+                            type="button"
+                            aria-pressed={scope === currentYear}
+                            onClick={() => setScope(currentYear)}
+                            className={
+                                scope === currentYear
+                                    ? 'border-l border-slate-300 bg-blue-500 px-3 py-1.5 text-sm font-medium text-white'
+                                    : 'border-l border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50'
+                            }
+                        >
+                            {currentYear}
+                        </button>
+                    </div>
+
+                    {ready ? (
+                        <div
+                            className="mx-auto overflow-hidden border border-slate-200"
+                            style={{
+                                width: CARD_WIDTH * CARD_PREVIEW_SCALE,
+                                height: CARD_HEIGHT * CARD_PREVIEW_SCALE,
+                            }}
+                        >
+                            <div
+                                style={{
+                                    width: CARD_WIDTH,
+                                    height: CARD_HEIGHT,
+                                    transform: `scale(${CARD_PREVIEW_SCALE})`,
+                                    transformOrigin: 'top left',
+                                }}
+                            >
+                                <div ref={cardRef}>
+                                    <PassportShareCard
+                                        displayName={displayName}
+                                        handle={handle}
+                                        scoped={scoped}
+                                        memberSince={data.stats.member_since}
+                                        shareUrl={shareUrl}
+                                        showBadges={sections.badges}
+                                        showMap={sections.map}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div
+                            className="mx-auto flex items-center justify-center border border-slate-200 bg-slate-50 text-xs text-slate-500"
+                            style={{
+                                width: CARD_WIDTH * CARD_PREVIEW_SCALE,
+                                height: CARD_HEIGHT * CARD_PREVIEW_SCALE,
+                            }}
+                        >
+                            Preparing your card…
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex justify-end gap-2 border-t border-slate-200 px-4 py-3">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                        Close
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleDownload}
+                        disabled={!ready || busy}
+                        className="border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        Download
+                    </button>
+                    {canNativeShare && (
+                        <button
+                            type="button"
+                            onClick={handleShare}
+                            disabled={!ready || busy}
+                            className="border border-blue-600 bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            Share
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/** "Share as card" trigger that opens the card dialog. */
+function SharePassportCardButton({
+    handle,
+    displayName,
+    shareCode,
+    data,
+    mapEvents,
+}: {
+    handle: string;
+    displayName: string;
+    shareCode: string | null;
+    data: PassportResponse;
+    mapEvents: PassportMapEvent[] | null;
+}) {
+    const [open, setOpen] = useState(false);
+    return (
+        <>
+            <button
+                type="button"
+                onClick={() => setOpen(true)}
+                className="inline-flex items-center gap-1.5 border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            >
+                Share as card
+            </button>
+            {open && (
+                <SharePassportCardModal
+                    handle={handle}
+                    displayName={displayName}
+                    shareCode={shareCode}
+                    data={data}
+                    mapEvents={mapEvents}
+                    onClose={() => setOpen(false)}
+                />
+            )}
         </>
     );
 }
@@ -724,7 +1014,16 @@ export default function PassportPage() {
                         data={data}
                         headerActions={
                             user?.handle ? (
-                                <SharePassportButton handle={user.handle} />
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <SharePassportButton handle={user.handle} />
+                                    <SharePassportCardButton
+                                        handle={user.handle}
+                                        displayName={(user.name || '').trim().split(/\s+/)[0] || user.handle}
+                                        shareCode={user.share_code ?? null}
+                                        data={data}
+                                        mapEvents={mapEvents}
+                                    />
+                                </div>
                             ) : undefined
                         }
                         timelineActions={<AddPastEventControl onAdded={handlePastEventAdded} />}

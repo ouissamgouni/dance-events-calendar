@@ -118,7 +118,7 @@ function AppShell() {
     <NotificationsProvider>
       <>
         <div
-          className="flex flex-col h-dvh"
+          className="flex flex-col h-full"
           style={qaPinnedWidth ? { marginRight: qaPinnedWidth, transition: 'margin-right 0.2s ease' } : { transition: 'margin-right 0.2s ease' }}
         >
           <div
@@ -135,7 +135,17 @@ function AppShell() {
               <DesktopNav />
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
+              {/* Desktop: inline event search, mirroring the people search box */}
               <ExplorerEventSearch
+                className="hidden sm:block w-64"
+                pastToggle
+                headerInline
+                onSelectEvent={(eventId) => navigate(`/event/${eventId}`)}
+                triggerLabel="Search events"
+              />
+              {/* Mobile: compact icon trigger opening a panel */}
+              <ExplorerEventSearch
+                className="sm:hidden"
                 compact
                 onDark
                 pastToggle
@@ -161,6 +171,7 @@ function AppShell() {
                 <Route path="/calendar" element={<Home />} />
                 <Route path="/for-you" element={<ForYouPage />} />
                 <Route path="/event/:eventId" element={<EventDetailPage />} />
+                <Route path="/event/:eventId/review" element={<EventDetailPage />} />
                 <Route path="/series/:seriesId" element={<SeriesPage />} />
                 <Route path="/tribe" element={<SectionLayout section="tribe" />}>
                   <Route index element={<Navigate to="/tribe/calendars" replace />} />

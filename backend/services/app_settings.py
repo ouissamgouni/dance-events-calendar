@@ -216,3 +216,43 @@ def get_interest_match_max_events_per_email(session: Optional[Session] = None) -
     if override is not None and override > 0:
         return override
     return DEFAULT_INTEREST_MATCH_MAX_EVENTS_PER_EMAIL
+
+
+# Activity features whose email delivery route (instant / digest) the admin
+# can configure independently. Each maps to two SiteSetting keys:
+# ``<feature>_email_instant`` and ``<feature>_email_digest``.
+EMAIL_MODE_FEATURES = (
+    "friends_going",
+    "social_activity",
+    "friend_reviews",
+    "friend_milestones",
+    "interest_matches",
+)
+
+
+def get_feature_email_instant(feature: str, session: Optional[Session] = None) -> bool:
+    """Admin route toggle: send ``feature`` emails immediately (non-batched)?
+
+    Defaults to False so features stay digest-only unless an admin opts in.
+    """
+    s, opened = _open_session(session)
+    try:
+        override = _get_bool_row(s, f"{feature}_email_instant")
+    finally:
+        if opened:
+            s.close()
+    return override if override is not None else False
+
+
+def get_feature_email_digest(feature: str, session: Optional[Session] = None) -> bool:
+    """Admin route toggle: include ``feature`` in the batched digest email?
+
+    Defaults to True (current behaviour for every activity feature).
+    """
+    s, opened = _open_session(session)
+    try:
+        override = _get_bool_row(s, f"{feature}_email_digest")
+    finally:
+        if opened:
+            s.close()
+    return override if override is not None else True

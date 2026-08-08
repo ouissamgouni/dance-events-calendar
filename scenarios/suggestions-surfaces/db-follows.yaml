@@ -4,17 +4,32 @@
 # candidate accounts with descending overlap:
 #   pop1: followed by alice + bob + carol (3 mutual witnesses)
 #   pop2: followed by alice + bob (2 mutual witnesses)
-#   pop3: followed by alice (1 mutual witness)
+#   pop3-pop14: followed by alice (1 mutual witness each)
 #   privatepop: followed by alice (1 mutual witness; friends-only but suggestable)
 #   hiddenpop: followed by alice + bob (opted out; must be excluded)
+#
+# pop4-pop14 are ranked by secondary signals (interest overlap, activity recency).
+# The pool of 15 graph candidates (pop1-pop14 + privatepop) ensures "Show more"
+# + "Shuffle" on /discover (page 12) and "Show more" on My network (page 6).
+#
+# thinviewer is mutual with dave only; dave follows just pop1/pop2, giving
+# thinviewer a 2-candidate FoF pool so /discover shows the organizer + curator
+# top-up right after the two network rows.
+#
+# salsahub/afrohub (verified organizers) are intentionally NOT in anyone's FoF
+# graph; they reach /discover through the organizer top-up tier, proving
+# organizers are surfaced even when not reachable via your network.
 #
 # newbie has no graph. The popular tail below also gives onboarding a
 # deterministic most-followed fallback after the verified organizer and
 # admin-managed curator candidates.
 #
-# The expected ordered Discover suggestion set for viewer is:
-#   pop1, pop2, pop3, privatepop, curator-bachata, curator-paris
-# where curators are the zero-score fallback/top-up candidates.
+# The expected ordered Discover suggestion set for viewer starts with:
+#   pop1, pop2, privatepop, pop3, pop4-pop14...
+# where privatepop outranks the alphabetically-earlier pop3 on the blended
+# score. For thinviewer it is:
+#   pop1, pop2, salsahub, afrohub, curator-bachata, curator-paris
+# (2 network rows, then the organizer top-up, then the curator top-up).
 follows:
   - follower: viewer
     followee: alice
@@ -35,6 +50,28 @@ follows:
   - follower: alice
     followee: pop3
   - follower: alice
+    followee: pop4
+  - follower: alice
+    followee: pop5
+  - follower: alice
+    followee: pop6
+  - follower: alice
+    followee: pop7
+  - follower: alice
+    followee: pop8
+  - follower: alice
+    followee: pop9
+  - follower: alice
+    followee: pop10
+  - follower: alice
+    followee: pop11
+  - follower: alice
+    followee: pop12
+  - follower: alice
+    followee: pop13
+  - follower: alice
+    followee: pop14
+  - follower: alice
     followee: privatepop
   - follower: alice
     followee: hiddenpop
@@ -50,3 +87,17 @@ follows:
     followee: salsahub
   - follower: admin
     followee: curator-bachata
+  # thinviewer <-> dave are mutual friends. dave follows only pop1/pop2, so
+  # thinviewer's friend-of-friend pool is just those two. On /discover this
+  # leaves spare slots on the first page, so the organizer (salsahub, afrohub)
+  # and curator (curator-bachata, curator-paris) top-up rows appear right
+  # after the two network rows. thinviewer is deliberately NOT a friend of
+  # alice/bob/carol, so viewer's expected FoF ordering is unaffected.
+  - follower: thinviewer
+    followee: dave
+  - follower: dave
+    followee: thinviewer
+  - follower: dave
+    followee: pop1
+  - follower: dave
+    followee: pop2

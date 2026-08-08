@@ -886,6 +886,12 @@ def get_me(
         "push_review_prompt_enabled": user.push_review_prompt_enabled,
         "email_milestone_unlocked_enabled": user.email_milestone_unlocked_enabled,
         "push_milestone_unlocked_enabled": user.push_milestone_unlocked_enabled,
+        "email_friends_going_enabled": user.email_friends_going_enabled,
+        "push_friends_going_enabled": user.push_friends_going_enabled,
+        "email_friend_reviews_enabled": user.email_friend_reviews_enabled,
+        "push_friend_reviews_enabled": user.push_friend_reviews_enabled,
+        "email_friend_milestones_enabled": user.email_friend_milestones_enabled,
+        "push_friend_milestones_enabled": user.push_friend_milestones_enabled,
         # Legacy aliases derived from the new flags. Kept for one release so
         # older frontend clients still work (Phase G §G.9 step 5 drops them).
         "reminder_email_enabled": user.email_event_reminders_enabled,
@@ -1025,6 +1031,12 @@ class UpdateNotificationPreferencesRequest(BaseModel):
     push_review_prompt_enabled: Optional[bool] = None
     email_milestone_unlocked_enabled: Optional[bool] = None
     push_milestone_unlocked_enabled: Optional[bool] = None
+    email_friends_going_enabled: Optional[bool] = None
+    push_friends_going_enabled: Optional[bool] = None
+    email_friend_reviews_enabled: Optional[bool] = None
+    push_friend_reviews_enabled: Optional[bool] = None
+    email_friend_milestones_enabled: Optional[bool] = None
+    push_friend_milestones_enabled: Optional[bool] = None
     # Legacy aliases — removed in the cleanup PR (§G.9 step 5).
     reminder_email_enabled: Optional[bool] = None
     activity_email_enabled: Optional[bool] = None
@@ -1076,6 +1088,12 @@ _NEW_FLAGS: tuple[str, ...] = (
     "push_review_prompt_enabled",
     "email_milestone_unlocked_enabled",
     "push_milestone_unlocked_enabled",
+    "email_friends_going_enabled",
+    "push_friends_going_enabled",
+    "email_friend_reviews_enabled",
+    "push_friend_reviews_enabled",
+    "email_friend_milestones_enabled",
+    "push_friend_milestones_enabled",
 )
 
 
@@ -1126,6 +1144,12 @@ def update_notification_preferences(
         "push_review_prompt_enabled": user.push_review_prompt_enabled,
         "email_milestone_unlocked_enabled": user.email_milestone_unlocked_enabled,
         "push_milestone_unlocked_enabled": user.push_milestone_unlocked_enabled,
+        "email_friends_going_enabled": user.email_friends_going_enabled,
+        "push_friends_going_enabled": user.push_friends_going_enabled,
+        "email_friend_reviews_enabled": user.email_friend_reviews_enabled,
+        "push_friend_reviews_enabled": user.push_friend_reviews_enabled,
+        "email_friend_milestones_enabled": user.email_friend_milestones_enabled,
+        "push_friend_milestones_enabled": user.push_friend_milestones_enabled,
         # Legacy mirror (removed in cleanup PR).
         "reminder_email_enabled": user.email_event_reminders_enabled,
         "activity_email_enabled": (

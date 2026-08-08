@@ -8,11 +8,14 @@ expectation: every marketing-adjacent email carries a working opt-out).
 Tokens are intentionally long-lived (no expiry): an unsubscribe link in an
 old email must keep working. Categories map to a boolean User column:
 
-* ``reminder``         -> ``email_event_reminders_enabled``
-* ``social_activity``  -> ``email_social_activity_enabled``
-* ``interest_matches`` -> ``email_interest_matches_enabled``
-* ``promo_codes``      -> ``email_promo_codes_enabled``
-* ``review_prompt``    -> ``email_review_prompt_enabled``* ``milestone``         -> ``email_milestone_unlocked_enabled``
+* ``reminder``          -> ``email_event_reminders_enabled``
+* ``social_activity``   -> ``email_social_activity_enabled``
+* ``friends_going``     -> ``email_friends_going_enabled``
+* ``friend_reviews``    -> ``email_friend_reviews_enabled``
+* ``friend_milestones`` -> ``email_friend_milestones_enabled``
+* ``interest_matches``  -> ``email_interest_matches_enabled``
+* ``promo_codes``       -> ``email_promo_codes_enabled``
+* ``review_prompt``     -> ``email_review_prompt_enabled``* ``milestone``          -> ``email_milestone_unlocked_enabled``
 Legacy category ``activity`` remains accepted for one release so
 unsubscribe links in already-delivered emails continue to work; it maps
 to both feature-specific email flags (social + interest) to preserve the
@@ -33,6 +36,9 @@ from backend.config.loader import get_session_secret
 UNSUBSCRIBE_CATEGORIES: dict[str, tuple[str, ...]] = {
     "reminder": ("email_event_reminders_enabled",),
     "social_activity": ("email_social_activity_enabled",),
+    "friends_going": ("email_friends_going_enabled",),
+    "friend_reviews": ("email_friend_reviews_enabled",),
+    "friend_milestones": ("email_friend_milestones_enabled",),
     "interest_matches": ("email_interest_matches_enabled",),
     "promo_codes": ("email_promo_codes_enabled",),
     "review_prompt": ("email_review_prompt_enabled",),

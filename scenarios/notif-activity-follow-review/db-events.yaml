@@ -1,0 +1,53 @@
+# Two past events Alice has reviewed. Seeding these ratings with
+# emit_notifications fans out subscription_review rows to Alice's
+# followers, exactly as the HTTP feedback route does.
+#
+#   ev-past  — Alice leaves a NAMED review → followers see "Alice
+#              reviewed ...". Carol is a co-attendee who has not rated
+#              it → gets the in-app row plus a "rate this" deep link.
+#   ev-anon  — Alice leaves an ANONYMOUS review → followers still get a
+#              row, but the reviewer is masked to "Someone".
+base_week: 0
+emit_notifications: true
+events:
+  - id: ev-past
+    calendar_id: salsa-cal-001
+    title: Rooftop Salsa Social
+    description: "Past event Alice reviewed (named)."
+    location: "Skybar, Lisbon, Portugal"
+    latitude: 38.7139
+    longitude: -9.1394
+    start: w-1 Wed 05:00
+    end: w-1 Wed 08:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: ev-anon
+    calendar_id: salsa-cal-001
+    title: Bachata Warehouse Night
+    description: "Past event Alice reviewed anonymously."
+    location: "Studio Azul, Paris, France"
+    latitude: 48.8662
+    longitude: 2.3744
+    start: w-1 Fri 19:30
+    end: w-1 Fri 22:30
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local
+
+ratings:
+  - event_id: ev-past
+    email: alice@example.com
+    overall_sentiment: amazing
+    comment: "Incredible floor and DJ!"
+    status: approved
+
+  - event_id: ev-anon
+    email: alice@example.com
+    overall_sentiment: great
+    comment: "Fun night, went anonymously."
+    is_anonymous: true
+    status: approved

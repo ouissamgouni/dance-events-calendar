@@ -44,7 +44,7 @@ export default function EventDetailPage() {
     const [reviewCount, setReviewCount] = useState(0);
     const titleCancelledRef = useRef(false);
 
-    // Auto-open review modal when user clicks "Be the first to review" or arrives via ?rate=1.
+    // Auto-open review modal when user clicks "Be the first to review" or arrives via the /review path.
     // A counter (not a boolean) so repeated requests to open the modal — e.g. clicking
     // "Be the first to review" again after closing it — reliably reopen it.
     const [reviewOpenToken, setReviewOpenToken] = useState(0);
@@ -52,35 +52,34 @@ export default function EventDetailPage() {
     // reloads its aggregate + review list without a full remount.
     const [reviewsRefreshToken, setReviewsRefreshToken] = useState(0);
 
-    // `?rate=1` arrives from a review-prompt notification ("how was it?")
-    // — auto-open the Rate modal once the event (and RateEventButton) has
-    // mounted, then drop the param from the URL so it doesn't reopen on
-    // refresh/back-navigation. Captured once via ref since `event` loads
-    // asynchronously and we must not lose the flag before it's read below.
-    // Bumping the token must wait until `event` is loaded: while it's still
-    // null this page renders a "Loading…" placeholder and RateEventButton
-    // isn't mounted yet, so its `autoOpenToken` ref would initialize to the
-    // already-bumped value and never see a "change" to react to.
-    const autoOpenRatingRef = useRef(searchParams.get('rate') === '1');
+    // The `/event/:id/review` path arrives from a review-prompt notification
+    // ("how was it?") — auto-open the Rate modal once the event (and
+    // RateEventButton) has mounted, then rewrite the URL to the canonical
+    // `/event/:id#community` so it doesn't reopen on refresh/back-navigation
+    // and closing the modal leaves the user on the reviews section. A path
+    // segment (not a query param) is used because it survives mobile PWA
+    // link-capture and redirects far more reliably than `?query`/`#hash`.
+    // Captured once via ref since `event` loads asynchronously and we must
+    // not lose the flag before it's read below. Bumping the token must wait
+    // until `event` is loaded: while it's still null this page renders a
+    // "Loading…" placeholder and RateEventButton isn't mounted yet, so its
+    // `autoOpenToken` ref would initialize to the already-bumped value and
+    // never see a "change" to react to.
+    const autoOpenRatingRef = useRef(location.pathname.endsWith('/review'));
     useEffect(() => {
         if (!autoOpenRatingRef.current || !event || authLoading) return;
         if (!user) {
             // Not signed in yet (e.g. clicked a review-prompt email/push
             // link cold) — send to login, then bounce straight back to this
-            // exact review URL (incl. `?rate=1#community`) once authenticated.
+            // exact review URL once authenticated.
             const returnTo = `${location.pathname}${location.search}${location.hash}`;
             navigate(`/login?next=${encodeURIComponent(returnTo)}`, { replace: true });
             return;
         }
         autoOpenRatingRef.current = false;
         setReviewOpenToken((t) => t + 1);
-        const next = new URLSearchParams(searchParams);
-        next.delete('rate');
-        // `setSearchParams` navigates to a bare "?search" string and drops
-        // any existing hash (e.g. `#community`), so restore it explicitly.
-        const nextSearch = next.toString();
         navigate(
-            { pathname: location.pathname, search: nextSearch ? `?${nextSearch}` : '', hash: location.hash },
+            { pathname: `/event/${eventId}`, search: location.search, hash: '#community' },
             { replace: true },
         );
         // eslint-disable-next-line react-hooks/exhaustive-deps
