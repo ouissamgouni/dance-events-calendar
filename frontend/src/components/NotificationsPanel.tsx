@@ -76,7 +76,7 @@ export default function NotificationsPanel({
             await markRead(item.id);
         }
         onClose();
-        if (item.kind === 'new_follower' || item.kind === 'new_friend' || item.kind === 'follow_request') {
+        if (item.kind === 'new_follower' || item.kind === 'new_friend' || item.kind === 'follow_request' || item.kind === 'subscription_milestone') {
             navigate(`/u/${item.actor.handle}`);
         } else if (item.kind === 'organizer_claim_decided') {
             navigate('/account');
