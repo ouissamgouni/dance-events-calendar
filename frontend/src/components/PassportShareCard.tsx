@@ -213,7 +213,7 @@ export default function PassportShareCard({
                             <p className="mt-1 text-xs font-medium text-slate-400">{dancingSinceLine}</p>
                         )}
                     </div>
-                    <p className="mt-1 max-w-[45%] shrink-0 text-right text-sm font-medium leading-tight text-blue-300">
+                    <p className="mt-4 max-w-[50%]  text-right text-sm font-medium leading-tight text-blue-300">
                         {headline}
                     </p>
                 </div>
