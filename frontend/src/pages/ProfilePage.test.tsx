@@ -87,6 +87,7 @@ describe('ProfilePage Dance Passport tab', () => {
             avg_gap_days: null,
             first_event_date: '2024-01-01T00:00:00',
             member_since: '2024-01-01T00:00:00',
+            dancing_since: null,
         },
         collections: { cities: [], countries: [] },
         milestones: [],

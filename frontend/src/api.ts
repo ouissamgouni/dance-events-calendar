@@ -2109,6 +2109,7 @@ export async function updateMyVisibility(
         passport_show_cities: boolean;
         passport_show_countries: boolean;
         passport_show_timeline: boolean;
+        dancing_since: string | null;
     }>,
 ): Promise<PublicProfile> {
     const res = await fetch(`${BASE}/social/me/visibility`, {

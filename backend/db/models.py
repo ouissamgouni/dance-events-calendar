@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import List, Optional
 from uuid import UUID, uuid4
 
@@ -97,6 +97,10 @@ class User(SQLModel, table=True):
     passport_show_cities: bool = Field(default=True, nullable=False)
     passport_show_countries: bool = Field(default=True, nullable=False)
     passport_show_timeline: bool = Field(default=False, nullable=False)
+    # User-chosen date they started dancing (may predate joining Movida).
+    # Drives the "Dancing since" line on the passport + share card; distinct
+    # from ``created_at`` (account) and the earliest attended event.
+    dancing_since: Optional[date] = Field(default=None)
     # Admin-granted credibility badge surfaced on the public profile.
     is_verified_organizer: bool = Field(default=False, nullable=False)
     # Phase: admin-curated lists. When True the account is operated by

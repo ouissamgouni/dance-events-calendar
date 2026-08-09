@@ -32,7 +32,7 @@ describe('PassportShareCard', () => {
         expect(screen.getByText('13')).toBeInTheDocument()
         expect(screen.getByText('50 Events')).toBeInTheDocument()
         expect(screen.getByText(/Dancer since/)).toBeInTheDocument()
-        expect(screen.getByText(/Most active in/)).toHaveTextContent('Barcelona')
+        expect(screen.queryByText(/Most active in/)).not.toBeInTheDocument()
     })
 
     it('shows a year subtitle and an empty state for a year with no events', () => {

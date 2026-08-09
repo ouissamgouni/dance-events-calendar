@@ -24,6 +24,7 @@ import { useToast } from '../components/Toast';
 import ExplorerEventSearch from '../components/ExplorerEventSearch';
 import PassportView from '../components/PassportView';
 import PassportShareCard from '../components/PassportShareCard';
+import SuggestEventModal from '../components/SuggestEventModal';
 import { scopePassport, type ShareScope } from '../utils/passportScope';
 import { CARD_HEIGHT, CARD_WIDTH, downloadImage, renderCardToBlob, shareImage } from '../utils/passportShareImage';
 import type {
@@ -345,20 +346,93 @@ function SharePassportModal({ handle, onClose }: { handle: string; onClose: () =
     );
 }
 
-/** "Share my passport" trigger that opens the link-sharing dialog. */
-function SharePassportButton({ handle }: { handle: string }) {
-    const [open, setOpen] = useState(false);
+/** Single "Share" trigger opening a menu: share as link or as card. */
+function SharePassportMenu({
+    handle,
+    displayName,
+    shareCode,
+    data,
+    mapEvents,
+}: {
+    handle: string;
+    displayName: string;
+    shareCode: string | null;
+    data: PassportResponse;
+    mapEvents: PassportMapEvent[] | null;
+}) {
+    const [menuOpen, setMenuOpen] = useState(false);
+    const [modal, setModal] = useState<'link' | 'card' | null>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!menuOpen) return;
+        const onDown = (e: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+        };
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setMenuOpen(false);
+        };
+        document.addEventListener('mousedown', onDown);
+        document.addEventListener('keydown', onKey);
+        return () => {
+            document.removeEventListener('mousedown', onDown);
+            document.removeEventListener('keydown', onKey);
+        };
+    }, [menuOpen]);
+
     return (
-        <>
+        <div ref={menuRef} className="relative">
             <button
                 type="button"
-                onClick={() => setOpen(true)}
+                onClick={() => setMenuOpen((o) => !o)}
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
                 className="inline-flex items-center gap-1.5 border border-blue-600 bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
             >
                 Share
+                <span aria-hidden>▾</span>
             </button>
-            {open && <SharePassportModal handle={handle} onClose={() => setOpen(false)} />}
-        </>
+            {menuOpen && (
+                <div
+                    role="menu"
+                    className="absolute right-0 z-20 mt-1 w-40 border border-slate-200 bg-white shadow-lg"
+                >
+                    <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                            setMenuOpen(false);
+                            setModal('link');
+                        }}
+                        className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                        As link
+                    </button>
+                    <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                            setMenuOpen(false);
+                            setModal('card');
+                        }}
+                        className="block w-full border-t border-slate-100 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                        As card
+                    </button>
+                </div>
+            )}
+            {modal === 'link' && <SharePassportModal handle={handle} onClose={() => setModal(null)} />}
+            {modal === 'card' && (
+                <SharePassportCardModal
+                    handle={handle}
+                    displayName={displayName}
+                    shareCode={shareCode}
+                    data={data}
+                    mapEvents={mapEvents}
+                    onClose={() => setModal(null)}
+                />
+            )}
+        </div>
     );
 }
 
@@ -391,7 +465,7 @@ function SharePassportCardModal({
     const [scope, setScope] = useState<ShareScope>('all');
     const [events, setEvents] = useState<PassportMapEvent[] | null>(mapEvents);
     const [shareUrl, setShareUrl] = useState<string | null>(null);
-    const [sections, setSections] = useState({ badges: true, map: true });
+    const [sections, setSections] = useState({ badges: true, map: true, dancingSince: true });
     const [busy, setBusy] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
     const canNativeShare =
@@ -425,6 +499,7 @@ function SharePassportCardModal({
                     setSections({
                         badges: profile.passport_show_badges ?? true,
                         map: profile.passport_show_cities ?? true,
+                        dancingSince: true,
                     });
                 }
             } catch {
@@ -537,6 +612,35 @@ function SharePassportCardModal({
                         </button>
                     </div>
 
+                    <div className="flex flex-wrap items-center gap-4">
+                        <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                            <input
+                                type="checkbox"
+                                checked={sections.map}
+                                onChange={(e) => setSections((s) => ({ ...s, map: e.target.checked }))}
+                            />
+                            Map
+                        </label>
+                        <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                            <input
+                                type="checkbox"
+                                checked={sections.badges}
+                                onChange={(e) => setSections((s) => ({ ...s, badges: e.target.checked }))}
+                            />
+                            Badges
+                        </label>
+                        {scope === 'all' && (
+                            <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                                <input
+                                    type="checkbox"
+                                    checked={sections.dancingSince}
+                                    onChange={(e) => setSections((s) => ({ ...s, dancingSince: e.target.checked }))}
+                                />
+                                Dancing since
+                            </label>
+                        )}
+                    </div>
+
                     {ready ? (
                         <div
                             className="mx-auto overflow-hidden border border-slate-200"
@@ -558,10 +662,11 @@ function SharePassportCardModal({
                                         displayName={displayName}
                                         handle={handle}
                                         scoped={scoped}
-                                        memberSince={data.stats.member_since}
+                                        memberSince={data.stats.dancing_since ?? data.stats.member_since}
                                         shareUrl={shareUrl}
                                         showBadges={sections.badges}
                                         showMap={sections.map}
+                                        showDancingSince={sections.dancingSince}
                                     />
                                 </div>
                             </div>
@@ -611,41 +716,108 @@ function SharePassportCardModal({
     );
 }
 
-/** "Share as card" trigger that opens the card dialog. */
-function SharePassportCardButton({
-    handle,
-    displayName,
-    shareCode,
-    data,
-    mapEvents,
+function formatJourneyDate(iso: string): string {
+    try {
+        return new Date(iso).toLocaleDateString(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+        });
+    } catch {
+        return iso;
+    }
+}
+
+/**
+ * Owner-only "Dancing since" line for the passport overview: shows the
+ * effective start date (user-set ``dancing_since`` or the account date) with an
+ * inline date editor, plus the first Movida event date for context.
+ */
+function DancingSinceControl({
+    dancingSince,
+    memberSince,
+    firstEventDate,
+    onSaved,
 }: {
-    handle: string;
-    displayName: string;
-    shareCode: string | null;
-    data: PassportResponse;
-    mapEvents: PassportMapEvent[] | null;
+    dancingSince: string | null;
+    memberSince: string;
+    firstEventDate: string | null;
+    onSaved: (iso: string) => void;
 }) {
-    const [open, setOpen] = useState(false);
+    const toast = useToast();
+    const [editing, setEditing] = useState(false);
+    const [value, setValue] = useState('');
+    const [saving, setSaving] = useState(false);
+    const effective = dancingSince ?? memberSince;
+    const today = new Date().toISOString().slice(0, 10);
+
+    const startEdit = () => {
+        setValue((dancingSince ?? memberSince ?? '').slice(0, 10));
+        setEditing(true);
+    };
+
+    const save = async () => {
+        if (!value) return;
+        setSaving(true);
+        try {
+            await updateMyVisibility({ dancing_since: value });
+            onSaved(value);
+            setEditing(false);
+            toast.push({ title: 'Saved', variant: 'success' });
+        } catch {
+            toast.push({ title: 'Could not save', variant: 'error' });
+        } finally {
+            setSaving(false);
+        }
+    };
+
     return (
-        <>
-            <button
-                type="button"
-                onClick={() => setOpen(true)}
-                className="inline-flex items-center gap-1.5 border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-            >
-                Share as card
-            </button>
-            {open && (
-                <SharePassportCardModal
-                    handle={handle}
-                    displayName={displayName}
-                    shareCode={shareCode}
-                    data={data}
-                    mapEvents={mapEvents}
-                    onClose={() => setOpen(false)}
-                />
+        <div className="text-xs text-slate-300">
+            {editing ? (
+                <div className="flex flex-wrap items-center gap-2">
+                    <span>Dancing since</span>
+                    <input
+                        type="date"
+                        value={value}
+                        max={today}
+                        onChange={(e) => setValue(e.target.value)}
+                        aria-label="Dancing since"
+                        className="border border-slate-600 bg-slate-800 px-2 py-1 text-white"
+                    />
+                    <button
+                        type="button"
+                        onClick={save}
+                        disabled={saving || !value}
+                        className="border border-blue-600 bg-blue-600 px-2 py-1 font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                    >
+                        Save
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setEditing(false)}
+                        className="border border-slate-600 bg-slate-800 px-2 py-1 font-medium text-slate-200 hover:bg-slate-700"
+                    >
+                        Cancel
+                    </button>
+                </div>
+            ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                    <span>Dancing since {formatJourneyDate(effective)}</span>
+                    <button
+                        type="button"
+                        onClick={startEdit}
+                        className="underline underline-offset-2 hover:text-white"
+                    >
+                        Edit
+                    </button>
+                </div>
             )}
-        </>
+            {firstEventDate && (
+                <p className="mt-0.5 text-slate-400">
+                    First event on Movida {formatJourneyDate(firstEventDate)}
+                </p>
+            )}
+        </div>
     );
 }
 
@@ -839,7 +1011,7 @@ function AttendedEventConfirmModal({
  * past events) to pick an event, then confirms attendance before it is added
  * to the passport.
  */
-function AddPastEventControl({ onAdded }: { onAdded: () => void }) {
+function AddPastEventControl({ onAdded, onOpenSubmitEvent }: { onAdded: () => void; onOpenSubmitEvent?: () => void }) {
     const [confirmId, setConfirmId] = useState<string | null>(null);
     return (
         <>
@@ -848,6 +1020,7 @@ function AddPastEventControl({ onAdded }: { onAdded: () => void }) {
                 small
                 triggerLabel="Add a past event"
                 onSelectEvent={(id) => setConfirmId(id)}
+                onOpenSubmitEvent={onOpenSubmitEvent}
             />
             {confirmId && (
                 <AttendedEventConfirmModal
@@ -874,6 +1047,7 @@ export default function PassportPage() {
     const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [mapEvents, setMapEvents] = useState<PassportMapEvent[] | null>(null);
+    const [showSuggestModal, setShowSuggestModal] = useState(false);
     const mapEventsRef = useRef(false);
     const celebratedRef = useRef(false);
 
@@ -1014,19 +1188,28 @@ export default function PassportPage() {
                         data={data}
                         headerActions={
                             user?.handle ? (
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <SharePassportButton handle={user.handle} />
-                                    <SharePassportCardButton
-                                        handle={user.handle}
-                                        displayName={(user.name || '').trim().split(/\s+/)[0] || user.handle}
-                                        shareCode={user.share_code ?? null}
-                                        data={data}
-                                        mapEvents={mapEvents}
-                                    />
-                                </div>
+                                <SharePassportMenu
+                                    handle={user.handle}
+                                    displayName={(user.name || '').trim().split(/\s+/)[0] || user.handle}
+                                    shareCode={user.share_code ?? null}
+                                    data={data}
+                                    mapEvents={mapEvents}
+                                />
                             ) : undefined
                         }
-                        timelineActions={<AddPastEventControl onAdded={handlePastEventAdded} />}
+                        dancingSinceSlot={
+                            <DancingSinceControl
+                                dancingSince={data.stats.dancing_since}
+                                memberSince={data.stats.member_since}
+                                firstEventDate={data.stats.first_event_date}
+                                onSaved={(iso) =>
+                                    setData((d) =>
+                                        d ? { ...d, stats: { ...d.stats, dancing_since: iso } } : d,
+                                    )
+                                }
+                            />
+                        }
+                        timelineActions={<AddPastEventControl onAdded={handlePastEventAdded} onOpenSubmitEvent={() => setShowSuggestModal(true)} />}
                         timelineItems={items}
                         timelineMarkers={markers}
                         timelineHasMore={hasMore}
@@ -1036,6 +1219,9 @@ export default function PassportPage() {
                         onNeedMapEvents={loadMapEvents}
                     />
                 </>
+            )}
+            {showSuggestModal && (
+                <SuggestEventModal onClose={() => setShowSuggestModal(false)} />
             )}
         </div>
     );

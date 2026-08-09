@@ -149,6 +149,7 @@ def build_stats_context(session: Session, user) -> dict:
         "avg_gap_days": average_gap_days(events),
         "first_event_date": events[-1].start if events else None,
         "member_since": user.created_at,
+        "dancing_since": user.dancing_since,
     }
 
 

@@ -11,6 +11,7 @@ Covers:
 import os
 
 import pytest
+from datetime import date
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine, select
@@ -369,6 +370,18 @@ def test_update_visibility_rejects_unknown_value(client, session):
         json={"account_visibility": "world-readable"},
     )
     assert r.status_code == 422
+
+
+def test_update_visibility_persists_dancing_since(client, session):
+    user = _make_user(session, "alice@example.com", "alice")
+    _login(client, "alice@example.com")
+    r = client.patch(
+        "/api/social/me/visibility",
+        json={"dancing_since": "2019-05-01"},
+    )
+    assert r.status_code == 200, r.text
+    session.refresh(user)
+    assert user.dancing_since == date(2019, 5, 1)
 
 
 # --- Social links -----------------------------------------------------------

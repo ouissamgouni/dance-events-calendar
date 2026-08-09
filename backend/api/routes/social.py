@@ -1499,6 +1499,8 @@ def update_visibility(
         viewer.passport_show_countries = payload.passport_show_countries
     if payload.passport_show_timeline is not None:
         viewer.passport_show_timeline = payload.passport_show_timeline
+    if payload.dancing_since is not None:
+        viewer.dancing_since = payload.dancing_since
     session.add(viewer)
     session.commit()
     session.refresh(viewer)
@@ -2595,9 +2597,7 @@ def discover_suggested(
     # Follows-in-common attribution for the network page (same "Followed by
     # @alice + N more" pill as My network). Keyed on the viewer's friends.
     viewer_friends = _friend_ids(session, viewer.id)
-    previews = _mutual_friends_previews(
-        session, viewer_friends, [u.id for u in page]
-    )
+    previews = _mutual_friends_previews(session, viewer_friends, [u.id for u in page])
     items = [
         _user_to_search_result(
             session,

@@ -673,6 +673,7 @@ export interface PassportStats {
     avg_gap_days: number | null;
     first_event_date: string | null;
     member_since: string;
+    dancing_since: string | null;
 }
 
 export interface PassportCityCollection {

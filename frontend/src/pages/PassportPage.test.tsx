@@ -83,6 +83,7 @@ const PASSPORT = {
         avg_gap_days: 11.5,
         first_event_date: '2024-01-10T20:00:00',
         member_since: '2023-06-01T00:00:00',
+        dancing_since: null,
     },
     collections: {
         cities: [
@@ -237,9 +238,10 @@ describe('PassportPage', () => {
 
         renderPassport()
 
-        // Opening the dialog does not mint a link yet.
+        // Opening the menu does not mint a link yet.
         const openBtn = await screen.findByRole('button', { name: 'Share' })
         fireEvent.click(openBtn)
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'As link' }))
         expect(shareCalled).toBe(false)
 
         // The dialog's own "Share link" button performs the mint.
@@ -297,7 +299,8 @@ describe('PassportPage', () => {
 
         renderPassport()
 
-        fireEvent.click(await screen.findByRole('button', { name: 'Share as card' }))
+        fireEvent.click(await screen.findByRole('button', { name: 'Share' }))
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'As card' }))
 
         // The dialog prepares the card (mints a link so the QR resolves, loads
         // events + section flags), then Download saves the PNG directly.

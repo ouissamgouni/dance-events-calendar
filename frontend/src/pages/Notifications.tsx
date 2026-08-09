@@ -421,7 +421,7 @@ function NotificationRow({
                     type="button"
                     onClick={() => {
                         if (isUnread) onMarkRead();
-                        navigate(`/event/${item.event_id}?rate=1#community`);
+                        navigate(`/event/${item.event_id}/review`);
                     }}
                     className="min-w-0 flex-1 text-left"
                 >

@@ -19,6 +19,7 @@ const PUBLIC_PASSPORT = {
         avg_gap_days: 14,
         first_event_date: '2023-06-01T00:00:00',
         member_since: '2023-06-01T00:00:00',
+        dancing_since: null,
     },
     collections: { cities: [], countries: [] },
     milestones: [

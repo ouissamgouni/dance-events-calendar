@@ -98,6 +98,7 @@ def build_shared_passport(
         avg_gap_days=ctx["avg_gap_days"],
         first_event_date=ctx["first_event_date"],
         member_since=ctx["member_since"],
+        dancing_since=ctx["dancing_since"],
     )
 
     milestones: list[PassportMilestone] = []
@@ -205,6 +206,7 @@ def get_passport(
         avg_gap_days=ctx["avg_gap_days"],
         first_event_date=ctx["first_event_date"],
         member_since=ctx["member_since"],
+        dancing_since=ctx["dancing_since"],
     )
     collections = passport_service.collections(ctx["events"])
     milestones = [

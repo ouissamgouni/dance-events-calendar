@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal, Optional
 from uuid import UUID
 
@@ -1949,6 +1949,7 @@ class UpdateVisibilityRequest(BaseModel):
     passport_show_cities: Optional[bool] = None
     passport_show_countries: Optional[bool] = None
     passport_show_timeline: Optional[bool] = None
+    dancing_since: Optional[date] = None
 
 
 class UpdateSocialLinksRequest(BaseModel):
@@ -2539,6 +2540,7 @@ class PassportStats(BaseModel):
     avg_gap_days: Optional[float] = None
     first_event_date: Optional[datetime] = None
     member_since: datetime
+    dancing_since: Optional[date] = None
 
 
 class PassportCityCollection(BaseModel):

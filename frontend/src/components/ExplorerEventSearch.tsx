@@ -22,6 +22,8 @@ interface ExplorerEventSearchProps {
      *  "Include past" toggle inline in the header box, and show only results
      *  (no duplicate search input) in the dropdown below. */
     headerInline?: boolean;
+    /** Callback to open the submit event form (shown in search overlay footer when includePast is true). */
+    onOpenSubmitEvent?: () => void;
 }
 
 function useDebounced<T>(value: T, ms: number): T {
@@ -83,6 +85,7 @@ export default function ExplorerEventSearch({
     includePast = false,
     pastToggle = false,
     headerInline = false,
+    onOpenSubmitEvent,
 }: ExplorerEventSearchProps) {
     const [open, setOpen] = useState(false);
     const [q, setQ] = useState('');
@@ -398,6 +401,20 @@ export default function ExplorerEventSearch({
                             );
                         })}
                     </div>
+                    {includePast && onOpenSubmitEvent && (
+                        <div className="border-t border-slate-200 bg-white px-3 py-2 text-center text-xs">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onOpenSubmitEvent();
+                                    reset();
+                                }}
+                                className="font-medium text-blue-600 hover:underline"
+                            >
+                                Missing event? Add it
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

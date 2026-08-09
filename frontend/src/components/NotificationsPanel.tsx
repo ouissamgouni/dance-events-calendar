@@ -81,7 +81,7 @@ export default function NotificationsPanel({
         } else if (item.kind === 'organizer_claim_decided') {
             navigate('/account');
         } else if (item.kind === 'event_review_prompt') {
-            navigate(`/event/${item.event_id}?rate=1#community`);
+            navigate(`/event/${item.event_id}/review`);
         } else if (item.kind === 'milestone_unlocked') {
             navigate('/mine/passport');
         } else {

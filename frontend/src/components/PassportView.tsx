@@ -123,7 +123,17 @@ function TabButton({
     );
 }
 
-function SummaryHeader({ data, title, actions }: { data: PassportResponse; title: string; actions?: ReactNode }) {
+function SummaryHeader({
+    data,
+    title,
+    actions,
+    dancingSinceSlot,
+}: {
+    data: PassportResponse;
+    title: string;
+    actions?: ReactNode;
+    dancingSinceSlot?: ReactNode;
+}) {
     const { stats } = data;
     const parts = [
         `${stats.total_events_attended} ${stats.total_events_attended === 1 ? 'event' : 'events'}`,
@@ -142,9 +152,11 @@ function SummaryHeader({ data, title, actions }: { data: PassportResponse; title
                 </p>
             )}
             <div className="mt-1 flex items-center justify-between gap-4">
-                <p className="text-xs text-slate-300">
-                    Dancing since {formatDate(stats.member_since)}
-                </p>
+                {dancingSinceSlot ?? (
+                    <p className="text-xs text-slate-300">
+                        Dancing since {formatDate(stats.dancing_since ?? stats.member_since)}
+                    </p>
+                )}
                 {actions && <div className="flex justify-end">{actions}</div>}
             </div>
         </header>
@@ -399,6 +411,8 @@ export interface PassportViewProps {
     sections?: PassportSection[];
     /** Owner-only controls rendered under the summary header (e.g. share button). */
     headerActions?: ReactNode;
+    /** Owner-only replacement for the "Dancing since" line (editable date + first-event). */
+    dancingSinceSlot?: ReactNode;
     /** Owner-only controls rendered at the top of the Timeline tab (e.g. add past event). */
     timelineActions?: ReactNode;
     // Timeline data (only used when 'timeline' is in sections).
@@ -419,6 +433,7 @@ export default function PassportView({
     title = 'Your Dance Passport',
     sections = ALL_SECTIONS,
     headerActions,
+    dancingSinceSlot,
     timelineActions,
     timelineItems = [],
     timelineMarkers = [],
@@ -481,7 +496,7 @@ export default function PassportView({
 
     return (
         <>
-            <SummaryHeader data={data} title={title} actions={headerActions} />
+            <SummaryHeader data={data} title={title} actions={headerActions} dancingSinceSlot={dancingSinceSlot} />
 
             <section className="grid grid-cols-3 gap-2 sm:grid-cols-6">
                 <StatCard

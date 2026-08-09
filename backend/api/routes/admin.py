@@ -1248,7 +1248,7 @@ def review_prompt_send_now(
                 uid,
                 title=push_title,
                 body=push_body,
-                url=f"/event/{body.event_id}?rate=1#community",
+                url=f"/event/{body.event_id}/review",
                 tag=f"review-prompt:{body.event_id}",
             )
             if delivered:
