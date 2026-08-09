@@ -953,6 +953,9 @@ class DatabaseSeeder:
                 "passport_show_cities",
                 "passport_show_countries",
                 "passport_show_timeline",
+                # User-chosen date they started dancing (drives the passport
+                # card's opt-in "Dancing since" line).
+                "dancing_since",
                 # Phase G — onboarding state. See ``auto_onboard`` handling
                 # below for the scenario-wide default when these are omitted.
                 "onboarded_at",
@@ -985,6 +988,10 @@ class DatabaseSeeder:
             raw_last_visit = user_kwargs.get("last_visit_at")
             if isinstance(raw_last_visit, str):
                 user_kwargs["last_visit_at"] = datetime.fromisoformat(raw_last_visit)
+            # ``dancing_since`` is a plain date; yaml may hand us an ISO string.
+            raw_dancing_since = user_kwargs.get("dancing_since")
+            if isinstance(raw_dancing_since, str):
+                user_kwargs["dancing_since"] = date.fromisoformat(raw_dancing_since)
             # Phase G — apply the scenario-wide auto-onboard default when
             # the entry didn't explicitly opt in or out. Explicit
             # ``onboarded_at: null`` in yaml means "leave un-onboarded" and

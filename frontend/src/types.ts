@@ -668,6 +668,7 @@ export interface PassportStats {
     countries_visited: number;
     reviews_written: number;
     styles_danced: number;
+    top_style: string | null;
     longest_month_streak: number;
     events_last_30_days: number;
     avg_gap_days: number | null;
@@ -707,6 +708,8 @@ export interface PassportMilestone {
     category: string;
     threshold: number;
     unit: string;
+    /** Cross-category rarity/impressiveness rank (higher = more distinctive). */
+    prestige: number;
     progress: number;
     unlocked: boolean;
     is_new: boolean;

@@ -82,6 +82,7 @@ describe('ProfilePage Dance Passport tab', () => {
             countries_visited: 1,
             reviews_written: 0,
             styles_danced: 1,
+            top_style: null,
             longest_month_streak: 1,
             events_last_30_days: 0,
             avg_gap_days: null,

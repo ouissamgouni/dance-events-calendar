@@ -67,6 +67,7 @@ function makeMilestone(overrides: Record<string, unknown> = {}) {
         unlocked: true,
         is_new: false,
         unlocked_at: '2024-01-10T20:00:00',
+        prestige: 1,
         ...overrides,
     }
 }
@@ -78,6 +79,7 @@ const PASSPORT = {
         countries_visited: 2,
         reviews_written: 5,
         styles_danced: 4,
+        top_style: null,
         longest_month_streak: 3,
         events_last_30_days: 2,
         avg_gap_days: 11.5,

@@ -2535,6 +2535,7 @@ class PassportStats(BaseModel):
     countries_visited: int
     reviews_written: int
     styles_danced: int
+    top_style: Optional[str] = None
     longest_month_streak: int
     events_last_30_days: int
     avg_gap_days: Optional[float] = None
@@ -2574,6 +2575,7 @@ class PassportMilestone(BaseModel):
     category: str
     threshold: int
     unit: str
+    prestige: int = 0
     progress: int
     unlocked: bool
     is_new: bool

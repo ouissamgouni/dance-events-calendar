@@ -13,6 +13,8 @@ from backend.db.models import User, UserEventAttendance
 from backend.db.seed import SCENARIOS_DIR, DatabaseSeeder
 from backend.services import passport as passport_service
 
+from datetime import date
+
 
 @pytest.fixture()
 def seeded_session(monkeypatch):
@@ -140,3 +142,37 @@ class TestDancePassportScenario:
         paris = next(c for c in cols["cities"] if c["city"] == "Paris")
         assert paris["latitude"] == 48.8566
         assert paris["longitude"] == 2.3522
+
+    def test_alba_top_style_is_salsa(self, seeded_session):
+        # Salsa is tagged on the most of Alba's attended events, so it is the
+        # all-time "Top style" surfaced on the share card.
+        alba = _user(seeded_session, "alba@example.com")
+        ctx = passport_service.build_stats_context(seeded_session, alba)
+        assert ctx["top_style"] == "Salsa"
+
+    def test_alba_dancing_since_seeded(self, seeded_session):
+        # The opt-in "Dancing since" origin is seeded from mock-users.yaml.
+        alba = _user(seeded_session, "alba@example.com")
+        assert alba.dancing_since == date(2018, 3, 15)
+
+    def test_milestones_carry_prestige(self, seeded_session):
+        alba = _user(seeded_session, "alba@example.com")
+        passport_service.evaluate_and_persist(seeded_session, alba)
+        ctx = passport_service.build_stats_context(seeded_session, alba)
+        view = passport_service.milestone_view(seeded_session, alba, ctx)
+        assert view, "expected milestones for alba"
+        assert all(isinstance(m["prestige"], int) for m in view)
+        # Prestige lets the card rank the most impressive badges first.
+        events_100 = next(m for m in view if m["key"] == "events_100")
+        first_event = next(m for m in view if m["key"] == "first_event")
+        assert events_100["prestige"] > first_event["prestige"]
+
+    def test_yara_multi_year_journey(self, seeded_session):
+        # Yara's all-time journey spans a prior year + the current year, so her
+        # totals exceed any single-year slice used by the year card.
+        yara = _user(seeded_session, "yara@example.com")
+        ctx = passport_service.build_stats_context(seeded_session, yara)
+        assert ctx["total_events"] == 7
+        assert len(ctx["cities"]) == 6  # Prague de-duplicated
+        assert len(ctx["countries"]) == 4  # FR, CH, AT, CZ
+        assert ctx["top_style"] == "Salsa"

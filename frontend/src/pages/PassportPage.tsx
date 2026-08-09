@@ -464,22 +464,22 @@ function SharePassportCardModal({
     const currentYear = new Date().getFullYear();
     const [scope, setScope] = useState<ShareScope>('all');
     const [events, setEvents] = useState<PassportMapEvent[] | null>(mapEvents);
-    const [shareUrl, setShareUrl] = useState<string | null>(null);
-    const [sections, setSections] = useState({ badges: true, map: true, dancingSince: true });
+    const [profileUrl, setProfileUrl] = useState<string | null>(null);
+    const [sections, setSections] = useState({ badges: true, map: true, dancingSince: false });
     const [busy, setBusy] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
     const canNativeShare =
         typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
-    // On open: ensure a public link (so the QR resolves), load the full event
-    // set for the scoped stats/map, and read the owner's section toggles.
+    // On open: build the profile link the QR resolves to (always available for a
+    // valid handle, even when the passport is private — the profile shows the
+    // dancer + a Follow gate), load the full event set for the scoped stats/map,
+    // and read the owner's section toggles.
     useEffect(() => {
         let cancelled = false;
         (async () => {
             try {
-                const existing = await fetchPassportShare().catch(() => null);
-                const token = existing?.token ?? (await createPassportShare({ require_signin: false })).token;
-                let url = `${window.location.origin}/shared/passport/${token}`;
+                let url = `${window.location.origin}/u/${handle}`;
                 if (shareCode) {
                     try {
                         const u = new URL(url);
@@ -493,14 +493,14 @@ function SharePassportCardModal({
                 const evs = mapEvents ?? (await fetchPassportEvents());
                 const profile = await fetchPublicProfile(handle).catch(() => null);
                 if (cancelled) return;
-                setShareUrl(url);
+                setProfileUrl(url);
                 setEvents(evs);
                 if (profile) {
-                    setSections({
+                    setSections((s) => ({
+                        ...s,
                         badges: profile.passport_show_badges ?? true,
                         map: profile.passport_show_cities ?? true,
-                        dancingSince: true,
-                    });
+                    }));
                 }
             } catch {
                 if (!cancelled) {
@@ -514,8 +514,17 @@ function SharePassportCardModal({
     }, [handle, shareCode, mapEvents, toast]);
 
     const scoped = useMemo(
-        () => (events ? scopePassport(events, data.milestones, scope) : null),
-        [events, data.milestones, scope],
+        () =>
+            events
+                ? scopePassport(
+                    events,
+                    data.milestones,
+                    scope,
+                    data.stats.top_style,
+                    data.stats.reviews_written,
+                )
+                : null,
+        [events, data.milestones, data.stats.top_style, data.stats.reviews_written, scope],
     );
 
     const filename = `dance-passport-${scope === 'all' ? 'alltime' : scope}.png`;
@@ -558,7 +567,7 @@ function SharePassportCardModal({
         }
     }, [generate, filename, toast]);
 
-    const ready = scoped != null && shareUrl != null;
+    const ready = scoped != null && profileUrl != null;
 
     return (
         <div
@@ -629,7 +638,7 @@ function SharePassportCardModal({
                             />
                             Badges
                         </label>
-                        {scope === 'all' && (
+                        {scope === 'all' && data.stats.dancing_since && (
                             <label className="inline-flex items-center gap-2 text-sm text-slate-700">
                                 <input
                                     type="checkbox"
@@ -662,8 +671,9 @@ function SharePassportCardModal({
                                         displayName={displayName}
                                         handle={handle}
                                         scoped={scoped}
-                                        memberSince={data.stats.dancing_since ?? data.stats.member_since}
-                                        shareUrl={shareUrl}
+                                        memberSince={data.stats.member_since}
+                                        dancingSince={data.stats.dancing_since}
+                                        profileUrl={profileUrl}
                                         showBadges={sections.badges}
                                         showMap={sections.map}
                                         showDancingSince={sections.dancingSince}

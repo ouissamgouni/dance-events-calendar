@@ -100,6 +100,8 @@ class TestPassportEndpoint:
         assert body["stats"]["cities_visited"] == 2
         assert body["stats"]["countries_visited"] == 2
         assert len(body["collections"]["countries"]) == 2
+        assert "top_style" in body["stats"]
+        assert all("prestige" in m for m in body["milestones"])
 
     def test_empty_passport(self, client_with_user):
         client, _engine, _user_id = client_with_user

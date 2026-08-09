@@ -467,6 +467,104 @@ events:
     price_is_free: true
     tags: [format:social, dance-style:salsa, reach:local]
 
+  # --- Yara's multi-year journey (drives the YEAR share card) --------------
+  # Current-year events: three clustered in the most recent weeks (the "most
+  # active" current-year month) plus two in the preceding months (a run of
+  # consecutive current-year months → in-year streak). Salsa dominates (top
+  # style). Two PRIOR-year events (large w-N offsets) make her all-time totals
+  # exceed the current-year card, so the year card is a genuine subset.
+  - id: evt-yr-01
+    calendar_id: passport-cal-001
+    title: Nantes Salsa Social
+    location: Le Nid, Nantes, France
+    latitude: 47.2184
+    longitude: -1.5536
+    city: Nantes
+    country: France
+    country_code: FR
+    start: w-1 Fri 21:00
+    end: w-1 Sat 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-yr-02
+    calendar_id: passport-cal-001
+    title: Bordeaux Salsa Night
+    location: Rock School Barbey, Bordeaux, France
+    latitude: 44.8378
+    longitude: -0.5792
+    city: Bordeaux
+    country: France
+    country_code: FR
+    start: w-2 Sat 21:00
+    end: w-2 Sun 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:regional]
+  - id: evt-yr-03
+    calendar_id: passport-cal-001
+    title: Toulouse Salsa Marathon
+    location: Le Bikini, Toulouse, France
+    latitude: 43.6047
+    longitude: 1.4442
+    city: Toulouse
+    country: France
+    country_code: FR
+    start: w-3 Sat 20:00
+    end: w-3 Sun 02:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:regional]
+  - id: evt-yr-04
+    calendar_id: passport-cal-001
+    title: Geneva Salsa Evening
+    location: Salsa Club, Geneva, Switzerland
+    latitude: 46.2044
+    longitude: 6.1432
+    city: Geneva
+    country: Switzerland
+    country_code: CH
+    start: w-6 Fri 20:00
+    end: w-6 Sat 00:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:regional]
+  - id: evt-yr-05
+    calendar_id: passport-cal-001
+    title: Vienna Bachata Night
+    location: Ottakringer Brauerei, Vienna, Austria
+    latitude: 48.2082
+    longitude: 16.3738
+    city: Vienna
+    country: Austria
+    country_code: AT
+    start: w-10 Sat 21:00
+    end: w-10 Sun 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:bachata, reach:regional]
+  - id: evt-yr-prior-01
+    calendar_id: passport-cal-001
+    title: Prague Salsa Weekender
+    location: Lucerna, Prague, Czechia
+    latitude: 50.0755
+    longitude: 14.4378
+    city: Prague
+    country: Czechia
+    country_code: CZ
+    start: w-80 Sat 19:00
+    end: w-80 Sun 02:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:regional]
+  - id: evt-yr-prior-02
+    calendar_id: passport-cal-001
+    title: Prague Salsa Social
+    location: Cross Club, Prague, Czechia
+    latitude: 50.0755
+    longitude: 14.4378
+    city: Prague
+    country: Czechia
+    country_code: CZ
+    start: w-82 Sat 21:00
+    end: w-82 Sun 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:regional]
+
 # alba writes >=10 reviews (drives reviews_written + first_review / reviews_10).
 ratings:
   - event_id: evt-dp-01
