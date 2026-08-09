@@ -194,6 +194,31 @@ events:
         reach:regional,
       ]
 
+  # Event with >5 friends attending (alice, bob, carla, henry, iris, jack).
+  - id: evt-tribe-u09
+    calendar_id: tribe-cal-001
+    title: Amsterdam Salsa Big Night
+    description: Huge friends meet-up — six of my friends are going.
+    location: Panama, Amsterdam, Netherlands
+    latitude: 52.3676
+    longitude: 4.9041
+    city: Amsterdam
+    country: Netherlands
+    country_code: NL
+    start: w4 Sat 21:00
+    end: w4 Sun 02:00
+    price_is_free: false
+    price_min: 18
+    price_currency: EUR
+    tags:
+      [
+        dance-style:salsa,
+        format:social,
+        level:all-levels,
+        venue:indoor,
+        reach:regional,
+      ]
+
   # ── Past (subjects of Following Reviews) ─────────────────────────
   - id: evt-tribe-p01
     calendar_id: tribe-cal-001

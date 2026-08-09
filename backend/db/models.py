@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import List, Optional
 from uuid import UUID, uuid4
 
@@ -97,6 +97,10 @@ class User(SQLModel, table=True):
     passport_show_cities: bool = Field(default=True, nullable=False)
     passport_show_countries: bool = Field(default=True, nullable=False)
     passport_show_timeline: bool = Field(default=False, nullable=False)
+    # User-chosen date they started dancing (may predate joining Movida).
+    # Drives the "Dancing since" line on the passport + share card; distinct
+    # from ``created_at`` (account) and the earliest attended event.
+    dancing_since: Optional[date] = Field(default=None)
     # Admin-granted credibility badge surfaced on the public profile.
     is_verified_organizer: bool = Field(default=False, nullable=False)
     # Phase: admin-curated lists. When True the account is operated by
@@ -172,6 +176,17 @@ class User(SQLModel, table=True):
     push_event_reminders_enabled: bool = Field(default=True, nullable=False)
     push_social_activity_enabled: bool = Field(default=True, nullable=False)
     push_interest_matches_enabled: bool = Field(default=True, nullable=False)
+    # Friends going to events (``subscription_going``) \u2014 split out of the
+    # broader social-activity bucket so users control friend-RSVP alerts
+    # independently of follows/friend-requests.
+    email_friends_going_enabled: bool = Field(default=True, nullable=False)
+    push_friends_going_enabled: bool = Field(default=True, nullable=False)
+    # A followee dropped a review (``subscription_review``).
+    email_friend_reviews_enabled: bool = Field(default=True, nullable=False)
+    push_friend_reviews_enabled: bool = Field(default=True, nullable=False)
+    # A followee unlocked a Dance Passport milestone (``subscription_milestone``).
+    email_friend_milestones_enabled: bool = Field(default=True, nullable=False)
+    push_friend_milestones_enabled: bool = Field(default=True, nullable=False)
     # Promo codes added to an event the user saved (see promo_codes.py
     # ``_fan_out_saved_event_promo_code``).
     email_promo_codes_enabled: bool = Field(default=True, nullable=False)
@@ -1362,6 +1377,13 @@ class Notification(SQLModel, table=True):
     # be pushed immediately but wait days to be folded into an email, or
     # vice versa when push is disabled for a recipient.
     pushed_at: Optional[datetime] = Field(default=None, index=True)
+    # Set once this notification has been sent as an immediate (non-batched)
+    # activity email, when the admin routes its feature through the instant
+    # email path (see ``services/activity_email.py``). Independent of
+    # ``emailed_at`` (the digest stamp) so a feature configured for BOTH
+    # instant and digest email delivers on each path without one suppressing
+    # the other.
+    instant_emailed_at: Optional[datetime] = Field(default=None, index=True)
     # Free-text context for kinds that need extra message copy beyond
     # actor/event, e.g. ``interest_event`` stores the matched profile
     # label(s) (comma-joined) so the digest/in-app renderers can say

@@ -11,6 +11,20 @@ users:
     account_visibility: public
     passport_visibility: public
     passport_show_timeline: true
+    # Opt-in "Dancing since" origin (default OFF on the share card). Enabling
+    # the share-card toggle surfaces a small "Dancing since 2018" line.
+    dancing_since: 2018-03-15
+  # Multi-year public dancer used to exercise the YEAR share card. Yara has
+  # events in a PRIOR calendar year AND the current year, a clustered "most
+  # active" current-year month, a run of consecutive current-year months, a
+  # dominant style (salsa), plus a milestone unlocked in the prior year (must
+  # NOT appear on the current-year card) and one unlocked this year.
+  - email: yara@example.com
+    name: Yara (multi-year journey)
+    handle: yara
+    account_visibility: public
+    passport_visibility: public
+    passport_show_timeline: true
   # Exactly-at-threshold journey: 10 attended events, 9 cities, 5 countries,
   # 10 reviews. Passport is FRIENDS-ONLY — Alba (a mutual friend, see
   # db-follows.yaml) can view it; strangers see the friends-only placeholder.

@@ -715,6 +715,99 @@ class TestEventUpdateEndpoint:
         finally:
             app.dependency_overrides.clear()
 
+    def test_patch_event_location_refreshes_place(self):
+        event = CachedEvent(
+            event_id="evt-1",
+            calendar_id="cal-1",
+            title="t",
+            location="Old Venue",
+            latitude=48.86,
+            longitude=2.35,
+            city="Paris",
+            country="France",
+            country_code="FR",
+            start=datetime(2026, 5, 1, 20, 0),
+            end=datetime(2026, 5, 1, 23, 0),
+        )
+        cal = CalendarSetting(
+            calendar_id="cal-1", name="Test", enabled=True, color="#ff0000"
+        )
+        mock_session = MagicMock(spec=Session)
+        mock_session.get.side_effect = lambda model, key: (
+            event if model == CachedEvent else cal
+        )
+        mock_session.exec.return_value.all.return_value = []
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[require_admin] = _fake_admin
+        try:
+            client = TestClient(app)
+            with (
+                patch(
+                    "backend.api.routes.admin.geocode_location",
+                    return_value=(52.52, 13.40),
+                ),
+                patch(
+                    "backend.api.routes.admin.reverse_geocode",
+                    return_value=("Berlin", "Germany", "DE"),
+                ),
+            ):
+                resp = client.patch(
+                    "/api/admin/events/evt-1", json={"location": "New Venue"}
+                )
+            assert resp.status_code == 200
+            assert event.latitude == 52.52
+            assert event.city == "Berlin"
+            assert event.country == "Germany"
+            assert event.country_code == "DE"
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_patch_event_location_clears_place_when_unresolved(self):
+        event = CachedEvent(
+            event_id="evt-1",
+            calendar_id="cal-1",
+            title="t",
+            location="Old Venue",
+            latitude=48.86,
+            longitude=2.35,
+            city="Paris",
+            country="France",
+            country_code="FR",
+            start=datetime(2026, 5, 1, 20, 0),
+            end=datetime(2026, 5, 1, 23, 0),
+        )
+        cal = CalendarSetting(
+            calendar_id="cal-1", name="Test", enabled=True, color="#ff0000"
+        )
+        mock_session = MagicMock(spec=Session)
+        mock_session.get.side_effect = lambda model, key: (
+            event if model == CachedEvent else cal
+        )
+        mock_session.exec.return_value.all.return_value = []
+        app.dependency_overrides[get_session] = lambda: mock_session
+        app.dependency_overrides[require_admin] = _fake_admin
+        try:
+            client = TestClient(app)
+            with (
+                patch(
+                    "backend.api.routes.admin.geocode_location",
+                    return_value=(1.0, 2.0),
+                ),
+                patch(
+                    "backend.api.routes.admin.reverse_geocode",
+                    return_value=None,
+                ),
+            ):
+                resp = client.patch(
+                    "/api/admin/events/evt-1", json={"location": "New Venue"}
+                )
+            assert resp.status_code == 200
+            assert event.city is None
+            assert event.country is None
+            assert event.country_code is None
+        finally:
+            app.dependency_overrides.clear()
+
     def test_patch_event_not_found(self):
         mock_session = MagicMock(spec=Session)
         mock_session.get.return_value = None

@@ -1,25 +1,44 @@
 test_plan:
-  name: "Social Interest Filter — Following (All) + Friends scopes, multi-select"
+  name: "Social Interest Filter — pill rail + combo-box overlay, any/all operator"
   description: >
-    Verify the explorer "Filter by following" widget end-to-end: the two
-    scopes (`interest_source=follows` for any followee, `interest_source=
-    friends` for mutual-only), the person rail (a horizontally-scrollable,
-    multi-select list of matching followees/friends with per-person
-    match counts), the Going/Saved toggle pills (no separate "Any" pill —
-    selecting both, or neither having been deselected, means "any"), and
-    the summary-bar chip that names the selected people directly. This
-    scenario merges and replaces the former `social-interest-filter-
-    following` and `social-interest-filter-friends` scenarios: instead of
-    switching between two signed-in users to exercise each scope, a
-    single `viewer` follows two people one-way (alice, frank), two
-    people mutually (bob, grace), and one person who shares at
-    friends-only audience (carol) — enough to prove both scopes union
-    correctly across more than one source, plus the privacy chokepoint,
-    without a user swap.
+    Verify the shared "Filter by following" widget end-to-end on both
+    surfaces that render it (the explorer inline row on Home AND the
+    mobile filter sheet — they share one `InterestFilterChips`
+    component). The widget has these parts:
 
-    Privacy invariants still apply per-row: an audience='friends' row is
-    hidden from one-way followers (mutual-only), strangers' attendance
-    never leaks, and the viewer's own attendance/saves are excluded.
+      1. Inline "All | Friends" (scope) and "Going | Saved" (kind)
+         toggles that apply live — they sit in the collapsed row, NOT
+         inside the overlay.
+      2. A "+" search button (find-user icon + "+") that sits to the
+         LEFT of the people pills and opens the combo-box overlay.
+      3. A collapsed, horizontally-scrollable pill rail of up to five
+         people rendered as first-name-only pills (no checkbox) — the
+         viewer's currently-selected people first (so the rail doubles
+         as the applied-filter summary), then the highest-count
+         candidates for quick inline discovery. Tapping a pill toggles
+         that person and applies immediately.
+      4. An "Any | All" operator that appears once at least one person
+         is selected; "Any" means OR (union across the selected
+         people, the default), "All" means AND (only events every
+         selected person shares).
+
+    The overlay (combo box) opened by the "+" button contains only a
+    searchable people list (full display names, scrolls once it exceeds
+    five rows) and a footer with three CTAs — "Close" (discards the
+    draft people edits and collapses), "Anyone" (applies the draft
+    selection with the OR/any operator and collapses), and "Everyone"
+    (applies the draft selection with the AND/all operator and
+    collapses).
+
+    Backend semantics: `interest_match=all` intersects only when the
+    viewer has explicitly picked TWO OR MORE visible people; a single
+    person (or a bare scope) is unaffected by the operator. `any`
+    unions as before.
+
+    Privacy invariants still apply per-row: an audience='friends' row
+    is hidden from one-way followers (mutual-only), strangers'
+    attendance never leaks, and the viewer's own attendance/saves are
+    excluded.
 
   preconditions:
     - "Run with: task start:scenario SCENARIO=filter-by-social-interest"
@@ -29,12 +48,10 @@ test_plan:
       frank (one-way), viewer ⇄ bob (mutual), viewer ⇄ grace (mutual),
       viewer → carol (one-way), eve → viewer (reverse-direction
       control), dave isolated (stranger control). Events evt-fsi-001..009
-      are each tied to one assertion (001/006 alice, 002/007 bob, 003
-      carol, 004 dave, 005 eve, 008 frank, 009 grace). evt-fsi-010..012
-      are catalog-only filler events (no attendance) seeded purely so
-      every tag in every group has a non-zero event_count, for manually
-      testing the tag filter's per-group horizontal scroll — they are
-      not tied to any numbered assertion below.
+      are each tied to one or more assertions (001/006 alice, 002/007
+      bob, 003 carol, 004 dave, 005 eve, 008 frank, 009 grace + bob for
+      the AND overlap). evt-fsi-010..012 are catalog-only filler events
+      (no attendance).
     - "Use a fresh browser profile or incognito window per signed-in user."
     - >
       Cookie banner: accept "Personalization" so /api/auth/* and
@@ -57,11 +74,23 @@ test_plan:
         🌐 Public.
       expected: >
         Six rows persist, all 🌐 Public. Alice's and Frank's rows will
-        only surface under the "All" scope (they are one-way
-        followees). Bob's and Grace's rows will surface under BOTH
-        "All" and "Friends" (they are viewer's mutual friends).
+        only surface under the "All" scope (one-way followees). Bob's
+        and Grace's rows will surface under BOTH "All" and "Friends"
+        (mutual friends).
 
     - id: 2
+      title: "Bob also goes to Grace's event (shared row for the AND test)"
+      description: >
+        Still signed in as Bob on Browser B, open evt-fsi-009 (Rueda
+        Congress Grand Ball — the same event Grace is going to) and mark
+        Going with 🌐 Public.
+      expected: >
+        evt-fsi-009 now has TWO going rows (Bob + Grace), both public.
+        This is the only event both mutual friends share, so it is the
+        single row the "Everyone"/All operator must isolate later
+        (step 11).
+
+    - id: 3
       title: "Carol (friends-only), Dave (stranger), and Eve (reverse follower) go"
       description: >
         Sign in as Carol on Browser C, open evt-fsi-003 (Cuban Night),
@@ -72,238 +101,256 @@ test_plan:
         Public.
       expected: >
         Three rows persist. Carol's row must NOT surface for viewer
-        under any scope yet (viewer follows carol one-way — not
-        mutual — so her friends-only row is gated). Dave's row is the
-        stranger control (must never surface). Eve's row tests the
-        direction invariant: eve follows viewer, but viewer does NOT
-        follow eve, so her row must never surface either.
+        under any scope yet (viewer follows carol one-way). Dave's row
+        is the stranger control. Eve's row tests the direction
+        invariant (eve follows viewer, viewer does not follow eve).
 
-    # ── Default state: pills + rail already visible, filter inactive ──
-    - id: 3
-      title: "Nothing is applied by default, but the pills and person rail are already visible"
+    # ── Default state: "+" button + rail visible, filter inactive ──
+    - id: 4
+      title: "Nothing is applied by default; the '+' button and person pill rail are already visible"
       description: >
         Sign in as Viewer on Browser F, open / (Home). Above the event
-        list, locate the "Following" row. Confirm neither the "All"
-        nor "Friends" scope pill is highlighted (no scope selected).
-        The "Going" and "Saved" pills and the horizontally-scrollable
-        person rail are already visible below them — they render for
-        any signed-in viewer regardless of whether a scope has been
-        picked yet, so the rail doubles as a browsing entry point.
+        list, locate the "Filter by following" row. Confirm the "+"
+        search button (find-user icon + "+", to the LEFT of the pills)
+        is present, and the collapsed pill rail already shows candidate
+        people as first-name-only pills. No overlay is open and no "Any
+        | All" operator is shown (nothing selected yet).
       expected: >
-        The initial page-load network request for GET /api/events
-        does NOT include `interest_source` (the filter has no default
-        scope). The rail shows "Alice Rivera" and "Bob Martin" with a
-        count of 2 each (going+saved), and "Frank Okafor" and "Grace
-        Kim" with a count of 1 each (going only) — all four unchecked,
-        under the implicit default `follows` pool the rail uses to
-        browse candidates; Carol is absent (0 matches — her only row
-        is friends-only and hidden). The Going/Saved pills render in
-        their neutral (non-highlighted) state since the filter isn't
-        active yet.
+        The initial GET /api/events request does NOT include
+        `interest_source` or `interest_match` (no default filter). The
+        rail shows up to five first-name pills ranked by match count:
+        "Alice" and "Bob" (count 2 each: going+saved), "Grace" (going)
+        and "Frank" (going) at count 1. Carol is absent (0 visible
+        matches — her only row is friends-only and hidden). No
+        checkboxes render — the pills are toggle buttons. The "Any |
+        All" operator is NOT shown.
 
-    # ── Checking a person directly activates the filter ────────────
-    - id: 4
-      title: "Checking a person in the rail activates the filter without clicking a scope pill first"
+    # ── Quick-pick a rail pill applies immediately ─────────────────
+    - id: 5
+      title: "Tapping a rail pill selects that person and applies immediately"
       description: >
-        From the default state in step 3 (no scope pill highlighted),
-        check Alice's checkbox in the person rail directly.
+        From the default state, tap the "Alice" pill in the rail (no
+        overlay, no scope pill clicked first).
       expected: >
         Network fires immediately: GET
-        /api/events?interest_source=follows&interest_user_handle=alice.
-        The "All" pill becomes highlighted even though it was never
-        explicitly clicked — selecting a person implicitly activates
-        the "follows" scope. The list narrows to Alice's two rows:
-        evt-fsi-001 and evt-fsi-006. Uncheck Alice to return to the
-        default state for the next step (the "All" pill stays
-        highlighted since a scope, once implied, does not silently
-        clear itself — only an explicit scope-pill click resets it,
-        per step 10).
+        /api/events?interest_source=follows&interest_user_handle=alice
+        (interest_match omitted — single person, defaults to any). The
+        "Alice" pill renders in its selected (filled) state and moves to
+        the front of the rail. The list narrows to Alice's two rows:
+        evt-fsi-001 and evt-fsi-006. The "Any | All" operator now
+        appears (data-testid interest-match-selector) with "Any"
+        highlighted.
 
-    # ── "All" scope happy path ──────────────────────────────────────
-    - id: 5
-      title: "'All' scope surfaces Alice + Bob + Frank + Grace's activity (six rows)"
-      description: >
-        Click the "All" scope pill (toggling it off then on again, to
-        start from a clean, explicitly-chosen state).
-      expected: >
-        Network: GET /api/events?interest_source=follows fires
-        (interest_kind omitted — both Going and Saved are active,
-        meaning "any"). The list renders EXACTLY six rows: evt-fsi-001
-        (Alice going), evt-fsi-002 (Bob going), evt-fsi-006 (Alice
-        saved), evt-fsi-007 (Bob saved), evt-fsi-008 (Frank going),
-        evt-fsi-009 (Grace going). NOT present: evt-fsi-003 (Carol,
-        friends-only, viewer not mutual), evt-fsi-004 (Dave, stranger),
-        evt-fsi-005 (Eve, reverse follower). The "Going" and "Saved"
-        pills both render as active (there is no separate "Any" pill).
-
-    # ── Going/Saved toggles (no more "Any" pill) ───────────────────
     - id: 6
-      title: "Turning off 'Saved' narrows to Going only"
+      title: "Tapping a second rail pill unions the results (default 'Any')"
       description: >
-        With the "All" scope active, click the "Saved" pill to
-        deactivate it (leaving only "Going" active).
-      expected: >
-        Network: GET
-        /api/events?interest_source=follows&interest_kind=going. The
-        list narrows to four rows: evt-fsi-001 (Alice going),
-        evt-fsi-002 (Bob going), evt-fsi-008 (Frank going), evt-fsi-009
-        (Grace going); evt-fsi-006 and evt-fsi-007 (saves) disappear.
-        The person-rail counts update to 1 each for Alice and Bob
-        (their saved-only event no longer counts); Frank and Grace stay
-        at 1 (they had no saved event to begin with).
-
-    - id: 7
-      title: "The last remaining active pill can't be turned off"
-      description: >
-        With only "Going" active (from step 6), click "Going" again.
-      expected: >
-        No-op: the request is not re-fired, "Going" stays active, and
-        the two-row list from step 6 is unchanged. At least one of
-        Going/Saved must always stay selected — there is no way to
-        reach an "everything unselected" state.
-
-    - id: 8
-      title: "Re-activating 'Saved' returns to the union (both active = any)"
-      description: >
-        Click "Saved" to reactivate it, so both Going and Saved are
-        active again.
-      expected: >
-        Network: GET /api/events?interest_source=follows (interest_kind
-        omitted again). The six-row list from step 5 returns, and the
-        person-rail counts go back to 2 each for Alice and Bob (Frank
-        and Grace stay at 1).
-
-    # ── Multi-select person rail applies immediately ──────────────
-    - id: 9
-      title: "Checking a person in the rail applies immediately"
-      description: >
-        With the "All" scope and both Going/Saved active, check
-        Alice's checkbox in the person rail.
-      expected: >
-        Network fires immediately (no separate "apply" step): GET
-        /api/events?interest_source=follows&interest_user_handle=alice.
-        The list narrows to Alice's two rows: evt-fsi-001 and
-        evt-fsi-006. Bob's, Frank's, and Grace's cards in the rail
-        remain visible, unchecked, with their counts still showing 2,
-        1, and 1 respectively.
-
-    - id: 10
-      title: "Checking a second person unions the results"
-      description: >
-        Still on Browser F, also check Bob's checkbox (Alice's stays
-        checked).
+        With Alice selected, tap the "Bob" pill in the rail.
       expected: >
         Network: GET
         /api/events?interest_source=follows&interest_user_handle=alice&interest_user_handle=bob
-        (both repeated). The list narrows to four rows (the union of
-        Alice's + Bob's activity): evt-fsi-001, evt-fsi-002,
-        evt-fsi-006, evt-fsi-007 — a subset of the six-row "everyone I
-        follow" list from step 5/8, since Frank and Grace are not
-        checked. Unchecking Alice narrows the list back down to Bob's
-        two rows (evt-fsi-002, evt-fsi-007).
+        (both repeated, interest_match omitted / any). The list is the
+        UNION of Alice's + Bob's activity: evt-fsi-001, evt-fsi-002,
+        evt-fsi-006, evt-fsi-007 (four rows). Both "Alice" and "Bob"
+        pills render selected and lead the rail.
 
-    # ── Scope pill click resets the filter ─────────────────────────
-    - id: 11
-      title: "Clicking 'Friends' resets the person selection and Going/Saved pills"
+    - id: 7
+      title: "Switching the operator to 'All' intersects the selection (AND)"
       description: >
-        With Bob still checked from step 10 (Alice unchecked), click
-        the "Saved" pill to leave only "Going" active, then click the
-        "Friends" scope pill.
+        With Alice + Bob selected, click "All" in the Any|All operator.
       expected: >
-        The click on "Friends" clears Bob's checkbox (no person stays
-        selected) AND resets Going/Saved back to both-active (any) —
-        confirmed by the person rail re-fetching for the new scope
-        with no cards pre-checked, and the Going/Saved pills both
-        rendering active again. Network: GET
-        /api/events?interest_source=friends fires (no
-        interest_user_handle, no interest_kind). The list renders
-        EXACTLY three rows: evt-fsi-002 (Bob going), evt-fsi-007 (Bob
-        saved), and evt-fsi-009 (Grace going) — Bob and Grace are
-        viewer's mutual friends, so the "Friends" scope with nobody
-        explicitly picked resolves to "Bob's + Grace's activity".
+        Network: GET
+        /api/events?interest_source=follows&interest_user_handle=alice&interest_user_handle=bob&interest_match=all.
+        Alice and Bob share NO event, so the list renders the empty
+        state ("No events match your filters"). Clicking "Any" again
+        restores the four-row union from step 6 and drops
+        interest_match from the request.
+
+    # ── The "+" overlay: searchable people list + CTAs only ────────
+    - id: 8
+      title: "The '+' button opens the combo-box overlay (people list + CTAs only)"
+      description: >
+        Click the "+" search button (data-testid following-search-open).
+      expected: >
+        A popover overlay opens (data-testid following-person-overlay)
+        anchored under the button. It contains ONLY a search input and a
+        scrollable people list showing FULL display names ("Alice
+        Rivera", "Bob Martin", …) with a per-person count and a
+        checkmark on the currently-drafted selections, plus a footer
+        with "Close", "Anyone", and "Everyone" CTAs. The scope
+        (All|Friends) and kind (Going|Saved) toggles are NOT in the
+        overlay — they stay inline in the collapsed row. Opening the
+        overlay fires GET /api/social/me/following (and the
+        interest-summary batch) but does NOT change the applied
+        /api/events request yet.
+
+    - id: 9
+      title: "Overlay edits are a draft — 'Close' discards them"
+      description: >
+        In the open overlay, tap "Grace Kim" in the list to add her to
+        the draft (her row gets a checkmark), then click "Close".
+      expected: >
+        The overlay collapses. NO new GET /api/events fires — the draft
+        (adding Grace) is discarded. The applied filter and the list are
+        exactly as they were before the overlay opened (the Alice + Bob
+        union from step 6, with "Any" active).
+
+    - id: 10
+      title: "Overlay 'Anyone' commits the draft with the any/OR operator"
+      description: >
+        Open the "+" overlay again. Clear the draft back to a clean
+        state (deselect Alice and Bob in the list if present), then tap
+        "Bob Martin" and "Grace Kim" so both are checked in the draft.
+        Click "Anyone".
+      expected: >
+        The overlay collapses and the selection is applied with OR:
+        GET /api/events?interest_source=follows&interest_user_handle=bob&interest_user_handle=grace
+        (interest_match omitted / any). The list is the UNION of Bob's +
+        Grace's activity: evt-fsi-002 (Bob going), evt-fsi-007 (Bob
+        saved), and evt-fsi-009 (Bob + Grace going) — three rows. The
+        collapsed rail now leads with the "Bob" and "Grace" pills and
+        the "Any | All" operator shows "Any" highlighted.
+
+    - id: 11
+      title: "Overlay 'Everyone' commits the draft with the all/AND operator"
+      description: >
+        Open the "+" overlay again (Bob + Grace still drafted/checked).
+        Click "Everyone".
+      expected: >
+        The overlay collapses and the selection is applied with AND:
+        GET /api/events?interest_source=follows&interest_user_handle=bob&interest_user_handle=grace&interest_match=all.
+        The list narrows to the single event BOTH share: evt-fsi-009
+        (Rueda Congress Grand Ball). evt-fsi-002 and evt-fsi-007 (Bob
+        only) drop out. The "Any | All" operator now shows "All"
+        highlighted.
 
     - id: 12
-      title: "Person rail under 'Friends' scope excludes non-mutual followees"
+      title: "Toggling the operator back to 'Any' from the collapsed summary re-unions"
       description: >
-        Still under the "Friends" scope from step 11, inspect the
-        person rail.
+        With Bob + Grace selected and "All" active (from step 11), click
+        "Any" in the collapsed Any|All operator (no overlay needed).
       expected: >
-        Network: GET /api/social/me/following fires again (scope
-        change re-triggers the fetch); the rail is filtered
-        client-side to `is_friend` rows. Only "Bob Martin" (count 2)
-        and "Grace Kim" (count 1) appear — Alice and Frank are NOT
-        shown, even though they are followees with matching activity,
-        because they are not mutual friends.
+        Network: GET
+        /api/events?interest_source=follows&interest_user_handle=bob&interest_user_handle=grace
+        (interest_match dropped). The three-row union from step 10
+        returns. This proves the operator is editable inline from the
+        collapsed summary, not only via the overlay CTAs.
 
-    # ── Summary bar shows handles, not a count ─────────────────────
+    # ── Scope + kind are inline live toggles ─────────────────────
     - id: 13
-      title: "Summary bar / mobile filter-sheet chip shows @handles, not 'N people'"
+      title: "The inline 'Friends' scope toggle narrows the candidate pool"
       description: >
-        Still under "Friends" scope, check Bob's checkbox in the
-        rail. Look at the applied-filters summary (desktop SummaryBar
-        strip, or the mobile "Filters (N)" chip row). Then click
-        "All" (resets), check both Alice's and Bob's checkboxes.
+        Clear any selected people. In the inline "All | Friends" scope
+        toggle (in the collapsed row, data-testid interest-scope-toggle),
+        click "Friends".
       expected: >
-        With only Bob checked: the summary chip reads "@bob" (not
-        "Friends" and not "1 person"). With both Alice and Bob checked
-        under "All": the chip reads "@alice, @bob" (not "2 people").
+        Selecting "Friends" applies live and re-fetches the following
+        list filtered client-side to mutual friends: the rail and the
+        "+" overlay list now show only "Bob Martin" and "Grace Kim" —
+        "Alice Rivera" and "Frank Okafor" are excluded (followees but
+        not mutual). Network: GET /api/events?interest_source=friends
+        fires (no interest_user_handle) and the list renders exactly the
+        mutual-friend rows: evt-fsi-002, evt-fsi-007 (Bob) and
+        evt-fsi-009 (Grace, plus Bob's shared going) — three rows.
+        Switching scope also resets the kind toggle back to both-active.
+
+    - id: 14
+      title: "The inline 'Going | Saved' kind toggle filters by activity type"
+      description: >
+        Still under the Friends scope, in the inline "Going | Saved"
+        toggle (data-testid interest-kind-toggle) deactivate "Saved" so
+        only "Going" is active.
+      expected: >
+        Network: GET
+        /api/events?interest_source=friends&interest_kind=going. Bob's
+        saved row (evt-fsi-007) drops out; the list shows evt-fsi-002
+        (Bob going) and evt-fsi-009 (Bob + Grace going) — two rows. At
+        least one of Going/Saved must always remain active (there is no
+        "both off" state).
+
+    # ── Summary bar reflects the operator ──────────────────────────
+    - id: 15
+      title: "Summary bar / filter-sheet chip shows @handles and the any/all operator"
+      description: >
+        Reset to the "All" scope. Select only "Bob" via the rail and
+        read the applied-filters summary (desktop SummaryBar strip, or
+        the mobile "Filters (N)" chip row). Then add "Grace" and toggle
+        the operator between "Any" and "All", reading the chip each
+        time.
+      expected: >
+        With only Bob: the chip reads "@bob" (not "Friends", not "1
+        person"). With Bob + Grace and "Any": the chip reads "any of
+        @bob, @grace". With Bob + Grace and "All": the chip reads "all
+        of @bob, @grace".
 
     # ── Privacy: friends-audience hidden until mutual ───────────────
-    - id: 14
+    - id: 16
       title: "Carol's friends-only row stays hidden until she follows viewer back"
       description: >
-        Click "All" to reset, and confirm evt-fsi-003 (Cuban Night,
-        Carol going friends-only) is absent from the unfiltered
-        six-row list. On Browser C, sign in as Carol, open /u/viewer,
+        Clear the filter (the ✕ next to the pills). Confirm evt-fsi-003
+        (Cuban Night, Carol going friends-only) is absent from the
+        unfiltered list. On Browser C, sign in as Carol, open /u/viewer,
         and click Follow so viewer ⇄ carol becomes mutual. Refresh
-        viewer's home with the "All" scope active.
+        viewer's home, open the "+" overlay, and pick the "Friends"
+        scope.
       expected: >
-        Before Carol follows back: evt-fsi-003 absent under both
-        scopes. After the back-follow, evt-fsi-003 appears under
-        "All" scope (seven rows total) AND under "Friends" scope
-        (carol is now also a mutual friend, joining bob and grace for
-        four rows total), and Carol now appears in the person rail
-        under both scopes with a count of 1. Have Carol unfollow
-        viewer at the end of this step so later re-runs see the
-        original graph.
+        Before Carol follows back: evt-fsi-003 absent under both scopes
+        and Carol absent from the overlay list. After the back-follow:
+        Carol appears in the overlay's Friends list (count 1) and
+        applying the Friends scope surfaces evt-fsi-003 alongside the
+        Bob/Grace rows. Have Carol unfollow viewer at the end of this
+        step so later re-runs see the original graph.
 
     # ── Deep link with an unfollowed handle ─────────────────────────
-    - id: 15
+    - id: 17
       title: "interest_user_handle for a non-followee returns empty, not an error"
       description: >
         Manually edit the URL to
         /?interest_source=follows&interest_user_handle=dave (dave is a
-        stranger — no follow edge either direction). Dave never
-        appears in the rail, so this can only be reached via the URL.
+        stranger — no follow edge either direction).
       expected: >
         The list renders the empty state ("No events match your
         filters"). Network: GET
         /api/events?interest_source=follows&interest_user_handle=dave
         → 200 with an empty items array — never 403/404/500.
 
-    # ── "See all" shortcut in the mobile filter sheet ────────────────
-    - id: 16
-      title: "'See all' in the filter sheet's Following section opens the subscriptions calendar"
+    - id: 18
+      title: "Deep link with interest_match=all across two shared people intersects"
+      description: >
+        Manually edit the URL to
+        /?interest_source=follows&interest_user_handle=bob&interest_user_handle=grace&interest_match=all
+        and load it fresh.
+      expected: >
+        On load the widget hydrates with Bob + Grace selected and the
+        "All" operator highlighted, and the list shows the single shared
+        row evt-fsi-009. This proves the operator round-trips through the
+        URL params on both the explorer and a cold page load.
+
+    # ── The overlay works identically inside the mobile filter sheet ─
+    - id: 19
+      title: "The same '+' overlay drives the mobile filter sheet"
       description: >
         Shrink the viewport to mobile width (or use a mobile emulator),
         tap "Open filters" to open the filter sheet, and locate the
-        "Following" section header. Tap "See all" in its top-right
-        corner.
+        "Filter by following" row inside it. Tap the "+" button, select
+        two mutual friends, and click "Everyone".
       expected: >
-        The filter sheet closes and the browser navigates to
-        /my-calendar/subscriptions (the dedicated calendar view scoped
-        to people the viewer follows).
+        The inline scope/kind toggles, "+" button, pill rail, and Any|All
+        operator render and behave exactly as on the desktop explorer
+        (same component); the overlay shows the searchable list +
+        Close/Anyone/Everyone CTAs. "Everyone" applies
+        interest_match=all and the filter-sheet summary chip reflects
+        "all of @…, @…". Closing the sheet keeps the applied filter.
 
     # ── Anonymous viewer ──────────────────────────────────────────
-    - id: 17
+    - id: 20
       title: "Anonymous viewer gets a sign-in nudge, not a 500"
       description: >
         Sign out (or open incognito on the scenario port). Open / and
-        click the "Following" row.
+        click the "+" search button.
       expected: >
-        No scope/kind pills or person rail render for a signed-out
-        viewer; an inline "Sign in to see picks from people you
-        follow." link appears instead. Network: the explorer does NOT
-        fire GET /api/events?interest_source=follows (gated on
-        signed-in state in the UI), or if it does, the response is 200
-        with an empty items array. No 401 / 403 / 500.
+        No person pills, overlay, or Any|All operator render for a
+        signed-out viewer; clicking "+" reveals an inline "Sign in to
+        see picks from people you follow." link instead of opening the
+        overlay. Network: the explorer does NOT fire GET
+        /api/events?interest_source=follows, or if it does, the response
+        is 200 with an empty items array. No 401 / 403 / 500.

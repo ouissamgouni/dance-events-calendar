@@ -1,12 +1,18 @@
-# Focused social-activity fixture. Alice attends ev-friend; Bob and
-# Carol follow Alice → each of them should receive a social_activity
-# digest entry for Alice's Going event.
+# All-features digest fixture. Alice generates activity across every
+# feature bucket; Bob (all email_* ON) folds them into ONE digest:
+#   ev-friend   — Alice is Going          → friends_going line
+#   ev-review   — Alice reviewed it       → friend_reviews line
+#   ev-past     — Alice attended (past)   → unlocks a milestone
+#   ev-interest — matches Bob's profile   → interest_matches line
+# `emit_notifications: true` drives the review fan-out for the rating
+# block below (same path as the HTTP feedback route).
 base_week: 0
+emit_notifications: true
 events:
   - id: ev-friend
     calendar_id: salsa-cal-001
     title: Bachata Friendly Social
-    description: "Used to validate friend/activity digest."
+    description: "Alice is going — drives the friends_going line."
     location: "Studio Azul, Paris, France"
     latitude: 48.8662
     longitude: 2.3744
@@ -16,3 +22,52 @@ events:
       - format:social
       - dance-style:bachata
       - reach:local
+
+  - id: ev-review
+    calendar_id: salsa-cal-001
+    title: Rooftop Salsa Social
+    description: "Past event Alice reviewed — drives the friend_reviews line."
+    location: "Skybar, Lisbon, Portugal"
+    latitude: 38.7139
+    longitude: -9.1394
+    start: w-1 Wed 05:00
+    end: w-1 Wed 08:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: ev-past
+    calendar_id: salsa-cal-001
+    title: Beginner Salsa Night
+    description: "Past event Alice attended — unlocks her first milestone."
+    location: "Casa del Ritmo, Madrid, Spain"
+    latitude: 40.4168
+    longitude: -3.7038
+    start: w-1 Mon 18:00
+    end: w-1 Mon 20:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: ev-interest
+    calendar_id: salsa-cal-001
+    title: International Salsa Congress Paris
+    description: "Upcoming event matching Bob's interest profile."
+    location: "Le Grand Salon, Paris, France"
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w+1 Sat 20:00
+    end: w+1 Sat 23:59
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:international
+
+ratings:
+  - event_id: ev-review
+    email: alice@example.com
+    overall_sentiment: amazing
+    comment: "Incredible floor and DJ!"
+    status: approved

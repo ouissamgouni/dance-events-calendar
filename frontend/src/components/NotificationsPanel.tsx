@@ -76,12 +76,12 @@ export default function NotificationsPanel({
             await markRead(item.id);
         }
         onClose();
-        if (item.kind === 'new_follower' || item.kind === 'new_friend' || item.kind === 'follow_request') {
+        if (item.kind === 'new_follower' || item.kind === 'new_friend' || item.kind === 'follow_request' || item.kind === 'subscription_milestone') {
             navigate(`/u/${item.actor.handle}`);
         } else if (item.kind === 'organizer_claim_decided') {
             navigate('/account');
         } else if (item.kind === 'event_review_prompt') {
-            navigate(`/event/${item.event_id}?rate=1#community`);
+            navigate(`/event/${item.event_id}/review`);
         } else if (item.kind === 'milestone_unlocked') {
             navigate('/mine/passport');
         } else {
@@ -218,6 +218,8 @@ function NotificationRow({
 }) {
     const isUnread = !item.read_at;
     const isFollowKind = item.kind === 'new_follower' || item.kind === 'new_friend' || item.kind === 'follow_request';
+    // Kinds with no associated event to append after the verb.
+    const noEventSuffix = isFollowKind || item.kind === 'subscription_milestone';
     const isReminder = item.kind === 'event_reminder';
     const isInterestEvent = item.kind === 'interest_event';
     const isPromoAdded = item.kind === 'promo_code_added';
@@ -250,23 +252,31 @@ function NotificationRow({
     };
     const verb =
         item.kind === 'subscription_going'
-            ? 'is going to'
-            : item.kind === 'subscription_suggested'
-                ? 'added'
-                : item.kind === 'new_follower'
-                    ? 'started following you'
-                    : item.kind === 'new_friend'
-                        ? 'and you are now friends!'
-                        : item.kind === 'follow_request'
-                            ? 'wants to follow you'
-                            : item.kind === 'promo_code_approved'
-                                ? 'approved your promo code for'
-                                : item.kind === 'promo_code_rejected'
-                                    ? 'rejected your promo code for'
-                                    : item.kind === 'organizer_claim_decided'
-                                        ? 'reviewed your organizer claim'
-                                        : 'updated';
-    const actorName = item.actor.display_name || `@${item.actor.handle}`;
+            ? (item.also_going ? 'are going to' : 'is going to')
+            : item.kind === 'subscription_review'
+                ? 'reviewed'
+                : item.kind === 'subscription_milestone'
+                    ? (item.context ? `reached a milestone: ${item.context}` : 'reached a new milestone')
+                    : item.kind === 'subscription_suggested'
+                        ? 'added'
+                        : item.kind === 'new_follower'
+                            ? 'started following you'
+                            : item.kind === 'new_friend'
+                                ? 'and you are now friends!'
+                                : item.kind === 'follow_request'
+                                    ? 'wants to follow you'
+                                    : item.kind === 'promo_code_approved'
+                                        ? 'approved your promo code for'
+                                        : item.kind === 'promo_code_rejected'
+                                            ? 'rejected your promo code for'
+                                            : item.kind === 'organizer_claim_decided'
+                                                ? 'reviewed your organizer claim'
+                                                : 'updated';
+    // Anonymous reviews are masked to "Someone" (no linked identity).
+    const isAnonReview = item.kind === 'subscription_review' && item.context === 'anon';
+    const actorName = isAnonReview
+        ? 'Someone'
+        : item.actor.display_name || `@${item.actor.handle}`;
     const initial = (actorName || '?').trim().charAt(0).toUpperCase();
     if (isInterestEvent) {
         const label = item.context || 'your saved search';
@@ -468,9 +478,9 @@ function NotificationRow({
                 )}
                 <div className="min-w-0 flex-1">
                     <p className="text-xs text-slate-700 truncate">
-                        <span className="font-medium text-slate-900">{actorName}</span>{' '}
+                        <span className="font-medium text-slate-900">{item.kind === 'subscription_going' && item.also_going ? `You and ${actorName}` : actorName}</span>{' '}
                         <span className="text-slate-500">{verb}</span>
-                        {!isFollowKind && (
+                        {!noEventSuffix && (
                             <>
                                 {' '}
                                 <span className="font-medium text-slate-900">

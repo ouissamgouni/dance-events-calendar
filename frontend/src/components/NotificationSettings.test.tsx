@@ -139,6 +139,12 @@ describe('NotificationSettings', () => {
         push_review_prompt_enabled: false,
         email_milestone_unlocked_enabled: false,
         push_milestone_unlocked_enabled: false,
+        email_friends_going_enabled: false,
+        push_friends_going_enabled: false,
+        email_friend_reviews_enabled: false,
+        push_friend_reviews_enabled: false,
+        email_friend_milestones_enabled: false,
+        push_friend_milestones_enabled: false,
       }),
     )
   })

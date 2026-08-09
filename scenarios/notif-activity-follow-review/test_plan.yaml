@@ -1,0 +1,85 @@
+test_plan:
+  name: "Friend reviews — activity notification"
+  description: >
+    When someone you follow drops a review, followers receive a
+    `subscription_review` in-app row immediately (plus push when
+    enabled), and the review folds into the batched activity digest
+    email. Anonymous reviews still fan out but are masked to "Someone".
+
+  preconditions:
+    - >-
+      Start scenario:
+      `SCENARIO=notif-activity-follow-review RESET=1 task start:scenario`
+    - >-
+      Seeding runs Alice's two reviews through the same `fan_out_review`
+      path as the HTTP feedback route (db-events.yaml
+      `emit_notifications: true`).
+
+  cast:
+    - "Alice — actor; reviews ev-past (named) and ev-anon (anonymous)."
+    - "Bob — follows Alice; friend_reviews email + push ON."
+    - "Carol — follows Alice; co-attendee of ev-past who has not rated it; email/push OFF."
+    - "Dave — does NOT follow Alice → negative control."
+
+  steps:
+    - id: 1
+      title: "In-app rows fire for followers"
+      description: >
+        `GET /api/notifications` as Bob and Carol.
+      expected: >
+        Each has a `subscription_review` row for Alice's ev-past review
+        showing "Alice reviewed Rooftop Salsa Social", and a second row
+        for ev-anon rendered as "Someone reviewed Bachata Warehouse
+        Night" (anonymous mask).
+
+    - id: 2
+      title: "Non-follower gets nothing"
+      description: >
+        `GET /api/notifications` as Dave.
+      expected: >
+        Zero subscription_review rows (Dave does not follow Alice).
+
+    - id: 3
+      title: "Actor is not self-notified"
+      description: >
+        `GET /api/notifications` as Alice.
+      expected: >
+        Alice has no subscription_review rows for her own reviews.
+
+    - id: 4
+      title: "Co-attendee rate deep link"
+      description: >
+        Open Carol's notifications in the UI and click the ev-past
+        friend-review row.
+      expected: >
+        Because Carol attended ev-past but has not rated it, the row
+        offers a "rate this event" call to action / deep link to the
+        event's review flow.
+
+    - id: 5
+      title: "Immediate push + instant email to Bob"
+      description: >
+        Bob has friend_reviews push ON, and settings.yaml enables
+        friend_reviews INSTANT email mode. Trigger a plain dispatch tick:
+        `SCENARIO=notif-activity-follow-review task notify:trigger:scenario`.
+      expected: >
+        Bob's subscription_review rows are pushed (pushed_at stamped) AND
+        Bob receives an INSTANT email right away (instant_emailed_at
+        stamped) containing "Alice shared their experience of Rooftop
+        Salsa Social" (anonymous line masked to "Someone"). Carol
+        (push + email OFF) receives neither. Both channels are immediate
+        — no schedule gate.
+
+    - id: 6
+      title: "Digest email on the forced tick"
+      description: >
+        Friend-review digest mode is still on (default) alongside instant.
+        On Bob's digest slot (or `task notify:trigger:scenario` with
+        `--immediate-emails` to force), Bob gets a second, DIGEST email
+        including the friend-review line.
+      expected: >
+        Bob (email ON) receives a DIGEST email (emailed_at stamped)
+        containing "Alice shared their experience of Rooftop Salsa
+        Social". Carol (email OFF) gets no email. The anonymous review
+        line reads "Someone shared their experience of Bachata Warehouse
+        Night".

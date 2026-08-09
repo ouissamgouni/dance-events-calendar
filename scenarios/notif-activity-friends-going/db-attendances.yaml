@@ -1,0 +1,13 @@
+# emit_notifications runs the subscription_going fan-out that the HTTP
+# attendance route does. Alice Going ev-friend → rows for Bob + Carol.
+# Bob is also Going the same event so his row masks to "You and Alice".
+emit_notifications: true
+attendances:
+  - event_id: ev-friend
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-friend
+    email: bob@example.com
+    share_publicly: true
+    share_audience: public

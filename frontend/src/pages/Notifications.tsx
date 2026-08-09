@@ -186,7 +186,7 @@ export default function NotificationsPage({ socialOnly = false }: { socialOnly?:
                 <p className="text-sm text-slate-400">Loading…</p>
             ) : items.length === 0 ? (
                 <p className="text-sm text-slate-500">
-                    No notifications yet. Build your tribe and profiles to start getting updates here.
+                    No notifications yet.
                 </p>
             ) : (
                 <ul className="divide-y divide-slate-100 border border-slate-200 bg-white">
@@ -268,21 +268,29 @@ function NotificationRow({
     };
     const verb =
         item.kind === 'subscription_going'
-            ? 'is going to'
-            : item.kind === 'subscription_suggested'
-                ? 'added'
-                : item.kind === 'new_follower'
-                    ? 'started following you'
-                    : item.kind === 'new_friend'
-                        ? 'and you are now friends!'
-                        : item.kind === 'follow_request'
-                            ? 'wants to follow you'
-                            : item.kind === 'follow_request_approved'
-                                ? 'approved your follow request'
-                                : 'updated';
-    const actorName = item.actor.display_name || `@${item.actor.handle}`;
+            ? (item.also_going ? 'are going to' : 'is going to')
+            : item.kind === 'subscription_review'
+                ? 'reviewed'
+                : item.kind === 'subscription_milestone'
+                    ? (item.context ? `reached a milestone: ${item.context}` : 'reached a new milestone')
+                    : item.kind === 'subscription_suggested'
+                        ? 'added'
+                        : item.kind === 'new_follower'
+                            ? 'started following you'
+                            : item.kind === 'new_friend'
+                                ? 'and you are now friends!'
+                                : item.kind === 'follow_request'
+                                    ? 'wants to follow you'
+                                    : item.kind === 'follow_request_approved'
+                                        ? 'approved your follow request'
+                                        : 'updated';
+    const isAnonReview = item.kind === 'subscription_review' && item.context === 'anon';
+    const actorName = isAnonReview
+        ? 'Someone'
+        : item.actor.display_name || `@${item.actor.handle}`;
+    const noEventSuffix = isFollowKind || item.kind === 'subscription_milestone';
     const initial = (actorName || '?').trim().charAt(0).toUpperCase();
-    const destination = isFollowKind ? `/u/${item.actor.handle}` : `/event/${item.event_id}`;
+    const destination = (isFollowKind || item.kind === 'subscription_milestone') ? `/u/${item.actor.handle}` : `/event/${item.event_id}`;
     if (item.kind === 'interest_event') {
         const label = item.context || 'your saved search';
         return (
@@ -413,7 +421,7 @@ function NotificationRow({
                     type="button"
                     onClick={() => {
                         if (isUnread) onMarkRead();
-                        navigate(`/event/${item.event_id}?rate=1#community`);
+                        navigate(`/event/${item.event_id}/review`);
                     }}
                     className="min-w-0 flex-1 text-left"
                 >
@@ -477,7 +485,7 @@ function NotificationRow({
             >
                 <p className="text-xs text-slate-700">
                     <span className="font-medium text-slate-900">
-                        {actorName}
+                        {item.kind === 'subscription_going' && item.also_going ? `You and ${actorName}` : actorName}
                     </span>
                     {item.actor.is_verified_organizer && (
                         <img
@@ -489,7 +497,7 @@ function NotificationRow({
                         />
                     )}{' '}
                     <span className="text-slate-500">{verb}</span>
-                    {!isFollowKind && (
+                    {!noEventSuffix && (
                         <>
                             {' '}
                             <span className="font-medium text-slate-900">

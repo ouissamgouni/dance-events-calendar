@@ -1,3 +1,5 @@
+# Bob + Carol follow Alice → both receive Alice's subscription_going
+# fan-out. Dave does NOT follow → negative control.
 follows:
   - follower: bob
     followee: alice

@@ -1,0 +1,37 @@
+# notif-activity-friends-going cast.
+#   Alice — actor; marks Going to ev-friend → fans out to her followers.
+#   Bob   — follows Alice; friends_going email + push ON; ALSO Going to
+#           ev-friend → his row renders "You and Alice are going to ...".
+#   Carol — follows Alice; friends_going email + push OFF; NOT going →
+#           in-app row only, rendered "Alice is going to ...".
+#   Dave  — does NOT follow Alice → negative control (no row).
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Alice%20Rivera
+
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+    account_visibility: public
+    email_friends_going_enabled: true
+    push_friends_going_enabled: true
+
+  - email: carol@example.com
+    name: Carol Nguyen
+    handle: carol
+    account_visibility: public
+    email_friends_going_enabled: false
+    push_friends_going_enabled: false
+
+  - email: dave@example.com
+    name: Dave Owens
+    handle: dave
+    account_visibility: public

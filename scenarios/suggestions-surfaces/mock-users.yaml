@@ -2,16 +2,41 @@
 #
 # Cast:
 #   - newbie: fresh user for onboarding follow suggestions.
-#   - viewer: mutual friends with alice/bob/carol; should see FoF suggestions.
-#   - loner: zero graph; should see Discover curator fallback only.
+#   - viewer: mutual friends with alice/bob/carol; sees blended FoF suggestions.
+#     Rich network (pop1-pop14 + privatepop = 15 graph candidates) ->
+#     demonstrates ranking, "Show more", and "Shuffle" (pool > /discover
+#     page size 12).
+#   - thinviewer: mutual friend of dave only; dave follows just pop1/pop2, so
+#     /discover shows 2 network rows THEN the organizer + curator top-up rows.
+#     This is the witness that organizers ARE suggested for a signed-in
+#     networked viewer (top-up fills the spare slots, like curators).
+#   - dave: thinviewer's only friend; follows pop1/pop2 to seed a thin FoF pool.
+#   - loner: zero graph; should see Discover organizer + curator fallback only.
 #   - alice/bob/carol: viewer's mutual friends, used as suggestion witnesses.
-#   - pop1/pop2/pop3: FoF candidates ranked by mutual-friend count.
-#   - privatepop: friends-only profile that remains suggestable.
+#   - pop1-pop14: 14 FoF candidates with varying mutual-friend counts.
+#     pop1(3 mutuals) and pop2(2 mutuals) lead on the graph signal. pop3
+#     and privatepop TIE at 1 mutual, so the blended relevance score
+#     (shared interests + recency) breaks the tie: privatepop ranks ABOVE
+#     pop3 even though "pop3" sorts first alphabetically. pop4-pop14 have
+#     1 mutual and are ranked by secondary signals. Together with privatepop
+#     this pool (15 graph candidates) exceeds /discover page size (12) to show
+#     "Show more" and "Shuffle".
+#   - privatepop: friends-only but suggestable; shares salsa with viewer and
+#     is the most recently active candidate -> outranks pop3.
 #   - hiddenpop: explicit suggestion opt-out; must never be shown.
-#   - salsa-hub: verified organizer for onboarding ranking.
+#   - salsahub/afrohub: verified organizers surfaced via the /discover
+#     organizer top-up (and onboarding). salsahub shares salsa with viewer and
+#     is more recently active, so it leads afrohub within the organizer tier.
 #   - curator-paris/curator-bachata: admin-managed fallback/top-up candidates.
+#     curator-bachata shares bachata with viewer so it leads curator-paris.
 #   - curator-hidden: admin-managed but opted out of suggestions.
 #   - admin: site admin control, excluded by backend discovery helpers.
+#
+# Ranking signals seeded below (see backend/api/routes/social.py
+# _relevance_scores): mutual friends come from db-follows.yaml; popularity
+# (approved followers) also from db-follows.yaml; shared interests from
+# per-user `preferred_tags`; activity from `last_visit_at`. Events-in-common
+# is covered by backend unit tests rather than this UI scenario.
 users:
   - email: newbie@example.com
     name: Nora Newbie
@@ -20,6 +45,20 @@ users:
   - email: viewer@example.com
     name: Vera Viewer
     handle: viewer
+    account_visibility: public
+    preferred_tags: [salsa, bachata]
+    last_visit_at: "2026-08-07T09:00:00"
+  - email: thinviewer@example.com
+    name: Tom Thin
+    handle: thinviewer
+    account_visibility: public
+    # Thin network (one friend, dave, who follows only pop1/pop2). Discover's
+    # first page has room after the 2 network rows, so the organizer + curator
+    # top-up rows appear right below them -> proves organizers ARE suggested
+    # for a signed-in networked viewer, not only in onboarding.
+  - email: dave@example.com
+    name: Dave Diaz
+    handle: dave
     account_visibility: public
   - email: loner@example.com
     name: Leo Loner
@@ -41,18 +80,93 @@ users:
     name: Popular One
     handle: pop1
     account_visibility: public
+    preferred_tags: [salsa, bachata]
+    last_visit_at: "2026-08-05T12:00:00"
   - email: popular2@example.com
     name: Popular Two
     handle: pop2
     account_visibility: public
+    preferred_tags: [salsa, bachata]
+    last_visit_at: "2026-08-04T12:00:00"
   - email: popular3@example.com
     name: Popular Three
     handle: pop3
     account_visibility: public
+    # No shared interests and the oldest visit -> loses the 1-mutual tie
+    # against privatepop.
+    last_visit_at: "2026-06-01T12:00:00"
+  - email: popular4@example.com
+    name: Popular Four
+    handle: pop4
+    account_visibility: public
+    preferred_tags: [salsa]
+    last_visit_at: "2026-08-06T14:00:00"
+  - email: popular5@example.com
+    name: Popular Five
+    handle: pop5
+    account_visibility: public
+    preferred_tags: [bachata]
+    last_visit_at: "2026-08-06T10:00:00"
+  - email: popular6@example.com
+    name: Popular Six
+    handle: pop6
+    account_visibility: public
+    preferred_tags: [salsa, bachata]
+    last_visit_at: "2026-08-06T08:00:00"
+  - email: popular7@example.com
+    name: Popular Seven
+    handle: pop7
+    account_visibility: public
+    preferred_tags: [salsa]
+    last_visit_at: "2026-08-05T15:00:00"
+  - email: popular8@example.com
+    name: Popular Eight
+    handle: pop8
+    account_visibility: public
+    preferred_tags: [bachata]
+    last_visit_at: "2026-08-05T11:00:00"
+  - email: popular9@example.com
+    name: Popular Nine
+    handle: pop9
+    account_visibility: public
+    preferred_tags: [salsa, bachata]
+    last_visit_at: "2026-08-04T16:00:00"
+  - email: popular10@example.com
+    name: Popular Ten
+    handle: pop10
+    account_visibility: public
+    preferred_tags: [salsa]
+    last_visit_at: "2026-08-04T09:00:00"
+  - email: popular11@example.com
+    name: Popular Eleven
+    handle: pop11
+    account_visibility: public
+    preferred_tags: [bachata]
+    last_visit_at: "2026-08-03T14:00:00"
+  - email: popular12@example.com
+    name: Popular Twelve
+    handle: pop12
+    account_visibility: public
+    preferred_tags: [salsa, bachata]
+    last_visit_at: "2026-08-02T12:00:00"
+  - email: popular13@example.com
+    name: Popular Thirteen
+    handle: pop13
+    account_visibility: public
+    preferred_tags: [salsa]
+    last_visit_at: "2026-08-01T12:00:00"
+  - email: popular14@example.com
+    name: Popular Fourteen
+    handle: pop14
+    account_visibility: public
+    preferred_tags: [bachata]
+    last_visit_at: "2026-07-31T12:00:00"
   - email: privatepop@example.com
     name: Private Popular
     handle: privatepop
     account_visibility: friends
+    preferred_tags: [salsa]
+    last_visit_at: "2026-08-07T08:00:00"
   - email: hiddenpop@example.com
     name: Hidden Popular
     handle: hiddenpop
@@ -63,6 +177,20 @@ users:
     handle: salsahub
     account_visibility: public
     is_verified_organizer: true
+    # Shares salsa with viewer and is the most recently active organizer, so
+    # it leads the organizer top-up tier even though "afrohub" sorts first
+    # alphabetically -> proves the organizer tier is relevance-ranked.
+    preferred_tags: [salsa]
+    last_visit_at: "2026-08-06T09:00:00"
+  - email: afro-hub@example.com
+    name: Afro Hub
+    handle: afrohub
+    account_visibility: public
+    is_verified_organizer: true
+    # No shared interest with viewer and an older visit -> ranks BELOW
+    # salsahub in the organizer top-up tier despite sorting first A-Z.
+    preferred_tags: [kizomba]
+    last_visit_at: "2026-06-15T09:00:00"
   - email: curator-paris@example.com
     name: Paris Salsa Curator
     handle: curator-paris
@@ -77,6 +205,7 @@ users:
     is_admin_managed: true
     managed_label: Bachata Curator
     bio: Editorial bachata calendar for social dancers.
+    preferred_tags: [bachata]
   - email: curator-hidden@example.com
     name: Hidden Curator
     handle: curator-hidden

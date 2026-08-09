@@ -1,6 +1,6 @@
 """API tests for the Dance Passport endpoints."""
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -100,6 +100,8 @@ class TestPassportEndpoint:
         assert body["stats"]["cities_visited"] == 2
         assert body["stats"]["countries_visited"] == 2
         assert len(body["collections"]["countries"]) == 2
+        assert "top_style" in body["stats"]
+        assert all("prestige" in m for m in body["milestones"])
 
     def test_empty_passport(self, client_with_user):
         client, _engine, _user_id = client_with_user
@@ -108,6 +110,19 @@ class TestPassportEndpoint:
 
         assert resp.status_code == 200
         assert resp.json()["stats"]["total_events_attended"] == 0
+
+    def test_stats_echo_dancing_since(self, client_with_user):
+        client, engine, user_id = client_with_user
+        with Session(engine) as s:
+            u = s.get(User, user_id)
+            u.dancing_since = date(2018, 3, 15)
+            s.add(u)
+            s.commit()
+
+        resp = client.get("/api/passport")
+
+        assert resp.status_code == 200
+        assert resp.json()["stats"]["dancing_since"] == "2018-03-15"
 
 
 @pytest.mark.unit

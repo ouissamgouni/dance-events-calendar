@@ -26,6 +26,9 @@ interface FeatureFlags {
     organizerClaimsEnabled: boolean;
     forYouRailEnabled: boolean;
     yourNextEventsRailEnabled: boolean;
+    /** Tribe > Calendars "Your Network" snapshot of upcoming events people
+     * you follow are going to. When false, the snapshot is hidden. */
+    networkGoingSnapshotEnabled: boolean;
     /** When true, tags on event cards render as colored badges (legacy
      * look). When false (default), tags render as inline "Practice · Indoor"
      * text so cards stay quieter. */
@@ -59,6 +62,7 @@ const defaultFlags: FeatureFlags = {
     organizerClaimsEnabled: false,
     forYouRailEnabled: false,
     yourNextEventsRailEnabled: false,
+    networkGoingSnapshotEnabled: true,
     tagAsBadge: false,
     tagBadgeColored: false,
     trendingTrailRichEnabled: false,
@@ -91,6 +95,7 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     organizerClaimsEnabled: s.organizer_claims_enabled ?? false,
                     forYouRailEnabled: s.for_you_rail_enabled ?? false,
                     yourNextEventsRailEnabled: s.your_next_events_rail_enabled ?? false,
+                    networkGoingSnapshotEnabled: s.network_going_snapshot_enabled ?? true,
                     tagAsBadge: s.tag_as_badge_enabled ?? false,
                     tagBadgeColored: s.tag_badge_colored ?? false,
                     trendingTrailRichEnabled: s.trending_trail_rich_enabled ?? false,

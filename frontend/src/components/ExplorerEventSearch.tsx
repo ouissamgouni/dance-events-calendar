@@ -18,6 +18,12 @@ interface ExplorerEventSearchProps {
     /** Render an "Include past" checkbox that lets the user opt past events
      *  into the results (used by the header search). */
     pastToggle?: boolean;
+    /** Desktop header variant: keep the single inline input, render the
+     *  "Include past" toggle inline in the header box, and show only results
+     *  (no duplicate search input) in the dropdown below. */
+    headerInline?: boolean;
+    /** Callback to open the submit event form (shown in search overlay footer when includePast is true). */
+    onOpenSubmitEvent?: () => void;
 }
 
 function useDebounced<T>(value: T, ms: number): T {
@@ -78,6 +84,8 @@ export default function ExplorerEventSearch({
     small = false,
     includePast = false,
     pastToggle = false,
+    headerInline = false,
+    onOpenSubmitEvent,
 }: ExplorerEventSearchProps) {
     const [open, setOpen] = useState(false);
     const [q, setQ] = useState('');
@@ -96,11 +104,13 @@ export default function ExplorerEventSearch({
     const { isAttending } = useAttendingEvents();
 
     useEffect(() => {
-        if (!open || !compact) return;
+        if (!open || compact) return;
         const updateTop = () => {
-            const rect = triggerRef.current?.getBoundingClientRect();
-            if (!rect) return;
-            setCompactPanelTop(Math.ceil(rect.bottom + 6));
+            if (compact && triggerRef.current) {
+                const rect = triggerRef.current?.getBoundingClientRect();
+                if (!rect) return;
+                setCompactPanelTop(Math.ceil(rect.bottom + 6));
+            }
         };
         updateTop();
         window.addEventListener('resize', updateTop);
@@ -208,68 +218,117 @@ export default function ExplorerEventSearch({
         : 'absolute right-0 top-full z-[8600] mt-1 w-80 max-w-[calc(100vw-2rem)] border border-slate-200 bg-white shadow-lg';
     const panelStyle = compact ? { top: compactPanelTop } : undefined;
 
+    // Desktop inline mode: show input directly instead of trigger button
+    const isDesktopInline = !compact && !small && !onDark;
+
     return (
         <div ref={containerRef} className={`relative ${className}`}>
-            <button
-                ref={triggerRef}
-                type="button"
-                onClick={() => setOpen((value) => !value)}
-                aria-label={triggerLabel}
-                title={triggerLabel}
-                className={onDark
-                    ? 'inline-flex items-center justify-center w-7 h-7 text-white hover:text-gray-200 transition'
-                    : compact
-                        ? 'inline-flex h-6 w-6 items-center justify-center border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition'
-                        : small
-                            ? 'inline-flex items-center justify-center gap-1 whitespace-nowrap border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 transition'
-                            : 'inline-flex items-center justify-center gap-1.5 whitespace-nowrap border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition'}
-                data-testid="explorer-event-search-trigger"
-            >
-                <img src="/search.png" alt="" aria-hidden="true" className={onDark ? 'h-4 w-4 invert' : small ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
-                {!compact && !onDark && <span>{triggerLabel}</span>}
-            </button>
+            {/* Desktop inline: show input directly */}
+            {isDesktopInline && (
+                <div className="hidden sm:flex items-center gap-2 border border-gray-600 bg-gray-700 px-2 py-1">
+                    <svg
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                        className="h-4 w-4 text-gray-400 flex-shrink-0"
+                        aria-hidden="true"
+                    >
+                        <path
+                            fillRule="evenodd"
+                            clipRule="evenodd"
+                            d="M9 3a6 6 0 1 0 3.873 10.59l3.768 3.768a1 1 0 0 0 1.415-1.415l-3.769-3.768A6 6 0 0 0 9 3Zm-4 6a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z"
+                        />
+                    </svg>
+                    <input
+                        ref={inputRef}
+                        type="text"
+                        value={q}
+                        onChange={(event) => setQ(event.target.value)}
+                        onKeyDown={onKeyDown}
+                        onFocus={() => setOpen(true)}
+                        placeholder={headerInline && effectiveIncludePast ? 'Search past events' : triggerLabel}
+                        aria-label={triggerLabel}
+                        className="flex-1 bg-transparent text-xs text-white placeholder:text-gray-400 focus:outline-none"
+                    />
+                    {headerInline && pastToggle && (
+                        <label className="flex items-center gap-1 text-[11px] text-gray-300 whitespace-nowrap select-none">
+                            <input
+                                type="checkbox"
+                                checked={pastChecked}
+                                onChange={(event) => setPastChecked(event.target.checked)}
+                                className="h-3 w-3"
+                                data-testid="explorer-event-search-include-past"
+                            />
+                            Past
+                        </label>
+                    )}
+                </div>
+            )}
+
+            {/* Mobile/compact: trigger button */}
+            {!isDesktopInline && (
+                <button
+                    ref={triggerRef}
+                    type="button"
+                    onClick={() => setOpen((value) => !value)}
+                    aria-label={triggerLabel}
+                    title={triggerLabel}
+                    className={onDark
+                        ? 'inline-flex items-center justify-center w-7 h-7 text-white hover:text-gray-200 transition'
+                        : compact
+                            ? 'inline-flex h-6 w-6 items-center justify-center border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition'
+                            : small
+                                ? 'inline-flex items-center justify-center gap-1 whitespace-nowrap border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 transition'
+                                : 'inline-flex items-center justify-center gap-1.5 whitespace-nowrap border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition'}
+                    data-testid="explorer-event-search-trigger"
+                >
+                    <img src="/search.png" alt="" aria-hidden="true" className={onDark ? 'h-4 w-4 invert' : small ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+                    {!compact && !onDark && <span>{triggerLabel}</span>}
+                </button>
+            )}
             {open && (
                 <div className={panelClassName} style={panelStyle}>
-                    <div className="border-b border-slate-200 p-2">
-                        <div className="flex items-center gap-2">
-                            {pastToggle && (
-                                <label className="flex items-center gap-1 text-xs text-slate-600 whitespace-nowrap select-none">
+                    {!headerInline && (
+                        <div className="border-b border-slate-200 p-2">
+                            <div className="flex items-center gap-2">
+                                {pastToggle && (
+                                    <label className="flex items-center gap-1 text-xs text-slate-600 whitespace-nowrap select-none">
+                                        <input
+                                            type="checkbox"
+                                            checked={pastChecked}
+                                            onChange={(event) => setPastChecked(event.target.checked)}
+                                            className="h-3.5 w-3.5"
+                                            data-testid="explorer-event-search-include-past"
+                                        />
+                                        Include past
+                                    </label>
+                                )}
+                                <div className="flex flex-1 items-center gap-2 border border-slate-300 bg-white px-2 py-1.5">
+                                    <svg
+                                        viewBox="0 0 20 20"
+                                        fill="currentColor"
+                                        className="h-4 w-4 text-slate-400"
+                                        aria-hidden="true"
+                                    >
+                                        <path
+                                            fillRule="evenodd"
+                                            clipRule="evenodd"
+                                            d="M9 3a6 6 0 1 0 3.873 10.59l3.768 3.768a1 1 0 0 0 1.415-1.415l-3.769-3.768A6 6 0 0 0 9 3Zm-4 6a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z"
+                                        />
+                                    </svg>
                                     <input
-                                        type="checkbox"
-                                        checked={pastChecked}
-                                        onChange={(event) => setPastChecked(event.target.checked)}
-                                        className="h-3.5 w-3.5"
-                                        data-testid="explorer-event-search-include-past"
+                                        ref={inputRef}
+                                        type="text"
+                                        value={q}
+                                        onChange={(event) => setQ(event.target.value)}
+                                        onKeyDown={onKeyDown}
+                                        placeholder={effectiveIncludePast ? 'Search past events by title' : 'Search upcoming events by title'}
+                                        aria-label={effectiveIncludePast ? 'Search past events by title' : 'Search upcoming events by title'}
+                                        className="w-full bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
                                     />
-                                    Include past
-                                </label>
-                            )}
-                            <div className="flex flex-1 items-center gap-2 border border-slate-300 bg-white px-2 py-1.5">
-                                <svg
-                                    viewBox="0 0 20 20"
-                                    fill="currentColor"
-                                    className="h-4 w-4 text-slate-400"
-                                    aria-hidden="true"
-                                >
-                                    <path
-                                        fillRule="evenodd"
-                                        clipRule="evenodd"
-                                        d="M9 3a6 6 0 1 0 3.873 10.59l3.768 3.768a1 1 0 0 0 1.415-1.415l-3.769-3.768A6 6 0 0 0 9 3Zm-4 6a4 4 0 1 1 8 0 4 4 0 0 1-8 0Z"
-                                    />
-                                </svg>
-                                <input
-                                    ref={inputRef}
-                                    type="text"
-                                    value={q}
-                                    onChange={(event) => setQ(event.target.value)}
-                                    onKeyDown={onKeyDown}
-                                    placeholder={effectiveIncludePast ? 'Search past events by title' : 'Search upcoming events by title'}
-                                    aria-label={effectiveIncludePast ? 'Search past events by title' : 'Search upcoming events by title'}
-                                    className="w-full bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
-                                />
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
                     <div className="max-h-80 overflow-auto bg-slate-50 px-2 py-1.5">
                         {term.length < 2 && (
                             <div className="bg-white p-3 text-xs text-slate-500">
@@ -342,6 +401,20 @@ export default function ExplorerEventSearch({
                             );
                         })}
                     </div>
+                    {includePast && onOpenSubmitEvent && (
+                        <div className="border-t border-slate-200 bg-white px-3 py-2 text-center text-xs">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    onOpenSubmitEvent();
+                                    reset();
+                                }}
+                                className="font-medium text-blue-600 hover:underline"
+                            >
+                                Missing event? Add it
+                            </button>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

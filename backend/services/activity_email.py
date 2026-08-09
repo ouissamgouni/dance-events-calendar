@@ -33,10 +33,17 @@ from backend.services.app_settings import (
     get_activity_digest_schedule,
     get_activity_digest_email_enabled,
     get_interest_match_max_events_per_email,
+    get_feature_email_instant,
+    get_feature_email_digest,
 )
 from backend.config.loader import get_public_app_url
 from backend.db.database import get_engine
-from backend.db.models import CachedEvent, Notification, User
+from backend.db.models import (
+    CachedEvent,
+    Notification,
+    User,
+    UserEventAttendance,
+)
 from backend.services.email import send_activity_digest_email
 from backend.services.notification_delivery import record_delivery
 from backend.services.push_service import send_push
@@ -47,6 +54,8 @@ logger = logging.getLogger(__name__)
 ACTIVITY_KINDS = (
     "subscription_going",
     "subscription_suggested",
+    "subscription_review",
+    "subscription_milestone",
     "new_follower",
     "new_friend",
     "follow_request",
@@ -58,8 +67,10 @@ ACTIVITY_KINDS = (
 # ``ACTIVITY_KINDS`` must appear here so it is either delivered or
 # explicitly dropped.
 FEATURE_BY_KIND: dict[str, str] = {
-    "subscription_going": "social_activity",
+    "subscription_going": "friends_going",
     "subscription_suggested": "social_activity",
+    "subscription_review": "friend_reviews",
+    "subscription_milestone": "friend_milestones",
     "new_follower": "social_activity",
     "new_friend": "social_activity",
     "follow_request": "social_activity",
@@ -70,8 +81,14 @@ FEATURE_BY_KIND: dict[str, str] = {
 # Per-(channel, feature) User attribute that must be True for delivery.
 CHANNEL_FLAG: dict[tuple[str, str], str] = {
     ("email", "social_activity"): "email_social_activity_enabled",
+    ("email", "friends_going"): "email_friends_going_enabled",
+    ("email", "friend_reviews"): "email_friend_reviews_enabled",
+    ("email", "friend_milestones"): "email_friend_milestones_enabled",
     ("email", "interest_matches"): "email_interest_matches_enabled",
     ("push", "social_activity"): "push_social_activity_enabled",
+    ("push", "friends_going"): "push_friends_going_enabled",
+    ("push", "friend_reviews"): "push_friend_reviews_enabled",
+    ("push", "friend_milestones"): "push_friend_milestones_enabled",
     ("push", "interest_matches"): "push_interest_matches_enabled",
 }
 
@@ -176,6 +193,7 @@ def _render_line(
     actor: User | None,
     event: CachedEvent | None,
     context: str | None = None,
+    also_going: bool = False,
 ) -> str:
     """Return an escaped HTML snippet describing one notification.
 
@@ -186,7 +204,10 @@ def _render_line(
     handle or when no event row is joined.
     """
     app = get_public_app_url().rstrip("/")
-    if actor is None:
+    # Anonymous reviews still fan out to followers but the reviewer's
+    # identity is masked to "Someone" (never linked).
+    anon = kind == "subscription_review" and context == "anon"
+    if actor is None or anon:
         who_text = "Someone"
     else:
         who_text = escape(
@@ -198,6 +219,8 @@ def _render_line(
             f'style="color:#1d4ed8;text-decoration:underline">{who_text}</a>'
         )
     else:
+        who = who_text
+    if anon:
         who = who_text
     if event and event.title:
         title_text = escape(event.title)
@@ -211,7 +234,18 @@ def _render_line(
     else:
         title = "an event"
     if kind == "subscription_going":
+        if also_going:
+            return f"You and <strong>{who}</strong> are going to {title}"
         return f"<strong>{who}</strong> is going to {title}"
+    if kind == "subscription_review":
+        return f"<strong>{who}</strong> shared their experience of {title}"
+    if kind == "subscription_milestone":
+        if context:
+            return (
+                f"<strong>{who}</strong> reached a milestone: "
+                f"<strong>{escape(context)}</strong>"
+            )
+        return f"<strong>{who}</strong> reached a new milestone"
     if kind == "subscription_suggested":
         return f"<strong>{who}</strong>'s suggested event {title} was approved"
     if kind == "new_follower":
@@ -233,16 +267,26 @@ def _render_plain(
     actor: User | None,
     event: CachedEvent | None,
     context: str | None = None,
+    also_going: bool = False,
 ) -> str:
     """Return a plain-text snippet describing one notification (for push)."""
+    anon = kind == "subscription_review" and context == "anon"
     who = (
         actor.display_name or (f"@{actor.handle}" if actor.handle else "Someone")
-        if actor is not None
+        if actor is not None and not anon
         else "Someone"
     )
     title = event.title if event and event.title else "an event"
     if kind == "subscription_going":
+        if also_going:
+            return f"You and {who} are going to {title}"
         return f"{who} is going to {title}"
+    if kind == "subscription_review":
+        return f"{who} shared their experience of {title}"
+    if kind == "subscription_milestone":
+        if context:
+            return f"{who} reached a milestone: {context}"
+        return f"{who} reached a new milestone"
     if kind == "subscription_suggested":
         return f"{who}'s suggested event {title} was approved"
     if kind == "new_follower":
@@ -320,6 +364,15 @@ def run_once(
     max_events_per_interest_email = get_interest_match_max_events_per_email()
 
     with Session(get_engine()) as session:
+        # Per-feature admin routing: which email vehicle(s) each activity
+        # feature uses. Computed once per run (not per row).
+        feat_instant: dict[str, bool] = {}
+        feat_digest: dict[str, bool] = {}
+        for feature in set(FEATURE_BY_KIND.values()):
+            feat_instant[feature] = get_feature_email_instant(feature, session)
+            feat_digest[feature] = get_feature_email_digest(feature, session)
+        any_instant = any(feat_instant.values())
+
         stmt = (
             select(Notification)
             .where(Notification.kind.in_(kinds or ACTIVITY_KINDS))  # type: ignore[union-attr]
@@ -327,12 +380,18 @@ def run_once(
             .order_by(Notification.recipient_user_id, Notification.created_at)
         )
         if not resend:
-            stmt = stmt.where(
-                or_(
-                    Notification.emailed_at.is_(None),  # type: ignore[union-attr]
-                    Notification.pushed_at.is_(None),  # type: ignore[union-attr]
+            pending_clauses = [
+                Notification.emailed_at.is_(None),  # type: ignore[union-attr]
+                Notification.pushed_at.is_(None),  # type: ignore[union-attr]
+            ]
+            # Only widen the candidate pool to un-instant-emailed rows when
+            # at least one feature is actually in instant mode; otherwise
+            # already-digested rows would re-select on every tick forever.
+            if any_instant:
+                pending_clauses.append(
+                    Notification.instant_emailed_at.is_(None)  # type: ignore[union-attr]
                 )
-            )
+            stmt = stmt.where(or_(*pending_clauses))
         if user_ids is not None:
             stmt = stmt.where(Notification.recipient_user_id.in_(user_ids))  # type: ignore[union-attr]
         pending = session.exec(stmt).all()
@@ -363,19 +422,54 @@ def run_once(
             if event_ids
         }
 
-        # Split into per-channel candidate lists (chronological order —
+        # Recipient co-attendance for "You and X are going to ..." — bulk
+        # load which (recipient, event) pairs the recipient is also going
+        # to, but only for subscription_going rows.
+        going_event_ids = {
+            n.event_id for n in pending if n.kind == "subscription_going" and n.event_id
+        }
+        also_going_pairs: set[tuple] = set()
+        if going_event_ids:
+            for row in session.exec(
+                select(UserEventAttendance.user_id, UserEventAttendance.event_id)
+                .where(UserEventAttendance.user_id.in_(recipient_ids))  # type: ignore[union-attr]
+                .where(UserEventAttendance.event_id.in_(going_event_ids))  # type: ignore[union-attr]
+            ).all():
+                also_going_pairs.add((row[0], row[1]))
+
+        def _also_going(n: Notification) -> bool:
+            return (
+                n.kind == "subscription_going"
+                and (n.recipient_user_id, n.event_id) in also_going_pairs
+            )
+
         # the query is already ordered this way). A row can be pending on
         # one channel and already handled on the other (e.g. pushed
         # immediately last tick, still waiting on the weekly email slot).
         skipped_off_schedule = 0
         skip_reason_counts: dict[str, int] = {}
         email_by_recipient: dict = {}
+        instant_by_recipient: dict = {}
         push_by_recipient: dict = {}
         for n in pending:
             recipient = users.get(n.recipient_user_id)
             if not recipient or recipient.deleted_at is not None:
                 continue
-            if resend or n.emailed_at is None:
+            feature = FEATURE_BY_KIND.get(n.kind)
+            # Instant email path: no schedule slot, gated only by the
+            # admin per-feature instant toggle (default off) and the
+            # ``instant_emailed_at`` idempotency stamp.
+            if (
+                feature is not None
+                and feat_instant.get(feature)
+                and (resend or n.instant_emailed_at is None)
+            ):
+                instant_by_recipient.setdefault(recipient.id, []).append(n)
+            if (
+                (resend or n.emailed_at is None)
+                and feature is not None
+                and feat_digest.get(feature, True)
+            ):
                 in_slot = force
                 if not force:
                     status = _slot_status(
@@ -422,20 +516,26 @@ def run_once(
             return included
 
         included_for_email = _apply_cap(email_by_recipient)
+        included_for_instant = _apply_cap(instant_by_recipient)
         included_for_push = _apply_cap(push_by_recipient)
 
-        email_groups: dict[tuple, list[Notification]] = {}
+        def _group_email(included: list[Notification]) -> tuple[dict, set]:
+            groups: dict[tuple, list[Notification]] = {}
+            seen: set = set()
+            for n in included:
+                recipient = users[n.recipient_user_id]
+                feature = FEATURE_BY_KIND.get(n.kind)
+                if feature is None:
+                    continue
+                seen.add(recipient.id)
+                if getattr(recipient, CHANNEL_FLAG[("email", feature)], True):
+                    groups.setdefault((recipient.id, feature), []).append(n)
+            return groups, seen
+
+        email_groups, email_recipients = _group_email(included_for_email)
+        instant_groups, _instant_recipients = _group_email(included_for_instant)
         push_groups: dict[tuple, list[Notification]] = {}
-        email_recipients: set = set()
         push_recipients: set = set()
-        for n in included_for_email:
-            recipient = users[n.recipient_user_id]
-            feature = FEATURE_BY_KIND.get(n.kind)
-            if feature is None:
-                continue
-            email_recipients.add(recipient.id)
-            if getattr(recipient, CHANNEL_FLAG[("email", feature)], True):
-                email_groups.setdefault((recipient.id, feature), []).append(n)
         for n in included_for_push:
             recipient = users[n.recipient_user_id]
             feature = FEATURE_BY_KIND.get(n.kind)
@@ -449,50 +549,57 @@ def run_once(
         # Late import to avoid circular dependency with backend.api.routes.social.
         from backend.api.routes.social import get_people_suggestions_for_email
 
-        for (recipient_id, feature), notifs in email_groups.items():
-            recipient = users[recipient_id]
-            discover_more_count = 0
-            email_notifs = notifs
-            if (
-                feature == "interest_matches"
-                and len(notifs) > max_events_per_interest_email
-            ):
-                discover_more_count = len(notifs) - max_events_per_interest_email
-                email_notifs = notifs[:max_events_per_interest_email]
-            lines = [
-                _render_line(
-                    n.kind,
-                    users.get(n.actor_user_id),
-                    events.get(n.event_id) if n.event_id else None,
-                    n.context,
-                )
-                for n in email_notifs
-            ]
-            suggestions = None
-            if feature == "social_activity":
-                suggestions = [
-                    {
-                        "handle": item.handle,
-                        "display_name": item.display_name,
-                        "avatar_url": item.avatar_url,
-                        "mutual_friend_count": item.mutual_friend_count,
-                        "followers_count": item.followers_count,
-                    }
-                    for item in get_people_suggestions_for_email(
-                        session, recipient, limit=5
+        def _send_email_groups(groups: dict) -> int:
+            sent = 0
+            for (recipient_id, feature), notifs in groups.items():
+                recipient = users[recipient_id]
+                discover_more_count = 0
+                email_notifs = notifs
+                if (
+                    feature == "interest_matches"
+                    and len(notifs) > max_events_per_interest_email
+                ):
+                    discover_more_count = len(notifs) - max_events_per_interest_email
+                    email_notifs = notifs[:max_events_per_interest_email]
+                lines = [
+                    _render_line(
+                        n.kind,
+                        users.get(n.actor_user_id),
+                        events.get(n.event_id) if n.event_id else None,
+                        n.context,
+                        also_going=_also_going(n),
                     )
+                    for n in email_notifs
                 ]
-            ok = send_activity_digest_email(
-                recipient,
-                lines,
-                feature=feature,
-                discover_more_count=discover_more_count,
-                suggestions=suggestions,
-            )
-            digests += 1
-            if ok:
-                for n in notifs:
-                    record_delivery(session, n.id, "email", now)
+                suggestions = None
+                if feature == "social_activity":
+                    suggestions = [
+                        {
+                            "handle": item.handle,
+                            "display_name": item.display_name,
+                            "avatar_url": item.avatar_url,
+                            "mutual_friend_count": item.mutual_friend_count,
+                            "followers_count": item.followers_count,
+                        }
+                        for item in get_people_suggestions_for_email(
+                            session, recipient, limit=5
+                        )
+                    ]
+                ok = send_activity_digest_email(
+                    recipient,
+                    lines,
+                    feature=feature,
+                    discover_more_count=discover_more_count,
+                    suggestions=suggestions,
+                )
+                sent += 1
+                if ok:
+                    for n in notifs:
+                        record_delivery(session, n.id, "email", now)
+            return sent
+
+        digests = _send_email_groups(email_groups)
+        instant_emails = _send_email_groups(instant_groups)
 
         pushed = 0
         for (recipient_id, feature), notifs in push_groups.items():
@@ -501,6 +608,7 @@ def run_once(
                 users.get(notifs[0].actor_user_id),
                 events.get(notifs[0].event_id) if notifs[0].event_id else None,
                 notifs[0].context,
+                also_going=_also_going(notifs[0]),
             )
             extra = len(notifs) - 1
             body = first if extra <= 0 else f"{first} and {extra} more"
@@ -530,6 +638,9 @@ def run_once(
         for n in included_for_email:
             n.emailed_at = now
             stamped += 1
+        for n in included_for_instant:
+            n.instant_emailed_at = now
+            stamped += 1
         for n in included_for_push:
             n.pushed_at = now
             stamped += 1
@@ -554,6 +665,7 @@ def run_once(
     )
     return {
         "digests": digests,
+        "instant_emails": instant_emails,
         "pushed": pushed,
         "stamped": stamped,
         "skipped_off_schedule": skipped_off_schedule,

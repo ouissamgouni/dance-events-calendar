@@ -36,6 +36,7 @@ from backend.db.models import (  # noqa: E402
     EventRating,
     Notification,
     PushSubscription,
+    SiteSetting,
     User,
     UserEventAttendance,
     UserFollow,
@@ -893,6 +894,40 @@ def test_activity_digest_batches_into_one_email(session, monkeypatch):
     assert len(calls[0][1]) == 2  # both notifications in one digest
 
 
+def test_activity_digest_kinds_filter_scopes_to_one_feature(session, monkeypatch):
+    """Per-feature "Send now" passes ``kinds`` so only that feature's
+    notifications are emailed; the other kinds stay pending for a later
+    tick. Backs the admin ``digest/send-now?feature=`` scoping."""
+    calls: list = []
+    monkeypatch.setattr(
+        activity_email,
+        "send_activity_digest_email",
+        lambda recipient, lines, **_: calls.append((recipient.id, list(lines))),
+    )
+    monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
+
+    bob = _make_user(session, "bob@example.com", "bob")
+    a1 = _make_user(session, "a1@example.com", "a1")
+    old = datetime.utcnow() - timedelta(minutes=5)
+    reviewed = _notif(
+        session, recipient=bob, actor=a1, kind="subscription_review", created_at=old
+    )
+    followed = _notif(
+        session, recipient=bob, actor=a1, kind="new_follower", created_at=old
+    )
+
+    # Scope to the friend_reviews feature only.
+    stats = activity_email.run_once(force=True, kinds=("subscription_review",))
+    assert stats["digests"] == 1
+    assert len(calls) == 1
+    assert len(calls[0][1]) == 1  # only the review line
+
+    session.refresh(reviewed)
+    session.refresh(followed)
+    assert reviewed.emailed_at is not None  # in-scope: stamped/sent
+    assert followed.emailed_at is None  # out-of-scope: left pending
+
+
 def test_activity_digest_emailed_at_is_idempotent(session, monkeypatch):
     calls: list = []
     monkeypatch.setattr(
@@ -912,6 +947,51 @@ def test_activity_digest_emailed_at_is_idempotent(session, monkeypatch):
     # to send.
     assert activity_email.run_once(force=True) == {"digests": 0, "pushed": 0}
     assert calls == [bob.id]
+
+
+def test_activity_email_instant_mode_sends_without_schedule(session, monkeypatch):
+    """When admin routes a feature to instant mode, its email is sent
+    immediately (no schedule gate) and stamps ``instant_emailed_at``,
+    independently of the digest ``emailed_at`` track."""
+    calls: list = []
+    monkeypatch.setattr(
+        activity_email,
+        "send_activity_digest_email",
+        lambda recipient, lines, **_: calls.append(recipient.id) or True,
+    )
+    monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
+
+    # Route friends_going to instant-only (no digest).
+    session.add(SiteSetting(key="friends_going_email_instant", value="true"))
+    session.add(SiteSetting(key="friends_going_email_digest", value="false"))
+    session.commit()
+
+    bob = _make_user(session, "bob@example.com", "bob")
+    a1 = _make_user(session, "a1@example.com", "a1")
+    _make_event(session, "ev-going")
+    old = datetime.utcnow() - timedelta(minutes=5)
+    n = _notif(
+        session,
+        recipient=bob,
+        actor=a1,
+        kind="subscription_going",
+        event_id="ev-going",
+        created_at=old,
+    )
+
+    # force=False: instant path must NOT depend on the weekly slot.
+    stats = activity_email.run_once(force=False)
+    assert stats["instant_emails"] == 1
+    assert calls == [bob.id]
+
+    session.refresh(n)
+    assert n.instant_emailed_at is not None
+    # Digest track untouched (digest mode was off for this feature).
+    assert n.emailed_at is None
+
+    # Re-run: instant already stamped → no second send.
+    stats2 = activity_email.run_once(force=False)
+    assert stats2["instant_emails"] == 0
 
 
 def test_activity_digest_optout_skips_email_but_stamps(session, monkeypatch):
@@ -1275,6 +1355,33 @@ def test_unsubscribe_activity_token_leaves_reminder_untouched(client, session):
     assert refreshed.email_social_activity_enabled is False
     assert refreshed.email_interest_matches_enabled is False
     assert refreshed.email_event_reminders_enabled is True
+
+
+def test_unsubscribe_per_feature_category_flips_flag(client, session):
+    """Each per-feature activity digest carries its own unsubscribe
+    category. These were missing from UNSUBSCRIBE_CATEGORIES and crashed
+    the digest footer with `ValueError: Unknown unsubscribe category`."""
+    from backend.services.email_tokens import make_unsubscribe_token
+
+    cases = [
+        ("friends_going", "email_friends_going_enabled"),
+        ("friend_reviews", "email_friend_reviews_enabled"),
+        ("friend_milestones", "email_friend_milestones_enabled"),
+    ]
+    for i, (category, flag) in enumerate(cases):
+        user = _make_user(session, f"u{i}@example.com", f"u{i}")
+        # Should not raise for the new categories.
+        token = make_unsubscribe_token(str(user.id), category)
+
+        r = client.get(f"/api/auth/unsubscribe?token={token}")
+        assert r.status_code == 200
+        assert r.json()["status"] == "unsubscribed"
+
+        session.expire_all()
+        refreshed = session.get(User, user.id)
+        assert getattr(refreshed, flag) is False
+        # A sibling feature flag is untouched.
+        assert refreshed.email_event_reminders_enabled is True
 
 
 def test_unsubscribe_invalid_token(client, session):

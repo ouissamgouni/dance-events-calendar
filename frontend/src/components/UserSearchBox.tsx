@@ -137,9 +137,8 @@ export default function UserSearchBox() {
         setMobileExpanded(false);
     };
 
-    // Mobile-only: collapsed to a magnifier icon by default; tap to expand
-    // into a small inline input that replaces the icon (header logo stays
-    // visible on the left).
+    // Collapsed to a magnifier icon by default (all breakpoints); tap to expand
+    // into an inline input that replaces the icon (header logo stays visible).
     const [mobileExpanded, setMobileExpanded] = useState(false);
     const mobileInputRef = useRef<HTMLInputElement>(null);
     useEffect(() => {
@@ -164,14 +163,14 @@ export default function UserSearchBox() {
 
     return (
         <div ref={containerRef} className="relative">
-            {/* Mobile: icon trigger (hidden when expanded) */}
+            {/* Collapsed icon trigger (hidden when expanded) */}
             {!mobileExpanded && (
                 <button
                     type="button"
                     onClick={() => setMobileExpanded(true)}
                     aria-label="Search users"
                     title="Search users"
-                    className="sm:hidden inline-flex items-center justify-center w-7 h-7 text-white hover:text-gray-200 transition"
+                    className="inline-flex items-center justify-center w-7 h-7 text-white hover:text-gray-200 transition"
                 >
                     <img
                         src="/find-user.png"
@@ -182,15 +181,9 @@ export default function UserSearchBox() {
                 </button>
             )}
 
-            {/* Desktop: inline input */}
-            <input
-                {...inputCommonProps}
-                className="hidden sm:block w-48 text-xs px-2 py-1 bg-gray-700 text-white placeholder:text-gray-400 border border-gray-600 focus:outline-none focus:border-blue-400"
-            />
-
-            {/* Mobile expanded: small inline input replacing the icon */}
+            {/* Expanded: inline input replacing the icon */}
             {mobileExpanded && (
-                <div className="sm:hidden inline-flex items-center gap-1">
+                <div className="inline-flex items-center gap-1">
                     <input
                         {...inputCommonProps}
                         ref={mobileInputRef}
@@ -198,7 +191,7 @@ export default function UserSearchBox() {
                             // Auto-collapse if user taps away with no query.
                             if (q === '') setMobileExpanded(false);
                         }}
-                        className="w-32 text-xs px-2 py-1 bg-gray-700 text-white placeholder:text-gray-400 border border-gray-600 focus:outline-none focus:border-blue-400"
+                        className="w-40 sm:w-48 text-xs px-2 py-1 bg-gray-700 text-white placeholder:text-gray-400 border border-gray-600 focus:outline-none focus:border-blue-400"
                     />
                     <button
                         type="button"

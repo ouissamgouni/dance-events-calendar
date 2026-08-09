@@ -1,9 +1,18 @@
 # Fire the same subscription_going fan-out that the HTTP attendance
-# route runs, so this seed yields real Notification rows for Alice's
-# followers instead of leaving the digest with nothing to emit.
+# route runs, so Alice's Going yields real Notification rows for her
+# followers. Alice also attends ev-review (so she can review it) and
+# ev-past (a past event that unlocks her first passport milestone).
 emit_notifications: true
 attendances:
   - event_id: ev-friend
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-review
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-past
     email: alice@example.com
     share_publicly: true
     share_audience: public

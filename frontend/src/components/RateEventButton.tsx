@@ -211,12 +211,19 @@ export default function RateEventButton({
         return null;
     }
 
-    // If not on event detail page, render as a link to the event detail page with community anchor
+    // If not on event detail page, render as a link to the event detail page.
+    // The read-only "count" appearance just views the reviews section; the
+    // "Review" CTAs (pill/icon) target the `/review` deep-link route so they
+    // auto-open the Rate modal on arrival — same as clicking Review on the
+    // detail page itself.
     if (!isOnEventDetailPage) {
+        const linkTo = appearance === 'count'
+            ? `/event/${eventId}#community`
+            : `/event/${eventId}/review`;
         return (
             <span className="relative inline-flex" onMouseDown={stop} onPointerDown={stop} onClick={stop}>
                 <Link
-                    to={`/event/${eventId}#community`}
+                    to={linkTo}
                     title={tooltip}
                     className={buttonClasses}
                 >

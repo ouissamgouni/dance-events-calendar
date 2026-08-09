@@ -369,15 +369,25 @@ function UserGrid({
 }
 
 function UserMeta({ user }: { user: DiscoverUser }) {
+    const previewHead = user.mutual_friends_preview?.[0];
+    const previewRest = (user.mutual_friend_count ?? 0) - (previewHead ? 1 : 0);
     return (
-        <div className="text-xs text-slate-500 truncate">
-            @{user.handle} · {user.subscribers_count} subscriber
-            {user.subscribers_count === 1 ? '' : 's'}
-            {user.is_subscribed && (
-                <span className="ml-1 text-emerald-600">
-                    · subscribed
-                </span>
+        <div className="min-w-0">
+            {previewHead && (
+                <div className="text-xs text-slate-500 truncate">
+                    Followed by @{previewHead}
+                    {previewRest > 0 && ` + ${previewRest} more`}
+                </div>
             )}
+            <div className="text-xs text-slate-500 truncate">
+                @{user.handle} · {user.subscribers_count} subscriber
+                {user.subscribers_count === 1 ? '' : 's'}
+                {user.is_subscribed && (
+                    <span className="ml-1 text-emerald-600">
+                        · subscribed
+                    </span>
+                )}
+            </div>
         </div>
     );
 }

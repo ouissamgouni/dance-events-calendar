@@ -18,8 +18,8 @@ test_plan:
     - "The scenario seeds Alice attending THREE events (`ev-friend`, `ev-friend2`, `ev-friend3`) with `emit_notifications: true`, so Bob, Carol and Dave (her followers) each already have three pending `subscription_going` in-app notifications before any admin action runs — enough backlog for the 'Max per user' cap to actually bind."
 
   cast:
-    - "Bob — email_social_activity_enabled=true. Selected first with a 'Max per user' cap of 2, then again uncapped → exercises the cap keeping the most recent notifications and deferring the oldest to a later run."
-    - "Carol — email_social_activity_enabled=true too, but deliberately NOT selected → negative control proving the action is scoped to chosen users, not 'everyone eligible'."
+    - "Bob — email_friends_going_enabled=true. Selected first with a 'Max per user' cap of 2, then again uncapped → exercises the cap keeping the most recent notifications and deferring the oldest to a later run."
+    - "Carol — email_friends_going_enabled=true too, but deliberately NOT selected → negative control proving the action is scoped to chosen users, not 'everyone eligible'."
     - "Dave — every notification channel toggle off → `skipped_disabled` probe even when selected."
 
   steps:
@@ -42,8 +42,8 @@ test_plan:
         without selecting anyone yet.
       expected: |
         Bob and Carol both show the Activity digest column as
-        email-on/push-off (matching `email_social_activity_enabled: true`,
-        `push_social_activity_enabled: false` in mock-users.yaml). Dave
+        email-on/push-off (matching `email_friends_going_enabled: true`,
+        `push_friends_going_enabled: false` in mock-users.yaml). Dave
         shows every column (Interest-match, Event reminders, Activity
         digest) as email-off/push-off. The Push column is off for all
         three — this scenario has `WEB_PUSH_ENABLED=false` and seeds no
@@ -84,7 +84,7 @@ test_plan:
         Refresh the Mailpit inbox after steps 3 and 4.
       expected: |
         Carol receives ZERO emails even though her
-        email_social_activity_enabled toggle is on and she has the same
+        email_friends_going_enabled toggle is on and she has the same
         three pending notifications as Bob started with — the admin
         action only acted on the selected user_ids.
 

@@ -710,3 +710,89 @@ def test_discover_suggested_curator_only_pool_reports_total(client, session):
     assert body["total"] == 3
     assert len(body["items"]) == 2
     assert all(u["source"] == "curator" for u in body["items"])
+
+
+def _make_organizer(session: Session, email: str, handle: str) -> User:
+    u = _make_user(session, email, handle)
+    u.is_verified_organizer = True
+    session.add(u)
+    session.commit()
+    session.refresh(u)
+    return u
+
+
+def test_discover_suggested_without_network_returns_organizers_then_curators(
+    client, session
+):
+    # Cold-start viewer (no network): fallback leads with verified organizers,
+    # then admin-managed curators.
+    _make_user(session, "viewer@example.com", "viewer")
+    _make_organizer(session, "orga@example.com", "orga")
+    _make_user(session, "cur@example.com", "cur", is_admin_managed=True)
+
+    _login(client, "viewer@example.com")
+    body = client.get("/api/social/discover/suggested").json()
+    assert [(u["handle"], u["source"]) for u in body["items"]] == [
+        ("orga", "organizer"),
+        ("cur", "curator"),
+    ]
+
+
+def test_discover_suggested_tops_up_thin_network_with_organizers_then_curators(
+    client, session
+):
+    # viewer follows alice; alice follows charlie (one network row). The
+    # first page has spare slots, so the organizer top-up (orga) leads the
+    # curator top-up (cur), appended after the network row.
+    viewer = _make_user(session, "viewer@example.com", "viewer")
+    alice = _make_user(session, "alice@example.com", "alice")
+    charlie = _make_user(session, "charlie@example.com", "charlie")
+    _follow(session, viewer, alice)
+    _follow(session, alice, charlie)
+    _make_organizer(session, "orga@example.com", "orga")
+    _make_user(session, "cur@example.com", "cur", is_admin_managed=True)
+
+    _login(client, "viewer@example.com")
+    body = client.get("/api/social/discover/suggested").json()
+    assert [(u["handle"], u["source"]) for u in body["items"]] == [
+        ("charlie", "network"),
+        ("orga", "organizer"),
+        ("cur", "curator"),
+    ]
+    # Top-up rows don't inflate the pageable pool total.
+    assert body["total"] == 1
+
+
+def test_discover_suggested_organizer_not_duplicated_when_in_network(client, session):
+    # An organizer reachable through the friend graph appears once as a
+    # network row, never re-added by the organizer top-up.
+    viewer = _make_user(session, "viewer@example.com", "viewer")
+    alice = _make_user(session, "alice@example.com", "alice")
+    orga = _make_organizer(session, "orga@example.com", "orga")
+    _follow(session, viewer, alice)
+    _follow(session, alice, orga)
+
+    _login(client, "viewer@example.com")
+    body = client.get("/api/social/discover/suggested").json()
+    handles = [u["handle"] for u in body["items"]]
+    assert handles.count("orga") == 1
+    orga_row = next(u for u in body["items"] if u["handle"] == "orga")
+    assert orga_row["source"] == "network"
+
+
+def test_discover_suggested_network_row_has_mutual_friends_preview(client, session):
+    # viewer and alice are mutual friends; alice follows charlie. The discover
+    # network row for charlie carries the same follows-in-common attribution
+    # as My network ("Followed by @alice").
+    viewer = _make_user(session, "viewer@example.com", "viewer")
+    alice = _make_user(session, "alice@example.com", "alice")
+    charlie = _make_user(session, "charlie@example.com", "charlie")
+    _follow(session, viewer, alice)
+    _follow(session, alice, viewer)  # mutual
+    _follow(session, alice, charlie)
+
+    _login(client, "viewer@example.com")
+    body = client.get("/api/social/discover/suggested").json()
+    charlie_row = next(u for u in body["items"] if u["handle"] == "charlie")
+    assert charlie_row["mutual_friend_count"] == 1
+    assert charlie_row["mutual_friends_preview"] == ["alice"]

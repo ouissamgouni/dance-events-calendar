@@ -10,6 +10,7 @@ import { AttendingEventsProvider } from '../context/AttendingEventsContext'
 import { ToastProvider } from '../components/Toast'
 import { server } from '../test/server'
 import { makeUser } from '../test/handlers'
+import { renderCardToBlob, downloadImage } from '../utils/passportShareImage'
 
 // Covers the Passport page rendering summary stats, milestones and the
 // Timeline/Cities/Countries tabs from the mocked /api/passport +
@@ -20,16 +21,27 @@ vi.mock('../components/EventMap', () => ({
     default: () => <div data-testid="passport-map">event map</div>,
 }))
 
+// Rasterising the share card needs a real canvas; stub the capture/share util
+// so the test asserts the dialog wiring (token mint + events fetch + scope)
+// rather than image encoding.
+vi.mock('../utils/passportShareImage', () => ({
+    CARD_WIDTH: 360,
+    CARD_HEIGHT: 640,
+    renderCardToBlob: vi.fn(async () => new Blob(['x'], { type: 'image/png' })),
+    shareImage: vi.fn(async () => 'unsupported'),
+    downloadImage: vi.fn(),
+}))
+
 function renderPassport() {
     return render(
-        <MemoryRouter initialEntries={['/passport']}>
+        <MemoryRouter initialEntries={['/mine/passport']}>
             <ToastProvider>
                 <AuthProvider>
                     <AttendanceSummariesProvider>
                         <SavedEventsProvider>
                             <AttendingEventsProvider>
                                 <Routes>
-                                    <Route path="/passport" element={<PassportPage />} />
+                                    <Route path="/mine/passport" element={<PassportPage />} />
                                     <Route path="/login" element={<p>login page</p>} />
                                     <Route path="/event/:eventId" element={<p>event page</p>} />
                                 </Routes>
@@ -55,6 +67,7 @@ function makeMilestone(overrides: Record<string, unknown> = {}) {
         unlocked: true,
         is_new: false,
         unlocked_at: '2024-01-10T20:00:00',
+        prestige: 1,
         ...overrides,
     }
 }
@@ -66,11 +79,13 @@ const PASSPORT = {
         countries_visited: 2,
         reviews_written: 5,
         styles_danced: 4,
+        top_style: null,
         longest_month_streak: 3,
         events_last_30_days: 2,
         avg_gap_days: 11.5,
         first_event_date: '2024-01-10T20:00:00',
         member_since: '2023-06-01T00:00:00',
+        dancing_since: null,
     },
     collections: {
         cities: [
@@ -225,9 +240,10 @@ describe('PassportPage', () => {
 
         renderPassport()
 
-        // Opening the dialog does not mint a link yet.
+        // Opening the menu does not mint a link yet.
         const openBtn = await screen.findByRole('button', { name: 'Share' })
         fireEvent.click(openBtn)
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'As link' }))
         expect(shareCalled).toBe(false)
 
         // The dialog's own "Share link" button performs the mint.
@@ -237,6 +253,67 @@ describe('PassportPage', () => {
         await waitFor(() => expect(shareCalled).toBe(true))
         // A toast surfaces the shareable link (native share is unavailable in jsdom).
         expect(await screen.findByText(/\/shared\/passport\/tok-abc/)).toBeInTheDocument()
+    })
+
+    it('generates a shareable image card from the share dialog', async () => {
+        let eventsFetched = false
+        server.use(
+            http.get('*/api/auth/me', () => HttpResponse.json(makeUser())),
+            http.get('*/api/passport', () => HttpResponse.json(PASSPORT)),
+            http.get('*/api/passport/timeline', () => HttpResponse.json(TIMELINE)),
+            http.get('*/api/passport/share', () => HttpResponse.json(null)),
+            http.post('*/api/passport/share', () =>
+                HttpResponse.json({ token: 'tok-img', require_signin: false }, { status: 201 }),
+            ),
+            http.get('*/social/users/*', () =>
+                HttpResponse.json({
+                    handle: 'dancer',
+                    display_name: 'Dana Dancer',
+                    passport_show_badges: true,
+                    passport_show_cities: true,
+                    passport_show_countries: true,
+                }),
+            ),
+            http.get('*/api/passport/events', () => {
+                eventsFetched = true
+                return HttpResponse.json([
+                    {
+                        event_id: 'evt-1',
+                        title: 'Paris Salsa Night',
+                        start: '2026-05-10T20:00:00',
+                        city: 'Paris',
+                        country: 'France',
+                        latitude: 48.85,
+                        longitude: 2.35,
+                    },
+                    {
+                        event_id: 'evt-2',
+                        title: 'Berlin Bachata',
+                        start: '2026-06-10T20:00:00',
+                        city: 'Berlin',
+                        country: 'Germany',
+                        latitude: 52.52,
+                        longitude: 13.4,
+                    },
+                ])
+            }),
+        )
+
+        renderPassport()
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Share' }))
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'As card' }))
+
+        // The dialog prepares the card (mints a link so the QR resolves, loads
+        // events + section flags), then Download saves the PNG directly.
+        const downloadBtn = await screen.findByRole('button', { name: 'Download' })
+        await waitFor(() => expect(downloadBtn).toBeEnabled())
+        fireEvent.click(downloadBtn)
+
+        await waitFor(() => expect(vi.mocked(renderCardToBlob)).toHaveBeenCalled())
+        expect(eventsFetched).toBe(true)
+        expect(vi.mocked(downloadImage)).toHaveBeenCalled()
+        expect(await screen.findByText('Image saved')).toBeInTheDocument()
     })
 
     it('adds a past event to the passport via the search + confirm flow', async () => {

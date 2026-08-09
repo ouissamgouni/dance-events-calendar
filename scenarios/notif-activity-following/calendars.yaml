@@ -1,0 +1,5 @@
+calendars:
+  - id: salsa-cal-001
+    name: Movida Salsa
+    color: "#e11d48"
+    enabled: true

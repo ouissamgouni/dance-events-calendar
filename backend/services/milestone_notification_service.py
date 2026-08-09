@@ -44,6 +44,7 @@ from backend.db.models import (
 )
 from backend.services.email import send_milestones_unlocked_email
 from backend.services.notification_delivery import record_delivery
+from backend.services.notifications import fan_out_milestone
 from backend.services.push_service import send_push
 
 logger = logging.getLogger(__name__)
@@ -163,6 +164,16 @@ def _create_milestone_notifications(session, user, to_email, to_push, notif_ids)
             session.flush()
             record_delivery(session, notif.id, "app")
             created += 1
+            # A freshly-unlocked milestone also fans out to the user's
+            # subscribers as a "friend milestone" activity notification,
+            # gated by the actor's passport visibility (private → no fan-out).
+            fan_out_milestone(
+                session,
+                user,
+                key,
+                audience=getattr(user, "passport_visibility", "friends"),
+                context=milestone.name,
+            )
         notif_ids[(user.id, key)] = notif.id
         if user.email_milestone_unlocked_enabled and notif.emailed_at is None:
             to_email.append((user, milestone))
@@ -201,7 +212,7 @@ def _dispatch_channels(to_email, to_push, notif_ids, session=None) -> tuple[int,
             user_id,
             title="Milestone unlocked!",
             body=f"{milestone.icon} {milestone.name} — {milestone.description}",
-            url="/passport",
+            url="/mine/passport",
             tag=f"milestone:{key}",
         )
         pushed += delivered

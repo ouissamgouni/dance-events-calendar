@@ -280,7 +280,8 @@ tasks:
 
   backfill-geo:staging:remote:
     desc: "Backfill city/country from event coords on remote staging DB (Neon
-      develop branch). Dry-run by default; COMMIT=1 to write. LIMIT=<n> to batch."
+      develop branch). Dry-run by default; COMMIT=1 to write. LIMIT=<n> to batch.
+      REFRESH=1 to overwrite events that already have a country."
     dir: backend
     dotenv:
       [
@@ -290,6 +291,7 @@ tasks:
     vars:
       COMMIT: '{{.COMMIT | default "0"}}'
       LIMIT: '{{.LIMIT | default ""}}'
+      REFRESH: '{{.REFRESH | default "0"}}'
     cmds:
       - |
         if [ -z "$DATABASE_URL" ]; then
@@ -300,8 +302,10 @@ tasks:
         [ "{{.COMMIT}}" = "1" ] && MODE_FLAG="--commit"
         LIMIT_FLAG=""
         [ -n "{{.LIMIT}}" ] && LIMIT_FLAG="--limit {{.LIMIT}}"
-        echo "Backfilling geo on remote staging (Neon): $(echo $DATABASE_URL | sed 's/:.*@/@/')  [$MODE_FLAG $LIMIT_FLAG]"
-        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.backfill_geo $MODE_FLAG $LIMIT_FLAG
+        REFRESH_FLAG=""
+        [ "{{.REFRESH}}" = "1" ] && REFRESH_FLAG="--refresh"
+        echo "Backfilling geo on remote staging (Neon): $(echo $DATABASE_URL | sed 's/:.*@/@/')  [$MODE_FLAG $LIMIT_FLAG $REFRESH_FLAG]"
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.backfill_geo $MODE_FLAG $LIMIT_FLAG $REFRESH_FLAG
 
   # ════════════════════════════════════════════════════════════════
   # Staging — Convenience aliases (default to local)
@@ -430,7 +434,8 @@ tasks:
 
   backfill-geo:prod:
     desc: "Backfill city/country from event coords on PROD database (Neon main
-      branch). Dry-run by default; COMMIT=1 to write. LIMIT=<n> to batch."
+      branch). Dry-run by default; COMMIT=1 to write. LIMIT=<n> to batch.
+      REFRESH=1 to overwrite events that already have a country."
     dir: backend
     dotenv:
       [
@@ -440,6 +445,7 @@ tasks:
     vars:
       COMMIT: '{{.COMMIT | default "0"}}'
       LIMIT: '{{.LIMIT | default ""}}'
+      REFRESH: '{{.REFRESH | default "0"}}'
     prompt:
       "⚠️  This will run backfill_geo against the PRODUCTION database (Neon
       main branch). With COMMIT=1 it writes city/country. Continue?"
@@ -453,8 +459,10 @@ tasks:
         [ "{{.COMMIT}}" = "1" ] && MODE_FLAG="--commit"
         LIMIT_FLAG=""
         [ -n "{{.LIMIT}}" ] && LIMIT_FLAG="--limit {{.LIMIT}}"
-        echo "Backfilling geo on prod (Neon): $(echo $DATABASE_URL | sed 's/:.*@/@/')  [$MODE_FLAG $LIMIT_FLAG]"
-        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.backfill_geo $MODE_FLAG $LIMIT_FLAG
+        REFRESH_FLAG=""
+        [ "{{.REFRESH}}" = "1" ] && REFRESH_FLAG="--refresh"
+        echo "Backfilling geo on prod (Neon): $(echo $DATABASE_URL | sed 's/:.*@/@/')  [$MODE_FLAG $LIMIT_FLAG $REFRESH_FLAG]"
+        PYTHONPATH={{.ROOT_DIR}} {{.ROOT_DIR}}/.venv/bin/python -m backend.scripts.backfill_geo $MODE_FLAG $LIMIT_FLAG $REFRESH_FLAG
 
   # ════════════════════════════════════════════════════════════════
   # Scenario

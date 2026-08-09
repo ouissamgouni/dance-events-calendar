@@ -93,11 +93,13 @@ def build_shared_passport(
         countries_visited=len(ctx["countries"]),
         reviews_written=ctx["reviews"],
         styles_danced=len(ctx["styles"]),
+        top_style=ctx["top_style"],
         longest_month_streak=ctx["longest_streak"],
         events_last_30_days=ctx["events_last_30d"],
         avg_gap_days=ctx["avg_gap_days"],
         first_event_date=ctx["first_event_date"],
         member_since=ctx["member_since"],
+        dancing_since=ctx["dancing_since"],
     )
 
     milestones: list[PassportMilestone] = []
@@ -200,11 +202,13 @@ def get_passport(
         countries_visited=len(ctx["countries"]),
         reviews_written=ctx["reviews"],
         styles_danced=len(ctx["styles"]),
+        top_style=ctx["top_style"],
         longest_month_streak=ctx["longest_streak"],
         events_last_30_days=ctx["events_last_30d"],
         avg_gap_days=ctx["avg_gap_days"],
         first_event_date=ctx["first_event_date"],
         member_since=ctx["member_since"],
+        dancing_since=ctx["dancing_since"],
     )
     collections = passport_service.collections(ctx["events"])
     milestones = [

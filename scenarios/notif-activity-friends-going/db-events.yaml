@@ -1,0 +1,17 @@
+# One upcoming event. Alice marks Going (fans out to Bob + Carol); Bob
+# also marks Going so his row renders "You and Alice are going to ...".
+base_week: 0
+events:
+  - id: ev-friend
+    calendar_id: salsa-cal-001
+    title: Friday Salsa Social
+    description: "Upcoming social Alice is going to."
+    location: "Skybar, Lisbon, Portugal"
+    latitude: 38.7139
+    longitude: -9.1394
+    start: w+1 Fri 20:00
+    end: w+1 Fri 23:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local

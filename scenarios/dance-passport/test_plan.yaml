@@ -18,6 +18,11 @@ test_plan:
     Seeded dancers (sign in at /login via the dev "Sign in as ..." buttons):
       - Alba (alba) — rich journey: 13 attended events, 11 cities, 7 countries,
         3 international, 10 approved reviews. Passport visibility: PUBLIC.
+        Has an opt-in "Dancing since 2018" origin (off by default on the card).
+      - Yara (yara) — multi-year journey: 7 attended events spanning a prior
+        year and the current year (5 current-year, 2 prior-year), a clustered
+        "most active" current-year month, consecutive current-year months,
+        salsa-dominant. Passport visibility: PUBLIC. Used for the YEAR card.
       - Bram (bram) — borderline: 10 attended events, 9 cities, 5 countries,
         10 reviews. Passport visibility: FRIENDS-ONLY. Mutual friend of Alba.
       - Nadia (nadia) — minimal: 1 attended event, 0 reviews. Passport
@@ -210,3 +215,117 @@ test_plan:
         no follow control on her own passport. A signed-out visitor is invited
         to sign in to follow.
       verification: "Follow CTA adapts to viewer state; owner sees none."
+
+    # ── Shareable card (image) ──────────────────────────────────
+    - id: 13
+      title: "Share as an image card — all-time story"
+      description: >
+        As a dancer I turn my passport into a shareable image for social
+        stories. Sign in as Alba, open the Dance Passport and choose "Share as
+        card" (the image/card option, distinct from the read-only link).
+      expected: >
+        The generated card leads with the dancer's name and, to the RIGHT of it,
+        an all-time headline anchored to when she joined ("Journey on Movida
+        since <Mon YYYY>"), shows her headline stats as compact cells, and a
+        grid of up to six highlights with no section label (the highlights
+        speak for themselves). A small QR code plus a "<host>/u/alba" caption
+        sit in the footer. The QR is modestly sized (roughly a fifth smaller
+        than a bold hero code) and the card renders cleanly at story
+        proportions.
+      verification: "All-time card: name + right-aligned join headline, stats, highlights, QR + handle."
+
+    - id: 14
+      title: "Highlights favour the most impressive achievements"
+      description: >
+        As a dancer my card should showcase my most impressive badges, not just
+        the most recent. Review the highlights on Alba's all-time card.
+      expected: >
+        Highlights are ranked by how impressive/rare each unlocked milestone is
+        (prestige), not by recency, and are capped at six. Only the top badge in
+        each family shows — "World Dancer" (5 countries) stands in for the whole
+        countries family, never displayed alongside the overshadowed "Passport
+        Stamped" (3 countries), and likewise for the other categories. The
+        redundant "Border Crosser" (attend an international event) is hidden
+        whenever any countries badge is present. Badges are grouped by family:
+        consistency (streak + the "Danced every N days" cadence) leads and the
+        review "Critic" badge trails, so the least-prestigious badge is the first
+        dropped when the row overflows. Each milestone highlight is described by
+        her ACTUAL totals (e.g. World Dancer → "7 countries"), never the fixed
+        milestone threshold wording. The cadence and "Top style · <style>"
+        highlights sit within this ordering (cadence with consistency, style just
+        ahead of reviews).
+      verification: "Highlights: consistency-first/reviews-last, one-per-category, Border Crosser suppressed by countries, ≤6, actual-total descriptions."
+
+    - id: 15
+      title: "Streak and top style surface as first-class facts"
+      description: >
+        As a consistent dancer my momentum and signature style show on the
+        card. On Alba's all-time card check the stat cells and highlights.
+      expected: >
+        Her most-danced style appears as a "❤️ Top style · Salsa" highlight on
+        the ALL-TIME card. A "🔥 Streak" stat cell (months in a row) shows
+        alongside the headline counts ONLY when no streak/regularity milestone
+        (e.g. "Consistent") already occupies a highlight — when such a milestone
+        is shown the streak cell is suppressed so the same fact isn't repeated.
+        Dancers with under a two-month run never show a streak cell.
+      verification: "Top-style highlight always shows; streak cell only when no regularity milestone is shown."
+
+    - id: 16
+      title: "'Dancing since' is opt-in on the card"
+      description: >
+        As a dancer I decide whether my dancing origin year is on the card.
+        On Alba's card toggle the "Dancing since" option in the card options.
+      expected: >
+        By default the card shows no "Dancing since" line. Enabling the option
+        adds a small "Dancing since 2018" line (from her seeded origin) directly
+        under her name. It never replaces the "Journey on Movida since" headline
+        and never appears on the year card.
+      verification: "Dancing-since line is hidden by default, opt-in only."
+
+    - id: 17
+      title: "A year card tells the story of a single year"
+      description: >
+        As a dancer I can share just this year's story. Sign in as Yara, open
+        the Dance Passport share card and switch it to the current-year view.
+      expected: >
+        The card headline reads "My <year> in Dance" (to the right of her name)
+        with no "Journey on Movida since" and no "Dancing since" line. Its stats
+        and highlights are limited to that year's events (a genuine subset of
+        her all-time totals, since two of her events are in a prior year). Year
+        highlights include a "Danced every N days" cadence badge and a
+        "Most active · <Month>" badge with that month's event count, plus new
+        countries (🌍) / new cities (✈️) reached that year — each listing up to
+        three place names then ", …" when more remain. A geography milestone
+        unlocked that year (e.g. a countries badge) absorbs the matching
+        new-places detail rather than showing two overlapping cards. Any other
+        milestone unlocked that year carries a small "Unlocked" tag to the right
+        of its name. Any in-year streak shows as a stat cell spelled out
+        ("N months in a row", no fire icon). The all-time "Top style" highlight
+        is NOT shown on the year card.
+      verification: "Year card: 'My <year>' headline, year-scoped stats/highlights, cadence, place-name lists, geo merge, 'Unlocked' tag, spelled-out streak, no top style."
+
+    - id: 18
+      title: "The card QR leads to the dancer's profile on this environment"
+      description: >
+        As someone who scans a shared card I land on the dancer's profile so I
+        can follow them. Scan / open the QR (and read the footer caption) on
+        cards for Alba (public), Bram (friends-only) and Nadia (private).
+      expected: >
+        The QR encodes "<origin>/u/<handle>" for the CURRENT environment and
+        the footer caption matches ("<host>/u/<handle>"). It always resolves to
+        the dancer's profile — for a public passport the profile shows the
+        passport; for friends-only/private it still resolves to the profile
+        with a Follow gate (never a dead link or a raw token URL).
+      verification: "QR → /u/<handle> on current env; always resolves to profile."
+
+    - id: 19
+      title: "An empty or thin journey degrades gracefully on the card"
+      description: >
+        As a brand-new dancer my card still looks intentional. Generate a card
+        for Felix/Bea (empty) and Nadia (single event).
+      expected: >
+        An empty passport yields a "just getting started" style card with no
+        stat streak cell and no highlights, rather than a broken or blank card.
+        A single-event journey shows the minimal stats it has and no streak
+        cell, and never fabricates highlights it hasn't earned.
+      verification: "Empty/thin journeys render a graceful minimal card."

@@ -24,6 +24,13 @@ follows:
   - { follower: bob, followee: me }
   - { follower: me, followee: carla }
   - { follower: carla, followee: me }
+  # --- extra mutual friends so one event has >5 friends attending ---
+  - { follower: me, followee: henry }
+  - { follower: henry, followee: me }
+  - { follower: me, followee: iris }
+  - { follower: iris, followee: me }
+  - { follower: me, followee: jack }
+  - { follower: jack, followee: me }
   # --- one-way: I follow dave, no follow-back ---
   - { follower: me, followee: dave }
   # --- one-way inbound: erin follows me ---

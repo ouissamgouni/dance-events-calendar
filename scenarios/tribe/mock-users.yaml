@@ -64,6 +64,25 @@ users:
       handle: grace,
       account_visibility: public,
     }
+  # Extra mutual friends of me so one event can have >5 friends attending.
+  - {
+      email: henry@example.com,
+      name: Henry Blanc,
+      handle: henry,
+      account_visibility: public,
+    }
+  - {
+      email: iris@example.com,
+      name: Iris Moreau,
+      handle: iris,
+      account_visibility: public,
+    }
+  - {
+      email: jack@example.com,
+      name: Jack Owens,
+      handle: jack,
+      account_visibility: public,
+    }
   - email: admin@example.com
     name: Dev Admin
     handle: admin

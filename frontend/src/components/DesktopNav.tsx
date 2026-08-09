@@ -21,9 +21,10 @@ export default function DesktopNav({ className = '' }: { className?: string }) {
                         key={dest.id}
                         to={dest.path}
                         aria-current={active ? 'page' : undefined}
-                        className={`relative px-2.5 py-1 text-sm transition ${active ? 'text-white font-semibold' : 'text-gray-300 hover:text-white'
+                        className={`relative inline-flex items-center gap-1.5 px-2.5 py-1 text-sm transition ${active ? 'text-white font-semibold' : 'text-gray-300 hover:text-white'
                             }`}
                     >
+                        <img src={dest.icon} alt="" aria-hidden="true" className="h-4 w-4 brightness-0 invert" />
                         {dest.label}
                         {active && (
                             <span aria-hidden="true" className="absolute -bottom-0.5 left-2.5 right-2.5 h-0.5 bg-blue-500" />

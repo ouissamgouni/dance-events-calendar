@@ -2,8 +2,13 @@
     "name": "Movida",
     "short_name": "Movida",
     "description": "Discover upcoming salsa classes, socials, and workshops near you.",
+    "id": "/",
     "start_url": "/",
+    "scope": "/",
     "display": "standalone",
+    "launch_handler": {
+        "client_mode": "navigate-existing"
+    },
     "background_color": "#0f172a",
     "theme_color": "#e11d48",
     "icons": [

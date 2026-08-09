@@ -1,0 +1,32 @@
+# Two past events. Alice attends ev-past → unlocks the "First Steps"
+# milestone (threshold = 1 attended event). Mallory attends ev-past2 →
+# also unlocks "First Steps" but with a private passport.
+base_week: 0
+events:
+  - id: ev-past
+    calendar_id: salsa-cal-001
+    title: Rooftop Salsa Social
+    description: "Past event Alice attended (unlocks First Steps)."
+    location: "Skybar, Lisbon, Portugal"
+    latitude: 38.7139
+    longitude: -9.1394
+    start: w-1 Wed 05:00
+    end: w-1 Wed 08:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: ev-past2
+    calendar_id: salsa-cal-001
+    title: Bachata Warehouse Night
+    description: "Past event Mallory attended (unlocks First Steps)."
+    location: "Studio Azul, Paris, France"
+    latitude: 48.8662
+    longitude: 2.3744
+    start: w-1 Fri 19:30
+    end: w-1 Fri 22:30
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local

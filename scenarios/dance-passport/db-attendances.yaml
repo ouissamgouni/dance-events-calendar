@@ -260,6 +260,31 @@ attendances:
       share_audience: private,
     }
 
+  # --- Yara: 7 attended events across a prior year + the current year, used
+  # to exercise the YEAR share card (busiest month, in-year streak, dominant
+  # style, new cities/countries). All public. ---
+  - event_id: evt-yr-01
+    email: yara@example.com
+    share_audience: public
+  - event_id: evt-yr-02
+    email: yara@example.com
+    share_audience: public
+  - event_id: evt-yr-03
+    email: yara@example.com
+    share_audience: public
+  - event_id: evt-yr-04
+    email: yara@example.com
+    share_audience: public
+  - event_id: evt-yr-05
+    email: yara@example.com
+    share_audience: public
+  - event_id: evt-yr-prior-01
+    email: yara@example.com
+    share_audience: public
+  - event_id: evt-yr-prior-02
+    email: yara@example.com
+    share_audience: public
+
   # --- anonymous device-only attendance (no user) — must be excluded ---
   - event_id: evt-dp-anon
     device_id: seed-anon-passport-1

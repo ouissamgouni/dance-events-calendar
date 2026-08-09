@@ -1499,6 +1499,8 @@ def update_visibility(
         viewer.passport_show_countries = payload.passport_show_countries
     if payload.passport_show_timeline is not None:
         viewer.passport_show_timeline = payload.passport_show_timeline
+    if payload.dancing_since is not None:
+        viewer.dancing_since = payload.dancing_since
     session.add(viewer)
     session.commit()
     session.refresh(viewer)
@@ -1945,12 +1947,18 @@ def _user_to_search_result(
     followed_ids: Optional[set[UUID]] = None,
     friend_ids: Optional[set[UUID]] = None,
     source: Optional[str] = None,
+    mutual_friend_count: int = 0,
+    mutual_friends_preview: Optional[list[str]] = None,
 ) -> UserSearchResult:
     """Project a ``User`` row into the discovery card shape.
 
     ``subscriber_ids``, ``followed_ids`` and ``friend_ids`` let the
     caller batch-precompute the viewer's current edges to avoid N+1.
     When not supplied we fall back to per-row queries.
+
+    ``mutual_friend_count`` / ``mutual_friends_preview`` carry the
+    follows-in-common attribution for network rows so discover can render
+    the same "Followed by @alice + N more" pill as "My network".
     """
     is_subscribed = False
     is_followed_by_viewer = False
@@ -1987,6 +1995,8 @@ def _user_to_search_result(
         is_followed_by_viewer=is_followed_by_viewer,
         is_friend=is_friend,
         source=source,
+        mutual_friend_count=mutual_friend_count,
+        mutual_friends_preview=mutual_friends_preview or [],
     )
 
 
@@ -2016,8 +2026,280 @@ def _viewer_follow_edge_ids(session: Session, viewer: User) -> set[UUID]:
     return {UUID(str(r)) if not isinstance(r, UUID) else r for r in rows}
 
 
+# ---------------------------------------------------------------------------
+# Blended relevance ranking for people suggestions
+# ---------------------------------------------------------------------------
+# A single 0..1 score blending five signals so suggestion surfaces rank by
+# relevance instead of falling back to alphabetical order. Each raw signal is
+# min-max normalized across the candidate pool so a signal with a large
+# absolute range (e.g. popularity) can't dominate one with a small range
+# (e.g. mutual friends). Weights sum to 1.0.
+_RANK_WEIGHTS: dict[str, float] = {
+    "mutual": 0.40,
+    "interest": 0.20,
+    "events": 0.15,
+    "activity": 0.15,
+    "popularity": 0.10,
+}
+
+
+def _interest_overlap_counts(
+    session: Session, viewer: User, candidate_ids: list[UUID]
+) -> dict[UUID, int]:
+    """Shared preferred-tag count between viewer and each candidate (batched)."""
+    if not candidate_ids:
+        return {}
+    viewer_tag_ids = set(
+        session.exec(
+            select(UserPreferredTag.tag_id).where(UserPreferredTag.user_id == viewer.id)
+        ).all()
+    )
+    if not viewer_tag_ids:
+        return {}
+    rows = session.exec(
+        select(
+            UserPreferredTag.user_id,
+            func.count(UserPreferredTag.tag_id),
+        )
+        .where(col(UserPreferredTag.user_id).in_(candidate_ids))
+        .where(col(UserPreferredTag.tag_id).in_(viewer_tag_ids))
+        .group_by(UserPreferredTag.user_id)
+    ).all()
+    return {r[0]: int(r[1]) for r in rows}
+
+
+def _events_in_common_counts(
+    session: Session, viewer: User, candidate_ids: list[UUID]
+) -> dict[UUID, int]:
+    """Count of events both viewer and candidate are currently attending."""
+    if not candidate_ids:
+        return {}
+    viewer_event_ids = set(
+        session.exec(
+            select(UserEventAttendance.event_id).where(
+                UserEventAttendance.user_id == viewer.id
+            )
+        ).all()
+    )
+    if not viewer_event_ids:
+        return {}
+    rows = session.exec(
+        select(
+            UserEventAttendance.user_id,
+            func.count(UserEventAttendance.event_id),
+        )
+        .where(col(UserEventAttendance.user_id).in_(candidate_ids))
+        .where(col(UserEventAttendance.event_id).in_(viewer_event_ids))
+        .group_by(UserEventAttendance.user_id)
+    ).all()
+    return {r[0]: int(r[1]) for r in rows}
+
+
+def _followers_counts_bulk(
+    session: Session, candidate_ids: list[UUID]
+) -> dict[UUID, int]:
+    """Approved-follower count for each candidate in one query."""
+    if not candidate_ids:
+        return {}
+    rows = session.exec(
+        select(
+            UserFollow.followee_id,
+            func.count(UserFollow.id),
+        )
+        .where(col(UserFollow.followee_id).in_(candidate_ids))
+        .where(UserFollow.status == "approved")
+        .group_by(UserFollow.followee_id)
+    ).all()
+    return {r[0]: int(r[1]) for r in rows}
+
+
+def _subscribers_counts_bulk(
+    session: Session, candidate_ids: list[UUID]
+) -> dict[UUID, int]:
+    """Calendar-subscriber count for each candidate in one query."""
+    if not candidate_ids:
+        return {}
+    rows = session.exec(
+        select(
+            CalendarSubscription.target_user_id,
+            func.count(CalendarSubscription.id),
+        )
+        .where(col(CalendarSubscription.target_user_id).in_(candidate_ids))
+        .group_by(CalendarSubscription.target_user_id)
+    ).all()
+    return {r[0]: int(r[1]) for r in rows}
+
+
+def _min_max_normalize(raw: dict[UUID, float]) -> dict[UUID, float]:
+    """Scale values to 0..1. All-equal (incl. empty) maps everything to 0.0."""
+    if not raw:
+        return {}
+    lo = min(raw.values())
+    hi = max(raw.values())
+    if hi <= lo:
+        return {k: 0.0 for k in raw}
+    span = hi - lo
+    return {k: (v - lo) / span for k, v in raw.items()}
+
+
+def _relevance_scores(
+    session: Session,
+    viewer: User,
+    candidates: list[User],
+    mutual_scores: dict[UUID, int],
+    *,
+    popularity: str = "followers",
+) -> dict[UUID, float]:
+    """Blended 0..1 relevance score per candidate.
+
+    ``mutual_scores`` is the surface's primary graph signal (mutual friends
+    for FoF, distinct network intermediaries for discover, empty for
+    onboarding). ``popularity`` picks the popularity source: ``followers``
+    (default) or ``subscribers`` for curator-heavy surfaces.
+    """
+    ids = [u.id for u in candidates]
+    if not ids:
+        return {}
+    interest = _interest_overlap_counts(session, viewer, ids)
+    events = _events_in_common_counts(session, viewer, ids)
+    if popularity == "subscribers":
+        pop = _subscribers_counts_bulk(session, ids)
+    else:
+        pop = _followers_counts_bulk(session, ids)
+
+    raw_mutual = {u.id: float(mutual_scores.get(u.id, 0)) for u in candidates}
+    raw_interest = {u.id: float(interest.get(u.id, 0)) for u in candidates}
+    raw_events = {u.id: float(events.get(u.id, 0)) for u in candidates}
+    raw_pop = {u.id: float(pop.get(u.id, 0)) for u in candidates}
+    # Activity: last-visit epoch seconds. Never-seen users take the pool's
+    # oldest visit so they normalize to 0.0 rather than skewing the range.
+    visits = [u.last_visit_at for u in candidates if u.last_visit_at is not None]
+    floor = min(visits) if visits else None
+    raw_activity: dict[UUID, float] = {}
+    for u in candidates:
+        ts = u.last_visit_at or floor
+        raw_activity[u.id] = ts.timestamp() if ts is not None else 0.0
+
+    n_mutual = _min_max_normalize(raw_mutual)
+    n_interest = _min_max_normalize(raw_interest)
+    n_events = _min_max_normalize(raw_events)
+    n_activity = _min_max_normalize(raw_activity)
+    n_pop = _min_max_normalize(raw_pop)
+
+    return {
+        u.id: (
+            _RANK_WEIGHTS["mutual"] * n_mutual.get(u.id, 0.0)
+            + _RANK_WEIGHTS["interest"] * n_interest.get(u.id, 0.0)
+            + _RANK_WEIGHTS["events"] * n_events.get(u.id, 0.0)
+            + _RANK_WEIGHTS["activity"] * n_activity.get(u.id, 0.0)
+            + _RANK_WEIGHTS["popularity"] * n_pop.get(u.id, 0.0)
+        )
+        for u in candidates
+    }
+
+
+def _rank_by_relevance(
+    session: Session,
+    viewer: User,
+    candidates: list[User],
+    mutual_scores: dict[UUID, int],
+    *,
+    popularity: str = "followers",
+) -> list[User]:
+    """Sort ``candidates`` in place by blended relevance (desc).
+
+    Deterministic tiebreak: verified organizer, then admin-managed, then
+    handle asc — so equal-score pools stay stable across requests.
+    """
+    scores = _relevance_scores(
+        session, viewer, candidates, mutual_scores, popularity=popularity
+    )
+    candidates.sort(
+        key=lambda u: (
+            -scores.get(u.id, 0.0),
+            0 if u.is_verified_organizer else 1,
+            0 if u.is_admin_managed else 1,
+            (u.handle or "").lower(),
+        )
+    )
+    return candidates
+
+
 def _suggestable_user_clause():
     return User.show_in_suggestions == True  # noqa: E712
+
+
+def _mutual_friends_previews(
+    session: Session,
+    viewer_friends: set[UUID],
+    candidate_ids: list[UUID],
+    *,
+    preview: int = 3,
+) -> dict[UUID, list[str]]:
+    """Bulk map ``candidate_id -> [friend handles who follow them]``.
+
+    Mirrors the per-row preview used by ``_build_fof_suggestions`` but in
+    one query so discover can attach follows-in-common attribution to its
+    network rows without an N+1. Handles come back sorted so the pill is
+    deterministic; callers slice ``[:preview]`` for display and use the
+    full length as the count.
+    """
+    if not viewer_friends or not candidate_ids:
+        return {}
+    rows = session.exec(
+        select(UserFollow.followee_id, User.handle)
+        .join(User, User.id == UserFollow.follower_id)
+        .where(col(UserFollow.followee_id).in_(candidate_ids))
+        .where(col(UserFollow.follower_id).in_(viewer_friends))
+        .where(User.handle.is_not(None))
+        .order_by(User.handle.asc())
+    ).all()
+    out: dict[UUID, list[str]] = {}
+    for cand_id, handle in rows:
+        if handle:
+            out.setdefault(cand_id, []).append(handle)
+    return out
+
+
+def _organizer_users(
+    session: Session,
+    viewer: Optional[User],
+    *,
+    limit: int,
+    excluded_ids: Optional[set[UUID]] = None,
+    exclude_followed: bool = False,
+    exclude_subscribed: bool = False,
+) -> list[User]:
+    """Verified-organizer top-up pool for discovery.
+
+    Mirrors ``_curator_users`` but keys off ``is_verified_organizer``.
+    Organizers are a high-trust seed signal, so discover surfaces them
+    even when they aren't reachable through the viewer's friend graph.
+    Ranked within the tier by blended relevance.
+    """
+    excluded: set[UUID] = set(excluded_ids or set())
+    if viewer is not None:
+        excluded.add(viewer.id)
+        if exclude_followed:
+            excluded.update(_viewer_follow_edge_ids(session, viewer))
+        if exclude_subscribed:
+            excluded.update(_viewer_subscription_ids(session, viewer))
+
+    stmt = (
+        select(User)
+        .where(User.is_verified_organizer == True)  # noqa: E712
+        .where(_suggestable_user_clause())
+        .where(User.deleted_at.is_(None))
+        .where(User.handle.is_not(None))
+    )
+    if excluded:
+        stmt = stmt.where(~col(User.id).in_(excluded))
+    rows = list(session.exec(stmt).all())
+    if viewer is not None:
+        _rank_by_relevance(session, viewer, rows, {})
+    else:
+        rows.sort(key=lambda u: (u.handle or "").lower())
+    return rows[:limit]
 
 
 def _curator_users(
@@ -2058,12 +2340,25 @@ def _curator_users(
         )
     if excluded:
         stmt = stmt.where(~col(User.id).in_(excluded))
-    stmt = stmt.order_by(
-        func.count(CalendarSubscription.subscriber_id).desc(),
-        User.managed_label.is_not(None).desc(),
-        User.handle.asc(),
-    ).limit(limit)
-    return list(session.exec(stmt).all())
+    # Stable base order; final ranking is done in Python so cold-start
+    # fallback leads with shared interests, then popularity (per product
+    # decision) instead of a plain alphabetical list.
+    stmt = stmt.order_by(User.handle.asc())
+    rows = list(session.exec(stmt).all())
+    interest = (
+        _interest_overlap_counts(session, viewer, [u.id for u in rows])
+        if viewer is not None
+        else {}
+    )
+    subs = _subscribers_counts_bulk(session, [u.id for u in rows])
+    rows.sort(
+        key=lambda u: (
+            -interest.get(u.id, 0),
+            -subs.get(u.id, 0),
+            (u.handle or "").lower(),
+        )
+    )
+    return rows[:limit]
 
 
 @router.get(
@@ -2207,15 +2502,25 @@ def discover_suggested(
         ).all()
     )
     if not network_ids:
-        curators = _curator_users(
+        organizers = _organizer_users(
             session,
             viewer,
             limit=_MAX_DISCOVER_POOL,
             exclude_followed=True,
             exclude_subscribed=True,
         )
+        curators = _curator_users(
+            session,
+            viewer,
+            limit=_MAX_DISCOVER_POOL,
+            excluded_ids={u.id for u in organizers},
+            exclude_followed=True,
+            exclude_subscribed=True,
+        )
+        # Organizers (high-trust) lead the cold-start fallback, then curators.
+        fallback = (organizers + curators)[:_MAX_DISCOVER_POOL]
         sub_ids = _viewer_subscription_ids(session, viewer)
-        page = curators[offset : offset + limit]
+        page = fallback[offset : offset + limit]
         return SuggestedUsersResponse(
             items=[
                 _user_to_search_result(
@@ -2223,11 +2528,11 @@ def discover_suggested(
                     viewer,
                     u,
                     subscriber_ids=sub_ids,
-                    source="curator",
+                    source="organizer" if u.is_verified_organizer else "curator",
                 )
                 for u in page
             ],
-            total=len(curators),
+            total=len(fallback),
         )
 
     # People followed or subscribed to by the viewer's network. Exclude users
@@ -2284,17 +2589,15 @@ def discover_suggested(
         if ranked_ids
         else []
     )
-    candidates.sort(
-        key=lambda u: (
-            -candidate_scores.get(u.id, 0),
-            -_subscribers_count(session, u.id),
-            (u.handle or ""),
-        )
-    )
+    _rank_by_relevance(session, viewer, candidates, candidate_scores)
     total = len(candidates)
     page = candidates[offset : offset + limit]
 
     sub_ids = _viewer_subscription_ids(session, viewer)
+    # Follows-in-common attribution for the network page (same "Followed by
+    # @alice + N more" pill as My network). Keyed on the viewer's friends.
+    viewer_friends = _friend_ids(session, viewer.id)
+    previews = _mutual_friends_previews(session, viewer_friends, [u.id for u in page])
     items = [
         _user_to_search_result(
             session,
@@ -2302,17 +2605,21 @@ def discover_suggested(
             u,
             subscriber_ids=sub_ids,
             source="network",
+            mutual_friend_count=len(previews.get(u.id, [])),
+            mutual_friends_preview=previews.get(u.id, [])[:3],
         )
         for u in page
     ]
-    # Curator top-up only fills the first page for cold-start viewers whose
-    # network yields fewer than a full page of suggestions.
+    # Curator/organizer top-up only fills the first page for viewers whose
+    # network yields fewer than a full page of suggestions. Organizers
+    # (high-trust) lead, then curators.
     if offset == 0 and len(items) < limit:
-        curators = _curator_users(
+        picked_ids = {u.id for u in candidates}
+        organizers = _organizer_users(
             session,
             viewer,
             limit=limit - len(items),
-            excluded_ids={u.id for u in candidates},
+            excluded_ids=picked_ids,
             exclude_followed=True,
             exclude_subscribed=True,
         )
@@ -2322,10 +2629,30 @@ def discover_suggested(
                 viewer,
                 u,
                 subscriber_ids=sub_ids,
-                source="curator",
+                source="organizer",
             )
-            for u in curators
+            for u in organizers
         )
+        picked_ids.update(u.id for u in organizers)
+        if len(items) < limit:
+            curators = _curator_users(
+                session,
+                viewer,
+                limit=limit - len(items),
+                excluded_ids=picked_ids,
+                exclude_followed=True,
+                exclude_subscribed=True,
+            )
+            items.extend(
+                _user_to_search_result(
+                    session,
+                    viewer,
+                    u,
+                    subscriber_ids=sub_ids,
+                    source="curator",
+                )
+                for u in curators
+            )
     return SuggestedUsersResponse(items=items, total=total)
 
 
@@ -3421,6 +3748,16 @@ def list_subscribed_events(
         pattern="^(all|going|saved)$",
         description="Restrict attribution to going or saved rows.",
     ),
+    match: str = Query(
+        default="any",
+        pattern="^(any|all)$",
+        description=(
+            "How multiple ``from_handles`` combine: ``any`` (default) "
+            "unions their activity; ``all`` intersects it (an event "
+            "qualifies only when every selected person is going/saved). "
+            "Ignored for a single handle."
+        ),
+    ),
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     session: Session = Depends(get_session),
@@ -3615,6 +3952,17 @@ def list_subscribed_events(
         if uid not in existing_uids:
             via_map.setdefault(ev_id, []).append((uid, "subscription_going"))
 
+    # AND semantics: keep only events every selected person contributes to.
+    # Applies to an explicit multi-person selection of two or more visible
+    # targets; a single handle or scope-only feed always unions.
+    required_ids = set(visible_ids)
+    if match == "all" and requested_handles and len(required_ids) > 1:
+        via_map = {
+            ev_id: pairs
+            for ev_id, pairs in via_map.items()
+            if required_ids <= {actor_id for actor_id, _ in pairs}
+        }
+
     if not via_map:
         return SubscribedEventListResponse(
             items=[], total=0, limit=limit, offset=offset
@@ -3726,7 +4074,7 @@ def onboarding_suggestions(
     picked: list[User] = []
     seen: set[UUID] = set()
 
-    # 1. Verified organizers.
+    # 1. Verified organizers, ranked within the tier by blended relevance.
     organizers = list(
         session.exec(
             select(User)
@@ -3735,9 +4083,9 @@ def onboarding_suggestions(
             .where(User.deleted_at.is_(None))
             .where(User.handle.is_not(None))
             .where(~col(User.id).in_(excluded))
-            .limit(limit)
         ).all()
     )
+    _rank_by_relevance(session, viewer, organizers, {})
     for u in organizers:
         if u.id in seen:
             continue
@@ -3758,10 +4106,9 @@ def onboarding_suggestions(
                 .where(User.deleted_at.is_(None))
                 .where(User.handle.is_not(None))
                 .where(~col(User.id).in_(skip_ids))
-                .order_by(User.handle.asc())
-                .limit(remaining)
             ).all()
         )
+        _rank_by_relevance(session, viewer, curators, {})
         for u in curators:
             if u.id in seen:
                 continue
@@ -3795,8 +4142,7 @@ def onboarding_suggestions(
                     .where(User.handle.is_not(None))
                 ).all()
             )
-            rank = {r[0]: int(r[1]) for r in rows}
-            extra.sort(key=lambda u: (-rank.get(u.id, 0), u.handle or ""))
+            _rank_by_relevance(session, viewer, extra, {})
             for u in extra:
                 if u.id in seen or len(picked) >= limit:
                     continue
@@ -3961,14 +4307,7 @@ def _build_fof_suggestions(
         ).all()
     )
     total = len(candidates)
-    candidates.sort(
-        key=lambda u: (
-            -candidate_scores.get(u.id, 0),
-            0 if u.is_verified_organizer else 1,
-            0 if u.is_admin_managed else 1,
-            (u.handle or "").lower(),
-        )
-    )
+    _rank_by_relevance(session, viewer, candidates, candidate_scores)
     candidates = candidates[offset : offset + limit]
 
     # Preview: up to 3 viewer-friends who follow each candidate.

@@ -1,0 +1,14 @@
+# Bob's interest profile — matches ev-interest (Paris salsa, international
+# reach) so the interest matcher fires an `interest_event` row that folds
+# into Bob's all-features digest email.
+interest_profiles:
+  - user: bob@example.com
+    label: "Bob: Paris salsa (intl)"
+    min_lat: 48.0
+    min_lng: 1.0
+    max_lat: 49.0
+    max_lng: 4.0
+    dance_tags: ["dance-style:salsa"]
+    reach_tags: ["reach:international"]
+    matches_enabled: true
+    is_active: true

@@ -10,6 +10,11 @@ Usage:
     python -m backend.scripts.backfill_geo --dry-run
     python -m backend.scripts.backfill_geo --commit
     python -m backend.scripts.backfill_geo --commit --limit 500
+    python -m backend.scripts.backfill_geo --commit --refresh
+
+By default only events missing a ``country`` are processed. Pass ``--refresh``
+to re-derive and overwrite the place for events that already have one (repairs
+stale city/country left behind by an earlier geocoding run).
 """
 
 import argparse
@@ -42,15 +47,21 @@ def main() -> None:
         default=None,
         help="Only process the first N matching events (throttle-friendly batches)",
     )
+    parser.add_argument(
+        "--refresh",
+        action="store_true",
+        help="Also re-derive events that already have a country, overwriting stale place",
+    )
     args = parser.parse_args()
 
     with Session(get_engine()) as session:
         stmt = select(CachedEvent).where(
             CachedEvent.latitude != None,  # noqa: E711
             CachedEvent.longitude != None,  # noqa: E711
-            CachedEvent.country == None,  # noqa: E711
             CachedEvent.deleted_at == None,  # noqa: E711
         )
+        if not args.refresh:
+            stmt = stmt.where(CachedEvent.country == None)  # noqa: E711
         if args.limit is not None:
             stmt = stmt.limit(args.limit)
         events = session.exec(stmt).all()
@@ -70,7 +81,8 @@ def main() -> None:
                 label = ", ".join(p for p in (city, country) if p) or "(no place)"
                 print(f"  {event.event_id}: {event.title} -> {label}")
             else:
-                if city and not event.city:
+                # With --refresh, overwrite unconditionally to repair stale place.
+                if city and (args.refresh or not event.city):
                     event.city = city
                 if country:
                     event.country = country

@@ -1,0 +1,91 @@
+test_plan:
+  name: "Friend milestones — activity notification"
+  description: >
+    When someone you follow reaches a Dance Passport milestone, followers
+    receive a `subscription_milestone` in-app row (plus push when
+    enabled) and the milestone folds into the batched activity digest
+    email. Fan-out is gated by the actor's `passport_visibility`:
+    public notifies followers, private notifies nobody. Rows are deduped
+    on the milestone key (`subject_key`).
+
+  preconditions:
+    - "Start Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`"
+    - >-
+      Start scenario:
+      `SCENARIO=notif-activity-follow-milestone RESET=1 task start:scenario`
+    - "Open the Mailpit inbox at http://127.0.0.1:8025 and clear existing messages."
+    - >-
+      Alice (public passport) and Mallory (private passport) each attend
+      one past event, enough to unlock the "First Steps" milestone.
+
+  cast:
+    - "Alice — actor, PUBLIC passport; unlocks First Steps."
+    - "Mallory — actor, PRIVATE passport; unlocks First Steps."
+    - "Bob — follows Alice; friend_milestones email + push ON."
+    - "Carol — follows Mallory (private) → visibility-gate control."
+    - "Dave — follows nobody → negative control."
+
+  steps:
+    - id: 1
+      title: "Trigger a dispatch tick"
+      description: >
+        `SCENARIO=notif-activity-follow-milestone task notify:trigger:scenario`
+        so the milestone service evaluates passports and fans out.
+      expected: >
+        Alice and Mallory each get their own self `milestone_unlocked`
+        row; the friend fan-out runs for Alice (public) only.
+
+    - id: 2
+      title: "Follower of a public passport is notified"
+      description: >
+        `GET /api/notifications` as Bob.
+      expected: >
+        Bob has one `subscription_milestone` row for Alice reading
+        "Alice reached a milestone: First Steps".
+
+    - id: 3
+      title: "Follower of a private passport is NOT notified"
+      description: >
+        `GET /api/notifications` as Carol.
+      expected: >
+        Carol has zero `subscription_milestone` rows — Mallory's private
+        passport suppresses friend fan-out despite Carol following her.
+
+    - id: 4
+      title: "Non-follower gets nothing"
+      description: >
+        `GET /api/notifications` as Dave.
+      expected: >
+        Zero subscription_milestone rows.
+
+    - id: 5
+      title: "Dedup on repeat ticks"
+      description: >
+        Trigger a second dispatch tick.
+      expected: >
+        Bob still has exactly one subscription_milestone row for the
+        First Steps key — the `subject_key` dedupe prevents duplicates.
+
+    - id: 6
+      title: "Immediate push + instant email"
+      description: >
+        Bob has friend_milestones push + email ON, and settings.yaml
+        enables friend_milestones INSTANT email mode. The plain dispatch
+        tick from step 1 (no `--immediate-emails`) delivers both.
+      expected: >
+        Bob's subscription_milestone row is pushed immediately
+        (pushed_at stamped) AND Bob receives an INSTANT email right away
+        (no schedule wait; instant_emailed_at stamped) containing "Alice
+        reached a milestone: First Steps".
+
+    - id: 7
+      title: "Digest email on the scheduled/forced tick"
+      description: >
+        `SCENARIO=notif-activity-follow-milestone task notify:trigger:scenario -- --immediate-emails`
+        `--immediate-emails` passes `force=True` so the per-user digest
+        schedule is bypassed. Digest mode is still on (default) alongside
+        instant.
+      expected: >
+        Bob receives a second, DIGEST email (emailed_at stamped)
+        containing "Alice reached a milestone: First Steps" — the digest
+        track is independent of the instant track.

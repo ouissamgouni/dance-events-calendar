@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal, Optional
 from uuid import UUID
 
@@ -715,6 +715,9 @@ class SiteSettingsResponse(BaseModel):
     # Explorer "Your next events" rail (viewer's own saved/going events).
     # When False, the rail is hidden entirely.
     your_next_events_rail_enabled: bool = True
+    # Tribe > Calendars "Your Network" snapshot of upcoming events people
+    # you follow are going to. When False, the snapshot is hidden.
+    network_going_snapshot_enabled: bool = True
     # Required tag-group ids used by the event suggestion form.
     suggest_event_required_dance_group_id: Optional[int] = None
     suggest_event_required_reach_group_id: Optional[int] = None
@@ -741,6 +744,19 @@ class SiteSettingsResponse(BaseModel):
     # Max matched events shown inline in an interest-match digest email
     # before the rest collapse behind a "Discover more" link to "For you".
     interest_match_max_events_per_email: int = 10
+    # Per-feature email delivery routing. Each activity feature can send an
+    # immediate email (instant), be batched into the digest (digest), both,
+    # or neither. Defaults preserve prior behaviour (digest-only).
+    friends_going_email_instant: bool = False
+    friends_going_email_digest: bool = True
+    social_activity_email_instant: bool = False
+    social_activity_email_digest: bool = True
+    friend_reviews_email_instant: bool = False
+    friend_reviews_email_digest: bool = True
+    friend_milestones_email_instant: bool = False
+    friend_milestones_email_digest: bool = True
+    interest_matches_email_instant: bool = False
+    interest_matches_email_digest: bool = True
     # Master switch for post-event "how was it?" review-prompt notifications
     # (Event Quality Layer Phase 3).
     review_prompt_enabled: bool = True
@@ -794,6 +810,12 @@ class DigestSendNowRequest(BaseModel):
     # activity (including notifications already emailed/pushed) and
     # forces a re-send/re-stamp of whichever rows the cap keeps.
     resend: bool = False
+    # Restrict the send to a single activity feature (one of the
+    # ``FEATURE_BY_KIND`` values, e.g. ``friend_reviews``). ``None`` sends
+    # every activity feature's pending backlog, as before. When set, only
+    # that feature's notification kinds are replayed and eligibility is
+    # gated on that feature's own email/push flags.
+    feature: Optional[str] = None
 
 
 class ForceSendUserResult(BaseModel):
@@ -941,6 +963,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     organizer_claims_enabled: Optional[bool] = None
     for_you_rail_enabled: Optional[bool] = None
     your_next_events_rail_enabled: Optional[bool] = None
+    network_going_snapshot_enabled: Optional[bool] = None
     suggest_event_required_dance_group_id: Optional[int] = Field(default=None, ge=1)
     suggest_event_required_reach_group_id: Optional[int] = Field(default=None, ge=1)
     # Notification / re-engagement global gates.
@@ -961,6 +984,16 @@ class SiteSettingsUpdateRequest(BaseModel):
     interest_match_max_events_per_email: Optional[int] = Field(
         default=None, ge=1, le=50
     )
+    friends_going_email_instant: Optional[bool] = None
+    friends_going_email_digest: Optional[bool] = None
+    social_activity_email_instant: Optional[bool] = None
+    social_activity_email_digest: Optional[bool] = None
+    friend_reviews_email_instant: Optional[bool] = None
+    friend_reviews_email_digest: Optional[bool] = None
+    friend_milestones_email_instant: Optional[bool] = None
+    friend_milestones_email_digest: Optional[bool] = None
+    interest_matches_email_instant: Optional[bool] = None
+    interest_matches_email_digest: Optional[bool] = None
     review_prompt_enabled: Optional[bool] = None
     review_prompt_delay_hours: Optional[int] = Field(default=None, ge=1, le=720)
     review_prompt_lookback_hours: Optional[int] = Field(default=None, ge=1, le=720)
@@ -1916,6 +1949,7 @@ class UpdateVisibilityRequest(BaseModel):
     passport_show_cities: Optional[bool] = None
     passport_show_countries: Optional[bool] = None
     passport_show_timeline: Optional[bool] = None
+    dancing_since: Optional[date] = None
 
 
 class UpdateSocialLinksRequest(BaseModel):
@@ -2015,6 +2049,9 @@ class NotificationItem(BaseModel):
     actor: NotificationActor
     context: Optional[str] = None
     subject_key: Optional[str] = None
+    # True when the viewer is also attending ``event_id`` (drives the
+    # "You and X are going to ..." phrasing for subscription_going rows).
+    also_going: bool = False
     created_at: datetime
     read_at: Optional[datetime] = None
 
@@ -2304,6 +2341,11 @@ class UserSearchResult(BaseModel):
     is_followed_by_viewer: bool = False
     is_friend: bool = False
     source: Optional[str] = None
+    # Follows-in-common attribution (populated for network/FoF rows on
+    # discover): count of the viewer's friends who follow this user, plus
+    # up to 3 of their handles for the "Followed by @alice + N more" pill.
+    mutual_friend_count: int = 0
+    mutual_friends_preview: list[str] = []
 
 
 class UserSearchResponse(BaseModel):
@@ -2493,11 +2535,13 @@ class PassportStats(BaseModel):
     countries_visited: int
     reviews_written: int
     styles_danced: int
+    top_style: Optional[str] = None
     longest_month_streak: int
     events_last_30_days: int
     avg_gap_days: Optional[float] = None
     first_event_date: Optional[datetime] = None
     member_since: datetime
+    dancing_since: Optional[date] = None
 
 
 class PassportCityCollection(BaseModel):
@@ -2531,6 +2575,7 @@ class PassportMilestone(BaseModel):
     category: str
     threshold: int
     unit: str
+    prestige: int = 0
     progress: int
     unlocked: bool
     is_new: bool

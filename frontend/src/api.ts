@@ -95,6 +95,7 @@ export async function fetchEvents(
         interestSource?: 'follows' | 'friends';
         interestKind?: 'any' | 'going' | 'saved';
         interestUserHandles?: string[];
+        interestMatch?: 'any' | 'all';
     },
     opts?: { fresh?: boolean },
 ): Promise<CalendarEvent[]> {
@@ -114,6 +115,7 @@ export async function fetchEvents(
     if (params?.interestSource) searchParams.set('interest_source', params.interestSource);
     if (params?.interestKind) searchParams.set('interest_kind', params.interestKind);
     for (const h of params?.interestUserHandles ?? []) searchParams.append('interest_user_handle', h);
+    if (params?.interestMatch === 'all') searchParams.set('interest_match', 'all');
     const qs = searchParams.toString();
     // Friend-filter params require the session cookie to identify the viewer
     // and apply mutual-follower checks; sending credentials is harmless for
@@ -150,6 +152,7 @@ export async function fetchEventsPage(
         interestSource?: 'follows' | 'friends';
         interestKind?: 'any' | 'going' | 'saved';
         interestUserHandles?: string[];
+        interestMatch?: 'any' | 'all';
         profiles?: 'me';
         limit: number;
         offset?: number;
@@ -172,6 +175,7 @@ export async function fetchEventsPage(
     if (params.interestSource) searchParams.set('interest_source', params.interestSource);
     if (params.interestKind) searchParams.set('interest_kind', params.interestKind);
     for (const h of params.interestUserHandles ?? []) searchParams.append('interest_user_handle', h);
+    if (params.interestMatch === 'all') searchParams.set('interest_match', 'all');
     if (params.profiles) searchParams.set('profiles', params.profiles);
     searchParams.set('limit', String(params.limit));
     if (params.offset) searchParams.set('offset', String(params.offset));
@@ -225,6 +229,7 @@ export interface SiteSettings {
     duplicate_auto_detect_enabled?: boolean;
     for_you_rail_enabled?: boolean;
     your_next_events_rail_enabled?: boolean;
+    network_going_snapshot_enabled?: boolean;
     suggest_event_required_dance_group_id?: number | null;
     suggest_event_required_reach_group_id?: number | null;
     tag_as_badge_enabled?: boolean;
@@ -255,6 +260,19 @@ export interface SiteSettings {
      * before the rest collapse behind a "Discover more" link to "For
      * you". 1-50, client default 10. */
     interest_match_max_events_per_email?: number;
+    /** Per-feature email delivery routing (instant email / batched digest).
+     * Each activity feature can send an immediate email, be batched into
+     * the digest, both, or neither. Defaults: instant=false, digest=true. */
+    friends_going_email_instant?: boolean;
+    friends_going_email_digest?: boolean;
+    social_activity_email_instant?: boolean;
+    social_activity_email_digest?: boolean;
+    friend_reviews_email_instant?: boolean;
+    friend_reviews_email_digest?: boolean;
+    friend_milestones_email_instant?: boolean;
+    friend_milestones_email_digest?: boolean;
+    interest_matches_email_instant?: boolean;
+    interest_matches_email_digest?: boolean;
     /** Master switch for post-event "how was it?" review-prompt
      * notifications (Event Quality Layer Phase 3). */
     review_prompt_enabled?: boolean;
@@ -377,10 +395,12 @@ export async function sendDigestNow(
     userIds: string[],
     maxNotificationsPerUser?: number,
     resend?: boolean,
+    feature?: string,
 ): Promise<DigestSendNowResponse> {
     const body: Record<string, unknown> = { user_ids: userIds };
     if (maxNotificationsPerUser != null) body.max_notifications_per_user = maxNotificationsPerUser;
     if (resend) body.resend = true;
+    if (feature) body.feature = feature;
     const res = await fetch(`${BASE}/admin/notifications/digest/send-now`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -656,6 +676,12 @@ export interface AuthUser {
     push_review_prompt_enabled?: boolean;
     email_milestone_unlocked_enabled?: boolean;
     push_milestone_unlocked_enabled?: boolean;
+    email_friends_going_enabled?: boolean;
+    push_friends_going_enabled?: boolean;
+    email_friend_reviews_enabled?: boolean;
+    push_friend_reviews_enabled?: boolean;
+    email_friend_milestones_enabled?: boolean;
+    push_friend_milestones_enabled?: boolean;
     /** Legacy four-flag aliases returned for one release so older
      *  clients keep working. Derived from the six new flags on the
      *  server (see PHASE_G_NOTIFICATION_GATING.md §G.9). */
@@ -839,6 +865,12 @@ export interface NotificationPreferences {
     push_review_prompt_enabled: boolean;
     email_milestone_unlocked_enabled: boolean;
     push_milestone_unlocked_enabled: boolean;
+    email_friends_going_enabled: boolean;
+    push_friends_going_enabled: boolean;
+    email_friend_reviews_enabled: boolean;
+    push_friend_reviews_enabled: boolean;
+    email_friend_milestones_enabled: boolean;
+    push_friend_milestones_enabled: boolean;
     /** Legacy mirror kept for one release. */
     reminder_email_enabled: boolean;
     activity_email_enabled: boolean;
@@ -861,6 +893,12 @@ export interface UpdateNotificationPreferencesPayload {
     push_review_prompt_enabled?: boolean;
     email_milestone_unlocked_enabled?: boolean;
     push_milestone_unlocked_enabled?: boolean;
+    email_friends_going_enabled?: boolean;
+    push_friends_going_enabled?: boolean;
+    email_friend_reviews_enabled?: boolean;
+    push_friend_reviews_enabled?: boolean;
+    email_friend_milestones_enabled?: boolean;
+    push_friend_milestones_enabled?: boolean;
     /** Legacy aliases accepted for one release — server writes through
      *  to the corresponding new flags. */
     reminder_email_enabled?: boolean;
@@ -1672,6 +1710,8 @@ export async function removeMySubscriber(handle: string): Promise<void> {
 export type NotificationKind =
     | 'subscription_going'
     | 'subscription_suggested'
+    | 'subscription_review'
+    | 'subscription_milestone'
     | 'new_follower'
     | 'new_friend'
     | 'follow_request'
@@ -1709,6 +1749,9 @@ export interface NotificationItem {
     /** Milestone key for `milestone_unlocked` rows (links to the passport).
      *  Null for kinds that don't use it. */
     subject_key?: string | null;
+    /** True when the viewer is also attending `event_id` (drives the
+     *  "You and X are going to ..." phrasing on subscription_going rows). */
+    also_going?: boolean;
     created_at: string;
     read_at: string | null;
 }
@@ -1799,12 +1842,13 @@ export interface SubscribedEventListResponse {
 }
 
 export async function fetchSubscribedEvents(
-    opts?: { fromHandle?: string; fromHandles?: string[]; kind?: 'all' | 'going' | 'saved'; limit?: number; offset?: number },
+    opts?: { fromHandle?: string; fromHandles?: string[]; kind?: 'all' | 'going' | 'saved'; match?: 'any' | 'all'; limit?: number; offset?: number },
 ): Promise<SubscribedEventListResponse> {
     const sp = new URLSearchParams();
     if (opts?.fromHandle) sp.set('from_handle', opts.fromHandle);
     if (opts?.fromHandles?.length) sp.set('from_handles', opts.fromHandles.join(','));
     if (opts?.kind && opts.kind !== 'all') sp.set('kind', opts.kind);
+    if (opts?.match === 'all') sp.set('match', 'all');
     if (opts?.limit) sp.set('limit', String(opts.limit));
     if (opts?.offset) sp.set('offset', String(opts.offset));
     const qs = sp.toString();
@@ -2065,6 +2109,7 @@ export async function updateMyVisibility(
         passport_show_cities: boolean;
         passport_show_countries: boolean;
         passport_show_timeline: boolean;
+        dancing_since: string | null;
     }>,
 ): Promise<PublicProfile> {
     const res = await fetch(`${BASE}/social/me/visibility`, {
@@ -2198,7 +2243,10 @@ export interface UserSearchResult {
     is_subscribed: boolean;
     is_friend?: boolean;
     is_followed_by_viewer?: boolean;
-    source?: 'network' | 'curator';
+    source?: 'network' | 'curator' | 'organizer';
+    /** Follows-in-common attribution for network rows on discover. */
+    mutual_friend_count?: number;
+    mutual_friends_preview?: string[];
 }
 
 export interface UserSearchResponse {

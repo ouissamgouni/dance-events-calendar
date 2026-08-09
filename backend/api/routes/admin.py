@@ -78,7 +78,11 @@ from backend.db.models import (
 )
 from backend.services.duplicate_detection import maybe_detect_duplicates_for_event
 from backend.services.series_detection import maybe_detect_series_for_event
-from backend.services.geocoding import geocode_location, search_locations
+from backend.services.geocoding import (
+    geocode_location,
+    reverse_geocode,
+    search_locations,
+)
 from backend.services.sync_job_service import SyncJobStatus, get_sync_job_service
 from backend.services.sync_service import SyncService
 
@@ -980,8 +984,36 @@ def digest_send_now(
     """Admin override: ship each selected user's pending activity digest
     (social activity + interest matches) right now, bypassing the digest
     schedule window and the once-per-day dedup gate for just that user.
+
+    When ``body.feature`` is set, the send is scoped to that single
+    feature: only its notification kinds are replayed and eligibility is
+    gated on that feature's own email/push flags.
     """
     from backend.services import activity_email
+
+    # Resolve the optional per-feature scope to its notification kinds +
+    # channel flag names. ``None`` = every activity feature (legacy).
+    feature = body.feature
+    scoped_kinds: tuple[str, ...] | None = None
+    if feature is not None:
+        scoped_kinds = tuple(
+            k for k, feat in activity_email.FEATURE_BY_KIND.items() if feat == feature
+        )
+        if not scoped_kinds:
+            raise HTTPException(status_code=422, detail=f"Unknown feature: {feature}")
+
+    def _has_any_channel(user: User) -> bool:
+        if feature is not None:
+            return bool(
+                getattr(user, f"email_{feature}_enabled", False)
+                or getattr(user, f"push_{feature}_enabled", False)
+            )
+        return (
+            user.email_social_activity_enabled
+            or user.email_interest_matches_enabled
+            or user.push_social_activity_enabled
+            or user.push_interest_matches_enabled
+        )
 
     users = {
         u.id: u
@@ -999,13 +1031,7 @@ def digest_send_now(
                 ForceSendUserResult(user_id=uid, email="", status="skipped_not_found")
             )
             continue
-        has_any_channel = (
-            user.email_social_activity_enabled
-            or user.email_interest_matches_enabled
-            or user.push_social_activity_enabled
-            or user.push_interest_matches_enabled
-        )
-        if not has_any_channel:
+        if not _has_any_channel(user):
             results.append(
                 ForceSendUserResult(
                     user_id=uid, email=user.email, status="skipped_disabled"
@@ -1022,6 +1048,7 @@ def digest_send_now(
     stats = activity_email.run_once(
         force=True,
         user_ids=eligible_ids,
+        kinds=scoped_kinds,
         max_notifications_per_user=body.max_notifications_per_user,
         resend=body.resend,
     )
@@ -1221,7 +1248,7 @@ def review_prompt_send_now(
                 uid,
                 title=push_title,
                 body=push_body,
-                url=f"/event/{body.event_id}?rate=1#community",
+                url=f"/event/{body.event_id}/review",
                 tag=f"review-prompt:{body.event_id}",
             )
             if delivered:
@@ -1773,6 +1800,8 @@ def update_event(
         "title" in update_data and update_data["title"] != event.title
     ) or ("start" in update_data and update_data["start"] != event.start)
 
+    old_coords = (event.latitude, event.longitude)
+
     for field, value in update_data.items():
         setattr(event, field, value)
 
@@ -1781,6 +1810,17 @@ def update_event(
         coords = geocode_location(event.location)
         if coords:
             event.latitude, event.longitude = coords
+
+    # Coordinates moved (re-geocoded or explicit) — refresh the structured place
+    # so the Dance Passport city/country stats don't go stale. Clear it when
+    # reverse geocoding yields nothing so a later backfill can repopulate.
+    if (event.latitude, event.longitude) != old_coords:
+        if event.latitude is not None and event.longitude is not None:
+            place = reverse_geocode(event.latitude, event.longitude)
+            if place:
+                event.city, event.country, event.country_code = place
+            else:
+                event.city = event.country = event.country_code = None
 
     from datetime import datetime as dt
 

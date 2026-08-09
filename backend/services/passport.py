@@ -65,6 +65,29 @@ def _style_slugs(session: Session, event_ids: list[str]) -> set[str]:
     return {slug for slug in rows}
 
 
+def top_dance_style(session: Session, event_ids: list[str]) -> str | None:
+    """Human label of the dance style tagged on the most attended events.
+
+    ``None`` when no attended event carries a dance-style tag. Ties break on the
+    tag's ordinal then label for a stable result.
+    """
+    if not event_ids:
+        return None
+    rows = session.exec(
+        select(Tag.label, func.count().label("n"))
+        .join(EventTag, EventTag.tag_id == Tag.id)
+        .join(TagGroup, TagGroup.id == Tag.group_id)
+        .where(TagGroup.slug == "dance-style")
+        .where(EventTag.event_id.in_(event_ids))
+        .group_by(Tag.id, Tag.label, Tag.ordinal)
+        .order_by(func.count().desc(), Tag.ordinal, Tag.label)
+    ).first()
+    if rows is None:
+        return None
+    label = rows[0] if isinstance(rows, (tuple, list)) else rows.label
+    return label
+
+
 def has_international_reach(session: Session, event_ids: list[str]) -> bool:
     """True if any attended event carries the ``reach:international`` tag."""
     if not event_ids:
@@ -142,6 +165,7 @@ def build_stats_context(session: Session, user) -> dict:
         "cities": cities,
         "countries": countries,
         "styles": styles,
+        "top_style": top_dance_style(session, event_ids),
         "reviews": reviews_written(session, user.id),
         "has_international": has_international_reach(session, event_ids),
         "longest_streak": longest_month_streak(events),
@@ -149,6 +173,7 @@ def build_stats_context(session: Session, user) -> dict:
         "avg_gap_days": average_gap_days(events),
         "first_event_date": events[-1].start if events else None,
         "member_since": user.created_at,
+        "dancing_since": user.dancing_since,
     }
 
 
@@ -270,9 +295,12 @@ class Milestone:
         "threshold",
         "unit",
         "metric",
+        "prestige",
     )
 
-    def __init__(self, key, name, description, icon, category, threshold, unit, metric):
+    def __init__(
+        self, key, name, description, icon, category, threshold, unit, metric, prestige
+    ):
         self.key = key
         self.name = name
         self.description = description
@@ -281,6 +309,7 @@ class Milestone:
         self.threshold = threshold
         self.unit = unit
         self.metric = metric
+        self.prestige = prestige
 
 
 def _m_events(ctx: dict) -> int:
@@ -317,6 +346,7 @@ MILESTONES: list[Milestone] = [
         1,
         "events",
         _m_events,
+        1,
     ),
     Milestone(
         "events_10",
@@ -327,6 +357,7 @@ MILESTONES: list[Milestone] = [
         10,
         "events",
         _m_events,
+        20,
     ),
     Milestone(
         "events_25",
@@ -337,6 +368,7 @@ MILESTONES: list[Milestone] = [
         25,
         "events",
         _m_events,
+        40,
     ),
     Milestone(
         "events_50",
@@ -347,6 +379,7 @@ MILESTONES: list[Milestone] = [
         50,
         "events",
         _m_events,
+        65,
     ),
     Milestone(
         "events_100",
@@ -357,6 +390,7 @@ MILESTONES: list[Milestone] = [
         100,
         "events",
         _m_events,
+        90,
     ),
     Milestone(
         "cities_5",
@@ -367,6 +401,7 @@ MILESTONES: list[Milestone] = [
         5,
         "cities",
         _m_cities,
+        35,
     ),
     Milestone(
         "cities_10",
@@ -377,6 +412,7 @@ MILESTONES: list[Milestone] = [
         10,
         "cities",
         _m_cities,
+        60,
     ),
     Milestone(
         "countries_3",
@@ -387,6 +423,7 @@ MILESTONES: list[Milestone] = [
         3,
         "countries",
         _m_countries,
+        45,
     ),
     Milestone(
         "countries_5",
@@ -397,6 +434,7 @@ MILESTONES: list[Milestone] = [
         5,
         "countries",
         _m_countries,
+        70,
     ),
     Milestone(
         "countries_10",
@@ -407,6 +445,7 @@ MILESTONES: list[Milestone] = [
         10,
         "countries",
         _m_countries,
+        95,
     ),
     Milestone(
         "first_international",
@@ -417,6 +456,7 @@ MILESTONES: list[Milestone] = [
         1,
         "events",
         _m_international,
+        30,
     ),
     Milestone(
         "first_review",
@@ -427,6 +467,7 @@ MILESTONES: list[Milestone] = [
         1,
         "reviews",
         _m_reviews,
+        10,
     ),
     Milestone(
         "reviews_10",
@@ -437,6 +478,7 @@ MILESTONES: list[Milestone] = [
         10,
         "reviews",
         _m_reviews,
+        40,
     ),
     Milestone(
         "streak_3_months",
@@ -447,6 +489,7 @@ MILESTONES: list[Milestone] = [
         3,
         "months",
         _m_streak,
+        50,
     ),
     Milestone(
         "streak_6_months",
@@ -457,6 +500,7 @@ MILESTONES: list[Milestone] = [
         6,
         "months",
         _m_streak,
+        75,
     ),
     Milestone(
         "streak_12_months",
@@ -467,6 +511,7 @@ MILESTONES: list[Milestone] = [
         12,
         "months",
         _m_streak,
+        100,
     ),
 ]
 
@@ -523,6 +568,7 @@ def milestone_view(session: Session, user, ctx: dict) -> list[dict]:
                 "category": m.category,
                 "threshold": m.threshold,
                 "unit": m.unit,
+                "prestige": m.prestige,
                 "progress": min(current, m.threshold),
                 "unlocked": row is not None,
                 "is_new": row is not None and row.seen_at is None,

@@ -755,6 +755,60 @@ def test_subscribed_events_multi_handle_kind_and_upcoming_filters(client, sessio
     assert "ev-past" not in event_ids
 
 
+def test_subscribed_events_match_all_intersects_people(client, session):
+    """``match=all`` returns only events every selected person shares."""
+    _make_calendar(session)
+    _make_event(session, "ev-shared", title="Shared Event")
+    _make_event(session, "ev-alice-only", title="Alice Only")
+
+    alice = _make_user(session, "alice@example.com", "alice")
+    carol = _make_user(session, "carol@example.com", "carol")
+    bob = _make_user(session, "bob@example.com", "bob")
+    _subscribe(session, bob, alice)
+    _subscribe(session, bob, carol)
+
+    for eid in ("ev-shared", "ev-alice-only"):
+        session.add(
+            UserEventAttendance(
+                device_id=f"da-{eid}",
+                event_id=eid,
+                user_id=alice.id,
+                share_audience="public",
+                share_publicly=True,
+            )
+        )
+    session.add(
+        UserEventAttendance(
+            device_id="dc-shared",
+            event_id="ev-shared",
+            user_id=carol.id,
+            share_audience="public",
+            share_publicly=True,
+        )
+    )
+    session.commit()
+
+    _login(client, "bob@example.com")
+    # any (default): union of both people.
+    r = client.get(
+        "/api/social/me/subscribed-events?from_handles=alice,carol&match=any"
+    )
+    assert r.status_code == 200, r.text
+    assert {i["event_id"] for i in r.json()["items"]} == {"ev-shared", "ev-alice-only"}
+
+    # all: only events both share.
+    r = client.get(
+        "/api/social/me/subscribed-events?from_handles=alice,carol&match=all"
+    )
+    assert r.status_code == 200, r.text
+    assert {i["event_id"] for i in r.json()["items"]} == {"ev-shared"}
+
+    # all with a single person is a no-op (AND needs 2+ people).
+    r = client.get("/api/social/me/subscribed-events?from_handles=alice&match=all")
+    assert r.status_code == 200, r.text
+    assert {i["event_id"] for i in r.json()["items"]} == {"ev-shared", "ev-alice-only"}
+
+
 def test_subscribed_events_unknown_handle_returns_empty(client, session):
     _make_calendar(session)
     alice = _make_user(session, "alice@example.com", "alice")
@@ -1062,3 +1116,171 @@ def test_e8_pending_follow_friends_event_does_not_appear_in_subscribed_feed(
     assert "ev-pending-friends" not in event_ids, (
         "pending-follow target's friends-audience event must NOT appear in feed"
     )
+
+
+# --- Friend reviews / milestones fan-out ------------------------------------
+
+
+def _make_past_event(session: Session, event_id: str) -> CachedEvent:
+    e = CachedEvent(
+        event_id=event_id,
+        calendar_id="cal-test",
+        title="Past Social",
+        start=datetime.utcnow() - timedelta(days=2, hours=2),
+        end=datetime.utcnow() - timedelta(days=2),
+        all_day=False,
+    )
+    session.add(e)
+    session.commit()
+    session.refresh(e)
+    return e
+
+
+def test_fan_out_review_notifies_subscribers_for_past_event(session):
+    from backend.services.notifications import fan_out_review
+
+    _make_calendar(session)
+    _make_past_event(session, "ev-rev")
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    dave = _make_user(session, "dave@example.com", "dave")  # no subscription
+    _subscribe(session, bob, alice)
+
+    inserted = fan_out_review(session, alice, "ev-rev")
+    session.commit()
+    assert inserted == 1
+
+    rows = session.exec(
+        select(Notification).where(Notification.recipient_user_id == bob.id)
+    ).all()
+    assert len(rows) == 1
+    assert rows[0].kind == "subscription_review"
+    assert rows[0].event_id == "ev-rev"
+    assert rows[0].context is None
+    # Non-subscriber and the actor themself get nothing.
+    assert _count_notifs(session, dave) == 0
+    assert _count_notifs(session, alice) == 0
+
+
+def test_fan_out_review_anonymous_sets_context(session):
+    from backend.services.notifications import fan_out_review
+
+    _make_calendar(session)
+    _make_past_event(session, "ev-rev")
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    _subscribe(session, bob, alice)
+
+    fan_out_review(session, alice, "ev-rev", anonymous=True)
+    session.commit()
+    row = session.exec(
+        select(Notification).where(Notification.recipient_user_id == bob.id)
+    ).one()
+    assert row.context == "anon"
+
+
+def test_fan_out_review_is_deduped(session):
+    from backend.services.notifications import fan_out_review
+
+    _make_calendar(session)
+    _make_past_event(session, "ev-rev")
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    _subscribe(session, bob, alice)
+
+    assert fan_out_review(session, alice, "ev-rev") == 1
+    session.commit()
+    assert fan_out_review(session, alice, "ev-rev") == 0
+    session.commit()
+    assert _count_notifs(session, bob) == 1
+
+
+def test_fan_out_milestone_public_notifies_and_dedupes(session):
+    from backend.services.notifications import fan_out_milestone
+
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    _subscribe(session, bob, alice)
+
+    assert fan_out_milestone(session, alice, "first_event", audience="public") == 1
+    session.commit()
+    row = session.exec(
+        select(Notification).where(Notification.recipient_user_id == bob.id)
+    ).one()
+    assert row.kind == "subscription_milestone"
+    assert row.event_id is None
+    assert row.subject_key == "first_event"
+
+    # Same milestone key does not re-notify.
+    assert fan_out_milestone(session, alice, "first_event", audience="public") == 0
+    session.commit()
+    assert _count_notifs(session, bob) == 1
+
+
+def test_fan_out_milestone_private_notifies_nobody(session):
+    from backend.services.notifications import fan_out_milestone
+
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    _subscribe(session, bob, alice)
+
+    assert fan_out_milestone(session, alice, "first_event", audience="private") == 0
+    session.commit()
+    assert _count_notifs(session, bob) == 0
+
+
+def test_notifications_list_sets_also_going_for_co_attendee(client, session):
+    _make_calendar(session)
+    _make_event(session, "ev-going")
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    _subscribe(session, bob, alice)
+    # Bob is also going to the same event.
+    session.add(
+        UserEventAttendance(
+            user_id=bob.id,
+            device_id="dev-bob",
+            event_id="ev-going",
+        )
+    )
+    session.add(
+        Notification(
+            recipient_user_id=bob.id,
+            actor_user_id=alice.id,
+            kind="subscription_going",
+            event_id="ev-going",
+        )
+    )
+    session.commit()
+
+    _login(client, "bob@example.com")
+    r = client.get("/api/notifications")
+    assert r.status_code == 200
+    items = r.json()["items"]
+    going = [i for i in items if i["kind"] == "subscription_going"]
+    assert len(going) == 1
+    assert going[0]["also_going"] is True
+
+
+def test_notifications_list_also_going_false_when_not_attending(client, session):
+    _make_calendar(session)
+    _make_event(session, "ev-going")
+    alice = _make_user(session, "alice@example.com", "alice")
+    bob = _make_user(session, "bob@example.com", "bob")
+    _subscribe(session, bob, alice)
+    session.add(
+        Notification(
+            recipient_user_id=bob.id,
+            actor_user_id=alice.id,
+            kind="subscription_going",
+            event_id="ev-going",
+        )
+    )
+    session.commit()
+
+    _login(client, "bob@example.com")
+    r = client.get("/api/notifications")
+    assert r.status_code == 200
+    going = [i for i in r.json()["items"] if i["kind"] == "subscription_going"]
+    assert len(going) == 1
+    assert going[0]["also_going"] is False

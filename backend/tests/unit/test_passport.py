@@ -459,6 +459,10 @@ class TestMilestones:
         assert first["unlocked"] is True
         assert first["is_new"] is True
         assert first["unit"] == "events"
+        assert (
+            first["prestige"]
+            == passport_service.MILESTONES_BY_KEY["first_event"].prestige
+        )
 
         acked = passport_service.acknowledge_milestones(session, user, ["first_event"])
         assert acked == 1
@@ -503,6 +507,60 @@ class TestCatalog:
         assert m.category == "streak"
         assert m.threshold == 12
         assert m.unit == "months"
+
+    def test_every_milestone_has_prestige(self):
+        for m in passport_service.MILESTONES:
+            assert isinstance(m.prestige, int)
+            assert 1 <= m.prestige <= 100
+
+    def test_capstone_milestones_outrank_first_steps(self):
+        first = passport_service.MILESTONES_BY_KEY["first_event"].prestige
+        assert passport_service.MILESTONES_BY_KEY["events_100"].prestige > first
+        assert passport_service.MILESTONES_BY_KEY["countries_10"].prestige > first
+        assert passport_service.MILESTONES_BY_KEY["streak_12_months"].prestige > first
+
+
+def _style_tag(session, group, slug, label, *, ordinal=0):
+    tag = Tag(group_id=group.id, slug=slug, label=label, ordinal=ordinal)
+    session.add(tag)
+    session.commit()
+    return tag
+
+
+@pytest.mark.unit
+class TestTopStyle:
+    def test_returns_most_attended_style_label(self, session):
+        user = User(email="a@example.com")
+        session.add(user)
+        group = TagGroup(slug="dance-style", label="Dance style")
+        session.add(group)
+        session.commit()
+        salsa = _style_tag(session, group, "salsa", "Salsa", ordinal=0)
+        bachata = _style_tag(session, group, "bachata", "Bachata", ordinal=1)
+        for i in range(3):
+            eid = f"salsa-{i}"
+            _event(session, eid, _past(30 - i))
+            session.add(EventTag(event_id=eid, tag_id=salsa.id))
+            _going(session, user.id, eid)
+        _event(session, "bachata-0", _past(5))
+        session.add(EventTag(event_id="bachata-0", tag_id=bachata.id))
+        _going(session, user.id, "bachata-0")
+        session.commit()
+
+        ctx = passport_service.build_stats_context(session, user)
+
+        assert ctx["top_style"] == "Salsa"
+
+    def test_none_when_no_style_tags(self, session):
+        user = User(email="a@example.com")
+        session.add(user)
+        _event(session, "e1", _past(10))
+        _going(session, user.id, "e1")
+        session.commit()
+
+        ctx = passport_service.build_stats_context(session, user)
+
+        assert ctx["top_style"] is None
 
 
 @pytest.mark.unit

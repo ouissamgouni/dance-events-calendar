@@ -8,7 +8,9 @@ import {
     getCalendarFeedUrl,
     fetchSubscribedEvents,
     fetchMySubscriptions,
+    fetchMyFriends,
     type SubscribedUser,
+    type SubscribedEventItem,
 } from '../api';
 import { getDeviceId } from '../utils/deviceId';
 import { useSavedEvents } from '../context/SavedEventsContext';
@@ -21,9 +23,24 @@ import EventMap from '../components/EventMap';
 import type { MapBounds } from '../components/EventMap';
 import EventModal from '../components/EventModal';
 import MySubscribersBadge from '../components/MySubscribersBadge';
+import { InterestFilterChips, type InterestFilterChange } from '../components/InterestFilter';
+import { firstNameOf, formatNameList } from '../utils/displayName';
 import type { CalendarEvent } from '../types';
 
 type Filter = 'all' | 'saved' | 'going';
+type InterestSource = 'follows' | 'friends' | null;
+type InterestKind = 'any' | 'going' | 'saved';
+type InterestMatch = 'any' | 'all';
+
+/** Relative countdown — "now", "in 1 day", "in 3 days", "in a week", "in 2 weeks". */
+function formatRelativeWhen(startIso: string): string {
+    const diffDays = Math.round((new Date(startIso).getTime() - Date.now()) / 86_400_000);
+    if (diffDays <= 0) return 'now';
+    if (diffDays === 1) return 'in 1 day';
+    if (diffDays < 7) return `in ${diffDays} days`;
+    if (diffDays < 14) return 'in a week';
+    return `in ${Math.round(diffDays / 7)} weeks`;
+}
 
 function downloadBlob(blob: Blob, filename: string) {
     const url = URL.createObjectURL(blob);
@@ -41,7 +58,7 @@ export default function MyCalendar() {
     const navigate = useNavigate();
     const { savedEventIds, savedCount, isSaved } = useSavedEvents();
     const { attendingEventIds, attendingCount, isAttending } = useAttendingEvents();
-    const { showPrices, showPopularity, popularityThreshold } = useFeatureFlags();
+    const { showPrices, showPopularity, popularityThreshold, networkGoingSnapshotEnabled } = useFeatureFlags();
     const { user, loading: authLoading } = useAuth();
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [loading, setLoading] = useState(true);
@@ -61,8 +78,12 @@ export default function MyCalendar() {
     const [subsEvents, setSubsEvents] = useState<CalendarEvent[]>([]);
     const [subsLoading, setSubsLoading] = useState(false);
     const [subsCalendars, setSubsCalendars] = useState<SubscribedUser[]>([]);
-    const [subsHandleFilters, setSubsHandleFilters] = useState<string[]>([]);
-    const [subsFilter, setSubsFilter] = useState<Filter>('all');
+    const [interestSource, setInterestSource] = useState<InterestSource>(null);
+    const [interestKind, setInterestKind] = useState<InterestKind>('going');
+    const [interestUserHandles, setInterestUserHandles] = useState<string[]>([]);
+    const [interestMatch, setInterestMatch] = useState<InterestMatch>('any');
+    const [friendHandles, setFriendHandles] = useState<string[]>([]);
+    const [snapshotEvents, setSnapshotEvents] = useState<SubscribedEventItem[]>([]);
     const [signInNudgeDismissed, setSignInNudgeDismissed] = useState<boolean>(() => {
         if (typeof window === 'undefined') return false;
         return window.localStorage.getItem('myCalendar.signInNudge.dismissed') === '1';
@@ -114,6 +135,7 @@ export default function MyCalendar() {
     useEffect(() => {
         if (!user) {
             setSubsCalendars([]);
+            setFriendHandles([]);
             return;
         }
         let cancelled = false;
@@ -122,19 +144,36 @@ export default function MyCalendar() {
                 if (cancelled) return;
                 setSubsCalendars(res.items);
             })
-            .catch(() => { /* tolerate; pills just won't appear */ });
+            .catch(() => { /* tolerate; empty-state copy just falls back */ });
+        fetchMyFriends({ limit: 100 })
+            .then((res) => {
+                if (cancelled) return;
+                setFriendHandles(res.items.map((f) => f.handle));
+            })
+            .catch(() => { /* tolerate; friends scope degrades to none */ });
         return () => { cancelled = true; };
     }, [user]);
 
     useEffect(() => {
         if (!isSubscriptionsRoute || !user) return;
+        const kind: Filter = interestKind === 'any' ? 'all' : interestKind;
+        // Map the explorer-style interest scope onto subscribed-event params:
+        // explicit people win; otherwise "friends" scope narrows to mutuals.
+        const fromHandles = interestUserHandles.length
+            ? interestUserHandles
+            : interestSource === 'friends'
+                ? friendHandles
+                : [];
+        // "Friends" scope with no mutuals must show nothing rather than
+        // falling back to every subscription.
+        if (interestSource === 'friends' && !interestUserHandles.length && friendHandles.length === 0) {
+            setSubsEvents([]);
+            setSubsLoading(false);
+            return;
+        }
         let cancelled = false;
         setSubsLoading(true);
-        fetchSubscribedEvents({
-            fromHandles: subsHandleFilters,
-            kind: subsFilter,
-            limit: 100,
-        })
+        fetchSubscribedEvents({ fromHandles, kind, match: interestUserHandles.length ? interestMatch : 'any', limit: 100 })
             .then((res) => {
                 if (cancelled) return;
                 setSubsEvents(res.items);
@@ -142,13 +181,67 @@ export default function MyCalendar() {
             .catch(() => { if (!cancelled) setSubsEvents([]); })
             .finally(() => { if (!cancelled) setSubsLoading(false); });
         return () => { cancelled = true; };
-    }, [isSubscriptionsRoute, user, subsHandleFilters, subsFilter]);
+    }, [isSubscriptionsRoute, user, interestSource, interestKind, interestUserHandles, interestMatch, friendHandles]);
 
-    const toggleSubsHandle = useCallback((handle: string) => {
-        setSubsHandleFilters((current) => current.includes(handle)
-            ? [] // If already selected, deselect
-            : [handle]); // If not selected, select only this one (exclusive)
+    // "Your Network" snapshot: upcoming events people you follow are going
+    // to, grouped by event, independent of the active filter above.
+    useEffect(() => {
+        if (!isSubscriptionsRoute || !user || !networkGoingSnapshotEnabled) {
+            setSnapshotEvents([]);
+            return;
+        }
+        let cancelled = false;
+        fetchSubscribedEvents({ kind: 'going', limit: 100 })
+            .then((res) => {
+                if (cancelled) return;
+                setSnapshotEvents(res.items);
+            })
+            .catch(() => { if (!cancelled) setSnapshotEvents([]); });
+        return () => { cancelled = true; };
+    }, [isSubscriptionsRoute, user, networkGoingSnapshotEnabled]);
+
+    const handleInterestChange = useCallback((next: InterestFilterChange) => {
+        if (Object.prototype.hasOwnProperty.call(next, 'source')) {
+            setInterestSource(next.source ?? null);
+            if (next.source === null) setInterestUserHandles([]);
+        }
+        if (Object.prototype.hasOwnProperty.call(next, 'kind')) {
+            setInterestKind(next.kind!);
+        }
+        if (Object.prototype.hasOwnProperty.call(next, 'match')) {
+            setInterestMatch(next.match!);
+        }
+        if (Object.prototype.hasOwnProperty.call(next, 'userHandles')) {
+            const nextHandles = next.userHandles ?? [];
+            setInterestUserHandles(nextHandles);
+            setInterestSource((current) => (nextHandles.length > 0 && current === null ? 'follows' : current));
+        }
     }, []);
+
+    const showNetworkSnapshot = () => {
+        setInterestUserHandles([]);
+        setInterestKind('going');
+        setInterestSource('follows');
+    };
+
+    // "Your Network" snapshot rows: upcoming going events grouped by event
+    // with the going people attached, plus the distinct-people total.
+    const snapshot = useMemo(() => {
+        const now = Date.now();
+        const distinctPeople = new Set<string>();
+        const rows = snapshotEvents
+            .filter((e) => new Date(e.end || e.start).getTime() >= now)
+            .map((e) => {
+                const goers = e.via
+                    .filter((v) => v.kind === 'subscription_going')
+                    .map((v) => v.actor);
+                for (const a of goers) distinctPeople.add(a.handle);
+                return { event: e, goers };
+            })
+            .filter((r) => r.goers.length > 0)
+            .sort((a, b) => b.goers.length - a.goers.length);
+        return { rows, peopleCount: distinctPeople.size };
+    }, [snapshotEvents]);
 
     const handleEventClick = useCallback((evt: CalendarEvent) => {
         trackView(evt.event_id, 'my-calendar');
@@ -413,66 +506,87 @@ export default function MyCalendar() {
                     </div>
                 )}
 
-                {activeView === 'subs' && subsCalendars.length > 0 && (
-                    <div className="mb-4 flex flex-col gap-2">
-                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                            <button
-                                type="button"
-                                onClick={() => setSubsHandleFilters([])}
-                                className={`shrink-0 px-2.5 py-1 text-xs font-medium border transition ${subsHandleFilters.length === 0
-                                    ? 'bg-blue-500 border-blue-500 text-white'
-                                    : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500'
-                                    }`}
-                            >
-                                Everyone
-                            </button>
-                            {subsCalendars.map((s) => {
-                                const selected = subsHandleFilters.includes(s.handle);
-                                return (
-                                    <button
-                                        key={s.handle}
-                                        type="button"
-                                        onClick={() => toggleSubsHandle(s.handle)}
-                                        aria-pressed={selected}
-                                        className={`shrink-0 px-2.5 py-1 text-xs font-medium border transition inline-flex items-center gap-1.5 ${selected
-                                            ? 'bg-blue-500 border-blue-500 text-white'
-                                            : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500'
-                                            }`}
-                                        title={`Toggle events from @${s.handle}`}
-                                    >
-                                        {s.avatar_url ? (
-                                            <img
-                                                src={s.avatar_url}
-                                                alt=""
-                                                className="h-4 w-4 rounded-full object-cover"
-                                                loading="lazy"
-                                            />
-                                        ) : (
-                                            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-slate-200 text-[9px] font-semibold text-slate-600">
-                                                {(s.display_name || s.handle).slice(0, 1).toUpperCase()}
-                                            </span>
-                                        )}
-                                        <span>@{s.handle}</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                        <div className="flex items-center gap-1">
-                            {(['all', 'saved', 'going'] as Filter[]).map((f) => (
+                {activeView === 'subs' && (
+                    <div className="mb-4 flex flex-col gap-3">
+                        {networkGoingSnapshotEnabled && user && snapshot.rows.length > 0 && (
+                            <div className="border border-slate-200 bg-white p-3.5">
+                                <div className="mt-1 flex items-center gap-1.5 text-sm font-medium">
+                                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+                                    {snapshot.peopleCount} {snapshot.peopleCount === 1 ? 'person is' : 'people are'} attending upcoming events
+                                </div>
+                                <ul className="mt-3 divide-y divide-slate-100">
+                                    {snapshot.rows.slice(0, 3).map(({ event, goers }) => {
+                                        const names = goers.map((a) => firstNameOf(a.display_name, a.handle));
+                                        const avatars = goers.slice(0, 5);
+                                        return (
+                                            <li key={event.event_id} className="flex items-center gap-2 py-2 first:pt-0 last:pb-0">
+                                                <div className="flex shrink-0 -space-x-1">
+                                                    {avatars.map((a, i) => {
+                                                        // Show 3 avatars on mobile, 5 on desktop.
+                                                        const hideOnMobile = i >= 3 ? ' max-sm:hidden' : '';
+                                                        return a.avatar_url ? (
+                                                            <img
+                                                                key={a.handle}
+                                                                src={a.avatar_url}
+                                                                alt=""
+                                                                loading="lazy"
+                                                                className={'h-5 w-5 rounded-full object-cover ring-2 ring-white' + hideOnMobile}
+                                                            />
+                                                        ) : (
+                                                            <span
+                                                                key={a.handle}
+                                                                className={'inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[9px] font-semibold text-slate-600 ring-2 ring-white' + hideOnMobile}
+                                                            >
+                                                                {(a.display_name || a.handle).slice(0, 1).toUpperCase()}
+                                                            </span>
+                                                        );
+                                                    })}
+                                                </div>
+                                                <span className="shrink-0 max-w-[7rem] truncate text-xs font-semibold text-slate-900 sm:hidden">
+                                                    {formatNameList(names, 3)}
+                                                </span>
+                                                <span className="hidden shrink-0 text-xs font-semibold text-slate-900 sm:inline">
+                                                    {formatNameList(names, 5)}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleEventClick(event)}
+                                                    title={event.title}
+                                                    className="min-w-0 flex-1 truncate text-left text-xs font-medium text-slate-700 hover:text-blue-600"
+                                                >
+                                                    {event.title}
+                                                </button>
+                                                <span className="shrink-0 text-[11px] text-slate-400">
+                                                    {formatRelativeWhen(event.start)}
+                                                </span>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
                                 <button
-                                    key={f}
                                     type="button"
-                                    onClick={() => setSubsFilter(f)}
-                                    className={`px-2 py-0.5 text-[11px] font-medium leading-5 border transition ${subsFilter === f
-                                        ? 'bg-blue-500 border-blue-500 text-white'
-                                        : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500'
-                                        }`}
+                                    onClick={showNetworkSnapshot}
+                                    className="mt-3 text-xs font-medium text-blue-600 hover:text-blue-700"
                                 >
-                                    {f === 'all' ? 'All' : f === 'saved' ? 'Saved' : 'Going'}
+                                    See all →
                                 </button>
-                            ))}
+                            </div>
+                        )}
+                        <div className="flex min-w-0 items-start gap-2">
+                            <div className="min-w-0 flex-1">
+                                <InterestFilterChips
+                                    signedIn={!!user}
+                                    followingCount={subsCalendars.length}
+                                    interestSource={interestSource}
+                                    interestKind={interestKind}
+                                    interestUserHandles={interestUserHandles}
+                                    interestMatch={interestMatch}
+                                    onChange={handleInterestChange}
+                                    showShortcut={false}
+                                />
+                            </div>
                             {subsLoading && subsEvents.length > 0 && (
-                                <span className="ml-2 text-[11px] text-slate-400">Updating…</span>
+                                <span className="mt-1 shrink-0 text-[11px] text-slate-400">Updating…</span>
                             )}
                         </div>
                     </div>
@@ -525,8 +639,9 @@ export default function MyCalendar() {
                     </div>
                 )}
 
-                {!activeLoading && activeView === 'subs' && !subsLoading && subsEvents.length === 0 && (
-                    subsCalendars.length === 0 && subsHandleFilters.length === 0 ? (
+                {!activeLoading && activeView === 'subs' && !subsLoading && subsEvents.length === 0 && (() => {
+                    const filterActive = interestSource !== null || interestUserHandles.length > 0;
+                    return subsCalendars.length === 0 && !filterActive ? (
                         <div className="flex flex-col items-center justify-center py-20 text-center">
                             <p className="text-slate-600 text-lg font-medium">
                                 Build your tribe
@@ -547,22 +662,22 @@ export default function MyCalendar() {
                                 No upcoming events from your subscriptions
                             </p>
                             <p className="text-slate-400 text-sm mt-1">
-                                {subsHandleFilters.length > 0
+                                {filterActive
                                     ? 'Those people have no matching upcoming events yet.'
                                     : 'When the calendars you subscribe to publish events, they’ll show up here.'}
                             </p>
-                            {subsHandleFilters.length > 0 && (
+                            {filterActive && (
                                 <button
                                     type="button"
-                                    onClick={() => setSubsHandleFilters([])}
+                                    onClick={() => { setInterestUserHandles([]); setInterestSource(null); }}
                                     className="mt-4 text-xs text-blue-600 hover:underline"
                                 >
                                     Show all subscriptions
                                 </button>
                             )}
                         </div>
-                    )
-                )}
+                    );
+                })()}
 
                 {!activeLoading && (
                     (activeView === 'mine' && allEventIds.length > 0) ||

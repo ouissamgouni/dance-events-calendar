@@ -99,3 +99,25 @@ class TestBackfillGeo:
             row = s.get(CachedEvent, "evt-unresolved")
             assert row.city is None
             assert row.country is None
+
+    def test_refresh_overwrites_events_that_already_have_country(
+        self, engine, monkeypatch
+    ):
+        _event(engine, "evt-stale", latitude=52.52, longitude=13.4, country="Germany")
+        _event(engine, "evt-no-coords", latitude=None, longitude=None)
+
+        monkeypatch.setattr(
+            backfill_geo,
+            "reverse_geocode",
+            lambda lat, lng: ("Berlin", "Germany", "DE"),
+        )
+        monkeypatch.setattr("sys.argv", ["backfill_geo", "--commit", "--refresh"])
+
+        backfill_geo.main()
+
+        with Session(engine) as s:
+            stale = s.get(CachedEvent, "evt-stale")
+            assert stale.city == "Berlin"
+            assert stale.country_code == "DE"
+            # Coordinate-less events are still skipped even with --refresh.
+            assert s.get(CachedEvent, "evt-no-coords").country is None

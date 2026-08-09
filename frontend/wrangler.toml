@@ -13,12 +13,16 @@
 #     Production:
 #       NODE_VERSION          = 22
 #       VITE_API_URL          = https://api.joinmovida.com
+#       VITE_APP_NAME         = Movida
+#       VITE_APP_NAME_SHORT   = Movida
 #       VITE_UMAMI_URL        = https://cloud.umami.is
 #       VITE_UMAMI_WEBSITE_ID = <prod-uuid>          (encrypted)
 #       Custom domain         = joinmovida.com
 #     Preview (staging):
 #       NODE_VERSION          = 22
 #       VITE_API_URL          = https://api-develop.joinmovida.com
+#       VITE_APP_NAME         = Movida (Develop)
+#       VITE_APP_NAME_SHORT   = Movida Dev
 #       VITE_UMAMI_URL        = https://cloud.umami.is
 #       VITE_UMAMI_WEBSITE_ID = <staging-uuid>       (encrypted)
 #       Custom domain         = develop.joinmovida.com

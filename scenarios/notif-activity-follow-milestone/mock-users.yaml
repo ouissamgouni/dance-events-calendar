@@ -1,0 +1,46 @@
+# notif-activity-follow-milestone cast.
+#   Alice   — actor with PUBLIC passport; attends ev-past → unlocks the
+#             "First Steps" milestone. Her followers should be notified.
+#   Mallory — actor with PRIVATE passport; also attends ev-past2 and
+#             unlocks a milestone, but her followers must NOT be notified
+#             (visibility gate).
+#   Bob     — follows Alice; friend_milestones email + push ON.
+#   Carol   — follows Mallory (private) → negative control for the
+#             visibility gate.
+#   Dave    — follows nobody → negative control.
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    account_visibility: public
+    passport_visibility: public
+
+  - email: mallory@example.com
+    name: Mallory Stone
+    handle: mallory
+    account_visibility: public
+    passport_visibility: private
+
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+    account_visibility: public
+    email_friend_milestones_enabled: true
+    push_friend_milestones_enabled: true
+
+  - email: carol@example.com
+    name: Carol Nguyen
+    handle: carol
+    account_visibility: public
+    email_friend_milestones_enabled: true
+    push_friend_milestones_enabled: true
+
+  - email: dave@example.com
+    name: Dave Owens
+    handle: dave
+    account_visibility: public

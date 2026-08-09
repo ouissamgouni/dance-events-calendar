@@ -11,7 +11,7 @@ test_plan:
   preconditions:
     - "task start:scenario SCENARIO=tribe"
     - "Sign in as me@example.com (Mateo)."
-    - "Follows (db-follows.yaml): me <-> alice/bob/carla (mutual); me -> dave (one-way); erin -> me (one-way inbound); frank -> me (pending); alice + bob -> grace (friend-of-friend)."
+    - "Follows (db-follows.yaml): me <-> alice/bob/carla/henry/iris/jack (mutual); me -> dave (one-way); erin -> me (one-way inbound); frank -> me (pending); alice + bob -> grace (friend-of-friend)."
 
   steps:
     - id: 1
@@ -27,8 +27,14 @@ test_plan:
       description: "Stay on the Calendars tab (/tribe/calendars)."
       expected: >
         Upcoming events my followees are going to appear: Paris (alice),
-        Madrid (bob), Berlin (carla), Lyon (dave). There is NO internal
-        "My events / From people I follow" toggle and NO back button.
+        Madrid (bob), Berlin (carla), Lyon (dave). Some events have several
+        of my follows going together — Paris (alice, bob, carla, dave),
+        Barcelona (alice, bob, dave), Vienna (dave, carla) — so the "Your
+        Network" snapshot groups their names as "Alice, Bob, Carla +N".
+        Amsterdam has more than five friends going (alice, bob, carla,
+        henry, iris, jack).
+        There is NO internal "My events / From people I follow" toggle and
+        NO back button.
 
     - id: 3
       title: "Activity shows social notifications only"
@@ -50,8 +56,9 @@ test_plan:
       title: "Network shows my graph and the pending request"
       description: "Open the Network tab (/tribe/network)."
       expected: >
-        Following lists alice, bob, carla, dave. Followers list alice,
-        bob, carla, erin. Friends (mutual) list alice, bob, carla. The
+        Following lists alice, bob, carla, dave, henry, iris, jack.
+        Followers list alice, bob, carla, erin, henry, iris, jack. Friends
+        (mutual) list alice, bob, carla, henry, iris, jack. The
         requests panel shows frank's pending inbound follow request
         (approve / decline).
 

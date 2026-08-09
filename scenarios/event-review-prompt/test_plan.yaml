@@ -46,7 +46,7 @@ test_plan:
         Social — Rate Me! — share yours" — with body copy "Carol, Dan +2
         others shared their experience of: …". Gina receives ONE GENERIC email
         "Movida: How was Rooftop Salsa Social — Rate Me!?". Both link to
-        `/event/ev-past?rate=1#community` and carry an unsubscribe link.
+        `/event/ev-past/review` and carry an unsubscribe link.
         Bob, Carol, Dan, Erin and Flo each receive 0 emails.
 
     - id: 3
@@ -58,7 +58,7 @@ test_plan:
         Rooftop Salsa Social — Rate Me!". Signed in as Bob or Gina the row
         reads the generic "How was it? Share your experience at …" (neither
         follows a reviewer). Clicking any row navigates to
-        `/event/ev-past?rate=1#community`, scrolls to Community Experience,
+        `/event/ev-past/review`, scrolls to Community Experience,
         and opens the Rate modal.
 
     - id: 4
@@ -103,11 +103,11 @@ test_plan:
       title: "Signed-out deep link redirects to login and back"
       description: >
         Sign out, then open the review-prompt link/email URL directly
-        (`/event/ev-past?rate=1#community`).
+        (`/event/ev-past/review`).
       expected: >
-        The app redirects to `/login?next=%2Fevent%2Fev-past%3Frate%3D1%23community`
+        The app redirects to `/login?next=%2Fevent%2Fev-past%2Freview`
         (or equivalent encoding) instead of showing the event page. After
-        signing in, the app returns to `/event/ev-past?rate=1#community`,
+        signing in, the app returns to `/event/ev-past/review`,
         scrolls to Community Experience, and auto-opens the Rate modal —
         same end result as step 3, just via a login detour.
 

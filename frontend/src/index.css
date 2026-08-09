@@ -46,18 +46,33 @@
   --color-surface: #f8fafc;
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   margin: 0;
   font-family: Inter, system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   background: var(--color-surface);
   color: #1e293b;
+  /* The app shell is a fixed, non-scrolling container (see #root). Locking
+     body scroll here removes the whole class of "content scrolled, bottom
+     nav pushed below the fold" bugs on mobile/PWA — the body can never
+     scroll, so the nav is always pinned. All page scrolling happens inside
+     <main>. Avoids relying on dvh/visualViewport recomputation. */
+  overflow: hidden;
+  overscroll-behavior: none;
 }
 
 #root {
-  height: 100vh;
-  /* fallback for browsers without dvh */
-  height: 100dvh;
+  /* Glue the shell to the visual viewport. A fixed inset:0 box always tracks
+     the viewport (incl. viewport-fit=cover safe areas) without depending on
+     dvh/vh unit recomputation, so the layout can't be scrolled off. */
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
 }
 
 /* ── Leaflet — undo Tailwind preflight on tiles ──── */

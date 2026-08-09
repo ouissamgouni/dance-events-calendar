@@ -1,0 +1,10 @@
+# Bob follows Alice (public passport) → should be notified when Alice
+# unlocks a milestone. Carol follows Mallory (private passport) → must
+# NOT be notified (visibility gate). Dave follows nobody.
+follows:
+  - follower: bob
+    followee: alice
+    status: approved
+  - follower: carol
+    followee: mallory
+    status: approved

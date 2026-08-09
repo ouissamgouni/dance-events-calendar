@@ -1,0 +1,7 @@
+# Enable INSTANT email mode for interest_matches, on top of the default
+# digest mode, so this scenario also exercises the immediate (no-schedule)
+# email path. With instant ON, a plain dispatch tick emails the row right
+# away (stamps instant_emailed_at); the digest step still delivers a
+# second email on the forced tick.
+settings:
+  interest_matches_email_instant: true

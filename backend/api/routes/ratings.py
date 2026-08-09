@@ -84,6 +84,7 @@ from backend.services.experience_aspects import (
     mood_metrics_from_averages,
 )
 from backend.services.ip_geolocation import geolocate_ip
+from backend.services.notifications import fan_out_review
 from backend.services.passport import attended_events
 from backend.services.profanity import contains_profanity
 from backend.services.review_prompt_service import (
@@ -716,6 +717,17 @@ def submit_feedback(
 
     session.commit()
     session.refresh(rating)
+
+    # Fan a "friend reviewed" activity notification out to the reviewer's
+    # subscribers, but only for a first-time review (not an edit) so
+    # re-submitting doesn't re-notify. Best-effort: never break submission.
+    if existing is None:
+        try:
+            fan_out_review(session, user, event_id, anonymous=body.is_anonymous)
+            session.commit()
+        except Exception:  # noqa: BLE001 — notification is best-effort
+            session.rollback()
+            logger.warning("Review fan-out failed", exc_info=True)
 
     if client_ip:
         background_tasks.add_task(_geolocate_rating, rating.id, client_ip)
