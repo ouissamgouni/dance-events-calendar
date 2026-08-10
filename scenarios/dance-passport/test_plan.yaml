@@ -35,8 +35,7 @@ test_plan:
       - Felix — Going only on a FUTURE event (empty passport).
       - Bea — signed in but never Going (empty passport).
       - Milestone "cusp" users (each one attend away from a milestone):
-        Dana (14/15 events), Elio (4/5 cities), Sami (2/3 countries),
-        Ines (0 international).
+        Dana (14/15 events), Elio (4/5 cities), Sami (2/3 countries).
       - Consistency users (recurring "active in N of the last 12 months"
         achievements, shown as a chronological milestone TRAIL — every unlock is
         a permanent card, repeats never collapsed. Attend a shared monthly
@@ -106,9 +105,8 @@ test_plan:
       description: >
         As a dancer sitting one event short of a milestone, marking one more
         past event as Going unlocks it immediately. For each cusp user (Dana →
-        15th event, Elio → 5th city, Sami → 3rd country, Ines → first
-        international), mark Going on the one spare past event that crosses the
-        threshold and reopen the passport.
+        15th event, Elio → 5th city, Sami → 3rd country), mark Going on the one
+        spare past event that crosses the threshold and reopen the passport.
       expected: >
         Each user starts with the target milestone locked one short of its
         threshold. After the single extra attendance the matching badge
@@ -125,7 +123,7 @@ test_plan:
       expected: >
         Each unlock produces exactly one in-app notification (no duplicates on
         re-run) that links back to the passport. Email and push honour the
-        per-user toggles (Dana: push only; Elio: in-app only; Sami/Ines: both).
+        per-user toggles (Dana: push only; Elio: in-app only; Sami: both).
         A "Dance Passport achievements" preference row is available with email
         and push switches.
       verification: "One in-app notification; email/push honour toggles."
@@ -262,17 +260,15 @@ test_plan:
         (prestige), not by recency, and are capped at six. Only the top badge in
         each family shows — "World Dancer" (5 countries) stands in for the whole
         countries family, never displayed alongside the overshadowed "Passport
-        Stamped" (3 countries), and likewise for the other categories. The
-        redundant "Border Crosser" (attend an international event) is hidden
-        whenever any countries badge is present. Badges are grouped by family:
-        consistency (the recurring active-months achievement + the "Danced every
-        N days" cadence) leads and the review "Critic" badge trails, so the
-        least-prestigious badge is the first dropped when the row overflows. Each
-        milestone highlight is described by her ACTUAL totals (e.g. World Dancer →
-        "7 countries"), never the fixed milestone threshold wording. The cadence
-        and "Top style · <style>" highlights sit within this ordering (cadence
-        with consistency, style just ahead of reviews).
-      verification: "Highlights: consistency-first/reviews-last, one-per-category, Border Crosser suppressed by countries, ≤6, actual-total descriptions."
+        Stamped" (3 countries), and likewise for the other categories. Badges are
+        grouped by family: consistency (the recurring active-months achievement +
+        the "Danced every N days" cadence) leads and the review "Critic" badge
+        trails, so the least-prestigious badge is the first dropped when the row
+        overflows. Each milestone highlight is described by her ACTUAL totals
+        (e.g. World Dancer → "7 countries"), never the fixed milestone threshold
+        wording. The cadence and "Top style · <style>" highlights sit within this
+        ordering (cadence with consistency, style just ahead of reviews).
+      verification: "Highlights: consistency-first/reviews-last, one-per-category, ≤6, actual-total descriptions."
 
     - id: 15
       title: "Active months and top style surface as first-class facts"

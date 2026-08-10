@@ -2049,6 +2049,9 @@ class NotificationItem(BaseModel):
     actor: NotificationActor
     context: Optional[str] = None
     subject_key: Optional[str] = None
+    # Optional narrative field for kinds that benefit from additional context
+    # beyond name/context. Used in milestone notifications.
+    description: Optional[str] = None
     # True when the viewer is also attending ``event_id`` (drives the
     # "You and X are going to ..." phrasing for subscription_going rows).
     also_going: bool = False
@@ -2572,6 +2575,7 @@ class PassportMilestone(BaseModel):
     key: str
     name: str
     description: str
+    achieved_description: str
     icon: str
     category: str
     threshold: int

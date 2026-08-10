@@ -161,12 +161,9 @@ def build_shared_passport(
             )
             for e in attended
         ]
-        intl_ids = passport_service.international_event_ids(
-            session, [e.event_id for e in attended]
-        )
         timeline_markers = [
             PassportTimelineMarker(**m)
-            for m in passport_service.timeline_milestone_markers(attended, intl_ids)
+            for m in passport_service.timeline_milestone_markers(attended)
         ]
         timeline_markers += [
             PassportTimelineMarker(**m)
@@ -298,12 +295,9 @@ def get_passport_timeline(
         )
         for e in page
     ]
-    intl_ids = passport_service.international_event_ids(
-        session, [e.event_id for e in events]
-    )
     markers = [
         PassportTimelineMarker(**m)
-        for m in passport_service.timeline_milestone_markers(events, intl_ids)
+        for m in passport_service.timeline_milestone_markers(events)
     ]
     markers += [
         PassportTimelineMarker(**m)

@@ -53,10 +53,9 @@ test_plan:
       expected: >
         Stats show 6 events, 6 cities, 5 countries. Unlocked milestones
         include First Steps (1 event), City Hopper (5 cities), Passport
-        Stamped (3 countries), World Dancer (5 countries), Border Crosser
-        (international) and Reviewer (first review). The timeline lists
-        the 6 past events newest-first. The upcoming going event does NOT
-        count.
+        Stamped (3 countries), World Dancer (5 countries) and Reviewer
+        (first review). The timeline lists the 6 past events newest-first.
+        The upcoming going event does NOT count.
 
     - id: 5
       title: "Reviews shows my three approved reviews"

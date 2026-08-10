@@ -67,22 +67,11 @@ const CATEGORY_RANK: Record<string, number> = {
     events: 1,
     cities: 2,
     countries: 3,
-    international: 4,
-    reviews: 5,
+    reviews: 4,
 };
 
 function categoryRank(category: string): number {
     return CATEGORY_RANK[category] ?? CATEGORY_RANK.countries;
-}
-
-/**
- * Drop the "international" milestone ("Border Crosser") once any "countries"
- * milestone is present — dancing in multiple countries already implies crossing
- * a border, so the lower-tier badge is redundant.
- */
-function suppressRedundant(milestones: PassportMilestone[]): PassportMilestone[] {
-    const hasCountries = milestones.some((m) => m.category === 'countries');
-    return hasCountries ? milestones.filter((m) => m.category !== 'international') : milestones;
 }
 
 /** Signature "Danced every N days" cadence badge; null when cadence is unknown. */
@@ -232,7 +221,7 @@ function topMilestonePerCategory(milestones: PassportMilestone[]): PassportMiles
             best.set(m.category, m);
         }
     }
-    return suppressRedundant([...best.values()]).sort(
+    return [...best.values()].sort(
         (a, b) =>
             categoryRank(a.category) - categoryRank(b.category) ||
             b.prestige - a.prestige ||
@@ -257,7 +246,7 @@ function milestonesUnlockedInYear(
             best.set(m.category, m);
         }
     }
-    return suppressRedundant([...best.values()]).sort(
+    return [...best.values()].sort(
         (a, b) =>
             categoryRank(a.category) - categoryRank(b.category) ||
             b.prestige - a.prestige ||

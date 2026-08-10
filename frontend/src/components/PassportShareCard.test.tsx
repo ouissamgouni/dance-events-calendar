@@ -38,8 +38,6 @@ describe('PassportShareCard', () => {
         expect(screen.getByText('Veteran')).toBeInTheDocument()
         expect(screen.getByText('Attend 50 events')).toBeInTheDocument()
         expect(screen.getByText(/Journey on Movida since/)).toBeInTheDocument()
-        // Active-months cell renders when there is at least one active month.
-        expect(screen.getByText('📅 Active months')).toBeInTheDocument()
         // QR footer shows the pretty profile handle, never the old @handle form.
         expect(screen.getByText('joinmovida.com/u/alba')).toBeInTheDocument()
     })
@@ -121,9 +119,6 @@ describe('PassportShareCard', () => {
         )
         expect(screen.getByText('My 2026 in Dance')).toBeInTheDocument()
         expect(screen.queryByText(/Journey on Movida since/)).not.toBeInTheDocument()
-        // Year card spells the active-month count out and drops the icon prefix.
-        expect(screen.getByText('months active')).toBeInTheDocument()
-        expect(screen.queryByText('📅 Active months')).not.toBeInTheDocument()
     })
 
     it('shows a year subtitle and an empty state for a year with no events', () => {

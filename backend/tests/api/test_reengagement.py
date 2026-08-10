@@ -328,6 +328,30 @@ def test_review_prompt_created_for_ended_going_event(session, monkeypatch):
     assert notifs[0].event_id == "ev-past"
 
 
+def test_notifications_filter_by_review_prompt_kind(client, session):
+    """GET /api/notifications?kind=event_review_prompt must be accepted (200),
+    not rejected as an invalid kind (400)."""
+    alice = _make_user(session, "alice@example.com", "alice")
+    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    _notif(
+        session,
+        recipient=alice,
+        actor=alice,
+        kind="event_review_prompt",
+        event_id="ev-past",
+    )
+
+    _login(client, "alice@example.com")  # reuses alice (matching provider_subject)
+
+    resp = client.get("/api/notifications?kind=event_review_prompt&limit=50")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert [n["kind"] for n in body["items"]] == ["event_review_prompt"]
+
+    # Sanity: a genuinely unknown kind is still rejected.
+    assert client.get("/api/notifications?kind=bogus_kind").status_code == 400
+
+
 def test_review_prompt_is_idempotent(session, monkeypatch):
     monkeypatch.setattr(
         review_prompt_service, "send_event_review_prompt_email", lambda *a, **k: True

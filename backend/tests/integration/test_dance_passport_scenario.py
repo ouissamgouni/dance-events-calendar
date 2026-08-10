@@ -57,7 +57,6 @@ class TestDancePassportScenario:
         assert len(ctx["countries"]) == 7
         assert ctx["reviews"] == 10  # rejected review excluded
         assert len(ctx["styles"]) == 4  # salsa, bachata, kizomba, zouk
-        assert ctx["has_international"] is True
 
         cols = passport_service.collections(ctx["events"])
         paris = next(c for c in cols["cities"] if c["city"] == "Paris")
@@ -91,8 +90,8 @@ class TestDancePassportScenario:
         alba = _user(seeded_session, "alba@example.com")
         newly = passport_service.evaluate_and_persist(seeded_session, alba)
 
-        # Rich journey unlocks event, city, country, review and international
-        # milestones on the first evaluation.
+        # Rich journey unlocks event, city, country and review milestones on the
+        # first evaluation.
         for key in (
             "first_event",
             "events_5",
@@ -100,7 +99,6 @@ class TestDancePassportScenario:
             "cities_10",
             "countries_3",
             "countries_5",
-            "first_international",
             "first_review",
             "reviews_10",
         ):
@@ -253,4 +251,7 @@ class TestDancePassportScenario:
         first = passport_service.evaluate_and_persist_consistency(seeded_session, cole)
         keys = {r["key"] for r in first}
         assert "consistency_3" in keys and "consistency_5" in keys
-        assert passport_service.evaluate_and_persist_consistency(seeded_session, cole) == []
+        assert (
+            passport_service.evaluate_and_persist_consistency(seeded_session, cole)
+            == []
+        )

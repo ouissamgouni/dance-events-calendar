@@ -197,19 +197,6 @@ attendances:
       share_audience: private,
     }
 
-  # --- cusp-international: only local events, no international yet. Spare
-  # international event = evt-dp-11 (London) -> Border Crosser. ---
-  - {
-      event_id: evt-dp-01,
-      email: cusp-international@example.com,
-      share_audience: private,
-    }
-  - {
-      event_id: evt-dp-09,
-      email: cusp-international@example.com,
-      share_audience: private,
-    }
-
   # --- Yara: 7 attended events across a prior year + the current year, used
   # to exercise the YEAR share card (busiest month, in-year streak, dominant
   # style, new cities/countries). All public. ---
@@ -239,51 +226,179 @@ attendances:
   # event is ~6 weeks apart so it lands in its own calendar month; the number
   # of attended events therefore equals the number of active months. ---
   # Cara: evt-cons-01..03 -> 3 active months -> Consistent.
-  - { event_id: evt-cons-01, email: consistent@example.com, share_audience: public }
-  - { event_id: evt-cons-02, email: consistent@example.com, share_audience: public }
-  - { event_id: evt-cons-03, email: consistent@example.com, share_audience: public }
+  - {
+      event_id: evt-cons-01,
+      email: consistent@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cons-02,
+      email: consistent@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cons-03,
+      email: consistent@example.com,
+      share_audience: public,
+    }
 
   # Cole: evt-cons-01..05 -> 5 active months -> Committed.
-  - { event_id: evt-cons-01, email: committed@example.com, share_audience: public }
-  - { event_id: evt-cons-02, email: committed@example.com, share_audience: public }
-  - { event_id: evt-cons-03, email: committed@example.com, share_audience: public }
-  - { event_id: evt-cons-04, email: committed@example.com, share_audience: public }
-  - { event_id: evt-cons-05, email: committed@example.com, share_audience: public }
+  - {
+      event_id: evt-cons-01,
+      email: committed@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cons-02,
+      email: committed@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cons-03,
+      email: committed@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cons-04,
+      email: committed@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cons-05,
+      email: committed@example.com,
+      share_audience: public,
+    }
 
   # Yuki: evt-cons-01..08 -> 8 active months -> Year-Rounder.
-  - { event_id: evt-cons-01, email: yearround@example.com, share_audience: public }
-  - { event_id: evt-cons-02, email: yearround@example.com, share_audience: public }
-  - { event_id: evt-cons-03, email: yearround@example.com, share_audience: public }
-  - { event_id: evt-cons-04, email: yearround@example.com, share_audience: public }
-  - { event_id: evt-cons-05, email: yearround@example.com, share_audience: public }
-  - { event_id: evt-cons-06, email: yearround@example.com, share_audience: public }
-  - { event_id: evt-cons-07, email: yearround@example.com, share_audience: public }
-  - { event_id: evt-cons-08, email: yearround@example.com, share_audience: public }
+  - {
+      event_id: evt-cons-01,
+      email: yearround@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cons-02,
+      email: yearround@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cons-03,
+      email: yearround@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cons-04,
+      email: yearround@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cons-05,
+      email: yearround@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cons-06,
+      email: yearround@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cons-07,
+      email: yearround@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cons-08,
+      email: yearround@example.com,
+      share_audience: public,
+    }
 
   # Bo: only 2 active months -> below the 3-month entry (no period).
-  - { event_id: evt-cons-01, email: belowentry@example.com, share_audience: public }
-  - { event_id: evt-cons-02, email: belowentry@example.com, share_audience: public }
+  - {
+      event_id: evt-cons-01,
+      email: belowentry@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cons-02,
+      email: belowentry@example.com,
+      share_audience: public,
+    }
 
   # Mira: an old 3-month period (evt-cons-old-*) that lapsed, then a fresh
   # Consistent reach (evt-cons-01..03) -> Consistent recurs (×2).
-  - { event_id: evt-cons-old-01, email: comeback@example.com, share_audience: public }
-  - { event_id: evt-cons-old-02, email: comeback@example.com, share_audience: public }
-  - { event_id: evt-cons-old-03, email: comeback@example.com, share_audience: public }
-  - { event_id: evt-cons-01, email: comeback@example.com, share_audience: public }
-  - { event_id: evt-cons-02, email: comeback@example.com, share_audience: public }
-  - { event_id: evt-cons-03, email: comeback@example.com, share_audience: public }
+  - {
+      event_id: evt-cons-old-01,
+      email: comeback@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cons-old-02,
+      email: comeback@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cons-old-03,
+      email: comeback@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cons-01,
+      email: comeback@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cons-02,
+      email: comeback@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-cons-03,
+      email: comeback@example.com,
+      share_audience: public,
+    }
 
   # Nia: 8 events in one ~10.6-month span (peak Year-Rounder) whose two oldest
   # months have since aged out -> current rolling count is 6. Earned cards for
   # Consistent/Committed/Year-Rounder persist; header + locked cards cool to 6.
-  - { event_id: evt-consdrop-01, email: dip@example.com, share_audience: public }
-  - { event_id: evt-consdrop-02, email: dip@example.com, share_audience: public }
-  - { event_id: evt-consdrop-03, email: dip@example.com, share_audience: public }
-  - { event_id: evt-consdrop-04, email: dip@example.com, share_audience: public }
-  - { event_id: evt-consdrop-05, email: dip@example.com, share_audience: public }
-  - { event_id: evt-consdrop-06, email: dip@example.com, share_audience: public }
-  - { event_id: evt-consdrop-07, email: dip@example.com, share_audience: public }
-  - { event_id: evt-consdrop-08, email: dip@example.com, share_audience: public }
+  - {
+      event_id: evt-consdrop-01,
+      email: dip@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-consdrop-02,
+      email: dip@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-consdrop-03,
+      email: dip@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-consdrop-04,
+      email: dip@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-consdrop-05,
+      email: dip@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-consdrop-06,
+      email: dip@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-consdrop-07,
+      email: dip@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-consdrop-08,
+      email: dip@example.com,
+      share_audience: public,
+    }
 
   # Hana: clustered months for the activity heatmap (8 / 3 / 1 / 1 this year +
   # 2 in a prior year) → intensity buckets across two matrix rows.

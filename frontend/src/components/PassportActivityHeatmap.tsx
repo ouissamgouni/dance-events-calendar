@@ -33,8 +33,6 @@ export default function PassportActivityHeatmap({
 
     return (
         <div className="mb-4 border border-slate-200 bg-white p-3">
-            <div className="mb-2 flex items-baseline justify-between">
-            </div>
             <div className="overflow-x-auto">
                 <div
                     className="inline-grid min-w-full gap-1"
@@ -99,7 +97,7 @@ function ActivityYearRow({
                         aria-label={label}
                         disabled={!interactive}
                         onClick={interactive ? () => onSelectMonth?.(month) : undefined}
-                        className={`aspect-square h-4 w-4 rounded-sm ${LEVEL_RAMP_LIGHT[level]} ${ring} ${interactive ? 'cursor-pointer hover:ring-2 hover:ring-slate-400' : 'cursor-default'
+                        className={`aspect-square h-5 w-5 sm:h-4 sm:w-4 ${LEVEL_RAMP_LIGHT[level]} ${ring} ${interactive ? 'cursor-pointer hover:ring-2 hover:ring-slate-400' : 'cursor-default'
                             }`}
                     />
                 );

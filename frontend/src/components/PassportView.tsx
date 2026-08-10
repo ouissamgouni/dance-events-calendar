@@ -6,7 +6,7 @@
  * by the owner's own /passport page, a profile "Dance Passport" tab and the
  * public shared link. Callers own data fetching; this component only renders.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import EventMap from './EventMap';
@@ -60,7 +60,6 @@ const TIMELINE_MILESTONE: Record<string, { icon: string; label: string }> = {
     countries_15: { icon: '🧭', label: 'Danced in 15 countries' },
     countries_25: { icon: '🌐', label: 'Danced in 25 countries' },
     countries_40: { icon: '🏆', label: 'Danced in 40 countries' },
-    first_international: { icon: '🌐', label: 'First international event' },
     first_review: { icon: '✍️', label: 'Wrote your first review' },
     reviews_3: { icon: '⭐', label: 'Wrote 3 reviews' },
     reviews_10: { icon: '💬', label: 'Wrote 10 reviews' },
@@ -287,10 +286,10 @@ function CountriesPanel({ data, events }: { data: PassportResponse; events: Pass
     );
 }
 
-function TimelineRow({ item, highlighted }: { item: PassportTimelineItem; highlighted?: boolean }) {
+function TimelineRow({ item, anchorMonth, highlighted }: { item: PassportTimelineItem; anchorMonth?: string | null; highlighted?: boolean }) {
     const place = [item.city, item.country].filter(Boolean).join(', ');
     return (
-        <li className="relative pl-6" data-month={item.start.slice(0, 7)}>
+        <li className="relative pl-6" data-month-anchor={anchorMonth ?? undefined}>
             {/* eslint-disable-next-line no-restricted-syntax -- small timeline status dot */}
             <span className="absolute left-[1px] top-[6px] h-3 w-3 rounded-full bg-slate-300 ring-2 ring-white" aria-hidden />
             <Link
@@ -317,7 +316,12 @@ function TimelineMarkerRow({ markers }: { markers: PassportTimelineMarker[] }) {
                 🏅
             </span>
             {single ? (
-                <MarkerBody m={single} />
+                <div className="max-w-[420px] text-xs leading-5 text-slate-600">
+                    <span className="font-semibold text-slate-700">{single.name}</span>
+                    {(single.label ?? TIMELINE_MILESTONE[single.key]?.label) && (
+                        <> · {single.label ?? TIMELINE_MILESTONE[single.key]?.label}</>
+                    )}
+                </div>
             ) : (
                 <div className="max-w-[420px] text-xs leading-5 text-slate-600">
                     <div className="font-medium text-slate-700">
@@ -327,17 +331,12 @@ function TimelineMarkerRow({ markers }: { markers: PassportTimelineMarker[] }) {
                         {markers.map((m) => {
                             const copy = TIMELINE_MILESTONE[m.key];
                             const icon = copy?.icon ?? m.icon;
-                            const secondary = m.label ?? copy?.label;
-                            const period =
-                                m.period_start && m.period_end
-                                    ? formatPeriodRange(m.period_start, m.period_end)
-                                    : null;
+                            const label = m.label ?? copy?.label;
                             return (
                                 <li key={m.key}>
                                     <span aria-hidden>{icon}</span>{' '}
                                     <span className="font-semibold text-slate-700">{m.name}</span>
-                                    {secondary && <> · {secondary}</>}
-                                    {period && <span className="text-slate-400"> · {period}</span>}
+                                    {label && <> · {label}</>}
                                 </li>
                             );
                         })}
@@ -348,37 +347,9 @@ function TimelineMarkerRow({ markers }: { markers: PassportTimelineMarker[] }) {
     );
 }
 
-// A single timeline milestone line. Consistency reaches (which carry a period
-// range) stack name / "N/12 active months" / range; event milestones stay on a
-// single "name · label" line.
-function MarkerBody({ m }: { m: PassportTimelineMarker }) {
-    const copy = TIMELINE_MILESTONE[m.key];
-    const secondary = m.label ?? copy?.label;
-    const period =
-        m.period_start && m.period_end
-            ? formatPeriodRange(m.period_start, m.period_end)
-            : null;
-    if (period) {
-        return (
-            <div className="max-w-[420px] text-xs leading-5 text-slate-600">
-                <div className="font-semibold text-slate-700">
-                    <span aria-hidden>{copy?.icon ?? m.icon}</span> {m.name}
-                </div>
-                {secondary && <div>{secondary}</div>}
-                <div className="text-slate-400">{period}</div>
-            </div>
-        );
-    }
-    return (
-        <div className="max-w-[420px] text-xs leading-5 text-slate-600">
-            <span className="font-semibold text-slate-700">{m.name}</span>
-            {secondary && <> · {secondary}</>}
-        </div>
-    );
-}
-
 function MilestoneBadge({ milestone }: { milestone: PassportMilestone }) {
-    const { unlocked, progress, threshold, unit } = milestone;
+    const { unlocked, progress, threshold } = milestone;
+    const remaining = Math.max(0, threshold - progress);
     return (
         <div
             className={
@@ -402,13 +373,17 @@ function MilestoneBadge({ milestone }: { milestone: PassportMilestone }) {
             </div>
             {unlocked ? (
                 <div className="mt-0.5 text-[10px] leading-tight text-slate-500">
-                    {milestone.description}
+                    {milestone.achieved_description}
                 </div>
             ) : (
-                <div className="mt-1 text-[10px] tabular-nums text-slate-400">
-                    {progress}/{threshold}
-                    {unit ? ` ${unit}` : ''}
-                </div>
+                <>
+                    <div className="mt-0.5 text-[10px] leading-tight text-slate-400">
+                        {milestone.description}
+                    </div>
+                    <div className="mt-1 text-[10px] font-semibold tabular-nums text-slate-500">
+                        {remaining} more to unlock
+                    </div>
+                </>
             )}
         </div>
     );
@@ -421,7 +396,6 @@ const MILESTONE_CATEGORY_ORDER = [
     'cities',
     'countries',
     'reviews',
-    'international',
 ] as const;
 
 const MILESTONE_CATEGORY_LABEL: Record<string, string> = {
@@ -429,7 +403,6 @@ const MILESTONE_CATEGORY_LABEL: Record<string, string> = {
     cities: 'Cities',
     countries: 'Countries',
     reviews: 'Reviews',
-    international: 'International',
 };
 
 // Each category is a single horizontally-scrollable row: achieved badges come
@@ -467,11 +440,25 @@ function MilestoneCategoryRow({
     );
 }
 
-function MilestonesGrid({ milestones }: { milestones: PassportMilestone[] }) {
+// Consistency is rendered as the second trail (right after Events), so it lives
+// inside the milestone grid rather than as a standalone panel.
+function MilestonesGrid({
+    milestones,
+    consistency,
+}: {
+    milestones: PassportMilestone[];
+    consistency?: PassportConsistency | null;
+}) {
+    const consistencyRow = consistency ? (
+        <ConsistencyTrailRow consistency={consistency} />
+    ) : null;
     if (milestones.length === 0) {
         return (
-            <div className="border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
-                No milestones yet.
+            <div className="space-y-4">
+                {consistencyRow}
+                <div className="border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+                    No milestones yet.
+                </div>
             </div>
         );
     }
@@ -494,20 +481,20 @@ function MilestonesGrid({ milestones }: { milestones: PassportMilestone[] }) {
                 {unlockedCount}/{milestones.length} unlocked
             </div>
             <div className="space-y-4">
-                {orderedCats.map((cat) => (
-                    <MilestoneCategoryRow
-                        key={cat}
-                        label={MILESTONE_CATEGORY_LABEL[cat] ?? cat}
-                        milestones={byCategory.get(cat) ?? []}
-                    />
+                {orderedCats.map((cat, idx) => (
+                    <Fragment key={cat}>
+                        <MilestoneCategoryRow
+                            label={MILESTONE_CATEGORY_LABEL[cat] ?? cat}
+                            milestones={byCategory.get(cat) ?? []}
+                        />
+                        {idx === 0 && consistencyRow}
+                    </Fragment>
                 ))}
             </div>
         </>
     );
 }
 
-/** Format a "YYYY-MM" range into a compact label: same month → "Jan 2026",
- * same year → "Jan–Nov 2026", crossing years → "Mar 2028–Feb 2029". */
 function formatPeriodRange(startYm: string, endYm: string): string {
     const [sy, sm] = startYm.split('-').map((n) => Number(n));
     const [ey, em] = endYm.split('-').map((n) => Number(n));
@@ -529,8 +516,12 @@ interface ConsistencyCardModel {
     icon: string;
     name: string;
     earned: boolean;
+    // Earned: "{threshold}/{window} active months". Locked: the goal description.
     activeLine: string;
+    // Earned only: the period range.
     period?: string;
+    // Locked only: count still needed to unlock.
+    remaining?: number;
 }
 
 function ConsistencyCard({ card }: { card: ConsistencyCardModel }) {
@@ -558,16 +549,22 @@ function ConsistencyCard({ card }: { card: ConsistencyCardModel }) {
                 className={
                     card.earned
                         ? 'mt-0.5 text-[10px] leading-tight tabular-nums text-slate-500'
-                        : 'mt-1 text-[10px] tabular-nums text-slate-400'
+                        : 'mt-0.5 text-[10px] leading-tight text-slate-400'
                 }
             >
                 {card.activeLine}
             </div>
-            {card.period && (
-                <div className="mt-0.5 text-[10px] leading-tight text-slate-400">
-                    {card.period}
-                </div>
-            )}
+            {card.earned
+                ? card.period && (
+                    <div className="mt-0.5 text-[10px] leading-tight text-slate-400">
+                        {card.period}
+                    </div>
+                )
+                : card.remaining != null && (
+                    <div className="mt-1 text-[10px] font-semibold tabular-nums text-slate-500">
+                        {card.remaining} more to unlock
+                    </div>
+                )}
         </div>
     );
 }
@@ -587,12 +584,13 @@ function ConsistencyTrailRow({ consistency }: { consistency: PassportConsistency
             icon: c.icon,
             name: c.name,
             earned: false,
-            activeLine: `${c.active_months}/${c.threshold} active months`,
+            activeLine: `Be active in ${c.threshold} of ${consistency.window} months`,
+            remaining: Math.max(0, c.threshold - c.active_months),
         })),
     ];
     if (cards.length === 0) return null;
     return (
-        <div className="mb-4">
+        <div>
             <div className="mb-1.5 flex items-baseline justify-between">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                     Consistency
@@ -664,7 +662,6 @@ export default function PassportView({
     const shown = ALL_SECTIONS.filter((s) => sections.includes(s));
     const [tab, setTab] = useState<PassportSection>(shown[0] ?? 'milestones');
     const tabsRef = useRef<HTMLDivElement>(null);
-    const timelineListRef = useRef<HTMLUListElement>(null);
     const has = (s: PassportSection) => shown.includes(s);
 
     const selectTab = useCallback((next: PassportSection) => {
@@ -672,16 +669,6 @@ export default function PassportView({
         requestAnimationFrame(() => {
             tabsRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
         });
-    }, []);
-
-    // Heatmap → timeline: remember the clicked month, then scroll to its first
-    // (newest) event, loading older pages until it's in view.
-    const [pendingMonth, setPendingMonth] = useState<string | null>(null);
-    const [highlightMonth, setHighlightMonth] = useState<string | null>(null);
-    const selectMonth = useCallback((month: string) => {
-        setTab('timeline');
-        setPendingMonth(month);
-        setHighlightMonth(month);
     }, []);
 
     // Ask the caller to load map events the first time a map tab is opened.
@@ -715,48 +702,75 @@ export default function PassportView({
         }
         const markerRows: Row[] = [...byTime.entries()].map(([raw, markers]) => ({
             kind: 'marker',
-            // Sort a hair above the same-dated event so the milestone renders just
-            // before the event that unlocked it (list is newest-first).
-            date: raw + 1,
+            // Sort a hair below the same-dated event so the milestone renders just
+            // after (directly under) the event that unlocked it, not the newer one
+            // above it (list is newest-first).
+            date: raw - 1,
             markers,
         }));
         return [...eventRows, ...markerRows].sort((a, b) => b.date - a.date);
     }, [timelineItems, timelineMarkers, timelineHasMore]);
 
+    // First (newest) event of each month gets a scroll anchor so the activity
+    // heatmap can jump the timeline to a clicked month.
+    const monthAnchorIds = useMemo(() => {
+        const seen = new Set<string>();
+        const byEvent = new Map<string, string>();
+        for (const row of timelineRows) {
+            if (row.kind !== 'event') continue;
+            const month = row.item.start.slice(0, 7);
+            if (!seen.has(month)) {
+                seen.add(month);
+                byEvent.set(row.item.event_id, month);
+            }
+        }
+        return byEvent;
+    }, [timelineRows]);
+
+    const timelineListRef = useRef<HTMLUListElement>(null);
+    const [highlightMonth, setHighlightMonth] = useState<string | null>(null);
+    const pendingMonthRef = useRef<string | null>(null);
+
+    const scrollToMonth = useCallback((month: string) => {
+        const el = timelineListRef.current?.querySelector(
+            `[data-month-anchor="${month}"]`,
+        );
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return true;
+        }
+        return false;
+    }, []);
+
+    const handleSelectMonth = useCallback(
+        (month: string) => {
+            setHighlightMonth(month);
+            // Scroll now if the month is loaded; otherwise remember it and page
+            // in more history until its events arrive.
+            if (!scrollToMonth(month) && timelineHasMore) {
+                pendingMonthRef.current = month;
+                onLoadMoreTimeline?.();
+            }
+        },
+        [scrollToMonth, timelineHasMore, onLoadMoreTimeline],
+    );
+
+    // Resolve a pending month scroll once newly-loaded items arrive.
+    useEffect(() => {
+        const month = pendingMonthRef.current;
+        if (!month) return;
+        if (scrollToMonth(month)) {
+            pendingMonthRef.current = null;
+        } else if (timelineHasMore && !loadingMoreTimeline) {
+            onLoadMoreTimeline?.();
+        } else {
+            pendingMonthRef.current = null;
+        }
+    }, [timelineItems, scrollToMonth, timelineHasMore, loadingMoreTimeline, onLoadMoreTimeline]);
+
     return (
         <>
             <SummaryHeader data={data} title={title} actions={headerActions} dancingSinceSlot={dancingSinceSlot} />
-
-            <section className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-                <StatCard
-                    value={data.stats.total_events_attended}
-                    label="Events attended"
-                    action={
-                        has('timeline')
-                            ? { label: 'Timeline', onClick: () => selectTab('timeline') }
-                            : undefined
-                    }
-                />
-                <StatCard
-                    value={data.stats.cities_visited}
-                    label="Cities"
-                    onLabelClick={has('cities') ? () => selectTab('cities') : undefined}
-                />
-                <StatCard
-                    value={data.stats.countries_visited}
-                    label="Countries"
-                    onLabelClick={has('countries') ? () => selectTab('countries') : undefined}
-                />
-                <StatCard
-                    value={`${data.stats.active_months_last_12}/12`}
-                    label="Active months"
-                />
-                <StatCard
-                    value={data.stats.avg_gap_days == null ? '—' : Math.max(1, Math.round(data.stats.avg_gap_days))}
-                    label="Days between events"
-                />
-                <StatCard value={data.stats.reviews_written} label="Reviews written" />
-            </section>
 
             <section ref={tabsRef}>
                 <div role="tablist" className="flex border-b border-slate-200">
@@ -770,10 +784,40 @@ export default function PassportView({
                 <div className="mt-4">
                     {tab === 'milestones' && has('milestones') && (
                         <>
-                            {data.consistency && (
-                                <ConsistencyTrailRow consistency={data.consistency} />
-                            )}
-                            <MilestonesGrid milestones={data.milestones} />
+                            <section className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
+                                <StatCard
+                                    value={data.stats.total_events_attended}
+                                    label="Events attended"
+                                    action={
+                                        has('timeline')
+                                            ? { label: 'Timeline', onClick: () => selectTab('timeline') }
+                                            : undefined
+                                    }
+                                />
+                                <StatCard
+                                    value={data.stats.cities_visited}
+                                    label="Cities"
+                                    onLabelClick={has('cities') ? () => selectTab('cities') : undefined}
+                                />
+                                <StatCard
+                                    value={data.stats.countries_visited}
+                                    label="Countries"
+                                    onLabelClick={has('countries') ? () => selectTab('countries') : undefined}
+                                />
+                                <StatCard
+                                    value={`${data.stats.active_months_last_12}/12`}
+                                    label="Active months"
+                                />
+                                <StatCard
+                                    value={data.stats.avg_gap_days == null ? '—' : Math.max(1, Math.round(data.stats.avg_gap_days))}
+                                    label="Days between events"
+                                />
+                                <StatCard value={data.stats.reviews_written} label="Reviews written" />
+                            </section>
+                            <MilestonesGrid
+                                milestones={data.milestones}
+                                consistency={data.consistency}
+                            />
                         </>
                     )}
                     {tab === 'timeline' && has('timeline') && (
@@ -781,19 +825,29 @@ export default function PassportView({
                             {timelineActions && (
                                 <div className="mb-3 flex justify-end">{timelineActions}</div>
                             )}
+                            <PassportActivityHeatmap
+                                months={data.monthly_activity ?? []}
+                                onSelectMonth={handleSelectMonth}
+                                highlightMonth={highlightMonth}
+                            />
                             {timelineItems.length === 0 ? (
                                 <div className="border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
                                     No attended events yet.
                                 </div>
                             ) : (
-                                <ul className="relative space-y-1.5">
+                                <ul className="relative space-y-1.5" ref={timelineListRef}>
                                     <span
                                         className="absolute left-[6px] top-2 bottom-2 w-px bg-slate-200"
                                         aria-hidden
                                     />
                                     {timelineRows.map((row) =>
                                         row.kind === 'event' ? (
-                                            <TimelineRow key={`e-${row.item.event_id}`} item={row.item} />
+                                            <TimelineRow
+                                                key={`e-${row.item.event_id}`}
+                                                item={row.item}
+                                                anchorMonth={monthAnchorIds.get(row.item.event_id) ?? null}
+                                                highlighted={highlightMonth != null && row.item.start.slice(0, 7) === highlightMonth}
+                                            />
                                         ) : (
                                             <TimelineMarkerRow
                                                 key={`m-${row.date}`}

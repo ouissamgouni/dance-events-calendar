@@ -65,9 +65,6 @@ users:
   # 2 countries -> mark Going on a 3rd-country event to unlock Passport Stamped.
   - email: cusp-stamped@example.com
     name: Sami (2/3 countries → Passport Stamped)
-  # Only local events -> mark Going on an international event to unlock Border Crosser.
-  - email: cusp-international@example.com
-    name: Ines (0 intl → Border Crosser)
   # --- Consistency users: each attends a prefix of the evt-cons ladder to land
   # on a specific recurring "Consistency achievement" level (active in N of the
   # last 12 months). Passports are PUBLIC so the level/current-period card and

@@ -705,6 +705,7 @@ export interface PassportMilestone {
     key: string;
     name: string;
     description: string;
+    achieved_description: string;
     icon: string;
     category: string;
     threshold: number;

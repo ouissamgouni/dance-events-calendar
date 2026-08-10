@@ -159,6 +159,7 @@ def _create_milestone_notifications(session, user, to_email, to_push, notif_ids)
                 kind=MILESTONE_UNLOCKED,
                 subject_key=key,
                 context=milestone.name,
+                description=milestone.achieved_description,
             )
             session.add(notif)
             session.flush()
@@ -173,19 +174,45 @@ def _create_milestone_notifications(session, user, to_email, to_push, notif_ids)
                 key,
                 audience=getattr(user, "passport_visibility", "friends"),
                 context=milestone.name,
+                description=milestone.achieved_description,
             )
         notif_ids[(user.id, key)] = notif.id
         if user.email_milestone_unlocked_enabled and notif.emailed_at is None:
             to_email.append((user, milestone))
         if user.push_milestone_unlocked_enabled and notif.pushed_at is None:
             to_push.append((user.id, key, milestone))
-    created += _create_consistency_notifications(session, user)
+    created += _create_consistency_notifications(
+        session, user, to_email, to_push, notif_ids
+    )
     return created
 
 
-def _create_consistency_notifications(session, user) -> int:
+def _consistency_milestone(subject_key, lvl):
+    """Milestone-shaped view of a consistency level so a reach can ride the
+    shared email/push builders. ``key`` is the reach ``subject_key`` so channel
+    delivery stamps land on the right ``Notification`` row."""
+    _, name, icon, threshold, description = lvl
+    return passport.Milestone(
+        key=subject_key,
+        name=name,
+        description=description,
+        achieved_description=description,
+        icon=icon,
+        category="consistency",
+        threshold=threshold,
+        unit="months",
+        metric=lambda ctx: 0,
+        prestige=0,
+    )
+
+
+def _create_consistency_notifications(
+    session, user, to_email, to_push, notif_ids
+) -> int:
     """Create in-app notifications for newly-reached recurring consistency
-    levels and fan them out to the user's subscribers.
+    levels, fan them out to the user's subscribers, and queue email/push like a
+    normal milestone (respecting the user's channel gates and per-channel
+    backfill).
 
     Consistency levels recur, so a notification is deduped per (level, period)
     via ``subject_key = "consistency:<level_key>:<YYYY-MM>"``: reaching the same
@@ -193,7 +220,7 @@ def _create_consistency_notifications(session, user) -> int:
     within the same period does not. Source of truth is the persisted
     ``UserConsistencyAchievement`` rows (each an upward reach).
     """
-    reaches = passport.evaluate_and_persist_consistency(session, user)
+    passport.evaluate_and_persist_consistency(session, user)
     # ``evaluate_and_persist_consistency`` returns only rows it just inserted;
     # a prior passport GET may have inserted them, so rebuild from the full set
     # of reaches lacking a notification instead of trusting that return value.
@@ -204,7 +231,7 @@ def _create_consistency_notifications(session, user) -> int:
         )
     ).all()
     existing = {
-        n.subject_key
+        n.subject_key: n
         for n in session.exec(
             select(Notification)
             .where(Notification.recipient_user_id == user.id)
@@ -217,28 +244,36 @@ def _create_consistency_notifications(session, user) -> int:
         lvl = levels.get(row.level_key)
         if lvl is None:
             continue
+        _, name, icon, _threshold, description = lvl
         subject_key = f"consistency:{row.level_key}:{row.period_start}"
-        if subject_key in existing:
-            continue
-        _, name, icon, _threshold = lvl
-        notif = Notification(
-            recipient_user_id=user.id,
-            actor_user_id=user.id,  # self: no external actor
-            kind=MILESTONE_UNLOCKED,
-            subject_key=subject_key,
-            context=name,
-        )
-        session.add(notif)
-        session.flush()
-        record_delivery(session, notif.id, "app")
-        created += 1
-        fan_out_milestone(
-            session,
-            user,
-            subject_key,
-            audience=audience,
-            context=name,
-        )
+        notif = existing.get(subject_key)
+        if notif is None:
+            notif = Notification(
+                recipient_user_id=user.id,
+                actor_user_id=user.id,  # self: no external actor
+                kind=MILESTONE_UNLOCKED,
+                subject_key=subject_key,
+                context=name,
+                description=description,
+            )
+            session.add(notif)
+            session.flush()
+            record_delivery(session, notif.id, "app")
+            created += 1
+            fan_out_milestone(
+                session,
+                user,
+                subject_key,
+                audience=audience,
+                context=name,
+                description=description,
+            )
+        notif_ids[(user.id, subject_key)] = notif.id
+        milestone = _consistency_milestone(subject_key, lvl)
+        if user.email_milestone_unlocked_enabled and notif.emailed_at is None:
+            to_email.append((user, milestone))
+        if user.push_milestone_unlocked_enabled and notif.pushed_at is None:
+            to_push.append((user.id, subject_key, milestone))
     return created
 
 

@@ -1746,6 +1746,9 @@ export interface NotificationItem {
      *  for `interest_event` rows (comma-joined when multiple profiles
      *  matched). Null for kinds that don't use it. */
     context: string | null;
+    /** Optional narrative field for kinds that benefit from additional context.
+     *  Used in milestone notifications to show the milestone description. */
+    description?: string | null;
     /** Milestone key for `milestone_unlocked` rows (links to the passport).
      *  Null for kinds that don't use it. */
     subject_key?: string | null;

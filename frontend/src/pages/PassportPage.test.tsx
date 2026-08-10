@@ -59,6 +59,7 @@ function makeMilestone(overrides: Record<string, unknown> = {}) {
         key: 'first_event',
         name: 'First Steps',
         description: 'Attend your first event',
+        achieved_description: 'Attended your first event',
         icon: '🎉',
         category: 'events',
         threshold: 1,
@@ -165,13 +166,14 @@ describe('PassportPage', () => {
         expect(await screen.findAllByText('First Steps')).not.toHaveLength(0)
         expect(screen.queryByText('France')).not.toBeInTheDocument()
 
-        fireEvent.click(screen.getByRole('tab', { name: 'Countries' }))
-        expect(await screen.findByText('France')).toBeInTheDocument()
-
-        // The "Cities" stat-card label acts as a shortcut to the Cities tab,
-        // which shows the (stubbed) EventMap beside the cities list.
+        // The "Cities" stat-card label (on the Milestones tab) is a shortcut to
+        // the Cities tab, which shows the (stubbed) EventMap beside the list.
         fireEvent.click(screen.getByRole('button', { name: 'Cities' }))
         expect(await screen.findByTestId('passport-map')).toBeInTheDocument()
+
+        // The tab bar switches to the Countries tab.
+        fireEvent.click(screen.getByRole('tab', { name: 'Countries' }))
+        expect(await screen.findByText('France')).toBeInTheDocument()
     })
 
     it('renders milestones with goal text, locked progress and fires a toast for new unlocks', async () => {
@@ -179,7 +181,7 @@ describe('PassportPage', () => {
             ...PASSPORT,
             milestones: [
                 makeMilestone({ is_new: true }),
-                makeMilestone({ key: 'events_10', name: 'Regular', threshold: 10, progress: 8, unlocked: false }),
+                makeMilestone({ key: 'events_10', name: 'Regular', description: 'Attend 10 events', threshold: 10, progress: 8, unlocked: false }),
             ],
         }
         let acked: string[] | null = null
@@ -196,13 +198,14 @@ describe('PassportPage', () => {
 
         renderPassport()
 
-        // Milestone badges render (unlocked "First Steps" with its goal text +
-        // locked "Regular" showing 8/10).
+        // Milestone badges render (unlocked "First Steps" with its achievement
+        // text + locked "Regular" showing the goal and distance to unlock).
         expect(await screen.findByText('Milestones')).toBeInTheDocument()
         expect(screen.getAllByText('First Steps').length).toBeGreaterThan(0)
-        expect(screen.getByText('Attend your first event')).toBeInTheDocument()
+        expect(screen.getByText('Attended your first event')).toBeInTheDocument()
         expect(screen.getByText('Regular')).toBeInTheDocument()
-        expect(screen.getByText(/8\/10 events/)).toBeInTheDocument()
+        expect(screen.getByText('Attend 10 events')).toBeInTheDocument()
+        expect(screen.getByText(/2 more to unlock/)).toBeInTheDocument()
 
         // Celebration toast for the newly-unlocked milestone.
         expect(await screen.findByText(/Milestone unlocked!/)).toBeInTheDocument()

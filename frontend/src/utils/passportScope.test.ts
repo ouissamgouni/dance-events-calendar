@@ -34,6 +34,7 @@ function milestone(overrides: Partial<PassportMilestone>): PassportMilestone {
         key: 'k',
         name: 'name',
         description: 'd',
+        achieved_description: 'ad',
         icon: '🏅',
         category: 'events',
         threshold: 1,
@@ -100,7 +101,6 @@ describe('scopePassport — all time', () => {
             milestone({ key: 'events_50', category: 'events', prestige: 65, name: 'Veteran' }),
             milestone({ key: 'cities_10', category: 'cities', prestige: 60, name: 'City Hopper' }),
             milestone({ key: 'countries_5', category: 'countries', prestige: 70, name: 'World Dancer' }),
-            milestone({ key: 'first_international', category: 'international', prestige: 30, name: 'Border Crosser' }),
             milestone({ key: 'reviews_10', category: 'reviews', prestige: 40, name: 'Critic' }),
         ]
         const cons = consistency({
@@ -131,10 +131,9 @@ describe('scopePassport — all time', () => {
         expect(s.consistencyInBadges).toBe(false)
     })
 
-    it('leads with consistency, trails with reviews, and drops Border Crosser next to a countries badge', () => {
+    it('leads with consistency and trails with reviews', () => {
         const milestones = [
             milestone({ key: 'reviews_10', category: 'reviews', prestige: 40, name: 'Critic' }),
-            milestone({ key: 'first_international', category: 'international', prestige: 30, name: 'Border Crosser' }),
             milestone({ key: 'countries_5', category: 'countries', prestige: 70, name: 'World Dancer' }),
         ]
         const cons = consistency({
@@ -142,7 +141,6 @@ describe('scopePassport — all time', () => {
         })
         const s = scopePassport(events, milestones, 'all', null, 0, cons)
         const keys = s.badges.map((b) => b.key)
-        expect(keys).not.toContain('first_international') // redundant beside a countries badge
         expect(keys[0]).toBe('consistency_top_consistency_5') // consistency leads
         expect(keys.indexOf('reviews_10')).toBe(keys.length - 1) // Critic trails
     })

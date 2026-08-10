@@ -274,3 +274,52 @@ def test_global_kill_switch_skips(session):
         ).first()
         is None
     )
+
+
+def test_consistency_reach_emails_and_pushes(session, monkeypatch):
+    """A recurring consistency reach rides the shared email + push channels
+    (with its description), like a normal milestone."""
+    emailed: list = []
+    pushed: list = []
+    monkeypatch.setattr(
+        milestone_notification_service,
+        "send_milestones_unlocked_email",
+        lambda u, ms: emailed.extend((m.key, m.description) for m in ms) or True,
+    )
+    monkeypatch.setattr(
+        milestone_notification_service,
+        "send_push",
+        lambda *a, **k: pushed.append((k.get("tag"), k.get("body"))) or 1,
+    )
+    gwen = _make_user(session, "gwen@example.com", "gwen")
+    # Three distinct active months in the rolling window -> Consistent (3/12).
+    _attend_past_event(session, gwen, "gw-0", days_ago=5)
+    _attend_past_event(session, gwen, "gw-1", days_ago=40)
+    _attend_past_event(session, gwen, "gw-2", days_ago=75)
+
+    milestone_notification_service.run_once()
+
+    notifs = session.exec(
+        select(Notification).where(Notification.kind == "milestone_unlocked")
+    ).all()
+    consistency = [
+        n for n in notifs if n.subject_key.startswith("consistency:consistency_3:")
+    ]
+    assert len(consistency) == 1
+    # Email included the consistency reach with its description.
+    assert any(
+        key.startswith("consistency:consistency_3:")
+        and desc == "Active 3 of the last 12 months"
+        for key, desc in emailed
+    )
+    # Push fired for the consistency reach carrying its description.
+    assert any(
+        tag is not None
+        and tag.startswith("milestone:consistency:consistency_3:")
+        and "Active 3 of the last 12 months" in (body or "")
+        for tag, body in pushed
+    )
+    # Both channels stamped on the consistency notification row.
+    session.refresh(consistency[0])
+    assert consistency[0].emailed_at is not None
+    assert consistency[0].pushed_at is not None

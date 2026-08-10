@@ -76,6 +76,7 @@ def _fan_out(
     audience: str = "public",
     subject_key: str | None = None,
     context: str | None = None,
+    description: str | None = None,
     skip_past_guard: bool = False,
 ) -> int:
     """Common fan-out logic; returns count of notifications inserted.
@@ -150,6 +151,7 @@ def _fan_out(
             event_id=event_id,
             subject_key=subject_key,
             context=context,
+            description=description,
         )
         session.add(notif)
         session.flush()
@@ -204,6 +206,7 @@ def fan_out_milestone(
     *,
     audience: str = "public",
     context: str | None = None,
+    description: str | None = None,
 ) -> int:
     """Notify subscribers that ``actor`` unlocked milestone ``subject_key``.
 
@@ -218,6 +221,7 @@ def fan_out_milestone(
         audience=audience,
         subject_key=subject_key,
         context=context,
+        description=description,
         skip_past_guard=True,
     )
 

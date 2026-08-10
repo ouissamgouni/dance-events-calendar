@@ -29,6 +29,7 @@ const PUBLIC_PASSPORT = {
             key: 'first_event',
             name: 'First Steps',
             description: 'Attend your first event',
+            achieved_description: 'Attended your first event',
             icon: '🎉',
             category: 'events',
             threshold: 1,

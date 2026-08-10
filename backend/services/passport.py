@@ -37,13 +37,20 @@ from backend.db.models import (
 # user's attended-event months, so there is no drift and no background job.
 CONSISTENCY_WINDOW = 12
 CONSISTENCY_ENTRY = 3  # active months in the window needed to open a period
-# (key, name, icon, threshold) ordered by ascending active-month threshold.
-CONSISTENCY_LEVELS: list[tuple[str, str, str, int]] = [
-    ("consistency_3", "Consistent", "📅", 3),
-    ("consistency_5", "Committed", "🗓️", 5),
-    ("consistency_8", "Year-Rounder", "🎆", 8),
-    ("consistency_10", "Unstoppable", "🔥", 10),
-    ("consistency_12", "Dance Lifestyle", "💎", 12),
+# (key, name, icon, threshold, description) ordered by ascending active-month
+# threshold.
+CONSISTENCY_LEVELS: list[tuple[str, str, str, int, str]] = [
+    ("consistency_3", "Consistent", "📅", 3, "Active 3 of the last 12 months"),
+    ("consistency_5", "Committed", "🗓️", 5, "Active 5 of the last 12 months"),
+    ("consistency_8", "Year-Rounder", "🎆", 8, "Active 8 of the last 12 months"),
+    ("consistency_10", "Unstoppable", "🔥", 10, "Active 10 of the last 12 months"),
+    (
+        "consistency_12",
+        "Dance Lifestyle",
+        "💎",
+        12,
+        "Active all 12 of the last 12 months",
+    ),
 ]
 
 
@@ -108,22 +115,6 @@ def top_dance_style(session: Session, event_ids: list[str]) -> str | None:
         return None
     label = rows[0] if isinstance(rows, (tuple, list)) else rows.label
     return label
-
-
-def has_international_reach(session: Session, event_ids: list[str]) -> bool:
-    """True if any attended event carries the ``reach:international`` tag."""
-    if not event_ids:
-        return False
-    row = session.exec(
-        select(Tag.id)
-        .join(EventTag, EventTag.tag_id == Tag.id)
-        .join(TagGroup, TagGroup.id == Tag.group_id)
-        .where(TagGroup.slug == "reach")
-        .where(Tag.slug == "international")
-        .where(EventTag.event_id.in_(event_ids))
-        .limit(1)
-    ).first()
-    return row is not None
 
 
 def _month_index(dt: datetime) -> int:
@@ -213,7 +204,6 @@ def build_stats_context(session: Session, user) -> dict:
         "styles": styles,
         "top_style": top_dance_style(session, event_ids),
         "reviews": reviews_written(session, user.id),
-        "has_international": has_international_reach(session, event_ids),
         "active_months_last_12": rolling_active_count(months, _month_index(now)),
         "active_months_this_year": sum(1 for mi in months if mi // 12 == now.year),
         "events_last_30d": events_last_30_days(events),
@@ -262,21 +252,18 @@ def collections(events: list[CachedEvent]) -> dict:
     return {"cities": city_list, "countries": country_list}
 
 
-def timeline_milestone_markers(
-    events: list[CachedEvent], intl_event_ids: set[str]
-) -> list[dict]:
+def timeline_milestone_markers(events: list[CachedEvent]) -> list[dict]:
     """Milestone unlocks placed on the date of the attended event that
     triggered them, for interleaving into the timeline.
 
-    Walks events oldest->newest so count/distinct/international milestones are
-    attributed to the historically-correct event. Review milestones are not
-    event-anchored and are omitted here; recurring consistency reaches are
-    emitted separately by ``consistency_timeline_markers``.
+    Walks events oldest->newest so count/distinct milestones are attributed to
+    the historically-correct event. Review milestones are not event-anchored and
+    are omitted here; recurring consistency reaches are emitted separately by
+    ``consistency_timeline_markers``.
     """
     ordered = sorted(events, key=lambda e: e.start)
     cities: set[tuple] = set()
     countries: set = set()
-    seen_intl = False
     emitted: set[str] = set()
     markers: list[dict] = []
     for i, event in enumerate(ordered, start=1):
@@ -284,14 +271,11 @@ def timeline_milestone_markers(
             cities.add((event.city, event.country))
         if event.country:
             countries.add(event.country)
-        if event.event_id in intl_event_ids:
-            seen_intl = True
         ctx = {
             "total_events": i,
             "cities": cities,
             "countries": countries,
             "reviews": 0,
-            "has_international": seen_intl,
         }
         for m in MILESTONES:
             if m.category == "reviews" or m.key in emitted:
@@ -309,21 +293,6 @@ def timeline_milestone_markers(
     return markers
 
 
-def international_event_ids(session: Session, event_ids: list[str]) -> set[str]:
-    """Attended event ids carrying the ``reach:international`` tag."""
-    if not event_ids:
-        return set()
-    rows = session.exec(
-        select(EventTag.event_id)
-        .join(Tag, Tag.id == EventTag.tag_id)
-        .join(TagGroup, TagGroup.id == Tag.group_id)
-        .where(TagGroup.slug == "reach")
-        .where(Tag.slug == "international")
-        .where(EventTag.event_id.in_(event_ids))
-    ).all()
-    return set(rows)
-
-
 # --- Milestones (Phase B) -------------------------------------------------
 #
 # Server-defined catalog. ``metric`` extracts the current progress value for a
@@ -337,6 +306,7 @@ class Milestone:
         "key",
         "name",
         "description",
+        "achieved_description",
         "icon",
         "category",
         "threshold",
@@ -346,11 +316,23 @@ class Milestone:
     )
 
     def __init__(
-        self, key, name, description, icon, category, threshold, unit, metric, prestige
+        self,
+        key,
+        name,
+        description,
+        achieved_description,
+        icon,
+        category,
+        threshold,
+        unit,
+        metric,
+        prestige,
     ):
         self.key = key
         self.name = name
         self.description = description
+        # Past-tense copy shown once unlocked (goal `description` is imperative).
+        self.achieved_description = achieved_description
         self.icon = icon
         self.category = category
         self.threshold = threshold
@@ -375,15 +357,12 @@ def _m_reviews(ctx: dict) -> int:
     return ctx["reviews"]
 
 
-def _m_international(ctx: dict) -> int:
-    return 1 if ctx["has_international"] else 0
-
-
 MILESTONES: list[Milestone] = [
     Milestone(
         "first_event",
         "First Steps",
         "Attend your first event",
+        "Attended your first event",
         "💃",
         "events",
         1,
@@ -395,6 +374,7 @@ MILESTONES: list[Milestone] = [
         "events_5",
         "Regular",
         "Attend 5 events",
+        "Attended 5 events",
         "🔥",
         "events",
         5,
@@ -406,6 +386,7 @@ MILESTONES: list[Milestone] = [
         "events_15",
         "Dedicated",
         "Attend 15 events",
+        "Attended 15 events",
         "🏆",
         "events",
         15,
@@ -417,6 +398,7 @@ MILESTONES: list[Milestone] = [
         "events_30",
         "Veteran",
         "Attend 30 events",
+        "Attended 30 events",
         "👑",
         "events",
         30,
@@ -428,6 +410,7 @@ MILESTONES: list[Milestone] = [
         "events_50",
         "Legend",
         "Attend 50 events",
+        "Attended 50 events",
         "✨",
         "events",
         50,
@@ -439,6 +422,7 @@ MILESTONES: list[Milestone] = [
         "events_75",
         "Elite",
         "Attend 75 events",
+        "Attended 75 events",
         "🌟",
         "events",
         75,
@@ -450,6 +434,7 @@ MILESTONES: list[Milestone] = [
         "events_100",
         "Icon",
         "Attend 100 events",
+        "Attended 100 events",
         "💎",
         "events",
         100,
@@ -461,6 +446,7 @@ MILESTONES: list[Milestone] = [
         "cities_3",
         "City Starter",
         "Dance in 3 cities",
+        "Danced in 3 cities",
         "🏙️",
         "cities",
         3,
@@ -472,6 +458,7 @@ MILESTONES: list[Milestone] = [
         "cities_5",
         "City Hopper",
         "Dance in 5 cities",
+        "Danced in 5 cities",
         "🧳",
         "cities",
         5,
@@ -483,6 +470,7 @@ MILESTONES: list[Milestone] = [
         "cities_10",
         "City Explorer",
         "Dance in 10 cities",
+        "Danced in 10 cities",
         "🗺️",
         "cities",
         10,
@@ -494,6 +482,7 @@ MILESTONES: list[Milestone] = [
         "cities_20",
         "City Collector",
         "Dance in 20 cities",
+        "Danced in 20 cities",
         "🚆",
         "cities",
         20,
@@ -505,6 +494,7 @@ MILESTONES: list[Milestone] = [
         "cities_30",
         "Urban Nomad",
         "Dance in 30 cities",
+        "Danced in 30 cities",
         "🌆",
         "cities",
         30,
@@ -516,6 +506,7 @@ MILESTONES: list[Milestone] = [
         "cities_50",
         "City Legend",
         "Dance in 50 cities",
+        "Danced in 50 cities",
         "✨",
         "cities",
         50,
@@ -527,6 +518,7 @@ MILESTONES: list[Milestone] = [
         "countries_3",
         "Passport Stamped",
         "Dance in 3 countries",
+        "Danced in 3 countries",
         "🛂",
         "countries",
         3,
@@ -538,6 +530,7 @@ MILESTONES: list[Milestone] = [
         "countries_5",
         "World Dancer",
         "Dance in 5 countries",
+        "Danced in 5 countries",
         "✈️",
         "countries",
         5,
@@ -549,6 +542,7 @@ MILESTONES: list[Milestone] = [
         "countries_10",
         "Globetrotter",
         "Dance in 10 countries",
+        "Danced in 10 countries",
         "🌍",
         "countries",
         10,
@@ -560,6 +554,7 @@ MILESTONES: list[Milestone] = [
         "countries_15",
         "World Explorer",
         "Dance in 15 countries",
+        "Danced in 15 countries",
         "🧭",
         "countries",
         15,
@@ -571,6 +566,7 @@ MILESTONES: list[Milestone] = [
         "countries_25",
         "Global Dancer",
         "Dance in 25 countries",
+        "Danced in 25 countries",
         "🌐",
         "countries",
         25,
@@ -582,6 +578,7 @@ MILESTONES: list[Milestone] = [
         "countries_40",
         "World Citizen",
         "Dance in 40 countries",
+        "Danced in 40 countries",
         "🏆",
         "countries",
         40,
@@ -590,20 +587,10 @@ MILESTONES: list[Milestone] = [
         97,
     ),
     Milestone(
-        "first_international",
-        "Border Crosser",
-        "Attend an international event",
-        "🌐",
-        "international",
-        1,
-        "events",
-        _m_international,
-        30,
-    ),
-    Milestone(
         "first_review",
         "Reviewer",
         "Write your first review",
+        "Wrote your first review",
         "✍️",
         "reviews",
         1,
@@ -615,6 +602,7 @@ MILESTONES: list[Milestone] = [
         "reviews_3",
         "Contributor",
         "Write 3 reviews",
+        "Wrote 3 reviews",
         "⭐",
         "reviews",
         3,
@@ -626,6 +614,7 @@ MILESTONES: list[Milestone] = [
         "reviews_10",
         "Critic",
         "Write 10 reviews",
+        "Wrote 10 reviews",
         "💬",
         "reviews",
         10,
@@ -637,6 +626,7 @@ MILESTONES: list[Milestone] = [
         "reviews_25",
         "Trusted Voice",
         "Write 25 reviews",
+        "Wrote 25 reviews",
         "📝",
         "reviews",
         25,
@@ -648,6 +638,7 @@ MILESTONES: list[Milestone] = [
         "reviews_50",
         "Community Guide",
         "Write 50 reviews",
+        "Wrote 50 reviews",
         "🏆",
         "reviews",
         50,
@@ -706,6 +697,7 @@ def milestone_view(session: Session, user, ctx: dict) -> list[dict]:
                 "key": m.key,
                 "name": m.name,
                 "description": m.description,
+                "achieved_description": m.achieved_description,
                 "icon": m.icon,
                 "category": m.category,
                 "threshold": m.threshold,
@@ -748,7 +740,7 @@ def acknowledge_milestones(session: Session, user, keys: list[str]) -> int:
 def _record_reaches(period: dict, count: int, month_index: int) -> None:
     """Append any newly-crossed level reaches (upward only, once per period)."""
     reached = {r["key"] for r in period["reaches"]}
-    for key, name, icon, threshold in CONSISTENCY_LEVELS:
+    for key, name, icon, threshold, _description in CONSISTENCY_LEVELS:
         if threshold <= count and key not in reached:
             period["reaches"].append(
                 {
@@ -868,7 +860,7 @@ def consistency_context(events: list[CachedEvent], now: datetime | None = None) 
             "threshold": threshold,
             "active_months": active_now,
         }
-        for key, name, icon, threshold in CONSISTENCY_LEVELS
+        for key, name, icon, threshold, _description in CONSISTENCY_LEVELS
         if key not in reached_keys
     ]
 

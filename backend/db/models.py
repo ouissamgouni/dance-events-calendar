@@ -1389,6 +1389,11 @@ class Notification(SQLModel, table=True):
     # label(s) (comma-joined) so the digest/in-app renderers can say
     # "matched your <label> alert" without a second lookup.
     context: Optional[str] = Field(default=None, max_length=200)
+    # Optional description for kinds that benefit from additional narrative
+    # beyond the context field. E.g. ``milestone_unlocked`` stores the
+    # milestone's description here so front-end renderers can display rich
+    # copy like "Milestone unlocked — {name} — {description}".
+    description: Optional[str] = Field(default=None, max_length=255)
     # Secondary dedupe discriminator for kinds whose actor is the recipient
     # themselves and which carry no ``event_id`` (e.g. ``milestone_unlocked``
     # stores the milestone key here). Part of ``uq_notification_dedupe`` so

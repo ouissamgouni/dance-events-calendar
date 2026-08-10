@@ -40,7 +40,7 @@ interface PassportShareCardProps {
 }
 
 const MAP_W = 312;
-const MAP_H = 150;
+const MAP_H = 130;
 
 interface GeoBounds {
     minLng: number;
@@ -252,6 +252,7 @@ export default function PassportShareCard({
     // Opt-in, all-time only: a small "Dancing since <year>" line under the name.
     const dancingSinceLine =
         !isYear && showDancingSince && dancingSince ? `Dancing since ${yearOf(dancingSince)}` : null;
+
 
     return (
         <div

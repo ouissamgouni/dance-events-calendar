@@ -520,28 +520,6 @@ class TestCollections:
         assert result["cities"][0]["longitude"] is None
 
 
-@pytest.mark.unit
-class TestInternationalReach:
-    def test_detects_international_tag(self, session):
-        user = User(email="a@example.com")
-        session.add(user)
-        group = TagGroup(slug="reach", label="Reach")
-        session.add(group)
-        session.commit()
-        tag = Tag(group_id=group.id, slug="international", label="International")
-        session.add(tag)
-        session.commit()
-        _event(session, "e1", _past(10), city="Paris", country="France")
-        session.add(EventTag(event_id="e1", tag_id=tag.id))
-        _going(session, user.id, "e1")
-        session.commit()
-
-        assert passport_service.has_international_reach(session, ["e1"]) is True
-
-    def test_no_tag_returns_false(self, session):
-        assert passport_service.has_international_reach(session, ["e1"]) is False
-
-
 def _attend_n(session, user_id, n, *, city_prefix="City", country="France"):
     """Attend N distinct past events, each in a distinct city."""
     for i in range(n):
@@ -591,24 +569,6 @@ class TestMilestones:
 
         assert "first_event" in first
         assert second == []  # nothing new the second time
-
-    def test_international_milestone(self, session):
-        user = User(email="a@example.com")
-        session.add(user)
-        group = TagGroup(slug="reach", label="Reach")
-        session.add(group)
-        session.commit()
-        tag = Tag(group_id=group.id, slug="international", label="International")
-        session.add(tag)
-        session.commit()
-        _event(session, "e1", _past(10), city="Berlin", country="Germany")
-        session.add(EventTag(event_id="e1", tag_id=tag.id))
-        _going(session, user.id, "e1")
-        session.commit()
-
-        newly = passport_service.evaluate_and_persist(session, user)
-
-        assert "first_international" in newly
 
     def test_milestone_view_is_new_then_acked(self, session):
         user = User(email="a@example.com")
@@ -671,6 +631,11 @@ class TestCatalog:
         for m in passport_service.MILESTONES:
             assert isinstance(m.prestige, int)
             assert 1 <= m.prestige <= 100
+
+    def test_every_milestone_has_achieved_description(self):
+        for m in passport_service.MILESTONES:
+            assert isinstance(m.achieved_description, str)
+            assert m.achieved_description
 
     def test_capstone_milestones_outrank_first_steps(self):
         first = passport_service.MILESTONES_BY_KEY["first_event"].prestige
@@ -771,7 +736,7 @@ class TestTimelineMarkers:
         session.commit()
 
         events = passport_service.attended_events(session, user.id)
-        markers = passport_service.timeline_milestone_markers(events, set())
+        markers = passport_service.timeline_milestone_markers(events)
         by_key = {m["key"]: m for m in markers}
 
         assert "first_event" in by_key
@@ -782,16 +747,3 @@ class TestTimelineMarkers:
         assert by_key["first_event"]["date"] == earliest
         # Review milestones are not event-anchored, so never appear here.
         assert "first_review" not in by_key
-
-    def test_international_marker_uses_provided_ids(self, session):
-        user = User(email="a@example.com")
-        session.add(user)
-        _event(session, "e1", _past(10), city="Berlin", country="Germany")
-        _going(session, user.id, "e1")
-        session.commit()
-
-        events = passport_service.attended_events(session, user.id)
-        markers = passport_service.timeline_milestone_markers(events, {"e1"})
-        keys = {m["key"] for m in markers}
-
-        assert "first_international" in keys
