@@ -179,6 +179,66 @@ def _create_milestone_notifications(session, user, to_email, to_push, notif_ids)
             to_email.append((user, milestone))
         if user.push_milestone_unlocked_enabled and notif.pushed_at is None:
             to_push.append((user.id, key, milestone))
+    created += _create_consistency_notifications(session, user)
+    return created
+
+
+def _create_consistency_notifications(session, user) -> int:
+    """Create in-app notifications for newly-reached recurring consistency
+    levels and fan them out to the user's subscribers.
+
+    Consistency levels recur, so a notification is deduped per (level, period)
+    via ``subject_key = "consistency:<level_key>:<YYYY-MM>"``: reaching the same
+    level again in a later period notifies afresh, while a decrease-then-regain
+    within the same period does not. Source of truth is the persisted
+    ``UserConsistencyAchievement`` rows (each an upward reach).
+    """
+    reaches = passport.evaluate_and_persist_consistency(session, user)
+    # ``evaluate_and_persist_consistency`` returns only rows it just inserted;
+    # a prior passport GET may have inserted them, so rebuild from the full set
+    # of reaches lacking a notification instead of trusting that return value.
+    levels = {lvl[0]: lvl for lvl in passport.CONSISTENCY_LEVELS}
+    all_reaches = session.exec(
+        select(passport.UserConsistencyAchievement).where(
+            passport.UserConsistencyAchievement.user_id == user.id
+        )
+    ).all()
+    existing = {
+        n.subject_key
+        for n in session.exec(
+            select(Notification)
+            .where(Notification.recipient_user_id == user.id)
+            .where(Notification.kind == MILESTONE_UNLOCKED)
+        ).all()
+    }
+    created = 0
+    audience = getattr(user, "passport_visibility", "friends")
+    for row in all_reaches:
+        lvl = levels.get(row.level_key)
+        if lvl is None:
+            continue
+        subject_key = f"consistency:{row.level_key}:{row.period_start}"
+        if subject_key in existing:
+            continue
+        _, name, icon, _threshold = lvl
+        notif = Notification(
+            recipient_user_id=user.id,
+            actor_user_id=user.id,  # self: no external actor
+            kind=MILESTONE_UNLOCKED,
+            subject_key=subject_key,
+            context=name,
+        )
+        session.add(notif)
+        session.flush()
+        record_delivery(session, notif.id, "app")
+        created += 1
+        fan_out_milestone(
+            session,
+            user,
+            subject_key,
+            audience=audience,
+            context=name,
+        )
     return created
 
 

@@ -291,8 +291,8 @@ events:
 
   # --- Milestone-testing pool (Phase B/D) -----------------------------------
   # Extra PAST "volume" events in Warsaw so a cusp user can sit at exactly
-  # 24 attended events; the 25th (evt-vol-13, the "spare") is left un-attended
-  # so a tester can mark Going on it and watch the "Dedicated" (events_25)
+  # 14 attended events; the 15th (evt-vol-13, the "spare") is left un-attended
+  # so a tester can mark Going on it and watch the "Dedicated" (events_15)
   # milestone unlock live. All past, all in one city (only the event *count*
   # matters for the volume milestone).
   - id: evt-vol-01
@@ -451,11 +451,11 @@ events:
     end: w-28 Sat 23:00
     price_is_free: true
     tags: [format:social, dance-style:salsa, reach:local]
-  # The "spare" 25th event — intentionally left un-attended by cusp-dedicated
+  # The "spare" 15th event — intentionally left un-attended by cusp-dedicated
   # so a tester can mark Going and unlock the Dedicated milestone.
   - id: evt-vol-13
     calendar_id: passport-cal-001
-    title: Warsaw Salsa Vol. 13 (spare — mark Going to hit 25)
+    title: Warsaw Salsa Vol. 13 (spare — mark Going to hit 15)
     location: Klub Tango, Warsaw, Poland
     latitude: 52.2297
     longitude: 21.0122
@@ -562,6 +562,472 @@ events:
     country_code: CZ
     start: w-82 Sat 21:00
     end: w-82 Sun 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:regional]
+
+  # --- Consistency ladder -------------------------------------------------
+  # A shared ladder of monthly socials, each ~6 weeks apart so every event
+  # lands in its own calendar month. The recurring "Consistency achievements"
+  # reward being active in N of the last 12 months. Consistency users below
+  # attend a PREFIX of this ladder to land on a specific level:
+  #   evt-cons-01..03  -> Consistent   (3 active months)
+  #   evt-cons-01..05  -> Committed    (5 active months)
+  #   evt-cons-01..08  -> Year-Rounder (8 active months)
+  # Two older events (evt-cons-old-*) sit >12 months back so a "comeback"
+  # dancer can form a first period, lapse, then reach Consistent again.
+  - id: evt-cons-01
+    calendar_id: passport-cal-001
+    title: Monthly Salsa Social
+    location: Sunset Studio, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-1 Fri 20:00
+    end: w-1 Sat 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-cons-02
+    calendar_id: passport-cal-001
+    title: Monthly Salsa Social
+    location: Sunset Studio, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-7 Fri 20:00
+    end: w-7 Sat 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-cons-03
+    calendar_id: passport-cal-001
+    title: Monthly Salsa Social
+    location: Sunset Studio, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-13 Fri 20:00
+    end: w-13 Sat 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-cons-04
+    calendar_id: passport-cal-001
+    title: Monthly Salsa Social
+    location: Sunset Studio, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-19 Fri 20:00
+    end: w-19 Sat 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-cons-05
+    calendar_id: passport-cal-001
+    title: Monthly Salsa Social
+    location: Sunset Studio, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-25 Fri 20:00
+    end: w-25 Sat 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-cons-06
+    calendar_id: passport-cal-001
+    title: Monthly Salsa Social
+    location: Sunset Studio, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-31 Fri 20:00
+    end: w-31 Sat 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-cons-07
+    calendar_id: passport-cal-001
+    title: Monthly Salsa Social
+    location: Sunset Studio, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-37 Fri 20:00
+    end: w-37 Sat 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-cons-08
+    calendar_id: passport-cal-001
+    title: Monthly Salsa Social
+    location: Sunset Studio, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-43 Fri 20:00
+    end: w-43 Sat 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-cons-old-01
+    calendar_id: passport-cal-001
+    title: Monthly Salsa Social
+    location: Sunset Studio, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-70 Fri 20:00
+    end: w-70 Sat 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-cons-old-02
+    calendar_id: passport-cal-001
+    title: Monthly Salsa Social
+    location: Sunset Studio, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-76 Fri 20:00
+    end: w-76 Sat 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-cons-old-03
+    calendar_id: passport-cal-001
+    title: Monthly Salsa Social
+    location: Sunset Studio, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-82 Fri 20:00
+    end: w-82 Sat 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+
+  # --- Consistency "dip" ladder (evt-consdrop-*) --------------------------
+  # Eight monthly socials whose span (~10.6 months) once put all 8 inside one
+  # rolling window (peak Year-Rounder), but the two oldest (w-57, w-63) have
+  # since aged out of the trailing 12 months, so the current rolling count is 6.
+  # Demonstrates that earned cards persist while current progress cools, and
+  # that a Year-Rounder period label spans ~10 months (crossing a year).
+  - id: evt-consdrop-01
+    calendar_id: passport-cal-001
+    title: Monthly Salsa Social
+    location: Sunset Studio, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-17 Fri 20:00
+    end: w-17 Sat 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-consdrop-02
+    calendar_id: passport-cal-001
+    title: Monthly Salsa Social
+    location: Sunset Studio, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-23 Fri 20:00
+    end: w-23 Sat 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-consdrop-03
+    calendar_id: passport-cal-001
+    title: Monthly Salsa Social
+    location: Sunset Studio, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-29 Fri 20:00
+    end: w-29 Sat 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-consdrop-04
+    calendar_id: passport-cal-001
+    title: Monthly Salsa Social
+    location: Sunset Studio, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-35 Fri 20:00
+    end: w-35 Sat 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-consdrop-05
+    calendar_id: passport-cal-001
+    title: Monthly Salsa Social
+    location: Sunset Studio, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-41 Fri 20:00
+    end: w-41 Sat 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-consdrop-06
+    calendar_id: passport-cal-001
+    title: Monthly Salsa Social
+    location: Sunset Studio, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-47 Fri 20:00
+    end: w-47 Sat 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-consdrop-07
+    calendar_id: passport-cal-001
+    title: Monthly Salsa Social
+    location: Sunset Studio, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-57 Fri 20:00
+    end: w-57 Sat 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-consdrop-08
+    calendar_id: passport-cal-001
+    title: Monthly Salsa Social
+    location: Sunset Studio, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-63 Fri 20:00
+    end: w-63 Sat 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+
+  # --- Hana's activity heatmap (drives the Timeline matrix + card views) -----
+  # Clustered so months land in different intensity buckets. The w-2 week is a
+  # "heavy" month (8 events → level 4); the w-6 week is a "medium" month (3 →
+  # level 2); w-10 and w-16 are single-event "light" months; two prior-year
+  # events (w-60) give a second matrix row.
+  - id: evt-hm-h1
+    calendar_id: passport-cal-001
+    title: Hana Heavy Mon
+    location: Studio A, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    city: Paris
+    country: France
+    country_code: FR
+    start: w-2 Mon 20:00
+    end: w-2 Mon 23:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-hm-h2
+    calendar_id: passport-cal-001
+    title: Hana Heavy Tue
+    location: Studio A, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    city: Paris
+    country: France
+    country_code: FR
+    start: w-2 Tue 20:00
+    end: w-2 Tue 23:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-hm-h3
+    calendar_id: passport-cal-001
+    title: Hana Heavy Wed
+    location: Studio A, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    city: Paris
+    country: France
+    country_code: FR
+    start: w-2 Wed 20:00
+    end: w-2 Wed 23:00
+    price_is_free: true
+    tags: [format:social, dance-style:bachata, reach:local]
+  - id: evt-hm-h4
+    calendar_id: passport-cal-001
+    title: Hana Heavy Thu
+    location: Studio A, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    city: Paris
+    country: France
+    country_code: FR
+    start: w-2 Thu 20:00
+    end: w-2 Thu 23:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-hm-h5
+    calendar_id: passport-cal-001
+    title: Hana Heavy Fri
+    location: Studio A, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    city: Paris
+    country: France
+    country_code: FR
+    start: w-2 Fri 20:00
+    end: w-2 Fri 23:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-hm-h6
+    calendar_id: passport-cal-001
+    title: Hana Heavy Sat
+    location: Studio A, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    city: Paris
+    country: France
+    country_code: FR
+    start: w-2 Sat 18:00
+    end: w-2 Sat 22:00
+    price_is_free: true
+    tags: [format:social, dance-style:bachata, reach:local]
+  - id: evt-hm-h7
+    calendar_id: passport-cal-001
+    title: Hana Heavy Sat Late
+    location: Studio A, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    city: Paris
+    country: France
+    country_code: FR
+    start: w-2 Sat 23:00
+    end: w-2 Sun 03:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:local]
+  - id: evt-hm-h8
+    calendar_id: passport-cal-001
+    title: Hana Heavy Sun
+    location: Studio A, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    city: Paris
+    country: France
+    country_code: FR
+    start: w-2 Sun 18:00
+    end: w-2 Sun 22:00
+    price_is_free: true
+    tags: [format:social, dance-style:kizomba, reach:local]
+  - id: evt-hm-m1
+    calendar_id: passport-cal-001
+    title: Hana Medium Fri
+    location: Le Studio, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-6 Fri 20:00
+    end: w-6 Fri 23:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:regional]
+  - id: evt-hm-m2
+    calendar_id: passport-cal-001
+    title: Hana Medium Sat
+    location: Le Studio, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-6 Sat 20:00
+    end: w-6 Sat 23:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:regional]
+  - id: evt-hm-m3
+    calendar_id: passport-cal-001
+    title: Hana Medium Sun
+    location: Le Studio, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    city: Lyon
+    country: France
+    country_code: FR
+    start: w-6 Sun 18:00
+    end: w-6 Sun 22:00
+    price_is_free: true
+    tags: [format:social, dance-style:bachata, reach:regional]
+  - id: evt-hm-l1
+    calendar_id: passport-cal-001
+    title: Hana Light October
+    location: Tanzhaus, Munich, Germany
+    latitude: 48.1351
+    longitude: 11.5820
+    city: Munich
+    country: Germany
+    country_code: DE
+    start: w-10 Sat 20:00
+    end: w-10 Sat 23:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:regional]
+  - id: evt-hm-l2
+    calendar_id: passport-cal-001
+    title: Hana Light September
+    location: Sala Apolo, Barcelona, Spain
+    latitude: 41.3851
+    longitude: 2.1734
+    city: Barcelona
+    country: Spain
+    country_code: ES
+    start: w-16 Sat 20:00
+    end: w-16 Sat 23:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:regional]
+  - id: evt-hm-p1
+    calendar_id: passport-cal-001
+    title: Hana Prior-Year Fri
+    location: Lucerna, Prague, Czechia
+    latitude: 50.0755
+    longitude: 14.4378
+    city: Prague
+    country: Czechia
+    country_code: CZ
+    start: w-60 Fri 20:00
+    end: w-60 Sat 01:00
+    price_is_free: true
+    tags: [format:social, dance-style:salsa, reach:regional]
+  - id: evt-hm-p2
+    calendar_id: passport-cal-001
+    title: Hana Prior-Year Sat
+    location: Lucerna, Prague, Czechia
+    latitude: 50.0755
+    longitude: 14.4378
+    city: Prague
+    country: Czechia
+    country_code: CZ
+    start: w-60 Sat 20:00
+    end: w-60 Sun 01:00
     price_is_free: true
     tags: [format:social, dance-style:salsa, reach:regional]
 

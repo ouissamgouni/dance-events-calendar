@@ -1470,3 +1470,34 @@ class UserMilestone(SQLModel, table=True):
     milestone_key: str = Field(max_length=48, nullable=False)
     unlocked_at: datetime = Field(default_factory=datetime.utcnow)
     seen_at: Optional[datetime] = Field(default=None)
+
+
+class UserConsistencyAchievement(SQLModel, table=True):
+    """A recurring Dance Passport consistency level a user reached in a period.
+
+    Consistency levels (Consistent/Committed/Year-Rounder/Unstoppable/Dance
+    Lifestyle) reward sustained activity over a rolling 12 calendar months and
+    RECUR: each distinct period (``period_start`` = the ``"YYYY-MM"`` month the
+    period opened) can earn every level again. The display is recomputed from
+    attended events on every read; these rows exist only to dedupe the
+    celebration toast and the upward-reach notification. ``reached_at`` is the
+    triggering event's start; ``seen_at`` NULL means "new — show the toast".
+    The level catalog lives in ``backend/services/passport.py``.
+    """
+
+    __tablename__ = "user_consistency_achievements"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "level_key",
+            "period_start",
+            name="uq_user_consistency_user_level_period",
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: UUID = Field(foreign_key="users.id", index=True, nullable=False)
+    level_key: str = Field(max_length=32, nullable=False)
+    period_start: str = Field(max_length=7, nullable=False)
+    reached_at: datetime = Field(default_factory=datetime.utcnow)
+    seen_at: Optional[datetime] = Field(default=None)

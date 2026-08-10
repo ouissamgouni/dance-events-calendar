@@ -80,7 +80,8 @@ const PASSPORT = {
         reviews_written: 5,
         styles_danced: 4,
         top_style: null,
-        longest_month_streak: 3,
+        active_months_last_12: 3,
+        active_months_this_year: 2,
         events_last_30_days: 2,
         avg_gap_days: 11.5,
         first_event_date: '2024-01-10T20:00:00',
@@ -101,6 +102,7 @@ const PASSPORT = {
         makeMilestone(),
         makeMilestone({ key: 'events_10', name: 'Regular', threshold: 10, progress: 8, unlocked: false }),
     ],
+    consistency: null,
 }
 
 const TIMELINE = {

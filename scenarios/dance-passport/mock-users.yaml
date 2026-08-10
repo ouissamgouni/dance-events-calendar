@@ -50,15 +50,15 @@ users:
   # --- Milestone-testing "cusp" users: each sits exactly one attend away from
   # a specific milestone, so a tester can mark Going on one more past event and
   # watch that milestone unlock live (with the celebration toast). ---
-  # 24 attended events -> mark Going on evt-vol-13 to unlock Dedicated (25).
+  # 14 attended events -> mark Going on evt-vol-13 to unlock Dedicated (15).
   - email: cusp-dedicated@example.com
-    name: Dana (24/25 events → Dedicated)
+    name: Dana (14/15 events → Dedicated)
     # Phase C: email off, push on — exercises per-channel milestone gating.
     email_milestone_unlocked_enabled: false
     push_milestone_unlocked_enabled: true
-  # 4 distinct cities -> mark Going on a 5th-city event to unlock Explorer.
+  # 4 distinct cities -> mark Going on a 5th-city event to unlock City Hopper.
   - email: cusp-explorer@example.com
-    name: Elio (4/5 cities → Explorer)
+    name: Elio (4/5 cities → City Hopper)
     # Phase C: both channels off — in-app milestone notification only.
     email_milestone_unlocked_enabled: false
     push_milestone_unlocked_enabled: false
@@ -68,5 +68,68 @@ users:
   # Only local events -> mark Going on an international event to unlock Border Crosser.
   - email: cusp-international@example.com
     name: Ines (0 intl → Border Crosser)
+  # --- Consistency users: each attends a prefix of the evt-cons ladder to land
+  # on a specific recurring "Consistency achievement" level (active in N of the
+  # last 12 months). Passports are PUBLIC so the level/current-period card and
+  # celebration toasts are visible on the Dance Passport tab. ---
+  # 3 active months -> Consistent (first entry into a consistency period).
+  - email: consistent@example.com
+    name: Cara (3 months → Consistent)
+    handle: cara
+    account_visibility: public
+    passport_visibility: public
+    passport_show_timeline: true
+  # 5 active months -> Committed.
+  - email: committed@example.com
+    name: Cole (5 months → Committed)
+    handle: cole
+    account_visibility: public
+    passport_visibility: public
+    passport_show_timeline: true
+  # 8 active months -> Year-Rounder.
+  - email: yearround@example.com
+    name: Yuki (8 months → Year-Rounder)
+    handle: yuki
+    account_visibility: public
+    passport_visibility: public
+    passport_show_timeline: true
+  # Two active months only -> below the 3-month entry, no period yet (shows the
+  # "next entry" progress toward Consistent instead of a current-period card).
+  - email: belowentry@example.com
+    name: Bo (2 months → below entry)
+    handle: bo
+    account_visibility: public
+    passport_visibility: public
+  # A first period (3 old months) that lapsed, then a fresh Consistent reach —
+  # demonstrates that consistency achievements RECUR (Consistent ×2), with the
+  # older period preserved in history.
+  - email: comeback@example.com
+    name: Mira (comeback → Consistent ×2)
+    handle: mira
+    account_visibility: public
+    passport_visibility: public
+    passport_show_timeline: true
+  # Reached Year-Rounder (8) inside one long period, then the two oldest active
+  # months aged out of the rolling window so the current count has cooled to 6.
+  # The earned Consistent/Committed/Year-Rounder cards stay permanently; the
+  # header shows the lower current count and the locked cards progress from it.
+  # The Year-Rounder card's period also spans ~10 months, crossing a year.
+  - email: dip@example.com
+    name: Nia (dip → Year-Rounder, now 6)
+    handle: nia
+    account_visibility: public
+    passport_visibility: public
+    passport_show_timeline: true
+  # Multi-year heatmap dancer used to exercise the Timeline "Activity over time"
+  # matrix and the share-card activity views. Events are deliberately clustered
+  # so different months land in different intensity buckets (1-2 / 3-4 / 5-7 /
+  # 8+), across the current AND a prior calendar year. Passport PUBLIC + timeline
+  # ON so the heatmap also renders on her shared/profile passport.
+  - email: heatmap@example.com
+    name: Hana (activity heatmap)
+    handle: hana
+    account_visibility: public
+    passport_visibility: public
+    passport_show_timeline: true
   - email: admin@example.com # matches ADMIN_EMAIL -> admin
     name: Dev Admin

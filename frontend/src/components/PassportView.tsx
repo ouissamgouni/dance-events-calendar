@@ -10,7 +10,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import EventMap from './EventMap';
+import PassportActivityHeatmap from './PassportActivityHeatmap';
 import type {
+    PassportConsistency,
     PassportMapEvent,
     PassportMilestone,
     PassportResponse,
@@ -39,22 +41,31 @@ function formatDate(iso: string): string {
 // name/description instead). Icons mirror the catalog except where a plain
 // label reads better. Unknown keys fall back to the marker icon + description.
 const TIMELINE_MILESTONE: Record<string, { icon: string; label: string }> = {
-    first_event: { icon: '🎉', label: 'First dance event' },
-    events_10: { icon: '💃', label: 'Danced at 10 events' },
-    events_25: { icon: '🔥', label: 'Danced at 25 events' },
-    events_50: { icon: '🏆', label: 'Danced at 50 events' },
-    events_100: { icon: '👑', label: 'Danced at 100 events' },
-    cities_5: { icon: '🗺️', label: 'Danced in 5 cities' },
-    cities_10: { icon: '🏙️', label: 'Danced in 10 cities' },
+    first_event: { icon: '💃', label: 'First dance event' },
+    events_5: { icon: '🔥', label: 'Danced at 5 events' },
+    events_15: { icon: '🏆', label: 'Danced at 15 events' },
+    events_30: { icon: '👑', label: 'Danced at 30 events' },
+    events_50: { icon: '✨', label: 'Danced at 50 events' },
+    events_75: { icon: '🌟', label: 'Danced at 75 events' },
+    events_100: { icon: '💎', label: 'Danced at 100 events' },
+    cities_3: { icon: '🏙️', label: 'Danced in 3 cities' },
+    cities_5: { icon: '🧳', label: 'Danced in 5 cities' },
+    cities_10: { icon: '🗺️', label: 'Danced in 10 cities' },
+    cities_20: { icon: '🚆', label: 'Danced in 20 cities' },
+    cities_30: { icon: '🌆', label: 'Danced in 30 cities' },
+    cities_50: { icon: '✨', label: 'Danced in 50 cities' },
     countries_3: { icon: '🛂', label: 'Danced in 3 countries' },
     countries_5: { icon: '✈️', label: 'Danced in 5 countries' },
     countries_10: { icon: '🌍', label: 'Danced in 10 countries' },
+    countries_15: { icon: '🧭', label: 'Danced in 15 countries' },
+    countries_25: { icon: '🌐', label: 'Danced in 25 countries' },
+    countries_40: { icon: '🏆', label: 'Danced in 40 countries' },
     first_international: { icon: '🌐', label: 'First international event' },
     first_review: { icon: '✍️', label: 'Wrote your first review' },
-    reviews_10: { icon: '⭐', label: 'Wrote 10 reviews' },
-    streak_3_months: { icon: '📅', label: 'Danced 3 months in a row' },
-    streak_6_months: { icon: '🗓️', label: 'Danced 6 months in a row' },
-    streak_12_months: { icon: '🎯', label: 'Danced 12 months in a row' },
+    reviews_3: { icon: '⭐', label: 'Wrote 3 reviews' },
+    reviews_10: { icon: '💬', label: 'Wrote 10 reviews' },
+    reviews_25: { icon: '📝', label: 'Wrote 25 reviews' },
+    reviews_50: { icon: '🏆', label: 'Wrote 50 reviews' },
 };
 
 function StatCard({
@@ -276,15 +287,15 @@ function CountriesPanel({ data, events }: { data: PassportResponse; events: Pass
     );
 }
 
-function TimelineRow({ item }: { item: PassportTimelineItem }) {
+function TimelineRow({ item, highlighted }: { item: PassportTimelineItem; highlighted?: boolean }) {
     const place = [item.city, item.country].filter(Boolean).join(', ');
     return (
-        <li className="relative pl-6">
+        <li className="relative pl-6" data-month={item.start.slice(0, 7)}>
             {/* eslint-disable-next-line no-restricted-syntax -- small timeline status dot */}
             <span className="absolute left-[1px] top-[6px] h-3 w-3 rounded-full bg-slate-300 ring-2 ring-white" aria-hidden />
             <Link
                 to={`/event/${item.event_id}`}
-                className="group block py-1 hover:bg-slate-50"
+                className={`group block py-1 hover:bg-slate-50 ${highlighted ? 'bg-blue-50 ring-2 ring-blue-400' : ''}`}
             >
                 <div className="text-sm font-semibold text-slate-900 group-hover:text-blue-600">
                     {item.title}
@@ -306,12 +317,7 @@ function TimelineMarkerRow({ markers }: { markers: PassportTimelineMarker[] }) {
                 🏅
             </span>
             {single ? (
-                <div className="max-w-[420px] text-xs leading-5 text-slate-600">
-                    <span className="font-semibold text-slate-700">{single.name}</span>
-                    {TIMELINE_MILESTONE[single.key]?.label && (
-                        <> · {TIMELINE_MILESTONE[single.key]?.label}</>
-                    )}
-                </div>
+                <MarkerBody m={single} />
             ) : (
                 <div className="max-w-[420px] text-xs leading-5 text-slate-600">
                     <div className="font-medium text-slate-700">
@@ -321,12 +327,17 @@ function TimelineMarkerRow({ markers }: { markers: PassportTimelineMarker[] }) {
                         {markers.map((m) => {
                             const copy = TIMELINE_MILESTONE[m.key];
                             const icon = copy?.icon ?? m.icon;
-                            const label = copy?.label;
+                            const secondary = m.label ?? copy?.label;
+                            const period =
+                                m.period_start && m.period_end
+                                    ? formatPeriodRange(m.period_start, m.period_end)
+                                    : null;
                             return (
                                 <li key={m.key}>
                                     <span aria-hidden>{icon}</span>{' '}
                                     <span className="font-semibold text-slate-700">{m.name}</span>
-                                    {label && <> · {label}</>}
+                                    {secondary && <> · {secondary}</>}
+                                    {period && <span className="text-slate-400"> · {period}</span>}
                                 </li>
                             );
                         })}
@@ -337,14 +348,43 @@ function TimelineMarkerRow({ markers }: { markers: PassportTimelineMarker[] }) {
     );
 }
 
+// A single timeline milestone line. Consistency reaches (which carry a period
+// range) stack name / "N/12 active months" / range; event milestones stay on a
+// single "name · label" line.
+function MarkerBody({ m }: { m: PassportTimelineMarker }) {
+    const copy = TIMELINE_MILESTONE[m.key];
+    const secondary = m.label ?? copy?.label;
+    const period =
+        m.period_start && m.period_end
+            ? formatPeriodRange(m.period_start, m.period_end)
+            : null;
+    if (period) {
+        return (
+            <div className="max-w-[420px] text-xs leading-5 text-slate-600">
+                <div className="font-semibold text-slate-700">
+                    <span aria-hidden>{copy?.icon ?? m.icon}</span> {m.name}
+                </div>
+                {secondary && <div>{secondary}</div>}
+                <div className="text-slate-400">{period}</div>
+            </div>
+        );
+    }
+    return (
+        <div className="max-w-[420px] text-xs leading-5 text-slate-600">
+            <span className="font-semibold text-slate-700">{m.name}</span>
+            {secondary && <> · {secondary}</>}
+        </div>
+    );
+}
+
 function MilestoneBadge({ milestone }: { milestone: PassportMilestone }) {
     const { unlocked, progress, threshold, unit } = milestone;
     return (
         <div
             className={
                 unlocked
-                    ? 'border border-amber-300 bg-amber-50 p-2 text-center'
-                    : 'border border-slate-200 bg-white p-2 text-center'
+                    ? 'flex h-full flex-col border border-amber-300 bg-amber-50 p-2 text-center'
+                    : 'flex h-full flex-col border border-slate-200 bg-white p-2 text-center'
             }
             title={milestone.description}
         >
@@ -374,6 +414,59 @@ function MilestoneBadge({ milestone }: { milestone: PassportMilestone }) {
     );
 }
 
+// Category rows, in display order. Unknown categories fall back to a title-cased
+// label and are appended after these.
+const MILESTONE_CATEGORY_ORDER = [
+    'events',
+    'cities',
+    'countries',
+    'reviews',
+    'international',
+] as const;
+
+const MILESTONE_CATEGORY_LABEL: Record<string, string> = {
+    events: 'Events',
+    cities: 'Cities',
+    countries: 'Countries',
+    reviews: 'Reviews',
+    international: 'International',
+};
+
+// Each category is a single horizontally-scrollable row: achieved badges come
+// first (catalog order is threshold-ascending), then the next goals. Cards are
+// sized so ~4 fit on mobile and ~6 on desktop before the row scrolls.
+function MilestoneCategoryRow({
+    label,
+    milestones,
+}: {
+    label: string;
+    milestones: PassportMilestone[];
+}) {
+    const unlockedCount = milestones.filter((m) => m.unlocked).length;
+    return (
+        <div>
+            <div className="mb-1.5 flex items-baseline justify-between">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    {label}
+                </h3>
+                <span className="text-[11px] tabular-nums text-slate-400">
+                    {unlockedCount}/{milestones.length}
+                </span>
+            </div>
+            <div className="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1">
+                {milestones.map((m) => (
+                    <div
+                        key={m.key}
+                        className="shrink-0 basis-[calc(25%_-_0.375rem)] snap-start md:basis-[calc(16.666%_-_0.417rem)]"
+                    >
+                        <MilestoneBadge milestone={m} />
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 function MilestonesGrid({ milestones }: { milestones: PassportMilestone[] }) {
     if (milestones.length === 0) {
         return (
@@ -382,18 +475,143 @@ function MilestonesGrid({ milestones }: { milestones: PassportMilestone[] }) {
             </div>
         );
     }
+    const byCategory = new Map<string, PassportMilestone[]>();
+    for (const m of milestones) {
+        const arr = byCategory.get(m.category);
+        if (arr) arr.push(m);
+        else byCategory.set(m.category, [m]);
+    }
+    const orderedCats = [
+        ...MILESTONE_CATEGORY_ORDER.filter((c) => byCategory.has(c)),
+        ...[...byCategory.keys()].filter(
+            (c) => !MILESTONE_CATEGORY_ORDER.includes(c as (typeof MILESTONE_CATEGORY_ORDER)[number]),
+        ),
+    ];
     const unlockedCount = milestones.filter((m) => m.unlocked).length;
     return (
         <>
             <div className="mb-2 text-xs tabular-nums text-slate-400">
                 {unlockedCount}/{milestones.length} unlocked
             </div>
-            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-                {milestones.map((m) => (
-                    <MilestoneBadge key={m.key} milestone={m} />
+            <div className="space-y-4">
+                {orderedCats.map((cat) => (
+                    <MilestoneCategoryRow
+                        key={cat}
+                        label={MILESTONE_CATEGORY_LABEL[cat] ?? cat}
+                        milestones={byCategory.get(cat) ?? []}
+                    />
                 ))}
             </div>
         </>
+    );
+}
+
+/** Format a "YYYY-MM" range into a compact label: same month → "Jan 2026",
+ * same year → "Jan–Nov 2026", crossing years → "Mar 2028–Feb 2029". */
+function formatPeriodRange(startYm: string, endYm: string): string {
+    const [sy, sm] = startYm.split('-').map((n) => Number(n));
+    const [ey, em] = endYm.split('-').map((n) => Number(n));
+    if (!sy || !sm || !ey || !em) return `${startYm}–${endYm}`;
+    const mon = (y: number, m: number) =>
+        new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'short' });
+    if (sy === ey && sm === em) return `${mon(sy, sm)} ${sy}`;
+    if (sy === ey) return `${mon(sy, sm)}–${mon(ey, em)} ${ey}`;
+    return `${mon(sy, sm)} ${sy}–${mon(ey, em)} ${ey}`;
+}
+
+// Recurring "Consistency" achievements: sustained activity over a rolling 12
+// calendar months (no consecutive-month requirement). Rendered as a chronological
+// trail — every upward reach is a permanent card (repeats are never collapsed),
+// historical periods first, then the current period's earned cards, then the
+// remaining locked/progress levels.
+interface ConsistencyCardModel {
+    key: string;
+    icon: string;
+    name: string;
+    earned: boolean;
+    activeLine: string;
+    period?: string;
+}
+
+function ConsistencyCard({ card }: { card: ConsistencyCardModel }) {
+    return (
+        <div
+            className={
+                card.earned
+                    ? 'flex h-full flex-col border border-amber-300 bg-amber-50 p-2 text-center'
+                    : 'flex h-full flex-col border border-slate-200 bg-white p-2 text-center'
+            }
+        >
+            <div className={card.earned ? 'text-xl' : 'text-xl opacity-30 grayscale'}>
+                {card.icon}
+            </div>
+            <div
+                className={
+                    card.earned
+                        ? 'mt-1 text-xs font-semibold text-slate-900'
+                        : 'mt-1 text-xs font-medium text-slate-400'
+                }
+            >
+                {card.name}
+            </div>
+            <div
+                className={
+                    card.earned
+                        ? 'mt-0.5 text-[10px] leading-tight tabular-nums text-slate-500'
+                        : 'mt-1 text-[10px] tabular-nums text-slate-400'
+                }
+            >
+                {card.activeLine}
+            </div>
+            {card.period && (
+                <div className="mt-0.5 text-[10px] leading-tight text-slate-400">
+                    {card.period}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function ConsistencyTrailRow({ consistency }: { consistency: PassportConsistency }) {
+    const cards: ConsistencyCardModel[] = [
+        ...consistency.earned.map((c) => ({
+            key: c.key,
+            icon: c.icon,
+            name: c.name,
+            earned: true,
+            activeLine: `${c.threshold}/${consistency.window} active months`,
+            period: formatPeriodRange(c.period_start, c.reached),
+        })),
+        ...consistency.locked.map((c) => ({
+            key: c.key,
+            icon: c.icon,
+            name: c.name,
+            earned: false,
+            activeLine: `${c.active_months}/${c.threshold} active months`,
+        })),
+    ];
+    if (cards.length === 0) return null;
+    return (
+        <div className="mb-4">
+            <div className="mb-1.5 flex items-baseline justify-between">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    Consistency
+                </h3>
+                <span className="text-[11px] tabular-nums text-slate-400">
+                    Current · {consistency.active_months}/{consistency.window} active months
+                </span>
+            </div>
+            <div className="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1">
+                {cards.map((c) => (
+                    <div
+                        key={c.key}
+                        className="shrink-0 basis-[calc(25%_-_0.375rem)] snap-start md:basis-[calc(16.666%_-_0.417rem)]"
+                    >
+                        <ConsistencyCard card={c} />
+                    </div>
+                ))}
+            </div>
+        </div>
     );
 }
 
@@ -446,6 +664,7 @@ export default function PassportView({
     const shown = ALL_SECTIONS.filter((s) => sections.includes(s));
     const [tab, setTab] = useState<PassportSection>(shown[0] ?? 'milestones');
     const tabsRef = useRef<HTMLDivElement>(null);
+    const timelineListRef = useRef<HTMLUListElement>(null);
     const has = (s: PassportSection) => shown.includes(s);
 
     const selectTab = useCallback((next: PassportSection) => {
@@ -453,6 +672,16 @@ export default function PassportView({
         requestAnimationFrame(() => {
             tabsRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
         });
+    }, []);
+
+    // Heatmap → timeline: remember the clicked month, then scroll to its first
+    // (newest) event, loading older pages until it's in view.
+    const [pendingMonth, setPendingMonth] = useState<string | null>(null);
+    const [highlightMonth, setHighlightMonth] = useState<string | null>(null);
+    const selectMonth = useCallback((month: string) => {
+        setTab('timeline');
+        setPendingMonth(month);
+        setHighlightMonth(month);
     }, []);
 
     // Ask the caller to load map events the first time a map tab is opened.
@@ -518,7 +747,10 @@ export default function PassportView({
                     label="Countries"
                     onLabelClick={has('countries') ? () => selectTab('countries') : undefined}
                 />
-                <StatCard value={data.stats.longest_month_streak} label="Months streak" />
+                <StatCard
+                    value={`${data.stats.active_months_last_12}/12`}
+                    label="Active months"
+                />
                 <StatCard
                     value={data.stats.avg_gap_days == null ? '—' : Math.max(1, Math.round(data.stats.avg_gap_days))}
                     label="Days between events"
@@ -537,7 +769,12 @@ export default function PassportView({
 
                 <div className="mt-4">
                     {tab === 'milestones' && has('milestones') && (
-                        <MilestonesGrid milestones={data.milestones} />
+                        <>
+                            {data.consistency && (
+                                <ConsistencyTrailRow consistency={data.consistency} />
+                            )}
+                            <MilestonesGrid milestones={data.milestones} />
+                        </>
                     )}
                     {tab === 'timeline' && has('timeline') && (
                         <>

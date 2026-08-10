@@ -669,7 +669,8 @@ export interface PassportStats {
     reviews_written: number;
     styles_danced: number;
     top_style: string | null;
-    longest_month_streak: number;
+    active_months_last_12: number;
+    active_months_this_year: number;
     events_last_30_days: number;
     avg_gap_days: number | null;
     first_event_date: string | null;
@@ -716,10 +717,80 @@ export interface PassportMilestone {
     unlocked_at: string | null;
 }
 
+/** One calendar month with the count of attended events ("YYYY-MM"). */
+export interface MonthlyActivity {
+    month: string;
+    count: number;
+}
+
 export interface PassportResponse {
     stats: PassportStats;
     collections: PassportCollections;
     milestones: PassportMilestone[];
+    consistency: PassportConsistency | null;
+    monthly_activity: MonthlyActivity[];
+}
+
+/** A permanent earned consistency card: one upward reach of a level within a
+ * period. Repeats are never merged — each reach is its own card. The displayed
+ * range runs `period_start` → `reached` and may cross calendar years. */
+export interface ConsistencyEarnedCard {
+    key: string;
+    level_key: string;
+    name: string;
+    icon: string;
+    threshold: number;
+    period_start: string;
+    reached: string;
+    is_current: boolean;
+}
+
+/** A not-yet-reached level for the current open period (or every level when no
+ * period is open). `active_months` is the current rolling progress numerator. */
+export interface ConsistencyLockedCard {
+    key: string;
+    name: string;
+    icon: string;
+    threshold: number;
+    active_months: number;
+}
+
+/** The strongest consistency level ever reached (all-time highlight). */
+export interface ConsistencyTop {
+    key: string;
+    name: string;
+    icon: string;
+    threshold: number;
+    times: number;
+}
+
+/** A calendar year's independent consistency classification (Jan–Dec). */
+export interface ConsistencyYearLevel {
+    year: number;
+    active_months: number;
+    key: string | null;
+    name: string | null;
+    icon: string | null;
+    threshold: number | null;
+}
+
+export interface ConsistencyNewReach {
+    key: string;
+    name: string;
+    icon: string;
+    period_start: string;
+}
+
+/** Recurring consistency achievements derived from attended events. */
+export interface PassportConsistency {
+    active: boolean;
+    active_months: number;
+    window: number;
+    earned: ConsistencyEarnedCard[];
+    locked: ConsistencyLockedCard[];
+    top: ConsistencyTop | null;
+    by_year: ConsistencyYearLevel[];
+    new: ConsistencyNewReach[];
 }
 
 export type PassportSection = 'milestones' | 'timeline' | 'cities' | 'countries';
@@ -729,12 +800,16 @@ export interface SharedPassportResponse {
     stats: PassportStats;
     collections: PassportCollections;
     milestones: PassportMilestone[];
+    // Populated only when 'milestones' is in `sections`.
+    consistency: PassportConsistency | null;
     events: PassportMapEvent[];
     // Sections the owner opted to share; pass straight to PassportView.
     sections: PassportSection[];
     // Populated only when 'timeline' is in `sections`.
     timeline_items: PassportTimelineItem[];
     timeline_markers: PassportTimelineMarker[];
+    // Populated only when 'timeline' is in `sections` (privacy gate).
+    monthly_activity: MonthlyActivity[];
     // Follow CTA context: owner handle + viewer relationship.
     handle: string | null;
     is_self: boolean;
@@ -757,6 +832,12 @@ export interface PassportTimelineMarker {
     name: string;
     icon: string;
     date: string;
+    /** Optional secondary line (recurring consistency reaches use it). */
+    label?: string | null;
+    /** Displayed period range ("YYYY-MM") for consistency reaches; null for
+     * event milestones. The client formats the human range (e.g. "Jan–Nov 2026"). */
+    period_start?: string | null;
+    period_end?: string | null;
 }
 
 export interface PassportTimelineResponse {

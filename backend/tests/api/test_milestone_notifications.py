@@ -145,7 +145,7 @@ def test_distinct_milestones_get_distinct_notifications(session):
         _attend_past_event(session, bob, f"ev-{i}", days_ago=100 - i)
 
     stats = milestone_notification_service.run_once()
-    # first_event + events_10 both unlock on the same run.
+    # first_event + events_5 both unlock on the same run.
     assert stats["milestones"] == 2
     keys = {
         n.subject_key
@@ -153,7 +153,7 @@ def test_distinct_milestones_get_distinct_notifications(session):
             select(Notification).where(Notification.kind == "milestone_unlocked")
         ).all()
     }
-    assert {"first_event", "events_10"} <= keys
+    assert {"first_event", "events_5"} <= keys
 
 
 def test_multiple_milestones_combined_into_one_email(session, monkeypatch):
@@ -174,7 +174,7 @@ def test_multiple_milestones_combined_into_one_email(session, monkeypatch):
     assert stats["emailed"] == 2
     # A single email call covering both milestones.
     assert len(calls) == 1
-    assert set(calls[0]) == {"first_event", "events_10"}
+    assert set(calls[0]) == {"first_event", "events_5"}
     # Both notification rows stamped emailed_at by the one send.
     notifs = session.exec(
         select(Notification).where(Notification.kind == "milestone_unlocked")

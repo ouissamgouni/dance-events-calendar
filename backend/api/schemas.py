@@ -2536,7 +2536,8 @@ class PassportStats(BaseModel):
     reviews_written: int
     styles_danced: int
     top_style: Optional[str] = None
-    longest_month_streak: int
+    active_months_last_12: int
+    active_months_this_year: int
     events_last_30_days: int
     avg_gap_days: Optional[float] = None
     first_event_date: Optional[datetime] = None
@@ -2582,10 +2583,99 @@ class PassportMilestone(BaseModel):
     unlocked_at: Optional[datetime] = None
 
 
+class ConsistencyEarnedCard(BaseModel):
+    """A permanent earned consistency card: one upward reach of a level within a
+    period. Repeats are never merged — each reach is its own card.
+
+    ``period_start`` → ``reached`` is the displayed range (first contributing
+    active month → the month the level was reached) and may cross calendar years.
+    """
+
+    key: str
+    level_key: str
+    name: str
+    icon: str
+    threshold: int
+    period_start: str
+    reached: str
+    is_current: bool
+
+
+class ConsistencyLockedCard(BaseModel):
+    """A not-yet-reached level for the current open period (or every level when
+    no period is open). ``active_months`` is the current rolling count shown as
+    the progress numerator."""
+
+    key: str
+    name: str
+    icon: str
+    threshold: int
+    active_months: int
+
+
+class ConsistencyTop(BaseModel):
+    """The strongest consistency level the user has ever reached (all-time)."""
+
+    key: str
+    name: str
+    icon: str
+    threshold: int
+    times: int
+
+
+class ConsistencyYearLevel(BaseModel):
+    """A calendar year's independent consistency classification (Jan–Dec active
+    months → the level that count reaches). ``key`` is null below the entry."""
+
+    year: int
+    active_months: int
+    key: Optional[str] = None
+    name: Optional[str] = None
+    icon: Optional[str] = None
+    threshold: Optional[int] = None
+
+
+class ConsistencyNewReach(BaseModel):
+    """An unacknowledged upward reach, for the celebration toast. ``key`` +
+    ``period_start`` form the ack identifier ``"level_key:YYYY-MM"``."""
+
+    key: str
+    name: str
+    icon: str
+    period_start: str
+
+
+class PassportConsistency(BaseModel):
+    """Recurring consistency achievements derived from attended events.
+
+    Rewards sustained activity over a rolling 12 calendar months without
+    requiring consecutive months; every level can be earned again in each
+    distinct period, so the trail keeps a permanent card per reach.
+    """
+
+    active: bool
+    active_months: int
+    window: int
+    earned: list[ConsistencyEarnedCard] = []
+    locked: list[ConsistencyLockedCard] = []
+    top: Optional[ConsistencyTop] = None
+    by_year: list[ConsistencyYearLevel] = []
+    new: list[ConsistencyNewReach] = []
+
+
+class MonthlyActivity(BaseModel):
+    """One calendar month ("YYYY-MM") with the count of attended events."""
+
+    month: str
+    count: int
+
+
 class PassportResponse(BaseModel):
     stats: PassportStats
     collections: PassportCollections
     milestones: list[PassportMilestone] = []
+    consistency: Optional[PassportConsistency] = None
+    monthly_activity: list[MonthlyActivity] = []
 
 
 class PassportTimelineItem(BaseModel):
@@ -2604,6 +2694,13 @@ class PassportTimelineMarker(BaseModel):
     name: str
     icon: str
     date: datetime
+    # Optional secondary line (used by recurring consistency markers to state
+    # the reach, e.g. "8/12 active months").
+    label: Optional[str] = None
+    # Displayed period range for consistency markers ("YYYY-MM"); the client
+    # formats the human range (e.g. "Jan–Nov 2026"). Null for event milestones.
+    period_start: Optional[str] = None
+    period_end: Optional[str] = None
 
 
 class SharedPassportResponse(BaseModel):
@@ -2620,6 +2717,8 @@ class SharedPassportResponse(BaseModel):
     stats: PassportStats
     collections: PassportCollections
     milestones: list[PassportMilestone] = []
+    # Populated only when 'milestones' is in ``sections``.
+    consistency: Optional[PassportConsistency] = None
     events: list[PassportMapEvent] = []
     # Sections the owner has opted to share (subset of milestones/timeline/
     # cities/countries). The client passes this straight to PassportView.
@@ -2627,6 +2726,8 @@ class SharedPassportResponse(BaseModel):
     # Populated only when 'timeline' is in ``sections``.
     timeline_items: list[PassportTimelineItem] = []
     timeline_markers: list[PassportTimelineMarker] = []
+    # Populated only when 'timeline' is in ``sections`` (privacy gate).
+    monthly_activity: list[MonthlyActivity] = []
     # Phase 3 Follow CTA: owner handle + the viewer's relationship so the
     # shared/profile passport can render a Follow button (or a sign-in
     # prompt for anonymous viewers). ``handle`` may be None for handleless
@@ -2637,7 +2738,9 @@ class SharedPassportResponse(BaseModel):
 
 
 class AckMilestonesRequest(BaseModel):
-    keys: list[str]
+    keys: list[str] = []
+    # Recurring consistency reaches to acknowledge, each ``"level_key:YYYY-MM"``.
+    consistency: list[str] = []
 
 
 class AckMilestonesResponse(BaseModel):

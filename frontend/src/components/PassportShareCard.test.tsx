@@ -9,7 +9,8 @@ const scoped: ScopedPassport = {
     cities: 11,
     countries: 7,
     cadenceDays: 9,
-    monthStreak: 4,
+    activeMonths: 8,
+    activeMonthsOf: 12,
     topStyle: 'Salsa',
     topCity: 'Barcelona',
     coords: [
@@ -17,7 +18,8 @@ const scoped: ScopedPassport = {
         { lat: 38.7, lng: -9.1 },
     ],
     badges: [{ key: 'events_50', icon: '🏆', label: 'Veteran', description: 'Attend 50 events' }],
-    streakInBadges: false,
+    monthly: [],
+    consistencyInBadges: false,
 }
 
 describe('PassportShareCard', () => {
@@ -36,8 +38,8 @@ describe('PassportShareCard', () => {
         expect(screen.getByText('Veteran')).toBeInTheDocument()
         expect(screen.getByText('Attend 50 events')).toBeInTheDocument()
         expect(screen.getByText(/Journey on Movida since/)).toBeInTheDocument()
-        // Streak cell renders when the month streak is meaningful (>= 2).
-        expect(screen.getByText('🔥 Streak')).toBeInTheDocument()
+        // Active-months cell renders when there is at least one active month.
+        expect(screen.getByText('📅 Active months')).toBeInTheDocument()
         // QR footer shows the pretty profile handle, never the old @handle form.
         expect(screen.getByText('joinmovida.com/u/alba')).toBeInTheDocument()
     })
@@ -94,7 +96,8 @@ describe('PassportShareCard', () => {
             cities: 4,
             countries: 3,
             cadenceDays: 20,
-            monthStreak: 3,
+            activeMonths: 3,
+            activeMonthsOf: 12,
             topStyle: null,
             topCity: 'Paris',
             coords: [
@@ -104,7 +107,8 @@ describe('PassportShareCard', () => {
             badges: [
                 { key: 'busiest_month', icon: '📅', label: 'Most active · August', description: '7 events' },
             ],
-            streakInBadges: false,
+            monthly: [],
+            consistencyInBadges: false,
         }
         render(
             <PassportShareCard
@@ -117,9 +121,9 @@ describe('PassportShareCard', () => {
         )
         expect(screen.getByText('My 2026 in Dance')).toBeInTheDocument()
         expect(screen.queryByText(/Journey on Movida since/)).not.toBeInTheDocument()
-        // Year card spells the streak out and drops the fire icon.
-        expect(screen.getByText('months in a row')).toBeInTheDocument()
-        expect(screen.queryByText('🔥 Streak')).not.toBeInTheDocument()
+        // Year card spells the active-month count out and drops the icon prefix.
+        expect(screen.getByText('months active')).toBeInTheDocument()
+        expect(screen.queryByText('📅 Active months')).not.toBeInTheDocument()
     })
 
     it('shows a year subtitle and an empty state for a year with no events', () => {
@@ -129,12 +133,14 @@ describe('PassportShareCard', () => {
             cities: 0,
             countries: 0,
             cadenceDays: null,
-            monthStreak: 0,
+            activeMonths: 0,
+            activeMonthsOf: 12,
             topStyle: null,
             topCity: null,
             coords: [],
             badges: [],
-            streakInBadges: false,
+            monthly: [],
+            consistencyInBadges: false,
         }
         render(
             <PassportShareCard

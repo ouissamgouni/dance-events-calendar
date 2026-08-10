@@ -12,6 +12,8 @@ from backend.api.schemas import (
     AckMilestonesResponse,
     CreatePassportShareRequest,
     PassportCollections,
+    PassportConsistency,
+    MonthlyActivity,
     PassportMapEvent,
     PassportMilestone,
     PassportResponse,
@@ -94,7 +96,8 @@ def build_shared_passport(
         reviews_written=ctx["reviews"],
         styles_danced=len(ctx["styles"]),
         top_style=ctx["top_style"],
-        longest_month_streak=ctx["longest_streak"],
+        active_months_last_12=ctx["active_months_last_12"],
+        active_months_this_year=ctx["active_months_this_year"],
         events_last_30_days=ctx["events_last_30d"],
         avg_gap_days=ctx["avg_gap_days"],
         first_event_date=ctx["first_event_date"],
@@ -103,11 +106,15 @@ def build_shared_passport(
     )
 
     milestones: list[PassportMilestone] = []
+    consistency = None
     if "milestones" in sections:
         milestones = [
             PassportMilestone(**{**m, "is_new": False})
             for m in passport_service.milestone_view(session, owner, ctx)
         ]
+        consistency = PassportConsistency(
+            **passport_service.consistency_context(ctx["events"])
+        )
 
     # Named city/country collections leak place names, so gate them behind the
     # map sections (the count-only stats above are always safe to show).
@@ -134,7 +141,11 @@ def build_shared_passport(
 
     timeline_items: list[PassportTimelineItem] = []
     timeline_markers: list[PassportTimelineMarker] = []
+    monthly = []
     if show_timeline:
+        monthly = [
+            MonthlyActivity(**m) for m in passport_service.monthly_activity(attended)
+        ]
         # City-level softening: drop the exact venue string and coordinates so
         # the shared timeline never pinpoints where the dancer was.
         timeline_items = [
@@ -157,6 +168,10 @@ def build_shared_passport(
             PassportTimelineMarker(**m)
             for m in passport_service.timeline_milestone_markers(attended, intl_ids)
         ]
+        timeline_markers += [
+            PassportTimelineMarker(**m)
+            for m in passport_service.consistency_timeline_markers(attended)
+        ]
 
     is_self = viewer is not None and viewer.id == owner.id
     is_following = False
@@ -176,10 +191,12 @@ def build_shared_passport(
         stats=stats,
         collections=PassportCollections(**collections),
         milestones=milestones,
+        consistency=consistency,
         events=events,
         sections=sections,
         timeline_items=timeline_items,
         timeline_markers=timeline_markers,
+        monthly_activity=monthly,
         handle=owner.handle,
         is_self=is_self,
         is_following=is_following,
@@ -195,6 +212,7 @@ def get_passport(
     # celebration toast fires). Phase C moves the source of truth to the
     # background scheduler; this stays idempotent.
     passport_service.evaluate_and_persist(session, user)
+    passport_service.evaluate_and_persist_consistency(session, user)
     ctx = passport_service.build_stats_context(session, user)
     stats = PassportStats(
         total_events_attended=ctx["total_events"],
@@ -203,7 +221,8 @@ def get_passport(
         reviews_written=ctx["reviews"],
         styles_danced=len(ctx["styles"]),
         top_style=ctx["top_style"],
-        longest_month_streak=ctx["longest_streak"],
+        active_months_last_12=ctx["active_months_last_12"],
+        active_months_this_year=ctx["active_months_this_year"],
         events_last_30_days=ctx["events_last_30d"],
         avg_gap_days=ctx["avg_gap_days"],
         first_event_date=ctx["first_event_date"],
@@ -219,6 +238,13 @@ def get_passport(
         stats=stats,
         collections=PassportCollections(**collections),
         milestones=milestones,
+        consistency=PassportConsistency(
+            **passport_service.consistency_view(session, user, ctx["events"])
+        ),
+        monthly_activity=[
+            MonthlyActivity(**m)
+            for m in passport_service.monthly_activity(ctx["events"])
+        ],
     )
 
 
@@ -244,6 +270,9 @@ def ack_milestones(
     session: Session = Depends(get_session),
 ) -> AckMilestonesResponse:
     acknowledged = passport_service.acknowledge_milestones(session, user, payload.keys)
+    acknowledged += passport_service.acknowledge_consistency(
+        session, user, payload.consistency
+    )
     return AckMilestonesResponse(acknowledged=acknowledged)
 
 
@@ -275,6 +304,10 @@ def get_passport_timeline(
     markers = [
         PassportTimelineMarker(**m)
         for m in passport_service.timeline_milestone_markers(events, intl_ids)
+    ]
+    markers += [
+        PassportTimelineMarker(**m)
+        for m in passport_service.consistency_timeline_markers(events)
     ]
     return PassportTimelineResponse(items=items, markers=markers, total=len(events))
 

@@ -3719,12 +3719,15 @@ export async function fetchPassportTimeline(
     return parseJsonResponse<PassportTimelineResponse>(res, 'Failed to fetch passport timeline');
 }
 
-export async function ackPassportMilestones(keys: string[]): Promise<{ acknowledged: number }> {
+export async function ackPassportMilestones(
+    keys: string[],
+    consistency: string[] = [],
+): Promise<{ acknowledged: number }> {
     const res = await fetch(`${BASE}/passport/milestones/ack`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ keys }),
+        body: JSON.stringify({ keys, consistency }),
     });
     return parseJsonResponse<{ acknowledged: number }>(res, 'Failed to acknowledge milestones');
 }

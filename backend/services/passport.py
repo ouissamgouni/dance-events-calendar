@@ -20,9 +20,31 @@ from backend.db.models import (
     EventTag,
     Tag,
     TagGroup,
+    UserConsistencyAchievement,
     UserEventAttendance,
     UserMilestone,
 )
+
+
+# --- Consistency achievements (recurring) ---------------------------------
+#
+# Reward sustained participation over a rolling 12 calendar months (the current
+# month plus the 11 before it). An "active month" is any calendar month with at
+# least one attended event; months need not be consecutive. Unlike the one-time
+# milestone catalog, consistency levels RECUR: each distinct "period" (a run
+# where the rolling active-month count stays >= the entry threshold) can earn
+# every level again. Everything here is recomputed deterministically from the
+# user's attended-event months, so there is no drift and no background job.
+CONSISTENCY_WINDOW = 12
+CONSISTENCY_ENTRY = 3  # active months in the window needed to open a period
+# (key, name, icon, threshold) ordered by ascending active-month threshold.
+CONSISTENCY_LEVELS: list[tuple[str, str, str, int]] = [
+    ("consistency_3", "Consistent", "📅", 3),
+    ("consistency_5", "Committed", "🗓️", 5),
+    ("consistency_8", "Year-Rounder", "🎆", 8),
+    ("consistency_10", "Unstoppable", "🔥", 10),
+    ("consistency_12", "Dance Lifestyle", "💎", 12),
+]
 
 
 def attended_events(session: Session, user_id: UUID) -> list[CachedEvent]:
@@ -104,21 +126,43 @@ def has_international_reach(session: Session, event_ids: list[str]) -> bool:
     return row is not None
 
 
-def longest_month_streak(events: list[CachedEvent]) -> int:
-    """Longest run of consecutive calendar months containing >=1 attended event."""
-    months = sorted({(e.start.year, e.start.month) for e in events})
-    if not months:
-        return 0
-    best = current = 1
-    for prev, nxt in zip(months, months[1:]):
-        prev_index = prev[0] * 12 + prev[1]
-        next_index = nxt[0] * 12 + nxt[1]
-        if next_index - prev_index == 1:
-            current += 1
-            best = max(best, current)
-        else:
-            current = 1
-    return best
+def _month_index(dt: datetime) -> int:
+    """Absolute calendar-month index (year*12 + month-1) for rolling-window math."""
+    return dt.year * 12 + (dt.month - 1)
+
+
+def _month_label(index: int) -> str:
+    """``"YYYY-MM"`` label for a month index (client formats the human range)."""
+    year, month = divmod(index, 12)
+    return f"{year:04d}-{month + 1:02d}"
+
+
+def active_month_indices(events: list[CachedEvent]) -> set[int]:
+    """Distinct calendar months (as indices) with at least one attended event."""
+    return {_month_index(e.start) for e in events}
+
+
+def monthly_activity(events: list[CachedEvent]) -> list[dict]:
+    """Per-month attended-event counts as ``[{"month": "YYYY-MM", "count": n}]``.
+
+    Only months with at least one event are emitted (oldest first); the client
+    fills the gaps between the first and last active year for the heatmap grid.
+    """
+    counts: dict[int, int] = {}
+    for e in events:
+        idx = _month_index(e.start)
+        counts[idx] = counts.get(idx, 0) + 1
+    return [
+        {"month": _month_label(idx), "count": counts[idx]} for idx in sorted(counts)
+    ]
+
+
+def rolling_active_count(
+    months: set[int], at_index: int, window: int = CONSISTENCY_WINDOW
+) -> int:
+    """Active months within the ``window`` calendar months ending at ``at_index``."""
+    low = at_index - (window - 1)
+    return sum(1 for mi in months if low <= mi <= at_index)
 
 
 def reviews_written(session: Session, user_id: UUID) -> int:
@@ -158,6 +202,8 @@ def build_stats_context(session: Session, user) -> dict:
     cities = {(e.city, e.country) for e in events if e.city}
     countries = {e.country for e in events if e.country}
     styles = _style_slugs(session, event_ids)
+    now = datetime.utcnow()
+    months = active_month_indices(events)
     return {
         "events": events,
         "event_ids": event_ids,
@@ -168,7 +214,8 @@ def build_stats_context(session: Session, user) -> dict:
         "top_style": top_dance_style(session, event_ids),
         "reviews": reviews_written(session, user.id),
         "has_international": has_international_reach(session, event_ids),
-        "longest_streak": longest_month_streak(events),
+        "active_months_last_12": rolling_active_count(months, _month_index(now)),
+        "active_months_this_year": sum(1 for mi in months if mi // 12 == now.year),
         "events_last_30d": events_last_30_days(events),
         "avg_gap_days": average_gap_days(events),
         "first_event_date": events[-1].start if events else None,
@@ -221,9 +268,10 @@ def timeline_milestone_markers(
     """Milestone unlocks placed on the date of the attended event that
     triggered them, for interleaving into the timeline.
 
-    Walks events oldest->newest so count/distinct/streak/international
-    milestones are attributed to the historically-correct event. Review
-    milestones are not event-anchored and are omitted here.
+    Walks events oldest->newest so count/distinct/international milestones are
+    attributed to the historically-correct event. Review milestones are not
+    event-anchored and are omitted here; recurring consistency reaches are
+    emitted separately by ``consistency_timeline_markers``.
     """
     ordered = sorted(events, key=lambda e: e.start)
     cities: set[tuple] = set()
@@ -244,7 +292,6 @@ def timeline_milestone_markers(
             "countries": countries,
             "reviews": 0,
             "has_international": seen_intl,
-            "longest_streak": longest_month_streak(ordered[:i]),
         }
         for m in MILESTONES:
             if m.category == "reviews" or m.key in emitted:
@@ -328,10 +375,6 @@ def _m_reviews(ctx: dict) -> int:
     return ctx["reviews"]
 
 
-def _m_streak(ctx: dict) -> int:
-    return ctx["longest_streak"]
-
-
 def _m_international(ctx: dict) -> int:
     return 1 if ctx["has_international"] else 0
 
@@ -341,40 +384,51 @@ MILESTONES: list[Milestone] = [
         "first_event",
         "First Steps",
         "Attend your first event",
-        "🎉",
-        "events",
-        1,
-        "events",
-        _m_events,
-        1,
-    ),
-    Milestone(
-        "events_10",
-        "Regular",
-        "Attend 10 events",
         "💃",
         "events",
-        10,
+        1,
         "events",
         _m_events,
-        20,
+        1,
     ),
     Milestone(
-        "events_25",
-        "Dedicated",
-        "Attend 25 events",
+        "events_5",
+        "Regular",
+        "Attend 5 events",
         "🔥",
         "events",
-        25,
+        5,
         "events",
         _m_events,
-        40,
+        15,
+    ),
+    Milestone(
+        "events_15",
+        "Dedicated",
+        "Attend 15 events",
+        "🏆",
+        "events",
+        15,
+        "events",
+        _m_events,
+        30,
+    ),
+    Milestone(
+        "events_30",
+        "Veteran",
+        "Attend 30 events",
+        "👑",
+        "events",
+        30,
+        "events",
+        _m_events,
+        48,
     ),
     Milestone(
         "events_50",
-        "Veteran",
+        "Legend",
         "Attend 50 events",
-        "🏆",
+        "✨",
         "events",
         50,
         "events",
@@ -382,10 +436,21 @@ MILESTONES: list[Milestone] = [
         65,
     ),
     Milestone(
+        "events_75",
+        "Elite",
+        "Attend 75 events",
+        "🌟",
+        "events",
+        75,
+        "events",
+        _m_events,
+        80,
+    ),
+    Milestone(
         "events_100",
-        "Legend",
+        "Icon",
         "Attend 100 events",
-        "👑",
+        "💎",
         "events",
         100,
         "events",
@@ -393,10 +458,21 @@ MILESTONES: list[Milestone] = [
         90,
     ),
     Milestone(
+        "cities_3",
+        "City Starter",
+        "Dance in 3 cities",
+        "🏙️",
+        "cities",
+        3,
+        "cities",
+        _m_cities,
+        20,
+    ),
+    Milestone(
         "cities_5",
-        "Explorer",
+        "City Hopper",
         "Dance in 5 cities",
-        "🗺️",
+        "🧳",
         "cities",
         5,
         "cities",
@@ -405,14 +481,47 @@ MILESTONES: list[Milestone] = [
     ),
     Milestone(
         "cities_10",
-        "City Hopper",
+        "City Explorer",
         "Dance in 10 cities",
-        "🏙️",
+        "🗺️",
         "cities",
         10,
         "cities",
         _m_cities,
-        60,
+        55,
+    ),
+    Milestone(
+        "cities_20",
+        "City Collector",
+        "Dance in 20 cities",
+        "🚆",
+        "cities",
+        20,
+        "cities",
+        _m_cities,
+        70,
+    ),
+    Milestone(
+        "cities_30",
+        "Urban Nomad",
+        "Dance in 30 cities",
+        "🌆",
+        "cities",
+        30,
+        "cities",
+        _m_cities,
+        82,
+    ),
+    Milestone(
+        "cities_50",
+        "City Legend",
+        "Dance in 50 cities",
+        "✨",
+        "cities",
+        50,
+        "cities",
+        _m_cities,
+        95,
     ),
     Milestone(
         "countries_3",
@@ -423,7 +532,7 @@ MILESTONES: list[Milestone] = [
         3,
         "countries",
         _m_countries,
-        45,
+        25,
     ),
     Milestone(
         "countries_5",
@@ -434,7 +543,7 @@ MILESTONES: list[Milestone] = [
         5,
         "countries",
         _m_countries,
-        70,
+        45,
     ),
     Milestone(
         "countries_10",
@@ -445,7 +554,40 @@ MILESTONES: list[Milestone] = [
         10,
         "countries",
         _m_countries,
-        95,
+        65,
+    ),
+    Milestone(
+        "countries_15",
+        "World Explorer",
+        "Dance in 15 countries",
+        "🧭",
+        "countries",
+        15,
+        "countries",
+        _m_countries,
+        78,
+    ),
+    Milestone(
+        "countries_25",
+        "Global Dancer",
+        "Dance in 25 countries",
+        "🌐",
+        "countries",
+        25,
+        "countries",
+        _m_countries,
+        88,
+    ),
+    Milestone(
+        "countries_40",
+        "World Citizen",
+        "Dance in 40 countries",
+        "🏆",
+        "countries",
+        40,
+        "countries",
+        _m_countries,
+        97,
     ),
     Milestone(
         "first_international",
@@ -470,10 +612,21 @@ MILESTONES: list[Milestone] = [
         10,
     ),
     Milestone(
+        "reviews_3",
+        "Contributor",
+        "Write 3 reviews",
+        "⭐",
+        "reviews",
+        3,
+        "reviews",
+        _m_reviews,
+        22,
+    ),
+    Milestone(
         "reviews_10",
         "Critic",
         "Write 10 reviews",
-        "⭐",
+        "💬",
         "reviews",
         10,
         "reviews",
@@ -481,37 +634,26 @@ MILESTONES: list[Milestone] = [
         40,
     ),
     Milestone(
-        "streak_3_months",
-        "Consistent",
-        "Dance 3 months in a row",
-        "📅",
-        "streak",
-        3,
-        "months",
-        _m_streak,
+        "reviews_25",
+        "Trusted Voice",
+        "Write 25 reviews",
+        "📝",
+        "reviews",
+        25,
+        "reviews",
+        _m_reviews,
+        60,
+    ),
+    Milestone(
+        "reviews_50",
+        "Community Guide",
+        "Write 50 reviews",
+        "🏆",
+        "reviews",
         50,
-    ),
-    Milestone(
-        "streak_6_months",
-        "Committed",
-        "Dance 6 months in a row",
-        "🗓️",
-        "streak",
-        6,
-        "months",
-        _m_streak,
-        75,
-    ),
-    Milestone(
-        "streak_12_months",
-        "Year-Rounder",
-        "Dance 12 months in a row",
-        "🎆",
-        "streak",
-        12,
-        "months",
-        _m_streak,
-        100,
+        "reviews",
+        _m_reviews,
+        80,
     ),
 ]
 
@@ -598,3 +740,343 @@ def acknowledge_milestones(session: Session, user, keys: list[str]) -> int:
     if rows:
         session.commit()
     return len(rows)
+
+
+# --- Consistency achievements (recurring) engine --------------------------
+
+
+def _record_reaches(period: dict, count: int, month_index: int) -> None:
+    """Append any newly-crossed level reaches (upward only, once per period)."""
+    reached = {r["key"] for r in period["reaches"]}
+    for key, name, icon, threshold in CONSISTENCY_LEVELS:
+        if threshold <= count and key not in reached:
+            period["reaches"].append(
+                {
+                    "key": key,
+                    "name": name,
+                    "icon": icon,
+                    "threshold": threshold,
+                    "month": month_index,
+                }
+            )
+
+
+def _consistency_periods(months: set[int], now_index: int) -> list[dict]:
+    """Replay the rolling active-month count month-by-month and split it into
+    consistency periods.
+
+    A period opens the month the rolling count first reaches
+    ``CONSISTENCY_ENTRY`` and closes once the count drops below it (its ``end``
+    is the last month still >= the entry threshold). The period still open at
+    ``now_index`` is returned with ``open=True``. Each period records, per
+    level, the month its threshold was first crossed upward (the "reach").
+    Because the rolling count changes by at most 1 per month, every threshold
+    is crossed exactly at its value and the reach month is itself active.
+    """
+    if not months:
+        return []
+    periods: list[dict] = []
+    current: dict | None = None
+    for m in range(min(months), now_index + 1):
+        count = rolling_active_count(months, m)
+        if current is None:
+            if count >= CONSISTENCY_ENTRY:
+                current = {"start": m, "end": m, "open": True, "reaches": []}
+                _record_reaches(current, count, m)
+        elif count >= CONSISTENCY_ENTRY:
+            current["end"] = m
+            _record_reaches(current, count, m)
+        else:
+            current["open"] = False
+            periods.append(current)
+            current = None
+    if current is not None:
+        current["end"] = now_index
+        periods.append(current)
+    return periods
+
+
+def _level_for_count(count: int) -> tuple | None:
+    """Highest level whose threshold is met by ``count`` (None below entry)."""
+    best = None
+    for level in CONSISTENCY_LEVELS:
+        if level[3] <= count:
+            best = level
+    return best
+
+
+def _earliest_active_in_window(
+    months: set[int], at_index: int, window: int = CONSISTENCY_WINDOW
+) -> int:
+    """Earliest active month still inside the rolling window ending at ``at_index``.
+
+    This is the first month that contributes to the reach count, so it anchors
+    the *displayed* period range of an earned card ("first contributing active
+    month → reach month"). It may sit in an earlier calendar year than the reach.
+    """
+    low = at_index - (window - 1)
+    return min(mi for mi in months if low <= mi <= at_index)
+
+
+def consistency_context(events: list[CachedEvent], now: datetime | None = None) -> dict:
+    """Full recurring-consistency state derived purely from attended months.
+
+    Models consistency as a chronological trail: every upward reach of a level
+    within a period is a permanent "earned" card (repeats are never collapsed),
+    ordered by the month it was reached. The current open period also surfaces
+    "locked" progress cards for the levels not yet reached. ``top`` condenses the
+    lifetime story (strongest level + recurrence) for the all-time card, and
+    ``by_year`` classifies each calendar year independently for the yearly card.
+    """
+    now = now or datetime.utcnow()
+    months = active_month_indices(events)
+    now_index = _month_index(now)
+    active_now = rolling_active_count(months, now_index)
+    periods = _consistency_periods(months, now_index)
+    open_period = periods[-1] if periods and periods[-1]["open"] else None
+
+    # Earned cards: one per (level, period) reach. Each card's displayed period
+    # runs from the earliest active month still in the window at the reach month
+    # → the reach month (may cross calendar years). Chronological, no ×N merge.
+    earned: list[dict] = []
+    for period in periods:
+        is_current = period is open_period
+        for reach in period["reaches"]:
+            start_index = _earliest_active_in_window(months, reach["month"])
+            earned.append(
+                {
+                    "key": f"{reach['key']}:{_month_label(period['start'])}",
+                    "level_key": reach["key"],
+                    "name": reach["name"],
+                    "icon": reach["icon"],
+                    "threshold": reach["threshold"],
+                    "period_start": _month_label(start_index),
+                    "reached": _month_label(reach["month"]),
+                    "is_current": is_current,
+                }
+            )
+    earned.sort(key=lambda c: c["reached"])
+
+    # Locked/progress cards: levels not yet reached in the current open period
+    # (or every level when no period is open), numerator = current rolling count.
+    reached_keys = {r["key"] for r in open_period["reaches"]} if open_period else set()
+    locked = [
+        {
+            "key": key,
+            "name": name,
+            "icon": icon,
+            "threshold": threshold,
+            "active_months": active_now,
+        }
+        for key, name, icon, threshold in CONSISTENCY_LEVELS
+        if key not in reached_keys
+    ]
+
+    # Strongest lifetime highlight = highest level ever reached (prioritised over
+    # repetition of a lower level) + how many times that level recurred.
+    counts: dict[str, dict] = {}
+    for period in periods:
+        for reach in period["reaches"]:
+            entry = counts.setdefault(
+                reach["key"],
+                {
+                    "name": reach["name"],
+                    "icon": reach["icon"],
+                    "threshold": reach["threshold"],
+                    "times": 0,
+                },
+            )
+            entry["times"] += 1
+    top = None
+    if counts:
+        strongest_key = max(counts, key=lambda k: counts[k]["threshold"])
+        s = counts[strongest_key]
+        top = {
+            "key": strongest_key,
+            "name": s["name"],
+            "icon": s["icon"],
+            "threshold": s["threshold"],
+            "times": s["times"],
+        }
+
+    # Per calendar year: distinct active months + the level that count classifies
+    # to (independent of rolling periods — used by the yearly passport card).
+    by_year: list[dict] = []
+    for year in sorted({mi // 12 for mi in months}):
+        count = sum(1 for mi in months if mi // 12 == year)
+        lvl = _level_for_count(count)
+        by_year.append(
+            {
+                "year": year,
+                "active_months": count,
+                "key": lvl[0] if lvl else None,
+                "name": lvl[1] if lvl else None,
+                "icon": lvl[2] if lvl else None,
+                "threshold": lvl[3] if lvl else None,
+            }
+        )
+
+    return {
+        "active": open_period is not None,
+        "active_months": active_now,
+        "window": CONSISTENCY_WINDOW,
+        "earned": earned,
+        "locked": locked,
+        "top": top,
+        "by_year": by_year,
+        "new": [],
+    }
+
+
+def _latest_event_by_month(events: list[CachedEvent]) -> dict[int, datetime]:
+    latest: dict[int, datetime] = {}
+    for e in events:
+        mi = _month_index(e.start)
+        if mi not in latest or e.start > latest[mi]:
+            latest[mi] = e.start
+    return latest
+
+
+def consistency_timeline_markers(
+    events: list[CachedEvent], now: datetime | None = None
+) -> list[dict]:
+    """Upward consistency reaches for the timeline — one per (level, period),
+    anchored to the latest attended event in the reach month. Recurs: the same
+    level appears again for a later period (keys carry the period start)."""
+    now = now or datetime.utcnow()
+    months = active_month_indices(events)
+    now_index = _month_index(now)
+    latest_by_month = _latest_event_by_month(events)
+    markers: list[dict] = []
+    for period in _consistency_periods(months, now_index):
+        period_start = _month_label(period["start"])
+        for reach in period["reaches"]:
+            anchor = latest_by_month.get(reach["month"])
+            if anchor is None:
+                continue
+            markers.append(
+                {
+                    "key": f"{reach['key']}:{period_start}",
+                    "name": reach["name"],
+                    "icon": reach["icon"],
+                    "date": anchor,
+                    "label": f"{reach['threshold']}/{CONSISTENCY_WINDOW} active months",
+                    "period_start": _month_label(
+                        _earliest_active_in_window(months, reach["month"])
+                    ),
+                    "period_end": _month_label(reach["month"]),
+                }
+            )
+    return markers
+
+
+def evaluate_and_persist_consistency(
+    session: Session, user, now: datetime | None = None
+) -> list[dict]:
+    """Reconcile ``UserConsistencyAchievement`` rows with the recomputed periods.
+
+    Inserts a row per newly-reached (level, period) and — the data-correction
+    policy — deletes rows whose (level, period) no longer exists once attendance
+    is cancelled/deleted (a month drops out of the active set). A normal rolling
+    decline never changes the recorded months, so historical achievements are
+    only ever removed by a genuine correction, never by quietening down.
+    Idempotent. Returns the newly-recorded reaches (for the toast path)."""
+    now = now or datetime.utcnow()
+    events = attended_events(session, user.id)
+    months = active_month_indices(events)
+    now_index = _month_index(now)
+    rows = session.exec(
+        select(UserConsistencyAchievement).where(
+            UserConsistencyAchievement.user_id == user.id
+        )
+    ).all()
+    existing = {(r.level_key, r.period_start): r for r in rows}
+    latest_by_month = _latest_event_by_month(events)
+    valid: set[tuple[str, str]] = set()
+    newly: list[dict] = []
+    changed = False
+    for period in _consistency_periods(months, now_index):
+        period_start = _month_label(period["start"])
+        for reach in period["reaches"]:
+            ident = (reach["key"], period_start)
+            valid.add(ident)
+            if ident in existing:
+                continue
+            session.add(
+                UserConsistencyAchievement(
+                    user_id=user.id,
+                    level_key=reach["key"],
+                    period_start=period_start,
+                    reached_at=latest_by_month.get(reach["month"], now),
+                )
+            )
+            changed = True
+            newly.append(
+                {
+                    "key": reach["key"],
+                    "name": reach["name"],
+                    "icon": reach["icon"],
+                    "period_start": period_start,
+                }
+            )
+    # Prune achievements invalidated by a data correction (cancelled/deleted
+    # attendance) — never by an ordinary decline (see docstring).
+    for ident, row in existing.items():
+        if ident not in valid:
+            session.delete(row)
+            changed = True
+    if changed:
+        session.commit()
+    return newly
+
+
+def consistency_view(
+    session: Session, user, events: list[CachedEvent] | None = None, now=None
+) -> dict:
+    """Consistency context plus the unseen reaches (``new``) for the toast."""
+    now = now or datetime.utcnow()
+    if events is None:
+        events = attended_events(session, user.id)
+    ctx = consistency_context(events, now)
+    lut = {lvl[0]: lvl for lvl in CONSISTENCY_LEVELS}
+    unseen = session.exec(
+        select(UserConsistencyAchievement)
+        .where(UserConsistencyAchievement.user_id == user.id)
+        .where(UserConsistencyAchievement.seen_at.is_(None))
+    ).all()
+    ctx["new"] = [
+        {
+            "key": r.level_key,
+            "name": lut[r.level_key][1],
+            "icon": lut[r.level_key][2],
+            "period_start": r.period_start,
+        }
+        for r in unseen
+        if r.level_key in lut
+    ]
+    return ctx
+
+
+def acknowledge_consistency(session: Session, user, idents: list[str]) -> int:
+    """Mark consistency reaches seen. Each ident is ``"level_key:YYYY-MM"``."""
+    wanted = set()
+    for ident in idents:
+        key, sep, period = ident.partition(":")
+        if sep:
+            wanted.add((key, period))
+    if not wanted:
+        return 0
+    rows = session.exec(
+        select(UserConsistencyAchievement)
+        .where(UserConsistencyAchievement.user_id == user.id)
+        .where(UserConsistencyAchievement.seen_at.is_(None))
+    ).all()
+    now = datetime.utcnow()
+    marked = 0
+    for row in rows:
+        if (row.level_key, row.period_start) in wanted:
+            row.seen_at = now
+            marked += 1
+    if marked:
+        session.commit()
+    return marked

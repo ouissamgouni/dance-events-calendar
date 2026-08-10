@@ -266,16 +266,20 @@ class TestPassportShare:
             "stats",
             "collections",
             "milestones",
+            "consistency",
             "events",
             "sections",
             "timeline_items",
             "timeline_markers",
+            "monthly_activity",
             "handle",
             "is_self",
             "is_following",
         }
         assert body["timeline_items"] == []
         assert body["timeline_markers"] == []
+        # Activity heatmap is gated by the timeline section (off by default).
+        assert body["monthly_activity"] == []
         assert "@" not in (body["display_name"] or "")
 
     def test_shared_honors_section_toggles(self, client_with_user):
@@ -310,6 +314,10 @@ class TestPassportShare:
         assert body["collections"]["countries"] == []
         # Opted-in timeline is populated.
         assert len(body["timeline_items"]) == 1
+        # Activity heatmap rides along with the shared timeline.
+        assert body["monthly_activity"] == [
+            {"month": (NOW - timedelta(days=30)).strftime("%Y-%m"), "count": 1}
+        ]
         # Stats are always shown regardless of toggles.
         assert body["stats"]["total_events_attended"] == 1
 

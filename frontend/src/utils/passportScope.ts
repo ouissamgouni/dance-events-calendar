@@ -10,7 +10,7 @@
  * year-scoped card instead surfaces the milestones *unlocked that year* plus a
  * few computed highlights (busiest month, new places, in-year streak).
  */
-import type { PassportMapEvent, PassportMilestone } from '../types';
+import type { PassportConsistency, PassportMapEvent, PassportMilestone, MonthlyActivity } from '../types';
 
 /** `'all'` = lifetime; a number = a specific calendar year. */
 export type ShareScope = 'all' | number;
@@ -32,29 +32,38 @@ export interface ScopedPassport {
     countries: number;
     /** Average days between events ("Danced every N days"); null if < 2 events. */
     cadenceDays: number | null;
-    /** Longest run of consecutive calendar months with an event, within scope. */
-    monthStreak: number;
+    /**
+     * Active months in scope: for the all-time card this is the rolling
+     * 12-month active-month count (from the recurring consistency engine); for
+     * a year card it's the number of distinct calendar months with an event
+     * that year.
+     */
+    activeMonths: number;
+    /** Denominator for {@link activeMonths}: 12 all-time, else 12 (calendar). */
+    activeMonthsOf: number;
     /** Most-danced style label (all-time, from backend); null when unknown. */
     topStyle: string | null;
     topCity: string | null;
     coords: { lat: number; lng: number }[];
     /** Up to MAX_BADGES badges/highlights for the card's badge row. */
     badges: ScopedBadge[];
+    /** Per-month attended-event counts in scope (for the activity heatmap). */
+    monthly: MonthlyActivity[];
     /**
-     * True when an all-time streak/regularity milestone (e.g. "Consistent")
-     * already occupies a badge slot, so the card hides the redundant streak
+     * True when a recurring consistency badge (e.g. "Committed") already
+     * occupies a badge slot, so the card hides the redundant active-months
      * stat cell.
      */
-    streakInBadges: boolean;
+    consistencyInBadges: boolean;
 }
 
 const MAX_BADGES = 6;
 const MS_PER_DAY = 86_400_000;
 
-// Badge display order across milestone families: consistency (streak) leads,
+// Badge display order across milestone families: consistency leads,
 // reviews ("Critic") trail. Everything else sits in the middle by prestige.
 const CATEGORY_RANK: Record<string, number> = {
-    streak: 0,
+    consistency: 0,
     events: 1,
     cities: 2,
     countries: 3,
@@ -89,6 +98,20 @@ function cadenceBadgeOf(cadenceDays: number | null): ScopedBadge | null {
 function eventYear(iso: string): number | null {
     const d = new Date(iso);
     return Number.isNaN(d.getTime()) ? null : d.getFullYear();
+}
+
+/** Per-month attended-event counts ("YYYY-MM"), oldest first. */
+function monthlyFromEvents(events: PassportMapEvent[]): MonthlyActivity[] {
+    const counts = new Map<string, number>();
+    for (const ev of events) {
+        const d = new Date(ev.start);
+        if (Number.isNaN(d.getTime())) continue;
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([month, count]) => ({ month, count }));
 }
 
 function cityKey(ev: PassportMapEvent): string | null {
@@ -138,23 +161,14 @@ function coordsOf(events: PassportMapEvent[]): { lat: number; lng: number }[] {
     return out;
 }
 
-/** Longest run of consecutive calendar months containing >=1 event, in scope. */
-function monthStreakOf(events: PassportMapEvent[]): number {
+/** Distinct calendar months with >=1 event in `year`. */
+function activeMonthsInYear(events: PassportMapEvent[], year: number): number {
     const months = new Set<number>();
     for (const ev of events) {
         const d = new Date(ev.start);
-        if (!Number.isNaN(d.getTime())) months.add(d.getFullYear() * 12 + d.getMonth());
+        if (!Number.isNaN(d.getTime()) && d.getFullYear() === year) months.add(d.getMonth());
     }
-    const sorted = [...months].sort((a, b) => a - b);
-    let best = 0;
-    let run = 0;
-    let prev: number | null = null;
-    for (const idx of sorted) {
-        run = prev !== null && idx - prev === 1 ? run + 1 : 1;
-        if (run > best) best = run;
-        prev = idx;
-    }
-    return best;
+    return months.size;
 }
 
 /** Actual-count totals used to describe all-time milestone badges accurately. */
@@ -162,7 +176,6 @@ interface AllTimeTotals {
     events: number;
     cities: number;
     countries: number;
-    monthStreak: number;
     reviews: number;
 }
 
@@ -193,8 +206,6 @@ function milestoneDescription(m: PassportMilestone, totals: AllTimeTotals): stri
             return countLabel(totals.countries, 'country');
         case 'reviews':
             return countLabel(totals.reviews, 'review');
-        case 'streak':
-            return `${totals.monthStreak} ${totals.monthStreak === 1 ? 'month' : 'months'} in a row`;
         default:
             return m.description;
     }
@@ -327,6 +338,8 @@ function newPlacesBadge(noun: string, icon: string, places: NewPlaces): ScopedBa
  * @param scope  `'all'` or a calendar year.
  * @param topStyle  Most-danced style label (all-time, from backend stats).
  * @param reviewsTotal  All-time approved review count (for the reviews badge).
+ * @param consistency  Recurring-consistency summary (for the all-time active-
+ *   months count and the lifetime consistency badge); null when unavailable.
  */
 export function scopePassport(
     events: PassportMapEvent[],
@@ -334,6 +347,7 @@ export function scopePassport(
     scope: ShareScope,
     topStyle: string | null = null,
     reviewsTotal = 0,
+    consistency: PassportConsistency | null = null,
 ): ScopedPassport {
     const scoped =
         scope === 'all'
@@ -350,20 +364,22 @@ export function scopePassport(
     }
 
     const cadenceDays = cadence(scoped);
-    const monthStreak = monthStreakOf(scoped);
+    const activeMonths =
+        scope === 'all'
+            ? (consistency?.active_months ?? 0)
+            : activeMonthsInYear(scoped, scope);
 
     let badges: ScopedBadge[];
-    let streakInBadges = false;
+    let consistencyInBadges = false;
     if (scope === 'all') {
         // Order every badge by family (CATEGORY_RANK): consistency leads, reviews
-        // trail. The cadence signature sits with consistency (just after streak)
+        // trail. The cadence signature sits with consistency (just after it)
         // and top style just ahead of reviews, so the least-prestigious "Critic"
         // badge is the first thing dropped when the row overflows.
         const totals: AllTimeTotals = {
             events: scoped.length,
             cities: cityKeys.size,
             countries: countryKeys.size,
-            monthStreak,
             reviews: reviewsTotal,
         };
         type Ranked = { badge: ScopedBadge; rank: number; category: string };
@@ -377,9 +393,35 @@ export function scopePassport(
             rank: categoryRank(m.category),
             category: m.category,
         }));
+        // Lifetime consistency highlight: strongest level ever reached, with a
+        // "×N" note when it recurred across multiple periods.
+        const top = consistency?.top;
+        if (top) {
+            const win = consistency?.window ?? 12;
+            const recur =
+                top.times === 1
+                    ? ''
+                    : top.times === 2
+                        ? ', twice'
+                        : `, ${top.times} times`;
+            ranked.push({
+                badge: {
+                    key: `consistency_top_${top.key}`,
+                    icon: top.icon,
+                    label: top.times > 1 ? `${top.name} ×${top.times}` : top.name,
+                    description: `${top.threshold}/${win} active months${recur}`,
+                },
+                rank: CATEGORY_RANK.consistency,
+                category: 'consistency',
+            });
+        }
         const cadenceBadge = cadenceBadgeOf(cadenceDays);
         if (cadenceBadge) {
-            ranked.push({ badge: cadenceBadge, rank: CATEGORY_RANK.streak + 0.5, category: 'cadence' });
+            ranked.push({
+                badge: cadenceBadge,
+                rank: CATEGORY_RANK.consistency + 0.5,
+                category: 'cadence',
+            });
         }
         if (topStyle) {
             ranked.push({
@@ -389,19 +431,16 @@ export function scopePassport(
             });
         }
         const shown = ranked.sort((a, b) => a.rank - b.rank).slice(0, MAX_BADGES);
-        streakInBadges = shown.some((r) => r.category === 'streak');
+        consistencyInBadges = shown.some((r) => r.category === 'consistency');
         badges = shown.map((r) => r.badge);
     } else {
         // Year card: cadence + busiest month lead, then new places / milestones
         // unlocked that year. A geography milestone unlocked in-year absorbs the
-        // matching "new countries/cities" detail so the two don't repeat. Streak
-        // milestones are dropped here — the spelled-out streak stat cell already
-        // carries that fact on the year card.
+        // matching "new countries/cities" detail so the two don't repeat.
         const newCountries = newPlaces(scope, events, countryKey, (e) => e.country);
         const newCities = newPlaces(scope, events, cityKey, (e) => e.city);
         const usedGeo = new Set<string>();
         const yearMilestones = milestonesUnlockedInYear(milestones, scope)
-            .filter((m) => m.category !== 'streak')
             .map((m): ScopedBadge => {
                 if (m.category === 'countries' && newCountries) {
                     usedGeo.add('countries');
@@ -421,7 +460,26 @@ export function scopePassport(
             geoBadges.push(newPlacesBadge('city', '✈️', newCities));
         }
         const busiest = busiestMonthBadge(scope, scoped);
-        badges = [cadenceBadgeOf(cadenceDays), busiest, ...geoBadges, ...yearMilestones]
+        // Yearly consistency highlight: the displayed calendar year's own Jan–Dec
+        // active-month count, classified to a level (no periods, no lifetime
+        // unlock). Leads the year card when the count qualifies.
+        const yearLevel = consistency?.by_year.find((y) => y.year === scope);
+        const consistencyYearBadge: ScopedBadge | null =
+            yearLevel && yearLevel.key
+                ? {
+                    key: `consistency_year_${yearLevel.key}`,
+                    icon: yearLevel.icon ?? '📅',
+                    label: yearLevel.name ?? 'Consistent',
+                    description: `${yearLevel.threshold}/12 active months`,
+                }
+                : null;
+        badges = [
+            consistencyYearBadge,
+            cadenceBadgeOf(cadenceDays),
+            busiest,
+            ...geoBadges,
+            ...yearMilestones,
+        ]
             .filter((b): b is ScopedBadge => b !== null)
             .slice(0, MAX_BADGES);
     }
@@ -432,11 +490,13 @@ export function scopePassport(
         cities: cityKeys.size,
         countries: countryKeys.size,
         cadenceDays,
-        monthStreak,
+        activeMonths,
+        activeMonthsOf: 12,
         topStyle: scope === 'all' ? topStyle : null,
         topCity: topCityLabel(scoped),
         coords: coordsOf(scoped),
         badges,
-        streakInBadges,
+        monthly: monthlyFromEvents(scoped),
+        consistencyInBadges,
     };
 }

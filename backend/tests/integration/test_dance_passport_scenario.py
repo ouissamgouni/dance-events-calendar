@@ -95,7 +95,7 @@ class TestDancePassportScenario:
         # milestones on the first evaluation.
         for key in (
             "first_event",
-            "events_10",
+            "events_5",
             "cities_5",
             "cities_10",
             "countries_3",
@@ -115,14 +115,14 @@ class TestDancePassportScenario:
 
         assert newly == ["first_event"]
 
-    def test_cusp_dedicated_unlocks_on_25th_event(self, seeded_session):
+    def test_cusp_dedicated_unlocks_on_15th_event(self, seeded_session):
         dana = _user(seeded_session, "cusp-dedicated@example.com")
         ctx = passport_service.build_stats_context(seeded_session, dana)
-        # Sits at exactly 24 attended events — one short of Dedicated (25).
-        assert ctx["total_events"] == 24
-        assert "events_25" not in passport_service.satisfied_keys(ctx)
+        # Sits at exactly 14 attended events — one short of Dedicated (15).
+        assert ctx["total_events"] == 14
+        assert "events_15" not in passport_service.satisfied_keys(ctx)
 
-        # Attend the spare 25th event, then re-evaluate: Dedicated unlocks.
+        # Attend the spare 15th event, then re-evaluate: Dedicated unlocks.
         seeded_session.add(
             UserEventAttendance(
                 device_id="test-dana-vol13",
@@ -133,7 +133,7 @@ class TestDancePassportScenario:
         seeded_session.commit()
 
         newly = passport_service.evaluate_and_persist(seeded_session, dana)
-        assert "events_25" in newly
+        assert "events_15" in newly
 
     def test_city_collection_carries_coordinates(self, seeded_session):
         alba = _user(seeded_session, "alba@example.com")
@@ -176,3 +176,81 @@ class TestDancePassportScenario:
         assert len(ctx["cities"]) == 6  # Prague de-duplicated
         assert len(ctx["countries"]) == 4  # FR, CH, AT, CZ
         assert ctx["top_style"] == "Salsa"
+
+    def _consistency(self, session, email):
+        user = _user(session, email)
+        ctx = passport_service.build_stats_context(session, user)
+        return passport_service.consistency_context(ctx["events"])
+
+    def test_consistent_user_reaches_first_level(self, seeded_session):
+        # Cara: 3 active months -> Consistent, an open period, one earned card.
+        c = self._consistency(seeded_session, "consistent@example.com")
+        assert c["active"] is True
+        assert c["active_months"] == 3
+        assert [card["level_key"] for card in c["earned"]] == ["consistency_3"]
+        assert c["top"]["key"] == "consistency_3"
+        assert c["top"]["times"] == 1
+
+    def test_committed_user_reaches_second_level(self, seeded_session):
+        # Cole: 5 active months -> Committed (two earned cards).
+        c = self._consistency(seeded_session, "committed@example.com")
+        assert c["active_months"] == 5
+        assert [card["level_key"] for card in c["earned"]] == [
+            "consistency_3",
+            "consistency_5",
+        ]
+        assert c["top"]["key"] == "consistency_5"
+
+    def test_year_rounder_reaches_third_level(self, seeded_session):
+        # Yuki: 8 active months -> Year-Rounder (three earned cards).
+        c = self._consistency(seeded_session, "yearround@example.com")
+        assert c["active_months"] == 8
+        assert [card["level_key"] for card in c["earned"]] == [
+            "consistency_3",
+            "consistency_5",
+            "consistency_8",
+        ]
+        assert c["top"]["key"] == "consistency_8"
+
+    def test_below_entry_has_no_period(self, seeded_session):
+        # Bo: 2 active months -> no period, only locked progress shown.
+        c = self._consistency(seeded_session, "belowentry@example.com")
+        assert c["active"] is False
+        assert c["active_months"] == 2
+        assert c["earned"] == []
+        assert c["locked"][0]["key"] == "consistency_3"
+        assert c["locked"][0]["active_months"] == 2
+
+    def test_comeback_user_recurs_consistent(self, seeded_session):
+        # Mira: an old lapsed 3-month period + a fresh Consistent reach ->
+        # Consistent earned twice as two separate permanent cards.
+        c = self._consistency(seeded_session, "comeback@example.com")
+        assert c["active"] is True
+        consistent_cards = [
+            card for card in c["earned"] if card["level_key"] == "consistency_3"
+        ]
+        assert len(consistent_cards) == 2
+        assert consistent_cards[0]["reached"] != consistent_cards[1]["reached"]
+        assert c["top"]["key"] == "consistency_3"
+        assert c["top"]["times"] == 2
+
+    def test_dip_user_keeps_earned_after_cooling(self, seeded_session):
+        # Nia: peaked at Year-Rounder (8) in one long period, then the two
+        # oldest months aged out so the current rolling count cooled below the
+        # peak. The earned cards persist and the all-time highlight stays put.
+        c = self._consistency(seeded_session, "dip@example.com")
+        assert c["active"] is True
+        earned_keys = [card["level_key"] for card in c["earned"]]
+        assert "consistency_8" in earned_keys  # Year-Rounder card persists
+        assert c["active_months"] < 8  # current count has cooled below the peak
+        assert c["top"]["key"] == "consistency_8"
+        # Locked levels progress from the (lower) current count, not from 8.
+        assert c["locked"][0]["active_months"] == c["active_months"]
+
+    def test_consistency_persist_is_idempotent(self, seeded_session):
+        # Recording a user's reaches is stable and re-runs are no-ops.
+        cole = _user(seeded_session, "committed@example.com")
+        first = passport_service.evaluate_and_persist_consistency(seeded_session, cole)
+        keys = {r["key"] for r in first}
+        assert "consistency_3" in keys and "consistency_5" in keys
+        assert passport_service.evaluate_and_persist_consistency(seeded_session, cole) == []
