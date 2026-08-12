@@ -173,8 +173,14 @@ class TestSettingsEndpoint:
         assert body["review_prompt_lookback_hours"] == 24
         assert body["for_you_review_window_days"] == 180
         assert body["review_mood_headline_min_reviews"] == 3
-
-    def test_admin_can_update_notification_gates(self, sqlite_client):
+        assert body["event_message_cta_min_going"] == 3
+        # Milestone notifications: master on, instant off (digest), digest on.
+        assert body["milestone_notifications_enabled"] is True
+        assert body["milestone_unlocked_email_instant"] is False
+        assert body["milestone_unlocked_email_digest"] is True
+        # Event messages: instant off (digest-only), digest on by default.
+        assert body["event_messages_email_instant"] is False
+        assert body["event_messages_email_digest"] is True
         client, engine = sqlite_client
         resp = client.put(
             "/api/settings",
@@ -190,6 +196,12 @@ class TestSettingsEndpoint:
                 "review_prompt_lookback_hours": 48,
                 "for_you_review_window_days": 365,
                 "review_mood_headline_min_reviews": 8,
+                "event_message_cta_min_going": 5,
+                "milestone_notifications_enabled": False,
+                "milestone_unlocked_email_instant": True,
+                "milestone_unlocked_email_digest": False,
+                "event_messages_email_instant": True,
+                "event_messages_email_digest": False,
             },
         )
         assert resp.status_code == 200, resp.text
@@ -205,6 +217,12 @@ class TestSettingsEndpoint:
         assert body["review_prompt_lookback_hours"] == 48
         assert body["for_you_review_window_days"] == 365
         assert body["review_mood_headline_min_reviews"] == 8
+        assert body["event_message_cta_min_going"] == 5
+        assert body["milestone_notifications_enabled"] is False
+        assert body["milestone_unlocked_email_instant"] is True
+        assert body["milestone_unlocked_email_digest"] is False
+        assert body["event_messages_email_instant"] is True
+        assert body["event_messages_email_digest"] is False
 
         with Session(engine) as session:
             assert session.get(SiteSetting, "event_reminders_enabled").value == "false"
@@ -223,6 +241,19 @@ class TestSettingsEndpoint:
             assert (
                 session.get(SiteSetting, "review_mood_headline_min_reviews").value
                 == "8"
+            )
+            assert session.get(SiteSetting, "event_message_cta_min_going").value == "5"
+            assert (
+                session.get(SiteSetting, "milestone_notifications_enabled").value
+                == "false"
+            )
+            assert (
+                session.get(SiteSetting, "milestone_unlocked_email_instant").value
+                == "true"
+            )
+            assert (
+                session.get(SiteSetting, "milestone_unlocked_email_digest").value
+                == "false"
             )
         # GET reflects the persisted values.
         body = client.get("/api/settings").json()

@@ -210,6 +210,10 @@ interface Props {
      * Going, ratings, tags, or avatar overlays. Used by the Dance Passport
      * map where actions would be out of place. */
     minimalPopup?: boolean;
+    /** When set, render a crosshair "recenter" control (under the +/− zoom
+     * buttons) that snaps the map back to these coordinates. Used on the
+     * event detail page to return to the event's own location after panning. */
+    recenterTo?: [number, number] | null;
 }
 
 interface PopupPortal {
@@ -624,6 +628,47 @@ function FlyToAreaController({
     return null;
 }
 
+/**
+ * A Leaflet control button (crosshair) that recenters the map back to a fixed
+ * location — used on the event detail page so the user can snap back to the
+ * event's own coordinates after panning. Rendered at ``topleft`` so it stacks
+ * directly under the default +/− zoom control.
+ */
+function RecenterControl({ recenterTo }: { recenterTo: [number, number] }) {
+    const map = useMap();
+    useEffect(() => {
+        const control = new L.Control({ position: 'topleft' });
+        control.onAdd = () => {
+            const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+            const link = L.DomUtil.create('a', '', container) as HTMLAnchorElement;
+            link.href = '#';
+            link.title = 'Recenter on event';
+            link.setAttribute('role', 'button');
+            link.setAttribute('aria-label', 'Recenter on event');
+            link.style.display = 'flex';
+            link.style.alignItems = 'center';
+            link.style.justifyContent = 'center';
+            link.innerHTML =
+                '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" ' +
+                'viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+                'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/>' +
+                '<line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/>' +
+                '<line x1="19" y1="12" x2="22" y2="12"/></svg>';
+            L.DomEvent.on(link, 'click', (e) => {
+                L.DomEvent.stop(e);
+                map.setView(recenterTo, CITY_ZOOM, { animate: true });
+            });
+            return container;
+        };
+        control.addTo(map);
+        return () => {
+            control.remove();
+        };
+    }, [map, recenterTo]);
+    return null;
+}
+
 function MarkerClusterLayer({
     events,
     hoveredEventId,
@@ -806,7 +851,7 @@ function MarkerClusterLayer({
     );
 }
 
-export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, preserveViewport, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true, minimalPopup = false }: Props) {
+export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, preserveViewport, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true, minimalPopup = false, recenterTo = null }: Props) {
     const { showRatings, eventColorBarColor, followingBadgeEnabled, unseenStateEnabled, trendingEnabled, trendingTopN, trendingTopPercent } = useFeatureFlags();
     const markerRefs = useRef(new Map<string, L.Marker>());
     const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
@@ -931,6 +976,7 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
             />
             <MapResizeController />
             <FlyToAreaController flyToArea={flyToArea} flyToAreaToken={flyToAreaToken} />
+            {recenterTo && <RecenterControl recenterTo={recenterTo} />}
             <BoundsReporter onBoundsChange={onBoundsChange} />
             <MarkerClusterLayer
                 events={geoEvents}

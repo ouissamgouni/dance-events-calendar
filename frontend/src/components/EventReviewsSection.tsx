@@ -108,13 +108,17 @@ interface Props {
     /** Bump this to a new value (e.g. a counter) whenever the current user's rating changed
      * elsewhere on the page, so the aggregate + review list reload without a full remount. */
     refreshToken?: number;
+    /** Render a chevron toggle in the header so the whole section can be
+     * collapsed (used on the event detail page). */
+    collapsible?: boolean;
 }
 
 const PAGE_SIZE = 5;
 
-export default function EventReviewsSection({ eventId, isPast = true, onAggregateLoaded, onOpenReviewForm, refreshToken }: Props) {
+export default function EventReviewsSection({ eventId, isPast = true, onAggregateLoaded, onOpenReviewForm, refreshToken, collapsible = false }: Props) {
     const { user } = useAuth();
     const location = useLocation();
+    const [collapsed, setCollapsed] = useState(false);
     // Review count is public — surface it to signed-out visitors from the shared
     // (count-only) aggregate cache so the gated section can still show "N reviews".
     const anonAggregate = useRatingAggregate(eventId);
@@ -220,6 +224,25 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
         onAggregateLoaded?.(anonAggregate);
     }, [user, anonAggregate, onAggregateLoaded]);
 
+    // Chevron toggle injected into each branch's "Community Experience"
+    // header when the section is rendered as a collapsible card.
+    const collapseChevron = collapsible ? (
+        <button
+            type="button"
+            onClick={() => setCollapsed((v) => !v)}
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? 'Expand community experience' : 'Collapse community experience'}
+            className="mr-1 align-middle text-slate-400 hover:text-slate-600"
+        >
+            <span
+                aria-hidden="true"
+                className={`inline-block transition-transform ${collapsed ? '' : 'rotate-90'}`}
+            >
+                ▸
+            </span>
+        </button>
+    ) : null;
+
     if (!user) {
         const count = anonAggregate?.count ?? 0;
         // Nothing to gate behind sign-in when the event has no reviews yet.
@@ -227,55 +250,55 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
         return (
             <section className="mt-4 border-t border-slate-200 pt-3 space-y-2">
                 <h3 className="text-base font-bold text-slate-900">
+                    {collapseChevron}
                     Community Experience{' '}
                     <span className="text-sm font-normal tabular-nums text-slate-500">
                         · {count} review{count === 1 ? '' : 's'}
                     </span>
                 </h3>
-                <p className="text-[11px] text-slate-500">
-                    <Link
-                        to={`/login?next=${encodeURIComponent(`${location.pathname}${location.search}#community`)}`}
-                        className="text-sky-600 hover:text-sky-700 font-medium"
-                    >
-                        Sign in
-                    </Link>{' '}
-                    to see and leave reviews for this event.
-                </p>
+                {!collapsed && (
+                    <p className="text-[11px] text-slate-500">
+                        <Link
+                            to={`/login?next=${encodeURIComponent(`${location.pathname}${location.search}#community`)}`}
+                            className="text-sky-600 hover:text-sky-700 font-medium"
+                        >
+                            Sign in
+                        </Link>{' '}
+                        to see and leave reviews for this event.
+                    </p>
+                )}
             </section>
         );
     }
 
     if (!effectiveAggregate || effectiveAggregate.count === 0) {
-        // Upcoming editions can't be reviewed — surface the series' typical
-        // experience (if any) so the section is never empty.
-        if (!isPast) {
-            return (
-                <section className="mt-4 border-t border-slate-200 pt-3 space-y-2">
-                    <h3 className="text-base font-bold text-slate-900">Community Experience</h3>
-                    {typicalCard}
-                    <p className="text-[11px] text-slate-500">
-                        Reviews open after the event takes place.
-                    </p>
-                </section>
-            );
-        }
         return (
             <section className="mt-4 border-t border-slate-200 pt-3 space-y-2">
-                <h3 className="text-base font-bold text-slate-900">Community Experience</h3>
-                <p className="text-[11px] text-slate-500">
-                    No reviews for this edition yet.{' '}
-                    {onOpenReviewForm ? (
-                        <button
-                            onClick={onOpenReviewForm}
-                            className="text-sky-600 hover:text-sky-700 font-medium"
-                        >
-                            Be the first to leave one!
-                        </button>
-                    ) : (
-                        <span>Be the first to leave one!</span>
-                    )}
-                </p>
-                {typicalCard}
+                <h3 className="text-base font-bold text-slate-900">{collapseChevron}Community Experience</h3>
+                {!collapsed && (
+                    <>
+                        {typicalCard}
+                        {isPast ? (
+                            <p className="text-[11px] text-slate-500">
+                                No reviews for this edition yet.{' '}
+                                {onOpenReviewForm ? (
+                                    <button
+                                        onClick={onOpenReviewForm}
+                                        className="text-sky-600 hover:text-sky-700 font-medium"
+                                    >
+                                        Be the first to leave one!
+                                    </button>
+                                ) : (
+                                    <span>Be the first to leave one!</span>
+                                )}
+                            </p>
+                        ) : (
+                            <p className="text-[11px] text-slate-500">
+                                Reviews open after the event takes place.
+                            </p>
+                        )}
+                    </>
+                )}
             </section>
         );
     }
@@ -283,110 +306,113 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
     return (
         <section className="mt-4 border-t border-slate-200 pt-3 space-y-4 max-w-full overflow-hidden">
             <h3 className="text-base font-bold text-slate-900">
+                {collapseChevron}
                 Community Experience <span className="font-medium text-slate-400">({effectiveAggregate.count})</span>
             </h3>
 
+            {!collapsed && (
+                <>
+                    <ExperienceBreakdown
+                        aggregate={effectiveAggregate}
+                        aspectLabels={aspectLabels}
+                        editionCount={crossEdition && series ? series.reviewed_edition_count : undefined}
+                        slotAfterMoodBreakdown={crossEdition ? null : typicalCard}
+                        moodHeadline={crossEdition ? typicalCard : undefined}
+                    />
 
-            <ExperienceBreakdown
-                aggregate={effectiveAggregate}
-                aspectLabels={aspectLabels}
-                editionCount={crossEdition && series ? series.reviewed_edition_count : undefined}
-                slotAfterMoodBreakdown={crossEdition ? null : typicalCard}
-                moodHeadline={crossEdition ? typicalCard : undefined}
-            />
+                    <div className="flex items-center gap-2 text-[11px] border-t border-slate-200 pt-4">
+                        <label className="text-slate-500">Sort:</label>
+                        <select
+                            value={sort}
+                            onChange={(e) => setSort(e.target.value as 'recent' | 'positive' | 'critical')}
+                            className="border border-slate-300 px-1.5 py-0.5 text-[11px] bg-white"
+                        >
+                            <option value="recent">Most recent</option>
+                            <option value="positive">Most positive</option>
+                            <option value="critical">Most critical</option>
+                        </select>
+                    </div>
 
-            <div className="flex items-center gap-2 text-[11px] border-t border-slate-200 pt-4">
-                <label className="text-slate-500">Sort:</label>
-                <select
-                    value={sort}
-                    onChange={(e) => setSort(e.target.value as 'recent' | 'positive' | 'critical')}
-                    className="border border-slate-300 px-1.5 py-0.5 text-[11px] bg-white"
-                >
-                    <option value="recent">Most recent</option>
-                    <option value="positive">Most positive</option>
-                    <option value="critical">Most critical</option>
-                </select>
-            </div>
-
-            <div className="max-w-full overflow-x-auto pb-2 -mx-1 px-1">
-                <div className="flex gap-4 divide-x divide-slate-200">
-                    {reviews.map((r) => {
-                        const meta = r.overall_sentiment ? SENTIMENT_META[r.overall_sentiment] : null;
-                        const initials =
-                            r.reviewer_label
-                                .trim()
-                                .split(/\s+/)
-                                .map((w) => w[0])
-                                .slice(0, 2)
-                                .join('')
-                                .toUpperCase() || '?';
-                        const tags = cardTags(r);
-                        const shown = tags.slice(0, CARD_TAGS_SHOWN);
-                        const extra = tags.length - shown.length;
-                        return (
-                            <div key={r.id} className="w-56 shrink-0 space-y-1.5 pl-4 first:pl-0">
-                                <div className="flex items-center gap-2">
-                                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[11px] font-semibold text-slate-600">
-                                        {initials}
-                                    </span>
-                                    <span className="text-sm font-medium text-slate-800 truncate">{r.reviewer_label}</span>
-                                </div>
-                                <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                                    {meta && <span title={meta.label}>{meta.emoji} {meta.label}</span>}
-                                    {meta && <span className="text-slate-300">·</span>}
-                                    <span>{new Date(r.created_at).toLocaleDateString()}</span>
-                                </div>
-                                {r.comment && (
-                                    <p className="text-xs text-slate-700 whitespace-pre-wrap break-words">{r.comment}</p>
-                                )}
-                                {tags.length > 0 && (
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {shown.map((t) => (
-                                            <span key={t.key} className={`rounded-full px-2 py-0.5 text-[11px] ${t.cls}`}>
-                                                {t.label}
+                    <div className="max-w-full overflow-x-auto pb-2 -mx-1 px-1">
+                        <div className="flex gap-4 divide-x divide-slate-200">
+                            {reviews.map((r) => {
+                                const meta = r.overall_sentiment ? SENTIMENT_META[r.overall_sentiment] : null;
+                                const initials =
+                                    r.reviewer_label
+                                        .trim()
+                                        .split(/\s+/)
+                                        .map((w) => w[0])
+                                        .slice(0, 2)
+                                        .join('')
+                                        .toUpperCase() || '?';
+                                const tags = cardTags(r);
+                                const shown = tags.slice(0, CARD_TAGS_SHOWN);
+                                const extra = tags.length - shown.length;
+                                return (
+                                    <div key={r.id} className="w-56 shrink-0 space-y-1.5 pl-4 first:pl-0">
+                                        <div className="flex items-center gap-2">
+                                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[11px] font-semibold text-slate-600">
+                                                {initials}
                                             </span>
-                                        ))}
-                                        {extra > 0 && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setExpandedReview(r)}
-                                                className="rounded-full bg-slate-100 text-slate-500 px-2 py-0.5 text-[11px] hover:bg-slate-200"
+                                            <span className="text-sm font-medium text-slate-800 truncate">{r.reviewer_label}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                                            {meta && <span title={meta.label}>{meta.emoji} {meta.label}</span>}
+                                            {meta && <span className="text-slate-300">·</span>}
+                                            <span>{new Date(r.created_at).toLocaleDateString()}</span>
+                                        </div>
+                                        {r.comment && (
+                                            <p className="text-xs text-slate-700 whitespace-pre-wrap break-words">{r.comment}</p>
+                                        )}
+                                        {tags.length > 0 && (
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {shown.map((t) => (
+                                                    <span key={t.key} className={`rounded-full px-2 py-0.5 text-[11px] ${t.cls}`}>
+                                                        {t.label}
+                                                    </span>
+                                                ))}
+                                                {extra > 0 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setExpandedReview(r)}
+                                                        className="rounded-full bg-slate-100 text-slate-500 px-2 py-0.5 text-[11px] hover:bg-slate-200"
+                                                    >
+                                                        +{extra} more
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                        {r.event_id !== eventId && (
+                                            <Link
+                                                to={`/event/${r.event_id}`}
+                                                className="inline-block text-[9px] font-medium text-sky-600 hover:text-sky-700"
                                             >
-                                                +{extra} more
-                                            </button>
+                                                From {r.event_title} →
+                                            </Link>
                                         )}
                                     </div>
-                                )}
-                                {r.event_id !== eventId && (
-                                    <Link
-                                        to={`/event/${r.event_id}`}
-                                        className="inline-block text-[9px] font-medium text-sky-600 hover:text-sky-700"
-                                    >
-                                        From {r.event_title} →
-                                    </Link>
-                                )}
-                            </div>
-                        );
-                    })}
-                    {reviews.length === 0 && !loading && (
-                        <div className="text-xs text-slate-500">No reviews to show.</div>
-                    )}
-                    {hasMore && (
-                        <button
-                            onClick={() => loadPage(reviews.length, false)}
-                            disabled={loading}
-                            className="shrink-0 self-center pl-4 text-xs text-sky-700 hover:text-sky-900 font-medium whitespace-nowrap"
-                        >
-                            {loading ? 'Loading…' : 'Load more'}
-                        </button>
-                    )}
-                </div>
-            </div>
+                                );
+                            })}
+                            {reviews.length === 0 && !loading && (
+                                <div className="text-xs text-slate-500">No reviews to show.</div>
+                            )}
+                            {hasMore && (
+                                <button
+                                    onClick={() => loadPage(reviews.length, false)}
+                                    disabled={loading}
+                                    className="shrink-0 self-center pl-4 text-xs text-sky-700 hover:text-sky-900 font-medium whitespace-nowrap"
+                                >
+                                    {loading ? 'Loading…' : 'Load more'}
+                                </button>
+                            )}
+                        </div>
+                    </div>
 
-            {expandedReview && (
-                <ReviewDetailModal review={expandedReview} onClose={() => setExpandedReview(null)} />
+                    {expandedReview && (
+                        <ReviewDetailModal review={expandedReview} onClose={() => setExpandedReview(null)} />
+                    )}
+                </>
             )}
-
         </section>
     );
 }

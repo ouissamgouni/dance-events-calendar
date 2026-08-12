@@ -54,6 +54,9 @@ VALID_KINDS = {
     "promo_code_added",
     "milestone_unlocked",
     "organizer_claim_decided",
+    "event_message",
+    "event_message_reply",
+    "event_message_reported",
 }
 
 

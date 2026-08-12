@@ -32,6 +32,7 @@ from backend.db.models import (
 from backend.services.ip_geolocation import geolocate_ip
 from backend.services import milestone_notification_service
 from backend.services import passport as passport_service
+from backend.services import activity_instant
 from backend.services.notifications import fan_out_going, withdraw_going
 
 router = APIRouter(prefix="/api", tags=["tracking"])
@@ -429,6 +430,17 @@ def track_event_attendance(
             )
         except Exception:  # noqa: BLE001 — notification is best-effort
             logger.warning("Immediate milestone notify failed", exc_info=True)
+        # If the "friends going" email is in instant mode, deliver the just
+        # fanned-out subscription_going emails now instead of on the tick.
+        try:
+            activity_instant.dispatch_activity_instant(
+                session,
+                kind="subscription_going",
+                actor=current_user,
+                event_id=payload.event_id,
+            )
+        except Exception:  # noqa: BLE001 — best-effort, never breaks tracking
+            logger.warning("Instant friends-going email failed", exc_info=True)
     # Reconcile recurring consistency achievements on any attendance change by an
     # authenticated user: a new Going may unlock a level, while cancelling one
     # (going off) prunes achievements whose period no longer exists.

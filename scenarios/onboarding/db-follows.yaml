@@ -34,3 +34,19 @@ follows:
     followee: pop2
   - follower: curatorbeta
     followee: pop3
+
+  # Mutual follows = friendships, so the graph shows real two-way relationships
+  # (not just one-directional follows). pop1<->pop2 and pop2<->alreadyfollowed
+  # are friends; alreadyfollowed also follows the curator the newbie follows.
+  - follower: pop1
+    followee: pop2
+  - follower: pop2
+    followee: pop1
+  - follower: pop2
+    followee: alreadyfollowed
+  - follower: alreadyfollowed
+    followee: pop2
+  - follower: alreadyfollowed
+    followee: verifiedcurator
+  - follower: pop1
+    followee: verifiedcurator

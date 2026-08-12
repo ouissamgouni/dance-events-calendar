@@ -1,11 +1,14 @@
 # All-features digest fixture. Alice generates activity across every
 # feature bucket; Bob (all email_* ON) folds them into ONE digest:
-#   ev-friend   — Alice is Going          → friends_going line
-#   ev-review   — Alice reviewed it       → friend_reviews line
-#   ev-past     — Alice attended (past)   → unlocks a milestone
-#   ev-interest — matches Bob's profile   → interest_matches line
-# `emit_notifications: true` drives the review fan-out for the rating
-# block below (same path as the HTTP feedback route).
+#   ev-friend    — Alice is Going          → friends_going line
+#   ev-review    — Alice reviewed it       → friend_reviews line
+#   ev-past      — Alice attended (past)   → friend_milestones line (subscription_milestone)
+#                  Bob also attended       → milestone_unlocked line (Bob's OWN first milestone)
+#   ev-interest  — matches Bob's profile   → interest_matches line
+#   ev-suggested — Alice's suggestion OK'd → suggested_events line (subscription_suggested)
+#   ev-messages  — Bob is going; Alice posts→ event_messages line (event_message)
+# `emit_notifications: true` drives the review + event-message fan-out;
+# `emit_suggested` fans out the approved-suggestion notification.
 base_week: 0
 emit_notifications: true
 events:
@@ -58,12 +61,40 @@ events:
     location: "Le Grand Salon, Paris, France"
     latitude: 48.8566
     longitude: 2.3522
-    start: w+1 Sat 20:00
-    end: w+1 Sat 23:59
+    start: w1 Sat 20:00
+    end: w1 Sat 23:59
     tags:
       - format:social
       - dance-style:salsa
       - reach:international
+
+  - id: ev-suggested
+    calendar_id: salsa-cal-001
+    title: Rooftop Kizomba Sunset
+    description: "Event Alice suggested — approval drives the suggested_events line."
+    location: "Terrace 9, Paris, France"
+    latitude: 48.8600
+    longitude: 2.3500
+    start: w1 Thu 20:00
+    end: w1 Thu 23:00
+    tags:
+      - format:social
+      - dance-style:kizomba
+      - reach:local
+
+  - id: ev-messages
+    calendar_id: salsa-cal-001
+    title: Sunday Social Practica
+    description: "Bob is going; Alice posts on the board → event_messages line."
+    location: "Studio Verde, Paris, France"
+    latitude: 48.8570
+    longitude: 2.3600
+    start: w1 Sun 18:00
+    end: w1 Sun 21:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
 
 ratings:
   - event_id: ev-review
@@ -71,3 +102,17 @@ ratings:
     overall_sentiment: amazing
     comment: "Incredible floor and DJ!"
     status: approved
+
+# Alice's suggested event was approved → fan out subscription_suggested to
+# her followers (Bob email ON → section; Carol email OFF → no section).
+emit_suggested:
+  - event_id: ev-suggested
+    email: alice@example.com
+
+# Alice posts on ev-messages' board; Bob (Going) receives an event_message
+# notification → event_messages section in his digest.
+messages:
+  - event_id: ev-messages
+    email: alice@example.com
+    category: question
+    body: "Anyone carpooling from the center before the practica?"

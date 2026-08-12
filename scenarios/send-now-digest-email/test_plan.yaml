@@ -58,12 +58,14 @@ test_plan:
         user" to 2. Click "Send now (1)".
       expected: |
         The action succeeds; the toast reports "1 of 1 user(s) delivered
-        (1 digest email(s), 0 push)". Mailpit receives exactly one email
-        addressed to bob@example.com whose body lists only TWO of the
-        three Going events — Alice's Salsa Sunday Practica and Kizomba
-        Night (the two most recently created notifications). The
-        Bachata Friendly Social notification (the oldest of the three)
-        is left pending, uncounted by the cap, for a future run.
+        (1 digest email(s), 0 push)". Mailpit receives exactly one
+        combined, card-styled email addressed to bob@example.com. Under a
+        "Friends going out" section it shows only TWO cards — Alice's
+        Salsa Sunday Practica and Kizomba Night (the two most recently
+        created notifications), each with Alice's avatar and a
+        muted date · city subline. The Bachata Friendly Social
+        notification (the oldest of the three) is left pending, uncounted
+        by the cap, for a future run.
 
     - id: 4
       title: "Repeat send-now for Bob uncapped flushes the remaining backlog"
@@ -73,10 +75,11 @@ test_plan:
         "Send now (1)".
       expected: |
         A second email arrives in Mailpit addressed to bob@example.com,
-        this time listing only the one notification the cap deferred in
-        step 3 — Alice's Bachata Friendly Social. Nothing is lost across
-        the two capped/uncapped runs, just split across them; Mailpit's
-        total is now two messages, both to Bob.
+        this time showing a single "Friends going out" card — the one
+        notification the cap deferred in step 3, Alice's Bachata Friendly
+        Social. Nothing is lost across the two capped/uncapped runs, just
+        split across them; Mailpit's total is now two messages, both to
+        Bob.
 
     - id: 5
       title: "Negative control — Carol was not selected"
@@ -126,3 +129,28 @@ test_plan:
         them. Mailpit's total is now three messages, all to Bob; Carol
         and Dave still show zero new mail (scoping is unaffected by the
         checkbox).
+
+    - id: 9
+      title: "Combined email carries a master unsubscribe-all link"
+      description: |
+        Open any of Bob's combined digest emails in Mailpit (e.g. the
+        step 3 message) and inspect the footer.
+      expected: |
+        The footer contains a single "unsubscribe" link for the whole
+        activity digest (the "digest" category), not a per-feature link.
+        Following it flips Bob's master `digest_email_enabled` flag off —
+        the same flag surfaced as the "Email digest" master toggle in
+        NotificationSettings.
+
+    - id: 10
+      title: "Master digest opt-out suppresses the combined email"
+      description: |
+        With Bob's `digest_email_enabled` now off (from step 9, or toggle
+        the "Email digest" master switch off in Bob's notification
+        settings), add Bob in the "Send digest now" picker, check
+        "Resend", set "Max per user" to 2 and click "Send now (1)".
+      expected: |
+        Even with pending/resend activity and his per-feature
+        `email_friends_going_enabled` still on, Bob receives NO combined
+        email — the master `digest_email_enabled=false` gate suppresses
+        the whole v2 digest. Mailpit's total stays at three messages.

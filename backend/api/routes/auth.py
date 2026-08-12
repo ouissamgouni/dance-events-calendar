@@ -73,6 +73,23 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 limiter = Limiter(key_func=client_ip)
 
+
+def _dispatch_social_instant_auth(session, *, kind: str, recipient_ids) -> None:
+    """Best-effort instant email for a social_activity kind from auth flows.
+
+    No-op unless the ``social_activity`` email mode is *instant*; otherwise the
+    activity-digest tick delivers these. Never raises into the caller.
+    """
+    from backend.services import activity_instant
+
+    try:
+        activity_instant.dispatch_activity_instant(
+            session, kind=kind, recipient_ids=recipient_ids
+        )
+    except Exception:  # noqa: BLE001 — best-effort, never breaks the flow
+        logger.warning("Instant social email failed (%s)", kind, exc_info=True)
+
+
 _COOKIE_NAME = "session_token"
 _MAX_AGE = 60 * 60 * 24 * 7  # 7 days
 
@@ -892,6 +909,11 @@ def get_me(
         "push_friend_reviews_enabled": user.push_friend_reviews_enabled,
         "email_friend_milestones_enabled": user.email_friend_milestones_enabled,
         "push_friend_milestones_enabled": user.push_friend_milestones_enabled,
+        "email_event_messages_enabled": user.email_event_messages_enabled,
+        "push_event_messages_enabled": user.push_event_messages_enabled,
+        "email_suggested_events_enabled": user.email_suggested_events_enabled,
+        "push_suggested_events_enabled": user.push_suggested_events_enabled,
+        "digest_email_enabled": user.digest_email_enabled,
         # Legacy aliases derived from the new flags. Kept for one release so
         # older frontend clients still work (Phase G §G.9 step 5 drops them).
         "reminder_email_enabled": user.email_event_reminders_enabled,
@@ -1037,6 +1059,11 @@ class UpdateNotificationPreferencesRequest(BaseModel):
     push_friend_reviews_enabled: Optional[bool] = None
     email_friend_milestones_enabled: Optional[bool] = None
     push_friend_milestones_enabled: Optional[bool] = None
+    email_event_messages_enabled: Optional[bool] = None
+    push_event_messages_enabled: Optional[bool] = None
+    email_suggested_events_enabled: Optional[bool] = None
+    push_suggested_events_enabled: Optional[bool] = None
+    digest_email_enabled: Optional[bool] = None
     # Legacy aliases — removed in the cleanup PR (§G.9 step 5).
     reminder_email_enabled: Optional[bool] = None
     activity_email_enabled: Optional[bool] = None
@@ -1094,6 +1121,11 @@ _NEW_FLAGS: tuple[str, ...] = (
     "push_friend_reviews_enabled",
     "email_friend_milestones_enabled",
     "push_friend_milestones_enabled",
+    "email_event_messages_enabled",
+    "push_event_messages_enabled",
+    "email_suggested_events_enabled",
+    "push_suggested_events_enabled",
+    "digest_email_enabled",
 )
 
 
@@ -1150,6 +1182,11 @@ def update_notification_preferences(
         "push_friend_reviews_enabled": user.push_friend_reviews_enabled,
         "email_friend_milestones_enabled": user.email_friend_milestones_enabled,
         "push_friend_milestones_enabled": user.push_friend_milestones_enabled,
+        "email_event_messages_enabled": user.email_event_messages_enabled,
+        "push_event_messages_enabled": user.push_event_messages_enabled,
+        "email_suggested_events_enabled": user.email_suggested_events_enabled,
+        "push_suggested_events_enabled": user.push_suggested_events_enabled,
+        "digest_email_enabled": user.digest_email_enabled,
         # Legacy mirror (removed in cleanup PR).
         "reminder_email_enabled": user.email_event_reminders_enabled,
         "activity_email_enabled": (
@@ -1738,6 +1775,12 @@ def redeem_referral(
         _notify_new_follower(session, followee=inviter, follower=viewer)
         _notify_new_friend(session, viewer, inviter)
         session.commit()
+        _dispatch_social_instant_auth(
+            session, kind="new_follower", recipient_ids={inviter.id}
+        )
+        _dispatch_social_instant_auth(
+            session, kind="new_friend", recipient_ids={inviter.id, viewer.id}
+        )
 
     return RedeemReferralResponse(
         inviter_handle=inviter.handle,
@@ -1813,6 +1856,9 @@ def redeem_share_follow(
         # notification helper or its row is dropped on teardown.
         _notify_new_follower(session, followee=sharer, follower=viewer)
         session.commit()
+        _dispatch_social_instant_auth(
+            session, kind="new_follower", recipient_ids={sharer.id}
+        )
 
     return RedeemShareFollowResponse(
         sharer_handle=sharer.handle,

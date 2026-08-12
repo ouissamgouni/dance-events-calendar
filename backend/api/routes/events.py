@@ -927,6 +927,51 @@ def search_events(
     ]
 
 
+@router.get("/popular-cities", response_model=list[dict])
+@limiter.limit("60/minute")
+def popular_cities(
+    request: Request,
+    limit: int = Query(default=8, ge=1, le=20),
+    session: Session = Depends(get_session),
+):
+    """Cities with the most upcoming events, for the onboarding local-area
+    step's quick-pick pills. Aggregates non-deleted, non-hidden, upcoming
+    ``CachedEvent`` rows by ``(city, country)``, ordered by event count.
+    Each city's pin is the average lat/lng of its events, so tapping a pill
+    centers the map without a geocoder round-trip. Cities missing a name or
+    coordinates are excluded so a pill can never resolve to an empty map."""
+    now = datetime.now(UTC).replace(tzinfo=None)
+    rows = session.exec(
+        select(
+            CachedEvent.city,
+            CachedEvent.country,
+            func.count(col(CachedEvent.event_id)).label("count"),
+            func.avg(col(CachedEvent.latitude)).label("lat"),
+            func.avg(col(CachedEvent.longitude)).label("lng"),
+        )
+        .where(CachedEvent.deleted_at.is_(None))  # type: ignore[union-attr]
+        .where(CachedEvent.is_hidden.is_(False))  # type: ignore[union-attr]
+        .where(CachedEvent.start >= now)
+        .where(CachedEvent.city.is_not(None))  # type: ignore[union-attr]
+        .where(col(CachedEvent.city) != "")
+        .where(CachedEvent.latitude.is_not(None))  # type: ignore[union-attr]
+        .where(CachedEvent.longitude.is_not(None))  # type: ignore[union-attr]
+        .group_by(col(CachedEvent.city), col(CachedEvent.country))
+        .order_by(func.count(col(CachedEvent.event_id)).desc())
+        .limit(limit)
+    ).all()
+    return [
+        {
+            "city": r[0],
+            "country": r[1],
+            "count": int(r[2]),
+            "lat": float(r[3]),
+            "lng": float(r[4]),
+        }
+        for r in rows
+    ]
+
+
 @router.post("/by-ids", response_model=list[EventResponse])
 @limiter.limit("120/minute")
 def get_events_by_ids(

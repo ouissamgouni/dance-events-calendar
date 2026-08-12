@@ -2,6 +2,10 @@
 # route runs, so Alice's Going yields real Notification rows for her
 # followers. Alice also attends ev-review (so she can review it) and
 # ev-past (a past event that unlocks her first passport milestone).
+# Bob attends ev-past (his OWN first milestone → milestone_unlocked line)
+# and ev-messages (Going, so he's an engaged recipient of Alice's board
+# post → event_messages line). Bob's rows are private (share_publicly
+# false) so they don't fan out subscription_going to his own followers.
 emit_notifications: true
 attendances:
   - event_id: ev-friend
@@ -16,3 +20,9 @@ attendances:
     email: alice@example.com
     share_publicly: true
     share_audience: public
+  - event_id: ev-past
+    email: bob@example.com
+    share_publicly: false
+  - event_id: ev-messages
+    email: bob@example.com
+    share_publicly: false

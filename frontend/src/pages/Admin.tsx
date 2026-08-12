@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { CalendarSetting, EventSuggestion, Tag } from '../types';
 import type { AdminTagGroup } from '../api';
@@ -74,13 +74,17 @@ function FeatureEmailCard({
     emailModes,
     onEmailModeChange,
     onMessage,
+    headerRight,
+    subline,
 }: {
-    feature: string;
+    feature?: string;
     label: string;
     description: string;
     emailModes: Record<string, boolean>;
     onEmailModeChange: (field: string, value: boolean) => void;
     onMessage: (msg: string) => void;
+    headerRight?: ReactNode;
+    subline?: ReactNode;
 }) {
     const [users, setUsers] = useState<AdminUserRow[]>([]);
     const [maxPerUser, setMaxPerUser] = useState<number | undefined>(undefined);
@@ -110,29 +114,39 @@ function FeatureEmailCard({
 
     return (
         <div className="border border-gray-100 p-3 space-y-3">
-            <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">{label}</span>
+            {headerRight ? (
+                <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">{label}</span>
+                    {headerRight}
+                </div>
+            ) : (
+                <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">{label}</span>
+            )}
             <p className="text-[10px] text-gray-400">{description}</p>
-            <div className="flex items-center gap-4 border-t border-gray-100 pt-2.5">
-                <span className="text-[11px] font-medium text-gray-700">Email delivery</span>
-                <label className="flex items-center gap-1 text-[10px] text-gray-500">
-                    <input
-                        type="checkbox"
-                        aria-label={`${label} instant email`}
-                        checked={!!emailModes[`${feature}_email_instant`]}
-                        onChange={(e) => onEmailModeChange(`${feature}_email_instant`, e.target.checked)}
-                    />
-                    Instant
-                </label>
-                <label className="flex items-center gap-1 text-[10px] text-gray-500">
-                    <input
-                        type="checkbox"
-                        aria-label={`${label} digest email`}
-                        checked={!!emailModes[`${feature}_email_digest`]}
-                        onChange={(e) => onEmailModeChange(`${feature}_email_digest`, e.target.checked)}
-                    />
-                    Digest
-                </label>
-            </div>
+            {subline}
+            {feature && (
+                <div className="flex items-center gap-4 border-t border-gray-100 pt-2.5">
+                    <span className="text-[11px] font-medium text-gray-700">Email delivery</span>
+                    <label className="flex items-center gap-1 text-[10px] text-gray-500">
+                        <input
+                            type="checkbox"
+                            aria-label={`${label} instant email`}
+                            checked={!!emailModes[`${feature}_email_instant`]}
+                            onChange={(e) => onEmailModeChange(`${feature}_email_instant`, e.target.checked)}
+                        />
+                        Instant
+                    </label>
+                    <label className="flex items-center gap-1 text-[10px] text-gray-500">
+                        <input
+                            type="checkbox"
+                            aria-label={`${label} digest email`}
+                            checked={!!emailModes[`${feature}_email_digest`]}
+                            onChange={(e) => onEmailModeChange(`${feature}_email_digest`, e.target.checked)}
+                        />
+                        Digest
+                    </label>
+                </div>
+            )}
             <div className="border-t border-gray-100 pt-2.5 space-y-1.5">
                 <div>
                     <span className="text-[11px] font-medium text-gray-700">Send now</span>
@@ -147,9 +161,9 @@ function FeatureEmailCard({
                     placeholder="Search email, handle, or name"
                 />
                 <div className="flex items-center gap-2">
-                    <label className="text-[10px] text-gray-500" htmlFor={`${feature}-now-max`}>Max per user</label>
+                    <label className="text-[10px] text-gray-500" htmlFor={`${feature ?? 'combined'}-now-max`}>Max per user</label>
                     <input
-                        id={`${feature}-now-max`}
+                        id={`${feature ?? 'combined'}-now-max`}
                         type="number"
                         min={1}
                         max={200}
@@ -158,9 +172,9 @@ function FeatureEmailCard({
                         placeholder="all"
                         className="w-16 text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                     />
-                    <label className="flex items-center gap-1 text-[10px] text-gray-500" htmlFor={`${feature}-now-resend`} title="Force re-sending notifications already emailed/pushed">
+                    <label className="flex items-center gap-1 text-[10px] text-gray-500" htmlFor={`${feature ?? 'combined'}-now-resend`} title="Force re-sending notifications already emailed/pushed">
                         <input
-                            id={`${feature}-now-resend`}
+                            id={`${feature ?? 'combined'}-now-resend`}
                             type="checkbox"
                             checked={resend}
                             onChange={(e) => setResend(e.target.checked)}
@@ -226,9 +240,15 @@ export default function Admin() {
     // backend parses in each user's local timezone.
     const [eventRemindersEnabled, setEventRemindersEnabled] = useState(true);
     const [activityDigestEmailEnabled, setActivityDigestEmailEnabled] = useState(true);
+    // Combined activity digest (v2): one balanced card email per recipient.
+    const [digestV2Enabled, setDigestV2Enabled] = useState(true);
+    const [digestPerKindCap, setDigestPerKindCap] = useState(5);
+    const [digestMaxItems, setDigestMaxItems] = useState(20);
+    const [milestoneNotificationsEnabled, setMilestoneNotificationsEnabled] = useState(true);
     const [interestMatchNotifsEnabled, setInterestMatchNotifsEnabled] = useState(true);
     const [webPushEnabled, setWebPushEnabled] = useState(false);
     const [reminderLeadHours, setReminderLeadHours] = useState(24);
+    const [eventMessageCtaMinGoing, setEventMessageCtaMinGoing] = useState(3);
     const [digestSchedule, setDigestSchedule] = useState('tue,fri @ 09:00');
     const [reviewPromptEnabled, setReviewPromptEnabled] = useState(true);
     const [reviewPromptDelayHours, setReviewPromptDelayHours] = useState(3);
@@ -389,9 +409,14 @@ export default function Admin() {
             setNetworkGoingSnapshotEnabled(s.network_going_snapshot_enabled ?? true);
             setEventRemindersEnabled(s.event_reminders_enabled ?? true);
             setActivityDigestEmailEnabled(s.activity_digest_email_enabled ?? true);
+            setDigestV2Enabled(s.digest_v2_enabled ?? true);
+            setDigestPerKindCap(s.digest_per_kind_cap ?? 5);
+            setDigestMaxItems(s.digest_max_items ?? 20);
+            setMilestoneNotificationsEnabled(s.milestone_notifications_enabled ?? true);
             setInterestMatchNotifsEnabled(s.interest_match_notifications_enabled ?? true);
             setWebPushEnabled(s.web_push_enabled ?? false);
             setReminderLeadHours(s.reminder_lead_hours ?? 24);
+            setEventMessageCtaMinGoing(s.event_message_cta_min_going ?? 3);
             setDigestSchedule(s.activity_digest_schedule ?? 'tue,fri @ 09:00');
             setReviewPromptEnabled(s.review_prompt_enabled ?? true);
             setReviewPromptDelayHours(s.review_prompt_delay_hours ?? 3);
@@ -410,6 +435,12 @@ export default function Admin() {
                 friend_milestones_email_digest: s.friend_milestones_email_digest ?? true,
                 interest_matches_email_instant: s.interest_matches_email_instant ?? false,
                 interest_matches_email_digest: s.interest_matches_email_digest ?? true,
+                event_messages_email_instant: s.event_messages_email_instant ?? false,
+                event_messages_email_digest: s.event_messages_email_digest ?? true,
+                suggested_events_email_instant: s.suggested_events_email_instant ?? false,
+                suggested_events_email_digest: s.suggested_events_email_digest ?? true,
+                milestone_unlocked_email_instant: s.milestone_unlocked_email_instant ?? false,
+                milestone_unlocked_email_digest: s.milestone_unlocked_email_digest ?? true,
             });
             setEventColorBarColor(s.event_color_bar_color || '#64748b');
             setTagSortMode(s.tag_sort_mode === 'event_count' ? 'event_count' : 'group');
@@ -884,6 +915,44 @@ export default function Admin() {
         }
     };
 
+    const handleToggleDigestV2 = async () => {
+        const newVal = !digestV2Enabled;
+        setDigestV2Enabled(newVal);
+        try {
+            await updateSettings({ digest_v2_enabled: newVal });
+            setMessage(`Combined digest (v2) ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setDigestV2Enabled(!newVal);
+            setMessage('Failed to update combined digest toggle.');
+        }
+    };
+
+    const handleDigestPerKindCapChange = async (value: number) => {
+        if (isNaN(value) || value < 1 || value > 50) return;
+        const prev = digestPerKindCap;
+        setDigestPerKindCap(value);
+        try {
+            await updateSettings({ digest_per_kind_cap: value });
+            setMessage(`Digest per-kind cap set to ${value}.`);
+        } catch {
+            setDigestPerKindCap(prev);
+            setMessage('Failed to update per-kind cap.');
+        }
+    };
+
+    const handleDigestMaxItemsChange = async (value: number) => {
+        if (isNaN(value) || value < 1 || value > 200) return;
+        const prev = digestMaxItems;
+        setDigestMaxItems(value);
+        try {
+            await updateSettings({ digest_max_items: value });
+            setMessage(`Digest max items set to ${value}.`);
+        } catch {
+            setDigestMaxItems(prev);
+            setMessage('Failed to update max items.');
+        }
+    };
+
     const handleToggleInterestMatchNotifs = async () => {
         const newVal = !interestMatchNotifsEnabled;
         setInterestMatchNotifsEnabled(newVal);
@@ -893,6 +962,18 @@ export default function Admin() {
         } catch {
             setInterestMatchNotifsEnabled(!newVal);
             setMessage('Failed to update interest notifications toggle.');
+        }
+    };
+
+    const handleToggleMilestoneNotifications = async () => {
+        const newVal = !milestoneNotificationsEnabled;
+        setMilestoneNotificationsEnabled(newVal);
+        try {
+            await updateSettings({ milestone_notifications_enabled: newVal });
+            setMessage(`Milestone notifications ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setMilestoneNotificationsEnabled(!newVal);
+            setMessage('Failed to update milestone notifications toggle.');
         }
     };
 
@@ -918,6 +999,19 @@ export default function Admin() {
         } catch {
             setReminderLeadHours(prev);
             setMessage('Failed to update reminder lead time.');
+        }
+    };
+
+    const handleEventMessageCtaMinGoingChange = async (value: number) => {
+        if (isNaN(value) || value < 1 || value > 10000) return;
+        const prev = eventMessageCtaMinGoing;
+        setEventMessageCtaMinGoing(value);
+        try {
+            await updateSettings({ event_message_cta_min_going: value });
+            setMessage(`"Ask a question" CTA threshold set to ${value} going.`);
+        } catch {
+            setEventMessageCtaMinGoing(prev);
+            setMessage('Failed to update ask CTA threshold.');
         }
     };
 
@@ -2180,6 +2274,23 @@ export default function Admin() {
                                             aria-label="Reminder lead time in hours"
                                         />
                                     </div>
+                                    <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
+                                        <div>
+                                            <span className="text-[11px] font-medium text-gray-700">"Ask a question" CTA threshold</span>
+                                            <p className="text-[10px] text-gray-400">Min "Going" attendees before a reminder includes an "Ask a question" link (1–10000)</p>
+                                        </div>
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={10000}
+                                            value={eventMessageCtaMinGoing}
+                                            onChange={(e) => setEventMessageCtaMinGoing(Number(e.target.value))}
+                                            onBlur={(e) => handleEventMessageCtaMinGoingChange(Number(e.target.value))}
+                                            onKeyDown={(e) => e.key === 'Enter' && handleEventMessageCtaMinGoingChange(eventMessageCtaMinGoing)}
+                                            className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                            aria-label="Ask a question CTA going threshold"
+                                        />
+                                    </div>
                                 </div>
 
                                 {/* Review prompt */}
@@ -2442,6 +2553,57 @@ export default function Admin() {
                                         email toggle and a scoped "Send now". In-app and push are always
                                         immediate.
                                     </p>
+                                    <div className="border-t border-gray-100 pt-2.5 space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[11px] font-medium text-gray-700">Combined digest (v2)</span>
+                                            <button
+                                                onClick={handleToggleDigestV2}
+                                                aria-label="Toggle combined digest v2"
+                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${digestV2Enabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                            >
+                                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${digestV2Enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                            </button>
+                                        </div>
+                                        <p className="text-[10px] text-gray-400">
+                                            On: one balanced, card-styled email per recipient merging every
+                                            eligible feature. Off: separate per-feature list emails.
+                                        </p>
+                                        <div className="flex items-center gap-2">
+                                            <label className="text-[10px] text-gray-500" htmlFor="digest-per-kind-cap">Per-kind cap</label>
+                                            <input
+                                                id="digest-per-kind-cap"
+                                                type="number"
+                                                min={1}
+                                                max={50}
+                                                value={digestPerKindCap}
+                                                onChange={(e) => setDigestPerKindCap(Number(e.target.value))}
+                                                onBlur={(e) => handleDigestPerKindCapChange(Number(e.target.value))}
+                                                aria-label="Digest per-kind cap"
+                                                className="w-16 text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                            />
+                                            <label className="text-[10px] text-gray-500" htmlFor="digest-max-items">Max items</label>
+                                            <input
+                                                id="digest-max-items"
+                                                type="number"
+                                                min={1}
+                                                max={200}
+                                                value={digestMaxItems}
+                                                onChange={(e) => setDigestMaxItems(Number(e.target.value))}
+                                                onBlur={(e) => handleDigestMaxItemsChange(Number(e.target.value))}
+                                                aria-label="Digest max items"
+                                                className="w-16 text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Send digest now — uses combined or legacy format per the Combined digest toggle above */}
+                                    <FeatureEmailCard
+                                        label="Send digest now"
+                                        description="Replay every eligible feature's pending activity as a digest for the selected users, bypassing the schedule and once-per-day dedup gate. Uses the combined card or legacy per-feature list format depending on the Combined digest toggle above."
+                                        emailModes={emailModes}
+                                        onEmailModeChange={handleEmailModeChange}
+                                        onMessage={setMessage}
+                                    />
                                 </div>
 
                                 {/* Per-feature activity email delivery + scoped Send now */}
@@ -2476,6 +2638,47 @@ export default function Admin() {
                                     emailModes={emailModes}
                                     onEmailModeChange={handleEmailModeChange}
                                     onMessage={setMessage}
+                                />
+                                <FeatureEmailCard
+                                    feature="event_messages"
+                                    label="Event messages"
+                                    description="A question or request is posted (or replied to) on an event you saved or are going to."
+                                    emailModes={emailModes}
+                                    onEmailModeChange={handleEmailModeChange}
+                                    onMessage={setMessage}
+                                />
+                                <FeatureEmailCard
+                                    feature="suggested_events"
+                                    label="Suggested events"
+                                    description="A suggested event you submitted is approved and fanned out to your followers."
+                                    emailModes={emailModes}
+                                    onEmailModeChange={handleEmailModeChange}
+                                    onMessage={setMessage}
+                                />
+
+                                {/* Milestones (personal passport unlocks) — master toggle merged into the card */}
+                                <FeatureEmailCard
+                                    feature="milestone_unlocked"
+                                    label="Milestones"
+                                    description="You unlock a Dance Passport milestone. Instant sends the rich per-milestone email immediately; Digest folds the unlock into the batched activity digest. In-app and push are always immediate."
+                                    emailModes={emailModes}
+                                    onEmailModeChange={handleEmailModeChange}
+                                    onMessage={setMessage}
+                                    headerRight={(
+                                        <button
+                                            onClick={handleToggleMilestoneNotifications}
+                                            aria-label="Toggle milestone notifications"
+                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${milestoneNotificationsEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                        >
+                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${milestoneNotificationsEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                        </button>
+                                    )}
+                                    subline={toggleCounts && (
+                                        <p className="text-[10px] text-gray-500">
+                                            {toggleCounts.milestones.email} email · {toggleCounts.milestones.push} push enabled
+                                            {' '}(of {toggleCounts.total_users} users)
+                                        </p>
+                                    )}
                                 />
 
                                 {/* Web push */}

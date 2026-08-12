@@ -184,7 +184,7 @@ def test_reminder_created_for_due_going_event(session, monkeypatch):
     monkeypatch.setattr(
         reminder_service,
         "send_event_reminder_email",
-        lambda u, e, w: sent.append(e.event_id) or True,
+        lambda u, e, w, **k: sent.append(e.event_id) or True,
     )
     monkeypatch.setattr(reminder_service, "send_push", lambda *a, **k: 0)
 
@@ -203,6 +203,51 @@ def test_reminder_created_for_due_going_event(session, monkeypatch):
     assert notifs[0].recipient_user_id == alice.id
     assert notifs[0].actor_user_id == alice.id  # self-actor
     assert notifs[0].event_id == "ev-soon"
+
+
+def test_reminder_ask_cta_gated_by_going_threshold(session, monkeypatch):
+    """The "Ask a question" CTA (context="ask" + include_ask_cta email flag)
+    is added only when an event has at least the configured number of Going
+    attendees (default 3)."""
+    seen: list = []
+    monkeypatch.setattr(
+        reminder_service,
+        "send_event_reminder_email",
+        lambda u, e, w, include_ask_cta=False: (
+            seen.append((e.event_id, include_ask_cta)) or True
+        ),
+    )
+    monkeypatch.setattr(reminder_service, "send_push", lambda *a, **k: 0)
+
+    # Popular event: 3 Going attendees → CTA on.
+    popular = _make_event(
+        session, "ev-popular", start=datetime.utcnow() + timedelta(hours=3)
+    )
+    for i in range(3):
+        u = _make_user(session, f"pop{i}@example.com", f"pop{i}")
+        _going(session, u, popular.event_id)
+
+    # Quiet event: single Going attendee → CTA off.
+    quiet = _make_event(
+        session, "ev-quiet", start=datetime.utcnow() + timedelta(hours=3)
+    )
+    solo = _make_user(session, "solo@example.com", "solo")
+    _going(session, solo, quiet.event_id)
+
+    reminder_service.run_once()
+
+    by_event = dict(seen)
+    assert by_event["ev-popular"] is True
+    assert by_event["ev-quiet"] is False
+
+    notifs = {
+        n.event_id: n
+        for n in session.exec(
+            select(Notification).where(Notification.kind == "event_reminder")
+        ).all()
+    }
+    assert notifs["ev-popular"].context == "ask"
+    assert notifs["ev-quiet"].context is None
 
 
 def test_reminder_is_idempotent(session, monkeypatch):
@@ -897,8 +942,10 @@ def test_activity_digest_batches_into_one_email(session, monkeypatch):
     calls: list = []
     monkeypatch.setattr(
         activity_email,
-        "send_activity_digest_email",
-        lambda recipient, lines, **_: calls.append((recipient.id, list(lines))),
+        "send_activity_digest_v2_email",
+        lambda recipient, sections, **_: calls.append(
+            (recipient.id, [e["primary_html"] for s in sections for e in s["entries"]])
+        ),
     )
     monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
 
@@ -918,6 +965,177 @@ def test_activity_digest_batches_into_one_email(session, monkeypatch):
     assert len(calls[0][1]) == 2  # both notifications in one digest
 
 
+def test_activity_digest_drops_past_event_but_stamps_it(session, monkeypatch):
+    """Past-event guard: a ``subscription_going`` notice whose event has
+    already ended is excluded from the digest email while the future one is
+    kept. Both rows are stamped ``emailed_at`` so the past one is consumed
+    and never re-sent on a later tick."""
+    calls: list = []
+    monkeypatch.setattr(
+        activity_email,
+        "send_activity_digest_v2_email",
+        lambda recipient, sections, **_: (
+            calls.append(
+                (
+                    recipient.id,
+                    [e["primary_html"] for s in sections for e in s["entries"]],
+                )
+            )
+            or True
+        ),
+    )
+    monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
+
+    bob = _make_user(session, "bob@example.com", "bob")
+    a1 = _make_user(session, "a1@example.com", "a1")
+    _make_event(session, "ev-future", start=datetime.utcnow() + timedelta(hours=6))
+    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    old = datetime.utcnow() - timedelta(minutes=5)
+    future = _notif(
+        session,
+        recipient=bob,
+        actor=a1,
+        kind="subscription_going",
+        event_id="ev-future",
+        created_at=old,
+    )
+    past = _notif(
+        session,
+        recipient=bob,
+        actor=a1,
+        kind="subscription_going",
+        event_id="ev-past",
+        created_at=old,
+    )
+
+    stats = activity_email.run_once(force=True)
+    assert stats["digests"] == 1
+    assert len(calls) == 1
+    assert len(calls[0][1]) == 1  # only the future line rendered
+
+    session.refresh(future)
+    session.refresh(past)
+    assert future.emailed_at is not None  # sent
+    assert past.emailed_at is not None  # excluded but consumed
+    # A later tick has nothing left to send (past row not re-selected).
+    assert activity_email.run_once(force=True) == {"digests": 0, "pushed": 0}
+
+
+def test_activity_digest_keeps_review_on_past_event(session, monkeypatch):
+    """Reviews are inherently about past events, so the past-event guard must
+    NOT drop a ``subscription_review`` notice even though its event has ended
+    (mirrors ``skip_past_guard`` in the fan-out path)."""
+    calls: list = []
+    monkeypatch.setattr(
+        activity_email,
+        "send_activity_digest_v2_email",
+        lambda recipient, sections, **_: (
+            calls.append(
+                (
+                    recipient.id,
+                    [e["primary_html"] for s in sections for e in s["entries"]],
+                )
+            )
+            or True
+        ),
+    )
+    monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
+
+    bob = _make_user(session, "bob@example.com", "bob")
+    a1 = _make_user(session, "a1@example.com", "a1")
+    _make_event(session, "ev-past", start=datetime.utcnow() - timedelta(hours=6))
+    old = datetime.utcnow() - timedelta(minutes=5)
+    _notif(
+        session,
+        recipient=bob,
+        actor=a1,
+        kind="subscription_review",
+        event_id="ev-past",
+        created_at=old,
+    )
+
+    stats = activity_email.run_once(force=True)
+    assert stats["digests"] == 1
+    assert len(calls) == 1
+    assert len(calls[0][1]) == 1  # review line kept despite past event
+
+
+def test_milestone_delivered_via_activity_digest(session, monkeypatch):
+    """A milestone notice left pending (digest mode, the default) is folded
+    into the batched activity digest. activity_email must NOT send it
+    instantly or push it — those channels are owned by the milestone
+    service — so only the digest email fires and stamps ``emailed_at``."""
+    calls: list = []
+    pushes: list = []
+    monkeypatch.setattr(
+        activity_email,
+        "send_activity_digest_v2_email",
+        lambda recipient, sections, **_: (
+            calls.append(
+                (
+                    recipient.id,
+                    [e["primary_html"] for s in sections for e in s["entries"]],
+                )
+            )
+            or True
+        ),
+    )
+    monkeypatch.setattr(
+        activity_email, "send_push", lambda *a, **k: pushes.append(1) or 0
+    )
+
+    bob = _make_user(session, "bob@example.com", "bob")
+    old = datetime.utcnow() - timedelta(minutes=5)
+    n = _notif(
+        session, recipient=bob, actor=bob, kind="milestone_unlocked", created_at=old
+    )
+    n.subject_key = "first_event"
+    n.description = "Attended your first event"
+    session.add(n)
+    session.commit()
+
+    stats = activity_email.run_once(force=True)
+    assert stats["digests"] == 1
+    assert len(calls) == 1
+    assert calls[0][0] == bob.id
+    assert len(calls[0][1]) == 1  # the single milestone line
+    assert pushes == []  # digest-only: activity_email never pushes milestone
+
+    session.refresh(n)
+    assert n.emailed_at is not None  # digest track stamped
+    assert n.instant_emailed_at is None  # instant path skipped
+    assert n.pushed_at is None  # push owned by milestone service
+
+
+def test_milestone_not_sent_instantly_by_activity_email(session, monkeypatch):
+    """Even with the milestone feature routed to instant, activity_email must
+    leave the rich immediate email to the milestone service (digest-only from
+    activity_email's perspective) — so no instant email is emitted here."""
+    session.add(SiteSetting(key="milestone_unlocked_email_instant", value="true"))
+    session.commit()
+    calls: list = []
+    monkeypatch.setattr(
+        activity_email,
+        "send_activity_digest_email",
+        lambda recipient, lines, **_: calls.append(recipient.id) or True,
+    )
+    monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
+
+    bob = _make_user(session, "bob@example.com", "bob")
+    old = datetime.utcnow() - timedelta(minutes=5)
+    n = _notif(
+        session, recipient=bob, actor=bob, kind="milestone_unlocked", created_at=old
+    )
+    n.subject_key = "first_event"
+    session.add(n)
+    session.commit()
+
+    stats = activity_email.run_once(force=False)
+    assert stats["instant_emails"] == 0
+    session.refresh(n)
+    assert n.instant_emailed_at is None
+
+
 def test_activity_digest_kinds_filter_scopes_to_one_feature(session, monkeypatch):
     """Per-feature "Send now" passes ``kinds`` so only that feature's
     notifications are emailed; the other kinds stay pending for a later
@@ -925,8 +1143,10 @@ def test_activity_digest_kinds_filter_scopes_to_one_feature(session, monkeypatch
     calls: list = []
     monkeypatch.setattr(
         activity_email,
-        "send_activity_digest_email",
-        lambda recipient, lines, **_: calls.append((recipient.id, list(lines))),
+        "send_activity_digest_v2_email",
+        lambda recipient, sections, **_: calls.append(
+            (recipient.id, [e["primary_html"] for s in sections for e in s["entries"]])
+        ),
     )
     monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
 
@@ -956,8 +1176,8 @@ def test_activity_digest_emailed_at_is_idempotent(session, monkeypatch):
     calls: list = []
     monkeypatch.setattr(
         activity_email,
-        "send_activity_digest_email",
-        lambda recipient, lines, **_: calls.append(recipient.id),
+        "send_activity_digest_v2_email",
+        lambda recipient, *a, **_: calls.append(recipient.id),
     )
     monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
 
@@ -1018,12 +1238,61 @@ def test_activity_email_instant_mode_sends_without_schedule(session, monkeypatch
     assert stats2["instant_emails"] == 0
 
 
+def test_instant_feature_never_also_digests(session, monkeypatch):
+    """When a feature has BOTH instant and digest enabled, a notification is
+    emailed on exactly one path — instant wins and the digest path is skipped
+    for that row (no duplicate 'basic + enriched' email)."""
+    digest_calls: list = []
+    instant_calls: list = []
+    monkeypatch.setattr(
+        activity_email,
+        "send_activity_digest_v2_email",
+        lambda recipient, *a, **_: digest_calls.append(recipient.id) or True,
+    )
+    monkeypatch.setattr(
+        activity_email,
+        "send_activity_digest_email",
+        lambda recipient, lines, **_: instant_calls.append(recipient.id) or True,
+    )
+    monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
+
+    # friends_going with instant AND digest both on.
+    session.add(SiteSetting(key="friends_going_email_instant", value="true"))
+    session.add(SiteSetting(key="friends_going_email_digest", value="true"))
+    session.commit()
+
+    bob = _make_user(session, "bob@example.com", "bob")
+    a1 = _make_user(session, "a1@example.com", "a1")
+    _make_event(session, "ev-going")
+    old = datetime.utcnow() - timedelta(minutes=5)
+    n = _notif(
+        session,
+        recipient=bob,
+        actor=a1,
+        kind="subscription_going",
+        event_id="ev-going",
+        created_at=old,
+    )
+
+    # force=True so the digest slot is not what gates delivery.
+    stats = activity_email.run_once(force=True)
+
+    # Exactly one email overall: the instant one. The digest path is skipped.
+    assert stats["instant_emails"] == 1
+    assert instant_calls == [bob.id]
+    assert digest_calls == []
+
+    session.refresh(n)
+    assert n.instant_emailed_at is not None
+    assert n.emailed_at is None
+
+
 def test_activity_digest_optout_skips_email_but_stamps(session, monkeypatch):
     calls: list = []
     monkeypatch.setattr(
         activity_email,
-        "send_activity_digest_email",
-        lambda recipient, lines, **_: calls.append(recipient.id),
+        "send_activity_digest_v2_email",
+        lambda recipient, *a, **_: calls.append(recipient.id),
     )
     monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
 
@@ -1119,8 +1388,8 @@ def test_activity_digest_delivers_in_scheduled_slot(session, monkeypatch):
     calls: list = []
     monkeypatch.setattr(
         activity_email,
-        "send_activity_digest_email",
-        lambda recipient, lines, **_: calls.append(recipient.id),
+        "send_activity_digest_v2_email",
+        lambda recipient, *a, **_: calls.append(recipient.id),
     )
     monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
     monkeypatch.setattr(
@@ -1157,8 +1426,8 @@ def test_activity_digest_per_user_timezone(session, monkeypatch):
     calls: list = []
     monkeypatch.setattr(
         activity_email,
-        "send_activity_digest_email",
-        lambda recipient, lines, **_: calls.append(recipient.id),
+        "send_activity_digest_v2_email",
+        lambda recipient, *a, **_: calls.append(recipient.id),
     )
     monkeypatch.setattr(activity_email, "send_push", lambda *a, **k: 0)
     monkeypatch.setattr(
@@ -1564,3 +1833,124 @@ def test_send_push_prunes_stale_endpoints(session, monkeypatch):
     # Stale (410) endpoint was pruned; live one remains.
     remaining = [s.endpoint for s in session.exec(select(PushSubscription)).all()]
     assert remaining == ["https://push/live"]
+
+
+# --- Truly-instant activity email (request-path, non-scheduler) -------------
+
+
+def test_activity_instant_sends_when_feature_is_instant(session, monkeypatch):
+    """dispatch_activity_instant emails immediately (no scheduler) when the
+    feature's email mode is instant, stamping ``instant_emailed_at`` and
+    leaving the digest ``emailed_at`` track untouched."""
+    from backend.services import activity_instant
+
+    calls: list = []
+    monkeypatch.setattr(
+        activity_instant,
+        "send_activity_digest_email",
+        lambda recipient, lines, **_: calls.append(recipient.id) or True,
+    )
+    session.add(SiteSetting(key="friends_going_email_instant", value="true"))
+    session.commit()
+
+    bob = _make_user(session, "bob@example.com", "bob")
+    a1 = _make_user(session, "a1@example.com", "a1")
+    _make_event(session, "ev-going")
+    n = _notif(
+        session,
+        recipient=bob,
+        actor=a1,
+        kind="subscription_going",
+        event_id="ev-going",
+    )
+
+    stats = activity_instant.dispatch_activity_instant(
+        session, kind="subscription_going", actor=a1, event_id="ev-going"
+    )
+    assert stats["emails"] == 1
+    assert calls == [bob.id]
+    session.refresh(n)
+    assert n.instant_emailed_at is not None
+    assert n.emailed_at is None  # digest track never touched
+
+    # Idempotent: re-dispatch finds it already stamped.
+    stats2 = activity_instant.dispatch_activity_instant(
+        session, kind="subscription_going", actor=a1, event_id="ev-going"
+    )
+    assert stats2["emails"] == 0
+
+
+def test_activity_instant_noop_when_feature_is_digest(session, monkeypatch):
+    """With the default digest mode, dispatch_activity_instant sends nothing
+    and leaves the row pending for the scheduler tick."""
+    from backend.services import activity_instant
+
+    calls: list = []
+    monkeypatch.setattr(
+        activity_instant,
+        "send_activity_digest_email",
+        lambda recipient, lines, **_: calls.append(recipient.id) or True,
+    )
+    bob = _make_user(session, "bob@example.com", "bob")
+    a1 = _make_user(session, "a1@example.com", "a1")
+    _make_event(session, "ev-going")
+    n = _notif(
+        session,
+        recipient=bob,
+        actor=a1,
+        kind="subscription_going",
+        event_id="ev-going",
+    )
+
+    stats = activity_instant.dispatch_activity_instant(
+        session, kind="subscription_going", actor=a1, event_id="ev-going"
+    )
+    assert stats["emails"] == 0
+    assert calls == []
+    session.refresh(n)
+    assert n.instant_emailed_at is None
+    assert n.emailed_at is None
+
+
+def test_activity_instant_social_scoped_by_recipient(session, monkeypatch):
+    """Event-less social kinds are matched by recipient (so the bidirectional
+    new_friend pair is covered) and email instantly when instant is on."""
+    from backend.services import activity_instant
+    from backend.api.routes import social as social_module
+
+    calls: list = []
+    monkeypatch.setattr(
+        activity_instant,
+        "send_activity_digest_email",
+        lambda recipient, lines, **_: calls.append(recipient.id) or True,
+    )
+    monkeypatch.setattr(
+        social_module, "get_people_suggestions_for_email", lambda *a, **k: []
+    )
+    session.add(SiteSetting(key="social_activity_email_instant", value="true"))
+    session.commit()
+
+    bob = _make_user(session, "bob@example.com", "bob")
+    a1 = _make_user(session, "a1@example.com", "a1")
+    n = _notif(session, recipient=bob, actor=a1, kind="new_follower")
+
+    stats = activity_instant.dispatch_activity_instant(
+        session, kind="new_follower", recipient_ids={bob.id}
+    )
+    assert stats["emails"] == 1
+    assert calls == [bob.id]
+    session.refresh(n)
+    assert n.instant_emailed_at is not None
+
+
+def test_activity_instant_skips_scan_only_and_dedicated_kinds(session):
+    """interest_event (scan-only) and milestone_unlocked / event_message
+    (dedicated services) are not deliverable by this module."""
+    from backend.services import activity_instant
+
+    bob = _make_user(session, "bob@example.com", "bob")
+    a1 = _make_user(session, "a1@example.com", "a1")
+    for kind in ("interest_event", "milestone_unlocked", "event_message"):
+        assert activity_instant.dispatch_activity_instant(
+            session, kind=kind, recipient_ids={bob.id}
+        ) == {"emails": 0}

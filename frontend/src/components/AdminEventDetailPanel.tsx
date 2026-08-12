@@ -4,6 +4,7 @@ import { blockEvent, dismissDuplicateGroup, fetchAdminEvent, fetchEventDuplicate
 import { notifyAdminDataChanged } from '../hooks/useAdminCounters';
 import AdminEventDetailContent from './AdminEventDetailContent';
 import EventReviewsSection from './EventReviewsSection';
+import EventMessagesSection from './EventMessagesSection';
 import EventMap from './EventMap';
 import type { CalendarEvent, DuplicateGroup, SeriesGroup } from '../types';
 
@@ -42,6 +43,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
     const [seriesSearchResults, setSeriesSearchResults] = useState<SeriesGroup[]>([]);
     const [seriesSearchLoading, setSeriesSearchLoading] = useState(false);
     const [communityExpanded, setCommunityExpanded] = useState(false);
+    const [messagesExpanded, setMessagesExpanded] = useState(false);
 
     const isOpen = eventId !== null;
 
@@ -506,6 +508,24 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                 {communityExpanded && (
                                     <div className="border-t border-slate-200 px-3 pb-3">
                                         <EventReviewsSection
+                                            eventId={event.event_id}
+                                            isPast={new Date(event.end).getTime() < Date.now()}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                            <div className="mt-4 border border-slate-200 overflow-hidden">
+                                <button
+                                    type="button"
+                                    onClick={() => setMessagesExpanded((v) => !v)}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-slate-50 transition"
+                                >
+                                    <span className="text-slate-400 text-[10px]">{messagesExpanded ? '▾' : '▸'}</span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Messages</span>
+                                </button>
+                                {messagesExpanded && (
+                                    <div className="border-t border-slate-200 px-3 pb-3">
+                                        <EventMessagesSection
                                             eventId={event.event_id}
                                             isPast={new Date(event.end).getTime() < Date.now()}
                                         />

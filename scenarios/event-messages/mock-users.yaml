@@ -1,0 +1,67 @@
+# event-messages cast — engagement decides who is notified on a new post.
+#
+#   Alice — the primary "you" user. Going ev-board / ev-going / ev-series-*;
+#           Saved ev-empty / ev-saved. Author of the ev-past accommodation
+#           thread and reviewer across the past events.
+#   Bob   — posts across boards; event_messages email + push ON. Reviewer.
+#   Carol — event_messages email + push ON; posts/replies widely. Reviewer.
+#   Dave  — event_messages email + push OFF → in-app row only, no email/push.
+#   Erin  — replies on ev-board; used as a negative-control recipient where
+#           she is not engaged.
+#   Frank — replies on ev-board; Going ev-past (blocked-post check).
+#   Grace — extra reply author (ev-board accommodation thread).
+#   Heidi — spare cast member for ad-hoc manual testing.
+#   Admin — receives new-post fan-out (folded into engaged) + report rows;
+#           drives the admin Event-messages instant/digest toggle + Send now.
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Alice%20Rivera
+
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+    account_visibility: public
+    email_event_messages_enabled: true
+    push_event_messages_enabled: true
+
+  - email: carol@example.com
+    name: Carol Nguyen
+    handle: carol
+    account_visibility: public
+    email_event_messages_enabled: true
+    push_event_messages_enabled: true
+
+  - email: dave@example.com
+    name: Dave Owens
+    handle: dave
+    account_visibility: public
+    email_event_messages_enabled: false
+    push_event_messages_enabled: false
+
+  - email: erin@example.com
+    name: Erin Walsh
+    handle: erin
+    account_visibility: public
+
+  - email: frank@example.com
+    name: Frank Osei
+    handle: frank
+    account_visibility: public
+
+  - email: grace@example.com
+    name: Grace Silva
+    handle: grace
+    account_visibility: public
+
+  - email: heidi@example.com
+    name: Heidi Brandt
+    handle: heidi
+    account_visibility: public

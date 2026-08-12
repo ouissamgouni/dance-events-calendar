@@ -24,13 +24,13 @@ export default function EventModal({ event, onClose, onEdit, source }: Props) {
             className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
             onClick={onClose}
         >
-            <div onClick={(e) => e.stopPropagation()}>
+            <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg min-w-0">
                 <EventDetailsPanel
                     event={event}
                     onClose={onClose}
                     onEdit={onEdit}
                     surface="card"
-                    className="w-full max-w-lg max-h-[85vh]"
+                    className="w-full max-h-[85vh]"
                     bodyClassName="max-h-[calc(85vh-80px)]"
                     source={source}
                 />

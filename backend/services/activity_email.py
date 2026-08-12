@@ -35,6 +35,9 @@ from backend.services.app_settings import (
     get_interest_match_max_events_per_email,
     get_feature_email_instant,
     get_feature_email_digest,
+    get_digest_v2_enabled,
+    get_digest_per_kind_cap,
+    get_digest_max_items,
 )
 from backend.config.loader import get_public_app_url
 from backend.db.database import get_engine
@@ -44,7 +47,11 @@ from backend.db.models import (
     User,
     UserEventAttendance,
 )
-from backend.services.email import send_activity_digest_email
+from backend.services.email import (
+    event_message_action_phrase,
+    send_activity_digest_email,
+    send_activity_digest_v2_email,
+)
 from backend.services.notification_delivery import record_delivery
 from backend.services.push_service import send_push
 
@@ -61,6 +68,9 @@ ACTIVITY_KINDS = (
     "follow_request",
     "follow_request_approved",
     "interest_event",
+    "milestone_unlocked",
+    "event_message",
+    "event_message_reply",
 )
 
 # One-to-one map from notification kind → feature bucket. Every kind in
@@ -68,7 +78,7 @@ ACTIVITY_KINDS = (
 # explicitly dropped.
 FEATURE_BY_KIND: dict[str, str] = {
     "subscription_going": "friends_going",
-    "subscription_suggested": "social_activity",
+    "subscription_suggested": "suggested_events",
     "subscription_review": "friend_reviews",
     "subscription_milestone": "friend_milestones",
     "new_follower": "social_activity",
@@ -76,6 +86,9 @@ FEATURE_BY_KIND: dict[str, str] = {
     "follow_request": "social_activity",
     "follow_request_approved": "social_activity",
     "interest_event": "interest_matches",
+    "milestone_unlocked": "milestone_unlocked",
+    "event_message": "event_messages",
+    "event_message_reply": "event_messages",
 }
 
 # Per-(channel, feature) User attribute that must be True for delivery.
@@ -85,12 +98,31 @@ CHANNEL_FLAG: dict[tuple[str, str], str] = {
     ("email", "friend_reviews"): "email_friend_reviews_enabled",
     ("email", "friend_milestones"): "email_friend_milestones_enabled",
     ("email", "interest_matches"): "email_interest_matches_enabled",
+    ("email", "milestone_unlocked"): "email_milestone_unlocked_enabled",
+    ("email", "event_messages"): "email_event_messages_enabled",
+    ("email", "suggested_events"): "email_suggested_events_enabled",
     ("push", "social_activity"): "push_social_activity_enabled",
     ("push", "friends_going"): "push_friends_going_enabled",
     ("push", "friend_reviews"): "push_friend_reviews_enabled",
     ("push", "friend_milestones"): "push_friend_milestones_enabled",
     ("push", "interest_matches"): "push_interest_matches_enabled",
+    ("push", "milestone_unlocked"): "push_milestone_unlocked_enabled",
+    ("push", "event_messages"): "push_event_messages_enabled",
+    ("push", "suggested_events"): "push_suggested_events_enabled",
 }
+
+# Features whose instant email + push are owned by a dedicated service
+# (milestone_notification_service sends the rich immediate milestone email
+# and all milestone push). activity_email only provides their DIGEST email,
+# so it must skip these in the instant-email and push paths to avoid
+# double-sending.
+_DIGEST_ONLY_FEATURES = frozenset({"milestone_unlocked"})
+
+# Kinds whose event is inherently in the past (reviews) are exempt from the
+# digest past-event guard, mirroring ``skip_past_guard`` in notifications.py.
+# Event-less kinds (milestones, follows) are exempt automatically since they
+# resolve to no event.
+_PAST_GUARD_EXEMPT_KINDS = frozenset({"subscription_review"})
 
 # Don't email notifications older than this window. With a twice-a-week
 # cadence the maximum realistic gap is ~3.5 days; 14 days is a safe cap
@@ -188,12 +220,25 @@ def _is_user_in_slot(
     return _slot_status(user, now_utc, weekdays, hour, minute) == "in_slot"
 
 
+def _message_action(kind: str, category: str | None) -> str:
+    """Verb phrase for an event-message notification line.
+
+    ``category`` (stored in the notification ``context``) shapes the copy for
+    top-level posts; replies use a fixed phrase. Delegates to the shared
+    builder in ``services.email`` so the digest line and the instant email
+    subject stay in sync.
+    """
+    return event_message_action_phrase(kind, category)
+
+
 def _render_line(
     kind: str,
     actor: User | None,
     event: CachedEvent | None,
     context: str | None = None,
     also_going: bool = False,
+    subject_key: str | None = None,
+    description: str | None = None,
 ) -> str:
     """Return an escaped HTML snippet describing one notification.
 
@@ -247,7 +292,17 @@ def _render_line(
             )
         return f"<strong>{who}</strong> reached a new milestone"
     if kind == "subscription_suggested":
-        return f"<strong>{who}</strong>'s suggested event {title} was approved"
+        return f"<strong>{who}</strong> suggested the event {title}"
+    if kind == "milestone_unlocked":
+        name_text = escape(context) if context else "a new achievement"
+        name = (
+            f'<a href="{app}/mine/passport" '
+            f'style="color:#1d4ed8;text-decoration:underline">'
+            f"<strong>{name_text}</strong></a>"
+        )
+        if description:
+            return f"\U0001f389 You unlocked {name} \u2014 {escape(description)}"
+        return f"\U0001f389 You unlocked {name}"
     if kind == "new_follower":
         return f"<strong>{who}</strong> started following you"
     if kind == "new_friend":
@@ -259,6 +314,12 @@ def _render_line(
     if kind == "interest_event":
         label = escape(context) if context else "your saved search"
         return f"{title} matched your <strong>{label}</strong> alert"
+    if kind in ("event_message", "event_message_reply"):
+        action = _message_action(kind, context)
+        line = f"<strong>{who}</strong> {action} {title}"
+        if description:
+            line += f": “{escape(description)}”"
+        return line
     return f"New activity from <strong>{who}</strong>"
 
 
@@ -268,6 +329,8 @@ def _render_plain(
     event: CachedEvent | None,
     context: str | None = None,
     also_going: bool = False,
+    subject_key: str | None = None,
+    description: str | None = None,
 ) -> str:
     """Return a plain-text snippet describing one notification (for push)."""
     anon = kind == "subscription_review" and context == "anon"
@@ -288,7 +351,14 @@ def _render_plain(
             return f"{who} reached a milestone: {context}"
         return f"{who} reached a new milestone"
     if kind == "subscription_suggested":
-        return f"{who}'s suggested event {title} was approved"
+        return f"{who} suggested the event {title}"
+    if kind == "milestone_unlocked":
+        name = context or "a new achievement"
+        return (
+            f"You unlocked {name}"
+            if not description
+            else f"You unlocked {name} \u2014 {description}"
+        )
     if kind == "new_follower":
         return f"{who} started following you"
     if kind == "new_friend":
@@ -304,6 +374,12 @@ def _render_plain(
         # actor_user_id == recipient for this kind (no real actor, see
         # reminder_service.py), so "who" is meaningless here.
         return f"Reminder: {title} is coming up"
+    if kind in ("event_message", "event_message_reply"):
+        action = _message_action(kind, context)
+        line = f"{who} {action} {title}"
+        if description:
+            line += f": “{description}”"
+        return line
     return f"New activity from {who}"
 
 
@@ -422,6 +498,22 @@ def run_once(
             if event_ids
         }
 
+        # Past-event guard: resolve which loaded events have already ended so
+        # digest email + push grouping can drop notifications about them before
+        # rendering (and before the interest discover_more math). Reuses the
+        # canonical ``_event_is_past`` definition. Late import mirrors the
+        # social-suggestions import below to avoid a circular dependency.
+        from backend.services.notifications import _event_is_past
+
+        past_event_ids = {eid for eid in events if _event_is_past(session, eid)}
+
+        def _skip_past(n: Notification) -> bool:
+            return (
+                n.kind not in _PAST_GUARD_EXEMPT_KINDS
+                and n.event_id is not None
+                and n.event_id in past_event_ids
+            )
+
         # Recipient co-attendance for "You and X are going to ..." — bulk
         # load which (recipient, event) pairs the recipient is also going
         # to, but only for subscription_going rows.
@@ -461,14 +553,25 @@ def run_once(
             # ``instant_emailed_at`` idempotency stamp.
             if (
                 feature is not None
+                and feature not in _DIGEST_ONLY_FEATURES
                 and feat_instant.get(feature)
                 and (resend or n.instant_emailed_at is None)
             ):
                 instant_by_recipient.setdefault(recipient.id, []).append(n)
+            # Digest path: skipped entirely when this feature has instant email
+            # enabled, so a feature configured for BOTH never emails the same
+            # notification twice (instant wins). Digest-only features and
+            # instant-disabled features still flow through here.
+            instant_owned = (
+                feature is not None
+                and feature not in _DIGEST_ONLY_FEATURES
+                and bool(feat_instant.get(feature))
+            )
             if (
                 (resend or n.emailed_at is None)
                 and feature is not None
                 and feat_digest.get(feature, True)
+                and not instant_owned
             ):
                 in_slot = force
                 if not force:
@@ -492,8 +595,9 @@ def run_once(
                     email_by_recipient.setdefault(recipient.id, []).append(n)
             # Push has no schedule slot — any not-yet-pushed row (or ANY
             # row at all when ``resend=True``) is a candidate on every
-            # call, regardless of ``force``.
-            if resend or n.pushed_at is None:
+            # call, regardless of ``force``. Digest-only features are
+            # skipped: their push is owned by a dedicated service.
+            if (resend or n.pushed_at is None) and feature not in _DIGEST_ONLY_FEATURES:
                 push_by_recipient.setdefault(recipient.id, []).append(n)
 
         # Cap the number of notifications included per recipient in THIS
@@ -549,18 +653,126 @@ def run_once(
         # Late import to avoid circular dependency with backend.api.routes.social.
         from backend.api.routes.social import get_people_suggestions_for_email
 
+        digest_v2 = get_digest_v2_enabled(session)
+        digest_per_kind_cap = get_digest_per_kind_cap(session)
+        digest_max_items = get_digest_max_items(session)
+
+        def _card_subline(event: CachedEvent | None) -> str | None:
+            if event is None:
+                return None
+            bits: list[str] = []
+            if event.start is not None:
+                bits.append(event.start.strftime("%b %-d"))
+            if event.city:
+                bits.append(event.city)
+            elif event.location:
+                bits.append(event.location)
+            return " · ".join(bits) if bits else None
+
+        def _build_entry(n: Notification) -> dict:
+            actor = users.get(n.actor_user_id)
+            event = events.get(n.event_id) if n.event_id else None
+            anon = n.kind == "subscription_review" and n.context == "anon"
+            return {
+                "kind": n.kind,
+                "primary_html": _render_line(
+                    n.kind,
+                    actor,
+                    event,
+                    n.context,
+                    also_going=_also_going(n),
+                    subject_key=n.subject_key,
+                    description=n.description,
+                ),
+                "avatar_url": (
+                    actor.avatar_url if actor is not None and not anon else None
+                ),
+                "initial": (
+                    (actor.display_name or actor.handle or "?")
+                    if actor is not None and not anon
+                    else None
+                ),
+                "subline": _card_subline(event),
+                "anon": anon,
+                "created_at": n.created_at,
+            }
+
+        def _send_combined_digests(groups: dict) -> int:
+            """Combined v2 digest: one card email per recipient.
+
+            ``groups`` is keyed by ``(recipient_id, feature)`` and already
+            gated per feature (digest flag, in-app channel flag, schedule).
+            Recipients with the master ``digest_email_enabled`` opt-out off
+            are skipped (their rows are still stamped outside so they are
+            consumed, not re-queued).
+            """
+            by_recipient: dict[str, dict[str, list[Notification]]] = {}
+            for (recipient_id, feature), notifs in groups.items():
+                by_recipient.setdefault(recipient_id, {}).setdefault(
+                    feature, []
+                ).extend(notifs)
+            sent = 0
+            for recipient_id, per_feature in by_recipient.items():
+                recipient = users[recipient_id]
+                if not getattr(recipient, "digest_email_enabled", True):
+                    continue
+                sections: list[dict] = []
+                delivered_ids: list = []
+                for feature, notifs in per_feature.items():
+                    visible = [n for n in notifs if not _skip_past(n)]
+                    if not visible:
+                        continue
+                    sections.append(
+                        {
+                            "feature": feature,
+                            "entries": [_build_entry(n) for n in visible],
+                        }
+                    )
+                    delivered_ids.extend(n.id for n in visible)
+                if not sections:
+                    continue
+                suggestions = None
+                if "social_activity" in per_feature:
+                    suggestions = [
+                        {
+                            "handle": item.handle,
+                            "display_name": item.display_name,
+                            "avatar_url": item.avatar_url,
+                            "mutual_friend_count": item.mutual_friend_count,
+                            "followers_count": item.followers_count,
+                        }
+                        for item in get_people_suggestions_for_email(
+                            session, recipient, limit=5
+                        )
+                    ]
+                ok = send_activity_digest_v2_email(
+                    recipient,
+                    sections,
+                    per_kind_cap=digest_per_kind_cap,
+                    max_items=digest_max_items,
+                    suggestions=suggestions,
+                )
+                sent += 1
+                if ok:
+                    for nid in delivered_ids:
+                        record_delivery(session, nid, "email", now)
+            return sent
+
         def _send_email_groups(groups: dict) -> int:
             sent = 0
             for (recipient_id, feature), notifs in groups.items():
                 recipient = users[recipient_id]
+                visible = [n for n in notifs if not _skip_past(n)]
+                if not visible:
+                    continue
                 discover_more_count = 0
-                email_notifs = notifs
+                email_notifs = visible
                 if (
                     feature == "interest_matches"
-                    and len(notifs) > max_events_per_interest_email
+                    and len(visible) > max_events_per_interest_email
                 ):
-                    discover_more_count = len(notifs) - max_events_per_interest_email
-                    email_notifs = notifs[:max_events_per_interest_email]
+                    discover_more_count = len(visible) - max_events_per_interest_email
+                    email_notifs = visible[:max_events_per_interest_email]
                 lines = [
                     _render_line(
                         n.kind,
@@ -568,6 +780,8 @@ def run_once(
                         events.get(n.event_id) if n.event_id else None,
                         n.context,
                         also_going=_also_going(n),
+                        subject_key=n.subject_key,
+                        description=n.description,
                     )
                     for n in email_notifs
                 ]
@@ -594,23 +808,30 @@ def run_once(
                 )
                 sent += 1
                 if ok:
-                    for n in notifs:
+                    for n in visible:
                         record_delivery(session, n.id, "email", now)
             return sent
 
-        digests = _send_email_groups(email_groups)
+        digests = (
+            _send_combined_digests(email_groups)
+            if digest_v2
+            else _send_email_groups(email_groups)
+        )
         instant_emails = _send_email_groups(instant_groups)
 
         pushed = 0
         for (recipient_id, feature), notifs in push_groups.items():
+            visible = [n for n in notifs if not _skip_past(n)]
+            if not visible:
+                continue
             first = _render_plain(
-                notifs[0].kind,
-                users.get(notifs[0].actor_user_id),
-                events.get(notifs[0].event_id) if notifs[0].event_id else None,
-                notifs[0].context,
-                also_going=_also_going(notifs[0]),
+                visible[0].kind,
+                users.get(visible[0].actor_user_id),
+                events.get(visible[0].event_id) if visible[0].event_id else None,
+                visible[0].context,
+                also_going=_also_going(visible[0]),
             )
-            extra = len(notifs) - 1
+            extra = len(visible) - 1
             body = first if extra <= 0 else f"{first} and {extra} more"
             title = "New match on Movida" if feature == "interest_matches" else "Movida"
             delivered = send_push(
@@ -622,7 +843,7 @@ def run_once(
             )
             pushed += delivered
             if delivered:
-                for n in notifs:
+                for n in visible:
                     record_delivery(session, n.id, "push", now)
 
         # Stamp emailed_at on every notification considered for email this

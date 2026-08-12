@@ -1,0 +1,10 @@
+# Bob + Carol follow Alice → both receive Alice's subscription_suggested
+# fan-out when her suggested event is approved. Dave does NOT follow →
+# negative control.
+follows:
+  - follower: bob
+    followee: alice
+    status: approved
+  - follower: carol
+    followee: alice
+    status: approved

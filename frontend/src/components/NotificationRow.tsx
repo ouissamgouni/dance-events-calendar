@@ -190,6 +190,9 @@ export default function NotificationRow({
                 {startLabel && (
                     <p className={`${subLabelSize} text-rose-600 mt-0.5`}>Starts {startLabel}</p>
                 )}
+                {item.context === 'ask' && (
+                    <p className={`${subLabelSize} text-blue-600 mt-0.5`}>💬 Ask a question about this event</p>
+                )}
                 <p className={timeClass}>{formatRelative(item.created_at)}</p>
             </>
         );
@@ -237,6 +240,26 @@ export default function NotificationRow({
                     <span className="text-slate-500">Milestone unlocked —</span>{' '}
                     <span className="font-medium text-slate-900">
                         {item.context || 'a new achievement'}
+                    </span>
+                </p>
+                {item.description && <p className={descClass}>{item.description}</p>}
+                <p className={timeClass}>{formatRelative(item.created_at)}</p>
+            </>
+        );
+    } else if (
+        item.kind === 'event_message' ||
+        item.kind === 'event_message_reply' ||
+        item.kind === 'event_message_reported'
+    ) {
+        const emoji = item.kind === 'event_message_reported' ? '🚩' : '💬';
+        icon = iconCircle('bg-sky-100 text-sky-600', emoji);
+        body = (
+            <>
+                <p className={specialTitle}>
+                    <span className="font-medium text-slate-700">{actorName}</span>{' '}
+                    <span className="text-slate-500">{verb}</span>{' '}
+                    <span className="font-medium text-slate-900">
+                        {item.event_title || 'an event'}
                     </span>
                 </p>
                 {item.description && <p className={descClass}>{item.description}</p>}

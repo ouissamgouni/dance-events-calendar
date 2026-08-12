@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 from itertools import cycle
 from pathlib import Path
 from typing import Any, Optional
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import yaml
 from sqlmodel import Session, delete, select
@@ -18,6 +18,7 @@ from backend.db.models import (
     CalendarSetting,
     EventExport,
     EventLinkClick,
+    EventMessage,
     EventPromoCode,
     EventRating,
     EventRatingAspectScore,
@@ -146,6 +147,11 @@ class DatabaseSeeder:
         self._seed_user_saved_events(scenario_dir / "db-events.yaml")
         self._seed_user_saved_events(scenario_dir / "db-saves.yaml")
         self._seed_ratings(scenario_dir / "db-events.yaml")
+        # Event message board: must come AFTER users + events (FKs on both).
+        self._seed_event_messages(scenario_dir / "db-events.yaml")
+        self._seed_event_messages(scenario_dir / "db-messages.yaml")
+        # Suggested-event fan-out: must come AFTER follows + events.
+        self._seed_suggested_notifications(scenario_dir / "db-events.yaml")
         self._seed_promo_codes(scenario_dir / "db-promo-codes.yaml")
         self._seed_organizer_claims(scenario_dir / "db-organizer-claims.yaml")
         self._seed_site_settings(
@@ -944,6 +950,13 @@ class DatabaseSeeder:
                 "push_friend_reviews_enabled",
                 "email_friend_milestones_enabled",
                 "push_friend_milestones_enabled",
+                # Event message board — per-channel toggles for the
+                # "questions & requests" notifications.
+                "email_event_messages_enabled",
+                "push_event_messages_enabled",
+                # Suggested-event approval fan-out toggles.
+                "email_suggested_events_enabled",
+                "push_suggested_events_enabled",
                 # Dance Passport sharing — passport visibility + per-section
                 # share toggles so scenarios can exercise the profile
                 # "Dance Passport" tab (viewable / friends-only / private) and
@@ -1841,6 +1854,200 @@ class DatabaseSeeder:
             seeded += 1
         if seeded:
             logger.info("Seeded %d UserSavedEvent rows", seeded)
+
+    def _seed_event_messages(self, path: Path) -> None:
+        """Pre-seed ``EventMessage`` rows from db-events.yaml or db-messages.yaml.
+
+        Lets scenarios pre-populate an event's message board (incl. past
+        events, whose board is read-only) without driving the UI. No
+        notification fan-out is performed — live test steps drive the
+        notification paths; this only seeds board state.
+
+        Expected structure::
+
+            messages:
+              - key: m1                   # local ref so replies can point here
+                event_id: ev-upcoming
+                email: alice@example.com  # author lookup (required)
+                category: accommodation   # question|accommodation|ride|tickets|meetup|lost_found|other
+                body: "Looking for a roommate for the weekend."
+                is_hidden: false          # optional (admin-hidden)
+              - reply_to: m1              # flat reply; inherits parent category
+                event_id: ev-upcoming
+                email: carol@example.com
+                body: "I might be interested!"
+
+        Idempotent on ``(event_id, author_user_id, body)``.
+
+        Set top-level ``emit_notifications: true`` to also fan out
+        ``event_message`` notifications for top-level posts (Going ∪ Saved
+        users + admin, minus the author) — mirroring the message-create
+        route. Digest scenarios rely on this to produce assertable rows.
+        Replies never fan out from seed (live steps drive thread replies).
+        """
+        if not path.exists():
+            return
+
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+
+        rows = data.get("messages") or []
+        if not rows:
+            return
+
+        emit_notifications = bool(data.get("emit_notifications", False))
+        user_by_email: dict[str, User] = {}
+
+        def _lookup_user(email: str | None) -> User | None:
+            if not email:
+                return None
+            key = email.strip().lower()
+            if key not in user_by_email:
+                user_by_email[key] = self.session.exec(
+                    select(User).where(User.email == key)
+                ).first()
+            return user_by_email[key]
+
+        # Two passes: seed top-level posts first (building a key -> id map) so
+        # replies can resolve their parent regardless of file ordering.
+        key_to_id: dict[str, UUID] = {}
+        seeded = 0
+
+        def _insert(entry: dict, parent_id: UUID | None) -> UUID | None:
+            nonlocal seeded
+            event_id = entry.get("event_id")
+            if not event_id:
+                return None
+            email = (entry.get("email") or "").strip().lower() or None
+            author = _lookup_user(email)
+            if email and author is None:
+                logger.warning(
+                    "Skipping event message: user %s not found (seed users first)",
+                    email,
+                )
+                return None
+            body = (entry.get("body") or "").strip()
+            if not body:
+                logger.warning("Skipping event message for %s: empty body", event_id)
+                return None
+            author_id = author.id if author else None
+
+            existing = self.session.exec(
+                select(EventMessage)
+                .where(EventMessage.event_id == event_id)
+                .where(EventMessage.author_user_id == author_id)
+                .where(EventMessage.body == body)
+            ).first()
+            if existing is not None:
+                return existing.id
+
+            if parent_id is not None:
+                category = "other"  # replies inherit; overwritten below
+                parent = self.session.get(EventMessage, parent_id)
+                if parent is not None:
+                    category = parent.category
+            else:
+                category = entry.get("category") or "other"
+                if category not in (
+                    "question",
+                    "accommodation",
+                    "ride",
+                    "tickets",
+                    "meetup",
+                    "lost_found",
+                    "other",
+                ):
+                    logger.warning(
+                        "Event message for %s: unknown category %r, using 'other'",
+                        event_id,
+                        category,
+                    )
+                    category = "other"
+
+            msg = EventMessage(
+                event_id=event_id,
+                author_user_id=author_id,
+                parent_id=parent_id,
+                category=category,
+                body=body,
+                is_hidden=bool(entry.get("is_hidden", False)),
+            )
+            self.session.add(msg)
+            self.session.flush()
+            seeded += 1
+            if emit_notifications and parent_id is None and author is not None:
+                from backend.services.notifications import fan_out_event_message
+
+                fan_out_event_message(
+                    self.session,
+                    author,
+                    event_id,
+                    msg.id,
+                    category=category,
+                    snippet=body[:140],
+                )
+            return msg.id
+
+        # Pass 1: top-level posts.
+        for entry in rows:
+            if not isinstance(entry, dict) or entry.get("reply_to"):
+                continue
+            msg_id = _insert(entry, None)
+            if msg_id is not None and entry.get("key"):
+                key_to_id[entry["key"]] = msg_id
+
+        # Pass 2: replies.
+        for entry in rows:
+            if not isinstance(entry, dict) or not entry.get("reply_to"):
+                continue
+            parent_id = key_to_id.get(entry["reply_to"])
+            if parent_id is None:
+                logger.warning(
+                    "Skipping reply: parent key %r not found", entry.get("reply_to")
+                )
+                continue
+            _insert(entry, parent_id)
+
+        if seeded:
+            logger.info("Seeded %d EventMessage rows", seeded)
+
+    def _seed_suggested_notifications(self, path: Path) -> None:
+        """Emit ``subscription_suggested`` notifications from db-events.yaml.
+
+        Mirrors the admin approval route: fans out to each actor's
+        followers. Must run AFTER follows so subscribers exist. Structure::
+
+            emit_suggested:
+              - event_id: ev-suggested        # resulting CachedEvent id
+                email: alice@example.com       # submitter/actor lookup
+        """
+        if not path.exists():
+            return
+
+        with open(path) as f:
+            data = yaml.safe_load(f) or {}
+
+        rows = data.get("emit_suggested") or []
+        if not rows:
+            return
+
+        from backend.services.notifications import fan_out_suggested
+
+        fanned = 0
+        for entry in rows:
+            if not isinstance(entry, dict):
+                continue
+            event_id = entry.get("event_id")
+            email = (entry.get("email") or "").strip().lower()
+            if not event_id or not email:
+                continue
+            actor = self.session.exec(select(User).where(User.email == email)).first()
+            if actor is None:
+                logger.warning("emit_suggested: actor %s not found", email)
+                continue
+            fanned += fan_out_suggested(self.session, actor, event_id)
+        if fanned:
+            logger.info("Emitted %d subscription_suggested notifications", fanned)
 
     def _seed_ratings(self, path: Path) -> None:
         """Pre-seed EventRating rows from db-events.yaml `ratings:` list.

@@ -210,6 +210,41 @@ def get_activity_digest_email_enabled() -> bool:
     return True if parsed is None else parsed
 
 
+def get_digest_v2_enabled() -> bool:
+    """Master switch for the combined card-styled digest (v2). Default True.
+
+    When off, the legacy separate per-feature digest emails are sent.
+    """
+    parsed = _parse_bool(os.getenv("DIGEST_V2_ENABLED"))
+    return True if parsed is None else parsed
+
+
+def get_digest_per_kind_cap() -> int:
+    """Max notifications shown per kind in the combined v2 digest before the
+    rest collapse behind an "and N more" line. Default 5."""
+    raw = os.getenv("DIGEST_PER_KIND_CAP", "5")
+    try:
+        return max(1, int(raw))
+    except (TypeError, ValueError):
+        return 5
+
+
+def get_digest_max_items() -> int:
+    """Max total notifications across all kinds in the combined v2 digest
+    before per-kind round-robin trimming. Default 20."""
+    raw = os.getenv("DIGEST_MAX_ITEMS", "20")
+    try:
+        return max(1, int(raw))
+    except (TypeError, ValueError):
+        return 20
+
+
+def get_milestone_notifications_enabled() -> bool:
+    """Master switch for Dance Passport milestone notifications. Default True."""
+    parsed = _parse_bool(os.getenv("MILESTONE_NOTIFICATIONS_ENABLED"))
+    return True if parsed is None else parsed
+
+
 def get_review_prompt_enabled() -> bool:
     """Master switch for post-event review-prompt generation + emails. Default True."""
     parsed = _parse_bool(os.getenv("REVIEW_PROMPT_ENABLED"))
@@ -219,6 +254,16 @@ def get_review_prompt_enabled() -> bool:
 def get_review_prompt_delay_hours() -> int:
     """Hours after an event's end to send the review prompt. Default 3."""
     raw = os.getenv("REVIEW_PROMPT_DELAY_HOURS", "3")
+    try:
+        return max(1, int(raw))
+    except (TypeError, ValueError):
+        return 3
+
+
+def get_event_message_cta_min_going() -> int:
+    """Minimum "Going" attendees before an event reminder includes an "Ask a
+    question" CTA to the message board. Default 3."""
+    raw = os.getenv("EVENT_MESSAGE_CTA_MIN_GOING", "3")
     try:
         return max(1, int(raw))
     except (TypeError, ValueError):

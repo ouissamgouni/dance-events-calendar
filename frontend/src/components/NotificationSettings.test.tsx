@@ -145,6 +145,10 @@ describe('NotificationSettings', () => {
         push_friend_reviews_enabled: false,
         email_friend_milestones_enabled: false,
         push_friend_milestones_enabled: false,
+        email_event_messages_enabled: false,
+        push_event_messages_enabled: false,
+        email_suggested_events_enabled: false,
+        push_suggested_events_enabled: false,
       }),
     )
   })

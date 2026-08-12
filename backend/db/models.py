@@ -200,6 +200,19 @@ class User(SQLModel, table=True):
     # every other category); these two gate email/push only.
     email_milestone_unlocked_enabled: bool = Field(default=True, nullable=False)
     push_milestone_unlocked_enabled: bool = Field(default=True, nullable=False)
+    # Someone posted a message/question (or a reply) on an event the user is
+    # going to or has saved (``event_message`` / ``event_message_reply``).
+    email_event_messages_enabled: bool = Field(default=True, nullable=False)
+    push_event_messages_enabled: bool = Field(default=True, nullable=False)
+    # A suggested event the user submitted was approved by an admin and
+    # fanned out to their followers (``subscription_suggested``). Split out of
+    # the broader social-activity bucket so users control it independently.
+    email_suggested_events_enabled: bool = Field(default=True, nullable=False)
+    push_suggested_events_enabled: bool = Field(default=True, nullable=False)
+    # Master opt-out for the combined activity digest email (v2). Independent
+    # of the per-feature email flags: unchecking it silences the whole digest
+    # regardless of which feature sections are enabled. In-app/push unaffected.
+    digest_email_enabled: bool = Field(default=True, nullable=False)
     # --- Interest Profiles & Interest-Event Notifications ---
     # Optional "home" location, used as the default center for radius-based
     # interest profiles. Nullable until the user sets it via preferences.
@@ -1145,6 +1158,79 @@ class EventRatingAspectTag(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class EventMessage(SQLModel, table=True):
+    """A user-posted message/question on an event (question, accommodation, ride,
+    tickets, meetup, lost_found, other).
+
+    Flat threading: top-level posts have ``parent_id IS NULL`` and carry a
+    ``category``; replies set ``parent_id`` to the top-level post and inherit
+    its category. Soft-deleted via ``deleted_at`` so a deleted parent keeps
+    its reply thread and moderation history. ``user_id`` is nullable with
+    ``ON DELETE SET NULL`` so account deletion anonymises authored messages.
+    """
+
+    __tablename__ = "event_messages"
+
+    id: UUID = Field(default_factory=uuid4, primary_key=True)
+    event_id: str = Field(foreign_key="cached_events.event_id", index=True)
+    author_user_id: Optional[UUID] = Field(
+        default=None, foreign_key="users.id", index=True
+    )
+    # NULL for a top-level post; the parent post id for a (flat) reply.
+    parent_id: Optional[UUID] = Field(
+        default=None, foreign_key="event_messages.id", index=True
+    )
+    # question | accommodation | ride | tickets | meetup | lost_found | other.
+    # Only meaningful on top-level posts; replies inherit the parent's category.
+    category: str = Field(default="other", max_length=16)
+    body: str = Field(sa_column=Column(Text))
+    # Admin moderation flag; hidden messages are excluded from public reads.
+    is_hidden: bool = Field(default=False, index=True)
+    deleted_at: Optional[datetime] = Field(default=None, index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class EventMessageReport(SQLModel, table=True):
+    """A user report flagging an ``EventMessage`` for admin moderation."""
+
+    __tablename__ = "event_message_reports"
+    __table_args__ = (
+        UniqueConstraint(
+            "message_id", "reporter_user_id", name="uq_event_message_report"
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    message_id: UUID = Field(foreign_key="event_messages.id", index=True)
+    reporter_user_id: Optional[UUID] = Field(
+        default=None, foreign_key="users.id", index=True
+    )
+    reason: Optional[str] = Field(default=None, max_length=280)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    resolved_at: Optional[datetime] = Field(default=None)
+    resolved_by: Optional[str] = Field(default=None, max_length=255)
+
+
+class UserEventMute(SQLModel, table=True):
+    """A signed-in user muting event-message notifications for one event.
+
+    One row means the user receives no ``event_message`` / ``event_message_reply``
+    notifications for ``event_id`` on any channel. Global feature toggles still
+    apply; this is an additional per-event opt-out.
+    """
+
+    __tablename__ = "user_event_mutes"
+    __table_args__ = (
+        UniqueConstraint("user_id", "event_id", name="uq_user_event_mute"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: UUID = Field(foreign_key="users.id", index=True)
+    event_id: str = Field(foreign_key="cached_events.event_id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class EventAttendance(SQLModel, table=True):
     """Append-only audit log of going/not_going actions (mirrors EventSave)."""
 
@@ -1379,10 +1465,10 @@ class Notification(SQLModel, table=True):
     pushed_at: Optional[datetime] = Field(default=None, index=True)
     # Set once this notification has been sent as an immediate (non-batched)
     # activity email, when the admin routes its feature through the instant
-    # email path (see ``services/activity_email.py``). Independent of
-    # ``emailed_at`` (the digest stamp) so a feature configured for BOTH
-    # instant and digest email delivers on each path without one suppressing
-    # the other.
+    # email path (see ``services/activity_email.py``). A feature with instant
+    # enabled skips the digest path entirely, so a notification is emailed on
+    # at most one path — ``instant_emailed_at`` and ``emailed_at`` are never
+    # both set for the same row.
     instant_emailed_at: Optional[datetime] = Field(default=None, index=True)
     # Free-text context for kinds that need extra message copy beyond
     # actor/event, e.g. ``interest_event`` stores the matched profile

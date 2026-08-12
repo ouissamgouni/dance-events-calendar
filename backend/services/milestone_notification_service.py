@@ -34,7 +34,10 @@ from datetime import datetime
 from sqlmodel import Session, select
 
 from backend.services import passport
-from backend.services.app_settings import get_milestone_notifications_enabled
+from backend.services.app_settings import (
+    get_feature_email_instant,
+    get_milestone_notifications_enabled,
+)
 from backend.db.database import get_engine
 from backend.db.models import (
     Notification,
@@ -42,7 +45,7 @@ from backend.db.models import (
     UserEventAttendance,
     UserMilestone,
 )
-from backend.services.email import send_milestones_unlocked_email
+from backend.services.email import send_milestone_instant_email
 from backend.services.notification_delivery import record_delivery
 from backend.services.notifications import fan_out_milestone
 from backend.services.push_service import send_push
@@ -138,6 +141,11 @@ def _create_milestone_notifications(session, user, to_email, to_push, notif_ids)
     )
     if not unlocked_keys:
         return 0
+    # Milestone emails ship immediately (rich, per-milestone) only when the
+    # admin routes this feature to instant. In digest mode the in-app row is
+    # left with ``emailed_at`` NULL so ``activity_email`` folds it into the
+    # batched digest instead. Push is unaffected (always immediate).
+    instant_email = get_feature_email_instant("milestone_unlocked", session)
     existing = {
         n.subject_key: n
         for n in session.exec(
@@ -177,7 +185,11 @@ def _create_milestone_notifications(session, user, to_email, to_push, notif_ids)
                 description=milestone.achieved_description,
             )
         notif_ids[(user.id, key)] = notif.id
-        if user.email_milestone_unlocked_enabled and notif.emailed_at is None:
+        if (
+            instant_email
+            and user.email_milestone_unlocked_enabled
+            and notif.emailed_at is None
+        ):
             to_email.append((user, milestone))
         if user.push_milestone_unlocked_enabled and notif.pushed_at is None:
             to_push.append((user.id, key, milestone))
@@ -221,6 +233,7 @@ def _create_consistency_notifications(
     ``UserConsistencyAchievement`` rows (each an upward reach).
     """
     passport.evaluate_and_persist_consistency(session, user)
+    instant_email = get_feature_email_instant("milestone_unlocked", session)
     # ``evaluate_and_persist_consistency`` returns only rows it just inserted;
     # a prior passport GET may have inserted them, so rebuild from the full set
     # of reaches lacking a notification instead of trusting that return value.
@@ -270,7 +283,11 @@ def _create_consistency_notifications(
             )
         notif_ids[(user.id, subject_key)] = notif.id
         milestone = _consistency_milestone(subject_key, lvl)
-        if user.email_milestone_unlocked_enabled and notif.emailed_at is None:
+        if (
+            instant_email
+            and user.email_milestone_unlocked_enabled
+            and notif.emailed_at is None
+        ):
             to_email.append((user, milestone))
         if user.push_milestone_unlocked_enabled and notif.pushed_at is None:
             to_push.append((user.id, subject_key, milestone))
@@ -293,7 +310,7 @@ def _dispatch_channels(to_email, to_push, notif_ids, session=None) -> tuple[int,
     emailed = 0
     emailed_ids: list[int] = []
     for user, milestones in by_user.values():
-        if send_milestones_unlocked_email(user, milestones):
+        if send_milestone_instant_email(user, milestones):
             emailed += len(milestones)
             for milestone in milestones:
                 nid = notif_ids.get((user.id, milestone.key))

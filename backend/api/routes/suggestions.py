@@ -35,6 +35,7 @@ from backend.db.models import (
 from backend.services.email import send_suggestion_notification
 from backend.services.geocoding import geocode_location
 from backend.services.ip_geolocation import geolocate_ip
+from backend.services import activity_instant
 from backend.services.notifications import fan_out_going, fan_out_suggested
 
 logger = logging.getLogger(__name__)
@@ -278,6 +279,18 @@ def submit_suggestion(
         session.add(suggestion)
         session.commit()
         session.refresh(suggestion)
+        if body.going and current_user is not None:
+            # Instant "friends going" email for the creator's own Going,
+            # when that feature is configured for instant delivery.
+            try:
+                activity_instant.dispatch_activity_instant(
+                    session,
+                    kind="subscription_going",
+                    actor=current_user,
+                    event_id=cached_event.event_id,
+                )
+            except Exception:  # noqa: BLE001 — best-effort
+                logger.warning("Instant friends-going email failed", exc_info=True)
 
     # Fire background tasks
     background_tasks.add_task(_geolocate_and_update, suggestion.id, client_ip)
@@ -504,6 +517,20 @@ def approve_suggestion(
 
     session.commit()
     session.refresh(suggestion)
+    # Instant "suggested events" email to the submitter's subscribers when
+    # that feature is in instant mode (else the digest tick handles it).
+    if suggestion.submitter_user_id is not None:
+        actor = session.get(User, suggestion.submitter_user_id)
+        if actor is not None:
+            try:
+                activity_instant.dispatch_activity_instant(
+                    session,
+                    kind="subscription_suggested",
+                    actor=actor,
+                    event_id=event_id,
+                )
+            except Exception:  # noqa: BLE001 — best-effort
+                logger.warning("Instant suggested-event email failed", exc_info=True)
     return suggestion
 
 

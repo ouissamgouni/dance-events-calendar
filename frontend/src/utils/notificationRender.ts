@@ -44,6 +44,30 @@ export function getNotificationVerb(item: NotificationItem): string {
             return 'rejected your promo code for';
         case 'organizer_claim_decided':
             return 'reviewed your organizer claim';
+        case 'event_message':
+            switch (item.context) {
+                case 'question':
+                    return 'asked a question about';
+                case 'accommodation':
+                case 'roommate': // legacy alias
+                    return 'posted about accommodation for';
+                case 'ride':
+                    return 'posted about a ride for';
+                case 'tickets':
+                    return 'posted about tickets for';
+                case 'meetup':
+                    return 'posted a meetup for';
+                case 'lost_found':
+                    return 'posted a lost-and-found note for';
+                default:
+                    return 'posted a message on';
+            }
+        case 'event_message_reply':
+            return item.context === 'root'
+                ? 'replied to your message on'
+                : 'replied to a message on';
+        case 'event_message_reported':
+            return 'reported a message on';
         default:
             return 'updated';
     }
@@ -66,6 +90,14 @@ export function resolveNotificationDestination(item: NotificationItem): string {
             return '/account';
         case 'event_review_prompt':
             return `/event/${item.event_id}/review`;
+        case 'event_reminder':
+            return item.context === 'ask'
+                ? `/event/${item.event_id}/ask`
+                : `/event/${item.event_id}`;
+        case 'event_message':
+        case 'event_message_reply':
+        case 'event_message_reported':
+            return `/event/${item.event_id}#messages`;
         default:
             return `/event/${item.event_id}`;
     }

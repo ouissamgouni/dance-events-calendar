@@ -28,11 +28,17 @@ users:
     email_friend_reviews_enabled: true
     email_friend_milestones_enabled: true
     email_interest_matches_enabled: true
+    email_milestone_unlocked_enabled: true
+    email_suggested_events_enabled: true
+    email_event_messages_enabled: true
     push_friends_going_enabled: false
     push_social_activity_enabled: false
     push_friend_reviews_enabled: false
     push_friend_milestones_enabled: false
     push_interest_matches_enabled: false
+    push_milestone_unlocked_enabled: false
+    push_suggested_events_enabled: false
+    push_event_messages_enabled: false
 
   # Negative probe — every activity email toggle OFF.
   - email: carol@example.com
@@ -44,11 +50,17 @@ users:
     email_friend_reviews_enabled: false
     email_friend_milestones_enabled: false
     email_interest_matches_enabled: false
+    email_milestone_unlocked_enabled: false
+    email_suggested_events_enabled: false
+    email_event_messages_enabled: false
     push_friends_going_enabled: false
     push_social_activity_enabled: false
     push_friend_reviews_enabled: false
     push_friend_milestones_enabled: false
     push_interest_matches_enabled: false
+    push_milestone_unlocked_enabled: false
+    push_suggested_events_enabled: false
+    push_event_messages_enabled: false
 
   # Mutual friends of Alice, surfaced as suggestions in Bob's digest.
   - email: diego@example.com

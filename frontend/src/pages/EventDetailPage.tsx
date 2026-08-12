@@ -14,6 +14,7 @@ import GoingButton from '../components/GoingButton';
 import SaveEventButton from '../components/SaveEventButton';
 import RateEventButton from '../components/RateEventButton';
 import EventReviewsSection from '../components/EventReviewsSection';
+import EventMessagesSection from '../components/EventMessagesSection';
 import InterestSection from '../components/InterestSection';
 import ShareButton from '../components/ShareButton';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
@@ -51,6 +52,9 @@ export default function EventDetailPage() {
     // Bumped whenever the current user's rating changes, so EventReviewsSection
     // reloads its aggregate + review list without a full remount.
     const [reviewsRefreshToken, setReviewsRefreshToken] = useState(0);
+    // Bumped by the "Ask" action in the details actions bar to open the
+    // message board's compose form (and scroll it into view).
+    const [askComposeToken, setAskComposeToken] = useState(0);
 
     // The `/event/:id/review` path arrives from a review-prompt notification
     // ("how was it?") — auto-open the Rate modal once the event (and
@@ -86,6 +90,28 @@ export default function EventDetailPage() {
     }, [event, user, authLoading]);
 
 
+    // The `/event/:id/ask` path arrives from an event-reminder "ask a
+    // question" CTA (email/push) — auto-open the message board's compose
+    // form once the event has mounted, then rewrite the URL to the
+    // canonical `/event/:id#messages`. Mirrors the `/review` handler above.
+    const autoOpenAskRef = useRef(location.pathname.endsWith('/ask'));
+    useEffect(() => {
+        if (!autoOpenAskRef.current || !event || authLoading) return;
+        if (!user) {
+            const returnTo = `${location.pathname}${location.search}${location.hash}`;
+            navigate(`/login?next=${encodeURIComponent(returnTo)}`, { replace: true });
+            return;
+        }
+        autoOpenAskRef.current = false;
+        setAskComposeToken((t) => t + 1);
+        navigate(
+            { pathname: `/event/${eventId}`, search: location.search, hash: '#messages' },
+            { replace: true },
+        );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [event, user, authLoading]);
+
+
     // Scroll to the community reviews section when arriving via a
     // `#community` link (e.g. clicking a Review button on a card, modal, or
     // map pin elsewhere in the app). React Router doesn't auto-scroll to
@@ -94,6 +120,14 @@ export default function EventDetailPage() {
     useEffect(() => {
         if (location.hash !== '#community' || !event) return;
         const el = document.getElementById('community');
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, [location.hash, event]);
+
+    // Scroll to the messages board when arriving via a `#messages` link (e.g.
+    // an event-message notification). Mirrors the `#community` handler above.
+    useEffect(() => {
+        if (location.hash !== '#messages' || !event) return;
+        const el = document.getElementById('messages');
         el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, [location.hash, event]);
 
@@ -264,10 +298,12 @@ export default function EventDetailPage() {
                         </h1>
                     )}
 
-                    {/* 2-column layout: details left, map right */}
+                    {/* 2-column hero: primary content left (wide), sticky map
+                        sidebar right (narrow). The community board + reviews
+                        live in a full-width region below. */}
                     <div className="flex flex-col lg:flex-row gap-6">
                         {/* Left: event details card */}
-                        <div className="lg:w-1/3 min-w-0">
+                        <div className="lg:w-2/3 min-w-0">
                             <article className="bg-white rounded-2xl shadow-lg overflow-hidden">
                                 <div className="px-6 py-5">
                                     {editMode && user?.is_admin ? (
@@ -316,6 +352,24 @@ export default function EventDetailPage() {
                                         title={event.title}
                                         url={shareUrl}
                                     />
+                                    {!isPast && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setAskComposeToken((t) => t + 1);
+                                                document
+                                                    .getElementById('messages')
+                                                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                            }}
+                                            className="inline-flex items-center gap-1 text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 transition shrink-0"
+                                            aria-label="Ask a question"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                                                <path fillRule="evenodd" d="M10 2c-4.418 0-8 3.134-8 7 0 1.76.743 3.37 1.97 4.6-.097 1.016-.417 2.13-.771 2.966a.75.75 0 0 0 .95.966 8.53 8.53 0 0 0 2.71-1.34A9.77 9.77 0 0 0 10 16c4.418 0 8-3.134 8-7s-3.582-7-8-7Z" clipRule="evenodd" />
+                                            </svg>
+                                            Ask
+                                        </button>
+                                    )}
                                     {showRatings && <RateEventButton eventId={event.event_id} appearance="pill" eventHasReviews={reviewCount > 0} autoOpenToken={reviewOpenToken} entryPoint="notification" isEventDetailPage showCount={false} isPast={isPast} onRatingChanged={() => setReviewsRefreshToken((t) => t + 1)} />}
                                     {!editMode && (
                                         <button
@@ -357,21 +411,52 @@ export default function EventDetailPage() {
                                         </button>
                                     )}
                                 </div>
-                                {showRatings && (
-                                    <div id="community" className="px-6 pb-5">
-                                        <EventReviewsSection eventId={event.event_id} isPast={isPast} onAggregateLoaded={(a) => setReviewCount(a?.count ?? 0)} onOpenReviewForm={() => setReviewOpenToken((t) => t + 1)} refreshToken={reviewsRefreshToken} />
-                                    </div>
-                                )}
                             </article>
                         </div>
 
-                        {/* Right: interactive map */}
+                        {/* Right: map sidebar. On desktop the column stretches
+                            to match the details column height (flex align-stretch)
+                            so the map bottom lines up with the overview card. */}
                         {event.latitude != null && event.longitude != null && (
-                            <div className="h-[300px] lg:w-2/3 lg:h-auto lg:aspect-[4/3] rounded-xl overflow-hidden shadow-sm">
-                                <EventMap events={[event]} />
+                            <div className="lg:w-1/3">
+                                <div className="h-[240px] lg:h-full lg:min-h-[240px] rounded-xl overflow-hidden shadow-sm">
+                                    <EventMap
+                                        events={[event]}
+                                        recenterTo={[event.latitude, event.longitude]}
+                                    />
+                                </div>
                             </div>
                         )}
                     </div>
+
+                    {/* Full-width community region: message board + reviews
+                        live in two clearly separated cards. Order adapts to
+                        whether the event has happened — upcoming events lead
+                        with coordination messages; past events lead with
+                        reviews. Each card is independently collapsible. */}
+                    {isPast ? (
+                        <>
+                            {showRatings && (
+                                <div id="community" className="mt-6 bg-white rounded-2xl shadow-lg px-6 py-5">
+                                    <EventReviewsSection collapsible eventId={event.event_id} isPast={isPast} onAggregateLoaded={(a) => setReviewCount(a?.count ?? 0)} onOpenReviewForm={() => setReviewOpenToken((t) => t + 1)} refreshToken={reviewsRefreshToken} />
+                                </div>
+                            )}
+                            <div className="mt-6 bg-white rounded-2xl shadow-lg px-6 py-5">
+                                <EventMessagesSection collapsible eventId={event.event_id} isPast={isPast} openComposeToken={askComposeToken} />
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="mt-6 bg-white rounded-2xl shadow-lg px-6 py-5">
+                                <EventMessagesSection collapsible eventId={event.event_id} isPast={isPast} openComposeToken={askComposeToken} />
+                            </div>
+                            {showRatings && (
+                                <div id="community" className="mt-6 bg-white rounded-2xl shadow-lg px-6 py-5">
+                                    <EventReviewsSection collapsible eventId={event.event_id} isPast={isPast} onAggregateLoaded={(a) => setReviewCount(a?.count ?? 0)} onOpenReviewForm={() => setReviewOpenToken((t) => t + 1)} refreshToken={reviewsRefreshToken} />
+                                </div>
+                            )}
+                        </>
+                    )}
                 </div>
 
                 {/* Sticky mobile CTA bar — mirrors the in-card actions bar so

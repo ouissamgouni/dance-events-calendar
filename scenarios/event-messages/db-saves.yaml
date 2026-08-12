@@ -1,0 +1,27 @@
+# Saves — the "Saved" half of engagement (Going ∪ Saved).
+#   Alice SAVED ev-empty + ev-saved (she's the "you" who saved these).
+#   Bob + Dave SAVED ev-board so a new post reaches saved-only users.
+#   Bob SAVED ev-going; Carol SAVED ev-not-engaged (engaged crowd sans Alice).
+#   ev-no-audience deliberately has NO saves and NO attendances.
+saves:
+  - event_id: ev-board
+    email: bob@example.com
+    audience: public
+  - event_id: ev-board
+    email: dave@example.com
+    audience: public
+  - event_id: ev-empty
+    email: alice@example.com
+    audience: public
+  - event_id: ev-saved
+    email: alice@example.com
+    audience: public
+  - event_id: ev-saved
+    email: carol@example.com
+    audience: public
+  - event_id: ev-going
+    email: bob@example.com
+    audience: public
+  - event_id: ev-not-engaged
+    email: carol@example.com
+    audience: public

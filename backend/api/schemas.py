@@ -730,6 +730,11 @@ class SiteSettingsResponse(BaseModel):
     event_reminders_enabled: bool = True
     # Master switch for batched activity digest emails.
     activity_digest_email_enabled: bool = True
+    # Combined card-styled digest (v2). When off, legacy per-feature digests.
+    digest_v2_enabled: bool = True
+    # Per-kind cap and total item cap for the combined v2 digest.
+    digest_per_kind_cap: int = 5
+    digest_max_items: int = 20
     # Master switch for interest-profile match notifications.
     interest_match_notifications_enabled: bool = True
     # Master switch for web-push delivery (independent of VAPID config).
@@ -757,6 +762,16 @@ class SiteSettingsResponse(BaseModel):
     friend_milestones_email_digest: bool = True
     interest_matches_email_instant: bool = False
     interest_matches_email_digest: bool = True
+    event_messages_email_instant: bool = False
+    event_messages_email_digest: bool = True
+    suggested_events_email_instant: bool = False
+    suggested_events_email_digest: bool = True
+    # Personal Dance Passport milestone unlocks. Master switch plus the
+    # per-route email delivery toggles. Instant keeps the rich immediate
+    # email; digest folds the milestone into the batched activity digest.
+    milestone_notifications_enabled: bool = True
+    milestone_unlocked_email_instant: bool = False
+    milestone_unlocked_email_digest: bool = True
     # Master switch for post-event "how was it?" review-prompt notifications
     # (Event Quality Layer Phase 3).
     review_prompt_enabled: bool = True
@@ -772,6 +787,9 @@ class SiteSettingsResponse(BaseModel):
     # Minimum reviews before an event/series shows a computed "Overall Mood"
     # headline label; below this the UI shows an "Early feedback" state.
     review_mood_headline_min_reviews: int = 3
+    # Minimum "Going" attendees before an event reminder includes an "Ask a
+    # question" CTA linking to the event's message board.
+    event_message_cta_min_going: int = 3
     # When True, saving/syncing an event automatically runs the near-duplicate
     # detection scan for it (see backend/services/duplicate_detection.py).
     # The admin Duplicates panel and manual "Scan now"/"Flag as duplicates"
@@ -932,6 +950,7 @@ class NotificationToggleCountsResponse(BaseModel):
     event_reminders: NotificationToggleCountEntry
     activity_digest: NotificationToggleCountEntry
     review_prompt: NotificationToggleCountEntry
+    milestones: NotificationToggleCountEntry
 
 
 class SiteSettingsUpdateRequest(BaseModel):
@@ -969,6 +988,9 @@ class SiteSettingsUpdateRequest(BaseModel):
     # Notification / re-engagement global gates.
     event_reminders_enabled: Optional[bool] = None
     activity_digest_email_enabled: Optional[bool] = None
+    digest_v2_enabled: Optional[bool] = None
+    digest_per_kind_cap: Optional[int] = Field(default=None, ge=1, le=50)
+    digest_max_items: Optional[int] = Field(default=None, ge=1, le=200)
     interest_match_notifications_enabled: Optional[bool] = None
     web_push_enabled: Optional[bool] = None
     reminder_lead_hours: Optional[int] = Field(default=None, ge=1, le=720)
@@ -994,11 +1016,19 @@ class SiteSettingsUpdateRequest(BaseModel):
     friend_milestones_email_digest: Optional[bool] = None
     interest_matches_email_instant: Optional[bool] = None
     interest_matches_email_digest: Optional[bool] = None
+    event_messages_email_instant: Optional[bool] = None
+    event_messages_email_digest: Optional[bool] = None
+    suggested_events_email_instant: Optional[bool] = None
+    suggested_events_email_digest: Optional[bool] = None
+    milestone_notifications_enabled: Optional[bool] = None
+    milestone_unlocked_email_instant: Optional[bool] = None
+    milestone_unlocked_email_digest: Optional[bool] = None
     review_prompt_enabled: Optional[bool] = None
     review_prompt_delay_hours: Optional[int] = Field(default=None, ge=1, le=720)
     review_prompt_lookback_hours: Optional[int] = Field(default=None, ge=1, le=720)
     for_you_review_window_days: Optional[int] = Field(default=None, ge=1, le=3650)
     review_mood_headline_min_reviews: Optional[int] = Field(default=None, ge=1, le=1000)
+    event_message_cta_min_going: Optional[int] = Field(default=None, ge=1, le=10000)
     duplicate_auto_detect_enabled: Optional[bool] = None
     series_auto_detect_enabled: Optional[bool] = None
 
@@ -1666,6 +1696,71 @@ class EventReviewPublic(BaseModel):
 class EventReviewsListResponse(BaseModel):
     items: list[EventReviewPublic]
     total: int
+
+
+class EventMessageAuthor(BaseModel):
+    handle: str = ""
+    display_name: str = ""
+    avatar_url: Optional[str] = None
+    is_verified_organizer: bool = False
+
+
+class EventMessageResponse(BaseModel):
+    """One message (or reply) on an event's Q&A board.
+
+    ``author`` is ``None`` for soft-anonymised messages (author account
+    deleted). ``is_own`` / ``can_delete`` are viewer-relative flags computed
+    server-side. Top-level posts carry their whole thread flattened into
+    ``replies`` (every descendant, chronological); a reply to another reply
+    sets ``reply_to`` to the addressed author for an "@name" prefix.
+    """
+
+    id: UUID
+    event_id: str
+    parent_id: Optional[UUID] = None
+    category: str
+    body: str
+    author: Optional[EventMessageAuthor] = None
+    is_own: bool = False
+    can_delete: bool = False
+    reply_count: int = 0
+    replies: list["EventMessageResponse"] = []
+    # When this message replies to another reply (not the top-level post),
+    # ``reply_to`` carries the addressed author so the UI can show an
+    # "@name" prefix in the flattened thread. ``None`` for top-level posts
+    # and direct replies to the top-level post.
+    reply_to: Optional[EventMessageAuthor] = None
+    created_at: datetime
+
+
+class EventMessagesListResponse(BaseModel):
+    items: list[EventMessageResponse]
+    total: int
+    # Whether the signed-in viewer muted message notifications for this event.
+    muted: bool = False
+
+
+class EventMessageCreate(BaseModel):
+    category: Literal[
+        "question",
+        "accommodation",
+        "ride",
+        "tickets",
+        "meetup",
+        "lost_found",
+        "other",
+    ] = "other"
+    body: str = Field(..., min_length=1, max_length=2000)
+    parent_id: Optional[UUID] = None
+
+
+class EventMessageReportCreate(BaseModel):
+    reason: Optional[str] = Field(default=None, max_length=280)
+
+
+class EventMessageCount(BaseModel):
+    event_id: str
+    count: int
 
 
 class BatchAggregateRequest(BaseModel):

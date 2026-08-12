@@ -1,0 +1,122 @@
+test_plan:
+  name: "Event reminders — all channels (in-app + email + push)"
+  description: >
+    Consolidated reminders scenario. Feature = event reminders. A single
+    dispatch tick fans an in-app `event_reminder` row to every `going`
+    attendee within the REMINDER_LEAD_HOURS window (240h = 10 days), then
+    email and push delivery are gated per-user so one cast covers every
+    channel combination plus a double-negative opt-out. Replaces the old
+    per-channel reminders-app / reminders-email / reminders-push scenarios.
+
+    Also exercises the "Ask a question" CTA both ways: ev-remind has 4
+    Going attendees (>= EVENT_MESSAGE_CTA_MIN_GOING=3) so its reminder is
+    tagged `context="ask"`, the email appends an ask CTA link, and the
+    in-app / push deep-link targets `/event/{id}/ask` (the message board
+    composer). The quiet ev-remind-quiet has only 1 Going (< threshold),
+    so its reminder omits the CTA and deep-links to the plain event page.
+
+  preconditions:
+    - >-
+      Start scenario:
+      `SCENARIO=notif-event-reminders RESET=1 task start:scenario`
+    - >-
+      For the push assertions: sign in as Bob and Carol in a browser and
+      enable notifications so each has a live PushSubscription bound to
+      their user_id before triggering the tick.
+
+  cast:
+    - "Alice — Going ev-remind + ev-remind-quiet; email ON, push OFF → in-app + email."
+    - "Bob   — Going ev-remind; email OFF, push ON → in-app + push."
+    - "Carol — Going ev-remind; email ON, push ON → in-app + email + push."
+    - "Dan   — Going ev-remind; email OFF, push OFF → in-app only (probe)."
+
+  steps:
+    - id: 1
+      title: "Trigger one dispatch tick"
+      description: >
+        `SCENARIO=notif-event-reminders task notify:trigger:scenario`
+      expected: >
+        Stats: `reminders.created=5` (4 for ev-remind + Alice for
+        ev-remind-quiet), `reminders.emailed=3` (Alice + Carol for
+        ev-remind, Alice for ev-remind-quiet), `reminders.pushed=2`
+        (Bob + Carol, assuming live subscriptions), `interest.created=0`,
+        `activity.digests=0`.
+
+    - id: 2
+      title: "In-app row appears for every attendee"
+      description: >
+        `GET /api/notifications` as each of Alice, Bob, Carol, Dan.
+      expected: >
+        Each has exactly one `event_reminder` row for ev-remind with copy
+        "Reminder — you're going to Rooftop Salsa Social", regardless of
+        their email/push toggles.
+
+    - id: 3
+      title: "Email delivered only to opted-in users"
+      description: >
+        Inspect Mailpit.
+      expected: >
+        Reminder emails for ev-remind to Alice and Carol only; none for
+        Bob or Dan.
+
+    - id: 4
+      title: "Push delivered only to opted-in subscribed users"
+      description: >
+        Observe web-push on the subscribed browsers.
+      expected: >
+        Push for ev-remind to Bob and Carol only; none for Alice or Dan
+        (Alice has push OFF; Dan has both OFF).
+
+    - id: 5
+      title: "Ask CTA — in-app reminder deep-links to the composer"
+      description: >
+        `GET /api/notifications` as any Going attendee (e.g. Alice) and
+        inspect the `event_reminder` row for ev-remind.
+      expected: >
+        The row carries `context="ask"` (4 Going >= 3 threshold), so the
+        UI shows the "💬 Ask a question" line and the row links to
+        `/event/ev-remind/ask` instead of `/event/ev-remind`.
+
+    - id: 6
+      title: "Ask CTA — reminder email appends the ask link"
+      description: >
+        Inspect the reminder emails in Mailpit (Alice + Carol).
+      expected: >
+        Each reminder email includes an "Ask a question" CTA linking to
+        `<PUBLIC_APP_URL>/event/ev-remind/ask`, in addition to the normal
+        reminder body.
+
+    - id: 7
+      title: "Ask CTA — push deep-link targets the composer"
+      description: >
+        Observe the web-push payload on Bob / Carol's subscribed browsers.
+      expected: >
+        The push notification opens `/event/ev-remind/ask` (not the plain
+        event page) when tapped.
+
+    - id: 8
+      title: "No ask CTA below threshold — quiet event omits the CTA"
+      description: >
+        Inspect Alice's `event_reminder` row and reminder email for
+        ev-remind-quiet (only 1 Going, below EVENT_MESSAGE_CTA_MIN_GOING=3).
+      expected: >
+        The in-app row has `context` unset (no "💬 Ask a question" line)
+        and links to `/event/ev-remind-quiet`; Alice's reminder email
+        carries no ask CTA link.
+
+    - id: 9
+      title: "Control event outside window is not reminded"
+      description: >
+        Verify no reminder row/email/push for ev-later (Sat of w2, past
+        the 240h window).
+      expected: >
+        Zero rows/emails/pushes referencing ev-later.
+
+    - id: 10
+      title: "Idempotence — re-run creates zero new rows"
+      description: >
+        `SCENARIO=notif-event-reminders task notify:trigger:scenario` again.
+      expected: >
+        `reminders.created=0` on the second tick — the unique constraint
+        on (recipient, kind, event_id) blocks duplicates; no re-emails or
+        re-pushes.

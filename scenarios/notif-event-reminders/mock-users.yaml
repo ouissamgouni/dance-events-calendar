@@ -1,0 +1,40 @@
+# event-reminders cast — one attendee per channel combination so a
+# single dispatch tick exercises in-app + email + push and the
+# double-negative opt-out at once.
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  # Email channel ON, push OFF → in-app + reminder email.
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    account_visibility: public
+    email_event_reminders_enabled: true
+    push_event_reminders_enabled: false
+
+  # Push channel ON, email OFF → in-app + web-push (browser subscribes).
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+    account_visibility: public
+    email_event_reminders_enabled: false
+    push_event_reminders_enabled: true
+
+  # Both channels ON → in-app + email + push.
+  - email: carol@example.com
+    name: Carol Nguyen
+    handle: carol
+    account_visibility: public
+    email_event_reminders_enabled: true
+    push_event_reminders_enabled: true
+
+  # Double-negative probe — both channels OFF → in-app row only.
+  - email: dan@example.com
+    name: Dan Osei
+    handle: dan
+    account_visibility: public
+    email_event_reminders_enabled: false
+    push_event_reminders_enabled: false

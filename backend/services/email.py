@@ -358,34 +358,51 @@ def _people_suggestions_html(suggestions: list[dict]) -> str:
     """
 
 
-def send_event_reminder_email(user, event, when_label: str) -> bool:
+def send_event_reminder_email(
+    user, event, when_label: str, include_ask_cta: bool = False
+) -> bool:
     """Email a user a reminder for an event they're going to.
 
     ``when_label`` is a human phrase like "tomorrow at 20:00" already
-    formatted in the user's timezone by the caller.
+    formatted in the user's timezone by the caller. When ``include_ask_cta``
+    is True (popular events, see reminder_service), an "Ask a question" link
+    to the event's message board is appended below the primary button.
     """
     if not user.email:
         return False
     app = get_public_app_url()
     event_url = f"{app}/event/{escape(str(event.event_id))}"
+    ask_url = f"{event_url}/ask"
     title = escape(event.title or "your event")
     title_link = (
         f'<a href="{event_url}" style="color:#1d4ed8;text-decoration:none">{title}</a>'
     )
     location = escape(event.location or "")
     subject = f"Reminder: {event.title or 'your event'} is coming up"
+    ask_cta = (
+        f"""
+    <p style="margin:4px 0 20px">
+      <a href="{ask_url}" style="color:#1d4ed8;text-decoration:none;font-size:13px">
+        💬 Ask a question about this event
+      </a>
+    </p>
+    """
+        if include_ask_cta
+        else ""
+    )
     body = f"""
     <p>This is a reminder that you're going to:</p>
     <p style="font-size:18px;font-weight:600;margin:8px 0">{title_link}</p>
     <p style="color:#374151;margin:4px 0">🕒 {escape(when_label)}</p>
     {f'<p style="color:#374151;margin:4px 0">📍 {location}</p>' if location else ""}
-    <p style="margin:20px 0">
+    <p style="margin:20px 0 4px">
       <a href="{event_url}"
                  style="background:#3b82f6;color:#fff;text-decoration:none;
                                 padding:10px 18px;display:inline-block">
         View event
       </a>
     </p>
+    {ask_cta}
     {_engagement_ctas_html(f"{app}/account#notifications")}
     """
     footer = _unsubscribe_footer(user.id, "reminder", "event reminders")
@@ -439,37 +456,42 @@ def send_event_review_prompt_email(user, event, friend_proof=None) -> bool:
     return _send_email(user.email, subject, html, "review prompt")
 
 
-def send_milestones_unlocked_email(user, milestones) -> bool:
+def send_milestone_instant_email(user, milestones) -> bool:
     """Email a user that they unlocked one or more Dance Passport milestones
     (see ``services/milestone_notification_service.py``). ``milestones`` is a
     non-empty list of ``passport.Milestone``; multiple unlocked in the same
     dispatch pass are combined into a single email instead of one per milestone.
+
+    Rendered with the shared card builder (:func:`_render_card`) so the instant
+    milestone email matches the combined digest's milestone cards.
     """
     if not user.email or not milestones:
         return False
     app = get_public_app_url()
     passport_url = f"{app}/mine/passport"
+    cards = []
+    for m in milestones:
+        primary = (
+            f'You unlocked <a href="{passport_url}" '
+            f'style="color:#1d4ed8;text-decoration:underline">'
+            f"<strong>{escape(m.name)}</strong></a>"
+        )
+        if m.description:
+            primary += f" \u2014 {escape(m.description)}"
+        cards.append(
+            _render_card({"kind": "milestone_unlocked", "primary_html": primary})
+        )
     if len(milestones) == 1:
-        m = milestones[0]
-        subject = f"Milestone unlocked: {m.name}"
-        intro = "<p>You just unlocked a new Dance Passport milestone:</p>"
-        items = (
-            f'<p style="font-size:22px;margin:8px 0">{m.icon} '
-            f"<strong>{escape(m.name)}</strong></p>"
-            f'<p style="color:#374151;margin:4px 0">{escape(m.description)}</p>'
-        )
+        subject = f"Milestone unlocked: {milestones[0].name}"
+        heading = "New milestone unlocked \U0001f389"
+        intro = "You just unlocked a new Dance Passport milestone:"
     else:
-        subject = f"You unlocked {len(milestones)} milestones! 🎉"
-        intro = "<p>You just unlocked new Dance Passport milestones:</p>"
-        items = "".join(
-            f'<p style="font-size:20px;margin:12px 0 2px">{m.icon} '
-            f"<strong>{escape(m.name)}</strong></p>"
-            f'<p style="color:#374151;margin:0 0 4px">{escape(m.description)}</p>'
-            for m in milestones
-        )
+        subject = f"You unlocked {len(milestones)} milestones! \U0001f389"
+        heading = "New milestones unlocked \U0001f389"
+        intro = "You just unlocked new Dance Passport milestones:"
     body = f"""
-    {intro}
-    {items}
+    <p>{intro}</p>
+    {"".join(cards)}
     <p style="margin:20px 0">
       <a href="{passport_url}"
                  style="background:#3b82f6;color:#fff;text-decoration:none;
@@ -480,11 +502,6 @@ def send_milestones_unlocked_email(user, milestones) -> bool:
     {_engagement_ctas_html(f"{app}/account#notify-milestone-unlocked")}
     """
     footer = _unsubscribe_footer(user.id, "milestone", "achievement updates")
-    heading = (
-        "New milestone unlocked 🎉"
-        if len(milestones) == 1
-        else "New milestones unlocked 🎉"
-    )
     html = _email_shell(heading, body, footer)
     return _send_email(user.email, subject, html, "milestone unlocked")
 
@@ -534,6 +551,83 @@ def send_promo_code_added_email(user, event, promo) -> bool:
     return _send_email(user.email, subject, html, "promo code added")
 
 
+def event_message_action_phrase(kind: str, category: str | None) -> str:
+    """Verb phrase for an event-message notification, e.g. "asked a question
+    about". Shared by the activity-email renderer and the instant email so the
+    subject/line copy stays in sync. ``category`` (the notification
+    ``context``) shapes top-level posts; replies use a fixed phrase, except
+    the thread's root author sees "your message" (signalled by
+    ``category == "root"``).
+    """
+    if kind == "event_message_reply":
+        return (
+            "replied to your message on"
+            if category == "root"
+            else "replied to a message on"
+        )
+    return {
+        "question": "asked a question about",
+        "accommodation": "posted about accommodation for",
+        "roommate": "posted about accommodation for",  # legacy alias
+        "ride": "posted about a ride for",
+        "tickets": "posted about tickets for",
+        "meetup": "posted a meetup for",
+        "lost_found": "posted a lost-and-found note for",
+    }.get((category or "other").lower(), "posted a message on")
+
+
+def send_event_message_instant_email(
+    user, actor, event, kind: str, category: str | None, snippet: str | None
+) -> bool:
+    """Email a user immediately about a new event-message post/reply when the
+    admin has enabled instant delivery for event messages (instead of waiting
+    for the activity digest scheduler).
+
+    The subject is content-aware: "{Actor} {action} {Event}" (e.g. "Ana asked
+    a question about Salsa Social") rather than the generic digest subject.
+    """
+    if not user.email:
+        return False
+    actor_name = "Someone"
+    if actor is not None:
+        actor_name = (
+            getattr(actor, "display_name", None)
+            or (f"@{actor.handle}" if getattr(actor, "handle", None) else None)
+            or "Someone"
+        )
+    action = event_message_action_phrase(kind, category)
+    event_title = event.title if event and event.title else "an event"
+    subject = f"{actor_name} {action} {event_title}"
+    app = get_public_app_url()
+    event_url = f"{app}/event/{escape(str(event.event_id))}#messages"
+    title_link = (
+        f'<a href="{event_url}" style="color:#1d4ed8;text-decoration:none">'
+        f"{escape(event_title)}</a>"
+    )
+    snippet_html = (
+        f'<p style="color:#374151;margin:8px 0;font-style:italic">'
+        f"\u201c{escape(snippet)}\u201d</p>"
+        if snippet
+        else ""
+    )
+    heading = "New message" if kind == "event_message_reply" else "New activity"
+    body = f"""
+    <p>{escape(actor_name)} {escape(action)} {title_link}:</p>
+    {snippet_html}
+    <p style="margin:20px 0">
+      <a href="{event_url}"
+                 style="background:#3b82f6;color:#fff;text-decoration:none;
+                                padding:10px 18px;display:inline-block">
+        View the conversation
+      </a>
+    </p>
+    {_engagement_ctas_html(f"{app}/account#notifications")}
+    """
+    footer = _unsubscribe_footer(user.id, "event_messages", "event message updates")
+    html = _email_shell(f"{heading} on {APP_NAME}", body, footer)
+    return _send_email(user.email, subject, html, "event message instant")
+
+
 def send_activity_digest_email(
     user,
     lines: list[str],
@@ -576,7 +670,18 @@ def send_activity_digest_email(
         )
         heading = "New matches on Movida"
         footer_label = "interest match updates"
+        footer_category = feature
         notifications_href = f"{app}/account#preferences"
+    elif feature == "milestone_unlocked":
+        subject = (
+            "You unlocked a new milestone on Movida"
+            if count == 1
+            else f"You unlocked {count} new milestones on Movida"
+        )
+        heading = "New milestone unlocked \U0001f389"
+        footer_label = "achievement updates"
+        footer_category = "milestone"
+        notifications_href = f"{app}/account#notify-milestone-unlocked"
     else:
         subject = (
             "You have 1 new notification on Movida"
@@ -585,6 +690,7 @@ def send_activity_digest_email(
         )
         heading = "New activity on Movida"
         footer_label = "activity updates"
+        footer_category = feature
         notifications_href = f"{app}/account#notifications"
     items = "".join(
         f'<li style="margin:6px 0;color:#374151">{line}</li>' for line in lines
@@ -606,6 +712,219 @@ def send_activity_digest_email(
     {_people_suggestions_html(suggestions or [])}
     {_engagement_ctas_html(notifications_href)}
     """
-    footer = _unsubscribe_footer(user.id, feature, footer_label)
+    footer = _unsubscribe_footer(user.id, footer_category, footer_label)
     html = _email_shell(heading, body, footer)
     return _send_email(user.email, subject, html, f"activity digest ({feature})")
+
+
+# --- Combined activity digest (v2) -----------------------------------------
+#
+# The v2 digest merges every eligible feature section into a single
+# card-styled email per recipient (behind the ``digest_v2_enabled`` site
+# setting). Cards carry an avatar (person kinds) or a type tile (event /
+# milestone kinds), the same linked primary sentence used by the legacy
+# list digest, and a muted "date · city" subline. Per-section headings and
+# a "See all" CTA replace the flat bulleted list.
+
+_CARD_PERSON_KINDS = frozenset(
+    {
+        "subscription_going",
+        "subscription_review",
+        "subscription_milestone",
+        "subscription_suggested",
+        "new_follower",
+        "new_friend",
+        "follow_request",
+        "follow_request_approved",
+        "event_message",
+        "event_message_reply",
+    }
+)
+
+# Card tile glyph per non-person kind. milestone_unlocked uses a medal so the
+# tile doesn't duplicate the 🎉 that already opens its notification sentence.
+_CARD_KIND_EMOJI = {
+    "milestone_unlocked": "\U0001f3c5",
+    "interest_event": "\U0001f50e",
+    "event_reminder": "\u23f0",
+}
+
+# (heading, CTA path) per feature section. A ``None`` path renders no CTA.
+_SECTION_META: dict[str, tuple[str, str | None]] = {
+    "friends_going": ("Friends going out", "/notifications"),
+    "friend_reviews": ("Reviews from people you follow", "/notifications"),
+    "friend_milestones": ("Milestones from people you follow", "/notifications"),
+    "social_activity": ("Your social activity", "/notifications"),
+    "interest_matches": ("New matches for your saved searches", "/for-you"),
+    "milestone_unlocked": ("Your achievements", "/mine/passport"),
+    "suggested_events": ("Suggested events", "/notifications"),
+}
+
+
+def _card_avatar_html(entry: dict) -> str:
+    kind = entry.get("kind")
+    is_person = kind in _CARD_PERSON_KINDS and not entry.get("anon")
+    if is_person:
+        url = entry.get("avatar_url")
+        if url:
+            return (
+                f'<img src="{escape(url)}" alt="" width="40" height="40" '
+                f'style="border-radius:50%;display:block;object-fit:cover">'
+            )
+        initial = escape((entry.get("initial") or "?")[:1].upper())
+        return (
+            '<div style="width:40px;height:40px;border-radius:50%;background:#e5e7eb;'
+            "color:#374151;font-weight:600;text-align:center;line-height:40px;"
+            f'font-size:16px">{initial}</div>'
+        )
+    emoji = _CARD_KIND_EMOJI.get(kind or "", "\U0001f4ec")
+    return (
+        '<div style="width:40px;height:40px;background:#eff6ff;font-size:20px;'
+        f'text-align:center;line-height:40px">{emoji}</div>'
+    )
+
+
+def _render_card(entry: dict) -> str:
+    """Render one structured digest entry as an HTML card.
+
+    ``entry`` keys: ``kind``, ``primary_html`` (the already-escaped linked
+    sentence from ``activity_email._render_line``), optional ``avatar_url``,
+    ``initial`` (fallback avatar letter), ``subline`` ("date · city"), and
+    ``anon`` (mask the avatar for anonymous reviews).
+    """
+    avatar = _card_avatar_html(entry)
+    subline = entry.get("subline")
+    subline_html = (
+        f'<div style="color:#6b7280;font-size:12px;margin-top:2px">{escape(subline)}</div>'
+        if subline
+        else ""
+    )
+    return f"""
+    <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:8px 0">
+      <tr>
+        <td style="width:40px;vertical-align:top;padding-right:10px">{avatar}</td>
+        <td style="vertical-align:top">
+          <div style="color:#111827;font-size:14px;line-height:1.4">{entry.get("primary_html", "")}</div>
+          {subline_html}
+        </td>
+      </tr>
+    </table>
+    """
+
+
+def _balance_sections(
+    sections: list[dict], *, per_kind_cap: int, max_items: int
+) -> list[dict]:
+    """Cap per kind, round-robin trim to ``max_items``, track "and N more".
+
+    Returns a list of ``{"feature", "buckets": {kind: {"entries", "more"}}}``
+    for non-empty sections, with each bucket already capped and its ``more``
+    overflow count set. Balancing keeps newest entries first and drops the
+    oldest tail across kinds evenly so no single kind crowds out the rest.
+    """
+    from datetime import datetime as _dt
+
+    section_data: list[dict] = []
+    for sec in sections:
+        buckets: dict[str, dict] = {}
+        ordered = sorted(
+            sec.get("entries", []),
+            key=lambda e: e.get("created_at") or _dt.min,
+            reverse=True,
+        )
+        for e in ordered:
+            b = buckets.setdefault(e["kind"], {"entries": [], "more": 0})
+            if len(b["entries"]) < max(1, per_kind_cap):
+                b["entries"].append(e)
+            else:
+                b["more"] += 1
+        if buckets:
+            section_data.append({"feature": sec["feature"], "buckets": buckets})
+
+    bucket_list = [b for s in section_data for b in s["buckets"].values()]
+    total = sum(len(b["entries"]) for b in bucket_list)
+    drop = total - max(1, max_items)
+    idx = 0
+    while drop > 0 and bucket_list:
+        b = bucket_list[idx % len(bucket_list)]
+        if b["entries"]:
+            b["entries"].pop()
+            b["more"] += 1
+            drop -= 1
+            idx += 1
+        else:
+            bucket_list.pop(idx % len(bucket_list))
+    return section_data
+
+
+def send_activity_digest_v2_email(
+    user,
+    sections: list[dict],
+    *,
+    per_kind_cap: int = 5,
+    max_items: int = 20,
+    suggestions: list[dict] | None = None,
+) -> bool:
+    """Send the combined, balanced, card-styled activity digest (v2).
+
+    ``sections`` is a list of ``{"feature": str, "entries": [entry, ...]}``
+    already gated upstream (per-feature digest flag, in-app channel flag,
+    schedule slot, and the master ``digest_email_enabled`` opt-out). Each
+    ``entry`` is the dict consumed by :func:`_render_card`. Returns ``True``
+    when an email was dispatched.
+    """
+    if not user.email:
+        return False
+    section_data = _balance_sections(
+        sections, per_kind_cap=per_kind_cap, max_items=max_items
+    )
+    app = get_public_app_url()
+    blocks: list[str] = []
+    card_count = 0
+    for s in section_data:
+        cards: list[str] = []
+        for kind, b in s["buckets"].items():
+            for e in b["entries"]:
+                cards.append(_render_card(e))
+                card_count += 1
+            if b["more"] > 0:
+                cards.append(
+                    '<div style="color:#6b7280;font-size:12px;margin:0 0 8px 50px">'
+                    f"and {b['more']} more</div>"
+                )
+        if not cards:
+            continue
+        label, href = _SECTION_META.get(
+            s["feature"], ("Recent activity", "/notifications")
+        )
+        cta = (
+            f'<a href="{app}{href}" style="color:#1d4ed8;text-decoration:underline;'
+            f'font-size:12px">See all &rarr;</a>'
+            if href
+            else ""
+        )
+        blocks.append(
+            f"""
+    <div style="margin:20px 0 8px">
+      <h3 style="font-size:14px;color:#111827;margin:0 0 4px">{escape(label)}</h3>
+      {"".join(cards)}
+      {cta}
+    </div>
+    """
+        )
+    if not blocks:
+        return False
+    subject = (
+        "You have 1 new notification on Movida"
+        if card_count == 1
+        else f"You have {card_count} new notifications on Movida"
+    )
+    body = f"""
+    <p>Here's what happened in your scene:</p>
+    {"".join(blocks)}
+    {_people_suggestions_html(suggestions or [])}
+    {_engagement_ctas_html(f"{app}/account#notifications")}
+    """
+    footer = _unsubscribe_footer(user.id, "digest", "the activity digest")
+    html = _email_shell("New activity on Movida", body, footer)
+    return _send_email(user.email, subject, html, "activity digest (combined)")

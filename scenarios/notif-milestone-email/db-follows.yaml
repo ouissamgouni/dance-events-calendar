@@ -1,0 +1,4 @@
+# No follow graph is needed: this scenario exercises the PERSONAL
+# milestone_unlocked notification for the dancer themselves, not the
+# friend fan-out. Present for parity with the seeder's expected inputs.
+follows: []

@@ -1,0 +1,346 @@
+# Event-messages scenario — nine events covering every board state.
+#
+# Primary user = Alice ("you"). Engagement (Going ∪ Saved) decides who is
+# notified when someone posts, and the board goes read-only once an event ends.
+#
+#   ev-board          upcoming — LIVE board pre-seeded with 4 threads whose
+#                     reply counts are 4 / 3 / 1 / 0. Alice is Going.
+#   ev-empty          upcoming — no messages yet (empty-state + Ask CTA).
+#   ev-saved          upcoming — Alice SAVED it; other attendees/savers present.
+#   ev-going          upcoming — Alice is GOING; other attendees/savers present.
+#   ev-no-audience    upcoming — nobody engaged. Posting is allowed but fans
+#                     out to no one; the poster is auto-engaged (auto-saved).
+#   ev-not-engaged    upcoming — Alice neither saved nor Going. Others engaged.
+#                     Proves posting is allowed for a non-engaged user and that
+#                     a post reaches the engaged crowd but not Alice (yet).
+#   ev-series-upcoming upcoming — member of a resolved series; shows the series'
+#                     Typical Experience roll-up (reviews) alongside messages.
+#   ev-series-past    past — reviewed sibling that feeds the roll-up above.
+#   ev-past           past — read-only board with pre-seeded messages + reviews.
+base_week: 0
+events:
+  - id: ev-board
+    calendar_id: salsa-cal-001
+    title: Friday Salsa Social
+    description: "Upcoming social — coordinate accommodation, rides, tickets, meetups, and questions here."
+    location: "Skybar, Lisbon, Portugal"
+    latitude: 38.7139
+    longitude: -9.1394
+    start: w1 Fri 20:00
+    end: w1 Fri 23:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: ev-empty
+    calendar_id: salsa-cal-001
+    title: Saturday Beginner Social
+    description: "Upcoming social with no messages yet — try the empty board's Ask a question CTA."
+    location: "Community Hall, Lisbon, Portugal"
+    latitude: 38.7223
+    longitude: -9.1393
+    start: w1 Sat 20:00
+    end: w1 Sat 23:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: ev-saved
+    calendar_id: salsa-cal-001
+    title: Wednesday Bachata Practica
+    description: "You saved this one — other attendees and savers are already here."
+    location: "Studio Norte, Porto, Portugal"
+    latitude: 41.1496
+    longitude: -8.6109
+    start: w2 Wed 19:00
+    end: w2 Wed 22:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local
+
+  - id: ev-going
+    calendar_id: salsa-cal-001
+    title: Thursday Kizomba Social
+    description: "You are going — coordinate with the crowd on the board."
+    location: "Riverside Loft, Lisbon, Portugal"
+    latitude: 38.7075
+    longitude: -9.1364
+    start: w2 Thu 19:00
+    end: w2 Thu 22:00
+    price_is_free: false
+    price_min: 8
+    price_currency: EUR
+    tags:
+      - format:social
+      - dance-style:kizomba
+      - reach:local
+
+  - id: ev-no-audience
+    calendar_id: salsa-cal-001
+    title: Friday Rooftop Salsa
+    description: "Nobody has saved or RSVP'd yet — post here to see the no-audience + auto-engage behaviour."
+    location: "Rooftop 21, Faro, Portugal"
+    latitude: 37.0194
+    longitude: -7.9304
+    start: w2 Fri 20:00
+    end: w2 Fri 23:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: ev-not-engaged
+    calendar_id: salsa-cal-001
+    title: Saturday Late Social
+    description: "You have not engaged — others have. Post here to test the non-engaged posting + auto-engage path."
+    location: "Club Havana, Lisbon, Portugal"
+    latitude: 38.7169
+    longitude: -9.1399
+    start: w3 Sat 20:00
+    end: w3 Sat 23:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: ev-series-upcoming
+    calendar_id: salsa-cal-001
+    title: Tuesday Kizomba Nights — Upcoming
+    description: "Upcoming edition of a weekly series. Not yet happened, so the board shows the series' Typical Experience roll-up instead of its own reviews."
+    location: "Milonga Hall, Lisbon, Portugal"
+    latitude: 38.7223
+    longitude: -9.1393
+    start: w2 Tue 20:00
+    end: w2 Tue 23:00
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+    tags:
+      - format:social
+      - dance-style:kizomba
+      - reach:local
+
+  - id: ev-series-past
+    calendar_id: salsa-cal-001
+    title: Tuesday Kizomba Nights — Last Week
+    description: "Last week's edition of the same weekly series — its reviews feed the upcoming edition's roll-up."
+    location: "Milonga Hall, Lisbon, Portugal"
+    latitude: 38.7223
+    longitude: -9.1393
+    start: w-1 Tue 20:00
+    end: w-1 Tue 23:00
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+    tags:
+      - format:social
+      - dance-style:kizomba
+      - reach:local
+
+  - id: ev-past
+    calendar_id: salsa-cal-001
+    title: Last Week's Bachata Night
+    description: "Already happened — the message board is read-only and reviews are in."
+    location: "Old Town Hall, Porto, Portugal"
+    latitude: 41.1496
+    longitude: -8.6109
+    start: w-1 Fri 20:00
+    end: w-1 Fri 23:00
+    price_is_free: true
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local
+
+# Resolved series so the upcoming edition can surface the roll-up of reviews
+# left on last week's sibling (cross-edition aggregation).
+event_series:
+  - canonical_title: Tuesday Kizomba Nights
+    status: resolved
+    source: manual
+    members:
+      - ev-series-past
+      - ev-series-upcoming
+
+# Reviews — on the past series sibling (feeds the upcoming roll-up) and on the
+# standalone past event (its own Community Experience block).
+ratings:
+  - event_id: ev-series-past
+    email: alice@example.com
+    overall_sentiment: amazing
+    comment: Beautiful floor and a warm crowd — my new Tuesday ritual.
+    aspect_scores:
+      atmosphere: 5
+      venue-quality: 5
+    aspect_tags:
+      - atmosphere:friendly-crowd
+      - venue-quality:great-dance-floor
+    audience_tags:
+      - audience:meet-new-people
+    comment_status: approved
+    status: approved
+  - event_id: ev-series-past
+    email: bob@example.com
+    overall_sentiment: great
+    comment: Lovely music selection, though it got busy late on.
+    aspect_scores:
+      music: 4
+      venue-quality: 3
+    aspect_tags:
+      - music:great-dj
+      - venue-quality:crowded
+    comment_status: approved
+    status: approved
+  - event_id: ev-series-past
+    email: carol@example.com
+    overall_sentiment: great
+    comment: Friendly regulars, easy to find a dance.
+    aspect_scores:
+      atmosphere: 4
+    aspect_tags:
+      - atmosphere:friendly-crowd
+    comment_status: approved
+    status: approved
+  - event_id: ev-series-past
+    email: dave@example.com
+    overall_sentiment: okay
+    comment: A bit quieter this week and the room felt stuffy.
+    aspect_scores:
+      atmosphere: 3
+      venue-quality: 2
+    aspect_tags:
+      - venue-quality:poor-ventilation
+    comment_status: approved
+    status: approved
+  - event_id: ev-past
+    email: alice@example.com
+    overall_sentiment: great
+    comment: Solid bachata night, friendly crowd and a good DJ.
+    aspect_scores:
+      atmosphere: 4
+      music: 4
+    aspect_tags:
+      - atmosphere:friendly-crowd
+      - music:great-dj
+    comment_status: approved
+    status: approved
+  - event_id: ev-past
+    email: bob@example.com
+    overall_sentiment: amazing
+    comment: Best bachata social in a while!
+    aspect_scores:
+      music: 5
+    aspect_tags:
+      - music:great-dj
+    comment_status: approved
+    status: approved
+
+# Pre-seeded boards. New categories are spread across events; reply chains on
+# ev-board give the 4 / 3 / 1 / 0 reply-count spread requested.
+messages:
+  # ── ev-board: 4 threads, reply counts 4 / 3 / 1 / 0 ──────────────────
+  - key: board-q
+    event_id: ev-board
+    email: bob@example.com
+    category: question
+    body: "Is there a beginner lesson before the social starts?"
+  - reply_to: board-q
+    event_id: ev-board
+    email: carol@example.com
+    body: "Yes — a 30-min intro at 7:30pm."
+  - reply_to: board-q
+    event_id: ev-board
+    email: dave@example.com
+    body: "Great, I'll come early for it too."
+  - reply_to: board-q
+    event_id: ev-board
+    email: erin@example.com
+    body: "Do we need a partner for the lesson?"
+  - reply_to: board-q
+    event_id: ev-board
+    email: frank@example.com
+    body: "No partner needed — everyone rotates."
+
+  - key: board-acc
+    event_id: ev-board
+    email: carol@example.com
+    category: accommodation
+    body: "Splitting an Airbnb near Skybar — 2 spots left, anyone in?"
+  - reply_to: board-acc
+    event_id: ev-board
+    email: dave@example.com
+    body: "Interested! What's the nightly rate?"
+  - reply_to: board-acc
+    event_id: ev-board
+    email: erin@example.com
+    body: "I might join for Friday only."
+  - reply_to: board-acc
+    event_id: ev-board
+    email: grace@example.com
+    body: "Sent you a message about the dates."
+
+  - key: board-ride
+    event_id: ev-board
+    email: dave@example.com
+    category: ride
+    body: "Driving in from Cascais around 7pm — room for 2."
+  - reply_to: board-ride
+    event_id: ev-board
+    email: erin@example.com
+    body: "Could I grab a lift back too?"
+
+  - key: board-tix
+    event_id: ev-board
+    email: erin@example.com
+    category: tickets
+    body: "One spare early-bird ticket at face value — message me."
+
+  # ── ev-saved: one meetup thread ──────────────────────────────────────
+  - key: saved-meetup
+    event_id: ev-saved
+    email: carol@example.com
+    category: meetup
+    body: "Meeting at the bar counter at 8 — look for the red rose."
+
+  # ── ev-going: one lost-and-found thread ──────────────────────────────
+  - key: going-lost
+    event_id: ev-going
+    email: bob@example.com
+    category: lost_found
+    body: "Left a black jacket last week — did anyone hand one in?"
+
+  # ── ev-series-upcoming: meetup + question alongside the review roll-up ─
+  - key: series-meetup
+    event_id: ev-series-upcoming
+    email: carol@example.com
+    category: meetup
+    body: "First-timers — we gather by the entrance at 8, come say hi!"
+  - key: series-q
+    event_id: ev-series-upcoming
+    email: dave@example.com
+    category: question
+    body: "Is the floor sprung wood or tile this week?"
+
+  # ── ev-past: read-only board (accommodation thread + a question) ──────
+  - key: past-acc
+    event_id: ev-past
+    email: alice@example.com
+    category: accommodation
+    body: "Anyone need a roommate to split the place near the venue?"
+  - reply_to: past-acc
+    event_id: ev-past
+    email: carol@example.com
+    body: "I was looking too — let's compare places!"
+  - key: past-q
+    event_id: ev-past
+    email: bob@example.com
+    category: question
+    body: "Was there a cloakroom at this venue?"

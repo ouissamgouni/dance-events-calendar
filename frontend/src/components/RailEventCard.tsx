@@ -30,6 +30,20 @@ interface RailEventCardProps {
     /** When true and `variant='compact'`, re-adds tags + AttendeeAvatarStack
      * (still keeps CTAs hidden). Driven by `trendingTrailRichEnabled`. */
     compactShowExtras?: boolean;
+    /** Overrides the feature-flag `tagsPerCard` cap for the tag badges. */
+    maxTags?: number;
+    /** Forces badge rendering even when the `tagAsBadge` flag is off. */
+    forceTagBadge?: boolean;
+    /** Light-blue accent surface (onboarding "In your area" sample). */
+    accent?: boolean;
+    /** Overrides the default card width utility class. */
+    widthClass?: string;
+    /** Keeps tag badges on a single line, clipping overflow to a "+x". */
+    tagSingleLine?: boolean;
+    /** Group slugs whose tags sort first in the badge row. */
+    tagPriorityGroups?: string[];
+    /** Forces colored tag badges regardless of the feature flag. */
+    forceTagColored?: boolean;
 }
 
 function formatRailDate(value: string): string {
@@ -66,6 +80,13 @@ export default function RailEventCard({
     extraBadge,
     variant = 'default',
     compactShowExtras = false,
+    maxTags,
+    forceTagBadge = false,
+    accent = false,
+    widthClass,
+    tagSingleLine = false,
+    tagPriorityGroups,
+    forceTagColored = false,
 }: RailEventCardProps) {
     const { tagsPerCard } = useFeatureFlags();
     const startLabel = formatRailDate(event.start);
@@ -74,7 +95,10 @@ export default function RailEventCard({
     const location = shortLocation(event.location);
     const compact = variant === 'compact';
     const showExtras = !compact || compactShowExtras;
-    const cardSize = compact ? 'w-[208px]' : 'w-[224px]';
+    const cardSize = widthClass ?? (compact ? 'w-[208px]' : 'w-[224px]');
+    const surface = accent
+        ? 'border-blue-200 bg-blue-50 hover:bg-blue-100'
+        : 'border-slate-200 bg-white hover:bg-slate-50';
 
     const handleMouseEnter = useCallback(() => onHover?.(event.event_id), [onHover, event.event_id]);
     const handleMouseLeave = useCallback(() => onHover?.(null), [onHover]);
@@ -82,7 +106,7 @@ export default function RailEventCard({
     return (
         <div
             // eslint-disable-next-line no-restricted-syntax -- rounded event cards per explicit design request (For you + Trending trails)
-            className={`group relative flex ${cardSize} shrink-0 flex-col rounded-md border border-slate-200 bg-white px-2.5 py-2.5 text-left transition hover:bg-slate-50 ${highlighted ? 'ring-1 ring-blue-200' : ''}`}
+            className={`group relative flex ${cardSize} shrink-0 flex-col rounded-md border ${surface} px-2.5 py-2.5 text-left transition ${highlighted ? 'ring-1 ring-blue-200' : ''}`}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
         >
@@ -142,7 +166,14 @@ export default function RailEventCard({
                 )}
                 {showExtras && event.tags && event.tags.length > 0 && (
                     <div className="mt-1.5">
-                        <TagBadges tags={event.tags} maxVisible={tagsPerCard} />
+                        <TagBadges
+                            tags={event.tags}
+                            maxVisible={maxTags ?? tagsPerCard}
+                            forceBadge={forceTagBadge}
+                            forceColored={forceTagColored}
+                            singleLine={tagSingleLine}
+                            priorityGroups={tagPriorityGroups}
+                        />
                     </div>
                 )}
             </button>

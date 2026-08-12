@@ -18,6 +18,7 @@ from backend.api.routes.attendance import router as attendance_router
 from backend.api.routes.auth import router as auth_router
 from backend.api.routes.config import router as config_router
 from backend.api.routes.events import router as events_router
+from backend.api.routes.event_messages import router as event_messages_router
 from backend.api.routes.export import router as export_router
 from backend.api.routes.interest_profiles import router as interest_profiles_router
 from backend.api.routes.notifications import router as notifications_router
@@ -149,6 +150,7 @@ if _os.getenv("RATE_LIMIT_ENABLED", "true").lower() in ("false", "0", "no"):
         "events",
         "export",
         "ratings",
+        "event_messages",
         "sharing",
         "social",
         "suggestions",
@@ -195,6 +197,7 @@ app.include_router(promo_codes_router)
 app.include_router(organizer_claims_router)
 app.include_router(tags_router)
 app.include_router(ratings_router)
+app.include_router(event_messages_router)
 app.include_router(social_router)
 app.include_router(notifications_router)
 app.include_router(push_router)

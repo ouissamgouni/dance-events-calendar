@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { MapContainer, TileLayer, useMap } from 'react-leaflet';
+import { CircleMarker, MapContainer, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import type { PreferredAreaPayload } from '../api';
 import { AREA_PRESETS, clampArea, DEFAULT_AREA_BBOX } from '../constants/area';
@@ -16,6 +16,10 @@ interface Props {
     onUseCurrentView?: () => void;
     /** Optional control rendered below the map. */
     controlsStart?: ReactNode;
+    /** Tailwind height class for the map container. Default 'h-72'. */
+    mapHeightClass?: string;
+    /** Optional event pins plotted on the map (e.g. a worldwide preview). */
+    markers?: Array<{ id: string; lat: number; lng: number }>;
 }
 
 const GUIDE_INSET_X_RATIO = 0.2;
@@ -26,7 +30,7 @@ const GUIDE_INSET_Y_RATIO = 0.22;
  * The map moves underneath a fixed guide box; saving converts that on-screen
  * guide into geographic bounds so the interaction matches what users see.
  */
-export default function AreaMapPicker({ value, onChange, onUseCurrentView, controlsStart }: Props) {
+export default function AreaMapPicker({ value, onChange, onUseCurrentView, controlsStart, mapHeightClass = 'h-72', markers }: Props) {
     const initial = value ?? DEFAULT_AREA_BBOX;
     const initialAreaRef = useRef(initial);
     const lastAppliedExternalRef = useRef<PreferredAreaPayload>(initial);
@@ -95,13 +99,17 @@ export default function AreaMapPicker({ value, onChange, onUseCurrentView, contr
         if (!mapReady || dirty) return;
         const next = value ?? DEFAULT_AREA_BBOX;
         const prev = lastAppliedExternalRef.current;
+        // Label-only changes (e.g. renaming the saved area) must NOT refit the
+        // map — doing so makes the just-saved box visibly jump.
         const unchanged =
             Math.abs(next.min_lat - prev.min_lat) < 1e-6
             && Math.abs(next.min_lng - prev.min_lng) < 1e-6
             && Math.abs(next.max_lat - prev.max_lat) < 1e-6
-            && Math.abs(next.max_lng - prev.max_lng) < 1e-6
-            && next.label === prev.label;
-        if (unchanged) return;
+            && Math.abs(next.max_lng - prev.max_lng) < 1e-6;
+        if (unchanged) {
+            lastAppliedExternalRef.current = next;
+            return;
+        }
         baselineRef.current = null;
         setDirty(false);
         fitAreaInGuide(next);
@@ -190,23 +198,19 @@ export default function AreaMapPicker({ value, onChange, onUseCurrentView, contr
 
     return (
         <div>
-            <p className="mb-2 max-w-md text-xs text-slate-600">
-                Move and zoom the map until your preferred event area fits inside
-                the box, then save it.
-            </p>
-            <div className="mb-2 flex flex-wrap items-center gap-1">
+            <div className="mb-2 flex flex-nowrap items-center gap-1 overflow-x-auto scrollbar-hide">
                 {AREA_PRESETS.map((preset) => (
                     <button
                         key={preset.label}
                         type="button"
                         onClick={() => handlePreset(preset)}
-                        className="border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-700 hover:bg-slate-50"
+                        className="shrink-0 whitespace-nowrap border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-700 hover:bg-slate-50"
                     >
                         {preset.label === 'Worldwide' ? '🌐' : preset.label}
                     </button>
                 ))}
             </div>
-            <div className="relative h-72 w-full max-w-md overflow-hidden border border-slate-300">
+            <div className={`relative ${mapHeightClass} w-full max-w-md overflow-hidden border border-slate-300`}>
                 <MapContainer
                     bounds={initialBounds}
                     style={{ height: '100%', width: '100%' }}
@@ -224,6 +228,14 @@ export default function AreaMapPicker({ value, onChange, onUseCurrentView, contr
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     />
+                    {markers?.map((m) => (
+                        <CircleMarker
+                            key={m.id}
+                            center={[m.lat, m.lng]}
+                            radius={4}
+                            pathOptions={{ color: '#2563eb', weight: 1, fillColor: '#2563eb', fillOpacity: 0.8 }}
+                        />
+                    ))}
                 </MapContainer>
                 <div
                     ref={guideRef}

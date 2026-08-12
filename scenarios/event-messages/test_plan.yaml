@@ -1,0 +1,184 @@
+test_plan:
+  name: "Event messages — attendee Q&A / requests board"
+  description: >
+    Signed-in users post a message on an event (question / accommodation /
+    ride / tickets / meetup / lost_found / other) with flat replies. A new
+    top-level post notifies everyone engaged with the event (Going ∪ Saved)
+    plus the site admin, minus the author, on in-app + push immediately and
+    email via the event_messages digest/instant route. Replies notify that
+    thread's participants, so the original author is pinged when someone
+    answers. Posting is an implicit interest signal: the author is
+    auto-engaged (auto-saved) so they receive later activity on the event.
+    Users who neither saved nor marked Going before a post receive nothing.
+    Posting is blocked once the event has ended (read-only board). Reports
+    notify the admin in-app. Email instant-vs-digest is an admin-configurable
+    per-feature toggle (this scenario turns instant ON); with instant ON a
+    notification is emailed on exactly one path (instant wins — never both).
+
+  preconditions:
+    - "Start Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`"
+    - >-
+      Start scenario:
+      `SCENARIO=event-messages RESET=1 task start:scenario`
+    - "Open the Mailpit inbox at http://127.0.0.1:8025 and clear existing messages."
+    - >-
+      For the push steps: in a Chromium browser sign in as Carol
+      (carol@example.com), open /account#notifications and click "Enable push
+      notifications" so a live PushSubscription row is bound to Carol.
+
+  events:
+    - "ev-board          — upcoming; 4 seeded threads (reply counts 4/3/1/0). Alice Going."
+    - "ev-empty          — upcoming; no messages. Alice Saved."
+    - "ev-saved          — upcoming; Alice Saved, other attendees/savers present."
+    - "ev-going          — upcoming; Alice Going, other attendees/savers present."
+    - "ev-no-audience    — upcoming; nobody engaged (no attendees/savers)."
+    - "ev-not-engaged    — upcoming; Alice not engaged, Bob/Carol engaged."
+    - "ev-series-upcoming — upcoming; series member, Typical Experience roll-up + 2 messages."
+    - "ev-series-past    — past; reviewed sibling feeding the roll-up."
+    - "ev-past           — past; read-only board + reviews."
+
+  cast:
+    - "Alice — primary 'you'; Going ev-board/ev-going/ev-series-upcoming/ev-past; Saved ev-empty/ev-saved."
+    - "Bob   — event_messages email + push ON; posts + reviews."
+    - "Carol — event_messages email + push ON; posts/replies; reviews."
+    - "Dave  — event_messages email + push OFF → in-app only."
+    - "Erin  — reply author on ev-board; non-engaged negative control elsewhere."
+    - "Frank — reply author on ev-board; Going ev-past (blocked post)."
+    - "Grace — reply author on ev-board accommodation thread."
+    - "Heidi — spare cast member."
+    - "Admin — receives new-post fan-out + report rows; drives the admin toggle."
+
+  steps:
+    - id: 1
+      title: "Seeded board renders 4 threads with the right reply counts"
+      description: >
+        Sign in as Alice and open the Friday Salsa Social (ev-board) detail
+        page. Scroll to the Messages board.
+      expected: >
+        Four top-level posts render with category chips: Bob's question (4
+        replies), Carol's accommodation request (3 replies), Dave's ride offer
+        (1 reply), Erin's tickets post (0 replies). Category filter pills cover
+        the seeded categories; the "Ask a question" CTA sits left of the pills
+        and "Open board →" is right-aligned in the Messages header.
+
+    - id: 2
+      title: "New post fans out to engaged users, not others"
+      description: >
+        Still as Alice, post a top-level QUESTION on ev-board.
+      expected: >
+        `GET /api/notifications` shows an `event_message` row for Bob (Saved),
+        Carol (Going), Dave (Saved), and Admin. Alice (author) has none. Each
+        row renders "Alice asked a question about Friday Salsa Social" with the
+        snippet. Alice is now also auto-saved to ev-board (private engagement
+        only — no visible change to her saved list).
+
+    - id: 3
+      title: "Immediate push + single instant email to opted-in recipients"
+      description: >
+        Trigger a plain dispatch tick:
+        `SCENARIO=event-messages task notify:trigger:scenario`. Then trigger a
+        forced digest tick:
+        `SCENARIO=event-messages task notify:trigger:scenario -- --immediate-emails`.
+      expected: >
+        Carol (email + push ON) gets a push AND exactly ONE instant email
+        (instant_emailed_at stamped, emailed_at stays NULL — the digest tick
+        does NOT send a second email for the same row). Dave (email + push OFF)
+        gets neither; his in-app row remains. Bob gets one instant email; Admin
+        per its own event_messages flags.
+
+    - id: 4
+      title: "Reply notifies the thread author on all channels"
+      description: >
+        Sign in as Carol, open Alice's question thread on ev-board, and reply.
+        Trigger a tick: `SCENARIO=event-messages task notify:trigger:scenario`.
+      expected: >
+        Alice receives an `event_message_reply` row rendered "Carol replied to
+        a message on Friday Salsa Social", plus a push and ONE instant email.
+        Carol (reply author) is not self-notified. Users not in that thread get
+        no reply row.
+
+    - id: 5
+      title: "Empty board shows the Ask CTA"
+      description: >
+        As Alice, open the Saturday Beginner Social (ev-empty).
+      expected: >
+        The Messages board shows the empty state with an "Ask a question" CTA
+        and no "Open board →" link (zero messages). The event action row shows
+        the "Ask" pill next to Share (upcoming event).
+
+    - id: 6
+      title: "Post with no audience — nobody notified, poster auto-engaged"
+      description: >
+        As Alice, open Friday Rooftop Salsa (ev-no-audience) — no attendees or
+        savers — and post a RIDE request. Then run a tick.
+      expected: >
+        No `event_message` rows are created for anyone but Admin (the fan-out
+        set is otherwise empty). Alice is auto-engaged:
+        `GET /api/events/ev-no-audience` shows her as Saved (private). A later
+        post by another engaged user would now reach Alice.
+
+    - id: 7
+      title: "Non-engaged user can still post (and becomes engaged)"
+      description: >
+        As Alice (not engaged with ev-not-engaged), open Saturday Late Social
+        and post a MEETUP message.
+      expected: >
+        Posting is allowed. The post fans out to the already-engaged crowd
+        (Bob Going, Carol Saved) + Admin, minus Alice. Alice is auto-engaged so
+        any subsequent post/reply reaches her too.
+
+    - id: 8
+      title: "Series roll-up + messages on an upcoming edition"
+      description: >
+        As Alice, open Tuesday Kizomba Nights — Upcoming (ev-series-upcoming).
+      expected: >
+        The board shows Carol's meetup + Dave's question threads AND a
+        Community Experience "Typical Experience" roll-up sourced from last
+        week's sibling reviews (ev-series-past). The Rate button is disabled
+        (event not yet happened); the roll-up is labelled as the series'
+        typical experience, not this edition's own reviews.
+
+    - id: 9
+      title: "Past event — read-only board + own reviews"
+      description: >
+        Sign in as Frank and open Last Week's Bachata Night (ev-past). Also
+        open it as Alice. Attempt to post via the API:
+        `POST /api/events/ev-past/messages`.
+      expected: >
+        The compose box and Reply actions are hidden — read-only notice. The
+        seeded threads (Alice's accommodation post + Carol's reply + Bob's
+        question) stay visible and can be reported/deleted. The direct API call
+        returns 409 "Event has ended". The Community Experience block shows
+        Alice's and Bob's reviews. No "Ask" pill on the past-event action row.
+
+    - id: 10
+      title: "Report a message notifies the admin in-app"
+      description: >
+        As Dave, open Bob's question thread on ev-board and use Report.
+      expected: >
+        Admin gets an `event_message_reported` in-app row referencing the
+        message. A second report of the same message by Dave is idempotent (no
+        duplicate row). Report notifications are in-app only (no email/push).
+
+    - id: 11
+      title: "Admin instant/digest toggle (per feature)"
+      description: >
+        In the admin Notifications tab, open the "Event messages" card. Turn
+        Instant OFF (leave Digest ON). Post a new message on ev-board as
+        Alice, then run a plain tick
+        (`SCENARIO=event-messages task notify:trigger:scenario`) followed by a
+        forced digest tick
+        (`SCENARIO=event-messages task notify:trigger:scenario -- --immediate-emails`).
+      expected: >
+        With Instant OFF, the plain tick sends NO immediate event_messages
+        email (in-app + push still fire). The forced digest tick delivers the
+        row inside the batched digest email instead. Re-enabling Instant
+        restores the single-instant-email behaviour from step 3.
+
+    - id: 12
+      title: "Per-feature Send now (admin)"
+      description: >
+        In the admin "Event messages" card, use "Send now" with Carol selected.
+      expected: >
+        Only Carol's pending event_messages activity is replayed as an
+        immediate email — other features' pending activity is untouched.

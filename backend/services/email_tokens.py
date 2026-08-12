@@ -43,6 +43,11 @@ UNSUBSCRIBE_CATEGORIES: dict[str, tuple[str, ...]] = {
     "promo_codes": ("email_promo_codes_enabled",),
     "review_prompt": ("email_review_prompt_enabled",),
     "milestone": ("email_milestone_unlocked_enabled",),
+    "event_messages": ("email_event_messages_enabled",),
+    "suggested_events": ("email_suggested_events_enabled",),
+    # Master opt-out for the combined activity digest (v2) — flips the
+    # single ``digest_email_enabled`` kill-switch off for the whole digest.
+    "digest": ("digest_email_enabled",),
     # Legacy alias — kept for one release so old unsubscribe links keep
     # working. Silences both feature-specific email digests.
     "activity": (
