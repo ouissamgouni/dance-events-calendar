@@ -6,11 +6,13 @@
  * by the owner's own /passport page, a profile "Dance Passport" tab and the
  * public shared link. Callers own data fetching; this component only renders.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import EventMap from './EventMap';
+import PassportActivityHeatmap from './PassportActivityHeatmap';
 import type {
+    PassportConsistency,
     PassportMapEvent,
     PassportMilestone,
     PassportResponse,
@@ -39,22 +41,30 @@ function formatDate(iso: string): string {
 // name/description instead). Icons mirror the catalog except where a plain
 // label reads better. Unknown keys fall back to the marker icon + description.
 const TIMELINE_MILESTONE: Record<string, { icon: string; label: string }> = {
-    first_event: { icon: '🎉', label: 'First dance event' },
-    events_10: { icon: '💃', label: 'Danced at 10 events' },
-    events_25: { icon: '🔥', label: 'Danced at 25 events' },
-    events_50: { icon: '🏆', label: 'Danced at 50 events' },
-    events_100: { icon: '👑', label: 'Danced at 100 events' },
-    cities_5: { icon: '🗺️', label: 'Danced in 5 cities' },
-    cities_10: { icon: '🏙️', label: 'Danced in 10 cities' },
+    first_event: { icon: '💃', label: 'First dance event' },
+    events_5: { icon: '🔥', label: 'Danced at 5 events' },
+    events_15: { icon: '🏆', label: 'Danced at 15 events' },
+    events_30: { icon: '👑', label: 'Danced at 30 events' },
+    events_50: { icon: '✨', label: 'Danced at 50 events' },
+    events_75: { icon: '🌟', label: 'Danced at 75 events' },
+    events_100: { icon: '💎', label: 'Danced at 100 events' },
+    cities_3: { icon: '🏙️', label: 'Danced in 3 cities' },
+    cities_5: { icon: '🧳', label: 'Danced in 5 cities' },
+    cities_10: { icon: '🗺️', label: 'Danced in 10 cities' },
+    cities_20: { icon: '🚆', label: 'Danced in 20 cities' },
+    cities_30: { icon: '🌆', label: 'Danced in 30 cities' },
+    cities_50: { icon: '✨', label: 'Danced in 50 cities' },
     countries_3: { icon: '🛂', label: 'Danced in 3 countries' },
     countries_5: { icon: '✈️', label: 'Danced in 5 countries' },
     countries_10: { icon: '🌍', label: 'Danced in 10 countries' },
-    first_international: { icon: '🌐', label: 'First international event' },
+    countries_15: { icon: '🧭', label: 'Danced in 15 countries' },
+    countries_25: { icon: '🌐', label: 'Danced in 25 countries' },
+    countries_40: { icon: '🏆', label: 'Danced in 40 countries' },
     first_review: { icon: '✍️', label: 'Wrote your first review' },
-    reviews_10: { icon: '⭐', label: 'Wrote 10 reviews' },
-    streak_3_months: { icon: '📅', label: 'Danced 3 months in a row' },
-    streak_6_months: { icon: '🗓️', label: 'Danced 6 months in a row' },
-    streak_12_months: { icon: '🎯', label: 'Danced 12 months in a row' },
+    reviews_3: { icon: '⭐', label: 'Wrote 3 reviews' },
+    reviews_10: { icon: '💬', label: 'Wrote 10 reviews' },
+    reviews_25: { icon: '📝', label: 'Wrote 25 reviews' },
+    reviews_50: { icon: '🏆', label: 'Wrote 50 reviews' },
 };
 
 function StatCard({
@@ -276,15 +286,15 @@ function CountriesPanel({ data, events }: { data: PassportResponse; events: Pass
     );
 }
 
-function TimelineRow({ item }: { item: PassportTimelineItem }) {
+function TimelineRow({ item, anchorMonth, highlighted }: { item: PassportTimelineItem; anchorMonth?: string | null; highlighted?: boolean }) {
     const place = [item.city, item.country].filter(Boolean).join(', ');
     return (
-        <li className="relative pl-6">
+        <li className="relative pl-6" data-month-anchor={anchorMonth ?? undefined}>
             {/* eslint-disable-next-line no-restricted-syntax -- small timeline status dot */}
             <span className="absolute left-[1px] top-[6px] h-3 w-3 rounded-full bg-slate-300 ring-2 ring-white" aria-hidden />
             <Link
                 to={`/event/${item.event_id}`}
-                className="group block py-1 hover:bg-slate-50"
+                className={`group block py-1 hover:bg-slate-50 ${highlighted ? 'bg-blue-50 ring-2 ring-blue-400' : ''}`}
             >
                 <div className="text-sm font-semibold text-slate-900 group-hover:text-blue-600">
                     {item.title}
@@ -308,8 +318,8 @@ function TimelineMarkerRow({ markers }: { markers: PassportTimelineMarker[] }) {
             {single ? (
                 <div className="max-w-[420px] text-xs leading-5 text-slate-600">
                     <span className="font-semibold text-slate-700">{single.name}</span>
-                    {TIMELINE_MILESTONE[single.key]?.label && (
-                        <> · {TIMELINE_MILESTONE[single.key]?.label}</>
+                    {(single.label ?? TIMELINE_MILESTONE[single.key]?.label) && (
+                        <> · {single.label ?? TIMELINE_MILESTONE[single.key]?.label}</>
                     )}
                 </div>
             ) : (
@@ -321,7 +331,7 @@ function TimelineMarkerRow({ markers }: { markers: PassportTimelineMarker[] }) {
                         {markers.map((m) => {
                             const copy = TIMELINE_MILESTONE[m.key];
                             const icon = copy?.icon ?? m.icon;
-                            const label = copy?.label;
+                            const label = m.label ?? copy?.label;
                             return (
                                 <li key={m.key}>
                                     <span aria-hidden>{icon}</span>{' '}
@@ -338,13 +348,14 @@ function TimelineMarkerRow({ markers }: { markers: PassportTimelineMarker[] }) {
 }
 
 function MilestoneBadge({ milestone }: { milestone: PassportMilestone }) {
-    const { unlocked, progress, threshold, unit } = milestone;
+    const { unlocked, progress, threshold } = milestone;
+    const remaining = Math.max(0, threshold - progress);
     return (
         <div
             className={
                 unlocked
-                    ? 'border border-amber-300 bg-amber-50 p-2 text-center'
-                    : 'border border-slate-200 bg-white p-2 text-center'
+                    ? 'flex h-full flex-col border border-amber-300 bg-amber-50 p-2 text-center'
+                    : 'flex h-full flex-col border border-slate-200 bg-white p-2 text-center'
             }
             title={milestone.description}
         >
@@ -362,38 +373,243 @@ function MilestoneBadge({ milestone }: { milestone: PassportMilestone }) {
             </div>
             {unlocked ? (
                 <div className="mt-0.5 text-[10px] leading-tight text-slate-500">
-                    {milestone.description}
+                    {milestone.achieved_description}
                 </div>
             ) : (
-                <div className="mt-1 text-[10px] tabular-nums text-slate-400">
-                    {progress}/{threshold}
-                    {unit ? ` ${unit}` : ''}
-                </div>
+                <>
+                    <div className="mt-0.5 text-[10px] leading-tight text-slate-400">
+                        {milestone.description}
+                    </div>
+                    <div className="mt-1 text-[10px] font-semibold tabular-nums text-slate-500">
+                        {remaining} more to unlock
+                    </div>
+                </>
             )}
         </div>
     );
 }
 
-function MilestonesGrid({ milestones }: { milestones: PassportMilestone[] }) {
+// Category rows, in display order. Unknown categories fall back to a title-cased
+// label and are appended after these.
+const MILESTONE_CATEGORY_ORDER = [
+    'events',
+    'cities',
+    'countries',
+    'reviews',
+] as const;
+
+const MILESTONE_CATEGORY_LABEL: Record<string, string> = {
+    events: 'Events',
+    cities: 'Cities',
+    countries: 'Countries',
+    reviews: 'Reviews',
+};
+
+// Each category is a single horizontally-scrollable row: achieved badges come
+// first (catalog order is threshold-ascending), then the next goals. Cards are
+// sized so ~4 fit on mobile and ~6 on desktop before the row scrolls.
+function MilestoneCategoryRow({
+    label,
+    milestones,
+}: {
+    label: string;
+    milestones: PassportMilestone[];
+}) {
+    const unlockedCount = milestones.filter((m) => m.unlocked).length;
+    return (
+        <div>
+            <div className="mb-1.5 flex items-baseline justify-between">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    {label}
+                </h3>
+                <span className="text-[11px] tabular-nums text-slate-400">
+                    {unlockedCount}/{milestones.length}
+                </span>
+            </div>
+            <div className="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1">
+                {milestones.map((m) => (
+                    <div
+                        key={m.key}
+                        className="shrink-0 basis-[calc(25%_-_0.375rem)] snap-start md:basis-[calc(16.666%_-_0.417rem)]"
+                    >
+                        <MilestoneBadge milestone={m} />
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+// Consistency is rendered as the second trail (right after Events), so it lives
+// inside the milestone grid rather than as a standalone panel.
+function MilestonesGrid({
+    milestones,
+    consistency,
+}: {
+    milestones: PassportMilestone[];
+    consistency?: PassportConsistency | null;
+}) {
+    const consistencyRow = consistency ? (
+        <ConsistencyTrailRow consistency={consistency} />
+    ) : null;
     if (milestones.length === 0) {
         return (
-            <div className="border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
-                No milestones yet.
+            <div className="space-y-4">
+                {consistencyRow}
+                <div className="border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+                    No milestones yet.
+                </div>
             </div>
         );
     }
+    const byCategory = new Map<string, PassportMilestone[]>();
+    for (const m of milestones) {
+        const arr = byCategory.get(m.category);
+        if (arr) arr.push(m);
+        else byCategory.set(m.category, [m]);
+    }
+    const orderedCats = [
+        ...MILESTONE_CATEGORY_ORDER.filter((c) => byCategory.has(c)),
+        ...[...byCategory.keys()].filter(
+            (c) => !MILESTONE_CATEGORY_ORDER.includes(c as (typeof MILESTONE_CATEGORY_ORDER)[number]),
+        ),
+    ];
     const unlockedCount = milestones.filter((m) => m.unlocked).length;
     return (
         <>
             <div className="mb-2 text-xs tabular-nums text-slate-400">
                 {unlockedCount}/{milestones.length} unlocked
             </div>
-            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-                {milestones.map((m) => (
-                    <MilestoneBadge key={m.key} milestone={m} />
+            <div className="space-y-4">
+                {orderedCats.map((cat, idx) => (
+                    <Fragment key={cat}>
+                        <MilestoneCategoryRow
+                            label={MILESTONE_CATEGORY_LABEL[cat] ?? cat}
+                            milestones={byCategory.get(cat) ?? []}
+                        />
+                        {idx === 0 && consistencyRow}
+                    </Fragment>
                 ))}
             </div>
         </>
+    );
+}
+
+function formatPeriodRange(startYm: string, endYm: string): string {
+    const [sy, sm] = startYm.split('-').map((n) => Number(n));
+    const [ey, em] = endYm.split('-').map((n) => Number(n));
+    if (!sy || !sm || !ey || !em) return `${startYm}–${endYm}`;
+    const mon = (y: number, m: number) =>
+        new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'short' });
+    if (sy === ey && sm === em) return `${mon(sy, sm)} ${sy}`;
+    if (sy === ey) return `${mon(sy, sm)}–${mon(ey, em)} ${ey}`;
+    return `${mon(sy, sm)} ${sy}–${mon(ey, em)} ${ey}`;
+}
+
+// Recurring "Consistency" achievements: sustained activity over a rolling 12
+// calendar months (no consecutive-month requirement). Rendered as a chronological
+// trail — every upward reach is a permanent card (repeats are never collapsed),
+// historical periods first, then the current period's earned cards, then the
+// remaining locked/progress levels.
+interface ConsistencyCardModel {
+    key: string;
+    icon: string;
+    name: string;
+    earned: boolean;
+    // Earned: "{threshold}/{window} active months". Locked: the goal description.
+    activeLine: string;
+    // Earned only: the period range.
+    period?: string;
+    // Locked only: count still needed to unlock.
+    remaining?: number;
+}
+
+function ConsistencyCard({ card }: { card: ConsistencyCardModel }) {
+    return (
+        <div
+            className={
+                card.earned
+                    ? 'flex h-full flex-col border border-amber-300 bg-amber-50 p-2 text-center'
+                    : 'flex h-full flex-col border border-slate-200 bg-white p-2 text-center'
+            }
+        >
+            <div className={card.earned ? 'text-xl' : 'text-xl opacity-30 grayscale'}>
+                {card.icon}
+            </div>
+            <div
+                className={
+                    card.earned
+                        ? 'mt-1 text-xs font-semibold text-slate-900'
+                        : 'mt-1 text-xs font-medium text-slate-400'
+                }
+            >
+                {card.name}
+            </div>
+            <div
+                className={
+                    card.earned
+                        ? 'mt-0.5 text-[10px] leading-tight tabular-nums text-slate-500'
+                        : 'mt-0.5 text-[10px] leading-tight text-slate-400'
+                }
+            >
+                {card.activeLine}
+            </div>
+            {card.earned
+                ? card.period && (
+                    <div className="mt-0.5 text-[10px] leading-tight text-slate-400">
+                        {card.period}
+                    </div>
+                )
+                : card.remaining != null && (
+                    <div className="mt-1 text-[10px] font-semibold tabular-nums text-slate-500">
+                        {card.remaining} more to unlock
+                    </div>
+                )}
+        </div>
+    );
+}
+
+function ConsistencyTrailRow({ consistency }: { consistency: PassportConsistency }) {
+    const cards: ConsistencyCardModel[] = [
+        ...consistency.earned.map((c) => ({
+            key: c.key,
+            icon: c.icon,
+            name: c.name,
+            earned: true,
+            activeLine: `${c.threshold}/${consistency.window} active months`,
+            period: formatPeriodRange(c.period_start, c.reached),
+        })),
+        ...consistency.locked.map((c) => ({
+            key: c.key,
+            icon: c.icon,
+            name: c.name,
+            earned: false,
+            activeLine: `Be active in ${c.threshold} of ${consistency.window} months`,
+            remaining: Math.max(0, c.threshold - c.active_months),
+        })),
+    ];
+    if (cards.length === 0) return null;
+    return (
+        <div>
+            <div className="mb-1.5 flex items-baseline justify-between">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    Consistency
+                </h3>
+                <span className="text-[11px] tabular-nums text-slate-400">
+                    Current · {consistency.active_months}/{consistency.window} active months
+                </span>
+            </div>
+            <div className="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1">
+                {cards.map((c) => (
+                    <div
+                        key={c.key}
+                        className="shrink-0 basis-[calc(25%_-_0.375rem)] snap-start md:basis-[calc(16.666%_-_0.417rem)]"
+                    >
+                        <ConsistencyCard card={c} />
+                    </div>
+                ))}
+            </div>
+        </div>
     );
 }
 
@@ -486,45 +702,75 @@ export default function PassportView({
         }
         const markerRows: Row[] = [...byTime.entries()].map(([raw, markers]) => ({
             kind: 'marker',
-            // Sort a hair above the same-dated event so the milestone renders just
-            // before the event that unlocked it (list is newest-first).
-            date: raw + 1,
+            // Sort a hair below the same-dated event so the milestone renders just
+            // after (directly under) the event that unlocked it, not the newer one
+            // above it (list is newest-first).
+            date: raw - 1,
             markers,
         }));
         return [...eventRows, ...markerRows].sort((a, b) => b.date - a.date);
     }, [timelineItems, timelineMarkers, timelineHasMore]);
 
+    // First (newest) event of each month gets a scroll anchor so the activity
+    // heatmap can jump the timeline to a clicked month.
+    const monthAnchorIds = useMemo(() => {
+        const seen = new Set<string>();
+        const byEvent = new Map<string, string>();
+        for (const row of timelineRows) {
+            if (row.kind !== 'event') continue;
+            const month = row.item.start.slice(0, 7);
+            if (!seen.has(month)) {
+                seen.add(month);
+                byEvent.set(row.item.event_id, month);
+            }
+        }
+        return byEvent;
+    }, [timelineRows]);
+
+    const timelineListRef = useRef<HTMLUListElement>(null);
+    const [highlightMonth, setHighlightMonth] = useState<string | null>(null);
+    const pendingMonthRef = useRef<string | null>(null);
+
+    const scrollToMonth = useCallback((month: string) => {
+        const el = timelineListRef.current?.querySelector(
+            `[data-month-anchor="${month}"]`,
+        );
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return true;
+        }
+        return false;
+    }, []);
+
+    const handleSelectMonth = useCallback(
+        (month: string) => {
+            setHighlightMonth(month);
+            // Scroll now if the month is loaded; otherwise remember it and page
+            // in more history until its events arrive.
+            if (!scrollToMonth(month) && timelineHasMore) {
+                pendingMonthRef.current = month;
+                onLoadMoreTimeline?.();
+            }
+        },
+        [scrollToMonth, timelineHasMore, onLoadMoreTimeline],
+    );
+
+    // Resolve a pending month scroll once newly-loaded items arrive.
+    useEffect(() => {
+        const month = pendingMonthRef.current;
+        if (!month) return;
+        if (scrollToMonth(month)) {
+            pendingMonthRef.current = null;
+        } else if (timelineHasMore && !loadingMoreTimeline) {
+            onLoadMoreTimeline?.();
+        } else {
+            pendingMonthRef.current = null;
+        }
+    }, [timelineItems, scrollToMonth, timelineHasMore, loadingMoreTimeline, onLoadMoreTimeline]);
+
     return (
         <>
             <SummaryHeader data={data} title={title} actions={headerActions} dancingSinceSlot={dancingSinceSlot} />
-
-            <section className="grid grid-cols-3 gap-2 sm:grid-cols-6">
-                <StatCard
-                    value={data.stats.total_events_attended}
-                    label="Events attended"
-                    action={
-                        has('timeline')
-                            ? { label: 'Timeline', onClick: () => selectTab('timeline') }
-                            : undefined
-                    }
-                />
-                <StatCard
-                    value={data.stats.cities_visited}
-                    label="Cities"
-                    onLabelClick={has('cities') ? () => selectTab('cities') : undefined}
-                />
-                <StatCard
-                    value={data.stats.countries_visited}
-                    label="Countries"
-                    onLabelClick={has('countries') ? () => selectTab('countries') : undefined}
-                />
-                <StatCard value={data.stats.longest_month_streak} label="Months streak" />
-                <StatCard
-                    value={data.stats.avg_gap_days == null ? '—' : Math.max(1, Math.round(data.stats.avg_gap_days))}
-                    label="Days between events"
-                />
-                <StatCard value={data.stats.reviews_written} label="Reviews written" />
-            </section>
 
             <section ref={tabsRef}>
                 <div role="tablist" className="flex border-b border-slate-200">
@@ -537,26 +783,71 @@ export default function PassportView({
 
                 <div className="mt-4">
                     {tab === 'milestones' && has('milestones') && (
-                        <MilestonesGrid milestones={data.milestones} />
+                        <>
+                            <section className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
+                                <StatCard
+                                    value={data.stats.total_events_attended}
+                                    label="Events attended"
+                                    action={
+                                        has('timeline')
+                                            ? { label: 'Timeline', onClick: () => selectTab('timeline') }
+                                            : undefined
+                                    }
+                                />
+                                <StatCard
+                                    value={data.stats.cities_visited}
+                                    label="Cities"
+                                    onLabelClick={has('cities') ? () => selectTab('cities') : undefined}
+                                />
+                                <StatCard
+                                    value={data.stats.countries_visited}
+                                    label="Countries"
+                                    onLabelClick={has('countries') ? () => selectTab('countries') : undefined}
+                                />
+                                <StatCard
+                                    value={`${data.stats.active_months_last_12}/12`}
+                                    label="Active months"
+                                />
+                                <StatCard
+                                    value={data.stats.avg_gap_days == null ? '—' : Math.max(1, Math.round(data.stats.avg_gap_days))}
+                                    label="Days between events"
+                                />
+                                <StatCard value={data.stats.reviews_written} label="Reviews written" />
+                            </section>
+                            <MilestonesGrid
+                                milestones={data.milestones}
+                                consistency={data.consistency}
+                            />
+                        </>
                     )}
                     {tab === 'timeline' && has('timeline') && (
                         <>
                             {timelineActions && (
                                 <div className="mb-3 flex justify-end">{timelineActions}</div>
                             )}
+                            <PassportActivityHeatmap
+                                months={data.monthly_activity ?? []}
+                                onSelectMonth={handleSelectMonth}
+                                highlightMonth={highlightMonth}
+                            />
                             {timelineItems.length === 0 ? (
                                 <div className="border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
                                     No attended events yet.
                                 </div>
                             ) : (
-                                <ul className="relative space-y-1.5">
+                                <ul className="relative space-y-1.5" ref={timelineListRef}>
                                     <span
                                         className="absolute left-[6px] top-2 bottom-2 w-px bg-slate-200"
                                         aria-hidden
                                     />
                                     {timelineRows.map((row) =>
                                         row.kind === 'event' ? (
-                                            <TimelineRow key={`e-${row.item.event_id}`} item={row.item} />
+                                            <TimelineRow
+                                                key={`e-${row.item.event_id}`}
+                                                item={row.item}
+                                                anchorMonth={monthAnchorIds.get(row.item.event_id) ?? null}
+                                                highlighted={highlightMonth != null && row.item.start.slice(0, 7) === highlightMonth}
+                                            />
                                         ) : (
                                             <TimelineMarkerRow
                                                 key={`m-${row.date}`}

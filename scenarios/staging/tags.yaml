@@ -1,17 +1,57 @@
 tag_groups:
-  - slug: misc
-    label: Misc
-    ordinal: 5
+  - slug: dance-style
+    label: Dance Style
+    ordinal: 10
     allow_multiple: true
-    color: "#f422b8"
+    onboarding_eligible: true
+    color: "#fb923c"
     tags:
-      - slug: ogouni-going
-        label: OGoing !
+      - slug: salsa
+        label: Salsa
         is_hero_filter: true
-        hero_ordinal: 0
+        hero_ordinal: 1
+        synonyms: ["salsa on1", "salsa on2", "linea", "línea", "la"]
+      - slug: cuban
+        label: Cuban (Casino)
+        synonyms: ["cubana", "salsa cubana", "casino", "rueda de casino"]
+      - slug: mambo
+        label: Mambo (On2)
+        synonyms: ["ny style", "new york style", "on2"]
+      - slug: bachata
+        label: Bachata
+        is_hero_filter: true
+        hero_ordinal: 2
+        synonyms:
+          [
+            "bachata sensual",
+            "bachata moderna",
+            "bachata dominicana",
+            "dominicana",
+          ]
+      - slug: kizomba
+        label: Kizomba
+        synonyms: ["urban kiz", "kiz", "tarraxo", "tarraxinha", "ghetto zouk"]
+      - slug: semba
+        label: Semba
+      - slug: konpa
+        label: Konpa
+        synonyms: ["kompa", "compas"]
+      - slug: zouk
+        label: Zouk
+        synonyms: ["brazilian zouk", "lambazouk"]
+      - slug: rueda
+        label: Rueda
+        synonyms: ["rueda de casino"]
+      - slug: cha-cha
+        label: Cha-Cha
+        synonyms: ["chachacha", "cha cha cha", "cha-cha-cha"]
+      - slug: son
+        label: Son
+        synonyms: ["son cubano"]
+
   - slug: format
     label: Format
-    ordinal: 10
+    ordinal: 20
     allow_multiple: true
     color: "#f472b6"
     tags:
@@ -102,9 +142,47 @@ tag_groups:
         label: International
         synonyms: ["world", "worldwide", "global", "congress", "festival"]
 
+  - slug: misc
+    label: Misc
+    ordinal: 40
+    allow_multiple: true
+    color: "#f422b8"
+    tags:
+      - slug: ogouni-going
+        label: OGoing !
+        is_hero_filter: true
+        hero_ordinal: 0
+      - slug: live-band
+        label: Live band
+        ordinal: 1
+        is_hero_filter: true
+        hero_ordinal: 9
+        synonyms: ["live music", "orchestra"]
+      - slug: pool-party
+        label: Pool party
+        ordinal: 2
+        synonyms: ["pool"]
+      - slug: trip
+        label: Trip
+        ordinal: 3
+        is_hero_filter: true
+        hero_ordinal: 6
+        synonyms: ["excursion", "getaway", "retreat", "tour"]
+      - slug: food
+        label: Food
+        ordinal: 4
+        is_hero_filter: true
+        hero_ordinal: 7
+      - slug: beach-side
+        label: Beach Side
+        ordinal: 5
+        is_hero_filter: true
+        hero_ordinal: 8
+        synonyms: ["beach"]
+
   - slug: venue
     label: Venue
-    ordinal: 40
+    ordinal: 50
     allow_multiple: true
     color: "#34d399"
     tags:
@@ -118,64 +196,22 @@ tag_groups:
       - slug: rooftop
         label: Rooftop
         synonyms: ["roof top", "terrace"]
-      - slug: live-band
-        label: Live band
-        enabled: false
-        synonyms:
-          ["live music", "live orchestra", "live percussion", "live drummers"]
       - slug: pool
         label: Pool
         ordinal: 4
 
-  - slug: dance-style
-    label: Dance Style
-    ordinal: 50
-    allow_multiple: true
-    onboarding_eligible: true
-    color: "#fb923c"
+  - slug: scale
+    label: Scale
+    ordinal: 55
+    allow_multiple: false
+    color: "#38bdf8"
     tags:
-      - slug: salsa
-        label: Salsa
-        is_hero_filter: true
-        hero_ordinal: 1
-        synonyms: ["salsa on1", "salsa on2", "linea", "línea", "la"]
-      - slug: cuban
-        label: Cuban (Casino)
-        synonyms: ["cubana", "salsa cubana", "casino", "rueda de casino"]
-      - slug: mambo
-        label: Mambo (On2)
-        synonyms: ["ny style", "new york style", "on2"]
-      - slug: bachata
-        label: Bachata
-        is_hero_filter: true
-        hero_ordinal: 2
-        synonyms:
-          [
-            "bachata sensual",
-            "bachata moderna",
-            "bachata dominicana",
-            "dominicana",
-          ]
-      - slug: kizomba
-        label: Kizomba
-        synonyms: ["urban kiz", "kiz", "tarraxo", "tarraxinha", "ghetto zouk"]
-      - slug: semba
-        label: Semba
-      - slug: konpa
-        label: Konpa
-        synonyms: ["kompa", "compas"]
-      - slug: zouk
-        label: Zouk
-        synonyms: ["brazilian zouk", "lambazouk"]
-      - slug: rueda
-        label: Rueda
-        synonyms: ["rueda de casino"]
-      - slug: cha-cha
-        label: Cha-Cha
-        synonyms: ["chachacha", "cha cha cha", "cha-cha-cha"]
-      - slug: son
-        label: Son
-        synonyms: ["son cubano"]
+      - slug: small
+        label: Small (<50)
+      - slug: medium
+        label: Medium (50-200)
+      - slug: large
+        label: Large (200+)
 
   - slug: level
     label: Level
@@ -323,6 +359,16 @@ tag_groups:
       - { slug: mostly-locals, label: Mostly locals }
       - { slug: small-event, label: Small event }
       - { slug: large-event, label: Large event }
+      - {
+          slug: good-gender-balance,
+          label: Good lead/follow balance,
+          polarity: positive,
+        }
+      - {
+          slug: gender-imbalance,
+          label: Lead/follow imbalance,
+          polarity: negative,
+        }
 
   - slug: venue-quality
     label: 🏛 Venue
@@ -465,6 +511,20 @@ tag_groups:
       - { slug: poor-visibility, label: Poor visibility, polarity: negative }
       - { slug: delayed-shows, label: Delayed, polarity: negative }
 
+  - slug: refreshments
+    label: 🥤 Refreshments
+    ordinal: 107
+    allow_multiple: true
+    color: "#f59e0b"
+    scope: aspect
+    tags:
+      - { slug: free-water, label: Free water, polarity: positive }
+      - { slug: free-coffee, label: "Free coffee & tea", polarity: positive }
+      - { slug: free-snacks, label: Free snacks, polarity: positive }
+      - { slug: free-food, label: Free food, polarity: positive }
+      - { slug: food-available, label: Food available }
+      - { slug: drinks-available, label: Drinks available }
+
   # ─────────────────────────────────────────────────────────────────────
   # Recommendation audience (scope: audience). Optional, neutral-polarity
   # "who would enjoy this" tags surfaced after the aspect step.
@@ -485,10 +545,5 @@ tag_groups:
       - { slug: high-energy-dancing, label: High-energy dancing }
       - { slug: meet-new-people, label: Meeting new people }
       - { slug: budget-friendly, label: Budget-friendly }
-      - { slug: drinks-lovers, label: Drinks lovers }
-      - { slug: food-lovers, label: Food lovers }
       - { slug: performance-lovers, label: 🎭 Performance lovers }
-      - { slug: beginners, label: Beginner }
-      - { slug: intermediate, label: Intermediate }
-      - { slug: advanced, label: Advanced }
-      - { slug: live-music-fans, label: 🎺 Live music lovers }
+      - { slug: foodies, label: "Food & drinks lovers" }

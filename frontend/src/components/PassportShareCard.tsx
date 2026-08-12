@@ -11,6 +11,13 @@
 import { QRCodeSVG } from 'qrcode.react';
 import { CARD_HEIGHT, CARD_WIDTH } from '../utils/passportShareImage';
 import type { ScopedPassport } from '../utils/passportScope';
+import {
+    activityLevel,
+    buildYearGrid,
+    LEVEL_RAMP_DARK,
+    MONTH_INITIALS,
+    takeLastYears,
+} from '../utils/passportActivity';
 import { WORLD_LAND } from '../data/worldLand';
 
 interface PassportShareCardProps {
@@ -28,10 +35,12 @@ interface PassportShareCardProps {
     /** Honor the owner's "Sections to share" toggles. */
     showBadges?: boolean;
     showMap?: boolean;
+    /** Render the activity heatmap (month strip on year cards, matrix on all-time). */
+    showActivity?: boolean;
 }
 
 const MAP_W = 312;
-const MAP_H = 150;
+const MAP_H = 130;
 
 interface GeoBounds {
     minLng: number;
@@ -160,12 +169,65 @@ function WorldMap({ coords }: { coords: { lat: number; lng: number }[] }) {
     );
 }
 
-function StatCell({ value, label }: { value: number; label: string }) {
+function StatCell({ value, label }: { value: number | string; label: string }) {
     return (
         <div style={{ flex: 1 }} className="border border-slate-700 bg-slate-800 px-2 py-3 text-center">
             <div className="text-2xl font-bold text-white tabular-nums leading-none">{value}</div>
             <div className="mt-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">{label}</div>
         </div>
+    );
+}
+
+// Year card: a single Jan–Dec row of intensity cells with month initials below.
+function CardActivityStrip({ scoped }: { scoped: ScopedPassport }) {
+    const rows = buildYearGrid(scoped.monthly);
+    const cells = rows.length > 0 ? rows[rows.length - 1].cells : new Array(12).fill(0);
+    return (
+        <div>
+            <div className="grid grid-cols-12 gap-1">
+                {cells.map((count, i) => (
+                    <div key={i} className={`aspect-square rounded-sm ${LEVEL_RAMP_DARK[activityLevel(count)]}`} />
+                ))}
+            </div>
+            <div className="mt-1 grid grid-cols-12 gap-1 text-center text-[8px] leading-none text-slate-500">
+                {MONTH_INITIALS.map((m, i) => (
+                    <span key={i}>{m}</span>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+// All-time card: a compact Year × Month matrix, capped at the last 2 years so
+// it never crowds the fixed-height card.
+function CardActivityMatrix({ scoped }: { scoped: ScopedPassport }) {
+    const rows = takeLastYears(buildYearGrid(scoped.monthly), 2);
+    if (rows.length === 0) return null;
+    return (
+        <div>
+            <div className="grid w-full gap-1" style={{ gridTemplateColumns: 'auto repeat(12, minmax(0, 1fr))' }}>
+                <span />
+                {MONTH_INITIALS.map((m, i) => (
+                    <span key={`h-${i}`} className="text-center text-[8px] leading-none text-slate-500">
+                        {m}
+                    </span>
+                ))}
+                {rows.map((row) => (
+                    <CardMatrixRow key={row.year} year={row.year} cells={row.cells} />
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function CardMatrixRow({ year, cells }: { year: number; cells: number[] }) {
+    return (
+        <>
+            <span className="pr-1 text-right text-[9px] leading-none tabular-nums text-slate-500">{year}</span>
+            {cells.map((count, i) => (
+                <div key={i} className={`aspect-square rounded-sm ${LEVEL_RAMP_DARK[activityLevel(count)]}`} />
+            ))}
+        </>
     );
 }
 export default function PassportShareCard({
@@ -178,6 +240,7 @@ export default function PassportShareCard({
     showDancingSince = false,
     showBadges = true,
     showMap = true,
+    showActivity = true,
 }: PassportShareCardProps) {
     const isYear = scoped.scope !== 'all';
     const isEmpty = scoped.totalEvents === 0;
@@ -189,13 +252,7 @@ export default function PassportShareCard({
     // Opt-in, all-time only: a small "Dancing since <year>" line under the name.
     const dancingSinceLine =
         !isYear && showDancingSince && dancingSince ? `Dancing since ${yearOf(dancingSince)}` : null;
-    // Hide the streak stat cell on the all-time card when a streak/regularity
-    // milestone (e.g. "Consistent") already occupies a badge slot — it would
-    // otherwise repeat the same fact.
-    const showStreakCell =
-        !isEmpty && scoped.monthStreak >= 2 && !(isYear ? false : scoped.streakInBadges);
-    // Year card spells the streak out explicitly and drops the fire icon.
-    const streakLabel = isYear ? 'months in a row' : '🔥 Streak';
+
 
     return (
         <div
@@ -206,15 +263,16 @@ export default function PassportShareCard({
                 <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
                     ✦ Movida · Dance Passport
                 </div>
-                <div className="mt-4 flex items-start justify-between gap-3">
+                <div className="mt-3 flex items-start justify-between gap-3">
                     <div className="min-w-0">
                         <h1 className="text-3xl font-bold leading-tight">{displayName}</h1>
+
+                    </div>
+                    <p className="mt-4 max-w-[90%] text-right text-sm font-medium leading-tight text-blue-300">
+                        {headline}
                         {dancingSinceLine && (
                             <p className="mt-1 text-xs font-medium text-slate-400">{dancingSinceLine}</p>
                         )}
-                    </div>
-                    <p className="mt-1 max-w-[45%] shrink-0 text-right text-sm font-medium leading-tight text-blue-300">
-                        {headline}
                     </p>
                 </div>
             </div>
@@ -235,12 +293,21 @@ export default function PassportShareCard({
                         </div>
                     )}
 
+                    {showActivity && scoped.monthly.length > 0 && (
+                        isYear ? (
+                            <CardActivityStrip scoped={scoped} />
+                        ) : (
+                            <CardActivityMatrix scoped={scoped} />
+                        )
+                    )}
+
                     <div className="flex gap-2">
                         <StatCell value={scoped.totalEvents} label="Events" />
                         <StatCell value={scoped.cities} label="Cities" />
                         <StatCell value={scoped.countries} label="Countries" />
-                        {showStreakCell && <StatCell value={scoped.monthStreak} label={streakLabel} />}
                     </div>
+
+
 
                     {showBadges && scoped.badges.length > 0 && (
                         <div className="grid grid-cols-2 gap-2">

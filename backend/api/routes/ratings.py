@@ -84,6 +84,7 @@ from backend.services.experience_aspects import (
     mood_metrics_from_averages,
 )
 from backend.services.ip_geolocation import geolocate_ip
+from backend.services import activity_instant
 from backend.services.notifications import fan_out_review
 from backend.services.passport import attended_events
 from backend.services.profanity import contains_profanity
@@ -725,6 +726,14 @@ def submit_feedback(
         try:
             fan_out_review(session, user, event_id, anonymous=body.is_anonymous)
             session.commit()
+            # Deliver the friend-review emails now when that feature is in
+            # instant mode (otherwise the digest tick picks them up).
+            activity_instant.dispatch_activity_instant(
+                session,
+                kind="subscription_review",
+                actor=user,
+                event_id=event_id,
+            )
         except Exception:  # noqa: BLE001 — notification is best-effort
             session.rollback()
             logger.warning("Review fan-out failed", exc_info=True)

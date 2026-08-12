@@ -1,0 +1,9 @@
+# Alice attends one past event → unlocks the "First Steps" milestone on
+# the next milestone-service tick. The event is past, so no RSVP fan-out
+# is needed; emit_notifications stays off.
+emit_notifications: false
+attendances:
+  - event_id: ev-past
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public

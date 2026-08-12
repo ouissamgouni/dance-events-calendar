@@ -18,7 +18,7 @@ import {
  * that flips all six channel flags to false in a single PATCH.
  */
 
-type FeatureKey = 'event_reminders' | 'social_activity' | 'friends_going' | 'friend_reviews' | 'friend_milestones' | 'interest_matches' | 'promo_codes' | 'review_prompt' | 'milestone_unlocked';
+type FeatureKey = 'event_reminders' | 'social_activity' | 'friends_going' | 'friend_reviews' | 'friend_milestones' | 'interest_matches' | 'promo_codes' | 'review_prompt' | 'milestone_unlocked' | 'event_messages' | 'suggested_events';
 type Channel = 'email' | 'push';
 type FlagKey =
     | 'email_event_reminders_enabled'
@@ -38,7 +38,11 @@ type FlagKey =
     | 'email_friend_reviews_enabled'
     | 'push_friend_reviews_enabled'
     | 'email_friend_milestones_enabled'
-    | 'push_friend_milestones_enabled';
+    | 'push_friend_milestones_enabled'
+    | 'email_event_messages_enabled'
+    | 'push_event_messages_enabled'
+    | 'email_suggested_events_enabled'
+    | 'push_suggested_events_enabled';
 
 const FEATURES: {
     key: FeatureKey;
@@ -99,6 +103,18 @@ const FEATURES: {
             label: 'Dance Passport achievements',
             description: 'When you unlock new milestones and achievements.',
             anchor: 'notify-milestone-unlocked',
+        },
+        {
+            key: 'event_messages',
+            label: 'Event messages',
+            description: 'Questions & requests on events you\u2019re going to or saved.',
+            anchor: 'notify-event-messages',
+        },
+        {
+            key: 'suggested_events',
+            label: 'Suggested events',
+            description: 'When an event you suggested is approved.',
+            anchor: 'notify-suggested-events',
         },
     ];
 
@@ -205,7 +221,7 @@ export default function NotificationSettings() {
         toastTimer.current = window.setTimeout(() => setSavedToast(false), 2000);
     };
 
-    const patchOne = async (field: FlagKey | 'timezone', value: boolean | string) => {
+    const patchOne = async (field: FlagKey | 'timezone' | 'digest_email_enabled', value: boolean | string) => {
         setSaving(field);
         setError(null);
         try {
@@ -330,6 +346,29 @@ export default function NotificationSettings() {
                 >
                     {saving === 'pause-all' ? 'Pausing…' : 'Pause all notifications'}
                 </button>
+            </div>
+
+            <div
+                id="notify-email-digest"
+                className="pt-3 mt-3 border-t border-slate-100 flex items-start justify-between gap-3"
+            >
+                <div>
+                    <div className="font-medium text-slate-900 text-xs">Email digest</div>
+                    <div className="text-[11px] text-slate-500">
+                        Master switch for the combined activity digest email. Off stops
+                        the digest entirely, whatever the per-feature email toggles say.
+                    </div>
+                </div>
+                <CellSwitch
+                    checked={
+                        typeof user.digest_email_enabled === 'boolean'
+                            ? user.digest_email_enabled
+                            : true
+                    }
+                    busy={saving === 'digest_email_enabled'}
+                    ariaLabel="Email digest — master switch"
+                    onChange={(v) => patchOne('digest_email_enabled', v)}
+                />
             </div>
 
             <div className="pt-3 mt-3 border-t border-slate-100">

@@ -9,12 +9,25 @@ interface Props {
     /** Force the colored variant even when the `tagBadgeColored` flag is
      * off. Ignored in plain-text mode. */
     forceColored?: boolean;
+    /** Keep badges on a single line, clipping overflow (paired with a low
+     * `maxVisible` + "+x" so the row never wraps). */
+    singleLine?: boolean;
+    /** Group slugs whose tags sort to the front before the visible slice. */
+    priorityGroups?: string[];
 }
 
-export default function TagBadges({ tags, maxVisible = 5, forceBadge = false, forceColored = false }: Props) {
+export default function TagBadges({ tags, maxVisible = 5, forceBadge = false, forceColored = false, singleLine = false, priorityGroups }: Props) {
     const { tagAsBadge, tagBadgeColored } = useFeatureFlags();
-    const enabledTags = tags.filter((tag) => tag.enabled);
-    if (!enabledTags.length) return null;
+    const filtered = tags.filter((tag) => tag.enabled);
+    if (!filtered.length) return null;
+
+    const enabledTags = priorityGroups && priorityGroups.length > 0
+        ? [...filtered].sort((a, b) => {
+            const ra = priorityGroups.indexOf(a.group_slug);
+            const rb = priorityGroups.indexOf(b.group_slug);
+            return (ra === -1 ? Number.MAX_SAFE_INTEGER : ra) - (rb === -1 ? Number.MAX_SAFE_INTEGER : rb);
+        })
+        : filtered;
 
     const visible = enabledTags.slice(0, maxVisible);
     const overflow = enabledTags.length - maxVisible;
@@ -36,7 +49,7 @@ export default function TagBadges({ tags, maxVisible = 5, forceBadge = false, fo
     // or explicit `forceColored` prop; otherwise render calm grey chips.
     const useColor = forceColored || tagBadgeColored;
     return (
-        <div className="flex flex-wrap gap-1">
+        <div className={singleLine ? 'flex flex-nowrap gap-1 overflow-hidden' : 'flex flex-wrap gap-1'}>
             {visible.map((tag) => {
                 if (useColor) {
                     const c = tag.group_color ?? tag.color ?? '#6b7280';

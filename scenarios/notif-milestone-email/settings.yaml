@@ -1,0 +1,10 @@
+# Default milestone email routing: instant OFF, digest ON. With these
+# defaults the milestone service leaves emailed_at NULL and the unlock is
+# delivered through the batched activity digest (legacy digest line) on
+# the scheduled/forced tick. Flip milestone_unlocked_email_instant to true
+# via the admin "Milestones" box to exercise the rich immediate email
+# path instead (see test_plan.yaml).
+settings:
+  milestone_notifications_enabled: true
+  milestone_unlocked_email_instant: false
+  milestone_unlocked_email_digest: true

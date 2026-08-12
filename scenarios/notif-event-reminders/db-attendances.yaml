@@ -1,0 +1,29 @@
+attendances:
+  # All four cast members are Going ev-remind → the reminder pipeline
+  # targets each one, and per-user channel toggles decide delivery.
+  - event_id: ev-remind
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+
+  - event_id: ev-remind
+    email: bob@example.com
+    share_publicly: true
+    share_audience: public
+
+  - event_id: ev-remind
+    email: carol@example.com
+    share_publicly: true
+    share_audience: public
+
+  - event_id: ev-remind
+    email: dan@example.com
+    share_publicly: true
+    share_audience: public
+
+  # Quiet event — only Alice is Going (1 < EVENT_MESSAGE_CTA_MIN_GOING), so
+  # her reminder (email ON) arrives WITHOUT the "Ask a question" CTA.
+  - event_id: ev-remind-quiet
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public

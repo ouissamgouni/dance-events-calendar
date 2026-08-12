@@ -730,6 +730,11 @@ class SiteSettingsResponse(BaseModel):
     event_reminders_enabled: bool = True
     # Master switch for batched activity digest emails.
     activity_digest_email_enabled: bool = True
+    # Combined card-styled digest (v2). When off, legacy per-feature digests.
+    digest_v2_enabled: bool = True
+    # Per-kind cap and total item cap for the combined v2 digest.
+    digest_per_kind_cap: int = 5
+    digest_max_items: int = 20
     # Master switch for interest-profile match notifications.
     interest_match_notifications_enabled: bool = True
     # Master switch for web-push delivery (independent of VAPID config).
@@ -757,6 +762,16 @@ class SiteSettingsResponse(BaseModel):
     friend_milestones_email_digest: bool = True
     interest_matches_email_instant: bool = False
     interest_matches_email_digest: bool = True
+    event_messages_email_instant: bool = False
+    event_messages_email_digest: bool = True
+    suggested_events_email_instant: bool = False
+    suggested_events_email_digest: bool = True
+    # Personal Dance Passport milestone unlocks. Master switch plus the
+    # per-route email delivery toggles. Instant keeps the rich immediate
+    # email; digest folds the milestone into the batched activity digest.
+    milestone_notifications_enabled: bool = True
+    milestone_unlocked_email_instant: bool = False
+    milestone_unlocked_email_digest: bool = True
     # Master switch for post-event "how was it?" review-prompt notifications
     # (Event Quality Layer Phase 3).
     review_prompt_enabled: bool = True
@@ -772,6 +787,9 @@ class SiteSettingsResponse(BaseModel):
     # Minimum reviews before an event/series shows a computed "Overall Mood"
     # headline label; below this the UI shows an "Early feedback" state.
     review_mood_headline_min_reviews: int = 3
+    # Minimum "Going" attendees before an event reminder includes an "Ask a
+    # question" CTA linking to the event's message board.
+    event_message_cta_min_going: int = 3
     # When True, saving/syncing an event automatically runs the near-duplicate
     # detection scan for it (see backend/services/duplicate_detection.py).
     # The admin Duplicates panel and manual "Scan now"/"Flag as duplicates"
@@ -932,6 +950,7 @@ class NotificationToggleCountsResponse(BaseModel):
     event_reminders: NotificationToggleCountEntry
     activity_digest: NotificationToggleCountEntry
     review_prompt: NotificationToggleCountEntry
+    milestones: NotificationToggleCountEntry
 
 
 class SiteSettingsUpdateRequest(BaseModel):
@@ -969,6 +988,9 @@ class SiteSettingsUpdateRequest(BaseModel):
     # Notification / re-engagement global gates.
     event_reminders_enabled: Optional[bool] = None
     activity_digest_email_enabled: Optional[bool] = None
+    digest_v2_enabled: Optional[bool] = None
+    digest_per_kind_cap: Optional[int] = Field(default=None, ge=1, le=50)
+    digest_max_items: Optional[int] = Field(default=None, ge=1, le=200)
     interest_match_notifications_enabled: Optional[bool] = None
     web_push_enabled: Optional[bool] = None
     reminder_lead_hours: Optional[int] = Field(default=None, ge=1, le=720)
@@ -994,11 +1016,19 @@ class SiteSettingsUpdateRequest(BaseModel):
     friend_milestones_email_digest: Optional[bool] = None
     interest_matches_email_instant: Optional[bool] = None
     interest_matches_email_digest: Optional[bool] = None
+    event_messages_email_instant: Optional[bool] = None
+    event_messages_email_digest: Optional[bool] = None
+    suggested_events_email_instant: Optional[bool] = None
+    suggested_events_email_digest: Optional[bool] = None
+    milestone_notifications_enabled: Optional[bool] = None
+    milestone_unlocked_email_instant: Optional[bool] = None
+    milestone_unlocked_email_digest: Optional[bool] = None
     review_prompt_enabled: Optional[bool] = None
     review_prompt_delay_hours: Optional[int] = Field(default=None, ge=1, le=720)
     review_prompt_lookback_hours: Optional[int] = Field(default=None, ge=1, le=720)
     for_you_review_window_days: Optional[int] = Field(default=None, ge=1, le=3650)
     review_mood_headline_min_reviews: Optional[int] = Field(default=None, ge=1, le=1000)
+    event_message_cta_min_going: Optional[int] = Field(default=None, ge=1, le=10000)
     duplicate_auto_detect_enabled: Optional[bool] = None
     series_auto_detect_enabled: Optional[bool] = None
 
@@ -1668,6 +1698,71 @@ class EventReviewsListResponse(BaseModel):
     total: int
 
 
+class EventMessageAuthor(BaseModel):
+    handle: str = ""
+    display_name: str = ""
+    avatar_url: Optional[str] = None
+    is_verified_organizer: bool = False
+
+
+class EventMessageResponse(BaseModel):
+    """One message (or reply) on an event's Q&A board.
+
+    ``author`` is ``None`` for soft-anonymised messages (author account
+    deleted). ``is_own`` / ``can_delete`` are viewer-relative flags computed
+    server-side. Top-level posts carry their whole thread flattened into
+    ``replies`` (every descendant, chronological); a reply to another reply
+    sets ``reply_to`` to the addressed author for an "@name" prefix.
+    """
+
+    id: UUID
+    event_id: str
+    parent_id: Optional[UUID] = None
+    category: str
+    body: str
+    author: Optional[EventMessageAuthor] = None
+    is_own: bool = False
+    can_delete: bool = False
+    reply_count: int = 0
+    replies: list["EventMessageResponse"] = []
+    # When this message replies to another reply (not the top-level post),
+    # ``reply_to`` carries the addressed author so the UI can show an
+    # "@name" prefix in the flattened thread. ``None`` for top-level posts
+    # and direct replies to the top-level post.
+    reply_to: Optional[EventMessageAuthor] = None
+    created_at: datetime
+
+
+class EventMessagesListResponse(BaseModel):
+    items: list[EventMessageResponse]
+    total: int
+    # Whether the signed-in viewer muted message notifications for this event.
+    muted: bool = False
+
+
+class EventMessageCreate(BaseModel):
+    category: Literal[
+        "question",
+        "accommodation",
+        "ride",
+        "tickets",
+        "meetup",
+        "lost_found",
+        "other",
+    ] = "other"
+    body: str = Field(..., min_length=1, max_length=2000)
+    parent_id: Optional[UUID] = None
+
+
+class EventMessageReportCreate(BaseModel):
+    reason: Optional[str] = Field(default=None, max_length=280)
+
+
+class EventMessageCount(BaseModel):
+    event_id: str
+    count: int
+
+
 class BatchAggregateRequest(BaseModel):
     event_ids: list[str] = Field(..., min_length=1, max_length=200)
 
@@ -2049,6 +2144,9 @@ class NotificationItem(BaseModel):
     actor: NotificationActor
     context: Optional[str] = None
     subject_key: Optional[str] = None
+    # Optional narrative field for kinds that benefit from additional context
+    # beyond name/context. Used in milestone notifications.
+    description: Optional[str] = None
     # True when the viewer is also attending ``event_id`` (drives the
     # "You and X are going to ..." phrasing for subscription_going rows).
     also_going: bool = False
@@ -2536,7 +2634,8 @@ class PassportStats(BaseModel):
     reviews_written: int
     styles_danced: int
     top_style: Optional[str] = None
-    longest_month_streak: int
+    active_months_last_12: int
+    active_months_this_year: int
     events_last_30_days: int
     avg_gap_days: Optional[float] = None
     first_event_date: Optional[datetime] = None
@@ -2571,6 +2670,7 @@ class PassportMilestone(BaseModel):
     key: str
     name: str
     description: str
+    achieved_description: str
     icon: str
     category: str
     threshold: int
@@ -2582,10 +2682,99 @@ class PassportMilestone(BaseModel):
     unlocked_at: Optional[datetime] = None
 
 
+class ConsistencyEarnedCard(BaseModel):
+    """A permanent earned consistency card: one upward reach of a level within a
+    period. Repeats are never merged — each reach is its own card.
+
+    ``period_start`` → ``reached`` is the displayed range (first contributing
+    active month → the month the level was reached) and may cross calendar years.
+    """
+
+    key: str
+    level_key: str
+    name: str
+    icon: str
+    threshold: int
+    period_start: str
+    reached: str
+    is_current: bool
+
+
+class ConsistencyLockedCard(BaseModel):
+    """A not-yet-reached level for the current open period (or every level when
+    no period is open). ``active_months`` is the current rolling count shown as
+    the progress numerator."""
+
+    key: str
+    name: str
+    icon: str
+    threshold: int
+    active_months: int
+
+
+class ConsistencyTop(BaseModel):
+    """The strongest consistency level the user has ever reached (all-time)."""
+
+    key: str
+    name: str
+    icon: str
+    threshold: int
+    times: int
+
+
+class ConsistencyYearLevel(BaseModel):
+    """A calendar year's independent consistency classification (Jan–Dec active
+    months → the level that count reaches). ``key`` is null below the entry."""
+
+    year: int
+    active_months: int
+    key: Optional[str] = None
+    name: Optional[str] = None
+    icon: Optional[str] = None
+    threshold: Optional[int] = None
+
+
+class ConsistencyNewReach(BaseModel):
+    """An unacknowledged upward reach, for the celebration toast. ``key`` +
+    ``period_start`` form the ack identifier ``"level_key:YYYY-MM"``."""
+
+    key: str
+    name: str
+    icon: str
+    period_start: str
+
+
+class PassportConsistency(BaseModel):
+    """Recurring consistency achievements derived from attended events.
+
+    Rewards sustained activity over a rolling 12 calendar months without
+    requiring consecutive months; every level can be earned again in each
+    distinct period, so the trail keeps a permanent card per reach.
+    """
+
+    active: bool
+    active_months: int
+    window: int
+    earned: list[ConsistencyEarnedCard] = []
+    locked: list[ConsistencyLockedCard] = []
+    top: Optional[ConsistencyTop] = None
+    by_year: list[ConsistencyYearLevel] = []
+    new: list[ConsistencyNewReach] = []
+
+
+class MonthlyActivity(BaseModel):
+    """One calendar month ("YYYY-MM") with the count of attended events."""
+
+    month: str
+    count: int
+
+
 class PassportResponse(BaseModel):
     stats: PassportStats
     collections: PassportCollections
     milestones: list[PassportMilestone] = []
+    consistency: Optional[PassportConsistency] = None
+    monthly_activity: list[MonthlyActivity] = []
 
 
 class PassportTimelineItem(BaseModel):
@@ -2604,6 +2793,13 @@ class PassportTimelineMarker(BaseModel):
     name: str
     icon: str
     date: datetime
+    # Optional secondary line (used by recurring consistency markers to state
+    # the reach, e.g. "8/12 active months").
+    label: Optional[str] = None
+    # Displayed period range for consistency markers ("YYYY-MM"); the client
+    # formats the human range (e.g. "Jan–Nov 2026"). Null for event milestones.
+    period_start: Optional[str] = None
+    period_end: Optional[str] = None
 
 
 class SharedPassportResponse(BaseModel):
@@ -2620,6 +2816,8 @@ class SharedPassportResponse(BaseModel):
     stats: PassportStats
     collections: PassportCollections
     milestones: list[PassportMilestone] = []
+    # Populated only when 'milestones' is in ``sections``.
+    consistency: Optional[PassportConsistency] = None
     events: list[PassportMapEvent] = []
     # Sections the owner has opted to share (subset of milestones/timeline/
     # cities/countries). The client passes this straight to PassportView.
@@ -2627,6 +2825,8 @@ class SharedPassportResponse(BaseModel):
     # Populated only when 'timeline' is in ``sections``.
     timeline_items: list[PassportTimelineItem] = []
     timeline_markers: list[PassportTimelineMarker] = []
+    # Populated only when 'timeline' is in ``sections`` (privacy gate).
+    monthly_activity: list[MonthlyActivity] = []
     # Phase 3 Follow CTA: owner handle + the viewer's relationship so the
     # shared/profile passport can render a Follow button (or a sign-in
     # prompt for anonymous viewers). ``handle`` may be None for handleless
@@ -2637,7 +2837,9 @@ class SharedPassportResponse(BaseModel):
 
 
 class AckMilestonesRequest(BaseModel):
-    keys: list[str]
+    keys: list[str] = []
+    # Recurring consistency reaches to acknowledge, each ``"level_key:YYYY-MM"``.
+    consistency: list[str] = []
 
 
 class AckMilestonesResponse(BaseModel):

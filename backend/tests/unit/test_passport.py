@@ -12,9 +12,11 @@ from backend.db.models import (
     Tag,
     TagGroup,
     User,
+    UserConsistencyAchievement,
     UserEventAttendance,
 )
 from backend.services import passport as passport_service
+from sqlmodel import select
 
 NOW = datetime.utcnow()
 
@@ -184,86 +186,275 @@ class TestStatsContext:
         assert ctx["cities"] == set()
         assert ctx["countries"] == set()
         assert ctx["reviews"] == 0
-        assert ctx["longest_streak"] == 0
+        assert ctx["active_months_last_12"] == 0
+        assert ctx["active_months_this_year"] == 0
         assert ctx["first_event_date"] is None
 
 
 @pytest.mark.unit
-class TestMonthStreak:
-    def test_consecutive_months(self):
-        events = [
-            CachedEvent(
-                event_id="a",
-                calendar_id="c",
-                title="a",
-                start=datetime(2025, 1, 15),
-                end=datetime(2025, 1, 15),
-            ),
-            CachedEvent(
-                event_id="b",
-                calendar_id="c",
-                title="b",
-                start=datetime(2025, 2, 3),
-                end=datetime(2025, 2, 3),
-            ),
-            CachedEvent(
-                event_id="c",
-                calendar_id="c",
-                title="c",
-                start=datetime(2025, 3, 20),
-                end=datetime(2025, 3, 20),
-            ),
-        ]
-        assert passport_service.longest_month_streak(events) == 3
+class TestConsistency:
+    """Recurring consistency achievements (rolling 12-month active months).
 
-    def test_gap_resets_streak(self):
-        events = [
-            CachedEvent(
-                event_id="a",
-                calendar_id="c",
-                title="a",
-                start=datetime(2025, 1, 15),
-                end=datetime(2025, 1, 15),
-            ),
-            CachedEvent(
-                event_id="b",
-                calendar_id="c",
-                title="b",
-                start=datetime(2025, 2, 3),
-                end=datetime(2025, 2, 3),
-            ),
-            # Gap in March.
-            CachedEvent(
-                event_id="c",
-                calendar_id="c",
-                title="c",
-                start=datetime(2025, 4, 20),
-                end=datetime(2025, 4, 20),
-            ),
-        ]
-        assert passport_service.longest_month_streak(events) == 2
+    A month is "active" when it has >=1 attended event; a period opens when the
+    rolling active-month count first reaches 3 and closes when it drops below 3.
+    Every level recurs across distinct periods.
+    """
 
-    def test_year_boundary(self):
-        events = [
-            CachedEvent(
-                event_id="a",
-                calendar_id="c",
-                title="a",
-                start=datetime(2024, 12, 15),
-                end=datetime(2024, 12, 15),
-            ),
-            CachedEvent(
-                event_id="b",
-                calendar_id="c",
-                title="b",
-                start=datetime(2025, 1, 3),
-                end=datetime(2025, 1, 3),
-            ),
-        ]
-        assert passport_service.longest_month_streak(events) == 2
+    @staticmethod
+    def _month_dt(rel: int) -> datetime:
+        """Datetime in the middle of relative month ``rel`` (0 = 2024-01)."""
+        year = 2024 + rel // 12
+        month = rel % 12 + 1
+        return datetime(year, month, 15)
 
-    def test_empty(self):
-        assert passport_service.longest_month_streak([]) == 0
+    def _ev(self, rel: int) -> CachedEvent:
+        dt = self._month_dt(rel)
+        return CachedEvent(
+            event_id=f"e{rel}",
+            calendar_id="c",
+            title="e",
+            start=dt,
+            end=dt,
+        )
+
+    def test_active_month_indices_and_rolling_count(self):
+        events = [self._ev(0), self._ev(0), self._ev(2), self._ev(5)]
+        months = passport_service.active_month_indices(events)
+        # Duplicate month collapses to a single active month.
+        assert len(months) == 3
+        at = passport_service._month_index(self._month_dt(5))
+        assert passport_service.rolling_active_count(months, at) == 3
+
+    def test_monthly_activity_counts_events_per_month(self):
+        # rel 0 = 2024-01 (x2), rel 2 = 2024-03 (x1), rel 5 = 2024-06 (x1).
+        events = [self._ev(0), self._ev(0), self._ev(2), self._ev(5)]
+        assert passport_service.monthly_activity(events) == [
+            {"month": "2024-01", "count": 2},
+            {"month": "2024-03", "count": 1},
+            {"month": "2024-06", "count": 1},
+        ]
+
+    def test_monthly_activity_empty(self):
+        assert passport_service.monthly_activity([]) == []
+
+    def test_first_consistent_opens_period(self):
+        events = [self._ev(0), self._ev(1), self._ev(2)]
+        ctx = passport_service.consistency_context(events, now=self._month_dt(2))
+        assert ctx["active"] is True
+        assert ctx["active_months"] == 3
+        # One earned card, Consistent, labelled with its contributing period.
+        assert [c["level_key"] for c in ctx["earned"]] == ["consistency_3"]
+        card = ctx["earned"][0]
+        assert card["period_start"] == "2024-01"
+        assert card["reached"] == "2024-03"
+        assert card["is_current"] is True
+        # Remaining levels are locked, progressing from the current count.
+        assert [c["key"] for c in ctx["locked"]] == [
+            "consistency_5",
+            "consistency_8",
+            "consistency_10",
+            "consistency_12",
+        ]
+        assert ctx["locked"][0]["active_months"] == 3
+        # Consistent reached exactly once so far.
+        top = ctx["top"]
+        assert top["key"] == "consistency_3"
+        assert top["threshold"] == 3
+        assert top["times"] == 1
+
+    def test_committed_level(self):
+        events = [self._ev(i) for i in range(5)]
+        ctx = passport_service.consistency_context(events, now=self._month_dt(4))
+        assert ctx["active_months"] == 5
+        assert [c["level_key"] for c in ctx["earned"]] == [
+            "consistency_3",
+            "consistency_5",
+        ]
+        assert ctx["top"]["key"] == "consistency_5"
+        assert ctx["top"]["threshold"] == 5
+
+    def test_year_rounder_level(self):
+        events = [self._ev(i) for i in range(8)]
+        ctx = passport_service.consistency_context(events, now=self._month_dt(7))
+        assert ctx["active_months"] == 8
+        assert [c["level_key"] for c in ctx["earned"]] == [
+            "consistency_3",
+            "consistency_5",
+            "consistency_8",
+        ]
+        assert [c["key"] for c in ctx["locked"]] == [
+            "consistency_10",
+            "consistency_12",
+        ]
+        assert ctx["top"]["key"] == "consistency_8"
+
+    def test_below_entry_shows_locked_progress(self):
+        events = [self._ev(0), self._ev(1)]
+        ctx = passport_service.consistency_context(events, now=self._month_dt(1))
+        assert ctx["active"] is False
+        assert ctx["earned"] == []
+        # Every level is locked, progressing from the current count of 2.
+        assert [c["key"] for c in ctx["locked"]] == [
+            "consistency_3",
+            "consistency_5",
+            "consistency_8",
+            "consistency_10",
+            "consistency_12",
+        ]
+        assert ctx["locked"][0]["active_months"] == 2
+        assert ctx["top"] is None
+
+    def test_decrease_keeps_earned_cards(self):
+        # Five active months early, then a dry spell so the rolling count falls
+        # back to 3 (but never below) — the period stays open and the cards
+        # already earned up to the peak persist.
+        events = [self._ev(i) for i in range(5)]
+        ctx = passport_service.consistency_context(events, now=self._month_dt(13))
+        assert ctx["active"] is True
+        assert ctx["active_months"] == 3
+        assert [c["level_key"] for c in ctx["earned"]] == [
+            "consistency_3",
+            "consistency_5",
+        ]
+        # Locked levels progress from the (lower) current count.
+        assert [c["key"] for c in ctx["locked"]] == [
+            "consistency_8",
+            "consistency_10",
+            "consistency_12",
+        ]
+        assert ctx["locked"][0]["active_months"] == 3
+        # All-time highlight keeps the strongest level ever reached.
+        assert ctx["top"]["key"] == "consistency_5"
+
+    def test_comeback_recurs_as_two_cards(self):
+        # Period 1 (months 0-2) reaches Consistent, then a long gap closes it;
+        # Period 2 (months 30-32) reaches Consistent again.
+        events = [self._ev(i) for i in (0, 1, 2, 30, 31, 32)]
+        ctx = passport_service.consistency_context(events, now=self._month_dt(32))
+        consistent_cards = [
+            c for c in ctx["earned"] if c["level_key"] == "consistency_3"
+        ]
+        # Two separate permanent cards — never collapsed into one "×2" card.
+        assert len(consistent_cards) == 2
+        assert consistent_cards[0]["reached"] != consistent_cards[1]["reached"]
+        assert ctx["top"]["key"] == "consistency_3"
+        assert ctx["top"]["times"] == 2
+
+    def test_by_year_classifies_each_calendar_year_independently(self):
+        # 3 active months in 2024, 5 in 2025.
+        events = [self._ev(i) for i in (0, 1, 2, 12, 13, 14, 15, 16)]
+        ctx = passport_service.consistency_context(events, now=self._month_dt(16))
+        by_year = {y["year"]: y for y in ctx["by_year"]}
+        assert by_year[2024]["active_months"] == 3
+        assert by_year[2024]["key"] == "consistency_3"
+        assert by_year[2025]["active_months"] == 5
+        assert by_year[2025]["key"] == "consistency_5"
+
+    def test_timeline_markers_recur_per_period(self):
+        events = [self._ev(i) for i in (0, 1, 2, 30, 31, 32)]
+        markers = passport_service.consistency_timeline_markers(
+            events, now=self._month_dt(32)
+        )
+        keys = [m["key"] for m in markers]
+        # One Consistent reach per period, each carrying its period start.
+        consistent_markers = [k for k in keys if k.startswith("consistency_3:")]
+        assert len(consistent_markers) == 2
+
+    def test_cancelled_attendance_prunes_earned_achievement(self, session):
+        user = User(email="dip@example.com")
+        session.add(user)
+        for rel in (0, 1, 2):
+            _event(session, f"cd{rel}", self._month_dt(rel))
+            _going(session, user.id, f"cd{rel}")
+        session.commit()
+        now = self._month_dt(2)
+        passport_service.evaluate_and_persist_consistency(session, user, now=now)
+        rows = session.exec(
+            select(UserConsistencyAchievement).where(
+                UserConsistencyAchievement.user_id == user.id
+            )
+        ).all()
+        assert {r.level_key for r in rows} == {"consistency_3"}
+
+        # Cancel one month → only 2 active months remain → the period no longer
+        # exists, so its earned achievement is pruned (data-correction policy).
+        att = session.exec(
+            select(UserEventAttendance).where(UserEventAttendance.event_id == "cd2")
+        ).first()
+        session.delete(att)
+        session.commit()
+        passport_service.evaluate_and_persist_consistency(session, user, now=now)
+        rows = session.exec(
+            select(UserConsistencyAchievement).where(
+                UserConsistencyAchievement.user_id == user.id
+            )
+        ).all()
+        assert rows == []
+
+    def test_empty_has_no_period(self):
+        ctx = passport_service.consistency_context([], now=self._month_dt(0))
+        assert ctx["active"] is False
+        assert ctx["active_months"] == 0
+        assert ctx["earned"] == []
+        assert ctx["top"] is None
+
+
+@pytest.mark.unit
+class TestConsistencyPersistence:
+    """DB-backed dedupe of consistency reaches for toast/notification."""
+
+    @staticmethod
+    def _month_dt(rel: int) -> datetime:
+        year = 2024 + rel // 12
+        month = rel % 12 + 1
+        return datetime(year, month, 15)
+
+    def _attend(self, session, user, rel: int) -> None:
+        dt = self._month_dt(rel)
+        event = CachedEvent(
+            event_id=f"e{rel}",
+            calendar_id="c",
+            title="e",
+            start=dt,
+            end=dt,
+        )
+        session.add(event)
+        session.add(
+            UserEventAttendance(
+                device_id=f"dev-{user.id}-{rel}",
+                user_id=user.id,
+                event_id=event.event_id,
+            )
+        )
+        session.commit()
+
+    def test_persist_is_idempotent_and_view_flags_new(self, session):
+        user = User(email="c@example.com")
+        session.add(user)
+        session.commit()
+        for rel in range(3):
+            self._attend(session, user, rel)
+
+        newly = passport_service.evaluate_and_persist_consistency(
+            session, user, now=self._month_dt(2)
+        )
+        assert any(r["key"] == "consistency_3" for r in newly)
+
+        # Second pass records nothing new.
+        again = passport_service.evaluate_and_persist_consistency(
+            session, user, now=self._month_dt(2)
+        )
+        assert again == []
+
+        view = passport_service.consistency_view(session, user, now=self._month_dt(2))
+        assert any(n["key"] == "consistency_3" for n in view["new"])
+
+        # Acknowledging clears the unseen reach.
+        idents = [f"{n['key']}:{n['period_start']}" for n in view["new"]]
+        marked = passport_service.acknowledge_consistency(session, user, idents)
+        assert marked == len(idents)
+        view2 = passport_service.consistency_view(session, user, now=self._month_dt(2))
+        assert view2["new"] == []
 
 
 @pytest.mark.unit
@@ -329,28 +520,6 @@ class TestCollections:
         assert result["cities"][0]["longitude"] is None
 
 
-@pytest.mark.unit
-class TestInternationalReach:
-    def test_detects_international_tag(self, session):
-        user = User(email="a@example.com")
-        session.add(user)
-        group = TagGroup(slug="reach", label="Reach")
-        session.add(group)
-        session.commit()
-        tag = Tag(group_id=group.id, slug="international", label="International")
-        session.add(tag)
-        session.commit()
-        _event(session, "e1", _past(10), city="Paris", country="France")
-        session.add(EventTag(event_id="e1", tag_id=tag.id))
-        _going(session, user.id, "e1")
-        session.commit()
-
-        assert passport_service.has_international_reach(session, ["e1"]) is True
-
-    def test_no_tag_returns_false(self, session):
-        assert passport_service.has_international_reach(session, ["e1"]) is False
-
-
 def _attend_n(session, user_id, n, *, city_prefix="City", country="France"):
     """Attend N distinct past events, each in a distinct city."""
     for i in range(n):
@@ -373,9 +542,9 @@ class TestMilestones:
         newly = passport_service.evaluate_and_persist(session, user)
 
         assert "first_event" in newly
-        assert "events_10" not in newly
+        assert "events_5" not in newly
 
-    def test_events_10_threshold(self, session):
+    def test_events_5_threshold(self, session):
         user = User(email="a@example.com")
         session.add(user)
         _attend_n(session, user.id, 10)
@@ -384,8 +553,8 @@ class TestMilestones:
         newly = passport_service.evaluate_and_persist(session, user)
 
         assert "first_event" in newly
-        assert "events_10" in newly
-        assert "events_25" not in newly
+        assert "events_5" in newly
+        assert "events_15" not in newly
         assert "cities_5" in newly  # 10 distinct cities
         assert "cities_10" in newly
 
@@ -400,50 +569,6 @@ class TestMilestones:
 
         assert "first_event" in first
         assert second == []  # nothing new the second time
-
-    def test_international_milestone(self, session):
-        user = User(email="a@example.com")
-        session.add(user)
-        group = TagGroup(slug="reach", label="Reach")
-        session.add(group)
-        session.commit()
-        tag = Tag(group_id=group.id, slug="international", label="International")
-        session.add(tag)
-        session.commit()
-        _event(session, "e1", _past(10), city="Berlin", country="Germany")
-        session.add(EventTag(event_id="e1", tag_id=tag.id))
-        _going(session, user.id, "e1")
-        session.commit()
-
-        newly = passport_service.evaluate_and_persist(session, user)
-
-        assert "first_international" in newly
-
-    def test_streak_milestone(self, session):
-        user = User(email="a@example.com")
-        session.add(user)
-        # Three events in three consecutive months.
-        months = [datetime(2025, 1, 15), datetime(2025, 2, 15), datetime(2025, 3, 15)]
-        for i, start in enumerate(months):
-            eid = f"ev-{i}"
-            evt = CachedEvent(
-                event_id=eid,
-                calendar_id="c",
-                title=eid,
-                start=start,
-                end=start + timedelta(hours=2),
-                city=f"City-{i}",
-                country="France",
-            )
-            session.add(evt)
-            _going(session, user.id, eid)
-        session.commit()
-
-        ctx = passport_service.build_stats_context(session, user)
-        keys = passport_service.satisfied_keys(ctx)
-
-        assert "streak_3_months" in keys
-        assert "streak_6_months" not in keys
 
     def test_milestone_view_is_new_then_acked(self, session):
         user = User(email="a@example.com")
@@ -483,10 +608,10 @@ class TestMilestones:
 
         ctx = passport_service.build_stats_context(session, user)
         view = passport_service.milestone_view(session, user, ctx)
-        events_10 = next(m for m in view if m["key"] == "events_10")
-        assert events_10["unlocked"] is False
-        assert events_10["progress"] == 3
-        assert events_10["threshold"] == 10
+        events_5 = next(m for m in view if m["key"] == "events_5")
+        assert events_5["unlocked"] is False
+        assert events_5["progress"] == 3
+        assert events_5["threshold"] == 5
 
 
 @pytest.mark.unit
@@ -497,27 +622,25 @@ class TestCatalog:
         assert m.category == "countries"
         assert m.threshold == 10
 
-    def test_cities_ten_renamed_from_globetrotter(self):
+    def test_cities_ten_is_city_explorer(self):
         m = passport_service.MILESTONES_BY_KEY["cities_10"]
-        assert m.name == "City Hopper"
+        assert m.name == "City Explorer"
         assert m.category == "cities"
-
-    def test_year_long_streak_milestone_exists(self):
-        m = passport_service.MILESTONES_BY_KEY["streak_12_months"]
-        assert m.category == "streak"
-        assert m.threshold == 12
-        assert m.unit == "months"
 
     def test_every_milestone_has_prestige(self):
         for m in passport_service.MILESTONES:
             assert isinstance(m.prestige, int)
             assert 1 <= m.prestige <= 100
 
+    def test_every_milestone_has_achieved_description(self):
+        for m in passport_service.MILESTONES:
+            assert isinstance(m.achieved_description, str)
+            assert m.achieved_description
+
     def test_capstone_milestones_outrank_first_steps(self):
         first = passport_service.MILESTONES_BY_KEY["first_event"].prestige
         assert passport_service.MILESTONES_BY_KEY["events_100"].prestige > first
         assert passport_service.MILESTONES_BY_KEY["countries_10"].prestige > first
-        assert passport_service.MILESTONES_BY_KEY["streak_12_months"].prestige > first
 
 
 def _style_tag(session, group, slug, label, *, ordinal=0):
@@ -613,27 +736,14 @@ class TestTimelineMarkers:
         session.commit()
 
         events = passport_service.attended_events(session, user.id)
-        markers = passport_service.timeline_milestone_markers(events, set())
+        markers = passport_service.timeline_milestone_markers(events)
         by_key = {m["key"]: m for m in markers}
 
         assert "first_event" in by_key
-        assert "events_10" in by_key
+        assert "events_5" in by_key
         assert "cities_10" in by_key
         # first_event fires on the earliest attended event.
         earliest = min(e.start for e in events)
         assert by_key["first_event"]["date"] == earliest
         # Review milestones are not event-anchored, so never appear here.
         assert "first_review" not in by_key
-
-    def test_international_marker_uses_provided_ids(self, session):
-        user = User(email="a@example.com")
-        session.add(user)
-        _event(session, "e1", _past(10), city="Berlin", country="Germany")
-        _going(session, user.id, "e1")
-        session.commit()
-
-        events = passport_service.attended_events(session, user.id)
-        markers = passport_service.timeline_milestone_markers(events, {"e1"})
-        keys = {m["key"] for m in markers}
-
-        assert "first_international" in keys

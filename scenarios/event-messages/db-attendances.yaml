@@ -1,0 +1,69 @@
+# Attendances (Going) — no emit_notifications: we don't want subscription_going
+# rows here, only the engagement state the event-message fan-out reads from.
+#   Alice is Going ev-board / ev-going / ev-series-upcoming / ev-past.
+#   Carol + Dave supply "other attendees" on the saved/going boards.
+#   Bob + Carol + Dave are Going ev-series-past so they can review it.
+#   Bob is Going ev-not-engaged (engaged crowd that excludes Alice).
+#   Frank is Going ev-past → used only to attempt a (blocked) past-event post.
+#   ev-no-audience deliberately has NO attendances or saves.
+attendances:
+  - event_id: ev-board
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-board
+    email: carol@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-saved
+    email: bob@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-saved
+    email: dave@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-going
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-going
+    email: carol@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-not-engaged
+    email: bob@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-series-upcoming
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-series-past
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-series-past
+    email: bob@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-series-past
+    email: carol@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-series-past
+    email: dave@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-past
+    email: alice@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-past
+    email: bob@example.com
+    share_publicly: true
+    share_audience: public
+  - event_id: ev-past
+    email: frank@example.com
+    share_publicly: true
+    share_audience: public

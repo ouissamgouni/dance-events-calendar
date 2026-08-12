@@ -1,0 +1,44 @@
+# interest-matches cast — one matched user per channel combination so a
+# single dispatch tick exercises in-app + email + push plus the
+# feature-level (silenced profile) and channel-level (all-off) negatives.
+users:
+  # Email ON, push OFF → in-app + email (baseline matcher probe).
+  - email: nora@example.com
+    name: Nora Match
+    handle: nora
+    email_interest_matches_enabled: true
+    push_interest_matches_enabled: false
+
+  # Email OFF, push ON → in-app + push (two profiles → dedup probe).
+  - email: bob@example.com
+    name: Bob Dedup
+    handle: bob
+    email_interest_matches_enabled: false
+    push_interest_matches_enabled: true
+
+  # Email ON, push ON → in-app + email + push (any-reach profile).
+  - email: carol@example.com
+    name: Carol Anyreach
+    handle: carol
+    email_interest_matches_enabled: true
+    push_interest_matches_enabled: true
+
+  # Profile silenced (matches_enabled=false) → 0 rows regardless of
+  # channels — feature-level negative.
+  - email: dan@example.com
+    name: Dan Silent
+    handle: dan
+    email_interest_matches_enabled: true
+    push_interest_matches_enabled: true
+
+  # Matches but BOTH channels OFF → in-app row only (Phase G: rows
+  # always fire) — channel-level negative probe.
+  - email: eve@example.com
+    name: Eve Channel-off
+    handle: eve
+    email_interest_matches_enabled: false
+    push_interest_matches_enabled: false
+
+  - email: admin@example.com
+    name: Dev Admin
+    handle: admin

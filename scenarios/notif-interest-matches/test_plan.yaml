@@ -1,0 +1,74 @@
+test_plan:
+  name: "Interest matches — all channels (in-app + email + push)"
+  description: >
+    Consolidated interest-profile-match scenario. Feature = interest
+    matches. The matcher's branch coverage (dance / reach / geo, events
+    M1–M7) is preserved from the old per-channel scenarios; per-user
+    channel toggles now discriminate delivery so one cast covers in-app +
+    email + push plus the feature-level (silenced profile) and
+    channel-level (all-off) negatives. `settings.yaml` also flips interest
+    matches to INSTANT email mode so the immediate (no-schedule) email path
+    is exercised alongside the digest. Replaces
+    notif-event-matches-profile-{app,email,push}.
+
+  preconditions:
+    - >-
+      Start scenario:
+      `SCENARIO=notif-interest-matches RESET=1 task start:scenario`
+    - >-
+      For the push assertions: sign in as Bob and Carol in a browser and
+      enable notifications so each has a live PushSubscription bound to
+      their user_id before triggering the tick.
+
+  cast:
+    - "Nora  — Paris salsa (intl); email ON, push OFF → in-app + email."
+    - "Bob   — two profiles (salsa + inactive bachata); email OFF, push ON → in-app + push, deduped to one row per multi-dance event."
+    - "Carol — any-reach salsa; email ON, push ON → in-app + email + push."
+    - "Dan   — silenced profile (matches_enabled=false) → 0 rows."
+    - "Eve   — matches; email OFF, push OFF → in-app row only."
+
+  steps:
+    - id: 1
+      title: "Trigger one dispatch tick"
+      description: >
+        `SCENARIO=notif-interest-matches task notify:trigger:scenario`
+      expected: >
+        `interest.created > 0` for Nora/Bob/Carol/Eve (per the M1–M7
+        matcher matrix), 0 for Dan. `reminders.created=0`.
+
+    - id: 2
+      title: "In-app rows follow the matcher matrix"
+      description: >
+        `GET /api/notifications` as each user.
+      expected: >
+        Nora/Carol get rows for the international Paris salsa events
+        (M1, M2); Carol also gets the local/no-reach events (M3, M6);
+        Bob gets one deduped row for the multi-dance M2 (salsa label;
+        bachata profile is inactive) and none for bachata-only M5; Eve
+        gets in-app rows despite both channels off; Dan gets none. No one
+        gets M4 (geo miss) or M7 (no geo).
+
+    - id: 3
+      title: "Email delivered only to opted-in matched users"
+      description: >
+        Inspect Mailpit.
+      expected: >
+        Interest-match emails to Nora and Carol only; none for Bob (push
+        only), Eve (off) or Dan (no rows). With instant mode on, a plain
+        tick emails immediately; the forced digest tick may add a second.
+
+    - id: 4
+      title: "Push delivered only to opted-in subscribed users"
+      description: >
+        Observe web-push on the subscribed browsers.
+      expected: >
+        Push to Bob and Carol only; none for Nora (push off), Eve (off)
+        or Dan (no rows).
+
+    - id: 5
+      title: "Idempotence — re-run creates zero new rows"
+      description: >
+        `SCENARIO=notif-interest-matches task notify:trigger:scenario` again.
+      expected: >
+        `interest.created=0` on the second tick; no re-emails / re-pushes
+        (idempotency stamps block duplicates).

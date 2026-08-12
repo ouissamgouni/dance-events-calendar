@@ -10,14 +10,11 @@ import {
     type PreferredAreaPayload,
 } from '../api';
 import type { TagGroup } from '../types';
-import TagsPicker, { type TagsPickerValue } from './TagsPicker';
-import AreaMapPicker from './AreaMapPicker';
+import { type TagsPickerValue } from './TagsPicker';
+import ProfileEditor from './ProfileEditor';
 import { ConfirmDialog } from './AppDialog';
 import { DEFAULT_AREA_BBOX, isWideArea } from '../constants/area';
 import { usePreferences } from '../context/PreferencesContext';
-
-const GUARDRAIL_MESSAGE =
-    'Large area: alerts and explorer results will include all local events. Narrow the Reach to focus.';
 
 function tagLabels(ids: number[], group: TagGroup | null): string[] {
     if (!group) return [];
@@ -174,12 +171,6 @@ function ProfileCard({
             .finally(() => setSaving(false));
     };
 
-    const draftIsWide = isWideArea(areaDraft);
-    const draftReachIncludesLocalOrEmpty =
-        reachValue.selectedTagIds.length === 0 ||
-        (localTagId != null && reachValue.selectedTagIds.includes(localTagId));
-    const showGuardrailHint = draftIsWide && draftReachIncludesLocalOrEmpty;
-
     const handleDelete = async () => {
         setConfirmDeleteOpen(false);
         setSaving(true);
@@ -268,19 +259,6 @@ function ProfileCard({
                         />
                         Active
                     </label>
-                    <label
-                        className="flex items-center gap-1.5 text-slate-500"
-                        title="Show new events here. Getting them in email/push requires the matching Notifications toggle."
-                    >
-                        <input
-                            type="checkbox"
-                            checked={profile.matches_enabled}
-                            disabled={saving}
-                            onChange={(e) => onToggleNotify(profile.id, e.target.checked)}
-                            className="h-3.5 w-3.5"
-                        />
-                        Match
-                    </label>
                 </div>
             </div>
 
@@ -310,42 +288,16 @@ function ProfileCard({
                     </div>
 
                     {danceGroup && (
-                        <div>
-                            <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1">
-                                Dance styles
-                            </label>
-                            <TagsPicker
-                                tagGroups={[danceGroup]}
-                                value={danceValue}
-                                onChange={handleDanceChange}
-                                allowFreeText={false}
-                                searchable={false}
-                            />
-                        </div>
-                    )}
-
-                    {reachGroup && (
-                        <div>
-                            <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1">
-                                Reach (leave empty to match any scale)
-                            </label>
-                            <TagsPicker
-                                tagGroups={[reachGroup]}
-                                value={reachValue}
-                                onChange={handleReachChange}
-                                allowFreeText={false}
-                                searchable={false}
-                            />
-                        </div>
-                    )}
-
-                    <div>
-                        <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1">
-                            Area
-                        </label>
-                        <AreaMapPicker
-                            value={{ ...areaDraft, label: labelDraft }}
-                            onChange={(next) => {
+                        <ProfileEditor
+                            danceGroup={danceGroup}
+                            reachGroup={reachGroup}
+                            localTagId={localTagId}
+                            danceValue={danceValue}
+                            reachValue={reachValue}
+                            onDanceChange={handleDanceChange}
+                            onReachChange={handleReachChange}
+                            area={{ ...areaDraft, label: labelDraft }}
+                            onAreaChange={(next) => {
                                 setAreaDraft({
                                     min_lat: next.min_lat,
                                     min_lng: next.min_lng,
@@ -378,13 +330,10 @@ function ProfileCard({
                                     labelInputRef.current?.select();
                                 }, 0);
                             }}
+                            saving={saving}
+                            matchesEnabled={profile.matches_enabled}
+                            onMatchesEnabledChange={(v) => onToggleNotify(profile.id, v)}
                         />
-                    </div>
-
-                    {showGuardrailHint && (
-                        <p className="border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-800">
-                            {GUARDRAIL_MESSAGE}
-                        </p>
                     )}
                 </div>
             )}

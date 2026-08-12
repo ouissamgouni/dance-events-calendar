@@ -23,6 +23,11 @@ test_plan:
         year and the current year (5 current-year, 2 prior-year), a clustered
         "most active" current-year month, consecutive current-year months,
         salsa-dominant. Passport visibility: PUBLIC. Used for the YEAR card.
+      - Hana (hana) — activity heatmap: 15 attended events clustered so months
+        land in different intensity buckets (a "heavy" ~8-event month, a
+        "medium" ~3-event month, single-event months, plus a prior-year row).
+        Passport visibility: PUBLIC, timeline shared. Used for the activity
+        heatmap (Timeline matrix + share-card views).
       - Bram (bram) — borderline: 10 attended events, 9 cities, 5 countries,
         10 reviews. Passport visibility: FRIENDS-ONLY. Mutual friend of Alba.
       - Nadia (nadia) — minimal: 1 attended event, 0 reviews. Passport
@@ -30,8 +35,20 @@ test_plan:
       - Felix — Going only on a FUTURE event (empty passport).
       - Bea — signed in but never Going (empty passport).
       - Milestone "cusp" users (each one attend away from a milestone):
-        Dana (24/25 events), Elio (4/5 cities), Sami (2/3 countries),
-        Ines (0 international).
+        Dana (14/15 events), Elio (4/5 cities), Sami (2/3 countries).
+      - Consistency users (recurring "active in N of the last 12 months"
+        achievements, shown as a chronological milestone TRAIL — every unlock is
+        a permanent card, repeats never collapsed. Attend a shared monthly
+        ladder ~6 weeks apart, so the number of attended events equals the
+        number of active months):
+        Cara (3 → Consistent), Cole (5 → Committed), Yuki (8 → Year-Rounder,
+        whose period label spans ~10 months and crosses a calendar year),
+        Bo (2 → below the entry, no period), Mira (an old lapsed 3-month
+        period then a fresh Consistent reach → Consistent earned twice as two
+        separate cards), Nia (reached Year-Rounder in one long period, then the
+        two oldest months aged out so the current count cooled to 6 — earned
+        cards persist while the header and locked cards show the lower count).
+        All PUBLIC.
 
     Relationships (db-follows.yaml): Alba <-> Bram are mutual friends.
     Privacy invariants baked into the seed: a future event never counts, an
@@ -88,9 +105,8 @@ test_plan:
       description: >
         As a dancer sitting one event short of a milestone, marking one more
         past event as Going unlocks it immediately. For each cusp user (Dana →
-        25th event, Elio → 5th city, Sami → 3rd country, Ines → first
-        international), mark Going on the one spare past event that crosses the
-        threshold and reopen the passport.
+        15th event, Elio → 5th city, Sami → 3rd country), mark Going on the one
+        spare past event that crosses the threshold and reopen the passport.
       expected: >
         Each user starts with the target milestone locked one short of its
         threshold. After the single extra attendance the matching badge
@@ -107,7 +123,7 @@ test_plan:
       expected: >
         Each unlock produces exactly one in-app notification (no duplicates on
         re-run) that links back to the passport. Email and push honour the
-        per-user toggles (Dana: push only; Elio: in-app only; Sami/Ines: both).
+        per-user toggles (Dana: push only; Elio: in-app only; Sami: both).
         A "Dance Passport achievements" preference row is available with email
         and push switches.
       verification: "One in-app notification; email/push honour toggles."
@@ -244,31 +260,30 @@ test_plan:
         (prestige), not by recency, and are capped at six. Only the top badge in
         each family shows — "World Dancer" (5 countries) stands in for the whole
         countries family, never displayed alongside the overshadowed "Passport
-        Stamped" (3 countries), and likewise for the other categories. The
-        redundant "Border Crosser" (attend an international event) is hidden
-        whenever any countries badge is present. Badges are grouped by family:
-        consistency (streak + the "Danced every N days" cadence) leads and the
-        review "Critic" badge trails, so the least-prestigious badge is the first
-        dropped when the row overflows. Each milestone highlight is described by
-        her ACTUAL totals (e.g. World Dancer → "7 countries"), never the fixed
-        milestone threshold wording. The cadence and "Top style · <style>"
-        highlights sit within this ordering (cadence with consistency, style just
-        ahead of reviews).
-      verification: "Highlights: consistency-first/reviews-last, one-per-category, Border Crosser suppressed by countries, ≤6, actual-total descriptions."
+        Stamped" (3 countries), and likewise for the other categories. Badges are
+        grouped by family: consistency (the recurring active-months achievement +
+        the "Danced every N days" cadence) leads and the review "Critic" badge
+        trails, so the least-prestigious badge is the first dropped when the row
+        overflows. Each milestone highlight is described by her ACTUAL totals
+        (e.g. World Dancer → "7 countries"), never the fixed milestone threshold
+        wording. The cadence and "Top style · <style>" highlights sit within this
+        ordering (cadence with consistency, style just ahead of reviews).
+      verification: "Highlights: consistency-first/reviews-last, one-per-category, ≤6, actual-total descriptions."
 
     - id: 15
-      title: "Streak and top style surface as first-class facts"
+      title: "Active months and top style surface as first-class facts"
       description: >
-        As a consistent dancer my momentum and signature style show on the
+        As a consistent dancer my regularity and signature style show on the
         card. On Alba's all-time card check the stat cells and highlights.
       expected: >
         Her most-danced style appears as a "❤️ Top style · Salsa" highlight on
-        the ALL-TIME card. A "🔥 Streak" stat cell (months in a row) shows
-        alongside the headline counts ONLY when no streak/regularity milestone
-        (e.g. "Consistent") already occupies a highlight — when such a milestone
-        is shown the streak cell is suppressed so the same fact isn't repeated.
-        Dancers with under a two-month run never show a streak cell.
-      verification: "Top-style highlight always shows; streak cell only when no regularity milestone is shown."
+        the ALL-TIME card. A "📅 Active months" stat cell (active in N of the
+        last 12 months, shown as N/12) sits alongside the headline counts ONLY
+        when no consistency achievement (e.g. "Consistent") already occupies a
+        highlight — when such a badge is shown the active-months cell is
+        suppressed so the same fact isn't repeated. Dancers with no active month
+        never show an active-months cell.
+      verification: "Top-style highlight always shows; active-months cell only when no consistency badge is shown."
 
     - id: 16
       title: "'Dancing since' is opt-in on the card"
@@ -299,10 +314,10 @@ test_plan:
         unlocked that year (e.g. a countries badge) absorbs the matching
         new-places detail rather than showing two overlapping cards. Any other
         milestone unlocked that year carries a small "Unlocked" tag to the right
-        of its name. Any in-year streak shows as a stat cell spelled out
-        ("N months in a row", no fire icon). The all-time "Top style" highlight
-        is NOT shown on the year card.
-      verification: "Year card: 'My <year>' headline, year-scoped stats/highlights, cadence, place-name lists, geo merge, 'Unlocked' tag, spelled-out streak, no top style."
+        of its name. The number of months active THIS year shows as a stat cell
+        spelled out ("N months active"). The all-time "Top style" highlight is
+        NOT shown on the year card.
+      verification: "Year card: 'My <year>' headline, year-scoped stats/highlights, cadence, place-name lists, geo merge, 'Unlocked' tag, months-active cell, no top style."
 
     - id: 18
       title: "The card QR leads to the dancer's profile on this environment"
@@ -325,7 +340,126 @@ test_plan:
         for Felix/Bea (empty) and Nadia (single event).
       expected: >
         An empty passport yields a "just getting started" style card with no
-        stat streak cell and no highlights, rather than a broken or blank card.
-        A single-event journey shows the minimal stats it has and no streak
-        cell, and never fabricates highlights it hasn't earned.
+        active-months cell and no highlights, rather than a broken or blank card.
+        A single-event journey shows the minimal stats it has and no
+        active-months cell, and never fabricates highlights it hasn't earned.
       verification: "Empty/thin journeys render a graceful minimal card."
+
+    # ── Recurring consistency achievements ──────────────────────
+    - id: 20
+      title: "Consistency is a chronological trail of what I've earned and what's next"
+      description: >
+        As a dancer who keeps showing up I earn recurring "Consistency"
+        achievements for being active in N of the last 12 months, without
+        needing consecutive months. Open the Dance Passport for each consistency
+        user and read the Consistency trail on the Milestones tab.
+      expected: >
+        Consistency renders as a horizontal milestone trail like the other
+        categories, headed "Consistency" with a "Current · N/12 active months"
+        summary. Each unlocked level is its own permanent earned card showing the
+        level ("N/12 active months") and the period it was reached (first
+        contributing active month → reach month), followed by the remaining
+        locked levels showing progress from the current count. Cara (3 active
+        months) has one earned card, Consistent; Cole (5) has Consistent +
+        Committed; Yuki (8) has Consistent + Committed + Year-Rounder, then
+        locked Unstoppable (8/10) and Dance Lifestyle (8/12). Bo, with only 2
+        active months and no open period, sees no earned cards — just locked
+        progress toward Consistent (2/3), Committed (2/5) and so on.
+      verification: "Trail header shows current count; each unlock is a separate earned card with its period; locked levels show progress from the current count."
+
+    - id: 21
+      title: "Achievements recur as new cards and never regress or vanish"
+      description: >
+        As a dancer my consistency achievements can be earned again in distinct
+        periods, and a quiet spell never erases what I reached. Open Mira's
+        passport (an old lapsed 3-month period plus a fresh Consistent reach) and
+        Nia's (reached Year-Rounder, then cooled to 6 active months).
+      expected: >
+        Mira has TWO separate "Consistent" earned cards, one per period, with
+        their own period labels — never merged into a single "×2" card in the
+        trail. Nia's trail keeps her Consistent, Committed and Year-Rounder
+        earned cards permanently even though her current rolling count has cooled
+        to 6: the header reads "Current · 6/12", and the locked Unstoppable /
+        Dance Lifestyle cards progress from 6 (6/10, 6/12) rather than
+        downgrading or deleting the earned Year-Rounder card. No re-celebration
+        fires for a decrease, and a data correction (a cancelled attendance that
+        removes an active month) is the only thing that can retract an already
+        earned card — an ordinary decline never does.
+      verification: "Repeats appear as separate cards (no ×2 in the trail); earned cards persist on a decline; only a real cancellation prunes them."
+
+    - id: 22
+      title: "Consistency reaches drop a timeline moment and headline the all-time/yearly cards"
+      description: >
+        As a dancer I want each consistency unlock recorded when it happened and
+        summarised on my shareable cards. Open Yuki's timeline and share cards,
+        and switch the share card between all-time and a specific year.
+      expected: >
+        Yuki's timeline shows one item per upward reach — "Year-Rounder · 8/12
+        active months · <period>" — anchored to the event that triggered it (no
+        items for progress changes, decreases or period endings; simultaneous
+        unlocks sharing one triggering event collapse into a single moment). The
+        ALL-TIME share card shows only the strongest lifetime highlight with a
+        recurrence note (e.g. "🎆 Year-Rounder · 8/12 active months", or
+        "Consistent ×2 · 3/12 active months, twice" for Mira), prioritising the
+        highest level over repetition of a lower one and never listing periods.
+        The YEARLY card is computed independently from that calendar year's
+        Jan–Dec active months and shows the matching level (e.g. "🎆
+        Year-Rounder · 8/12 active months") as a yearly highlight only — it does
+        not mint another lifetime unlock.
+      verification: "Timeline: one item per reach with period, no progress/decrease items; all-time: strongest level + ×N, no periods; yearly: independent Jan–Dec classification."
+
+    # ── Activity heatmap (activity over time) ───────────────────
+    - id: 23
+      title: "The Timeline opens with an activity-over-time heatmap"
+      description: >
+        As a dancer I can see how my dancing has ebbed and flowed over the
+        months. Sign in as Hana and open the Timeline tab of her Dance Passport.
+      expected: >
+        Above the timeline list a compact "Activity over time" grid renders one
+        row per calendar year (oldest first, with any gap years shown as empty
+        rows) and twelve month columns (J..D). Each cell is shaded by that
+        month's attended-event count across five fixed intensity buckets
+        (none / 1–2 / 3–4 / 5–7 / 8+), so Hana's clustered "heavy" month reads as
+        the darkest cell, her "medium" month a mid tone, and her single-event
+        months the lightest active tone. A "Less → More" legend explains the
+        ramp. Dancers with no attended events show no heatmap.
+      verification: "Timeline tab shows a Year×Month grid with per-month intensity buckets and a legend; empty passports omit it."
+
+    - id: 24
+      title: "Hovering and clicking a month connects the heatmap to the timeline"
+      description: >
+        As a dancer I can read exact counts and jump to a month's events. Hover a
+        cell in Hana's heatmap, then click a month that has activity.
+      expected: >
+        Hovering a cell reveals the exact count and month (e.g. "8 events · Jul
+        2026"). Clicking a month with activity scrolls the timeline to that
+        month's events (loading older pages as needed) and briefly highlights the
+        landed rows. Empty months are not clickable.
+      verification: "Hover shows exact count/month; clicking an active month scrolls+highlights the timeline; empty months inert."
+
+    - id: 25
+      title: "The share card can include an activity view, gated by a checkbox"
+      description: >
+        As a dancer I choose whether my card shows my activity rhythm. Open
+        Hana's Dance Passport share card and toggle the new "Activity" option in
+        the card options for both the all-time and current-year views.
+      expected: >
+        With "Activity" enabled the ALL-TIME card shows a compact Year × Month
+        matrix capped at the last two calendar years (so it never crowds the
+        card), and the CURRENT-YEAR card shows a single Jan–Dec month strip with
+        the same intensity buckets. Unchecking "Activity" removes the view from
+        the card entirely. The option is independent of the Map/Badges toggles.
+      verification: "Activity checkbox adds a last-2-years matrix (all-time) or month strip (year) to the card; unchecking removes it."
+
+    - id: 26
+      title: "The activity heatmap follows the shared timeline privacy toggle"
+      description: >
+        As a viewer I only see a dancer's activity heatmap when they've shared
+        their timeline. View Hana's public passport (timeline shared), then a
+        passport whose owner has the timeline section turned OFF.
+      expected: >
+        On Hana's shared/profile passport the "Activity over time" heatmap
+        renders (her timeline is shared). When the owner has NOT shared their
+        timeline section, neither the timeline nor the activity heatmap appears —
+        the per-month activity data is withheld along with the timeline.
+      verification: "Shared heatmap shows only when the timeline section is shared; withheld otherwise."

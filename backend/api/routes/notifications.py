@@ -47,11 +47,16 @@ VALID_KINDS = {
     "follow_request",
     "follow_request_approved",
     "event_reminder",
+    "event_review_prompt",
     "interest_event",
     "promo_code_approved",
     "promo_code_rejected",
     "promo_code_added",
     "milestone_unlocked",
+    "organizer_claim_decided",
+    "event_message",
+    "event_message_reply",
+    "event_message_reported",
 }
 
 
@@ -140,6 +145,7 @@ def _hydrate(
                 ),
                 context=r.context,
                 subject_key=r.subject_key,
+                description=r.description,
                 also_going=(
                     r.kind == "subscription_going"
                     and r.event_id in also_going_event_ids

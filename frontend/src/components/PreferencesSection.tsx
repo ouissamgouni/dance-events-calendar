@@ -3,43 +3,29 @@ import { fetchTagGroups } from '../api';
 import type { TagGroup } from '../types';
 import { usePreferences } from '../context/PreferencesContext';
 import { useAuth } from '../context/AuthContext';
-import AreaMapPicker from './AreaMapPicker';
+import ProfileEditor from './ProfileEditor';
 import InterestProfilesManager from './InterestProfilesManager';
 import { DEFAULT_AREA_BBOX } from '../constants/area';
-import TagsPicker, { type TagsPickerValue } from './TagsPicker';
+import { type TagsPickerValue } from './TagsPicker';
 import type { PreferredAreaPayload } from '../api';
 
 /**
- * Renders the "Preferences" editor (preferred tags + preferred map area) on
- * the Settings page. Used by both anonymous and authenticated users — the
- * component talks to {@link usePreferences} which transparently persists to
- * localStorage (anon) or the server (authed).
+ * Renders the "Preferences" editor (preferred dance/reach tags + preferred
+ * map area) on the Settings page. Used by both anonymous and authenticated
+ * users — the component talks to {@link usePreferences} which transparently
+ * persists to localStorage (anon) or the server (authed).
  *
- * The tag UI reuses the admin event-side-panel picker (`TagsPicker`) so
- * users get the same searchable, group-coloured, scrollable card. Free-text
- * suggestions are disabled here — prefs only reference existing tags.
- *
- * Edits autosave: tag toggles persist after a short debounce; area edits
- * commit immediately when the user clicks an explicit AreaMapPicker action
- * or renames the saved area. The whole section is collapsible to keep the
- * Settings page compact.
+ * Anonymous users get the shared {@link ProfileEditor} (same wording, map
+ * event pins, and "In your area" samples as onboarding). Signed-in users see
+ * the {@link InterestProfilesManager} instead. Free-text tag suggestions are
+ * disabled — prefs only reference existing tags. The section is collapsible
+ * to keep the Settings page compact.
  */
-const TAG_AUTOSAVE_DEBOUNCE_MS = 600;
-
 export default function PreferencesSection() {
     const { prefs, setPrefs, clearPrefs, hasSetPrefs } = usePreferences();
     const { user } = useAuth();
     const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
     const [loading, setLoading] = useState(true);
-    // Local optimistic mirror of selected tag ids. Drives the chip UI and
-    // feeds the debounced autosave. Re-synced from ``prefs.tagIds`` whenever
-    // the stored prefs change beneath us (sign-in hydrate, "Save as my
-    // defaults" clicked elsewhere) — but suppressed while a local edit is
-    // pending so the user's toggle doesn't visually flicker.
-    const [tagsValue, setTagsValue] = useState<TagsPickerValue>(() => ({
-        selectedTagIds: [...prefs.tagIds],
-        freeTexts: {},
-    }));
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [savedToast, setSavedToast] = useState(false);
@@ -52,8 +38,6 @@ export default function PreferencesSection() {
     // via setPrefs on blur / Enter.
     const [areaLabelDraft, setAreaLabelDraft] = useState<string>(() => prefs.area?.label ?? DEFAULT_AREA_BBOX.label);
 
-    const pendingTagFlushRef = useRef(false);
-    const debounceTimerRef = useRef<number | null>(null);
     const toastTimerRef = useRef<number | null>(null);
     const areaSavedTimerRef = useRef<number | null>(null);
     const areaNameInputRef = useRef<HTMLInputElement | null>(null);
@@ -64,11 +48,6 @@ export default function PreferencesSection() {
             .catch(() => setTagGroups([]))
             .finally(() => setLoading(false));
     }, []);
-
-    useEffect(() => {
-        if (pendingTagFlushRef.current) return;
-        setTagsValue({ selectedTagIds: [...prefs.tagIds], freeTexts: {} });
-    }, [prefs.tagIds]);
 
     useEffect(() => {
         setAreaLabelDraft(prefs.area?.label ?? DEFAULT_AREA_BBOX.label);
@@ -86,6 +65,34 @@ export default function PreferencesSection() {
         areaSavedTimerRef.current = window.setTimeout(() => setAreaSavedFlash(false), 2000);
     };
 
+    const danceGroup = useMemo(
+        () => tagGroups.find((g) => g.slug === 'dance-style' && g.enabled !== false) ?? null,
+        [tagGroups],
+    );
+    const reachGroup = useMemo(
+        () => tagGroups.find((g) => g.slug === 'reach' && g.enabled !== false) ?? null,
+        [tagGroups],
+    );
+    const localTagId = useMemo(
+        () => reachGroup?.tags.find((t) => t.slug === 'local')?.id ?? null,
+        [reachGroup],
+    );
+
+    const danceValue = useMemo<TagsPickerValue>(
+        () => ({
+            selectedTagIds: danceGroup ? prefs.tagIds.filter((id) => danceGroup.tags.some((t) => t.id === id)) : [],
+            freeTexts: {},
+        }),
+        [prefs.tagIds, danceGroup],
+    );
+    const reachValue = useMemo<TagsPickerValue>(
+        () => ({
+            selectedTagIds: reachGroup ? prefs.tagIds.filter((id) => reachGroup.tags.some((t) => t.id === id)) : [],
+            freeTexts: {},
+        }),
+        [prefs.tagIds, reachGroup],
+    );
+
     const flushTags = async (tagIds: number[]) => {
         setSaving(true);
         setError(null);
@@ -95,19 +102,19 @@ export default function PreferencesSection() {
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to save preferences');
         } finally {
-            pendingTagFlushRef.current = false;
             setSaving(false);
         }
     };
 
-    const handleTagsChange = (next: TagsPickerValue) => {
-        setTagsValue(next);
-        pendingTagFlushRef.current = true;
-        if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
-        const snapshot = [...next.selectedTagIds];
-        debounceTimerRef.current = window.setTimeout(() => {
-            void flushTags(snapshot);
-        }, TAG_AUTOSAVE_DEBOUNCE_MS);
+    // Replace only this group's ids in prefs, preserving tags from other
+    // groups so switching dance/reach never drops the rest.
+    const handleDanceChange = (next: TagsPickerValue) => {
+        const preserved = prefs.tagIds.filter((id) => !(danceGroup?.tags.some((t) => t.id === id) ?? false));
+        void flushTags([...preserved, ...next.selectedTagIds]);
+    };
+    const handleReachChange = (next: TagsPickerValue) => {
+        const preserved = prefs.tagIds.filter((id) => !(reachGroup?.tags.some((t) => t.id === id) ?? false));
+        void flushTags([...preserved, ...next.selectedTagIds]);
     };
 
     // Map-triggered area edits reset the label to "Custom" (per remark:
@@ -156,13 +163,7 @@ export default function PreferencesSection() {
         setSaving(true);
         setError(null);
         try {
-            if (debounceTimerRef.current) {
-                window.clearTimeout(debounceTimerRef.current);
-                debounceTimerRef.current = null;
-            }
-            pendingTagFlushRef.current = false;
             await clearPrefs();
-            setTagsValue({ selectedTagIds: [], freeTexts: {} });
             showSavedToast();
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to clear preferences');
@@ -170,11 +171,6 @@ export default function PreferencesSection() {
             setSaving(false);
         }
     };
-
-    const visibleGroups = useMemo(
-        () => tagGroups.filter((g) => g.enabled !== false && g.tags.some((t) => t.enabled !== false)),
-        [tagGroups],
-    );
 
     return (
         <section
@@ -213,39 +209,19 @@ export default function PreferencesSection() {
                                 These tags and map area are used as your starting event filters.
                             </p>
 
-                            {/* ── Preferred tags (all enabled groups) ── */}
-                            <div className="mb-4">
-                                <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1.5">
-                                    Preferred tags
-                                </label>
-                                {loading ? (
-                                    <p className="text-xs text-slate-400">Loading…</p>
-                                ) : visibleGroups.length === 0 ? (
-                                    <p className="text-xs text-slate-400">No tags available.</p>
-                                ) : (
-                                    <div
-                                        className="border border-slate-200 bg-white max-h-72 overflow-y-auto p-3"
-                                        data-testid="preferences-tags-card"
-                                    >
-                                        <TagsPicker
-                                            tagGroups={visibleGroups}
-                                            value={tagsValue}
-                                            onChange={handleTagsChange}
-                                            allowFreeText={false}
-                                            searchable
-                                        />
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* ── Default event area ── */}
-                            <div className="mb-3">
-                                <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1.5">
-                                    Default event area
-                                </label>
-                                <AreaMapPicker
-                                    value={prefs.area}
-                                    onChange={handleAreaChange}
+                            {loading ? (
+                                <p className="text-xs text-slate-400">Loading…</p>
+                            ) : (
+                                <ProfileEditor
+                                    danceGroup={danceGroup}
+                                    reachGroup={reachGroup}
+                                    localTagId={localTagId}
+                                    danceValue={danceValue}
+                                    reachValue={reachValue}
+                                    onDanceChange={handleDanceChange}
+                                    onReachChange={handleReachChange}
+                                    area={prefs.area}
+                                    onAreaChange={handleAreaChange}
                                     onUseCurrentView={() => {
                                         // Defer until after the area save commits.
                                         window.setTimeout(() => {
@@ -256,7 +232,9 @@ export default function PreferencesSection() {
                                             }
                                         }, 0);
                                     }}
-                                    controlsStart={(
+                                    saving={saving}
+                                    showMatchesToggle={false}
+                                    areaNameControl={(
                                         <div className="flex shrink-0 items-center gap-2">
                                             <label htmlFor="pref-area-name" className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
                                                 Name
@@ -290,7 +268,7 @@ export default function PreferencesSection() {
                                         </div>
                                     )}
                                 />
-                            </div>
+                            )}
 
                             {error && <p className="text-xs text-red-700 mb-2">{error}</p>}
 

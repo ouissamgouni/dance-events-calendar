@@ -22,6 +22,8 @@ from backend.db.models import SiteSetting
 
 DEFAULT_DIGEST_SCHEDULE = "tue,fri @ 09:00"
 DEFAULT_INTEREST_MATCH_MAX_EVENTS_PER_EMAIL = 10
+DEFAULT_DIGEST_PER_KIND_CAP = 5
+DEFAULT_DIGEST_MAX_ITEMS = 20
 
 
 def _open_session(session: Optional[Session]) -> tuple[Session, bool]:
@@ -82,7 +84,7 @@ def get_milestone_notifications_enabled(session: Optional[Session] = None) -> bo
             s.close()
     if override is not None:
         return override
-    return True
+    return loader.get_milestone_notifications_enabled()
 
 
 def get_activity_digest_email_enabled(session: Optional[Session] = None) -> bool:
@@ -95,6 +97,42 @@ def get_activity_digest_email_enabled(session: Optional[Session] = None) -> bool
     if override is not None:
         return override
     return loader.get_activity_digest_email_enabled()
+
+
+def get_digest_v2_enabled(session: Optional[Session] = None) -> bool:
+    s, opened = _open_session(session)
+    try:
+        override = _get_bool_row(s, "digest_v2_enabled")
+    finally:
+        if opened:
+            s.close()
+    if override is not None:
+        return override
+    return loader.get_digest_v2_enabled()
+
+
+def get_digest_per_kind_cap(session: Optional[Session] = None) -> int:
+    s, opened = _open_session(session)
+    try:
+        override = _get_int_row(s, "digest_per_kind_cap")
+    finally:
+        if opened:
+            s.close()
+    if override is not None and override > 0:
+        return override
+    return loader.get_digest_per_kind_cap()
+
+
+def get_digest_max_items(session: Optional[Session] = None) -> int:
+    s, opened = _open_session(session)
+    try:
+        override = _get_int_row(s, "digest_max_items")
+    finally:
+        if opened:
+            s.close()
+    if override is not None and override > 0:
+        return override
+    return loader.get_digest_max_items()
 
 
 def get_review_prompt_enabled(session: Optional[Session] = None) -> bool:
@@ -155,6 +193,18 @@ def get_review_mood_headline_min_reviews(session: Optional[Session] = None) -> i
     if override is not None and override > 0:
         return override
     return loader.get_review_mood_headline_min_reviews()
+
+
+def get_event_message_cta_min_going(session: Optional[Session] = None) -> int:
+    s, opened = _open_session(session)
+    try:
+        override = _get_int_row(s, "event_message_cta_min_going")
+    finally:
+        if opened:
+            s.close()
+    if override is not None and override > 0:
+        return override
+    return loader.get_event_message_cta_min_going()
 
 
 def get_interest_match_notifications_enabled(session: Optional[Session] = None) -> bool:
@@ -227,6 +277,9 @@ EMAIL_MODE_FEATURES = (
     "friend_reviews",
     "friend_milestones",
     "interest_matches",
+    "milestone_unlocked",
+    "event_messages",
+    "suggested_events",
 )
 
 

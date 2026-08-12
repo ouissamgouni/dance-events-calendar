@@ -1,0 +1,19 @@
+# notif-milestone-email cast.
+#   Alice — the only dancer. Attends one past event → unlocks the
+#           "First Steps" milestone (threshold = 1 attended event) on the
+#           next milestone-service tick. Milestone email + push ON so both
+#           the immediate push and the (digest- or instant-routed) email
+#           can be observed.
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    account_visibility: public
+    passport_visibility: public
+    email_milestone_unlocked_enabled: true
+    push_milestone_unlocked_enabled: true

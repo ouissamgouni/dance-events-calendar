@@ -13,6 +13,7 @@ Privacy notes:
 """
 
 from datetime import datetime, timedelta
+import logging
 import os
 from typing import Optional
 from uuid import UUID
@@ -126,9 +127,26 @@ from backend.config.loader import get_current_onboarding_version
 
 router = APIRouter(prefix="/api/social", tags=["social"])
 limiter = Limiter(key_func=client_ip)
+logger = logging.getLogger(__name__)
 
 
 # --- Helpers ----------------------------------------------------------------
+
+
+def _dispatch_social_instant(session, *, kind: str, recipient_ids) -> None:
+    """Best-effort instant email for an event-less social_activity kind.
+
+    No-op unless the ``social_activity`` email mode is *instant*; otherwise
+    the activity-digest tick delivers these. Never raises into the caller.
+    """
+    from backend.services import activity_instant
+
+    try:
+        activity_instant.dispatch_activity_instant(
+            session, kind=kind, recipient_ids=recipient_ids
+        )
+    except Exception:  # noqa: BLE001 — best-effort, never breaks the action
+        logger.warning("Instant social email failed (%s)", kind, exc_info=True)
 
 
 def _friend_requests_enabled() -> bool:
@@ -817,6 +835,7 @@ def follow_user(
             sub, _ = ensure_calendar_subscription(session, viewer.id, target.id)
             notify_follow_request(session, target=target, requester=viewer)
             session.commit()
+            _dispatch_social_instant(session, kind="follow_request", recipient_ids={target.id})
             return FollowActionResponse(
                 handle=target.handle or "",
                 is_following=False,
@@ -868,6 +887,13 @@ def follow_user(
             needs_commit = True
         if needs_commit:
             session.commit()
+    # Deliver instant social emails now (no-op unless social_activity email is
+    # in instant mode); the digest tick handles them otherwise.
+    _dispatch_social_instant(session, kind="new_follower", recipient_ids={target.id})
+    if is_friend and is_new_follow:
+        _dispatch_social_instant(
+            session, kind="new_friend", recipient_ids={target.id, viewer.id}
+        )
     sub_after = _get_subscription(session, viewer.id, target.id)
     return FollowActionResponse(
         handle=target.handle or "",
@@ -1082,6 +1108,14 @@ def approve_follow_request(
         session, target_id=viewer.id, requester_id=requester.id
     )
     session.commit()
+    # Instant social emails (no-op unless social_activity email is instant).
+    _dispatch_social_instant(
+        session, kind="follow_request_approved", recipient_ids={requester.id}
+    )
+    if is_friend:
+        _dispatch_social_instant(
+            session, kind="new_friend", recipient_ids={viewer.id, requester.id}
+        )
     return FollowActionResponse(
         handle=requester.handle or "",
         is_following=True,
@@ -4186,6 +4220,8 @@ def onboarding_complete(
     handles = list(dict.fromkeys(handles))  # de-dup, preserve order
 
     followed: list[str] = []
+    followed_ids: set[int] = set()
+    friended_ids: set[int] = set()
     if handles:
         already = _already_followed_ids(session, viewer.id)
         # Resolve all in one query.
@@ -4206,6 +4242,7 @@ def onboarding_complete(
                 # Best-effort — never block onboarding on notification
                 # delivery (e.g. transient email/queue errors).
                 pass
+            followed_ids.add(target.id)
             # Detect mutual completion (the inviter may already follow
             # the new user back via an earlier referral redemption).
             if is_mutual_follow(session, viewer.id, target.id):
@@ -4214,6 +4251,7 @@ def onboarding_complete(
                     notify_new_friend(session, viewer, target)
                 except Exception:
                     pass
+                friended_ids.add(target.id)
             followed.append(target.handle or "")
 
     viewer.onboarded_at = datetime.utcnow()
@@ -4221,6 +4259,16 @@ def onboarding_complete(
     session.add(viewer)
     session.commit()
     session.refresh(viewer)
+
+    # Instant social emails for the batch-follows (no-op unless instant mode).
+    if followed_ids:
+        _dispatch_social_instant(
+            session, kind="new_follower", recipient_ids=followed_ids
+        )
+    if friended_ids:
+        _dispatch_social_instant(
+            session, kind="new_friend", recipient_ids=friended_ids | {viewer.id}
+        )
 
     return CompleteOnboardingResponse(
         onboarded_at=viewer.onboarded_at.isoformat(),

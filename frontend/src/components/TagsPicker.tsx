@@ -16,6 +16,10 @@ interface Props {
     searchable?: boolean;
     /** Allow user-entered free-text tag suggestions. Default true. */
     allowFreeText?: boolean;
+    /** Hide the per-group label header (caller renders its own). Default false. */
+    hideGroupLabels?: boolean;
+    /** When false, tag chips scroll horizontally instead of wrapping. Default true. */
+    wrap?: boolean;
     /** Container className override. */
     className?: string;
 }
@@ -38,6 +42,8 @@ export default function TagsPicker({
     excludeTagIds,
     searchable = true,
     allowFreeText = true,
+    hideGroupLabels = false,
+    wrap = true,
     className,
 }: Props) {
     const [activeGroupSlug, setActiveGroupSlug] = useState<string | 'all'>('all');
@@ -189,13 +195,15 @@ export default function TagsPicker({
 
                     return (
                         <div key={group.slug}>
-                            <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: c }}>
-                                {group.label}
-                            </p>
+                            {!hideGroupLabels && (
+                                <p className="text-[10px] font-medium uppercase tracking-wide mb-1" style={{ color: c }}>
+                                    {group.label}
+                                </p>
+                            )}
                             {allFiltered ? (
                                 <p className="text-[11px] text-slate-400 italic">No tags available.</p>
                             ) : (
-                                <div className="flex flex-wrap gap-1">
+                                <div className={wrap ? 'flex flex-wrap gap-1' : 'flex flex-nowrap gap-1 overflow-x-auto scrollbar-hide pb-0.5'}>
                                     {group.tags.map((tag) => {
                                         const tc = tag.group_color ?? tag.color ?? c;
                                         const selected = selectedSet.has(tag.id);
@@ -204,7 +212,7 @@ export default function TagsPicker({
                                                 key={tag.id}
                                                 type="button"
                                                 onClick={() => toggleTag(tag.id)}
-                                                className="px-2 py-0.5 text-[11px] border transition-colors"
+                                                className={`px-2 py-0.5 text-[11px] border transition-colors whitespace-nowrap ${wrap ? '' : 'shrink-0'}`}
                                                 style={
                                                     selected
                                                         ? { backgroundColor: tc, borderColor: tc, color: 'white' }

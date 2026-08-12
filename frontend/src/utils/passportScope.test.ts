@@ -1,6 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import { scopePassport } from './passportScope'
-import type { PassportMapEvent, PassportMilestone } from '../types'
+import type { PassportConsistency, PassportMapEvent, PassportMilestone } from '../types'
+
+function consistency(overrides: Partial<PassportConsistency> = {}): PassportConsistency {
+    return {
+        active: false,
+        active_months: 0,
+        window: 12,
+        earned: [],
+        locked: [],
+        top: null,
+        by_year: [],
+        new: [],
+        ...overrides,
+    }
+}
 
 function ev(overrides: Partial<PassportMapEvent>): PassportMapEvent {
     return {
@@ -20,6 +34,7 @@ function milestone(overrides: Partial<PassportMilestone>): PassportMilestone {
         key: 'k',
         name: 'name',
         description: 'd',
+        achieved_description: 'ad',
         icon: '🏅',
         category: 'events',
         threshold: 1,
@@ -86,22 +101,25 @@ describe('scopePassport — all time', () => {
             milestone({ key: 'events_50', category: 'events', prestige: 65, name: 'Veteran' }),
             milestone({ key: 'cities_10', category: 'cities', prestige: 60, name: 'City Hopper' }),
             milestone({ key: 'countries_5', category: 'countries', prestige: 70, name: 'World Dancer' }),
-            milestone({ key: 'first_international', category: 'international', prestige: 30, name: 'Border Crosser' }),
             milestone({ key: 'reviews_10', category: 'reviews', prestige: 40, name: 'Critic' }),
-            milestone({ key: 'streak_6', category: 'streak', prestige: 75, name: 'Committed' }),
         ]
-        const s = scopePassport(events, milestones, 'all', 'Salsa')
+        const cons = consistency({
+            top: { key: 'consistency_5', name: 'Committed', icon: '🗓️', threshold: 5, times: 1 },
+        })
+        const s = scopePassport(events, milestones, 'all', 'Salsa', 0, cons)
         const keys = s.badges.map((b) => b.key)
         expect(keys).toContain('top_style')
         expect(s.badges.length).toBeLessThanOrEqual(6)
     })
 
-    it('flags a streak milestone in the badge row so the card hides the streak cell', () => {
-        const milestones = [
-            milestone({ key: 'streak_6', category: 'streak', prestige: 75, name: 'Committed' }),
-        ]
-        const s = scopePassport(events, milestones, 'all')
-        expect(s.streakInBadges).toBe(true)
+    it('flags a consistency badge in the badge row so the card hides the active-months cell', () => {
+        const cons = consistency({
+            active_months: 5,
+            top: { key: 'consistency_5', name: 'Committed', icon: '🗓️', threshold: 5, times: 2 },
+        })
+        const s = scopePassport(events, [], 'all', null, 0, cons)
+        expect(s.consistencyInBadges).toBe(true)
+        expect(s.badges[0].key).toBe('consistency_top_consistency_5')
     })
 
     it('adds cadence and top style highlights on the all-time card', () => {
@@ -110,20 +128,20 @@ describe('scopePassport — all time', () => {
         expect(keys).toContain('cadence')
         expect(keys).toContain('top_style')
         expect(s.topStyle).toBe('Salsa')
-        expect(s.streakInBadges).toBe(false)
+        expect(s.consistencyInBadges).toBe(false)
     })
 
-    it('leads with consistency, trails with reviews, and drops Border Crosser next to a countries badge', () => {
+    it('leads with consistency and trails with reviews', () => {
         const milestones = [
             milestone({ key: 'reviews_10', category: 'reviews', prestige: 40, name: 'Critic' }),
-            milestone({ key: 'first_international', category: 'international', prestige: 30, name: 'Border Crosser' }),
             milestone({ key: 'countries_5', category: 'countries', prestige: 70, name: 'World Dancer' }),
-            milestone({ key: 'streak_6', category: 'streak', prestige: 75, name: 'Committed' }),
         ]
-        const s = scopePassport(events, milestones, 'all')
+        const cons = consistency({
+            top: { key: 'consistency_5', name: 'Committed', icon: '🗓️', threshold: 5, times: 1 },
+        })
+        const s = scopePassport(events, milestones, 'all', null, 0, cons)
         const keys = s.badges.map((b) => b.key)
-        expect(keys).not.toContain('first_international') // redundant beside a countries badge
-        expect(keys[0]).toBe('streak_6') // consistency leads
+        expect(keys[0]).toBe('consistency_top_consistency_5') // consistency leads
         expect(keys.indexOf('reviews_10')).toBe(keys.length - 1) // Critic trails
     })
 })
@@ -154,13 +172,13 @@ describe('scopePassport — a specific year', () => {
         expect(keys).not.toContain('events_10') // unlocked in a prior year
     })
 
-    it('adds computed highlights: busiest month and new places, with an in-year streak', () => {
+    it('adds computed highlights: busiest month and new places, counting active months', () => {
         const s = scopePassport(events, [], 2026)
         const keys = s.badges.map((b) => b.key)
         expect(keys).toContain('busiest_month')
         expect(keys).toContain('new_city') // Berlin is new in 2026 (Paris was 2025)
         expect(keys).toContain('new_country') // Germany is new in 2026
-        expect(s.monthStreak).toBe(2) // Mar + Apr consecutive
+        expect(s.activeMonths).toBe(2) // Mar + Apr are the two active months
     })
 
     it('lists up to three new place names, then an ellipsis when more remain', () => {

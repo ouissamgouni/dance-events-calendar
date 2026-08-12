@@ -28,6 +28,8 @@ tag_groups:
         label: Kizomba
       - slug: zouk
         label: Zouk
+      - slug: mambo
+        label: Mambo
 
   - slug: reach
     label: Reach
@@ -42,4 +44,4 @@ tag_groups:
         label: Regional
       - slug: international
         label: International
-        synonyms: [ "world", "worldwide", "global", "congress", "festival" ]
+        synonyms: ["world", "worldwide", "global", "congress", "festival"]

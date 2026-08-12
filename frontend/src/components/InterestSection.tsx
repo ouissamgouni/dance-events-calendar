@@ -57,9 +57,14 @@ function Avatar({
     handle: string | null;
     display_name: string | null;
     avatar_url: string | null;
-    size?: 'sm' | 'md';
+    size?: 'xs' | 'sm' | 'md';
 }) {
-    const px = size === 'md' ? 'h-8 w-8 text-xs' : 'h-6 w-6 text-[10px]';
+    const px =
+        size === 'md'
+            ? 'h-8 w-8 text-xs'
+            : size === 'xs'
+                ? 'h-5 w-5 text-[9px]'
+                : 'h-6 w-6 text-[10px]';
     const name = display_name || handle || '?';
     if (avatar_url) {
         return (
@@ -249,12 +254,13 @@ function FollowChipButton({
 function FriendChip({ a }: { a: WedgeAttendee }) {
     return (
         <li
-            className={`inline-flex items-center gap-1.5 pl-0.5 pr-2.5 py-0.5 ${variantClasses('friend')}`}
+            className={`inline-flex shrink-0 items-center gap-1.5 pl-0.5 pr-2.5 py-0.5 ${variantClasses('friend')}`}
         >
             <Avatar
                 handle={a.handle}
                 display_name={a.display_name}
                 avatar_url={a.avatar_url}
+                size="xs"
             />
             <NameLink
                 handle={a.handle}
@@ -268,12 +274,13 @@ function FriendChip({ a }: { a: WedgeAttendee }) {
 function FofChip({ a }: { a: FofGoingAttendee }) {
     return (
         <li
-            className={`inline-flex items-center gap-1.5 pl-0.5 pr-2 py-0.5 ${variantClasses('fof')}`}
+            className={`inline-flex shrink-0 items-center gap-1.5 pl-0.5 pr-2 py-0.5 ${variantClasses('fof')}`}
         >
             <Avatar
                 handle={a.handle}
                 display_name={a.display_name}
                 avatar_url={a.avatar_url}
+                size="xs"
             />
             <NameLink
                 handle={a.handle}
@@ -299,12 +306,13 @@ function FofChip({ a }: { a: FofGoingAttendee }) {
 function OtherChip({ a, isSelf = false }: { a: Attendee; isSelf?: boolean }) {
     return (
         <li
-            className={`inline-flex items-center gap-1.5 pl-0.5 pr-2 py-0.5 ${variantClasses('other')}`}
+            className={`inline-flex shrink-0 items-center gap-1.5 pl-0.5 pr-2 py-0.5 ${variantClasses('other')}`}
         >
             <Avatar
                 handle={a.handle}
                 display_name={a.display_name}
                 avatar_url={a.avatar_url}
+                size="xs"
             />
             <NameLink
                 handle={a.handle}
@@ -460,6 +468,14 @@ export default function InterestSection({ eventId, eventTitle, isPast = false }:
                 className="w-4 h-4 object-contain"
             />
             Interest
+            <span className="normal-case font-normal text-slate-600">
+                {summary.total_going} {isPast ? 'attended' : 'going'} ·{' '}
+                {summary.total_saved} saved
+            </span>
+            <span className="text-slate-300" aria-hidden="true">
+                ·
+            </span>
+
         </button>
     );
 
@@ -475,7 +491,6 @@ export default function InterestSection({ eventId, eventTitle, isPast = false }:
                 <div className="mb-2">{Header}</div>
                 {!collapsed && (
                     <>
-                        <CountsRow summary={summary} isPast={isPast} />
                         {summary.total_going > 0 && (
                             <div className="text-slate-500 mt-1">
                                 {isPast ? 'Sign in to see who attended.' : "Sign in to see who's going."}
@@ -504,8 +519,6 @@ export default function InterestSection({ eventId, eventTitle, isPast = false }:
             {Header}
             {!collapsed && (
                 <>
-                    <CountsRow summary={summary} isPast={isPast} />
-
                     {isEmpty ? (
                         <div className="text-[11px] text-slate-500">
                             No one has shared their name yet — be the first by marking
@@ -591,20 +604,6 @@ export default function InterestSection({ eventId, eventTitle, isPast = false }:
 // Small bits
 // ---------------------------------------------------------------------------
 
-function CountsRow({ summary, isPast = false }: { summary: AttendanceSummary; isPast?: boolean }) {
-    return (
-        <div className="text-xs text-slate-600 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            <span>
-                <span className="font-medium">{summary.total_going}</span> {isPast ? 'attended' : 'going'}
-            </span>
-            <span className="text-slate-300">·</span>
-            <span>
-                <span className="font-medium">{summary.total_saved}</span> saved
-            </span>
-        </div>
-    );
-}
-
 function BucketRow({
     label,
     count,
@@ -621,7 +620,7 @@ function BucketRow({
             <div className="text-[10px] uppercase tracking-wide text-slate-400 mb-1">
                 {label} ({count})
             </div>
-            <ul className="flex flex-wrap gap-x-2 gap-y-1 items-center">
+            <ul className="flex gap-2 items-center overflow-x-auto pb-1 -mb-1">
                 {children}
             </ul>
         </div>

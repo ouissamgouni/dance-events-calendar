@@ -250,6 +250,13 @@ export interface SiteSettings {
     activity_digest_email_enabled?: boolean;
     interest_match_notifications_enabled?: boolean;
     web_push_enabled?: boolean;
+    /** Combined activity digest (v2): one balanced, card-styled email per
+     * recipient merging every eligible feature section. Flag off falls back
+     * to the separate per-feature list emails. ``per_kind_cap`` caps cards
+     * per kind (then "and N more"); ``max_items`` caps total cards. */
+    digest_v2_enabled?: boolean;
+    digest_per_kind_cap?: number;
+    digest_max_items?: number;
     /** Hours before an event's start when the reminder is fired. 1-720. */
     reminder_lead_hours?: number;
     /** Cadence for the activity-digest email in the format
@@ -273,6 +280,21 @@ export interface SiteSettings {
     friend_milestones_email_digest?: boolean;
     interest_matches_email_instant?: boolean;
     interest_matches_email_digest?: boolean;
+    /** Event message board (Q&A / requests). Instant email / batched
+     * digest for new posts and thread replies. Defaults: instant=false,
+     * digest=true. */
+    event_messages_email_instant?: boolean;
+    event_messages_email_digest?: boolean;
+    /** Suggested-event approval fan-out (``subscription_suggested``). Instant
+     * email / batched digest. Defaults: instant=false, digest=true. */
+    suggested_events_email_instant?: boolean;
+    suggested_events_email_digest?: boolean;
+    /** Personal Dance Passport milestone unlocks. Master switch plus the
+     * per-route email delivery toggles (instant rich email / batched
+     * digest). Defaults: enabled=true, instant=false, digest=true. */
+    milestone_notifications_enabled?: boolean;
+    milestone_unlocked_email_instant?: boolean;
+    milestone_unlocked_email_digest?: boolean;
     /** Master switch for post-event "how was it?" review-prompt
      * notifications (Event Quality Layer Phase 3). */
     review_prompt_enabled?: boolean;
@@ -290,6 +312,9 @@ export interface SiteSettings {
      * Mood" headline label; below this the UI shows an "Early feedback"
      * state. 1-1000, client default 3. */
     review_mood_headline_min_reviews?: number;
+    /** Minimum "Going" attendees before an event reminder includes an
+     * "Ask a question" CTA to the message board. 1-10000, client default 3. */
+    event_message_cta_min_going?: number;
 }
 
 export async function fetchSettings(): Promise<SiteSettings> {
@@ -462,6 +487,7 @@ export interface NotificationToggleCounts {
     event_reminders: NotificationToggleCountEntry;
     activity_digest: NotificationToggleCountEntry;
     review_prompt: NotificationToggleCountEntry;
+    milestones: NotificationToggleCountEntry;
 }
 
 export async function fetchNotificationToggleCounts(): Promise<NotificationToggleCounts> {
@@ -682,6 +708,11 @@ export interface AuthUser {
     push_friend_reviews_enabled?: boolean;
     email_friend_milestones_enabled?: boolean;
     push_friend_milestones_enabled?: boolean;
+    email_event_messages_enabled?: boolean;
+    push_event_messages_enabled?: boolean;
+    email_suggested_events_enabled?: boolean;
+    push_suggested_events_enabled?: boolean;
+    digest_email_enabled?: boolean;
     /** Legacy four-flag aliases returned for one release so older
      *  clients keep working. Derived from the six new flags on the
      *  server (see PHASE_G_NOTIFICATION_GATING.md §G.9). */
@@ -871,6 +902,10 @@ export interface NotificationPreferences {
     push_friend_reviews_enabled: boolean;
     email_friend_milestones_enabled: boolean;
     push_friend_milestones_enabled: boolean;
+    email_event_messages_enabled: boolean;
+    push_event_messages_enabled: boolean;
+    email_suggested_events_enabled: boolean;
+    push_suggested_events_enabled: boolean;
     /** Legacy mirror kept for one release. */
     reminder_email_enabled: boolean;
     activity_email_enabled: boolean;
@@ -899,6 +934,12 @@ export interface UpdateNotificationPreferencesPayload {
     push_friend_reviews_enabled?: boolean;
     email_friend_milestones_enabled?: boolean;
     push_friend_milestones_enabled?: boolean;
+    email_event_messages_enabled?: boolean;
+    push_event_messages_enabled?: boolean;
+    email_suggested_events_enabled?: boolean;
+    push_suggested_events_enabled?: boolean;
+    /** Master opt-out for the combined activity digest email (v2). */
+    digest_email_enabled?: boolean;
     /** Legacy aliases accepted for one release — server writes through
      *  to the corresponding new flags. */
     reminder_email_enabled?: boolean;
@@ -1723,7 +1764,10 @@ export type NotificationKind =
     | 'event_reminder'
     | 'event_review_prompt'
     | 'interest_event'
-    | 'milestone_unlocked';
+    | 'milestone_unlocked'
+    | 'event_message'
+    | 'event_message_reply'
+    | 'event_message_reported';
 
 export interface NotificationActor {
     handle: string;
@@ -1746,6 +1790,9 @@ export interface NotificationItem {
      *  for `interest_event` rows (comma-joined when multiple profiles
      *  matched). Null for kinds that don't use it. */
     context: string | null;
+    /** Optional narrative field for kinds that benefit from additional context.
+     *  Used in milestone notifications to show the milestone description. */
+    description?: string | null;
     /** Milestone key for `milestone_unlocked` rows (links to the passport).
      *  Null for kinds that don't use it. */
     subject_key?: string | null;
@@ -3611,6 +3658,23 @@ export async function fetchRatingAggregates(eventIds: string[]): Promise<EventRa
     return parseJsonResponse<EventRatingAggregate[]>(res, 'Failed to fetch rating aggregates');
 }
 
+export interface EventMessageCount {
+    event_id: string;
+    count: number;
+}
+
+export async function fetchEventMessageCounts(eventIds: string[]): Promise<EventMessageCount[]> {
+    if (!eventIds.length) return [];
+    const res = await fetch(`${BASE}/events/messages/counts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event_ids: eventIds }),
+        credentials: 'include',
+    });
+    if (!res.ok) return [];
+    return parseJsonResponse<EventMessageCount[]>(res, 'Failed to fetch message counts');
+}
+
 /** Cross-edition rating roll-up for the resolved series this event belongs to,
  * or ``null`` when the event isn't part of a resolved series (or the caller
  * isn't signed in). */
@@ -3685,6 +3749,115 @@ export async function fetchFollowingReviews(
     return parseJsonResponse<EventReviewsList>(res, 'Failed to fetch following reviews');
 }
 
+// ─────────────────────────── Event messages (Q&A board) ───────────────────
+
+export type EventMessageCategory = 'question' | 'accommodation' | 'ride' | 'tickets' | 'meetup' | 'lost_found' | 'other';
+
+export interface EventMessageAuthor {
+    handle: string;
+    display_name: string;
+    avatar_url: string | null;
+    is_verified_organizer: boolean;
+}
+
+export interface EventMessage {
+    id: string;
+    event_id: string;
+    parent_id: string | null;
+    category: EventMessageCategory;
+    body: string;
+    author: EventMessageAuthor | null;
+    is_own: boolean;
+    can_delete: boolean;
+    reply_count: number;
+    replies: EventMessage[];
+    // When this message replies to another reply (not the top-level post),
+    // ``reply_to`` carries the addressed author so the UI can show an
+    // "@name" prefix in the flattened thread. ``null`` for top-level posts
+    // and direct replies to the top-level post.
+    reply_to?: EventMessageAuthor | null;
+    created_at: string;
+}
+
+export interface EventMessagesList {
+    items: EventMessage[];
+    total: number;
+    // Whether the signed-in viewer muted message notifications for this event.
+    muted?: boolean;
+}
+
+export async function fetchEventMessages(
+    eventId: string,
+    opts?: { category?: EventMessageCategory; limit?: number; offset?: number },
+): Promise<EventMessagesList> {
+    const sp = new URLSearchParams();
+    if (opts?.category) sp.set('category', opts.category);
+    if (opts?.limit != null) sp.set('limit', String(opts.limit));
+    if (opts?.offset != null) sp.set('offset', String(opts.offset));
+    const qs = sp.toString();
+    const res = await fetch(
+        `${BASE}/events/${encodeURIComponent(eventId)}/messages${qs ? `?${qs}` : ''}`,
+        { credentials: 'include' },
+    );
+    return parseJsonResponse<EventMessagesList>(res, 'Failed to fetch messages');
+}
+
+export async function postEventMessage(
+    eventId: string,
+    payload: { category: EventMessageCategory; body: string; parentId?: string },
+): Promise<EventMessage> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+            category: payload.category,
+            body: payload.body,
+            parent_id: payload.parentId ?? null,
+        }),
+    });
+    return parseJsonResponse<EventMessage>(res, 'Failed to post message');
+}
+
+export async function deleteEventMessage(eventId: string, messageId: string): Promise<void> {
+    const res = await fetch(
+        `${BASE}/events/${encodeURIComponent(eventId)}/messages/${encodeURIComponent(messageId)}`,
+        { method: 'DELETE', credentials: 'include' },
+    );
+    if (!res.ok && res.status !== 204) {
+        throw new Error('Failed to delete message');
+    }
+}
+
+export async function reportEventMessage(
+    eventId: string,
+    messageId: string,
+    reason?: string,
+): Promise<void> {
+    const res = await fetch(
+        `${BASE}/events/${encodeURIComponent(eventId)}/messages/${encodeURIComponent(messageId)}/report`,
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ reason: reason ?? null }),
+        },
+    );
+    if (!res.ok && res.status !== 204) {
+        throw new Error('Failed to report message');
+    }
+}
+
+export async function muteEventMessages(eventId: string, muted: boolean): Promise<void> {
+    const res = await fetch(`${BASE}/events/${encodeURIComponent(eventId)}/mute`, {
+        method: muted ? 'PUT' : 'DELETE',
+        credentials: 'include',
+    });
+    if (!res.ok && res.status !== 204) {
+        throw new Error('Failed to update mute setting');
+    }
+}
+
 export async function fetchMyRatings(): Promise<MyRating[]> {
     const res = await fetch(`${BASE}/users/me/ratings`, { credentials: 'include' });
     return parseJsonResponse<MyRating[]>(res, 'Failed to fetch my ratings');
@@ -3719,12 +3892,15 @@ export async function fetchPassportTimeline(
     return parseJsonResponse<PassportTimelineResponse>(res, 'Failed to fetch passport timeline');
 }
 
-export async function ackPassportMilestones(keys: string[]): Promise<{ acknowledged: number }> {
+export async function ackPassportMilestones(
+    keys: string[],
+    consistency: string[] = [],
+): Promise<{ acknowledged: number }> {
     const res = await fetch(`${BASE}/passport/milestones/ack`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ keys }),
+        body: JSON.stringify({ keys, consistency }),
     });
     return parseJsonResponse<{ acknowledged: number }>(res, 'Failed to acknowledge milestones');
 }
@@ -3946,6 +4122,24 @@ export async function searchEvents(
         credentials: 'include',
     });
     return parseJsonResponse<EventSearchResult[]>(res, 'Failed to search events');
+}
+
+export interface PopularCity {
+    city: string;
+    country: string | null;
+    count: number;
+    lat: number;
+    lng: number;
+}
+
+/** Cities with the most upcoming events — used to render quick-pick pills on
+ * the onboarding local-area step so users can center the map without typing. */
+export async function fetchPopularCities(limit = 8): Promise<PopularCity[]> {
+    const res = await fetch(`${BASE}/events/popular-cities?limit=${limit}`, {
+        credentials: 'include',
+    });
+    if (!res.ok) return [];
+    return parseJsonResponse<PopularCity[]>(res, 'Failed to load popular cities');
 }
 
 export async function fetchMyOrganizerClaims(

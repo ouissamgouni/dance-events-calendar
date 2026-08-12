@@ -1,0 +1,2234 @@
+# Upcoming, geocoded events for the onboarding wizard preview surfaces.
+#
+# Two features read these rows:
+#   1. Step 3 "Here's what you'll see" — the live preview keyed on the picked
+#      dance styles + reach + the chosen map AREA, using the same GET /events
+#      Explorer query. Because it is area-aware, a narrow area far from any
+#      seeded venue naturally yields the empty state ("turn on alerts").
+#   2. Local step "popular cities" pills — GET /api/events/popular-cities
+#      aggregates these by (city, country). Paris has the most upcoming
+#      events, so it ranks first.
+#
+# Coverage: all four dance styles (salsa, bachata, kizomba, zouk), six
+# continents, a mix of local/regional/international reach, and dates spread
+# across ~18 weeks so the timeline never looks bunched.
+#
+# `base_week: 0` anchors relative dates to the current week's Monday; `wN`
+# offsets are weeks into the future so every row is upcoming.
+base_week: 0
+events:
+  # --- Europe ---------------------------------------------------------------
+  - id: onb-paris-salsa-1
+    calendar_id: salsa-cal-001
+    title: Friday Salsa Social – Paris
+    description: Weekly salsa cubana social with a live warm-up class.
+    location: Le Balajo, 9 Rue de Lappe, 75011 Paris, France
+    latitude: 48.8533
+    longitude: 2.3716
+    city: Paris
+    country: France
+    country_code: FR
+    start: w1 Fri 21:00
+    end: w1 Sat 02:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: onb-paris-bachata-1
+    calendar_id: salsa-cal-001
+    title: Bachata Sensual Night – Paris
+    description: Sensual bachata all night across two floors.
+    location: Cabaret Sauvage, Paris, France
+    latitude: 48.8935
+    longitude: 2.3899
+    city: Paris
+    country: France
+    country_code: FR
+    start: w2 Sat 20:30
+    end: w2 Sun 01:30
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local
+
+  - id: onb-paris-salsa-2
+    calendar_id: salsa-cal-001
+    title: Salsa Workshop Weekend – Paris
+    description: Two-day salsa workshop for all levels.
+    location: Studio Harmonic, Paris, France
+    latitude: 48.8551
+    longitude: 2.3690
+    city: Paris
+    country: France
+    country_code: FR
+    start: w4 Sat 14:00
+    end: w4 Sun 18:00
+    tags:
+      - format:workshop
+      - dance-style:salsa
+      - reach:regional
+
+  - id: onb-paris-zouk-1
+    calendar_id: salsa-cal-001
+    title: Brazilian Zouk Lab – Paris
+    description: Zouk connection lab and social with guest DJs.
+    location: La Bellevilloise, Paris, France
+    latitude: 48.8676
+    longitude: 2.3853
+    city: Paris
+    country: France
+    country_code: FR
+    start: w7 Fri 20:30
+    end: w7 Sat 01:00
+    tags:
+      - format:social
+      - dance-style:zouk
+      - reach:local
+
+  - id: onb-berlin-bachata-1
+    calendar_id: salsa-cal-001
+    title: Berlin Bachata Vibes
+    description: Berlin's monthly bachata gathering — sensual & moderna rooms.
+    location: Astra Kulturhaus, Berlin, Germany
+    latitude: 52.5075
+    longitude: 13.4531
+    city: Berlin
+    country: Germany
+    country_code: DE
+    start: w2 Fri 20:00
+    end: w2 Sat 01:00
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local
+
+  - id: onb-berlin-kizomba-1
+    calendar_id: salsa-cal-001
+    title: Kizomba Night – Berlin
+    description: Kizomba and semba social with a beginner taster.
+    location: Sova Studios, Berlin, Germany
+    latitude: 52.5219
+    longitude: 13.4132
+    city: Berlin
+    country: Germany
+    country_code: DE
+    start: w6 Sat 21:00
+    end: w6 Sun 02:00
+    tags:
+      - format:social
+      - dance-style:kizomba
+      - reach:regional
+
+  - id: onb-london-kizomba-1
+    calendar_id: salsa-cal-001
+    title: Kizomba Fuego – London
+    description: Two floors of kizomba & semba in Soho.
+    location: Bar Salsa, 96 Charing Cross Rd, London, UK
+    latitude: 51.5142
+    longitude: -0.1300
+    city: London
+    country: United Kingdom
+    country_code: GB
+    start: w3 Sat 21:00
+    end: w3 Sun 03:00
+    tags:
+      - format:social
+      - dance-style:kizomba
+      - reach:local
+
+  - id: onb-london-salsa-1
+    calendar_id: salsa-cal-001
+    title: London Salsa Congress
+    description: Three-day international salsa congress with world-class artists.
+    location: Hilton London Metropole, London, UK
+    latitude: 51.5203
+    longitude: -0.1637
+    city: London
+    country: United Kingdom
+    country_code: GB
+    start: w9 Fri 18:00
+    end: w9 Sun 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: onb-lisbon-salsa-1
+    calendar_id: salsa-cal-001
+    title: Lisbon Salsa Festival
+    description: International salsa & kizomba festival by the river.
+    location: Marina de Oeiras, Lisbon, Portugal
+    latitude: 38.6866
+    longitude: -9.2436
+    city: Lisbon
+    country: Portugal
+    country_code: PT
+    start: w5 Fri 18:00
+    end: w5 Sun 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - dance-style:kizomba
+      - reach:international
+
+  - id: onb-madrid-bachata-1
+    calendar_id: salsa-cal-001
+    title: Bachata Madrid Sensual
+    description: Sensual bachata social with two guest instructors.
+    location: Sala Barco, Madrid, Spain
+    latitude: 40.4240
+    longitude: -3.7020
+    city: Madrid
+    country: Spain
+    country_code: ES
+    start: w3 Sat 22:00
+    end: w3 Sun 03:00
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local
+
+  - id: onb-rome-salsa-1
+    calendar_id: salsa-cal-001
+    title: Salsa sotto le Stelle – Rome
+    description: Open-air salsa and bachata social under the summer sky.
+    location: Villaggio Globale, Rome, Italy
+    latitude: 41.8790
+    longitude: 12.4732
+    city: Rome
+    country: Italy
+    country_code: IT
+    start: w8 Sat 21:00
+    end: w8 Sun 02:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:regional
+
+  - id: onb-amsterdam-kizomba-1
+    calendar_id: salsa-cal-001
+    title: Amsterdam Kizomba Friday
+    description: Kizomba, semba and tarraxa in a canal-side venue.
+    location: Panama, Amsterdam, Netherlands
+    latitude: 52.3731
+    longitude: 4.9270
+    city: Amsterdam
+    country: Netherlands
+    country_code: NL
+    start: w4 Fri 20:00
+    end: w4 Sat 01:00
+    tags:
+      - format:social
+      - dance-style:kizomba
+      - reach:local
+
+  - id: onb-warsaw-zouk-1
+    calendar_id: salsa-cal-001
+    title: Warsaw Zouk Weekend
+    description: Brazilian zouk workshops and socials across a weekend.
+    location: Studio Rytm, Warsaw, Poland
+    latitude: 52.2319
+    longitude: 21.0067
+    city: Warsaw
+    country: Poland
+    country_code: PL
+    start: w10 Sat 15:00
+    end: w10 Sun 23:00
+    tags:
+      - format:workshop
+      - dance-style:zouk
+      - reach:regional
+
+  # --- North America --------------------------------------------------------
+  - id: onb-nyc-salsa-1
+    calendar_id: salsa-cal-001
+    title: NYC Salsa on 2 Social
+    description: Classic mambo social with a live band set.
+    location: Stepping Out Studios, New York, USA
+    latitude: 40.7462
+    longitude: -73.9880
+    city: New York
+    country: United States
+    country_code: US
+    start: w2 Thu 20:00
+    end: w2 Fri 00:30
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: onb-nyc-bachata-1
+    calendar_id: salsa-cal-001
+    title: New York Bachata Festival
+    description: International bachata festival with parties and bootcamps.
+    location: NY Marriott Marquis, New York, USA
+    latitude: 40.7590
+    longitude: -73.9845
+    city: New York
+    country: United States
+    country_code: US
+    start: w11 Fri 18:00
+    end: w11 Sun 23:00
+    tags:
+      - format:festival
+      - dance-style:bachata
+      - reach:international
+
+  - id: onb-la-bachata-1
+    calendar_id: salsa-cal-001
+    title: LA Bachata Nights
+    description: Sensual bachata social by the beach.
+    location: Granada LA, Los Angeles, USA
+    latitude: 34.0219
+    longitude: -118.3965
+    city: Los Angeles
+    country: United States
+    country_code: US
+    start: w5 Sat 21:00
+    end: w5 Sun 02:00
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local
+
+  - id: onb-toronto-kizomba-1
+    calendar_id: salsa-cal-001
+    title: Toronto Kizomba Friday
+    description: Kizomba and urban kiz social with a warm-up class.
+    location: Lula Lounge, Toronto, Canada
+    latitude: 43.6449
+    longitude: -79.4266
+    city: Toronto
+    country: Canada
+    country_code: CA
+    start: w6 Fri 21:00
+    end: w6 Sat 02:00
+    tags:
+      - format:social
+      - dance-style:kizomba
+      - reach:regional
+
+  - id: onb-mexico-salsa-1
+    calendar_id: salsa-cal-001
+    title: Salsa en la Roma – CDMX
+    description: Salsa and cumbia social night in Colonia Roma.
+    location: Mama Rumba, Mexico City, Mexico
+    latitude: 19.4141
+    longitude: -99.1631
+    city: Mexico City
+    country: Mexico
+    country_code: MX
+    start: w7 Sat 21:00
+    end: w7 Sun 02:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  # --- South America --------------------------------------------------------
+  - id: onb-cali-salsa-1
+    calendar_id: salsa-cal-001
+    title: Cali Salsa Festival
+    description: Salsa caleña festival — the world capital of salsa.
+    location: Plaza de Toros, Cali, Colombia
+    latitude: 3.4206
+    longitude: -76.5410
+    city: Cali
+    country: Colombia
+    country_code: CO
+    start: w12 Fri 18:00
+    end: w12 Sun 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: onb-buenosaires-zouk-1
+    calendar_id: salsa-cal-001
+    title: Zouk Buenos Aires
+    description: Brazilian zouk social with visiting DJs.
+    location: La Viruta, Buenos Aires, Argentina
+    latitude: -34.5895
+    longitude: -58.4235
+    city: Buenos Aires
+    country: Argentina
+    country_code: AR
+    start: w8 Sat 22:00
+    end: w8 Sun 03:00
+    tags:
+      - format:social
+      - dance-style:zouk
+      - reach:regional
+
+  - id: onb-saopaulo-zouk-1
+    calendar_id: salsa-cal-001
+    title: São Paulo Zouk Congress
+    description: The original Brazilian zouk congress with workshops and shows.
+    location: Clube Homs, São Paulo, Brazil
+    latitude: -23.5636
+    longitude: -46.6528
+    city: São Paulo
+    country: Brazil
+    country_code: BR
+    start: w13 Fri 18:00
+    end: w13 Sun 23:00
+    tags:
+      - format:festival
+      - dance-style:zouk
+      - reach:international
+
+  # --- Asia & Middle East ---------------------------------------------------
+  - id: onb-tokyo-salsa-1
+    calendar_id: salsa-cal-001
+    title: Tokyo Salsa Social
+    description: Salsa on 1 social with a live percussion set.
+    location: Salsa Sudada, Tokyo, Japan
+    latitude: 35.6595
+    longitude: 139.7005
+    city: Tokyo
+    country: Japan
+    country_code: JP
+    start: w9 Sat 20:00
+    end: w9 Sun 00:30
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: onb-singapore-bachata-1
+    calendar_id: salsa-cal-001
+    title: Singapore Bachata Social
+    description: Sensual bachata social with a rooftop view.
+    location: CÉ LA VI, Singapore
+    latitude: 1.2847
+    longitude: 103.8610
+    city: Singapore
+    country: Singapore
+    country_code: SG
+    start: w10 Fri 21:00
+    end: w10 Sat 01:30
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:regional
+
+  - id: onb-bangkok-zouk-1
+    calendar_id: salsa-cal-001
+    title: Bangkok Zouk Night
+    description: Brazilian zouk social with a beginners' warm-up.
+    location: The Iron Fairies, Bangkok, Thailand
+    latitude: 13.7315
+    longitude: 100.5697
+    city: Bangkok
+    country: Thailand
+    country_code: TH
+    start: w14 Sat 21:00
+    end: w14 Sun 01:30
+    tags:
+      - format:social
+      - dance-style:zouk
+      - reach:regional
+
+  - id: onb-dubai-kizomba-1
+    calendar_id: salsa-cal-001
+    title: Dubai Kizomba Festival
+    description: International kizomba festival with desert socials.
+    location: Zabeel Hall, Dubai, UAE
+    latitude: 25.2285
+    longitude: 55.3273
+    city: Dubai
+    country: United Arab Emirates
+    country_code: AE
+    start: w15 Fri 18:00
+    end: w15 Sun 23:00
+    tags:
+      - format:festival
+      - dance-style:kizomba
+      - reach:international
+
+  # --- Oceania & Africa -----------------------------------------------------
+  - id: onb-sydney-bachata-1
+    calendar_id: salsa-cal-001
+    title: Sydney Bachata Social
+    description: Sensual and dominican bachata by the harbour.
+    location: The Argyle, Sydney, Australia
+    latitude: -33.8599
+    longitude: 151.2090
+    city: Sydney
+    country: Australia
+    country_code: AU
+    start: w11 Sat 20:00
+    end: w11 Sun 01:00
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local
+
+  - id: onb-capetown-kizomba-1
+    calendar_id: salsa-cal-001
+    title: Cape Town Kizomba Social
+    description: Kizomba and semba social overlooking Table Mountain.
+    location: The Waiting Room, Cape Town, South Africa
+    latitude: -33.9270
+    longitude: 18.4218
+    city: Cape Town
+    country: South Africa
+    country_code: ZA
+    start: w16 Sat 21:00
+    end: w16 Sun 02:00
+    tags:
+      - format:social
+      - dance-style:kizomba
+      - reach:regional
+
+  - id: onb-marrakech-salsa-1
+    calendar_id: salsa-cal-001
+    title: Marrakech Salsa Congress
+    description: International salsa & bachata congress in a riad resort.
+    location: Palais des Congrès, Marrakech, Morocco
+    latitude: 31.6225
+    longitude: -8.0116
+    city: Marrakech
+    country: Morocco
+    country_code: MA
+    start: w18 Fri 18:00
+    end: w18 Sun 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:international
+  # === BEGIN generated worldwide events (gen_onboarding_events.py) ===
+
+  - id: onb-gen-000-paris
+    calendar_id: salsa-cal-001
+    title: Salsa Social – Paris
+    description: Salsa social in Paris (local scale).
+    location: Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    city: Paris
+    country: France
+    country_code: FR
+    start: w1 Thu 20:00
+    end: w1 Fri 01:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: onb-gen-001-paris
+    calendar_id: salsa-cal-001
+    title: Bachata Social – Paris
+    description: Bachata social in Paris (local scale).
+    location: Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    city: Paris
+    country: France
+    country_code: FR
+    start: w8 Fri 20:00
+    end: w8 Sat 01:00
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local
+
+  - id: onb-gen-002-london
+    calendar_id: salsa-cal-001
+    title: Kizomba Social – London
+    description: Kizomba social in London (regional scale).
+    location: London, United Kingdom
+    latitude: 51.5074
+    longitude: -0.1278
+    city: London
+    country: United Kingdom
+    country_code: GB
+    start: w15 Sat 20:00
+    end: w15 Sun 01:00
+    tags:
+      - format:social
+      - dance-style:kizomba
+      - reach:regional
+
+  - id: onb-gen-003-london
+    calendar_id: salsa-cal-001
+    title: Zouk Workshop – London
+    description: Zouk workshop in London (regional scale).
+    location: London, United Kingdom
+    latitude: 51.5074
+    longitude: -0.1278
+    city: London
+    country: United Kingdom
+    country_code: GB
+    start: w22 Sun 14:00
+    end: w22 Sun 18:00
+    tags:
+      - format:workshop
+      - dance-style:zouk
+      - reach:regional
+
+  - id: onb-gen-004-madrid
+    calendar_id: salsa-cal-001
+    title: Mambo Workshop – Madrid
+    description: Mambo workshop in Madrid (international scale).
+    location: Madrid, Spain
+    latitude: 40.4168
+    longitude: -3.7038
+    city: Madrid
+    country: Spain
+    country_code: ES
+    start: w29 Thu 14:00
+    end: w29 Thu 18:00
+    tags:
+      - format:workshop
+      - dance-style:mambo
+      - reach:international
+
+  - id: onb-gen-005-madrid
+    calendar_id: salsa-cal-001
+    title: Salsa & Bachata Workshop – Madrid
+    description: Salsa & Bachata workshop in Madrid (international scale).
+    location: Madrid, Spain
+    latitude: 40.4168
+    longitude: -3.7038
+    city: Madrid
+    country: Spain
+    country_code: ES
+    start: w36 Fri 14:00
+    end: w36 Fri 18:00
+    tags:
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:international
+
+  - id: onb-gen-006-barcelona
+    calendar_id: salsa-cal-001
+    title: Salsa, Bachata & Kizomba Festival – Barcelona
+    description: Salsa, Bachata & Kizomba festival in Barcelona (local scale).
+    location: Barcelona, Spain
+    latitude: 41.3874
+    longitude: 2.1686
+    city: Barcelona
+    country: Spain
+    country_code: ES
+    start: w43 Sat 18:00
+    end: w43 Sat 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:local
+
+  - id: onb-gen-007-barcelona
+    calendar_id: salsa-cal-001
+    title: Salsa & Mambo Festival – Barcelona
+    description: Salsa & Mambo festival in Barcelona (local scale).
+    location: Barcelona, Spain
+    latitude: 41.3874
+    longitude: 2.1686
+    city: Barcelona
+    country: Spain
+    country_code: ES
+    start: w50 Sun 18:00
+    end: w50 Sun 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - dance-style:mambo
+      - reach:local
+
+  - id: onb-gen-008-rome
+    calendar_id: salsa-cal-001
+    title: Salsa Festival – Rome
+    description: Salsa festival in Rome (regional scale).
+    location: Rome, Italy
+    latitude: 41.9028
+    longitude: 12.4964
+    city: Rome
+    country: Italy
+    country_code: IT
+    start: w6 Thu 18:00
+    end: w6 Thu 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:regional
+
+  - id: onb-gen-009-rome
+    calendar_id: salsa-cal-001
+    title: Bachata Social – Rome
+    description: Bachata social in Rome (regional scale).
+    location: Rome, Italy
+    latitude: 41.9028
+    longitude: 12.4964
+    city: Rome
+    country: Italy
+    country_code: IT
+    start: w13 Fri 20:00
+    end: w13 Sat 01:00
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:regional
+
+  - id: onb-gen-010-milan
+    calendar_id: salsa-cal-001
+    title: Kizomba Social – Milan
+    description: Kizomba social in Milan (international scale).
+    location: Milan, Italy
+    latitude: 45.4642
+    longitude: 9.19
+    city: Milan
+    country: Italy
+    country_code: IT
+    start: w20 Sat 20:00
+    end: w20 Sun 01:00
+    tags:
+      - format:social
+      - dance-style:kizomba
+      - reach:international
+
+  - id: onb-gen-011-milan
+    calendar_id: salsa-cal-001
+    title: Zouk Social – Milan
+    description: Zouk social in Milan (international scale).
+    location: Milan, Italy
+    latitude: 45.4642
+    longitude: 9.19
+    city: Milan
+    country: Italy
+    country_code: IT
+    start: w27 Sun 20:00
+    end: w27 Mon 01:00
+    tags:
+      - format:social
+      - dance-style:zouk
+      - reach:international
+
+  - id: onb-gen-012-amsterdam
+    calendar_id: salsa-cal-001
+    title: Mambo Workshop – Amsterdam
+    description: Mambo workshop in Amsterdam (local scale).
+    location: Amsterdam, Netherlands
+    latitude: 52.3676
+    longitude: 4.9041
+    city: Amsterdam
+    country: Netherlands
+    country_code: NL
+    start: w34 Thu 14:00
+    end: w34 Thu 18:00
+    tags:
+      - format:workshop
+      - dance-style:mambo
+      - reach:local
+
+  - id: onb-gen-013-amsterdam
+    calendar_id: salsa-cal-001
+    title: Salsa & Bachata Workshop – Amsterdam
+    description: Salsa & Bachata workshop in Amsterdam (local scale).
+    location: Amsterdam, Netherlands
+    latitude: 52.3676
+    longitude: 4.9041
+    city: Amsterdam
+    country: Netherlands
+    country_code: NL
+    start: w41 Fri 14:00
+    end: w41 Fri 18:00
+    tags:
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:local
+
+  - id: onb-gen-014-lisbon
+    calendar_id: salsa-cal-001
+    title: Salsa, Bachata & Kizomba Workshop – Lisbon
+    description: Salsa, Bachata & Kizomba workshop in Lisbon (regional scale).
+    location: Lisbon, Portugal
+    latitude: 38.7223
+    longitude: -9.1393
+    city: Lisbon
+    country: Portugal
+    country_code: PT
+    start: w48 Sat 14:00
+    end: w48 Sat 18:00
+    tags:
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:regional
+
+  - id: onb-gen-015-lisbon
+    calendar_id: salsa-cal-001
+    title: Salsa & Mambo Festival – Lisbon
+    description: Salsa & Mambo festival in Lisbon (regional scale).
+    location: Lisbon, Portugal
+    latitude: 38.7223
+    longitude: -9.1393
+    city: Lisbon
+    country: Portugal
+    country_code: PT
+    start: w4 Sun 18:00
+    end: w4 Sun 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - dance-style:mambo
+      - reach:regional
+
+  - id: onb-gen-016-warsaw
+    calendar_id: salsa-cal-001
+    title: Salsa Festival – Warsaw
+    description: Salsa festival in Warsaw (international scale).
+    location: Warsaw, Poland
+    latitude: 52.2297
+    longitude: 21.0122
+    city: Warsaw
+    country: Poland
+    country_code: PL
+    start: w11 Thu 18:00
+    end: w11 Thu 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: onb-gen-017-warsaw
+    calendar_id: salsa-cal-001
+    title: Bachata Festival – Warsaw
+    description: Bachata festival in Warsaw (international scale).
+    location: Warsaw, Poland
+    latitude: 52.2297
+    longitude: 21.0122
+    city: Warsaw
+    country: Poland
+    country_code: PL
+    start: w18 Fri 18:00
+    end: w18 Fri 23:00
+    tags:
+      - format:festival
+      - dance-style:bachata
+      - reach:international
+
+  - id: onb-gen-018-zurich
+    calendar_id: salsa-cal-001
+    title: Kizomba Social – Zurich
+    description: Kizomba social in Zurich (local scale).
+    location: Zurich, Switzerland
+    latitude: 47.3769
+    longitude: 8.5417
+    city: Zurich
+    country: Switzerland
+    country_code: CH
+    start: w25 Sat 20:00
+    end: w25 Sun 01:00
+    tags:
+      - format:social
+      - dance-style:kizomba
+      - reach:local
+
+  - id: onb-gen-019-zurich
+    calendar_id: salsa-cal-001
+    title: Zouk Social – Zurich
+    description: Zouk social in Zurich (local scale).
+    location: Zurich, Switzerland
+    latitude: 47.3769
+    longitude: 8.5417
+    city: Zurich
+    country: Switzerland
+    country_code: CH
+    start: w32 Sun 20:00
+    end: w32 Mon 01:00
+    tags:
+      - format:social
+      - dance-style:zouk
+      - reach:local
+
+  - id: onb-gen-020-prague
+    calendar_id: salsa-cal-001
+    title: Mambo Social – Prague
+    description: Mambo social in Prague (regional scale).
+    location: Prague, Czechia
+    latitude: 50.0755
+    longitude: 14.4378
+    city: Prague
+    country: Czechia
+    country_code: CZ
+    start: w39 Thu 20:00
+    end: w39 Fri 01:00
+    tags:
+      - format:social
+      - dance-style:mambo
+      - reach:regional
+
+  - id: onb-gen-021-prague
+    calendar_id: salsa-cal-001
+    title: Salsa & Bachata Workshop – Prague
+    description: Salsa & Bachata workshop in Prague (regional scale).
+    location: Prague, Czechia
+    latitude: 50.0755
+    longitude: 14.4378
+    city: Prague
+    country: Czechia
+    country_code: CZ
+    start: w46 Fri 14:00
+    end: w46 Fri 18:00
+    tags:
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:regional
+
+  - id: onb-gen-022-istanbul
+    calendar_id: salsa-cal-001
+    title: Salsa, Bachata & Kizomba Workshop – Istanbul
+    description: Salsa, Bachata & Kizomba workshop in Istanbul (international scale).
+    location: Istanbul, Turkiye
+    latitude: 41.0082
+    longitude: 28.9784
+    city: Istanbul
+    country: Turkiye
+    country_code: TR
+    start: w2 Sat 14:00
+    end: w2 Sat 18:00
+    tags:
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+
+  - id: onb-gen-023-istanbul
+    calendar_id: salsa-cal-001
+    title: Salsa & Mambo Workshop – Istanbul
+    description: Salsa & Mambo workshop in Istanbul (international scale).
+    location: Istanbul, Turkiye
+    latitude: 41.0082
+    longitude: 28.9784
+    city: Istanbul
+    country: Turkiye
+    country_code: TR
+    start: w9 Sun 14:00
+    end: w9 Sun 18:00
+    tags:
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:mambo
+      - reach:international
+
+  - id: onb-gen-024-vienna
+    calendar_id: salsa-cal-001
+    title: Salsa Festival – Vienna
+    description: Salsa festival in Vienna (local scale).
+    location: Vienna, Austria
+    latitude: 48.2082
+    longitude: 16.3738
+    city: Vienna
+    country: Austria
+    country_code: AT
+    start: w16 Thu 18:00
+    end: w16 Thu 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:local
+
+  - id: onb-gen-025-vienna
+    calendar_id: salsa-cal-001
+    title: Bachata Festival – Vienna
+    description: Bachata festival in Vienna (local scale).
+    location: Vienna, Austria
+    latitude: 48.2082
+    longitude: 16.3738
+    city: Vienna
+    country: Austria
+    country_code: AT
+    start: w23 Fri 18:00
+    end: w23 Fri 23:00
+    tags:
+      - format:festival
+      - dance-style:bachata
+      - reach:local
+
+  - id: onb-gen-026-stockholm
+    calendar_id: salsa-cal-001
+    title: Kizomba Festival – Stockholm
+    description: Kizomba festival in Stockholm (regional scale).
+    location: Stockholm, Sweden
+    latitude: 59.3293
+    longitude: 18.0686
+    city: Stockholm
+    country: Sweden
+    country_code: SE
+    start: w30 Sat 18:00
+    end: w30 Sat 23:00
+    tags:
+      - format:festival
+      - dance-style:kizomba
+      - reach:regional
+
+  - id: onb-gen-027-stockholm
+    calendar_id: salsa-cal-001
+    title: Zouk Social – Stockholm
+    description: Zouk social in Stockholm (regional scale).
+    location: Stockholm, Sweden
+    latitude: 59.3293
+    longitude: 18.0686
+    city: Stockholm
+    country: Sweden
+    country_code: SE
+    start: w37 Sun 20:00
+    end: w37 Mon 01:00
+    tags:
+      - format:social
+      - dance-style:zouk
+      - reach:regional
+
+  - id: onb-gen-028-berlin
+    calendar_id: salsa-cal-001
+    title: Mambo Social – Berlin
+    description: Mambo social in Berlin (international scale).
+    location: Berlin, Germany
+    latitude: 52.52
+    longitude: 13.405
+    city: Berlin
+    country: Germany
+    country_code: DE
+    start: w44 Thu 20:00
+    end: w44 Fri 01:00
+    tags:
+      - format:social
+      - dance-style:mambo
+      - reach:international
+
+  - id: onb-gen-029-berlin
+    calendar_id: salsa-cal-001
+    title: Salsa & Bachata Social – Berlin
+    description: Salsa & Bachata social in Berlin (international scale).
+    location: Berlin, Germany
+    latitude: 52.52
+    longitude: 13.405
+    city: Berlin
+    country: Germany
+    country_code: DE
+    start: w51 Fri 20:00
+    end: w51 Sat 01:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:international
+
+  - id: onb-gen-030-new-york
+    calendar_id: salsa-cal-001
+    title: Salsa, Bachata & Kizomba Workshop – New York
+    description: Salsa, Bachata & Kizomba workshop in New York (local scale).
+    location: New York, United States
+    latitude: 40.7128
+    longitude: -74.006
+    city: New York
+    country: United States
+    country_code: US
+    start: w7 Sat 14:00
+    end: w7 Sat 18:00
+    tags:
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:local
+
+  - id: onb-gen-031-new-york
+    calendar_id: salsa-cal-001
+    title: Salsa & Mambo Workshop – New York
+    description: Salsa & Mambo workshop in New York (local scale).
+    location: New York, United States
+    latitude: 40.7128
+    longitude: -74.006
+    city: New York
+    country: United States
+    country_code: US
+    start: w14 Sun 14:00
+    end: w14 Sun 18:00
+    tags:
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:mambo
+      - reach:local
+
+  - id: onb-gen-032-miami
+    calendar_id: salsa-cal-001
+    title: Salsa Workshop – Miami
+    description: Salsa workshop in Miami (regional scale).
+    location: Miami, United States
+    latitude: 25.7617
+    longitude: -80.1918
+    city: Miami
+    country: United States
+    country_code: US
+    start: w21 Thu 14:00
+    end: w21 Thu 18:00
+    tags:
+      - format:workshop
+      - dance-style:salsa
+      - reach:regional
+
+  - id: onb-gen-033-miami
+    calendar_id: salsa-cal-001
+    title: Bachata Festival – Miami
+    description: Bachata festival in Miami (regional scale).
+    location: Miami, United States
+    latitude: 25.7617
+    longitude: -80.1918
+    city: Miami
+    country: United States
+    country_code: US
+    start: w28 Fri 18:00
+    end: w28 Fri 23:00
+    tags:
+      - format:festival
+      - dance-style:bachata
+      - reach:regional
+
+  - id: onb-gen-034-los-angeles
+    calendar_id: salsa-cal-001
+    title: Kizomba Festival – Los Angeles
+    description: Kizomba festival in Los Angeles (international scale).
+    location: Los Angeles, United States
+    latitude: 34.0522
+    longitude: -118.2437
+    city: Los Angeles
+    country: United States
+    country_code: US
+    start: w35 Sat 18:00
+    end: w35 Sat 23:00
+    tags:
+      - format:festival
+      - dance-style:kizomba
+      - reach:international
+
+  - id: onb-gen-035-los-angeles
+    calendar_id: salsa-cal-001
+    title: Zouk Festival – Los Angeles
+    description: Zouk festival in Los Angeles (international scale).
+    location: Los Angeles, United States
+    latitude: 34.0522
+    longitude: -118.2437
+    city: Los Angeles
+    country: United States
+    country_code: US
+    start: w42 Sun 18:00
+    end: w42 Sun 23:00
+    tags:
+      - format:festival
+      - dance-style:zouk
+      - reach:international
+
+  - id: onb-gen-036-chicago
+    calendar_id: salsa-cal-001
+    title: Mambo Social – Chicago
+    description: Mambo social in Chicago (local scale).
+    location: Chicago, United States
+    latitude: 41.8781
+    longitude: -87.6298
+    city: Chicago
+    country: United States
+    country_code: US
+    start: w49 Thu 20:00
+    end: w49 Fri 01:00
+    tags:
+      - format:social
+      - dance-style:mambo
+      - reach:local
+
+  - id: onb-gen-037-chicago
+    calendar_id: salsa-cal-001
+    title: Salsa & Bachata Social – Chicago
+    description: Salsa & Bachata social in Chicago (local scale).
+    location: Chicago, United States
+    latitude: 41.8781
+    longitude: -87.6298
+    city: Chicago
+    country: United States
+    country_code: US
+    start: w5 Fri 20:00
+    end: w5 Sat 01:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:local
+
+  - id: onb-gen-038-san-francisco
+    calendar_id: salsa-cal-001
+    title: Salsa, Bachata & Kizomba Social – San Francisco
+    description: Salsa, Bachata & Kizomba social in San Francisco (regional scale).
+    location: San Francisco, United States
+    latitude: 37.7749
+    longitude: -122.4194
+    city: San Francisco
+    country: United States
+    country_code: US
+    start: w12 Sat 20:00
+    end: w12 Sun 01:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:regional
+
+  - id: onb-gen-039-san-francisco
+    calendar_id: salsa-cal-001
+    title: Salsa & Mambo Workshop – San Francisco
+    description: Salsa & Mambo workshop in San Francisco (regional scale).
+    location: San Francisco, United States
+    latitude: 37.7749
+    longitude: -122.4194
+    city: San Francisco
+    country: United States
+    country_code: US
+    start: w19 Sun 14:00
+    end: w19 Sun 18:00
+    tags:
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:mambo
+      - reach:regional
+
+  - id: onb-gen-040-toronto
+    calendar_id: salsa-cal-001
+    title: Salsa Workshop – Toronto
+    description: Salsa workshop in Toronto (international scale).
+    location: Toronto, Canada
+    latitude: 43.6532
+    longitude: -79.3832
+    city: Toronto
+    country: Canada
+    country_code: CA
+    start: w26 Thu 14:00
+    end: w26 Thu 18:00
+    tags:
+      - format:workshop
+      - dance-style:salsa
+      - reach:international
+
+  - id: onb-gen-041-toronto
+    calendar_id: salsa-cal-001
+    title: Bachata Workshop – Toronto
+    description: Bachata workshop in Toronto (international scale).
+    location: Toronto, Canada
+    latitude: 43.6532
+    longitude: -79.3832
+    city: Toronto
+    country: Canada
+    country_code: CA
+    start: w33 Fri 14:00
+    end: w33 Fri 18:00
+    tags:
+      - format:workshop
+      - dance-style:bachata
+      - reach:international
+
+  - id: onb-gen-042-montreal
+    calendar_id: salsa-cal-001
+    title: Kizomba Festival – Montreal
+    description: Kizomba festival in Montreal (local scale).
+    location: Montreal, Canada
+    latitude: 45.5019
+    longitude: -73.5674
+    city: Montreal
+    country: Canada
+    country_code: CA
+    start: w40 Sat 18:00
+    end: w40 Sat 23:00
+    tags:
+      - format:festival
+      - dance-style:kizomba
+      - reach:local
+
+  - id: onb-gen-043-montreal
+    calendar_id: salsa-cal-001
+    title: Zouk Festival – Montreal
+    description: Zouk festival in Montreal (local scale).
+    location: Montreal, Canada
+    latitude: 45.5019
+    longitude: -73.5674
+    city: Montreal
+    country: Canada
+    country_code: CA
+    start: w47 Sun 18:00
+    end: w47 Sun 23:00
+    tags:
+      - format:festival
+      - dance-style:zouk
+      - reach:local
+
+  - id: onb-gen-044-mexico-city
+    calendar_id: salsa-cal-001
+    title: Mambo Festival – Mexico City
+    description: Mambo festival in Mexico City (regional scale).
+    location: Mexico City, Mexico
+    latitude: 19.4326
+    longitude: -99.1332
+    city: Mexico City
+    country: Mexico
+    country_code: MX
+    start: w3 Thu 18:00
+    end: w3 Thu 23:00
+    tags:
+      - format:festival
+      - dance-style:mambo
+      - reach:regional
+
+  - id: onb-gen-045-mexico-city
+    calendar_id: salsa-cal-001
+    title: Salsa & Bachata Social – Mexico City
+    description: Salsa & Bachata social in Mexico City (regional scale).
+    location: Mexico City, Mexico
+    latitude: 19.4326
+    longitude: -99.1332
+    city: Mexico City
+    country: Mexico
+    country_code: MX
+    start: w10 Fri 20:00
+    end: w10 Sat 01:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:regional
+
+  - id: onb-gen-046-havana
+    calendar_id: salsa-cal-001
+    title: Salsa, Bachata & Kizomba Social – Havana
+    description: Salsa, Bachata & Kizomba social in Havana (international scale).
+    location: Havana, Cuba
+    latitude: 23.1136
+    longitude: -82.3666
+    city: Havana
+    country: Cuba
+    country_code: CU
+    start: w17 Sat 20:00
+    end: w17 Sun 01:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+
+  - id: onb-gen-047-havana
+    calendar_id: salsa-cal-001
+    title: Salsa & Mambo Social – Havana
+    description: Salsa & Mambo social in Havana (international scale).
+    location: Havana, Cuba
+    latitude: 23.1136
+    longitude: -82.3666
+    city: Havana
+    country: Cuba
+    country_code: CU
+    start: w24 Sun 20:00
+    end: w24 Mon 01:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:mambo
+      - reach:international
+
+  - id: onb-gen-048-bogota
+    calendar_id: salsa-cal-001
+    title: Salsa Workshop – Bogota
+    description: Salsa workshop in Bogota (local scale).
+    location: Bogota, Colombia
+    latitude: 4.711
+    longitude: -74.0721
+    city: Bogota
+    country: Colombia
+    country_code: CO
+    start: w31 Thu 14:00
+    end: w31 Thu 18:00
+    tags:
+      - format:workshop
+      - dance-style:salsa
+      - reach:local
+
+  - id: onb-gen-049-bogota
+    calendar_id: salsa-cal-001
+    title: Bachata Workshop – Bogota
+    description: Bachata workshop in Bogota (local scale).
+    location: Bogota, Colombia
+    latitude: 4.711
+    longitude: -74.0721
+    city: Bogota
+    country: Colombia
+    country_code: CO
+    start: w38 Fri 14:00
+    end: w38 Fri 18:00
+    tags:
+      - format:workshop
+      - dance-style:bachata
+      - reach:local
+
+  - id: onb-gen-050-cali
+    calendar_id: salsa-cal-001
+    title: Kizomba Workshop – Cali
+    description: Kizomba workshop in Cali (regional scale).
+    location: Cali, Colombia
+    latitude: 3.4516
+    longitude: -76.532
+    city: Cali
+    country: Colombia
+    country_code: CO
+    start: w45 Sat 14:00
+    end: w45 Sat 18:00
+    tags:
+      - format:workshop
+      - dance-style:kizomba
+      - reach:regional
+
+  - id: onb-gen-051-cali
+    calendar_id: salsa-cal-001
+    title: Zouk Festival – Cali
+    description: Zouk festival in Cali (regional scale).
+    location: Cali, Colombia
+    latitude: 3.4516
+    longitude: -76.532
+    city: Cali
+    country: Colombia
+    country_code: CO
+    start: w1 Sun 18:00
+    end: w1 Sun 23:00
+    tags:
+      - format:festival
+      - dance-style:zouk
+      - reach:regional
+
+  - id: onb-gen-052-medellin
+    calendar_id: salsa-cal-001
+    title: Mambo Festival – Medellin
+    description: Mambo festival in Medellin (international scale).
+    location: Medellin, Colombia
+    latitude: 6.2442
+    longitude: -75.5812
+    city: Medellin
+    country: Colombia
+    country_code: CO
+    start: w8 Thu 18:00
+    end: w8 Thu 23:00
+    tags:
+      - format:festival
+      - dance-style:mambo
+      - reach:international
+
+  - id: onb-gen-053-medellin
+    calendar_id: salsa-cal-001
+    title: Salsa & Bachata Festival – Medellin
+    description: Salsa & Bachata festival in Medellin (international scale).
+    location: Medellin, Colombia
+    latitude: 6.2442
+    longitude: -75.5812
+    city: Medellin
+    country: Colombia
+    country_code: CO
+    start: w15 Fri 18:00
+    end: w15 Fri 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:international
+
+  - id: onb-gen-054-buenos-aires
+    calendar_id: salsa-cal-001
+    title: Salsa, Bachata & Kizomba Social – Buenos Aires
+    description: Salsa, Bachata & Kizomba social in Buenos Aires (local scale).
+    location: Buenos Aires, Argentina
+    latitude: -34.6037
+    longitude: -58.3816
+    city: Buenos Aires
+    country: Argentina
+    country_code: AR
+    start: w22 Sat 20:00
+    end: w22 Sun 01:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:local
+
+  - id: onb-gen-055-buenos-aires
+    calendar_id: salsa-cal-001
+    title: Salsa & Mambo Social – Buenos Aires
+    description: Salsa & Mambo social in Buenos Aires (local scale).
+    location: Buenos Aires, Argentina
+    latitude: -34.6037
+    longitude: -58.3816
+    city: Buenos Aires
+    country: Argentina
+    country_code: AR
+    start: w29 Sun 20:00
+    end: w29 Mon 01:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:mambo
+      - reach:local
+
+  - id: onb-gen-056-sao-paulo
+    calendar_id: salsa-cal-001
+    title: Salsa Social – Sao Paulo
+    description: Salsa social in Sao Paulo (regional scale).
+    location: Sao Paulo, Brazil
+    latitude: -23.5505
+    longitude: -46.6333
+    city: Sao Paulo
+    country: Brazil
+    country_code: BR
+    start: w36 Thu 20:00
+    end: w36 Fri 01:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:regional
+
+  - id: onb-gen-057-sao-paulo
+    calendar_id: salsa-cal-001
+    title: Bachata Workshop – Sao Paulo
+    description: Bachata workshop in Sao Paulo (regional scale).
+    location: Sao Paulo, Brazil
+    latitude: -23.5505
+    longitude: -46.6333
+    city: Sao Paulo
+    country: Brazil
+    country_code: BR
+    start: w43 Fri 14:00
+    end: w43 Fri 18:00
+    tags:
+      - format:workshop
+      - dance-style:bachata
+      - reach:regional
+
+  - id: onb-gen-058-rio-de-janeiro
+    calendar_id: salsa-cal-001
+    title: Kizomba Workshop – Rio de Janeiro
+    description: Kizomba workshop in Rio de Janeiro (international scale).
+    location: Rio de Janeiro, Brazil
+    latitude: -22.9068
+    longitude: -43.1729
+    city: Rio de Janeiro
+    country: Brazil
+    country_code: BR
+    start: w50 Sat 14:00
+    end: w50 Sat 18:00
+    tags:
+      - format:workshop
+      - dance-style:kizomba
+      - reach:international
+
+  - id: onb-gen-059-rio-de-janeiro
+    calendar_id: salsa-cal-001
+    title: Zouk Workshop – Rio de Janeiro
+    description: Zouk workshop in Rio de Janeiro (international scale).
+    location: Rio de Janeiro, Brazil
+    latitude: -22.9068
+    longitude: -43.1729
+    city: Rio de Janeiro
+    country: Brazil
+    country_code: BR
+    start: w6 Sun 14:00
+    end: w6 Sun 18:00
+    tags:
+      - format:workshop
+      - dance-style:zouk
+      - reach:international
+
+  - id: onb-gen-060-lima
+    calendar_id: salsa-cal-001
+    title: Mambo Festival – Lima
+    description: Mambo festival in Lima (local scale).
+    location: Lima, Peru
+    latitude: -12.0464
+    longitude: -77.0428
+    city: Lima
+    country: Peru
+    country_code: PE
+    start: w13 Thu 18:00
+    end: w13 Thu 23:00
+    tags:
+      - format:festival
+      - dance-style:mambo
+      - reach:local
+
+  - id: onb-gen-061-lima
+    calendar_id: salsa-cal-001
+    title: Salsa & Bachata Festival – Lima
+    description: Salsa & Bachata festival in Lima (local scale).
+    location: Lima, Peru
+    latitude: -12.0464
+    longitude: -77.0428
+    city: Lima
+    country: Peru
+    country_code: PE
+    start: w20 Fri 18:00
+    end: w20 Fri 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:local
+
+  - id: onb-gen-062-tokyo
+    calendar_id: salsa-cal-001
+    title: Salsa, Bachata & Kizomba Festival – Tokyo
+    description: Salsa, Bachata & Kizomba festival in Tokyo (regional scale).
+    location: Tokyo, Japan
+    latitude: 35.6762
+    longitude: 139.6503
+    city: Tokyo
+    country: Japan
+    country_code: JP
+    start: w27 Sat 18:00
+    end: w27 Sat 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:regional
+
+  - id: onb-gen-063-tokyo
+    calendar_id: salsa-cal-001
+    title: Salsa & Mambo Social – Tokyo
+    description: Salsa & Mambo social in Tokyo (regional scale).
+    location: Tokyo, Japan
+    latitude: 35.6762
+    longitude: 139.6503
+    city: Tokyo
+    country: Japan
+    country_code: JP
+    start: w34 Sun 20:00
+    end: w34 Mon 01:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - dance-style:mambo
+      - reach:regional
+
+  - id: onb-gen-064-singapore
+    calendar_id: salsa-cal-001
+    title: Salsa Social – Singapore
+    description: Salsa social in Singapore (international scale).
+    location: Singapore, Singapore
+    latitude: 1.3521
+    longitude: 103.8198
+    city: Singapore
+    country: Singapore
+    country_code: SG
+    start: w41 Thu 20:00
+    end: w41 Fri 01:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:international
+
+  - id: onb-gen-065-singapore
+    calendar_id: salsa-cal-001
+    title: Bachata Social – Singapore
+    description: Bachata social in Singapore (international scale).
+    location: Singapore, Singapore
+    latitude: 1.3521
+    longitude: 103.8198
+    city: Singapore
+    country: Singapore
+    country_code: SG
+    start: w48 Fri 20:00
+    end: w48 Sat 01:00
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:international
+
+  - id: onb-gen-066-bangkok
+    calendar_id: salsa-cal-001
+    title: Kizomba Workshop – Bangkok
+    description: Kizomba workshop in Bangkok (local scale).
+    location: Bangkok, Thailand
+    latitude: 13.7563
+    longitude: 100.5018
+    city: Bangkok
+    country: Thailand
+    country_code: TH
+    start: w4 Sat 14:00
+    end: w4 Sat 18:00
+    tags:
+      - format:workshop
+      - dance-style:kizomba
+      - reach:local
+
+  - id: onb-gen-067-bangkok
+    calendar_id: salsa-cal-001
+    title: Zouk Workshop – Bangkok
+    description: Zouk workshop in Bangkok (local scale).
+    location: Bangkok, Thailand
+    latitude: 13.7563
+    longitude: 100.5018
+    city: Bangkok
+    country: Thailand
+    country_code: TH
+    start: w11 Sun 14:00
+    end: w11 Sun 18:00
+    tags:
+      - format:workshop
+      - dance-style:zouk
+      - reach:local
+
+  - id: onb-gen-068-dubai
+    calendar_id: salsa-cal-001
+    title: Mambo Workshop – Dubai
+    description: Mambo workshop in Dubai (regional scale).
+    location: Dubai, United Arab Emirates
+    latitude: 25.2048
+    longitude: 55.2708
+    city: Dubai
+    country: United Arab Emirates
+    country_code: AE
+    start: w18 Thu 14:00
+    end: w18 Thu 18:00
+    tags:
+      - format:workshop
+      - dance-style:mambo
+      - reach:regional
+
+  - id: onb-gen-069-dubai
+    calendar_id: salsa-cal-001
+    title: Salsa & Bachata Festival – Dubai
+    description: Salsa & Bachata festival in Dubai (regional scale).
+    location: Dubai, United Arab Emirates
+    latitude: 25.2048
+    longitude: 55.2708
+    city: Dubai
+    country: United Arab Emirates
+    country_code: AE
+    start: w25 Fri 18:00
+    end: w25 Fri 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:regional
+
+  - id: onb-gen-070-seoul
+    calendar_id: salsa-cal-001
+    title: Salsa, Bachata & Kizomba Festival – Seoul
+    description: Salsa, Bachata & Kizomba festival in Seoul (international scale).
+    location: Seoul, South Korea
+    latitude: 37.5665
+    longitude: 126.978
+    city: Seoul
+    country: South Korea
+    country_code: KR
+    start: w32 Sat 18:00
+    end: w32 Sat 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+
+  - id: onb-gen-071-seoul
+    calendar_id: salsa-cal-001
+    title: Salsa & Mambo Festival – Seoul
+    description: Salsa & Mambo festival in Seoul (international scale).
+    location: Seoul, South Korea
+    latitude: 37.5665
+    longitude: 126.978
+    city: Seoul
+    country: South Korea
+    country_code: KR
+    start: w39 Sun 18:00
+    end: w39 Sun 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - dance-style:mambo
+      - reach:international
+
+  - id: onb-gen-072-hong-kong
+    calendar_id: salsa-cal-001
+    title: Salsa Social – Hong Kong
+    description: Salsa social in Hong Kong (local scale).
+    location: Hong Kong, Hong Kong
+    latitude: 22.3193
+    longitude: 114.1694
+    city: Hong Kong
+    country: Hong Kong
+    country_code: HK
+    start: w46 Thu 20:00
+    end: w46 Fri 01:00
+    tags:
+      - format:social
+      - dance-style:salsa
+      - reach:local
+
+  - id: onb-gen-073-hong-kong
+    calendar_id: salsa-cal-001
+    title: Bachata Social – Hong Kong
+    description: Bachata social in Hong Kong (local scale).
+    location: Hong Kong, Hong Kong
+    latitude: 22.3193
+    longitude: 114.1694
+    city: Hong Kong
+    country: Hong Kong
+    country_code: HK
+    start: w2 Fri 20:00
+    end: w2 Sat 01:00
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:local
+
+  - id: onb-gen-074-bengaluru
+    calendar_id: salsa-cal-001
+    title: Kizomba Social – Bengaluru
+    description: Kizomba social in Bengaluru (regional scale).
+    location: Bengaluru, India
+    latitude: 12.9716
+    longitude: 77.5946
+    city: Bengaluru
+    country: India
+    country_code: IN
+    start: w9 Sat 20:00
+    end: w9 Sun 01:00
+    tags:
+      - format:social
+      - dance-style:kizomba
+      - reach:regional
+
+  - id: onb-gen-075-bengaluru
+    calendar_id: salsa-cal-001
+    title: Zouk Workshop – Bengaluru
+    description: Zouk workshop in Bengaluru (regional scale).
+    location: Bengaluru, India
+    latitude: 12.9716
+    longitude: 77.5946
+    city: Bengaluru
+    country: India
+    country_code: IN
+    start: w16 Sun 14:00
+    end: w16 Sun 18:00
+    tags:
+      - format:workshop
+      - dance-style:zouk
+      - reach:regional
+
+  - id: onb-gen-076-tel-aviv
+    calendar_id: salsa-cal-001
+    title: Mambo Workshop – Tel Aviv
+    description: Mambo workshop in Tel Aviv (international scale).
+    location: Tel Aviv, Israel
+    latitude: 32.0853
+    longitude: 34.7818
+    city: Tel Aviv
+    country: Israel
+    country_code: IL
+    start: w23 Thu 14:00
+    end: w23 Thu 18:00
+    tags:
+      - format:workshop
+      - dance-style:mambo
+      - reach:international
+
+  - id: onb-gen-077-tel-aviv
+    calendar_id: salsa-cal-001
+    title: Salsa & Bachata Workshop – Tel Aviv
+    description: Salsa & Bachata workshop in Tel Aviv (international scale).
+    location: Tel Aviv, Israel
+    latitude: 32.0853
+    longitude: 34.7818
+    city: Tel Aviv
+    country: Israel
+    country_code: IL
+    start: w30 Fri 14:00
+    end: w30 Fri 18:00
+    tags:
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:international
+
+  - id: onb-gen-078-cape-town
+    calendar_id: salsa-cal-001
+    title: Salsa, Bachata & Kizomba Festival – Cape Town
+    description: Salsa, Bachata & Kizomba festival in Cape Town (local scale).
+    location: Cape Town, South Africa
+    latitude: -33.9249
+    longitude: 18.4241
+    city: Cape Town
+    country: South Africa
+    country_code: ZA
+    start: w37 Sat 18:00
+    end: w37 Sat 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:local
+
+  - id: onb-gen-079-cape-town
+    calendar_id: salsa-cal-001
+    title: Salsa & Mambo Festival – Cape Town
+    description: Salsa & Mambo festival in Cape Town (local scale).
+    location: Cape Town, South Africa
+    latitude: -33.9249
+    longitude: 18.4241
+    city: Cape Town
+    country: South Africa
+    country_code: ZA
+    start: w44 Sun 18:00
+    end: w44 Sun 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - dance-style:mambo
+      - reach:local
+
+  - id: onb-gen-080-nairobi
+    calendar_id: salsa-cal-001
+    title: Salsa Festival – Nairobi
+    description: Salsa festival in Nairobi (regional scale).
+    location: Nairobi, Kenya
+    latitude: -1.2921
+    longitude: 36.8219
+    city: Nairobi
+    country: Kenya
+    country_code: KE
+    start: w51 Thu 18:00
+    end: w51 Thu 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:regional
+
+  - id: onb-gen-081-nairobi
+    calendar_id: salsa-cal-001
+    title: Bachata Social – Nairobi
+    description: Bachata social in Nairobi (regional scale).
+    location: Nairobi, Kenya
+    latitude: -1.2921
+    longitude: 36.8219
+    city: Nairobi
+    country: Kenya
+    country_code: KE
+    start: w7 Fri 20:00
+    end: w7 Sat 01:00
+    tags:
+      - format:social
+      - dance-style:bachata
+      - reach:regional
+
+  - id: onb-gen-082-lagos
+    calendar_id: salsa-cal-001
+    title: Kizomba Social – Lagos
+    description: Kizomba social in Lagos (international scale).
+    location: Lagos, Nigeria
+    latitude: 6.5244
+    longitude: 3.3792
+    city: Lagos
+    country: Nigeria
+    country_code: NG
+    start: w14 Sat 20:00
+    end: w14 Sun 01:00
+    tags:
+      - format:social
+      - dance-style:kizomba
+      - reach:international
+
+  - id: onb-gen-083-lagos
+    calendar_id: salsa-cal-001
+    title: Zouk Social – Lagos
+    description: Zouk social in Lagos (international scale).
+    location: Lagos, Nigeria
+    latitude: 6.5244
+    longitude: 3.3792
+    city: Lagos
+    country: Nigeria
+    country_code: NG
+    start: w21 Sun 20:00
+    end: w21 Mon 01:00
+    tags:
+      - format:social
+      - dance-style:zouk
+      - reach:international
+
+  - id: onb-gen-084-marrakech
+    calendar_id: salsa-cal-001
+    title: Mambo Workshop – Marrakech
+    description: Mambo workshop in Marrakech (local scale).
+    location: Marrakech, Morocco
+    latitude: 31.6295
+    longitude: -7.9811
+    city: Marrakech
+    country: Morocco
+    country_code: MA
+    start: w28 Thu 14:00
+    end: w28 Thu 18:00
+    tags:
+      - format:workshop
+      - dance-style:mambo
+      - reach:local
+
+  - id: onb-gen-085-marrakech
+    calendar_id: salsa-cal-001
+    title: Salsa & Bachata Workshop – Marrakech
+    description: Salsa & Bachata workshop in Marrakech (local scale).
+    location: Marrakech, Morocco
+    latitude: 31.6295
+    longitude: -7.9811
+    city: Marrakech
+    country: Morocco
+    country_code: MA
+    start: w35 Fri 14:00
+    end: w35 Fri 18:00
+    tags:
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:local
+
+  - id: onb-gen-086-accra
+    calendar_id: salsa-cal-001
+    title: Salsa, Bachata & Kizomba Workshop – Accra
+    description: Salsa, Bachata & Kizomba workshop in Accra (regional scale).
+    location: Accra, Ghana
+    latitude: 5.6037
+    longitude: -0.187
+    city: Accra
+    country: Ghana
+    country_code: GH
+    start: w42 Sat 14:00
+    end: w42 Sat 18:00
+    tags:
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:regional
+
+  - id: onb-gen-087-accra
+    calendar_id: salsa-cal-001
+    title: Salsa & Mambo Festival – Accra
+    description: Salsa & Mambo festival in Accra (regional scale).
+    location: Accra, Ghana
+    latitude: 5.6037
+    longitude: -0.187
+    city: Accra
+    country: Ghana
+    country_code: GH
+    start: w49 Sun 18:00
+    end: w49 Sun 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - dance-style:mambo
+      - reach:regional
+
+  - id: onb-gen-088-luanda
+    calendar_id: salsa-cal-001
+    title: Salsa Festival – Luanda
+    description: Salsa festival in Luanda (international scale).
+    location: Luanda, Angola
+    latitude: -8.839
+    longitude: 13.2894
+    city: Luanda
+    country: Angola
+    country_code: AO
+    start: w5 Thu 18:00
+    end: w5 Thu 23:00
+    tags:
+      - format:festival
+      - dance-style:salsa
+      - reach:international
+
+  - id: onb-gen-089-luanda
+    calendar_id: salsa-cal-001
+    title: Bachata Festival – Luanda
+    description: Bachata festival in Luanda (international scale).
+    location: Luanda, Angola
+    latitude: -8.839
+    longitude: 13.2894
+    city: Luanda
+    country: Angola
+    country_code: AO
+    start: w12 Fri 18:00
+    end: w12 Fri 23:00
+    tags:
+      - format:festival
+      - dance-style:bachata
+      - reach:international
+
+  - id: onb-gen-090-sydney
+    calendar_id: salsa-cal-001
+    title: Kizomba Social – Sydney
+    description: Kizomba social in Sydney (local scale).
+    location: Sydney, Australia
+    latitude: -33.8688
+    longitude: 151.2093
+    city: Sydney
+    country: Australia
+    country_code: AU
+    start: w19 Sat 20:00
+    end: w19 Sun 01:00
+    tags:
+      - format:social
+      - dance-style:kizomba
+      - reach:local
+
+  - id: onb-gen-091-sydney
+    calendar_id: salsa-cal-001
+    title: Zouk Social – Sydney
+    description: Zouk social in Sydney (local scale).
+    location: Sydney, Australia
+    latitude: -33.8688
+    longitude: 151.2093
+    city: Sydney
+    country: Australia
+    country_code: AU
+    start: w26 Sun 20:00
+    end: w26 Mon 01:00
+    tags:
+      - format:social
+      - dance-style:zouk
+      - reach:local
+
+  - id: onb-gen-092-melbourne
+    calendar_id: salsa-cal-001
+    title: Mambo Social – Melbourne
+    description: Mambo social in Melbourne (regional scale).
+    location: Melbourne, Australia
+    latitude: -37.8136
+    longitude: 144.9631
+    city: Melbourne
+    country: Australia
+    country_code: AU
+    start: w33 Thu 20:00
+    end: w33 Fri 01:00
+    tags:
+      - format:social
+      - dance-style:mambo
+      - reach:regional
+
+  - id: onb-gen-093-melbourne
+    calendar_id: salsa-cal-001
+    title: Salsa & Bachata Workshop – Melbourne
+    description: Salsa & Bachata workshop in Melbourne (regional scale).
+    location: Melbourne, Australia
+    latitude: -37.8136
+    longitude: 144.9631
+    city: Melbourne
+    country: Australia
+    country_code: AU
+    start: w40 Fri 14:00
+    end: w40 Fri 18:00
+    tags:
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - reach:regional
+
+  - id: onb-gen-094-auckland
+    calendar_id: salsa-cal-001
+    title: Salsa, Bachata & Kizomba Workshop – Auckland
+    description: Salsa, Bachata & Kizomba workshop in Auckland (international scale).
+    location: Auckland, New Zealand
+    latitude: -36.8485
+    longitude: 174.7633
+    city: Auckland
+    country: New Zealand
+    country_code: NZ
+    start: w47 Sat 14:00
+    end: w47 Sat 18:00
+    tags:
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:bachata
+      - dance-style:kizomba
+      - reach:international
+
+  - id: onb-gen-095-auckland
+    calendar_id: salsa-cal-001
+    title: Salsa & Mambo Workshop – Auckland
+    description: Salsa & Mambo workshop in Auckland (international scale).
+    location: Auckland, New Zealand
+    latitude: -36.8485
+    longitude: 174.7633
+    city: Auckland
+    country: New Zealand
+    country_code: NZ
+    start: w3 Sun 14:00
+    end: w3 Sun 18:00
+    tags:
+      - format:workshop
+      - dance-style:salsa
+      - dance-style:mambo
+      - reach:international
+
+  # === END generated worldwide events ===
+
+attendances:
+  - event_id: onb-gen-000-paris
+    email: verifiedcurator@example.com
+    share_publicly: true
+  - event_id: onb-gen-006-barcelona
+    email: verifiedcurator@example.com
+    share_publicly: true
+  - event_id: onb-gen-012-amsterdam
+    email: verifiedcurator@example.com
+    share_publicly: true
+  - event_id: onb-gen-018-zurich
+    email: verifiedcurator@example.com
+    share_publicly: true
+  - event_id: onb-gen-024-vienna
+    email: verifiedcurator@example.com
+    share_publicly: true
+  - event_id: onb-gen-030-new-york
+    email: verifiedcurator@example.com
+    share_publicly: true
+  - event_id: onb-gen-036-chicago
+    email: verifiedcurator@example.com
+    share_publicly: true
+  - event_id: onb-gen-042-montreal
+    email: verifiedcurator@example.com
+    share_publicly: true
+  - event_id: onb-gen-048-bogota
+    email: verifiedcurator@example.com
+    share_publicly: true
+  - event_id: onb-gen-054-buenos-aires
+    email: verifiedcurator@example.com
+    share_publicly: true
+  - event_id: onb-gen-060-lima
+    email: verifiedcurator@example.com
+    share_publicly: true
+  - event_id: onb-gen-066-bangkok
+    email: verifiedcurator@example.com
+    share_publicly: true
+  - event_id: onb-gen-072-hong-kong
+    email: verifiedcurator@example.com
+    share_publicly: true
+  - event_id: onb-gen-078-cape-town
+    email: verifiedcurator@example.com
+    share_publicly: true
+  - event_id: onb-gen-084-marrakech
+    email: verifiedcurator@example.com
+    share_publicly: true
+  - event_id: onb-gen-090-sydney
+    email: verifiedcurator@example.com
+    share_publicly: true

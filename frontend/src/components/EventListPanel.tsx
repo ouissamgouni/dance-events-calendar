@@ -8,8 +8,9 @@ import { useAttendanceSummary } from '../context/AttendanceSummariesContext';
 import SaveEventButton from './SaveEventButton';
 import GoingButton from './GoingButton';
 import AttendeeAvatarStack from './AttendeeAvatarStack';
-import RateEventButton from './RateEventButton';
 import TagBadges from './TagBadges';
+import { useRatingAggregate } from '../context/RatingAggregatesContext';
+import { useEventMessageCount } from '../context/MessageCountsContext';
 import { isTrendingScore } from '../utils/trending';
 import { shortLocation } from '../utils/locationShort';
 import { isPriceSectionVisible } from '../utils/sectionVisibility';
@@ -219,6 +220,42 @@ function formatDayHeader(d: Date): string {
     return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
+function CardEngagementBadges({ eventId, showRatings }: { eventId: string; showRatings: boolean }) {
+    const agg = useRatingAggregate(eventId);
+    const messageCount = useEventMessageCount(eventId);
+    const reviews = showRatings ? (agg?.count ?? 0) : 0;
+    const messages = messageCount ?? 0;
+    if (reviews === 0 && messages === 0) return null;
+    return (
+        <div className="flex shrink-0 items-center gap-2">
+            {reviews > 0 && (
+                <Link
+                    to={`/event/${encodeURIComponent(eventId)}#community`}
+                    onClick={(e) => e.stopPropagation()}
+                    title="See reviews"
+                    aria-label={`${reviews} review${reviews === 1 ? '' : 's'}`}
+                    className="flex items-center gap-1 text-slate-500 hover:text-slate-700"
+                >
+                    <img src="/star.png" alt="" aria-hidden="true" className="h-3.5 w-3.5 object-contain" />
+                    <span className="tabular-nums text-[10px] font-medium">{reviews}</span>
+                </Link>
+            )}
+            {messages > 0 && (
+                <Link
+                    to={`/event/${encodeURIComponent(eventId)}#messages`}
+                    onClick={(e) => e.stopPropagation()}
+                    title="See messages"
+                    aria-label={`${messages} message${messages === 1 ? '' : 's'}`}
+                    className="flex items-center gap-1 text-slate-500 hover:text-slate-700"
+                >
+                    <img src="/comment.png" alt="" aria-hidden="true" className="h-3.5 w-3.5 object-contain" />
+                    <span className="tabular-nums text-[10px] font-medium">{messages}</span>
+                </Link>
+            )}
+        </div>
+    );
+}
+
 export function EventListCard({
     event,
     mapBounds,
@@ -328,19 +365,13 @@ export function EventListCard({
                                     forceBadge={tagsAsBadge}
                                 />
                             </div>
-                            {showRatings && (
-                                <RateEventButton
-                                    eventId={event.event_id}
-                                    appearance="count"
-                                    size="sm"
-                                    stopPropagation
-                                    className="shrink-0"
-                                />
-                            )}
+                            <CardEngagementBadges eventId={event.event_id} showRatings={showRatings} />
                         </div>
                     )}
                     <div className="mt-1 flex flex-wrap items-center gap-2">
-
+                        {!(event.tags?.length > 0) && (
+                            <CardEngagementBadges eventId={event.event_id} showRatings={showRatings} />
+                        )}
                     </div>
                     <div className="event-card-actions absolute top-0 right-0 flex items-center gap-1.5">
                         <ActionCountCluster eventId={event.event_id} isSavedFlag={isSavedFlag} isPast={new Date(event.end).getTime() < Date.now()} />

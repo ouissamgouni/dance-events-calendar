@@ -19,14 +19,18 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlmodel import Session, or_, select
+from sqlmodel import Session, col, func, or_, select
 
 from backend.api.deps import can_view, is_mutual_follow
 from backend.db.models import (
     CachedEvent,
     CalendarSubscription,
+    EventMessage,
     Notification,
     User,
+    UserEventAttendance,
+    UserEventMute,
+    UserSavedEvent,
 )
 from backend.services.notification_delivery import record_delivery
 
@@ -53,6 +57,13 @@ FOLLOW_REQUEST = "follow_request"
 # actor is the approver (alice). Replaces the wrong new_follower that
 # previously went to the approver instead.
 FOLLOW_REQUEST_APPROVED = "follow_request_approved"
+# Someone posted a top-level message/question on an event; fanned out to
+# everyone engaged with the event (Going ∪ Saved) plus the site admin.
+EVENT_MESSAGE = "event_message"
+# Someone replied to a message; fanned out to that thread's participants.
+EVENT_MESSAGE_REPLY = "event_message_reply"
+# A user reported a message; delivered to the site admin only (in-app).
+EVENT_MESSAGE_REPORTED = "event_message_reported"
 
 
 def _event_is_past(session: Session, event_id: str) -> bool:
@@ -76,6 +87,7 @@ def _fan_out(
     audience: str = "public",
     subject_key: str | None = None,
     context: str | None = None,
+    description: str | None = None,
     skip_past_guard: bool = False,
 ) -> int:
     """Common fan-out logic; returns count of notifications inserted.
@@ -150,6 +162,7 @@ def _fan_out(
             event_id=event_id,
             subject_key=subject_key,
             context=context,
+            description=description,
         )
         session.add(notif)
         session.flush()
@@ -204,6 +217,7 @@ def fan_out_milestone(
     *,
     audience: str = "public",
     context: str | None = None,
+    description: str | None = None,
 ) -> int:
     """Notify subscribers that ``actor`` unlocked milestone ``subject_key``.
 
@@ -218,6 +232,7 @@ def fan_out_milestone(
         audience=audience,
         subject_key=subject_key,
         context=context,
+        description=description,
         skip_past_guard=True,
     )
 
@@ -475,3 +490,209 @@ def discard_follow_request_notification(
             & (_N.kind == FOLLOW_REQUEST)
         )
     )
+
+
+def _admin_user_ids(session: Session) -> list:
+    """Return the User ids matching the configured admin email (0 or 1 row)."""
+    from backend.config.loader import get_admin_email
+
+    email = get_admin_email()
+    if not email:
+        return []
+    return list(
+        session.exec(
+            select(User.id).where(func.lower(User.email) == email.lower())
+        ).all()
+    )
+
+
+def _engaged_user_ids(session: Session, event_id: str, *, exclude) -> set:
+    """User ids engaged with ``event_id`` — currently Going or has Saved it.
+
+    Anonymous device-only rows (user_id IS NULL) are ignored: message
+    notifications require a signed-in recipient. ``exclude`` (the author)
+    is removed from the set.
+    """
+    going = session.exec(
+        select(UserEventAttendance.user_id)
+        .where(UserEventAttendance.event_id == event_id)
+        .where(col(UserEventAttendance.user_id).is_not(None))
+    ).all()
+    saved = session.exec(
+        select(UserSavedEvent.user_id)
+        .where(UserSavedEvent.event_id == event_id)
+        .where(col(UserSavedEvent.user_id).is_not(None))
+    ).all()
+    ids = set(going) | set(saved)
+    ids.discard(exclude)
+    ids.discard(None)
+    return ids
+
+
+def _muted_user_ids(session: Session, event_id: str) -> set:
+    """User ids who muted event-message notifications for ``event_id``."""
+    return set(
+        session.exec(
+            select(UserEventMute.user_id).where(UserEventMute.event_id == event_id)
+        ).all()
+    )
+
+
+def _insert_message_notification(
+    session: Session,
+    *,
+    recipient_id,
+    actor_id,
+    kind: str,
+    event_id: str,
+    subject_key: str,
+    context: str | None,
+    description: str | None,
+) -> Notification:
+    notif = Notification(
+        recipient_user_id=recipient_id,
+        actor_user_id=actor_id,
+        kind=kind,
+        event_id=event_id,
+        subject_key=subject_key,
+        context=context,
+        description=description,
+    )
+    session.add(notif)
+    session.flush()
+    record_delivery(session, notif.id, "app")
+    return notif
+
+
+def fan_out_event_message(
+    session: Session,
+    author: User,
+    event_id: str,
+    message_id,
+    *,
+    category: str | None = None,
+    snippet: str | None = None,
+) -> list[Notification]:
+    """Notify engaged users that ``author`` posted a message on ``event_id``.
+
+    Recipients = (Going ∪ Saved) signed-in users plus the site admin, minus
+    the author. ``category`` and ``snippet`` are stored on the notification
+    (context/description) so renderers can show "asked about a roommate: …"
+    without a second lookup. ``message_id`` is the dedupe/deep-link key
+    (``subject_key``). Returns the created notifications so callers can
+    dispatch instant email/push. Caller owns the transaction.
+    """
+    recipients = _engaged_user_ids(session, event_id, exclude=author.id)
+    recipients |= {aid for aid in _admin_user_ids(session) if aid != author.id}
+    recipients -= _muted_user_ids(session, event_id)
+    created: list[Notification] = []
+    for rid in recipients:
+        created.append(
+            _insert_message_notification(
+                session,
+                recipient_id=rid,
+                actor_id=author.id,
+                kind=EVENT_MESSAGE,
+                event_id=event_id,
+                subject_key=str(message_id),
+                context=category,
+                description=snippet,
+            )
+        )
+    return created
+
+
+def notify_thread_reply(
+    session: Session,
+    author: User,
+    event_id: str,
+    root_message_id,
+    reply_message_id,
+    *,
+    category: str | None = None,
+    snippet: str | None = None,
+) -> list[Notification]:
+    """Notify a thread's participants that ``author`` replied.
+
+    Participants = the top-level post's author + everyone who posted anywhere
+    in the thread (any depth), minus the current replier. Deep-links to the
+    reply via ``subject_key`` = ``reply_message_id``. Returns the created
+    notifications so callers can dispatch instant email/push. Caller owns the
+    transaction.
+    """
+    root_author = session.exec(
+        select(EventMessage.author_user_id).where(EventMessage.id == root_message_id)
+    ).first()
+    # Flattened threads allow reply-to-reply, so gather every author in the
+    # subtree rooted at the top-level post, not just direct replies.
+    reply_rows = session.exec(
+        select(EventMessage.id, EventMessage.parent_id, EventMessage.author_user_id)
+        .where(EventMessage.event_id == event_id)
+        .where(col(EventMessage.parent_id).is_not(None))
+    ).all()
+    children_by_parent: dict = {}
+    author_by_id: dict = {}
+    for mid, pid, aid in reply_rows:
+        children_by_parent.setdefault(pid, []).append(mid)
+        author_by_id[mid] = aid
+    recipients: set = set()
+    queue = [root_message_id]
+    seen: set = set()
+    while queue:
+        pid = queue.pop(0)
+        for child_id in children_by_parent.get(pid, []):
+            if child_id in seen:
+                continue
+            seen.add(child_id)
+            recipients.add(author_by_id.get(child_id))
+            queue.append(child_id)
+    if root_author is not None:
+        recipients.add(root_author)
+    recipients.discard(author.id)
+    recipients.discard(None)
+    recipients -= _muted_user_ids(session, event_id)
+    created: list[Notification] = []
+    for rid in recipients:
+        created.append(
+            _insert_message_notification(
+                session,
+                recipient_id=rid,
+                actor_id=author.id,
+                kind=EVENT_MESSAGE_REPLY,
+                event_id=event_id,
+                subject_key=str(reply_message_id),
+                # "root" signals the copy "replied to your message" for the
+                # original poster; category is unused in reply rendering.
+                context=("root" if rid == root_author else category),
+                description=snippet,
+            )
+        )
+    return created
+
+
+def notify_message_reported(
+    session: Session,
+    reporter: User,
+    event_id: str,
+    message_id,
+    *,
+    reason: str | None = None,
+) -> int:
+    """Notify the site admin that ``reporter`` flagged a message (in-app only).
+
+    Not wired into the email/push feature buckets, so it stays an in-app
+    moderation signal. Caller owns the transaction.
+    """
+    recipients = [aid for aid in _admin_user_ids(session) if aid != reporter.id]
+    for rid in recipients:
+        _insert_message_notification(
+            session,
+            recipient_id=rid,
+            actor_id=reporter.id,
+            kind=EVENT_MESSAGE_REPORTED,
+            event_id=event_id,
+            subject_key=str(message_id),
+            context=(reason[:200] if reason else None),
+            description=None,
+        )
+    return len(recipients)

@@ -465,7 +465,7 @@ function SharePassportCardModal({
     const [scope, setScope] = useState<ShareScope>('all');
     const [events, setEvents] = useState<PassportMapEvent[] | null>(mapEvents);
     const [profileUrl, setProfileUrl] = useState<string | null>(null);
-    const [sections, setSections] = useState({ badges: true, map: true, dancingSince: false });
+    const [sections, setSections] = useState({ badges: true, map: true, dancingSince: false, activity: true });
     const [busy, setBusy] = useState(false);
     const cardRef = useRef<HTMLDivElement>(null);
     const canNativeShare =
@@ -522,9 +522,17 @@ function SharePassportCardModal({
                     scope,
                     data.stats.top_style,
                     data.stats.reviews_written,
+                    data.consistency,
                 )
                 : null,
-        [events, data.milestones, data.stats.top_style, data.stats.reviews_written, scope],
+        [
+            events,
+            data.milestones,
+            data.stats.top_style,
+            data.stats.reviews_written,
+            data.consistency,
+            scope,
+        ],
     );
 
     const filename = `dance-passport-${scope === 'all' ? 'alltime' : scope}.png`;
@@ -638,6 +646,14 @@ function SharePassportCardModal({
                             />
                             Badges
                         </label>
+                        <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                            <input
+                                type="checkbox"
+                                checked={sections.activity}
+                                onChange={(e) => setSections((s) => ({ ...s, activity: e.target.checked }))}
+                            />
+                            Activity
+                        </label>
                         {scope === 'all' && data.stats.dancing_since && (
                             <label className="inline-flex items-center gap-2 text-sm text-slate-700">
                                 <input
@@ -677,6 +693,7 @@ function SharePassportCardModal({
                                         showBadges={sections.badges}
                                         showMap={sections.map}
                                         showDancingSince={sections.dancingSince}
+                                        showActivity={sections.activity}
                                     />
                                 </div>
                             </div>
@@ -1076,7 +1093,8 @@ export default function PassportPage() {
                 // the toast never re-fires on the next open.
                 if (!celebratedRef.current) {
                     const fresh = passport.milestones.filter((m) => m.is_new);
-                    if (fresh.length > 0) {
+                    const freshConsistency = passport.consistency?.new ?? [];
+                    if (fresh.length > 0 || freshConsistency.length > 0) {
                         celebratedRef.current = true;
                         fresh.forEach((m) =>
                             toast.push({
@@ -1085,7 +1103,17 @@ export default function PassportPage() {
                                 variant: 'success',
                             }),
                         );
-                        ackPassportMilestones(fresh.map((m) => m.key)).catch(() => {
+                        freshConsistency.forEach((c) =>
+                            toast.push({
+                                title: `${c.icon} ${c.name}!`,
+                                message: 'Consistency achievement reached',
+                                variant: 'success',
+                            }),
+                        );
+                        ackPassportMilestones(
+                            fresh.map((m) => m.key),
+                            freshConsistency.map((c) => `${c.key}:${c.period_start}`),
+                        ).catch(() => {
                             // Non-fatal: the toast still showed; retry on next open.
                         });
                     }
@@ -1143,7 +1171,8 @@ export default function PassportPage() {
             setMarkers(timeline.markers);
             setTotal(timeline.total);
             const fresh = passport.milestones.filter((m) => m.is_new);
-            if (fresh.length > 0) {
+            const freshConsistency = passport.consistency?.new ?? [];
+            if (fresh.length > 0 || freshConsistency.length > 0) {
                 fresh.forEach((m) =>
                     toast.push({
                         title: `${m.icon} Milestone unlocked!`,
@@ -1151,7 +1180,17 @@ export default function PassportPage() {
                         variant: 'success',
                     }),
                 );
-                ackPassportMilestones(fresh.map((m) => m.key)).catch(() => { });
+                freshConsistency.forEach((c) =>
+                    toast.push({
+                        title: `${c.icon} ${c.name}!`,
+                        message: 'Consistency achievement reached',
+                        variant: 'success',
+                    }),
+                );
+                ackPassportMilestones(
+                    fresh.map((m) => m.key),
+                    freshConsistency.map((c) => `${c.key}:${c.period_start}`),
+                ).catch(() => { });
             }
             // Invalidate the lazily-loaded map so the new city/country appears.
             mapEventsRef.current = false;

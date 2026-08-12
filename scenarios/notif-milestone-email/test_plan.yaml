@@ -1,0 +1,98 @@
+test_plan:
+  name: "Milestones — personal unlock email routing"
+  description: >
+    A personal Dance Passport milestone unlock (`milestone_unlocked`) is a
+    configurable notification with its own admin "Milestones" box. In-app
+    and push are always immediate. Email delivery is admin-routed per
+    feature: with instant OFF / digest ON (the default) the unlock email
+    arrives through the batched activity digest (the legacy digest line);
+    with instant ON the milestone service sends the rich per-milestone
+    email immediately. Additive — no template retirement, no combined
+    email, no card layout.
+
+  preconditions:
+    - "Start Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`"
+    - >-
+      Start scenario:
+      `SCENARIO=notif-milestone-email RESET=1 task start:scenario`
+    - "Open the Mailpit inbox at http://127.0.0.1:8025 and clear existing messages."
+    - >-
+      Alice attends one past event, enough to unlock the "First Steps"
+      milestone.
+
+  cast:
+    - "Alice — the only dancer; unlocks First Steps. Milestone email + push ON."
+    - "Admin — signs in to the admin panel to configure the Milestones box."
+
+  steps:
+    - id: 1
+      title: "Milestones box renders in the admin panel"
+      description: >
+        Sign in as Admin and open the Notifications section of the admin
+        panel.
+      expected: >
+        A dedicated "Milestones" box shows a master toggle (ON), a per-user
+        count line ("N email · M push enabled"), and a "Milestone unlocked"
+        card with Email delivery Instant/Digest checkboxes (Instant off,
+        Digest on) plus a "Send now" control.
+
+    - id: 2
+      title: "Digest mode (default) — unlock defers email to the digest"
+      description: >
+        With Instant OFF / Digest ON, trigger a dispatch tick:
+        `SCENARIO=notif-milestone-email task notify:trigger:scenario`.
+      expected: >
+        Alice gets a self `milestone_unlocked` in-app row and an immediate
+        push (pushed_at stamped). NO email arrives yet — the milestone
+        service left emailed_at NULL because instant is off. Mailpit inbox
+        is still empty.
+
+    - id: 3
+      title: "Digest email delivered on the forced tick"
+      description: >
+        Trigger a forced tick so the per-user digest schedule is bypassed:
+        `SCENARIO=notif-milestone-email task notify:trigger:scenario -- --immediate-emails`.
+      expected: >
+        Alice receives ONE activity digest email whose body includes the
+        milestone line "You unlocked First Steps …" (emailed_at stamped).
+        The email is the existing/legacy digest — no new combined template.
+
+    - id: 4
+      title: "Master toggle OFF suppresses milestone notifications"
+      description: >
+        In the Milestones box, turn the master toggle OFF, RESET the
+        scenario, and trigger a dispatch tick.
+      expected: >
+        No `milestone_unlocked` row is created, no push, and no email —
+        the master switch gates the whole feature
+        (`{"skipped": "milestone_notifications_disabled"}`).
+
+    - id: 5
+      title: "Instant mode — rich immediate email"
+      description: >
+        Re-enable the master toggle, tick the "Instant" Email-delivery
+        checkbox on the "Milestone unlocked" card, RESET the scenario, and
+        trigger a plain dispatch tick (no `--immediate-emails`).
+      expected: >
+        Alice receives the rich per-milestone email immediately with no
+        schedule wait (instant_emailed_at stamped) containing "You unlocked
+        First Steps". Push still fires immediately. The digest track is
+        untouched (emailed_at stays NULL).
+
+    - id: 6
+      title: "Send now delivers pending milestone email on demand"
+      description: >
+        Back in digest mode (Instant OFF), after a tick has created a
+        pending milestone row, use the Milestones card "Send now" for Alice.
+      expected: >
+        Alice immediately receives the pending milestone via the digest
+        send-now path, bypassing the schedule and the once-per-day gate.
+
+    - id: 7
+      title: "Dedup on repeat ticks"
+      description: >
+        Trigger a second dispatch tick without any new attendance.
+      expected: >
+        Alice still has exactly one `milestone_unlocked` row for the First
+        Steps key — the `subject_key` dedupe prevents duplicates, and no
+        duplicate email is sent.

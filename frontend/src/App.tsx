@@ -9,6 +9,7 @@ import { PreferencesProvider } from './context/PreferencesContext';
 import { AttendingEventsProvider } from './context/AttendingEventsContext';
 import { AttendanceSummariesProvider } from './context/AttendanceSummariesContext';
 import { RatingAggregatesProvider } from './context/RatingAggregatesContext';
+import { MessageCountsProvider } from './context/MessageCountsContext';
 import { MyRatingsProvider } from './context/MyRatingsContext';
 import { PwaInstallProvider } from './context/PwaInstallContext';
 import { QaTestPlanProvider, useQaPinnedWidth } from './components/QaTestPlanPanel';
@@ -39,9 +40,7 @@ const DiscoverPage = lazy(() => import('./pages/DiscoverPage'));
 const SharedCalendarPage = lazy(() => import('./pages/SharedCalendarPage'));
 const SharedPassportPage = lazy(() => import('./pages/SharedPassportPage'));
 const Privacy = lazy(() => import('./pages/Privacy'));
-const OnboardingPreferences = lazy(() => import('./pages/OnboardingPreferences'));
-const OnboardingLocal = lazy(() => import('./pages/OnboardingLocal'));
-const OnboardingFollow = lazy(() => import('./pages/OnboardingFollow'));
+const OnboardingWizard = lazy(() => import('./pages/OnboardingWizard'));
 const ReferralLanding = lazy(() => import('./pages/ReferralLanding'));
 const ForYouPage = lazy(() => import('./pages/ForYouPage'));
 const InstallPage = lazy(() => import('./pages/InstallPage'));
@@ -67,6 +66,7 @@ export default function App() {
             <SavedEventsProvider>
               <PreferencesProvider>
                 <RatingAggregatesProvider>
+                  <MessageCountsProvider>
                   <MyRatingsProvider>
                     <AttendingEventsProvider>
                       <PwaInstallProvider>
@@ -76,6 +76,7 @@ export default function App() {
                       </PwaInstallProvider>
                     </AttendingEventsProvider>
                   </MyRatingsProvider>
+                  </MessageCountsProvider>
                 </RatingAggregatesProvider>
               </PreferencesProvider>
             </SavedEventsProvider>
@@ -164,14 +165,16 @@ function AppShell() {
             <Suspense fallback={null}>
               <Routes>
                 <Route path="/" element={<Home />} />
-                <Route path="/onboarding/preferences" element={<OnboardingPreferences />} />
-                <Route path="/onboarding/local" element={<OnboardingLocal />} />
-                <Route path="/onboarding/follow" element={<OnboardingFollow />} />
+                <Route path="/onboarding" element={<OnboardingWizard />} />
+                <Route path="/onboarding/preferences" element={<OnboardingWizard />} />
+                <Route path="/onboarding/local" element={<OnboardingWizard />} />
+                <Route path="/onboarding/follow" element={<OnboardingWizard />} />
                 <Route path="/r/:code" element={<ReferralLanding />} />
                 <Route path="/calendar" element={<Home />} />
                 <Route path="/for-you" element={<ForYouPage />} />
                 <Route path="/event/:eventId" element={<EventDetailPage />} />
                 <Route path="/event/:eventId/review" element={<EventDetailPage />} />
+                <Route path="/event/:eventId/ask" element={<EventDetailPage />} />
                 <Route path="/series/:seriesId" element={<SeriesPage />} />
                 <Route path="/tribe" element={<SectionLayout section="tribe" />}>
                   <Route index element={<Navigate to="/tribe/calendars" replace />} />

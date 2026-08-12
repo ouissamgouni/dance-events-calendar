@@ -55,7 +55,7 @@ def _no_send(monkeypatch):
     """Stub email/push so run_once never touches the network by default."""
     monkeypatch.setattr(
         milestone_notification_service,
-        "send_milestones_unlocked_email",
+        "send_milestone_instant_email",
         lambda *a, **k: True,
     )
     monkeypatch.setattr(milestone_notification_service, "send_push", lambda *a, **k: 0)
@@ -145,7 +145,7 @@ def test_distinct_milestones_get_distinct_notifications(session):
         _attend_past_event(session, bob, f"ev-{i}", days_ago=100 - i)
 
     stats = milestone_notification_service.run_once()
-    # first_event + events_10 both unlock on the same run.
+    # first_event + events_5 both unlock on the same run.
     assert stats["milestones"] == 2
     keys = {
         n.subject_key
@@ -153,15 +153,17 @@ def test_distinct_milestones_get_distinct_notifications(session):
             select(Notification).where(Notification.kind == "milestone_unlocked")
         ).all()
     }
-    assert {"first_event", "events_10"} <= keys
+    assert {"first_event", "events_5"} <= keys
 
 
 def test_multiple_milestones_combined_into_one_email(session, monkeypatch):
     """Two milestones unlocked in the same pass send a single combined email."""
+    session.add(SiteSetting(key="milestone_unlocked_email_instant", value="true"))
+    session.commit()
     calls: list = []
     monkeypatch.setattr(
         milestone_notification_service,
-        "send_milestones_unlocked_email",
+        "send_milestone_instant_email",
         lambda u, ms: calls.append([m.key for m in ms]) or True,
     )
     monkeypatch.setattr(milestone_notification_service, "send_push", lambda *a, **k: 0)
@@ -174,7 +176,7 @@ def test_multiple_milestones_combined_into_one_email(session, monkeypatch):
     assert stats["emailed"] == 2
     # A single email call covering both milestones.
     assert len(calls) == 1
-    assert set(calls[0]) == {"first_event", "events_10"}
+    assert set(calls[0]) == {"first_event", "events_5"}
     # Both notification rows stamped emailed_at by the one send.
     notifs = session.exec(
         select(Notification).where(Notification.kind == "milestone_unlocked")
@@ -183,12 +185,43 @@ def test_multiple_milestones_combined_into_one_email(session, monkeypatch):
     assert all(n.emailed_at is not None for n in notifs)
 
 
+def test_digest_mode_defers_milestone_email(session, monkeypatch):
+    """With instant delivery off (the default), the milestone service creates
+    the in-app row but leaves ``emailed_at`` NULL and sends no immediate email
+    — the activity digest picks it up later. Push still fires immediately."""
+    emailed: list = []
+    pushed: list = []
+    monkeypatch.setattr(
+        milestone_notification_service,
+        "send_milestone_instant_email",
+        lambda u, ms: emailed.extend(m.key for m in ms) or True,
+    )
+    monkeypatch.setattr(
+        milestone_notification_service,
+        "send_push",
+        lambda *a, **k: pushed.append(k.get("tag")) or 1,
+    )
+    hank = _make_user(session, "hank@example.com", "hank")
+    _attend_past_event(session, hank, "ev-1", days_ago=5)
+
+    stats = milestone_notification_service.run_once()
+    assert stats["milestones"] == 1
+    assert emailed == []  # digest mode: no immediate email
+    assert stats["emailed"] == 0
+    assert stats["pushed"] == 1  # push stays immediate
+    notif = session.exec(
+        select(Notification).where(Notification.kind == "milestone_unlocked")
+    ).one()
+    assert notif.emailed_at is None  # left for the activity digest
+    assert notif.pushed_at is not None
+
+
 def test_email_gated_off_still_creates_in_app(session, monkeypatch):
     emailed: list = []
     pushed: list = []
     monkeypatch.setattr(
         milestone_notification_service,
-        "send_milestones_unlocked_email",
+        "send_milestone_instant_email",
         lambda u, ms: emailed.extend(m.key for m in ms) or True,
     )
     monkeypatch.setattr(
@@ -220,10 +253,12 @@ def test_email_gated_off_still_creates_in_app(session, monkeypatch):
 def test_email_backfilled_after_toggle_flip(session, monkeypatch):
     """An in-app notice created while email was off must still email once the
     user opts in later — without re-creating the in-app row."""
+    session.add(SiteSetting(key="milestone_unlocked_email_instant", value="true"))
+    session.commit()
     emailed: list = []
     monkeypatch.setattr(
         milestone_notification_service,
-        "send_milestones_unlocked_email",
+        "send_milestone_instant_email",
         lambda u, ms: emailed.extend(m.key for m in ms) or True,
     )
     monkeypatch.setattr(milestone_notification_service, "send_push", lambda *a, **k: 0)
@@ -274,3 +309,54 @@ def test_global_kill_switch_skips(session):
         ).first()
         is None
     )
+
+
+def test_consistency_reach_emails_and_pushes(session, monkeypatch):
+    """A recurring consistency reach rides the shared email + push channels
+    (with its description), like a normal milestone."""
+    session.add(SiteSetting(key="milestone_unlocked_email_instant", value="true"))
+    session.commit()
+    emailed: list = []
+    pushed: list = []
+    monkeypatch.setattr(
+        milestone_notification_service,
+        "send_milestone_instant_email",
+        lambda u, ms: emailed.extend((m.key, m.description) for m in ms) or True,
+    )
+    monkeypatch.setattr(
+        milestone_notification_service,
+        "send_push",
+        lambda *a, **k: pushed.append((k.get("tag"), k.get("body"))) or 1,
+    )
+    gwen = _make_user(session, "gwen@example.com", "gwen")
+    # Three distinct active months in the rolling window -> Consistent (3/12).
+    _attend_past_event(session, gwen, "gw-0", days_ago=5)
+    _attend_past_event(session, gwen, "gw-1", days_ago=40)
+    _attend_past_event(session, gwen, "gw-2", days_ago=75)
+
+    milestone_notification_service.run_once()
+
+    notifs = session.exec(
+        select(Notification).where(Notification.kind == "milestone_unlocked")
+    ).all()
+    consistency = [
+        n for n in notifs if n.subject_key.startswith("consistency:consistency_3:")
+    ]
+    assert len(consistency) == 1
+    # Email included the consistency reach with its description.
+    assert any(
+        key.startswith("consistency:consistency_3:")
+        and desc == "Active 3 of the last 12 months"
+        for key, desc in emailed
+    )
+    # Push fired for the consistency reach carrying its description.
+    assert any(
+        tag is not None
+        and tag.startswith("milestone:consistency:consistency_3:")
+        and "Active 3 of the last 12 months" in (body or "")
+        for tag, body in pushed
+    )
+    # Both channels stamped on the consistency notification row.
+    session.refresh(consistency[0])
+    assert consistency[0].emailed_at is not None
+    assert consistency[0].pushed_at is not None

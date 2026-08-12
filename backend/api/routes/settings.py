@@ -207,6 +207,9 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         activity_digest_email_enabled=app_settings.get_activity_digest_email_enabled(
             session
         ),
+        digest_v2_enabled=app_settings.get_digest_v2_enabled(session),
+        digest_per_kind_cap=app_settings.get_digest_per_kind_cap(session),
+        digest_max_items=app_settings.get_digest_max_items(session),
         interest_match_notifications_enabled=app_settings.get_interest_match_notifications_enabled(
             session
         ),
@@ -246,6 +249,27 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         interest_matches_email_digest=app_settings.get_feature_email_digest(
             "interest_matches", session
         ),
+        event_messages_email_instant=app_settings.get_feature_email_instant(
+            "event_messages", session
+        ),
+        event_messages_email_digest=app_settings.get_feature_email_digest(
+            "event_messages", session
+        ),
+        suggested_events_email_instant=app_settings.get_feature_email_instant(
+            "suggested_events", session
+        ),
+        suggested_events_email_digest=app_settings.get_feature_email_digest(
+            "suggested_events", session
+        ),
+        milestone_notifications_enabled=app_settings.get_milestone_notifications_enabled(
+            session
+        ),
+        milestone_unlocked_email_instant=app_settings.get_feature_email_instant(
+            "milestone_unlocked", session
+        ),
+        milestone_unlocked_email_digest=app_settings.get_feature_email_digest(
+            "milestone_unlocked", session
+        ),
         review_prompt_enabled=app_settings.get_review_prompt_enabled(session),
         review_prompt_delay_hours=app_settings.get_review_prompt_delay_hours(session),
         review_prompt_lookback_hours=app_settings.get_review_prompt_lookback_hours(
@@ -253,6 +277,9 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         ),
         for_you_review_window_days=app_settings.get_for_you_review_window_days(session),
         review_mood_headline_min_reviews=app_settings.get_review_mood_headline_min_reviews(
+            session
+        ),
+        event_message_cta_min_going=app_settings.get_event_message_cta_min_going(
             session
         ),
         duplicate_auto_detect_enabled=_get_bool_setting(
@@ -488,6 +515,24 @@ def update_settings(
         _set_bool_setting(
             session, "activity_digest_email_enabled", body.activity_digest_email_enabled
         )
+    if body.digest_v2_enabled is not None:
+        _set_bool_setting(session, "digest_v2_enabled", body.digest_v2_enabled)
+    if body.digest_per_kind_cap is not None:
+        row = session.get(SiteSetting, "digest_per_kind_cap")
+        if row:
+            row.value = str(body.digest_per_kind_cap)
+        else:
+            row = SiteSetting(
+                key="digest_per_kind_cap", value=str(body.digest_per_kind_cap)
+            )
+        session.add(row)
+    if body.digest_max_items is not None:
+        row = session.get(SiteSetting, "digest_max_items")
+        if row:
+            row.value = str(body.digest_max_items)
+        else:
+            row = SiteSetting(key="digest_max_items", value=str(body.digest_max_items))
+        session.add(row)
     if body.interest_match_notifications_enabled is not None:
         _set_bool_setting(
             session,
@@ -496,12 +541,21 @@ def update_settings(
         )
     if body.web_push_enabled is not None:
         _set_bool_setting(session, "web_push_enabled", body.web_push_enabled)
+    if body.milestone_notifications_enabled is not None:
+        _set_bool_setting(
+            session,
+            "milestone_notifications_enabled",
+            body.milestone_notifications_enabled,
+        )
     for _feature in (
         "friends_going",
         "social_activity",
         "friend_reviews",
         "friend_milestones",
         "interest_matches",
+        "milestone_unlocked",
+        "event_messages",
+        "suggested_events",
     ):
         _instant = getattr(body, f"{_feature}_email_instant")
         if _instant is not None:
@@ -583,6 +637,17 @@ def update_settings(
             row = SiteSetting(
                 key="review_mood_headline_min_reviews",
                 value=str(body.review_mood_headline_min_reviews),
+            )
+        session.add(row)
+
+    if body.event_message_cta_min_going is not None:
+        row = session.get(SiteSetting, "event_message_cta_min_going")
+        if row:
+            row.value = str(body.event_message_cta_min_going)
+        else:
+            row = SiteSetting(
+                key="event_message_cta_min_going",
+                value=str(body.event_message_cta_min_going),
             )
         session.add(row)
 

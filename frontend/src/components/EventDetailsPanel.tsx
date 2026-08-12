@@ -43,12 +43,6 @@ export default function EventDetailsPanel({
                     <h2 className="text-lg font-bold text-slate-900 leading-snug">
                         {event.title}
                     </h2>
-                    <Link
-                        to={`/event/${event.event_id}${source ? `?src=${source}` : ''}`}
-                        className="text-xs text-blue-600 hover:text-blue-700 hover:underline mt-0.5 inline-block"
-                    >
-                        See full details →
-                    </Link>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                     <SaveEventButton eventId={event.event_id} appearance="icon" />
@@ -101,6 +95,14 @@ export default function EventDetailsPanel({
             </div>
             <div className={`modal-scroll overflow-y-auto overscroll-contain px-6 py-4 ${bodyClassName}`.trim()}>
                 <EventDetailContent event={event} onEdit={onEdit} compact={true} />
+            </div>
+            <div className="border-t border-slate-100 px-6 py-3 flex justify-end">
+                <Link
+                    to={`/event/${event.event_id}${source ? `?src=${source}` : ''}`}
+                    className="text-xs text-blue-600 hover:text-blue-700 hover:underline"
+                >
+                    See full details →
+                </Link>
             </div>
         </div>
     );

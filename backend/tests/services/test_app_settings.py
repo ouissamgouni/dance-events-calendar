@@ -239,6 +239,32 @@ def test_mood_headline_min_reviews_ignores_non_positive_row(session, monkeypatch
     assert app_settings.get_review_mood_headline_min_reviews(session) == 3
 
 
+# --- event_message_cta_min_going ------------------------------------------
+
+
+def test_event_message_cta_min_going_prefers_db_row(session, monkeypatch):
+    monkeypatch.setattr(
+        "backend.config.loader.get_event_message_cta_min_going", lambda: 3
+    )
+    _put(session, "event_message_cta_min_going", "8")
+    assert app_settings.get_event_message_cta_min_going(session) == 8
+
+
+def test_event_message_cta_min_going_falls_back_when_row_missing(session, monkeypatch):
+    monkeypatch.setattr(
+        "backend.config.loader.get_event_message_cta_min_going", lambda: 4
+    )
+    assert app_settings.get_event_message_cta_min_going(session) == 4
+
+
+def test_event_message_cta_min_going_ignores_non_positive_row(session, monkeypatch):
+    monkeypatch.setattr(
+        "backend.config.loader.get_event_message_cta_min_going", lambda: 3
+    )
+    _put(session, "event_message_cta_min_going", "0")
+    assert app_settings.get_event_message_cta_min_going(session) == 3
+
+
 # --- activity_digest_schedule ---------------------------------------------
 
 

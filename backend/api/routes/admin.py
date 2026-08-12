@@ -736,6 +736,10 @@ def notification_toggle_counts(
             email=_count(User.email_review_prompt_enabled == True),  # noqa: E712
             push=_count(User.push_review_prompt_enabled == True),  # noqa: E712
         ),
+        milestones=NotificationToggleCountEntry(
+            email=_count(User.email_milestone_unlocked_enabled == True),  # noqa: E712
+            push=_count(User.push_milestone_unlocked_enabled == True),  # noqa: E712
+        ),
     )
 
 
@@ -757,7 +761,7 @@ def _notification_kinds_by_type() -> dict[str, list[str]]:
     for kind, feature in activity_email.FEATURE_BY_KIND.items():
         if feature == "interest_matches":
             kinds_by_type["interest_match"].append(kind)
-        elif feature == "social_activity":
+        elif feature in ("social_activity", "suggested_events"):
             kinds_by_type["activity_digest"].append(kind)
     return kinds_by_type
 
@@ -1008,11 +1012,13 @@ def digest_send_now(
                 getattr(user, f"email_{feature}_enabled", False)
                 or getattr(user, f"push_{feature}_enabled", False)
             )
-        return (
-            user.email_social_activity_enabled
-            or user.email_interest_matches_enabled
-            or user.push_social_activity_enabled
-            or user.push_interest_matches_enabled
+        # Global (combined) send-now: eligible if ANY activity feature's
+        # email or push channel is on — the combined v2 digest spans all
+        # of them, so a friends-only or reviews-only user still qualifies.
+        return any(
+            getattr(user, f"email_{feat}_enabled", False)
+            or getattr(user, f"push_{feat}_enabled", False)
+            for feat in set(activity_email.FEATURE_BY_KIND.values())
         )
 
     users = {

@@ -1,0 +1,97 @@
+test_plan:
+  name: "Suggested events — dedicated feature toggle (H4)"
+  description: >
+    Verifies that ``subscription_suggested`` (an event a user submitted
+    being approved and fanned out to their followers) is now its own
+    feature bucket with independent email/push gates
+    (``email_suggested_events_enabled`` / ``push_suggested_events_enabled``),
+    split out of the broader "Friends & social" (social_activity) bucket.
+    Proves (1) the admin "Suggested events" email-delivery card and the
+    per-user "Suggested events" account row exist and drive the flags, and
+    (2) toggling the suggested-events email off removes ITS section from
+    the combined activity digest (v2) while leaving every other section
+    intact; on → it renders as its own card section.
+
+  preconditions:
+    - "Start a local SMTP catcher on port 1025 with a web UI, e.g. Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`."
+    - "Run the scenario with: `SCENARIO=notif-suggested-events task start:scenario BROWSER=isolated RESET_BROWSER=1`."
+    - "Open the SMTP catcher UI, e.g. Mailpit at http://127.0.0.1:8025, and clear any existing messages."
+    - "Seed: Bob and Carol both follow Alice. Bob has suggested-events email + push ON; Carol has suggested-events email OFF (push ON). Dave does not follow Alice."
+
+  cast:
+    - "Alice — submitter. Suggests an event the admin approves → fan-out to her followers."
+    - "Bob — follows Alice; suggested_events email + push ON → in-app + push + a combined digest with a Suggested-events section."
+    - "Carol — follows Alice; suggested_events email OFF (push ON) → in-app + push, but NO suggested-events section in her digest."
+    - "Dave — does not follow Alice → negative control (no row)."
+
+  steps:
+    - id: 1
+      title: "Admin config exposes a 'Suggested events' email-delivery card"
+      description: |
+        Sign in as Dev Admin, open /admin/configuration → Notifications
+        card. Locate the per-feature "Suggested events" card in the email
+        delivery section (between "Event messages" and "Milestones").
+      expected: |
+        A "Suggested events" card is present with Instant/Digest email
+        checkboxes (default Instant off, Digest on) and its own scoped
+        "Send now" picker — proving suggested_events is a first-class
+        feature the admin can route independently.
+
+    - id: 2
+      title: "Account page exposes a 'Suggested events' notification row"
+      description: |
+        As Bob, open /account#notify-suggested-events (Notification
+        settings). Confirm a "Suggested events" row with Email + Push
+        switches, described as "When an event you suggested is approved."
+      expected: |
+        The row exists and reflects Bob's seed (Email ON, Push ON),
+        distinct from the "Friends & social" row. Toggling either switch
+        PATCHes ``{email|push}_suggested_events_enabled`` and round-trips
+        in GET /auth/me.
+
+    - id: 3
+      title: "Approve Alice's suggestion → followers get the notification"
+      description: |
+        As Alice (Browser A), open /suggest and submit a new event
+        ("Alice's Suggested Salsa", any future date). As Admin, open
+        /admin/suggestions, find it and click Approve, assigning it to
+        Movida Salsa.
+      expected: |
+        POST /api/admin/suggestions/{id}/approve → 200; a CachedEvent is
+        created and a ``subscription_suggested`` notification (actor=alice)
+        is inserted for Bob AND Carol (Alice's followers), not Dave. Both
+        Bob and Carol receive an immediate push (both have push ON).
+
+    - id: 4
+      title: "Bob's combined digest shows a 'Suggested events approved' section"
+      description: |
+        Wait for the next digest tick (or use the admin "Suggested events"
+        card's Send now for Bob). Open Bob's combined digest in Mailpit.
+      expected: |
+        Bob's single combined email includes a "Suggested events approved"
+        card section with "Alice's suggested event … was approved" (Alice's
+        avatar + date · city subline). Because Bob's
+        ``email_suggested_events_enabled`` is ON, the section renders.
+
+    - id: 5
+      title: "Carol's digest has NO suggested-events section (email gate off)"
+      description: |
+        Trigger/inspect Carol's combined digest in Mailpit the same way.
+      expected: |
+        Carol still got the in-app row and a push, but her combined digest
+        has NO "Suggested events approved" section — her
+        ``email_suggested_events_enabled`` is OFF. Any other enabled
+        sections she has are unaffected, proving the gate is per-feature.
+
+    - id: 6
+      title: "Flip Bob's suggested-events email off → section leaves the digest"
+      description: |
+        As Bob, open /account#notify-suggested-events and turn the
+        Suggested events Email switch OFF. Approve another Alice suggestion
+        (repeat step 3) and inspect Bob's next combined digest.
+      expected: |
+        Bob's new combined digest no longer contains the "Suggested events
+        approved" section (its rows are gated out), while every other
+        section he qualifies for still appears — the toggle removes only
+        its own section. Turning it back ON restores the section on the
+        following approval.

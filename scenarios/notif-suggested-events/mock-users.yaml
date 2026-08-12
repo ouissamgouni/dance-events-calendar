@@ -1,0 +1,39 @@
+# notif-suggested-events cast.
+#   Alice — submitter; suggests an event that the admin approves →
+#           fans out `subscription_suggested` to her followers.
+#   Bob   — follows Alice; suggested_events email + push ON → gets the
+#           notification and its section in the combined digest email.
+#   Carol — follows Alice; suggested_events email OFF (push ON) → in-app
+#           + push only; her combined digest has NO suggested-events
+#           section (per-feature email gate proof).
+#   Dave  — does NOT follow Alice → negative control (no row).
+users:
+  - email: admin@example.com
+    name: Admin
+    handle: admin
+    account_visibility: public
+
+  - email: alice@example.com
+    name: Alice Rivera
+    handle: alice
+    account_visibility: public
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Alice%20Rivera
+
+  - email: bob@example.com
+    name: Bob Martin
+    handle: bob
+    account_visibility: public
+    email_suggested_events_enabled: true
+    push_suggested_events_enabled: true
+
+  - email: carol@example.com
+    name: Carol Nguyen
+    handle: carol
+    account_visibility: public
+    email_suggested_events_enabled: false
+    push_suggested_events_enabled: true
+
+  - email: dave@example.com
+    name: Dave Owens
+    handle: dave
+    account_visibility: public

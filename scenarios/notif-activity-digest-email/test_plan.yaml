@@ -2,15 +2,21 @@ test_plan:
   name: "Activity digest — all features in one email"
   description: >
     Comprehensive digest-email render test. One actor (Alice) generates
-    activity across EVERY feature bucket and a single follower (Bob) with
-    all `email_*` toggles ON receives ONE digest email whose body carries
-    a line for each feature: friends_going (Alice is going),
-    social_activity (a new follower + a new friend), friend_reviews
-    (Alice reviewed an event), friend_milestones (Alice reached a
-    passport milestone) and interest_matches (a new event matched Bob's
-    profile) — plus the "People you may want to follow" suggestions
-    section and the engagement CTA block. Carol (all toggles OFF) is the
-    negative probe. Push is silent (every user has push_* OFF).
+    activity across EVERY digest-eligible feature bucket and a single
+    follower (Bob) with all `email_*` toggles ON receives ONE combined
+    digest email whose body carries a section for each feature:
+    friends_going (Alice is going), social_activity (a new follower + a
+    new friend), friend_reviews (Alice reviewed an event),
+    friend_milestones (Alice reached a passport milestone),
+    interest_matches (a new event matched Bob's profile),
+    suggested_events (Alice's suggested event was approved),
+    milestone_unlocked (Bob's OWN first passport milestone) and
+    event_messages (Alice posted on a board Bob is going to) — plus the
+    "People you may want to follow" suggestions section and the
+    engagement CTA block. Carol (all toggles OFF) is the negative probe.
+    Push is silent (every user has push_* OFF). Run once with Combined
+    digest (v2) ON for the single card email, then flip it OFF in admin
+    to see the legacy per-feature list emails.
 
   preconditions:
     - "Start Mailpit: `mailpit --smtp 127.0.0.1:1025 --listen 127.0.0.1:8025`"
@@ -20,8 +26,8 @@ test_plan:
     - "Open the Mailpit inbox at http://127.0.0.1:8025 and clear existing messages."
 
   cast:
-    - "Alice — actor; Going ev-friend, reviewed ev-review, attended ev-past (milestone). Mutual friend of Bob."
-    - "Bob   — follower with EVERY `email_*` toggle ON → one all-features digest."
+    - "Alice — actor; Going ev-friend, reviewed ev-review, attended ev-past (milestone), suggested ev-suggested (approved), posted on ev-messages. Mutual friend of Bob."
+    - "Bob   — follower with EVERY `email_*` toggle ON → one all-features digest. Also attended ev-past (his OWN first milestone) and is Going ev-messages (engaged recipient of Alice's board post)."
     - "Carol — follower with EVERY `email_*` toggle OFF → in-app only."
     - "diego, elena — followed by Alice; surfaced as Bob's mutual-friend suggestions."
     - "curator-bachata — admin-managed curator, also followed by Alice; surfaced as a third suggestion alongside diego/elena."
@@ -48,14 +54,18 @@ test_plan:
       description: >
         Open Bob's digest email in Mailpit and read the activity list.
       expected: >
-        Bob receives exactly ONE digest email prefixed with "Movida:"
-        containing a line for each feature:
+        Bob receives exactly ONE combined digest email prefixed with
+        "Movida:" containing a section for each feature:
         friends_going — "Alice is going to Bachata Friendly Social";
         social_activity — "Carol started following you" and "You and Alice
         are now friends"; friend_reviews — "Alice shared their experience
         of Rooftop Salsa Social"; friend_milestones — "Alice reached a
         milestone: ..."; interest_matches — "International Salsa Congress
-        Paris matched your ... alert". Carol receives 0 emails.
+        Paris matched your ... alert"; suggested_events — "Alice suggested
+        the event Rooftop Kizomba Sunset"; milestone_unlocked (Your
+        achievements) — "🎉 You unlocked ..." for Bob's own first milestone,
+        whose card tile is a 🏅 medal (NOT a duplicate 🎉); event_messages —
+        "Alice asked ... Sunday Social Practica". Carol receives 0 emails.
 
     - id: 3
       title: "Push channel remains silent"
@@ -104,3 +114,18 @@ test_plan:
         `localhost:5173` — and the `open.png`/`share.png`/etc. icons must
         render (both depend on the scenario's `PUBLIC_APP_URL` override
         matching the live frontend port).
+
+    - id: 6
+      title: "Combined digest OFF → legacy per-feature emails"
+      description: >
+        Reset Mailpit, open admin Settings → Activity digest, toggle
+        "Combined digest" OFF, then re-run the digest trigger
+        (`task notify:trigger:scenario -- --immediate-emails`).
+      expected: >
+        Instead of the single combined card, Bob now receives SEPARATE
+        legacy list emails — one per feature bucket that has activity
+        (friends_going, social_activity, friend_reviews,
+        friend_milestones, interest_matches, suggested_events,
+        milestone_unlocked, event_messages) — each a plain per-feature
+        digest. Carol still receives 0 emails. Toggling the flag back ON
+        restores the single combined card from step 2.

@@ -1,11 +1,18 @@
 test_plan:
-  name: "Onboarding preferences and follow suggestions"
+  name: "Onboarding wizard: styles, area preview, follow, local, recap"
   description: >
-    First-sign-in flow that first asks for preferences using admin-eligible
-    onboarding tag groups, then surfaces follow suggestions. Follow buttons
-    save immediately from each card. Done and Skip stamp `users.onboarded_at`
-    so the App-level guard never bounces the user back here on subsequent
-    loads.
+    First-sign-in flow as a single stepped wizard modelled on the review
+    workflow: one card, a progress bar ABOVE the step title, a back/continue
+    footer, and a final recap with per-section Edit jumps. The FIVE steps are
+    styles → area → follow → local → recap. The standalone "preview" step was
+    folded into step 2: step 2 shows a worldwide event MAP (markers for every
+    matching event on the globe) plus a "In your area" TRAIL below it that is
+    the same matched set filtered client-side to the current area box.
+    A SOFT GATE releases after step 1: picking a style and tapping Continue
+    stamps `users.onboarded_at` (via POST /api/social/onboarding/complete with
+    `handles: []`) so the App-level guard never bounces the user back
+    mid-wizard. Every /onboarding* URL (/onboarding, /onboarding/preferences,
+    /onboarding/local, /onboarding/follow) renders the same wizard.
 
   preconditions:
     - "Run with: task start:scenario SCENARIO=onboarding"
@@ -15,171 +22,311 @@ test_plan:
       curators (`curatoralpha`, `curatorbeta`), three popular accounts
       (`pop1`, friends-only `pop2`, opted-out `pop3`), plus exclusion probes
       for already-followed, pending-follow, and no-handle users.
-
+    - >
+      People graph: mutual follows create real friendships — `pop1`<->`pop2`
+      and `pop2`<->`alreadyfollowed` are two-way friends; `alreadyfollowed`
+      and `pop1` both follow `verifiedcurator`, so the curator sits inside the
+      newbie's follow neighbourhood.
+    - >
+      Curator-with-events: `verifiedcurator` is publicly Going to 16 of the
+      seeded events (seeded via `attendances:` in db-events.yaml,
+      `share_publicly: true`), so following the curator surfaces real events
+      the newbie can discover.
+    - >
+      `tags.yaml` marks the `dance-style` and `reach` tag groups as
+      `onboarding_eligible`; the `format` group is intentionally not eligible.
+      The dance-style group is `salsa`, `bachata`, `kizomba`, `zouk`, `mambo`.
+    - >
+      `db-events.yaml` seeds 124 upcoming, geocoded events across six
+      continents spread over the next ~12 months. Tag mixes cover every
+      requested combination: single styles (salsa, bachata, kizomba, zouk,
+      mambo), combos (salsa+bachata, salsa+bachata+kizomba, salsa+mambo),
+      each reach tier (local, regional, international), and each format
+      (social, workshop, festival). Paris has the most upcoming events, so it
+      ranks first in the popular-cities pills. Because the step-2 trail is
+      area-aware, a narrow area over open ocean exercises the empty-trail
+      state while the worldwide map stays populated.
     - >
       The API also excludes soft-deleted users. This scenario documents that
       rule but does not seed a soft-deleted user because the scenario user
       seeder does not currently accept `deleted_at`.
-    - >
-      `tags.yaml` marks only the `dance-style` tag group as
-      `onboarding_eligible`; the `format` group is intentionally not eligible.
 
   steps:
     - id: 1
-      title: "Fresh sign-in lands on onboarding preferences"
+      title: "Fresh sign-in lands on the wizard at step 1 (styles)"
       description: >
         Open / in a brand-new browser session. /login → "Sign in as
         Nora Newbie".
       expected: >
-        URL becomes /onboarding/preferences?next=%2F. The preferred tags card
-        shows `Dance Style` tags (`Salsa`, `Bachata`, `Kizomba`, `Zouk`) and
-        does not show the non-eligible `Format` tags. The default event area
-        section is expanded by default and explains that the map controls the
-        starting event area, not the user's physical location. Skip is visible
-        in the header, and Continue is enabled even before any preference is
-        selected.
-
-    - id: 1b
-      title: "Default event area guide stays fixed while choosing a map area"
-      description: >
-        From /onboarding/preferences?next=%2F, pan and zoom the default event
-        area map, then tap `Save area in box`.
-      expected: >
-        The highlighted box stays fixed on screen while the map moves beneath
-        it. Saving uses the area inside that fixed box, focuses the area-name
-        field, and persists through /api/auth/preferences without an error.
+        URL becomes /onboarding/preferences?next=%2F. A single card shows, from
+        top to bottom, a progress bar with 5 segments (segment 1 filled) ABOVE
+        the header "What do you dance?" and "Step 1 of 5". The card contains a
+        `Dance styles` picker (`Salsa`, `Bachata`, `Kizomba`, `Zouk`, `Mambo` —
+        NOT the non-eligible `Format` tags) and a `Reach` picker (`Local`,
+        `Regional`, `International`, with `International` pre-selected). There is
+        NO live preview on step 1 (the preview lives on step 2). No Back arrow
+        (first step). Continue is DISABLED until a style is picked. No Skip
+        button.
 
     - id: 1a
-      title: "Preferences skip advances to local step"
+      title: "Continue from step 1 soft-completes onboarding and advances"
       description: >
-        From /onboarding/preferences?next=%2F, tap Skip.
-      expected: >
-        URL becomes /onboarding/local?next=%2F (Skip still suggests the
-        optional local-profile step) without stamping onboarded_at and
-        without hitting /api/interest-profiles. Nora already owns
-        exactly one default profile from signup
-        (`matches_enabled=false`, `is_active=true`) which remains
-        untouched. On the local step, the Dance styles picker is EMPTY
-        (nothing was selected before skipping).
-
-    - id: 2
-      title: "Preferences continue to local step"
-      description: >
-        Select `Salsa` and `Bachata`. Leave the map section collapsed and tap
+        With at least one style selected (e.g. `Salsa` + `Bachata`), tap
         Continue.
       expected: >
-        Network saves preferred tag ids through /api/auth/preferences and
-        PATCHes /api/interest-profiles/<id> on the signup-seeded default
-        profile (label, area, dance/reach tag ids, `matches_enabled=true`,
-        `is_active=true`). No new profile row is created. URL replaces
-        to /onboarding/local?next=%2F.
+        PATCH /api/auth/preferences persists the picked dance tag ids (merged
+        into browse tags). POST /api/social/onboarding/complete fires with
+        `handles: []` → 200 (soft gate: stamps `onboarded_at`, body
+        `followed: []`). URL advances to step 2 with header "Where do you
+        dance?" and progress segment 2 filled. Navigating directly to / now no
+        longer redirects back into the wizard.
+
+    - id: 2
+      title: "Step 2 (area): worldwide event map + area-filtered trail"
+      description: >
+        Inspect step 2 after picking styles on step 1.
+      expected: >
+        Header "Where do you dance?" with the hint "Sets your default Explorer
+        area and the region we alert you about for the selected tags." Directly
+        UNDER that description sits a compact editable badge recap of the chosen
+        styles + reach (tag chips + a dance icon) with an "Edit" link that jumps
+        back to step 1. Below the recap, the map (AreaMapPicker) shows a
+        draggable/highlighted area box AND lightweight blue markers for EVERY
+        matching event across the globe (six continents); the small area-name
+        label + input sit under the map. A wide-area guardrail hint (when the
+        box is wide) renders IMMEDIATELY UNDER THE MAP. Then an "In your area"
+        section shows a SAMPLE OF UP TO 5 compact event cards with a distinctive
+        light-blue background = the SAME matched set filtered client-side to the
+        current box (no refetch on pan); each card's tags stay on ONE line with
+        colored badges and a "+x" overflow. An "Alert me about matches" checkbox
+        (CHECKED by default) sits at the bottom. A Back arrow is present; there
+        is no Skip on step 2.
 
     - id: 2a
-      title: "Local step shows dance styles first, then city + notify toggle"
+      title: "Two styles apply OR faceting to markers and trail"
       description: >
-        Inspect the /onboarding/local page.
+        With `Salsa` and `Bachata` picked, observe the map markers and trail.
       expected: >
-        Sections appear in this order: (1) optional "Dance styles"
-        TagsPicker (PRE-FILLED with whatever the user picked in Step 2
-        — e.g. Salsa + Bachata; empty if the user skipped Step 1),
-        (2) "City" search + "Use my current location", (3) "Radius"
-        slider (5–150 km, default 10), (4) preview map, (5) "Notify me
-        about matching events" checkbox CHECKED by default. Continue is
-        disabled (tooltip: "Pick a city or use your current location
-        first") until a pin is set. Skip is visible in the header.
+        Events matching EITHER salsa OR bachata are shown (disjunctive faceting
+        within the dance group, AND across groups) — an event tagged only
+        salsa and an event tagged only bachata both appear; the combo
+        salsa+bachata event also appears once. The same matched set drives both
+        the worldwide markers and the in-box trail.
 
     - id: 2b
-      title: "Skip on local step creates NO second profile"
+      title: "Saving the box focuses the area-name box without a visual jump"
       description: >
-        From /onboarding/local, tap Skip in the header.
+        Pan/zoom the box to a new area and tap the centered "Save area"
+        button.
       expected: >
-        URL replaces to /onboarding/follow?next=%2F. NO POST to
-        /api/interest-profiles occurs — the preferences profile from
-        Step 2 remains the only, and active, profile.
+        The saved box stays put — it does NOT jump back to the previous area
+        and then forward. Immediately after saving, keyboard focus moves into
+        the area-name input so the user can rename the area right away.
 
     - id: 2c
-      title: "Continue on local step creates an INACTIVE second profile"
+      title: "Dragging the box to Europe filters the trail (map stays global)"
       description: >
-        Re-run the scenario (or navigate back), reach /onboarding/local
-        again with the preferences profile in place. Pick a city, keep
-        radius at 10 km, keep Notify checked, tap Continue.
+        Drag/pan the box over Europe, then read the trail.
       expected: >
-        PATCH /api/auth/preferences persists only `home_location` (the
-        preferences profile's area is preserved). A second POST
-        /api/interest-profiles fires with the bbox, dance/reach tag ids,
-        `matches_enabled: true`, and `is_active: false` and returns 200.
-        The preferences profile remains ACTIVE. URL replaces to
-        /onboarding/follow?next=%2F. Both profiles are visible in
-        Settings → Alerts, only the first marked Active.
+        The worldwide markers stay put across all continents, but the "In your
+        area" trail now lists only events whose coordinates fall inside the
+        European box (e.g. Paris/Berlin/Madrid), not events in the Americas or
+        Asia. No network refetch occurs on pan.
+
+    - id: 2d
+      title: "Empty ocean box shows the empty-trail alert nudge"
+      description: >
+        Drag the box over open ocean far from any venue.
+      expected: >
+        The worldwide map stays populated, but the sample cards are replaced by
+        an empty-state nudge inviting the user to turn on alerts. The "Alert me
+        about matches" checkbox stays available and checked.
+
+    - id: 2e
+      title: "Continue on step 2 finalizes the default profile"
+      description: >
+        Keep "Alert me about matches" checked and tap Continue.
+      expected: >
+        The area box PATCHes /api/auth/preferences (browse area) and the
+        signup-seeded default profile is updated (label, bounds, dance/reach
+        tag ids, `matches_enabled=true`, `is_active=true`); no new profile row
+        is created. URL advances to step 3 (follow).
 
     - id: 3
-      title: "Suggestion ranking and exclusions are enforced"
+      title: "Step 3 (follow) ranking and exclusions are enforced"
       description: >
-        Inspect the freshly loaded onboarding follow list.
+        Inspect the freshly loaded suggestion list on step 3.
       expected: >
         All verified organizers appear before any curator-only account;
         `verifiedcurator` appears once, not repeated in the curator section;
-        curator-only accounts appear as
-        `curatoralpha`, then `curatorbeta`; the visible popular tail appears
-        as `pop1`, then friends-only `pop2` because `pop1` has the highest
-        follower count and account visibility does not control suggestion
-        eligibility.
-        The list does not include `newbie` (self), `alreadyfollowed` (existing
-        approved follow), `pendingtarget` (existing pending outgoing request),
-        `pop3` (explicit `show_in_suggestions: false`), or
-        `nohandle@example.com` (candidate without a handle). Soft-deleted users
-        are also excluded by the endpoint, but are not represented in this
-        scenario fixture because the seeder does not support `deleted_at`.
+        curator-only accounts appear as `curatoralpha`, then `curatorbeta`;
+        the visible popular tail appears as `pop1`, then friends-only `pop2`.
+        The list excludes `newbie` (self), `alreadyfollowed` (approved follow),
+        `pendingtarget` (pending outgoing request), `pop3`
+        (`show_in_suggestions: false`), and `nohandle@example.com` (no handle).
+        The list is vertically scrollable (capped ~5 rows). A search box lets
+        the user find and add other accounts by name/@handle. A header Skip is
+        present.
 
-    - id: 4
-      title: "Limit truncates after higher-ranked groups"
+    - id: 3a
+      title: "Search opens an OVERLAY (not inline) with follow controls"
+      description: >
+        Type a query into the follow search box.
+      expected: >
+        Results render in an absolutely-positioned overlay (mt-1, bordered,
+        shadowed, z-50, max-height scroll) below the input — it does NOT push
+        the suggestions list down. Each result row mirrors the header user row
+        (avatar, display name, "@handle · N subscribers"). A not-followed
+        account shows a `Follow` button; `alreadyfollowed` shows a `Following`
+        badge (no CTA); `pendingtarget` shows a `Requested` badge.
+
+    - id: 3b
+      title: "Following a searched account prepends it to the suggestions"
+      description: >
+        In the overlay, tap `Follow` on a searched account.
+      expected: >
+        POST /api/social/users/{handle}/follow fires and the user is prepended
+        to the TOP of the suggestions list marked `Following`; the deterministic
+        suggestion ranking of the remaining rows is unchanged.
+
+    - id: 3c
+      title: "Suggestion limit truncates after higher-ranked groups"
       description: >
         With Nora signed in, call
-        /api/social/onboarding/suggestions?limit=5 directly from the browser
-        session or API client.
+        /api/social/onboarding/suggestions?limit=5 directly.
       expected: >
-        The response contains exactly five suggestions: the three verified
-        organizers plus `curatoralpha` and `curatorbeta`. It does not include
-        `pop1` or `pop2` until a higher limit leaves room for the most-followed
-        tail. `pop3` never appears because it opted out of suggestions.
+        Exactly five suggestions: the three verified organizers plus
+        `curatoralpha` and `curatorbeta`. `pop1`/`pop2` only appear at higher
+        limits; `pop3` never appears (opted out).
 
-    - id: 5
-      title: "Follow from cards and complete"
+    - id: 3d
+      title: "Follow from a suggestion card is immediate and reversible"
       description: >
         Tap `Follow` on `salsahub`, `verifiedcurator`, and `pop1`. Tap the
-        `Following` button on `pop1` again to undo it, then tap Done.
+        `Following` button on `pop1` again to undo it. Tap Continue.
       expected: >
-        Each first card click immediately POSTs
-        /api/social/users/{handle}/follow and the card changes to `Following`.
-        Tapping `Following` again immediately DELETEs
-        /api/social/users/pop1/follow and the card returns to `Follow`.
-        Done POSTs /api/social/onboarding/complete with `handles: []` → 200,
-        body contains `onboarded_at` and `followed: []` because follows were
-        already persisted individually.
-        App navigates to /. Refreshing the page stays on / — the guard no
-        longer redirects.
+        Each first card click immediately POSTs the follow and the card flips
+        to `Following`; tapping `Following` again immediately DELETEs it and
+        the card returns to `Follow`. Continue advances to step 4 (local); no
+        onboarding/complete call is required (soft gate already stamped
+        `onboarded_at` at step 1).
+
+    - id: 4
+      title: "Step 4 (local): separate-profile note, styles-first, gated map"
+      description: >
+        Inspect step 4.
+      expected: >
+        A blue note explains this OPTIONAL step creates a SEPARATE "near home"
+        profile with its own tighter radius that does NOT replace the default
+        area. Sections in order: (1) a "Dance styles" picker (horizontally
+        scrollable) PRE-FILLED with the step-1 selection; (2) "City" with
+        horizontally scrollable popular-city pills — `Paris` first (most
+        upcoming events) — plus a city search with a "Use my location" button
+        to its right. The Radius slider, preview map, and mail checkbox are
+        HIDDEN until a location is chosen; before that, a hint reads
+        "Pick a city or use your location…". The FOOTER makes Skip the PRIMARY
+        (blue) button ("Skip for now"); Continue ("Save this profile") is the
+        secondary button and stays disabled until both a pin and ≥1 style.
+
+    - id: 4a
+      title: "Picking a popular-city pill reveals the radius, map, and alert"
+      description: >
+        Tap the `Paris` pill.
+      expected: >
+        Tapping the pill sets the pin to Paris's coordinates and highlights the
+        pill. A "Remove location" link appears above the newly-revealed
+        controls. The previously-hidden Radius slider (5–150 km, default 10),
+        the preview map (centered on Paris with a coverage box), and a
+        "Alert me about near-home matches" mail checkbox all appear. The
+        secondary Continue ("Save this profile") button becomes enabled.
+
+    - id: 4a1
+      title: "Remove location clears the pin and hides the controls"
+      description: >
+        With a Paris pin chosen, tap "Remove location".
+      expected: >
+        The pin clears, the radius slider / preview map / mail checkbox
+        disappear, and the "Pick a city or use your location…" hint returns.
+        Continue ("Save this profile") goes back to disabled.
+
+    - id: 4b
+      title: "Save this profile creates an INACTIVE second profile"
+      description: >
+        With a Paris pin, keep radius 10 km, leave the mail checkbox checked,
+        and tap "Save this profile".
+      expected: >
+        PATCH /api/auth/preferences persists `home_location`. A POST
+        /api/interest-profiles fires with the local bbox, dance tag ids,
+        `matches_enabled=true` (mail checkbox), `is_active=false` → 200. The
+        default profile stays ACTIVE. URL advances to step 5 (recap). Both
+        profiles are visible in Settings → Alerts, only the first marked Active.
+
+    - id: 4c
+      title: "Skip for now creates NO second profile"
+      description: >
+        Re-run to reach step 4, then tap the primary "Skip for now" button.
+      expected: >
+        URL advances to step 5 (recap). No POST /api/interest-profiles occurs;
+        the default profile remains the only, active profile.
+
+    - id: 4d
+      title: "Skip after saving DELETES the previously-created local profile"
+      description: >
+        Save a Paris local profile (4b), tap the header Back arrow to return to
+        step 4, then tap the primary "Skip for now" button.
+      expected: >
+        DELETE /api/interest-profiles/{id} fires for the local profile and
+        PATCH /api/auth/preferences clears `home_location`. The recap's "Local
+        search profile" section now reads "Skipped", and Settings → Alerts shows
+        only the default profile.
+
+    - id: 5
+      title: "Step 5 (recap): three profile-shaped sections with Edit jumps"
+      description: >
+        Inspect the recap.
+      expected: >
+        Three sections (icon headers, not text labels), each with an "Edit"
+        link: (1) "Default search profile" — styles as horizontally scrollable
+        tag chips, then a small NON-INTERACTIVE mini-map showing the saved
+        area's bounding box (NO event pins) with the area label beneath it, and
+        the Alerts on/off state aligned to the RIGHT of the area row
+        (Edit → step 1); (2) "Local search profile" — city · radius · alerts, or
+        "Skipped" (Edit → step 4); (3) "Following" — followed users as
+        horizontally scrollable avatars, or "None yet" (Edit → step 3).
+        Overflowing chip/avatar rows scroll horizontally rather than wrapping.
+
+    - id: 5a
+      title: "Edit from recap returns straight to recap"
+      description: >
+        Tap "Edit" on the Default search profile section.
+      expected: >
+        The wizard jumps back to step 1 with the footer button reading "Done";
+        completing it returns straight to recap (not forward through the
+        remaining steps).
+
+    - id: 5b
+      title: "Back arrow walks steps in reverse"
+      description: >
+        From any step past the first, tap the header Back arrow.
+      expected: >
+        The wizard moves to the previous step and un-fills the trailing
+        progress segment; selections made so far are preserved.
 
     - id: 6
-      title: "Skip path still stamps onboarded_at"
+      title: "Finish from recap navigates to the app"
       description: >
-        Reset DB (re-run `task start:scenario SCENARIO=onboarding`), sign in
-        as Nora Newbie again, continue through preferences, tap "Skip" on
-        the local page, and tap "Skip" in the top-right of the follow page.
+        On step 5, tap "Start exploring".
       expected: >
-        POST /api/social/onboarding/complete with `handles: []` → 200
-        with `onboarded_at` set and `followed: []`. App navigates to
-        /. No new UserFollow rows created (check NetworkPanel
-        "Following" tab is empty).
+        The app navigates to / (the `next` target). Refreshing stays on / —
+        the guard no longer redirects because `onboarded_at` is set.
 
     - id: 7
-      title: "Pre-onboarded user never sees the screen"
+      title: "Pre-onboarded user can still reach the wizard by URL"
       description: >
-        While still signed in as Nora (already onboarded), navigate
-        directly to /onboarding/follow.
+        While signed in as Nora (already onboarded), navigate directly to
+        /onboarding/follow.
       expected: >
-        The route still renders the suggestions list (the page itself
-        is reachable by URL — only the *guard* is suppressed). Tapping
-        Follow immediately follows that card but stays on the page; tapping
-        Skip or Done updates onboarded_at again with a fresh timestamp and
-        bounces back to /. This proves the gate is the only redirector — the
-        page itself stays usable for testing.
+        The wizard still renders (the route is reachable by URL — only the
+        *guard* is suppressed once `onboarded_at` is set). This proves the gate
+        is the only redirector; the wizard itself stays usable for re-editing
+        preferences and follows.

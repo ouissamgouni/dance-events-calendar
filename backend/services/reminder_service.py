@@ -21,10 +21,12 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlmodel import Session, col, select, update
+from sqlalchemy import func
 
 from backend.services.app_settings import (
     get_reminder_lead_hours,
     get_event_reminders_enabled,
+    get_event_message_cta_min_going,
 )
 from backend.db.database import get_engine
 from backend.db.models import CachedEvent, Notification, User, UserEventAttendance
@@ -103,30 +105,43 @@ def run_once() -> dict:
         due = _due_pairs(session, now, lead_hours)
         if not due:
             return {"reminders": 0}
+        # Popular events (>= threshold "Going") get an "Ask a question" CTA
+        # in the reminder pointing at the message board.
+        ask_min = get_event_message_cta_min_going(session)
+        due_event_ids = {e.event_id for _, e in due}
+        going_counts = dict(
+            session.exec(
+                select(UserEventAttendance.event_id, func.count())
+                .where(col(UserEventAttendance.event_id).in_(due_event_ids))
+                .group_by(col(UserEventAttendance.event_id))
+            ).all()
+        )
         for user, event in due:
+            ask = going_counts.get(event.event_id, 0) >= ask_min
             notif = Notification(
                 recipient_user_id=user.id,
                 actor_user_id=user.id,  # self: no external actor
                 kind=EVENT_REMINDER,
                 event_id=event.event_id,
+                context="ask" if ask else None,
             )
             session.add(notif)
             session.flush()
             notif_ids[(user.id, event.event_id)] = notif.id
             record_delivery(session, notif.id, "app")
             if user.email_event_reminders_enabled:
-                to_email.append((user, event))
+                to_email.append((user, event, ask))
             if user.push_event_reminders_enabled:
-                to_push.append((user.id, event.title, event.event_id))
+                to_push.append((user.id, event.title, event.event_id, ask))
         session.commit()
 
     # Send emails after commit so the in-app reminder is durable even if
     # SMTP is slow/unavailable. Best-effort; failures are logged, not raised.
     emailed = 0
     emailed_ids: list[int] = []
-    for user, event in to_email:
+    for user, event, ask in to_email:
         when_label = _format_when(event.start, user.timezone)
-        if send_event_reminder_email(user, event, when_label):
+        if send_event_reminder_email(user, event, when_label, include_ask_cta=ask):
             emailed += 1
             nid = notif_ids.get((user.id, event.event_id))
             if nid is not None:
@@ -136,12 +151,12 @@ def run_once() -> dict:
     # when web-push is unconfigured.
     pushed = 0
     pushed_ids: list[int] = []
-    for user_id, title, event_id in to_push:
+    for user_id, title, event_id, ask in to_push:
         delivered = send_push(
             user_id,
             title="Event reminder",
             body=f"{title or 'An event'} is coming up.",
-            url=f"/event/{event_id}",
+            url=f"/event/{event_id}/ask" if ask else f"/event/{event_id}",
             tag=f"reminder:{event_id}",
         )
         pushed += delivered

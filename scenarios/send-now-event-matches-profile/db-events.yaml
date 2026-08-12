@@ -1,6 +1,6 @@
 base_week: 0
 # Single matching event — the matcher truth table (dance/reach/geo
-# gates) is already exercised by notif-event-matches-profile-email.
+# gates) is already exercised by notif-interest-matches.
 # This scenario only needs one unambiguous match so it can focus on
 # the admin force-send action's user-scoping and channel fan-out.
 events:

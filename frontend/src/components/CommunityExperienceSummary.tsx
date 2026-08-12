@@ -10,8 +10,6 @@ interface Props {
     /** Whether the event has already ended. Drives own-reviews vs. pooled
      * "typical experience" for an upcoming edition in a series with history. */
     isPast: boolean;
-    /** Source appended as ?src= on the "See full details" link, for attribution. */
-    detailLinkSource?: string;
 }
 
 /**
@@ -22,7 +20,7 @@ interface Props {
  * link to the event page's ``#community`` section. Renders nothing until there
  * are reviews.
  */
-export default function CommunityExperienceSummary({ eventId, isPast, detailLinkSource }: Props) {
+export default function CommunityExperienceSummary({ eventId, isPast }: Props) {
     const { user } = useAuth();
     const anonAggregate = useRatingAggregate(eventId);
     const { series, crossEdition, aggregate } = useCommunityExperience(eventId, isPast);
@@ -33,7 +31,7 @@ export default function CommunityExperienceSummary({ eventId, isPast, detailLink
         const count = anonAggregate?.count ?? 0;
         if (count === 0) return null;
         return (
-            <div className="border-t border-slate-100 pt-3 space-y-1">
+            <div className="space-y-1">
                 <h3 className="text-sm font-semibold text-slate-900">
                     Community Experience{' '}
                     <span className="font-normal tabular-nums text-slate-500">
@@ -58,7 +56,7 @@ export default function CommunityExperienceSummary({ eventId, isPast, detailLink
     const editions = series?.reviewed_edition_count ?? 0;
 
     return (
-        <div className="border-t border-slate-100 pt-3 space-y-1.5">
+        <div className="space-y-1.5">
             <ExperienceMoodBox
                 label={crossEdition ? 'Typical experience' : 'Overall experience'}
                 displayState={aggregate.display_state}
@@ -70,14 +68,6 @@ export default function CommunityExperienceSummary({ eventId, isPast, detailLink
                     ? `Based on the last ${editions} edition${editions === 1 ? '' : 's'}`
                     : `Based on ${aggregate.count} review${aggregate.count === 1 ? '' : 's'}`}
             />
-            <div className="flex justify-end">
-                <Link
-                    to={`/event/${eventId}${detailLinkSource ? `?src=${detailLinkSource}` : ''}#community`}
-                    className="text-[11px] font-medium text-sky-600 hover:text-sky-700"
-                >
-                    See full details →
-                </Link>
-            </div>
         </div>
     );
 }
