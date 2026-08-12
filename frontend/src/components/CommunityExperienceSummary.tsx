@@ -10,8 +10,6 @@ interface Props {
     /** Whether the event has already ended. Drives own-reviews vs. pooled
      * "typical experience" for an upcoming edition in a series with history. */
     isPast: boolean;
-    /** Source appended as ?src= on the "See full details" link, for attribution. */
-    detailLinkSource?: string;
 }
 
 /**
@@ -22,7 +20,7 @@ interface Props {
  * link to the event page's ``#community`` section. Renders nothing until there
  * are reviews.
  */
-export default function CommunityExperienceSummary({ eventId, isPast, detailLinkSource }: Props) {
+export default function CommunityExperienceSummary({ eventId, isPast }: Props) {
     const { user } = useAuth();
     const anonAggregate = useRatingAggregate(eventId);
     const { series, crossEdition, aggregate } = useCommunityExperience(eventId, isPast);
