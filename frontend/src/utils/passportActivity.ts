@@ -72,7 +72,7 @@ export function buildYearGrid(months: MonthlyActivity[]): YearRow[] {
     }
     if (!Number.isFinite(minYear)) return [];
     const rows: YearRow[] = [];
-    for (let year = maxYear; year >= minYear; year -= 1) {
+    for (let year = minYear; year <= maxYear; year += 1) {
         rows.push({ year, cells: counts.get(year) ?? new Array(12).fill(0) });
     }
     return rows;
