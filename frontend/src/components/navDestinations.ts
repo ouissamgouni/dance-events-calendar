@@ -31,7 +31,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
     },
     {
         id: 'mine',
-        label: 'Mine',
+        label: 'MyDance',
         path: '/mine',
         icon: '/calendar.png',
         isActive: (p) => p === '/mine' || p.startsWith('/mine/'),
