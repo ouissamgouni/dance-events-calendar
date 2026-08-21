@@ -21,11 +21,11 @@ export default function InvitePage() {
             </Helmet>
             <div className="max-w-md mx-auto px-4 py-10">
                 {loading ? null : !user ? (
-                    <div className="w-full border border-blue-100 bg-blue-50 px-6 py-5 text-sm text-blue-700">
+                    <div className="w-full border border-blue-100 bg-blue-50 px-6 py-5 text-sm text-action">
                         <p className="mb-3">Sign in first to invite a friend.</p>
                         <Link
                             to="/login?next=/invite"
-                            className="inline-block bg-blue-500 text-white hover:bg-blue-600 px-4 py-2 text-sm font-medium transition"
+                            className="inline-block bg-action text-white hover:bg-action px-4 py-2 text-sm font-medium transition"
                         >
                             Sign in
                         </Link>

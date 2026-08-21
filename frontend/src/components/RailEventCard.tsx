@@ -98,15 +98,14 @@ export default function RailEventCard({
     const cardSize = widthClass ?? (compact ? 'w-[208px]' : 'w-[224px]');
     const surface = accent
         ? 'border-blue-200 bg-blue-50 hover:bg-blue-100'
-        : 'border-slate-200 bg-white hover:bg-slate-50';
+        : 'border-card-line bg-surface hover:bg-canvas';
 
     const handleMouseEnter = useCallback(() => onHover?.(event.event_id), [onHover, event.event_id]);
     const handleMouseLeave = useCallback(() => onHover?.(null), [onHover]);
 
     return (
         <div
-            // eslint-disable-next-line no-restricted-syntax -- rounded event cards per explicit design request (For you + Trending trails)
-            className={`group relative flex ${cardSize} shrink-0 flex-col rounded-md border ${surface} px-2.5 py-2.5 text-left transition ${highlighted ? 'ring-1 ring-blue-200' : ''}`}
+            className={`group relative flex ${cardSize} shrink-0 flex-col rounded-card border ${surface} px-2.5 py-2.5 text-left transition ${highlighted ? 'ring-1 ring-action' : ''}`}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
         >
@@ -126,13 +125,13 @@ export default function RailEventCard({
                 onClick={() => onClick(event)}
                 onFocus={handleMouseEnter}
                 onBlur={handleMouseLeave}
-                className="flex flex-1 flex-col text-left focus:outline-none focus:ring-2 focus:ring-blue-300"
+                className="flex flex-1 flex-col text-left focus:outline-none focus:ring-2 focus:ring-action"
             >
-                <h3 className={`min-w-0 truncate text-sm font-semibold leading-snug text-slate-900 group-hover:text-blue-700 ${compact ? '' : 'pr-16'}`} title={event.title}>
+                <h3 className={`min-w-0 truncate text-sm font-semibold leading-snug text-ink group-hover:text-action ${compact ? '' : 'pr-16'}`} title={event.title}>
                     {isNew && (
                         <span
                             // eslint-disable-next-line no-restricted-syntax -- small status dot (new event indicator) — allowed exception per frontend rules
-                            className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-blue-500 align-middle"
+                            className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-action align-middle"
                             aria-label="New"
                             data-testid={newDotTestId}
                         />
@@ -151,7 +150,7 @@ export default function RailEventCard({
                     </div>
                 )}
                 <div className="mt-1 flex items-center gap-3">
-                    <span className="truncate text-xs font-medium text-slate-600">{startLabel}</span>
+                    <span className="truncate text-xs font-medium text-ink-soft">{startLabel}</span>
                     {extraBadge}
                     <AttendeeAvatarStack
                         eventId={event.event_id}
@@ -160,7 +159,7 @@ export default function RailEventCard({
                     />
                 </div>
                 {location && (
-                    <p className="mt-1 truncate text-[11px] text-slate-500" title={event.location ?? undefined}>
+                    <p className="mt-1 truncate text-[11px] text-ink-soft" title={event.location ?? undefined}>
                         {location}
                     </p>
                 )}

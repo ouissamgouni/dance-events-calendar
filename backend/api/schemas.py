@@ -718,6 +718,9 @@ class SiteSettingsResponse(BaseModel):
     # Tribe > Calendars "Your Network" snapshot of upcoming events people
     # you follow are going to. When False, the snapshot is hidden.
     network_going_snapshot_enabled: bool = True
+    # Experiment: render the filter summary bar as a two-line, icon-prefixed
+    # variant with the Map/Calendar controls pinned to its right.
+    summary_two_line_enabled: bool = False
     # Required tag-group ids used by the event suggestion form.
     suggest_event_required_dance_group_id: Optional[int] = None
     suggest_event_required_reach_group_id: Optional[int] = None
@@ -983,6 +986,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     for_you_rail_enabled: Optional[bool] = None
     your_next_events_rail_enabled: Optional[bool] = None
     network_going_snapshot_enabled: Optional[bool] = None
+    summary_two_line_enabled: Optional[bool] = None
     suggest_event_required_dance_group_id: Optional[int] = Field(default=None, ge=1)
     suggest_event_required_reach_group_id: Optional[int] = Field(default=None, ge=1)
     # Notification / re-engagement global gates.

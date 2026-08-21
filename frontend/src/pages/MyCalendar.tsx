@@ -373,14 +373,14 @@ export default function MyCalendar() {
         <div className="min-h-screen bg-[#f8fafc]">
             <main className="mx-auto max-w-7xl px-4 py-4">
                 {!user && allEventIds.length > 0 && !signInNudgeDismissed && (
-                    <div className="mb-4 flex flex-wrap items-center gap-3 border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                    <div className="mb-4 flex flex-wrap items-center gap-3 border border-line bg-canvas px-4 py-3 text-sm text-ink">
                         <p className="flex-1 min-w-[14rem]">
-                            <span className="font-medium text-slate-800">Your calendar is taking shape.</span>{' '}
+                            <span className="font-medium text-ink">Your calendar is taking shape.</span>{' '}
                             You&apos;ve already added {allEventIds.length} event{allEventIds.length === 1 ? '' : 's'}. Sign in to keep them synced across devices and ready to share.
                         </p>
                         <Link
                             to={`/login?next=${encodeURIComponent('/mine/calendar')}`}
-                            className="shrink-0 bg-blue-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-blue-600 transition"
+                            className="shrink-0 bg-action px-4 py-1.5 text-xs font-medium text-white hover:bg-action transition"
                         >
                             Sign in
                         </Link>
@@ -388,7 +388,7 @@ export default function MyCalendar() {
                             type="button"
                             onClick={dismissSignInNudge}
                             aria-label="Dismiss"
-                            className="shrink-0 text-slate-400 hover:text-slate-700 text-lg leading-none px-1"
+                            className="shrink-0 text-muted hover:text-ink text-lg leading-none px-1"
                         >
                             ×
                         </button>
@@ -400,7 +400,7 @@ export default function MyCalendar() {
                         {user && (
                             <MySubscribersBadge
                                 mobileIconSrc="/rss.png"
-                                className="shrink-0 inline-flex items-center gap-1 border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-blue-700 transition"
+                                className="shrink-0 inline-flex items-center gap-1 border border-line bg-surface px-2 py-1 text-xs font-medium text-ink hover:bg-canvas hover:text-action transition"
                             />
                         )}
                         <div ref={exportMenuRef} className="relative shrink-0">
@@ -409,7 +409,7 @@ export default function MyCalendar() {
                                 disabled={!!exporting}
                                 aria-haspopup="menu"
                                 aria-expanded={exportMenuOpen}
-                                className="inline-flex items-center gap-1 border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
+                                className="inline-flex items-center gap-1 border border-line bg-surface px-2 py-1 text-xs text-ink hover:bg-canvas transition disabled:opacity-50"
                             >
                                 {exporting ? 'Exporting…' : (
                                     <>
@@ -422,10 +422,10 @@ export default function MyCalendar() {
                                 )}
                             </button>
                             {exportMenuOpen && (
-                                <div role="menu" className="absolute left-0 top-full mt-1 w-56 bg-white border border-slate-200 shadow-lg z-[9000]">
-                                    <div className="px-3 pt-2 pb-1.5 border-b border-slate-100">
-                                        <div className="text-[10px] font-medium uppercase tracking-wide text-slate-400 mb-1">Include</div>
-                                        <div className="inline-flex w-full overflow-hidden rounded border border-slate-200">
+                                <div role="menu" className="absolute left-0 top-full mt-1 w-56 bg-surface border border-line shadow-lg z-[9000]">
+                                    <div className="px-3 pt-2 pb-1.5 border-b border-card-line">
+                                        <div className="text-[10px] font-medium uppercase tracking-wide text-muted mb-1">Include</div>
+                                        <div className="inline-flex w-full overflow-hidden rounded border border-line">
                                             {([
                                                 { key: 'all' as Filter, label: 'All', count: allEventIds.length },
                                                 { key: 'saved' as Filter, label: 'Saved', count: savedCount },
@@ -437,8 +437,8 @@ export default function MyCalendar() {
                                                     onClick={() => setExportScope(opt.key)}
                                                     aria-pressed={exportScope === opt.key}
                                                     className={`flex-1 px-1.5 py-1 text-[11px] transition ${exportScope === opt.key
-                                                        ? 'bg-blue-500 text-white'
-                                                        : 'bg-white text-slate-600 hover:bg-slate-50'
+                                                        ? 'bg-action text-white'
+                                                        : 'bg-surface text-ink-soft hover:bg-canvas'
                                                         }`}
                                                 >
                                                     {opt.label} ({opt.count})
@@ -450,7 +450,7 @@ export default function MyCalendar() {
                                         role="menuitem"
                                         disabled={scopedEventIds.length === 0}
                                         onClick={() => { setExportMenuOpen(false); handleExportIcs(); }}
-                                        className="block w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 transition disabled:opacity-40"
+                                        className="block w-full text-left px-3 py-1.5 text-xs text-ink hover:bg-canvas transition disabled:opacity-40"
                                     >
                                         📅 Export .ics
                                     </button>
@@ -458,7 +458,7 @@ export default function MyCalendar() {
                                         role="menuitem"
                                         disabled={scopedEventIds.length === 0}
                                         onClick={() => { setExportMenuOpen(false); handleExportXlsx(); }}
-                                        className="block w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 transition disabled:opacity-40"
+                                        className="block w-full text-left px-3 py-1.5 text-xs text-ink hover:bg-canvas transition disabled:opacity-40"
                                     >
                                         📊 Export .xlsx
                                     </button>
@@ -467,7 +467,7 @@ export default function MyCalendar() {
                                             role="menuitem"
                                             disabled={feedStatus === 'loading'}
                                             onClick={() => { setExportMenuOpen(false); handleSubscribe(); }}
-                                            className="block w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50 transition border-t border-slate-100 disabled:opacity-40"
+                                            className="block w-full text-left px-3 py-1.5 text-xs text-ink hover:bg-canvas transition border-t border-card-line disabled:opacity-40"
                                         >
                                             📲 Subscribe in calendar app
                                         </button>
@@ -478,7 +478,7 @@ export default function MyCalendar() {
                         <button
                             onClick={handleShare}
                             disabled={shareStatus === 'loading'}
-                            className="shrink-0 border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-50 transition disabled:opacity-50 inline-flex items-center gap-1"
+                            className="shrink-0 border border-line bg-surface px-2 py-1 text-xs text-ink hover:bg-canvas transition disabled:opacity-50 inline-flex items-center gap-1"
                         >
                             {shareStatus === 'copied' ? (
                                 <>✓ Link copied!</>
@@ -496,7 +496,7 @@ export default function MyCalendar() {
                         {!activeLoading && pastEventIds.size > 0 && (
                             <button
                                 onClick={() => setShowPastEvents((v) => !v)}
-                                className="shrink-0 border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-50 transition"
+                                className="shrink-0 border border-line bg-surface px-2 py-1 text-xs text-ink-soft hover:bg-canvas transition"
                             >
                                 {showPastEvents
                                     ? 'Hide past events'
@@ -509,9 +509,9 @@ export default function MyCalendar() {
                 {activeView === 'subs' && (
                     <div className="mb-4 flex flex-col gap-3">
                         {networkGoingSnapshotEnabled && user && snapshot.rows.length > 0 && (
-                            <div className="border border-slate-200 bg-white p-3.5">
+                            <div className="border border-line bg-surface p-3.5">
                                 <div className="mt-1 flex items-center gap-1.5 text-sm font-medium">
-                                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+                                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-success" aria-hidden="true" />
                                     {snapshot.peopleCount} {snapshot.peopleCount === 1 ? 'person is' : 'people are'} attending upcoming events
                                 </div>
                                 <ul className="mt-3 divide-y divide-slate-100">
@@ -535,28 +535,28 @@ export default function MyCalendar() {
                                                         ) : (
                                                             <span
                                                                 key={a.handle}
-                                                                className={'inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[9px] font-semibold text-slate-600 ring-2 ring-white' + hideOnMobile}
+                                                                className={'inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[9px] font-semibold text-ink-soft ring-2 ring-white' + hideOnMobile}
                                                             >
                                                                 {(a.display_name || a.handle).slice(0, 1).toUpperCase()}
                                                             </span>
                                                         );
                                                     })}
                                                 </div>
-                                                <span className="shrink-0 max-w-[7rem] truncate text-xs font-semibold text-slate-900 sm:hidden">
+                                                <span className="shrink-0 max-w-[7rem] truncate text-xs font-semibold text-ink sm:hidden">
                                                     {formatNameList(names, 3)}
                                                 </span>
-                                                <span className="hidden shrink-0 text-xs font-semibold text-slate-900 sm:inline">
+                                                <span className="hidden shrink-0 text-xs font-semibold text-ink sm:inline">
                                                     {formatNameList(names, 5)}
                                                 </span>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleEventClick(event)}
                                                     title={event.title}
-                                                    className="min-w-0 flex-1 truncate text-left text-xs font-medium text-slate-700 hover:text-blue-600"
+                                                    className="min-w-0 flex-1 truncate text-left text-xs font-medium text-ink hover:text-action"
                                                 >
                                                     {event.title}
                                                 </button>
-                                                <span className="shrink-0 text-[11px] text-slate-400">
+                                                <span className="shrink-0 text-[11px] text-muted">
                                                     {formatRelativeWhen(event.start)}
                                                 </span>
                                             </li>
@@ -566,7 +566,7 @@ export default function MyCalendar() {
                                 <button
                                     type="button"
                                     onClick={showNetworkSnapshot}
-                                    className="mt-3 text-xs font-medium text-blue-600 hover:text-blue-700"
+                                    className="mt-3 text-xs font-medium text-action hover:text-action"
                                 >
                                     See all →
                                 </button>
@@ -586,7 +586,7 @@ export default function MyCalendar() {
                                 />
                             </div>
                             {subsLoading && subsEvents.length > 0 && (
-                                <span className="mt-1 shrink-0 text-[11px] text-slate-400">Updating…</span>
+                                <span className="mt-1 shrink-0 text-[11px] text-muted">Updating…</span>
                             )}
                         </div>
                     </div>
@@ -605,8 +605,8 @@ export default function MyCalendar() {
                                     key={f}
                                     onClick={() => setActiveFilter(f)}
                                     className={`px-2 py-0.5 text-[11px] font-medium leading-5 border transition ${activeFilter === f
-                                        ? 'bg-blue-100 border-blue-200 text-blue-700'
-                                        : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500'
+                                        ? 'bg-blue-100 border-blue-200 text-action'
+                                        : 'bg-surface border-line text-ink-soft hover:border-action hover:text-action'
                                         }`}
                                 >
                                     {label}
@@ -618,7 +618,7 @@ export default function MyCalendar() {
 
 
                 {activeLoading && (
-                    <p className="text-center text-slate-400 py-12">Loading your events…</p>
+                    <p className="text-center text-muted py-12">Loading your events…</p>
                 )}
 
                 {!activeLoading && activeView === 'mine' && allEventIds.length === 0 && (
@@ -626,13 +626,13 @@ export default function MyCalendar() {
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-10 h-10 text-slate-300 mb-4">
                             <path d="M5 4a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v14l-5-2.5L5 18V4Z" />
                         </svg>
-                        <p className="text-slate-600 text-lg font-medium">No events yet</p>
-                        <p className="text-slate-400 text-sm mt-1">
+                        <p className="text-ink-soft text-lg font-medium">No events yet</p>
+                        <p className="text-muted text-sm mt-1">
                             Save events or mark "I'm going" to build your personal calendar.
                         </p>
                         <Link
                             to="/"
-                            className="mt-6 inline-flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold px-5 py-2 shadow-sm transition"
+                            className="mt-6 inline-flex items-center gap-1.5 bg-action hover:bg-action text-white text-sm font-semibold px-5 py-2 shadow-sm transition"
                         >
                             Browse events →
                         </Link>
@@ -643,25 +643,25 @@ export default function MyCalendar() {
                     const filterActive = interestSource !== null || interestUserHandles.length > 0;
                     return subsCalendars.length === 0 && !filterActive ? (
                         <div className="flex flex-col items-center justify-center py-20 text-center">
-                            <p className="text-slate-600 text-lg font-medium">
+                            <p className="text-ink-soft text-lg font-medium">
                                 Build your tribe
                             </p>
-                            <p className="text-slate-400 text-sm mt-1">
+                            <p className="text-muted text-sm mt-1">
                                 Follow other dancers to see the events they’re going to and saving.
                             </p>
                             <Link
                                 to="/tribe/discover"
-                                className="mt-6 inline-flex items-center gap-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm font-semibold px-5 py-2 shadow-sm transition"
+                                className="mt-6 inline-flex items-center gap-1.5 bg-action hover:bg-action text-white text-sm font-semibold px-5 py-2 shadow-sm transition"
                             >
                                 Discover people →
                             </Link>
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center py-20 text-center">
-                            <p className="text-slate-600 text-lg font-medium">
+                            <p className="text-ink-soft text-lg font-medium">
                                 No upcoming events from your subscriptions
                             </p>
-                            <p className="text-slate-400 text-sm mt-1">
+                            <p className="text-muted text-sm mt-1">
                                 {filterActive
                                     ? 'Those people have no matching upcoming events yet.'
                                     : 'When the calendars you subscribe to publish events, they’ll show up here.'}
@@ -670,7 +670,7 @@ export default function MyCalendar() {
                                 <button
                                     type="button"
                                     onClick={() => { setInterestUserHandles([]); setInterestSource(null); }}
-                                    className="mt-4 text-xs text-blue-600 hover:underline"
+                                    className="mt-4 text-xs text-action hover:underline"
                                 >
                                     Show all subscriptions
                                 </button>
@@ -740,21 +740,21 @@ export default function MyCalendar() {
                         onClick={() => setSubscribeOpen(false)}
                     >
                         <div
-                            className="w-full max-w-md bg-white shadow-xl"
+                            className="w-full max-w-md bg-surface shadow-xl"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-                                <h2 className="text-sm font-semibold text-slate-800">Subscribe in your calendar app</h2>
+                            <div className="flex items-center justify-between border-b border-line px-4 py-3">
+                                <h2 className="text-sm font-semibold text-ink">Subscribe in your calendar app</h2>
                                 <button
                                     onClick={() => setSubscribeOpen(false)}
                                     aria-label="Close"
-                                    className="text-slate-400 hover:text-slate-600"
+                                    className="text-muted hover:text-ink-soft"
                                 >
                                     ✕
                                 </button>
                             </div>
                             <div className="px-4 py-3 space-y-3">
-                                <p className="text-xs text-slate-500">
+                                <p className="text-xs text-ink-soft">
                                     Your {exportScope === 'all' ? 'saved & going' : exportScope} events stay in sync in Apple
                                     or Google Calendar. The feed updates automatically when you save or join events.
                                 </p>
@@ -763,11 +763,11 @@ export default function MyCalendar() {
                                         readOnly
                                         value={feedUrl}
                                         onFocus={(e) => e.currentTarget.select()}
-                                        className="min-w-0 flex-1 border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-slate-700"
+                                        className="min-w-0 flex-1 border border-line bg-canvas px-2 py-1.5 text-xs text-ink"
                                     />
                                     <button
                                         onClick={handleCopyFeedUrl}
-                                        className="shrink-0 bg-blue-500 px-3 py-1.5 text-xs text-white hover:bg-blue-600 transition"
+                                        className="shrink-0 bg-action px-3 py-1.5 text-xs text-white hover:bg-action transition"
                                     >
                                         {feedStatus === 'copied' ? '✓ Copied' : 'Copy'}
                                     </button>
@@ -775,7 +775,7 @@ export default function MyCalendar() {
                                 <div className="flex flex-wrap gap-1.5">
                                     <a
                                         href={feedUrl.replace(/^https?:/, 'webcal:')}
-                                        className="inline-flex items-center gap-1 border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 hover:bg-slate-50 transition"
+                                        className="inline-flex items-center gap-1 border border-line bg-surface px-2.5 py-1.5 text-xs text-ink hover:bg-canvas transition"
                                     >
                                         🍎 Add to Apple Calendar
                                     </a>
@@ -783,12 +783,12 @@ export default function MyCalendar() {
                                         href={`https://calendar.google.com/calendar/r?cid=${encodeURIComponent(feedUrl)}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 hover:bg-slate-50 transition"
+                                        className="inline-flex items-center gap-1 border border-line bg-surface px-2.5 py-1.5 text-xs text-ink hover:bg-canvas transition"
                                     >
                                         📆 Add to Google Calendar
                                     </a>
                                 </div>
-                                <p className="text-[11px] text-slate-400">
+                                <p className="text-[11px] text-muted">
                                     Anyone with this link can see these events. Keep it private.
                                 </p>
                             </div>

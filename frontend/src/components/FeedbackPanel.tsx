@@ -66,10 +66,10 @@ export default function FeedbackPanel({ isOpen, onClose, onCountChange }: Props)
         const colors: Record<string, string> = {
             pending: 'bg-amber-50 text-amber-700 border-amber-200',
             approved: 'bg-sky-50 text-sky-700 border-sky-200',
-            rejected: 'bg-slate-100 text-slate-600 border-slate-300',
+            rejected: 'bg-slate-100 text-ink-soft border-line',
         };
         return (
-            <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 border ${colors[status] ?? 'bg-slate-100 text-slate-600 border-slate-300'}`}>
+            <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 border ${colors[status] ?? 'bg-slate-100 text-ink-soft border-line'}`}>
                 {status}
             </span>
         );
@@ -80,14 +80,14 @@ export default function FeedbackPanel({ isOpen, onClose, onCountChange }: Props)
             {isOpen && <div className="fixed inset-0 bg-slate-900/20 z-40" onClick={onClose} />}
 
             <div
-                className={`fixed top-0 right-0 h-full w-[420px] bg-white shadow-lg border-l border-slate-200 z-50 transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+                className={`fixed top-0 right-0 h-full w-[420px] bg-surface shadow-lg border-l border-line z-50 transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-50">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-line bg-canvas">
                     <div className="flex items-center gap-2">
                         <button
                             onClick={load}
-                            className={`text-slate-400 hover:text-slate-700 p-1 transition-transform ${loading ? 'animate-spin' : ''}`}
+                            className={`text-muted hover:text-ink p-1 transition-transform ${loading ? 'animate-spin' : ''}`}
                             title="Refresh"
                             aria-label="Refresh"
                         >
@@ -96,7 +96,7 @@ export default function FeedbackPanel({ isOpen, onClose, onCountChange }: Props)
                                 <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
                             </svg>
                         </button>
-                        <h2 className="text-[11px] font-semibold text-slate-700 uppercase tracking-wide">Feedback &amp; Reviews</h2>
+                        <h2 className="text-[11px] font-semibold text-ink uppercase tracking-wide">Feedback &amp; Reviews</h2>
                         {pendingTotal > 0 && (
                             <span className="inline-flex items-center justify-center bg-slate-700 text-white text-[10px] font-semibold px-1.5 py-0.5 min-w-[18px]">
                                 {pendingTotal}
@@ -105,7 +105,7 @@ export default function FeedbackPanel({ isOpen, onClose, onCountChange }: Props)
                     </div>
                     <button
                         onClick={onClose}
-                        className="text-slate-400 hover:text-slate-700 text-sm leading-none p-1"
+                        className="text-muted hover:text-ink text-sm leading-none p-1"
                         aria-label="Close"
                     >
                         ✕
@@ -113,14 +113,14 @@ export default function FeedbackPanel({ isOpen, onClose, onCountChange }: Props)
                 </div>
 
                 {/* Tabs */}
-                <div className="flex border-b border-slate-200">
+                <div className="flex border-b border-line">
                     {TABS.map((tab) => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
                             className={`flex-1 py-1.5 text-[11px] font-medium capitalize transition border-b-2 ${activeTab === tab
                                 ? 'border-sky-600 text-sky-700'
-                                : 'border-transparent text-slate-400 hover:text-slate-700'
+                                : 'border-transparent text-muted hover:text-ink'
                                 }`}
                         >
                             {tab}
@@ -129,14 +129,14 @@ export default function FeedbackPanel({ isOpen, onClose, onCountChange }: Props)
                 </div>
 
                 {/* Pagination top bar */}
-                <div className="flex items-center justify-between px-3 py-1 border-b border-slate-200 bg-slate-50/60 text-[10px] text-slate-500">
+                <div className="flex items-center justify-between px-3 py-1 border-b border-line bg-canvas/60 text-[10px] text-ink-soft">
                     <div>{total} item{total !== 1 ? 's' : ''}</div>
                     <div className="flex items-center gap-1.5">
                         <label>Per page:</label>
                         <select
                             value={pageSize}
                             onChange={(e) => setPageSize(Number(e.target.value))}
-                            className="border border-slate-300 px-1 py-0.5 text-[10px] bg-white"
+                            className="border border-line px-1 py-0.5 text-[10px] bg-surface"
                         >
                             {PAGE_SIZES.map((s) => (
                                 <option key={s} value={s}>{s}</option>
@@ -148,24 +148,24 @@ export default function FeedbackPanel({ isOpen, onClose, onCountChange }: Props)
                 {/* List */}
                 <div className="overflow-y-auto" style={{ height: 'calc(100% - 130px)' }}>
                     {loading ? (
-                        <p className="text-center text-[11px] text-slate-400 mt-8">Loading…</p>
+                        <p className="text-center text-[11px] text-muted mt-8">Loading…</p>
                     ) : items.length === 0 ? (
-                        <p className="text-center text-[11px] text-slate-400 mt-8">No feedback</p>
+                        <p className="text-center text-[11px] text-muted mt-8">No feedback</p>
                     ) : (
                         <ul className="divide-y divide-slate-100">
                             {items.map((r) => (
                                 <li
                                     key={r.id}
-                                    className="px-3 py-2 hover:bg-slate-50 cursor-pointer transition"
+                                    className="px-3 py-2 hover:bg-canvas cursor-pointer transition"
                                     onClick={() => setReviewing(r)}
                                 >
                                     <div className="flex items-start justify-between gap-2">
                                         <div className="min-w-0 flex-1">
-                                            <p className="text-[12px] font-medium text-slate-800 truncate">
+                                            <p className="text-[12px] font-medium text-ink truncate">
                                                 {r.event_title || r.event_id}
                                             </p>
-                                            <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-slate-500">
-                                                <span className="font-mono text-slate-400" title={r.event_id}>
+                                            <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-ink-soft">
+                                                <span className="font-mono text-muted" title={r.event_id}>
                                                     {r.event_id}
                                                 </span>
                                                 <button
@@ -176,9 +176,9 @@ export default function FeedbackPanel({ isOpen, onClose, onCountChange }: Props)
                                                     View event
                                                 </button>
                                             </div>
-                                            <div className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-500">
+                                            <div className="mt-1 flex items-center gap-1.5 text-[10px] text-ink-soft">
                                                 {r.overall_sentiment && (
-                                                    <span className="text-slate-700" title={SENTIMENT_META[r.overall_sentiment].label}>
+                                                    <span className="text-ink" title={SENTIMENT_META[r.overall_sentiment].label}>
                                                         {SENTIMENT_META[r.overall_sentiment].emoji}
                                                     </span>
                                                 )}
@@ -188,7 +188,7 @@ export default function FeedbackPanel({ isOpen, onClose, onCountChange }: Props)
                                                 {r.submitter_country && <span title={r.submitter_country}>· {r.submitter_country}</span>}
                                             </div>
                                             {r.comment && (
-                                                <p className="text-slate-600 text-[11px] mt-1 line-clamp-2">
+                                                <p className="text-ink-soft text-[11px] mt-1 line-clamp-2">
                                                     {r.comment.slice(0, 120)}{r.comment.length > 120 ? '…' : ''}
                                                 </p>
                                             )}
@@ -199,11 +199,11 @@ export default function FeedbackPanel({ isOpen, onClose, onCountChange }: Props)
                                                     </span>
                                                 )}
                                                 {r.linked_tag_suggestion_ids.length > 0 && (
-                                                    <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 border border-slate-300 bg-slate-50 text-slate-600">
+                                                    <span className="text-[9px] font-semibold uppercase px-1.5 py-0.5 border border-line bg-canvas text-ink-soft">
                                                         +{r.linked_tag_suggestion_ids.length} tag suggestion{r.linked_tag_suggestion_ids.length !== 1 ? 's' : ''}
                                                     </span>
                                                 )}
-                                                <span className="text-slate-400 text-[10px] ml-auto">
+                                                <span className="text-muted text-[10px] ml-auto">
                                                     {new Date(r.created_at).toLocaleDateString()}
                                                 </span>
                                             </div>
@@ -217,21 +217,21 @@ export default function FeedbackPanel({ isOpen, onClose, onCountChange }: Props)
                 </div>
 
                 {/* Pagination footer */}
-                <div className="flex items-center justify-between px-3 py-1.5 border-t border-slate-200 bg-slate-50 text-[11px]">
+                <div className="flex items-center justify-between px-3 py-1.5 border-t border-line bg-canvas text-[11px]">
                     <button
                         onClick={() => setPage((p) => Math.max(1, p - 1))}
                         disabled={page <= 1 || loading}
-                        className="px-2 py-0.5 border border-slate-300 disabled:opacity-50 hover:bg-white"
+                        className="px-2 py-0.5 border border-line disabled:opacity-50 hover:bg-surface"
                     >
                         ← Prev
                     </button>
-                    <span className="text-slate-500">
+                    <span className="text-ink-soft">
                         Page {page} of {totalPages}
                     </span>
                     <button
                         onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                         disabled={page >= totalPages || loading}
-                        className="px-2 py-0.5 border border-slate-300 disabled:opacity-50 hover:bg-white"
+                        className="px-2 py-0.5 border border-line disabled:opacity-50 hover:bg-surface"
                     >
                         Next →
                     </button>

@@ -32,7 +32,7 @@ export default function PassportActivityHeatmap({
     if (rows.length === 0) return null;
 
     return (
-        <div className="mb-4 border border-slate-200 bg-white p-3">
+        <div className="mb-4 border border-line bg-surface p-3">
             <div className="overflow-x-auto">
                 <div
                     className="inline-grid min-w-full gap-1"
@@ -44,7 +44,7 @@ export default function PassportActivityHeatmap({
                     {MONTH_INITIALS.map((initial, i) => (
                         <span
                             key={`h-${i}`}
-                            className="text-center text-[10px] leading-4 text-slate-400"
+                            className="text-center text-[10px] leading-4 text-muted"
                             aria-hidden
                         >
                             {initial}
@@ -79,7 +79,7 @@ function ActivityYearRow({
 }) {
     return (
         <>
-            <span className="pr-2 text-right text-xs leading-4 tabular-nums text-slate-500">
+            <span className="pr-2 text-right text-xs leading-4 tabular-nums text-ink-soft">
                 {year}
             </span>
             {cells.map((count, i) => {
@@ -87,7 +87,7 @@ function ActivityYearRow({
                 const level = activityLevel(count);
                 const label = `${count} event${count === 1 ? '' : 's'} · ${MONTH_SHORT[i]} ${year}`;
                 const highlighted = highlightMonth === month;
-                const ring = highlighted ? 'ring-2 ring-blue-500' : '';
+                const ring = highlighted ? 'ring-2 ring-action' : '';
                 const interactive = count > 0 && onSelectMonth != null;
                 return (
                     <button

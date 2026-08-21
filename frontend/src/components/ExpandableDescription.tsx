@@ -43,7 +43,7 @@ export default function ExpandableDescription({
         <div>
             <div
                 ref={ref}
-                className={`whitespace-pre-line leading-relaxed text-slate-600 ${compact ? 'text-xs' : 'text-sm'} ${expanded ? '' : clampClass}`}
+                className={`whitespace-pre-line leading-relaxed text-ink-soft ${compact ? 'text-xs' : 'text-sm'} ${expanded ? '' : clampClass}`}
             >
                 {text}
             </div>

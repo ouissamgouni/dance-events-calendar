@@ -112,16 +112,16 @@ export default function NotificationRow({
     // Variant style tokens.
     const iconSize = isPanel ? 'w-8 h-8 sm:w-7 sm:h-7 shrink-0' : 'w-8 h-8';
     const specialTitle = isPanel
-        ? 'text-xs text-slate-700 truncate'
-        : 'text-sm text-slate-700';
-    const defaultTitle = isPanel ? 'text-xs text-slate-700 truncate' : 'text-xs text-slate-700';
+        ? 'text-xs text-ink truncate'
+        : 'text-sm text-ink';
+    const defaultTitle = isPanel ? 'text-xs text-ink truncate' : 'text-xs text-ink';
     const timeClass = isPanel
-        ? 'text-[10px] text-slate-400 mt-0.5'
-        : 'text-xs text-slate-400 mt-0.5';
+        ? 'text-[10px] text-muted mt-0.5'
+        : 'text-xs text-muted mt-0.5';
     const subLabelSize = isPanel ? 'text-[11px]' : 'text-xs';
     const descClass = isPanel
-        ? 'text-[10px] text-slate-500 mt-0.5'
-        : 'text-xs text-slate-500 mt-0.5';
+        ? 'text-[10px] text-ink-soft mt-0.5'
+        : 'text-xs text-ink-soft mt-0.5';
 
     const iconCircle = (extra: string, glyph: string): ReactNode => (
         <div
@@ -138,14 +138,14 @@ export default function NotificationRow({
 
     if (item.kind === 'interest_event') {
         const label = item.context || 'your saved search';
-        icon = iconCircle('bg-blue-100 text-blue-600', '✨');
+        icon = iconCircle('bg-blue-100 text-action', '✨');
         body = (
             <>
                 <p className={specialTitle}>
-                    <span className="font-medium text-slate-900">
+                    <span className="font-medium text-ink">
                         {item.event_title || 'An event'}
                     </span>{' '}
-                    <span className="text-slate-500">matched your {label} alert</span>
+                    <span className="text-ink-soft">matched your {label} alert</span>
                 </p>
                 <p className={timeClass}>
                     {formatRelative(item.created_at)}
@@ -159,7 +159,7 @@ export default function NotificationRow({
                                     e.stopPropagation();
                                     navigate('/account#notifications');
                                 }}
-                                className="text-blue-600 hover:text-blue-700"
+                                className="text-action hover:text-action"
                             >
                                 Manage alerts
                             </span>
@@ -182,8 +182,8 @@ export default function NotificationRow({
         body = (
             <>
                 <p className={specialTitle}>
-                    <span className="text-slate-500">Reminder — you're going to</span>{' '}
-                    <span className="font-medium text-slate-900">
+                    <span className="text-ink-soft">Reminder — you're going to</span>{' '}
+                    <span className="font-medium text-ink">
                         {item.event_title || 'an event'}
                     </span>
                 </p>
@@ -191,7 +191,7 @@ export default function NotificationRow({
                     <p className={`${subLabelSize} text-rose-600 mt-0.5`}>Starts {startLabel}</p>
                 )}
                 {item.context === 'ask' && (
-                    <p className={`${subLabelSize} text-blue-600 mt-0.5`}>💬 Ask a question about this event</p>
+                    <p className={`${subLabelSize} text-action mt-0.5`}>💬 Ask a question about this event</p>
                 )}
                 <p className={timeClass}>{formatRelative(item.created_at)}</p>
             </>
@@ -201,8 +201,8 @@ export default function NotificationRow({
         body = (
             <>
                 <p className={specialTitle}>
-                    <span className="text-slate-500">Promo code added —</span>{' '}
-                    <span className="font-medium text-slate-900">
+                    <span className="text-ink-soft">Promo code added —</span>{' '}
+                    <span className="font-medium text-ink">
                         {item.event_title || 'an event'}
                     </span>
                 </p>
@@ -218,14 +218,14 @@ export default function NotificationRow({
             <>
                 <p className={specialTitle}>
                     {item.context ? (
-                        <span className="text-slate-500">
-                            <span className="font-medium text-slate-700">{item.context}</span>{' '}
+                        <span className="text-ink-soft">
+                            <span className="font-medium text-ink">{item.context}</span>{' '}
                             shared their experience at
                         </span>
                     ) : (
-                        <span className="text-slate-500">How was it? Rate your experience at</span>
+                        <span className="text-ink-soft">How was it? Rate your experience at</span>
                     )}{' '}
-                    <span className="font-medium text-slate-900">
+                    <span className="font-medium text-ink">
                         {item.event_title || 'an event'}
                     </span>
                 </p>
@@ -237,8 +237,8 @@ export default function NotificationRow({
         body = (
             <>
                 <p className={specialTitle}>
-                    <span className="text-slate-500">Milestone unlocked —</span>{' '}
-                    <span className="font-medium text-slate-900">
+                    <span className="text-ink-soft">Milestone unlocked —</span>{' '}
+                    <span className="font-medium text-ink">
                         {item.context || 'a new achievement'}
                     </span>
                 </p>
@@ -256,9 +256,9 @@ export default function NotificationRow({
         body = (
             <>
                 <p className={specialTitle}>
-                    <span className="font-medium text-slate-700">{actorName}</span>{' '}
-                    <span className="text-slate-500">{verb}</span>{' '}
-                    <span className="font-medium text-slate-900">
+                    <span className="font-medium text-ink">{actorName}</span>{' '}
+                    <span className="text-ink-soft">{verb}</span>{' '}
+                    <span className="font-medium text-ink">
                         {item.event_title || 'an event'}
                     </span>
                 </p>
@@ -277,7 +277,7 @@ export default function NotificationRow({
         ) : (
             <div
                 // eslint-disable-next-line no-restricted-syntax -- avatar placeholder (allowed exception per frontend rules)
-                className={`${iconSize} rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-semibold ${isPanel ? 'text-xs' : 'text-sm'}`}
+                className={`${iconSize} rounded-full bg-slate-200 text-ink-soft flex items-center justify-center font-semibold ${isPanel ? 'text-xs' : 'text-sm'}`}
             >
                 {initial}
             </div>
@@ -285,7 +285,7 @@ export default function NotificationRow({
         body = (
             <>
                 <p className={defaultTitle}>
-                    <span className="font-medium text-slate-900">
+                    <span className="font-medium text-ink">
                         {item.kind === 'subscription_going' && item.also_going
                             ? `You and ${actorName}`
                             : actorName}
@@ -299,11 +299,11 @@ export default function NotificationRow({
                             className="inline-block w-3.5 h-3.5 ml-1 align-middle object-contain"
                         />
                     )}{' '}
-                    <span className="text-slate-500">{verb}</span>
+                    <span className="text-ink-soft">{verb}</span>
                     {!noEventSuffix && (
                         <>
                             {' '}
-                            <span className="font-medium text-slate-900">
+                            <span className="font-medium text-ink">
                                 {item.event_title || 'an event'}
                             </span>
                         </>
@@ -313,7 +313,7 @@ export default function NotificationRow({
                 {showFollowBack && (
                     <div className="mt-2">
                         {following ? (
-                            <span className="inline-block px-2 py-1 text-[11px] border border-slate-200 bg-white text-slate-600">
+                            <span className="inline-block px-2 py-1 text-[11px] border border-line bg-surface text-ink-soft">
                                 ✓ Following
                             </span>
                         ) : (
@@ -321,7 +321,7 @@ export default function NotificationRow({
                                 type="button"
                                 onClick={handleFollowBack}
                                 disabled={followBusy}
-                                className="px-2 py-1 text-[11px] bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-60"
+                                className="px-2 py-1 text-[11px] bg-action text-white hover:bg-action disabled:opacity-60"
                             >
                                 {followBusy ? 'Following…' : 'Follow back'}
                             </button>
@@ -331,11 +331,11 @@ export default function NotificationRow({
                 {item.kind === 'follow_request' && (
                     <div className="mt-2 flex gap-2">
                         {requestHandled === 'approved' ? (
-                            <span className="inline-block px-2 py-1 text-[11px] border border-slate-200 bg-white text-slate-600">
+                            <span className="inline-block px-2 py-1 text-[11px] border border-line bg-surface text-ink-soft">
                                 ✓ Approved
                             </span>
                         ) : requestHandled === 'declined' ? (
-                            <span className="inline-block px-2 py-1 text-[11px] border border-slate-200 bg-white text-slate-600">
+                            <span className="inline-block px-2 py-1 text-[11px] border border-line bg-surface text-ink-soft">
                                 Declined
                             </span>
                         ) : (
@@ -344,7 +344,7 @@ export default function NotificationRow({
                                     type="button"
                                     onClick={handleApprove}
                                     disabled={requestBusy}
-                                    className="px-2 py-1 text-[11px] bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-60"
+                                    className="px-2 py-1 text-[11px] bg-action text-white hover:bg-action disabled:opacity-60"
                                 >
                                     {requestBusy ? '…' : 'Approve'}
                                 </button>
@@ -352,7 +352,7 @@ export default function NotificationRow({
                                     type="button"
                                     onClick={handleDecline}
                                     disabled={requestBusy}
-                                    className="px-2 py-1 text-[11px] border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                                    className="px-2 py-1 text-[11px] border border-line bg-surface text-ink hover:bg-canvas disabled:opacity-60"
                                 >
                                     Decline
                                 </button>
@@ -370,14 +370,14 @@ export default function NotificationRow({
                 <button
                     type="button"
                     onClick={handleNavigate}
-                    className={`w-full text-left flex items-start gap-3 px-4 py-3 sm:px-3 sm:py-2 hover:bg-slate-50 ${isUnread ? 'bg-blue-50/40' : 'bg-white'}`}
+                    className={`w-full text-left flex items-start gap-3 px-4 py-3 sm:px-3 sm:py-2 hover:bg-canvas ${isUnread ? 'bg-blue-50/40' : 'bg-surface'}`}
                 >
                     {icon}
                     <div className="min-w-0 flex-1">{body}</div>
                     {isUnread && (
                         <span
                             // eslint-disable-next-line no-restricted-syntax -- small unread status dot (allowed exception per frontend rules)
-                            className="mt-1.5 w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"
+                            className="mt-1.5 w-1.5 h-1.5 rounded-full bg-action shrink-0"
                             aria-label="Unread"
                         />
                     )}
@@ -388,7 +388,7 @@ export default function NotificationRow({
 
     return (
         <li
-            className={`flex items-start gap-3 px-3 py-3 ${isUnread ? 'bg-blue-50/40' : 'bg-white'}`}
+            className={`flex items-start gap-3 px-3 py-3 ${isUnread ? 'bg-blue-50/40' : 'bg-surface'}`}
         >
             {icon}
             <button
@@ -403,7 +403,7 @@ export default function NotificationRow({
                     type="button"
                     onClick={onMarkRead}
                     disabled={busy}
-                    className="shrink-0 text-xs text-slate-500 hover:text-blue-600 disabled:opacity-50"
+                    className="shrink-0 text-xs text-ink-soft hover:text-action disabled:opacity-50"
                 >
                     {busy ? '…' : 'Mark read'}
                 </button>

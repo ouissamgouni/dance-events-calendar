@@ -58,8 +58,8 @@ export default function InlineTagsPicker({ eventId, currentTags, onUpdated }: Pr
                 searchable
             />
             <div className="flex items-center gap-2 min-h-[14px]">
-                {saving && <span className="text-[10px] text-slate-400">Saving…</span>}
-                {error && <span className="text-[10px] text-red-500">{error}</span>}
+                {saving && <span className="text-[10px] text-muted">Saving…</span>}
+                {error && <span className="text-[10px] text-danger">{error}</span>}
             </div>
         </div>
     );

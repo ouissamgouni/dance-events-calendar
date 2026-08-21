@@ -15,8 +15,8 @@ export default function BottomNav() {
     return (
         <nav
             aria-label="Primary"
-            className="md:hidden shrink-0 flex items-stretch border-t border-slate-200 bg-slate-100"
-            style={{ height: 'calc(68px + env(safe-area-inset-bottom))', paddingBottom: 'env(safe-area-inset-bottom)' }}
+            className="md:hidden shrink-0 flex items-stretch border-t border-line bg-surface z-[8001]"
+            style={{ height: 'calc(64px + env(safe-area-inset-bottom))', paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
             {NAV_DESTINATIONS.map((dest) => {
                 const active = dest.isActive(pathname);
@@ -26,11 +26,11 @@ export default function BottomNav() {
                         key={dest.id}
                         to={dest.path}
                         aria-current={active ? 'page' : undefined}
-                        className={`relative flex-1 flex flex-col items-center justify-center gap-1 text-[11px] transition ${active ? 'text-blue-600 font-medium' : 'text-slate-500 hover:text-slate-700'
+                        className={`relative flex-1 flex flex-col items-center justify-center gap-1 text-xs transition ${active ? 'text-action font-medium' : 'text-ink-soft hover:text-ink'
                             }`}
                     >
                         {active && (
-                            <span aria-hidden="true" className="absolute top-0 left-0 right-0 h-0.5 bg-blue-600" />
+                            <span aria-hidden="true" className="absolute top-0 left-1/2 -translate-x-1/2 w-[60%] h-[3px] bg-action" />
                         )}
                         <span className="relative">
                             <img
@@ -43,7 +43,7 @@ export default function BottomNav() {
                             {showDot && (
                                 <span
                                     // eslint-disable-next-line no-restricted-syntax -- small status dot (new indicator) — allowed exception per frontend rules
-                                    className="absolute -right-1 -top-0.5 h-1.5 w-1.5 rounded-full bg-blue-500"
+                                    className="absolute -right-1 -top-0.5 h-1.5 w-1.5 rounded-full bg-action"
                                     aria-label="New items available"
                                     data-testid="for-you-nav-new-dot"
                                 />

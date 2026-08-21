@@ -11,17 +11,17 @@ function MyReviewCard({ review, name }: { review: MyRating; name: string }) {
     const meta = review.overall_sentiment ? SENTIMENT_META[review.overall_sentiment] : null;
     const initials = name.trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase() || '?';
     return (
-        <li className="border border-slate-200 bg-white p-3">
+        <li className="border border-line bg-surface p-3">
             <div className="flex items-center gap-2 min-w-0">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-600">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-ink-soft">
                     {initials}
                 </span>
                 <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-slate-900">
+                    <div className="truncate text-sm font-semibold text-ink">
                         {name}
-                        {review.is_anonymous && <span className="ml-1 text-xs font-normal text-slate-400">· anonymous</span>}
+                        {review.is_anonymous && <span className="ml-1 text-xs font-normal text-muted">· anonymous</span>}
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                    <div className="flex items-center gap-1.5 text-xs text-ink-soft">
                         {meta && <span>{meta.emoji} {meta.label}</span>}
                         {meta && <span className="text-slate-300">·</span>}
                         <span>{new Date(review.created_at).toLocaleDateString()}</span>
@@ -29,10 +29,10 @@ function MyReviewCard({ review, name }: { review: MyRating; name: string }) {
                 </div>
             </div>
             {review.comment && (
-                <p className="mt-2 text-sm text-slate-700 whitespace-pre-wrap break-words line-clamp-4">
+                <p className="mt-2 text-sm text-ink whitespace-pre-wrap break-words line-clamp-4">
                     {review.comment}
                     {review.comment_status === 'pending' && (
-                        <span className="ml-1 text-slate-400">(awaiting review)</span>
+                        <span className="ml-1 text-muted">(awaiting review)</span>
                     )}
                 </p>
             )}
@@ -62,8 +62,8 @@ export default function MyReviewsPage() {
 
     if (!user) {
         return (
-            <div className="mx-auto max-w-xl px-4 py-6 text-xs text-slate-600">
-                <Link to="/login" className="text-blue-600 hover:underline">Sign in</Link> to see the reviews you've written.
+            <div className="mx-auto max-w-xl px-4 py-6 text-xs text-ink-soft">
+                <Link to="/login" className="text-action hover:underline">Sign in</Link> to see the reviews you've written.
             </div>
         );
     }
@@ -72,11 +72,11 @@ export default function MyReviewsPage() {
 
     return (
         <div className="mx-auto max-w-xl px-4 py-4">
-            <h1 className="mb-3 text-sm font-semibold text-slate-900">My Reviews</h1>
+            <h1 className="mb-3 text-sm font-semibold text-ink">My Reviews</h1>
             {myRatings === null ? (
-                <p className="text-sm text-slate-400">Loading…</p>
+                <p className="text-sm text-muted">Loading…</p>
             ) : myRatings.length === 0 ? (
-                <p className="text-sm text-slate-500">You haven't rated any events yet.</p>
+                <p className="text-sm text-ink-soft">You haven't rated any events yet.</p>
             ) : (
                 <ul className="space-y-2">
                     {myRatings.map((r) => <MyReviewCard key={r.id} review={r} name={name} />)}

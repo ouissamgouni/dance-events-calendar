@@ -29,11 +29,11 @@ export default function EventSeriesLink({ eventId }: Props) {
     if (!series) return null;
 
     return (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-ink-soft">
             This event belongs to the{' '}
             <Link
                 to={`/series/${series.series_id}`}
-                className="font-medium text-blue-600 hover:text-blue-700 hover:underline"
+                className="font-medium text-action hover:text-action hover:underline"
             >
                 {series.canonical_title}
             </Link>{' '}

@@ -38,7 +38,7 @@ export default function TagBadges({ tags, maxVisible = 5, forceBadge = false, fo
         const overflowLabel = overflow > 0 ? ` +${overflow}` : '';
         const title = enabledTags.map((t) => t.label).join(' \u00b7 ');
         return (
-            <p className="truncate text-[10px] text-slate-500" title={title}>
+            <p className="truncate text-[10px] text-ink-soft" title={title}>
                 {visible.map((t) => t.label).join(' \u00b7 ')}
                 {overflowLabel}
             </p>
@@ -71,7 +71,7 @@ export default function TagBadges({ tags, maxVisible = 5, forceBadge = false, fo
                 return (
                     <span
                         key={tag.id}
-                        className="inline-flex items-center bg-slate-100 px-1.5 py-px text-[9px] font-medium leading-3 text-slate-600"
+                        className="inline-flex items-center bg-slate-100 px-1.5 py-px text-[9px] font-medium leading-3 text-ink-soft"
                         title={`${tag.group_label}: ${tag.label}`}
                     >
                         {tag.label}
@@ -79,7 +79,7 @@ export default function TagBadges({ tags, maxVisible = 5, forceBadge = false, fo
                 );
             })}
             {overflow > 0 && (
-                <span className="inline-flex items-center px-1.5 py-px text-[9px] font-medium leading-3 text-gray-400">
+                <span className="inline-flex items-center px-1.5 py-px text-[9px] font-medium leading-3 text-muted">
                     +{overflow}
                 </span>
             )}

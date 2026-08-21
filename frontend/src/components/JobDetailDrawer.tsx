@@ -23,15 +23,15 @@ interface JobDetailDrawerProps {
 }
 
 const STATUS_BADGE: Record<string, string> = {
-    running: 'bg-blue-100 text-blue-700',
+    running: 'bg-blue-100 text-action',
     processing: 'bg-violet-100 text-violet-700',
     abort_requested: 'bg-amber-100 text-amber-700',
-    completed: 'bg-emerald-100 text-emerald-700',
+    completed: 'bg-emerald-100 text-success',
     warning: 'bg-amber-100 text-amber-700',
-    failed: 'bg-red-100 text-red-700',
-    aborted: 'bg-gray-100 text-gray-600',
-    idle: 'bg-gray-100 text-gray-500',
-    queued: 'bg-gray-100 text-gray-500',
+    failed: 'bg-red-100 text-danger',
+    aborted: 'bg-gray-100 text-ink-soft',
+    idle: 'bg-gray-100 text-ink-soft',
+    queued: 'bg-gray-100 text-ink-soft',
 };
 
 const isActive = (s: string) => s === 'running' || s === 'abort_requested';
@@ -121,18 +121,18 @@ export default function JobDetailDrawer({ jobId, onClose }: JobDetailDrawerProps
         <>
             <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
             <div
-                className="fixed top-0 right-0 h-full w-full sm:w-[1100px] max-w-[95vw] bg-white shadow-xl border-l border-gray-200 z-50 flex flex-col"
+                className="fixed top-0 right-0 h-full w-full sm:w-[1100px] max-w-[95vw] bg-surface shadow-xl border-l border-line z-50 flex flex-col"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
-                <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200">
-                    <h2 className="text-xs font-semibold text-gray-900">
-                        Job <span className="text-gray-500">#{jobId.slice(0, 8)}</span>
+                <div className="flex items-center justify-between px-4 py-2 border-b border-line">
+                    <h2 className="text-xs font-semibold text-ink">
+                        Job <span className="text-ink-soft">#{jobId.slice(0, 8)}</span>
                     </h2>
                     <div className="flex items-center gap-2">
                         <button
                             onClick={refresh}
-                            className="text-gray-400 hover:text-gray-600 text-sm"
+                            className="text-muted hover:text-ink-soft text-sm"
                             title="Refresh"
                             aria-label="Refresh"
                         >
@@ -140,7 +140,7 @@ export default function JobDetailDrawer({ jobId, onClose }: JobDetailDrawerProps
                         </button>
                         <button
                             onClick={onClose}
-                            className="text-gray-400 hover:text-gray-600 text-sm leading-none p-1"
+                            className="text-muted hover:text-ink-soft text-sm leading-none p-1"
                             aria-label="Close"
                         >
                             ✕
@@ -151,10 +151,10 @@ export default function JobDetailDrawer({ jobId, onClose }: JobDetailDrawerProps
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto">
                     {error && (
-                        <div className="px-4 py-2 text-[11px] text-red-600">{error}</div>
+                        <div className="px-4 py-2 text-[11px] text-danger">{error}</div>
                     )}
                     {!job && !error && (
-                        <div className="px-4 py-3 text-[11px] text-gray-400">Loading…</div>
+                        <div className="px-4 py-3 text-[11px] text-muted">Loading…</div>
                     )}
                     {job && !openCal && (
                         <JobView
@@ -225,8 +225,8 @@ function JobView({
     const stats: { label: string; value: number; tone?: string }[] = [
         { label: 'Calendars', value: totals.calendars_synced },
         { label: 'Fetched', value: totals.events_fetched },
-        { label: 'New', value: totalNew, tone: 'text-emerald-600' },
-        { label: 'Updated', value: totalUpdated, tone: 'text-blue-600' },
+        { label: 'New', value: totalNew, tone: 'text-success' },
+        { label: 'Updated', value: totalUpdated, tone: 'text-action' },
         { label: 'Duplicates', value: totals.events_deduped },
         ...(totalIssues > 0
             ? [{ label: 'Issues', value: totalIssues, tone: 'text-amber-600' }]
@@ -240,7 +240,7 @@ function JobView({
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${STATUS_BADGE[job.status] ?? 'bg-gray-100 text-gray-500'
+                            className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${STATUS_BADGE[job.status] ?? 'bg-gray-100 text-ink-soft'
                                 }`}
                         >
                             {job.status}
@@ -255,27 +255,27 @@ function JobView({
                         )}
                     </div>
                 </div>
-                <div className="text-[11px] text-gray-500 flex items-center gap-3 flex-wrap">
+                <div className="text-[11px] text-ink-soft flex items-center gap-3 flex-wrap">
                     <span className="flex items-center gap-1">
                         🕐 Started: {formatTime(job.started_at)}
                     </span>
                     <span>Duration: {durationLabel(job.started_at, job.finished_at)}</span>
                     {job.mode && (
-                        <span className="capitalize text-gray-400">· {job.mode}</span>
+                        <span className="capitalize text-muted">· {job.mode}</span>
                     )}
                 </div>
             </div>
 
             {/* Stat row */}
-            <div className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+            <div className="bg-canvas border border-card-line rounded-lg px-3 py-2">
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
                     {stats.map((s) => (
                         <div key={s.label}>
-                            <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">
+                            <div className="text-[10px] text-ink-soft uppercase tracking-wide mb-0.5">
                                 {s.label}
                             </div>
-                            <div className={`text-sm font-semibold ${s.value === 0 ? 'text-gray-400' : (s.tone ?? 'text-gray-900')}`}>
-                                {s.value > 0 && s.tone === 'text-emerald-600' ? `+${s.value}` : s.value}
+                            <div className={`text-sm font-semibold ${s.value === 0 ? 'text-muted' : (s.tone ?? 'text-ink')}`}>
+                                {s.value > 0 && s.tone === 'text-success' ? `+${s.value}` : s.value}
                             </div>
                         </div>
                     ))}
@@ -286,7 +286,7 @@ function JobView({
             {(job.error_message || job.warning_message) && (
                 <div className="space-y-1.5">
                     {job.error_message && (
-                        <div className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded px-2.5 py-1.5">
+                        <div className="text-[11px] text-danger bg-red-50 border border-red-200 rounded px-2.5 py-1.5">
                             {job.error_message}
                         </div>
                     )}
@@ -300,11 +300,11 @@ function JobView({
 
             {/* Calendar Runs */}
             <div>
-                <h3 className="text-xs font-semibold text-gray-800 mb-2">
+                <h3 className="text-xs font-semibold text-ink mb-2">
                     Calendar Runs
                 </h3>
                 {calendars.length === 0 ? (
-                    <div className="text-[11px] text-gray-400">No calendars in this job.</div>
+                    <div className="text-[11px] text-muted">No calendars in this job.</div>
                 ) : (
                     <div className="space-y-2">
                         {calendars.map((c) => (
@@ -344,26 +344,26 @@ function CalendarRunCard({
     return (
         <button
             onClick={onClick}
-            className="w-full text-left bg-white border border-gray-200 hover:border-gray-300 hover:shadow-sm rounded-lg px-3 py-2 transition flex items-center gap-3"
+            className="w-full text-left bg-surface border border-line hover:border-line hover:shadow-sm rounded-lg px-3 py-2 transition flex items-center gap-3"
         >
             <span
-                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0 ${STATUS_BADGE[cal.status] ?? 'bg-gray-100 text-gray-500'
+                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0 ${STATUS_BADGE[cal.status] ?? 'bg-gray-100 text-ink-soft'
                     }`}
             >
                 {cal.status}
             </span>
             <div className="flex-1 min-w-0">
-                <div className="text-xs font-medium text-gray-900 truncate">
+                <div className="text-xs font-medium text-ink truncate">
                     {cal.calendar_name}
                 </div>
-                <div className="text-[10px] text-gray-400 truncate font-mono">
+                <div className="text-[10px] text-muted truncate font-mono">
                     {cal.calendar_id}
                 </div>
             </div>
             <div className="hidden sm:flex items-center gap-4 text-[11px] flex-shrink-0">
                 <Stat label="Processed" value={cal.fetched} />
-                <Stat label="New" value={newCount} tone="text-emerald-600" prefix="+" />
-                <Stat label="Updated" value={updatedCount} tone="text-blue-600" />
+                <Stat label="New" value={newCount} tone="text-success" prefix="+" />
+                <Stat label="Updated" value={updatedCount} tone="text-action" />
                 {issues > 0 && <Stat label="Issues" value={issues} tone="text-amber-600" />}
             </div>
             <span className="text-gray-300 text-base flex-shrink-0">›</span>
@@ -384,8 +384,8 @@ function Stat({
 }) {
     return (
         <div className="text-right">
-            <div className="text-[9px] text-gray-400 uppercase tracking-wide">{label}</div>
-            <div className={`text-xs font-semibold ${value === 0 ? 'text-gray-400' : (tone ?? 'text-gray-700')}`}>
+            <div className="text-[9px] text-muted uppercase tracking-wide">{label}</div>
+            <div className={`text-xs font-semibold ${value === 0 ? 'text-muted' : (tone ?? 'text-ink')}`}>
                 {prefix && value > 0 ? prefix : ''}
                 {value}
             </div>

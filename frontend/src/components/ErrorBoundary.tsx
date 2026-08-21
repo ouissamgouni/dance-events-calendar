@@ -87,8 +87,8 @@ export default class ErrorBoundary extends Component<Props, State> {
 
         if (this.state.recovering) {
             return (
-                <div className="flex min-h-dvh items-center justify-center bg-slate-50 px-6 text-center">
-                    <p className="text-sm text-slate-600" role="status" aria-live="polite">
+                <div className="flex min-h-dvh items-center justify-center bg-canvas px-6 text-center">
+                    <p className="text-sm text-ink-soft" role="status" aria-live="polite">
                         Updating the app…
                     </p>
                 </div>
@@ -96,15 +96,15 @@ export default class ErrorBoundary extends Component<Props, State> {
         }
 
         return (
-            <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-slate-50 px-6 text-center">
+            <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-canvas px-6 text-center">
                 <div>
-                    <p className="text-base font-semibold text-slate-800">Something went wrong</p>
-                    <p className="mt-1 text-sm text-slate-600">Please reload to continue.</p>
+                    <p className="text-base font-semibold text-ink">Something went wrong</p>
+                    <p className="mt-1 text-sm text-ink-soft">Please reload to continue.</p>
                 </div>
                 <button
                     type="button"
                     onClick={this.reloadNow}
-                    className="bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 transition"
+                    className="bg-action px-4 py-2 text-sm font-medium text-white hover:bg-action transition"
                 >
                     Reload
                 </button>

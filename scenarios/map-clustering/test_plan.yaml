@@ -89,7 +89,10 @@ test_plan:
         `onBoundsChange` fires, the list panel re-queries with the
         new bounds, and only the 8 evt-cluster-ber-* events remain
         visible in the list. Confirms map-list coupling still works
-        regardless of pin density.
+        regardless of pin density. On mobile the map is reached via the
+        map miniature / SummaryBar Map toggle (fullscreen); panning
+        there surfaces the "Search this area" pill and the bottom
+        "View list · N" CTA rather than a side-by-side list.
 
     - id: 6
       title: "Following decorations are visible on the seeded pins"
@@ -130,6 +133,10 @@ test_plan:
         rings (alice, emma, frank, gina, hugo); a small inline
         PeopleIcon prefixes the track. Followed-not-friends and
         strangers fill the overflow count but DO NOT add blue rings.
+        On desktop this renders as a Leaflet popup; on mobile the same
+        content renders in the compact bottom event preview of the
+        fullscreen map (name, date, location, tags, people going, Save,
+        Details), replaced when another pin is tapped.
 
     - id: 8
       title: "Trending badge is drawn on the top-N pins"

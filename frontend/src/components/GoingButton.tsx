@@ -368,12 +368,12 @@ export default function GoingButton({
             role="dialog"
             aria-label="Attendance visibility"
             style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left, width: POPOVER_WIDTH }}
-            className="z-[12000] border border-slate-200 bg-white p-3 shadow-xl text-left"
+            className="z-[12000] border border-line bg-surface p-3 shadow-xl text-left"
         >
-            <p className="text-xs font-medium text-slate-800 mb-2">
+            <p className="text-xs font-medium text-ink mb-2">
                 {popoverKind === 'confirm' ? "You're going!" : 'Edit visibility'}
             </p>
-            <p className="text-[11px] text-slate-600 mb-2">
+            <p className="text-[11px] text-ink-soft mb-2">
                 Who can see you in the attendee list?
             </p>
             <AudiencePicker
@@ -382,7 +382,7 @@ export default function GoingButton({
                 size="full"
                 ariaLabel="Attendance visibility"
             />
-            <p className="text-[11px] text-slate-500 mt-1.5">
+            <p className="text-[11px] text-ink-soft mt-1.5">
                 {pendingAudience === 'public'
                     ? 'You will appear in the attendee list to anyone who can view this event.'
                     : pendingAudience === 'friends'
@@ -395,7 +395,7 @@ export default function GoingButton({
                  ON also persists the current selection as the new default
                  immediately, so the user doesn't have to re-pick. */}
             {popoverKind === 'edit' && (
-                <label className="mt-2 flex items-start gap-2 text-[11px] text-slate-600 cursor-pointer">
+                <label className="mt-2 flex items-start gap-2 text-[11px] text-ink-soft cursor-pointer">
                     <input
                         type="checkbox"
                         checked={rememberDefault}
@@ -442,14 +442,14 @@ export default function GoingButton({
                             <button
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); setPopoverKind(null); }}
-                                className="text-xs px-2 py-1 text-slate-600 hover:bg-slate-100"
+                                className="text-xs px-2 py-1 text-ink-soft hover:bg-canvas"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="button"
                                 onClick={confirmGoing}
-                                className="text-xs px-3 py-1 bg-blue-500 text-white hover:bg-blue-600"
+                                className="text-xs px-3 py-1 bg-action text-white hover:bg-action"
                             >
                                 {markLabel}
                             </button>
@@ -458,7 +458,7 @@ export default function GoingButton({
                         <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); setPopoverKind(null); }}
-                            className="text-xs px-2 py-1 text-slate-600 hover:bg-slate-100"
+                            className="text-xs px-2 py-1 text-ink-soft hover:bg-canvas"
                         >
                             Close
                         </button>
@@ -495,7 +495,7 @@ export default function GoingButton({
                         onClick={openEditShare}
                         title={`Visibility: ${getAudience(eventId)} \u2014 click to edit`}
                         aria-label={`Visibility: ${getAudience(eventId)} \u2014 edit`}
-                        className="px-2 transition flex items-center hover:bg-emerald-200 border-l border-emerald-200 text-emerald-700"
+                        className="px-2 transition flex items-center hover:bg-emerald-200 border-l border-emerald-200 text-success"
                     >
                         <AudienceTierIcon audience={getAudience(eventId)} className="w-3.5 h-3.5" />
                     </button>
@@ -515,7 +515,7 @@ export default function GoingButton({
                     className={
                         prominent && !going
                             ? `rounded-full px-5 py-2 text-sm font-semibold shadow-sm transition flex items-center gap-2 bg-rose-600 text-white hover:bg-rose-700 ${className}`.trim()
-                            : `text-xs rounded-full px-3 py-1 transition flex items-center gap-1.5 ${going ? 'text-emerald-800 bg-emerald-100 hover:bg-emerald-200' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'} ${className}`.trim()
+                            : `text-xs rounded-full px-3 py-1 transition flex items-center gap-1.5 ${going ? 'text-emerald-800 bg-emerald-100 hover:bg-emerald-200' : 'text-ink-soft bg-slate-100 hover:bg-canvas'} ${className}`.trim()
                     }
                 >
                     <RaisedHandIcon
@@ -538,7 +538,7 @@ export default function GoingButton({
                 onClick={handleClick}
                 aria-label={tooltip}
                 title={tooltip}
-                className={`relative rounded-full transition-colors ${size === 'sm' ? 'p-0.5' : 'p-1.5'} ${going ? 'text-emerald-400 hover:text-emerald-500' : 'text-slate-400 hover:text-slate-600'} ${className}`.trim()}
+                className={`relative rounded-full transition-colors ${size === 'sm' ? 'p-0.5' : 'p-1.5'} ${going ? 'text-emerald-400 hover:text-emerald-500' : 'text-muted hover:text-ink-soft'} ${className}`.trim()}
             >
                 <RaisedHandIcon solid={going} className={iconSizeClass} />
             </button>

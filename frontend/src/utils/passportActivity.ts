@@ -31,15 +31,15 @@ export const LEVEL_RAMP_LIGHT: Record<0 | 1 | 2 | 3 | 4, string> = {
     0: 'bg-slate-100',
     1: 'bg-emerald-200',
     2: 'bg-emerald-400',
-    3: 'bg-emerald-500',
+    3: 'bg-success',
     4: 'bg-emerald-700',
 };
 
 export const LEVEL_RAMP_DARK: Record<0 | 1 | 2 | 3 | 4, string> = {
-    0: 'bg-white/5',
+    0: 'bg-surface/5',
     1: 'bg-emerald-900',
     2: 'bg-emerald-700',
-    3: 'bg-emerald-500',
+    3: 'bg-success',
     4: 'bg-emerald-300',
 };
 

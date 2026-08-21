@@ -286,7 +286,7 @@ export default function AdminUsersTab() {
             <button
                 type="button"
                 onClick={() => onSort(field)}
-                className={`flex items-center gap-1 uppercase hover:text-slate-900${align === 'right' ? ' ml-auto' : ''}`}
+                className={`flex items-center gap-1 uppercase hover:text-ink${align === 'right' ? ' ml-auto' : ''}`}
             >
                 {label}
                 {sortIndicator(field)}
@@ -298,7 +298,7 @@ export default function AdminUsersTab() {
         <section className="space-y-4">
             <header className="flex flex-wrap items-center gap-3">
                 <h2 className="text-lg font-semibold">Users</h2>
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-ink-soft">
                     {loading ? 'Loading…' : `${total.toLocaleString()} total`}
                 </span>
                 <div className="ml-auto">
@@ -310,7 +310,7 @@ export default function AdminUsersTab() {
                             setOffset(0);
                         }}
                         placeholder="Search handle, name, email"
-                        className="w-64 border border-slate-300 px-2 py-1 text-xs"
+                        className="w-64 border border-line px-2 py-1 text-xs"
                         aria-label="Search users"
                     />
                 </div>
@@ -336,19 +336,19 @@ export default function AdminUsersTab() {
             </div>
 
             {error && (
-                <div className="border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                <div className="border border-red-200 bg-red-50 px-3 py-2 text-xs text-danger">
                     {error}
                 </div>
             )}
             {notice && !error && (
-                <div className="border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                <div className="border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-action">
                     {notice}
                 </div>
             )}
 
-            <div className="overflow-x-auto border border-slate-200">
+            <div className="overflow-x-auto border border-line">
                 <table className="w-full text-xs">
-                    <thead className="bg-slate-50 text-left text-xs uppercase text-slate-600">
+                    <thead className="bg-canvas text-left text-xs uppercase text-ink-soft">
                         <tr>
                             <th className="px-3 py-2">User</th>
                             <th className="px-3 py-2">Email</th>
@@ -368,7 +368,7 @@ export default function AdminUsersTab() {
                     <tbody>
                         {!loading && rows.length === 0 && (
                             <tr>
-                                <td colSpan={13} className="px-3 py-8 text-center text-slate-500">
+                                <td colSpan={13} className="px-3 py-8 text-center text-ink-soft">
                                     No users match these filters.
                                 </td>
                             </tr>
@@ -377,7 +377,7 @@ export default function AdminUsersTab() {
                             const isDeleted = row.deleted_at !== null;
                             const isBlocked = row.active_block_id !== null;
                             return (
-                                <tr key={row.user_id} className="border-t border-slate-200 hover:bg-slate-50">
+                                <tr key={row.user_id} className="border-t border-line hover:bg-canvas">
                                     <td className="px-3 py-2">
                                         <div className="flex items-center gap-2 min-w-0">
                                             {row.avatar_url ? (
@@ -389,16 +389,16 @@ export default function AdminUsersTab() {
                                                 <div className="truncate font-medium">
                                                     {row.display_name || '—'}
                                                 </div>
-                                                <div className="text-xs text-slate-500 truncate">
+                                                <div className="text-xs text-ink-soft truncate">
                                                     {row.handle ? `@${row.handle}` : '(no handle)'}
                                                 </div>
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-3 py-2 text-slate-700 truncate max-w-[16rem]">
+                                    <td className="px-3 py-2 text-ink truncate max-w-[16rem]">
                                         {row.email}
                                     </td>
-                                    <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
+                                    <td className="px-3 py-2 text-ink-soft whitespace-nowrap">
                                         {row.last_visit_at ? (() => {
                                             const parsed = parseUserAgent(row.last_visit_user_agent);
                                             const details = [
@@ -418,7 +418,7 @@ export default function AdminUsersTab() {
                                                 </div>
                                             );
                                         })() : (
-                                            <span className="text-slate-400">—</span>
+                                            <span className="text-muted">—</span>
                                         )}
                                     </td>
                                     <td className="px-3 py-2 text-right tabular-nums">
@@ -455,27 +455,27 @@ export default function AdminUsersTab() {
                                                 type="button"
                                                 disabled={isDeleted || busyUserId === row.user_id}
                                                 onClick={() => onToggleForceEnablePush(row)}
-                                                className="px-2 py-1 text-xs border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
                                                 title={row.force_enable_push_prompt ? 'Stop forcing the enable-notifications banner (normal 24h snooze applies)' : "Force-show the enable-notifications banner, bypassing this user's 24h dismiss snooze"}
                                             >
                                                 {row.force_enable_push_prompt ? 'Unforce push' : 'Force push'}
                                             </button>
                                         </div>
                                     </td>
-                                    <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
+                                    <td className="px-3 py-2 text-ink-soft whitespace-nowrap">
                                         <div className="flex items-center gap-2">
                                             {row.installed_at ? (
                                                 <span title={`Installed ${fmtDate(row.installed_at)}`}>
                                                     {fmtDate(row.installed_at)}
                                                 </span>
                                             ) : (
-                                                <span className="text-slate-400">Not installed</span>
+                                                <span className="text-muted">Not installed</span>
                                             )}
                                             <button
                                                 type="button"
                                                 disabled={isDeleted || busyUserId === row.user_id}
                                                 onClick={() => onToggleForceInstall(row)}
-                                                className="px-2 py-1 text-xs border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
                                                 title={row.force_install_prompt ? 'Stop forcing the install-app banner (normal 14-day snooze applies)' : "Force-show the install-app banner, bypassing this user's 14-day dismiss snooze"}
                                             >
                                                 {row.force_install_prompt ? 'Unforce install' : 'Force install'}
@@ -485,7 +485,7 @@ export default function AdminUsersTab() {
                                                     type="button"
                                                     disabled={isDeleted || busyUserId === row.user_id}
                                                     onClick={() => onSendInstallEmail(row)}
-                                                    className="px-2 py-1 text-xs border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
                                                     title="Email this user an invitation to install the app, with a link to the /install page"
                                                 >
                                                     Send install email
@@ -493,7 +493,7 @@ export default function AdminUsersTab() {
                                             )}
                                         </div>
                                     </td>
-                                    <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
+                                    <td className="px-3 py-2 text-ink-soft whitespace-nowrap">
                                         {fmtDate(row.created_at)}
                                     </td>
                                     <td className="px-3 py-2">
@@ -510,20 +510,20 @@ export default function AdminUsersTab() {
                                             )}
                                             {row.is_admin_managed && (
                                                 <span
-                                                    className="px-1.5 py-px text-xs bg-blue-50 text-blue-700 border border-blue-200"
+                                                    className="px-1.5 py-px text-xs bg-blue-50 text-action border border-blue-200"
                                                     title={row.managed_label || 'Admin-managed curator account'}
                                                 >
                                                     managed{row.managed_label ? `: ${row.managed_label}` : ''}
                                                 </span>
                                             )}
                                             {isDeleted && (
-                                                <span className="px-1.5 py-px text-xs bg-slate-200 text-slate-700">
+                                                <span className="px-1.5 py-px text-xs bg-slate-200 text-ink">
                                                     deleted
                                                 </span>
                                             )}
                                             {isBlocked && (
                                                 <span
-                                                    className="px-1.5 py-px text-xs bg-red-50 text-red-700 border border-red-200"
+                                                    className="px-1.5 py-px text-xs bg-red-50 text-danger border border-red-200"
                                                     title={row.blocked_at ? `Blocked ${fmtDate(row.blocked_at)}` : 'Blocked from signing in'}
                                                 >
                                                     blocked
@@ -537,7 +537,7 @@ export default function AdminUsersTab() {
                                                 type="button"
                                                 disabled={isDeleted || busyUserId === row.user_id}
                                                 onClick={() => onToggleVerified(row)}
-                                                className="px-2 py-1 text-xs border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
                                                 title={row.is_verified_organizer ? 'Remove verified badge' : 'Mark as verified organizer'}
                                             >
                                                 {row.is_verified_organizer ? 'Unverify' : 'Verify'}
@@ -546,7 +546,7 @@ export default function AdminUsersTab() {
                                                 type="button"
                                                 disabled={isDeleted || row.is_admin || busyUserId === row.user_id}
                                                 onClick={() => onToggleManaged(row)}
-                                                className="px-2 py-1 text-xs border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
                                                 title={row.is_admin_managed ? 'Unmark as admin-managed account' : 'Mark as admin-managed curator account'}
                                             >
                                                 {row.is_admin_managed ? 'Unmanage' : 'Manage'}
@@ -556,7 +556,7 @@ export default function AdminUsersTab() {
                                                     type="button"
                                                     disabled={isDeleted || busyUserId === row.user_id}
                                                     onClick={() => onEditManagedLabel(row)}
-                                                    className="px-2 py-1 text-xs border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
                                                     title="Edit internal managed label"
                                                 >
                                                     Label
@@ -567,7 +567,7 @@ export default function AdminUsersTab() {
                                                     type="button"
                                                     disabled={isDeleted || row.is_admin || busyUserId === row.user_id}
                                                     onClick={() => setMergeTarget(row)}
-                                                    className="px-2 py-1 text-xs border border-red-300 text-red-700 bg-white hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    className="px-2 py-1 text-xs border border-red-300 text-danger bg-surface hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
                                                     title="Merge this managed account into another user"
                                                 >
                                                     Merge
@@ -577,7 +577,7 @@ export default function AdminUsersTab() {
                                                 type="button"
                                                 disabled={isDeleted || row.is_admin || busyUserId === row.user_id}
                                                 onClick={() => onDelete(row)}
-                                                className="px-2 py-1 text-xs border border-red-300 text-red-700 bg-white hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                className="px-2 py-1 text-xs border border-red-300 text-danger bg-surface hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
                                                 title={row.is_admin ? "Can't delete the admin from here" : 'Delete this account'}
                                             >
                                                 Delete
@@ -587,7 +587,7 @@ export default function AdminUsersTab() {
                                                     type="button"
                                                     disabled={busyUserId === row.user_id}
                                                     onClick={() => setUnblockTarget(row)}
-                                                    className="px-2 py-1 text-xs border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    className="px-2 py-1 text-xs border border-line bg-surface hover:bg-canvas disabled:opacity-40 disabled:cursor-not-allowed"
                                                     title="Allow this account to sign in again"
                                                 >
                                                     Unblock
@@ -597,7 +597,7 @@ export default function AdminUsersTab() {
                                                     type="button"
                                                     disabled={isDeleted || row.is_admin || busyUserId === row.user_id}
                                                     onClick={() => setBlockPrompt(row)}
-                                                    className="px-2 py-1 text-xs border border-red-300 text-red-700 bg-white hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    className="px-2 py-1 text-xs border border-red-300 text-danger bg-surface hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
                                                     title={row.is_admin ? "Can't block the admin from here" : 'Block this account from signing in'}
                                                 >
                                                     Block
@@ -618,18 +618,18 @@ export default function AdminUsersTab() {
                         type="button"
                         disabled={offset === 0 || loading}
                         onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-                        className="px-2 py-1 border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40"
+                        className="px-2 py-1 border border-line bg-surface hover:bg-canvas disabled:opacity-40"
                     >
                         ← Previous
                     </button>
-                    <span className="text-slate-600">
+                    <span className="text-ink-soft">
                         {offset + 1}–{Math.min(offset + PAGE_SIZE, total)} of {total}
                     </span>
                     <button
                         type="button"
                         disabled={offset + PAGE_SIZE >= total || loading}
                         onClick={() => setOffset(offset + PAGE_SIZE)}
-                        className="px-2 py-1 border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-40"
+                        className="px-2 py-1 border border-line bg-surface hover:bg-canvas disabled:opacity-40"
                     >
                         Next →
                     </button>
@@ -775,7 +775,7 @@ function MergeUsersDialog({
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="admin-merge-title"
-                className="w-full max-w-lg border border-slate-200 bg-white shadow-xl"
+                className="w-full max-w-lg border border-line bg-surface shadow-xl"
                 onClick={(e) => e.stopPropagation()}
                 onSubmit={(e) => {
                     e.preventDefault();
@@ -786,15 +786,15 @@ function MergeUsersDialog({
                     onConfirm(destinationUserId, reason.trim() || null);
                 }}
             >
-                <div className="border-b border-slate-100 px-4 py-3">
-                    <h2 id="admin-merge-title" className="text-sm font-semibold text-slate-900">Merge Managed User</h2>
+                <div className="border-b border-card-line px-4 py-3">
+                    <h2 id="admin-merge-title" className="text-sm font-semibold text-ink">Merge Managed User</h2>
                 </div>
-                <div className="space-y-4 px-4 py-3 text-sm text-slate-700">
+                <div className="space-y-4 px-4 py-3 text-sm text-ink">
                     <div className="border border-red-200 bg-red-50 px-3 py-2 text-red-800">
                         {userDisplay(source)} will be soft-deleted after its data is moved. The destination user keeps their email, Google sign-in, handle, name, and avatar.
                     </div>
                     <div className="space-y-1.5">
-                        <label htmlFor="merge-destination-search" className="block font-medium text-slate-800">Search destination user</label>
+                        <label htmlFor="merge-destination-search" className="block font-medium text-ink">Search destination user</label>
                         <input
                             id="merge-destination-search"
                             type="search"
@@ -803,16 +803,16 @@ function MergeUsersDialog({
                                 setQuery(e.target.value);
                                 setFieldError(null);
                             }}
-                            className="w-full border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-full border border-line px-3 py-2 text-sm text-ink focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
                             placeholder="Search email, handle, or name"
                             autoFocus
                         />
-                        <div className="max-h-44 overflow-y-auto border border-slate-200 bg-white">
+                        <div className="max-h-44 overflow-y-auto border border-line bg-surface">
                             {searching && (
-                                <div className="px-3 py-2 text-xs text-slate-500">Searching…</div>
+                                <div className="px-3 py-2 text-xs text-ink-soft">Searching…</div>
                             )}
                             {!searching && candidates.length === 0 && (
-                                <div className="px-3 py-2 text-xs text-slate-500">No active non-admin users found.</div>
+                                <div className="px-3 py-2 text-xs text-ink-soft">No active non-admin users found.</div>
                             )}
                             {!searching && candidates.map((row) => {
                                 const selected = row.user_id === destinationUserId;
@@ -825,54 +825,54 @@ function MergeUsersDialog({
                                             setFieldError(null);
                                         }}
                                         className={selected
-                                            ? 'block w-full border-b border-slate-100 bg-blue-500 px-3 py-2 text-left text-xs text-white last:border-b-0'
-                                            : 'block w-full border-b border-slate-100 bg-white px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 last:border-b-0'}
+                                            ? 'block w-full border-b border-card-line bg-action px-3 py-2 text-left text-xs text-white last:border-b-0'
+                                            : 'block w-full border-b border-card-line bg-surface px-3 py-2 text-left text-xs text-ink hover:bg-canvas last:border-b-0'}
                                     >
                                         <span className="block font-medium">{userDisplay(row)}</span>
-                                        <span className={selected ? 'block text-blue-50' : 'block text-slate-500'}>{row.email}</span>
+                                        <span className={selected ? 'block text-blue-50' : 'block text-ink-soft'}>{row.email}</span>
                                     </button>
                                 );
                             })}
                         </div>
-                        {fieldError && <p className="text-xs text-red-700">{fieldError}</p>}
-                        {searchError && <p className="text-xs text-red-700">{searchError}</p>}
+                        {fieldError && <p className="text-xs text-danger">{fieldError}</p>}
+                        {searchError && <p className="text-xs text-danger">{searchError}</p>}
                     </div>
-                    <div className="grid gap-2 border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 sm:grid-cols-2">
+                    <div className="grid gap-2 border border-line bg-canvas px-3 py-2 text-xs text-ink-soft sm:grid-cols-2">
                         <div>
-                            <div className="font-medium text-slate-800">Source</div>
+                            <div className="font-medium text-ink">Source</div>
                             <div>{userDisplay(source)}</div>
                             <div>{source.email}</div>
                         </div>
                         <div>
-                            <div className="font-medium text-slate-800">Destination</div>
+                            <div className="font-medium text-ink">Destination</div>
                             <div>{userDisplay(destination)}</div>
                             <div>{destination?.email ?? 'Choose a user'}</div>
                         </div>
                     </div>
                     <div className="space-y-1.5">
-                        <label htmlFor="merge-reason" className="block font-medium text-slate-800">Internal reason</label>
+                        <label htmlFor="merge-reason" className="block font-medium text-ink">Internal reason</label>
                         <textarea
                             id="merge-reason"
                             value={reason}
                             maxLength={500}
                             onChange={(e) => setReason(e.target.value)}
-                            className="min-h-20 w-full border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="min-h-20 w-full border border-line px-3 py-2 text-sm text-ink focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
                             placeholder="Blocked Google account recovery"
                         />
                     </div>
                 </div>
-                <div className="flex justify-end gap-2 border-t border-slate-100 px-4 py-3">
+                <div className="flex justify-end gap-2 border-t border-card-line px-4 py-3">
                     <button
                         type="button"
                         onClick={onCancel}
-                        className="border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                        className="border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:bg-canvas"
                     >
                         Cancel
                     </button>
                     <button
                         type="submit"
                         disabled={!destinationUserId}
-                        className="bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="bg-danger px-3 py-1.5 text-sm font-medium text-white hover:bg-danger/90 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         Merge
                     </button>

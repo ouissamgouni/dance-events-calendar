@@ -246,7 +246,7 @@ export default function ShareReferralBanner() {
             <div
                 role="status"
                 data-testid="share-referral-banner-redeemed"
-                className="flex items-center justify-between gap-3 bg-emerald-50 border-b border-emerald-100 px-4 py-1.5 text-xs text-slate-700"
+                className="flex items-center justify-between gap-3 bg-emerald-50 border-b border-emerald-100 px-4 py-1.5 text-xs text-ink"
             >
                 <p>
                     You're now following{' '}
@@ -255,7 +255,7 @@ export default function ShareReferralBanner() {
                 {(status.handle ?? source.handle) ? (
                     <Link
                         to={`/u/${status.handle ?? source.handle}`}
-                        className="bg-blue-500 px-2.5 py-0.5 text-[11px] font-semibold text-white hover:bg-blue-600 transition"
+                        className="bg-action px-2.5 py-0.5 text-[11px] font-semibold text-white hover:bg-action transition"
                     >
                         Open profile
                     </Link>
@@ -269,7 +269,7 @@ export default function ShareReferralBanner() {
             role="region"
             aria-label="Share-link follow prompt"
             data-testid="share-referral-banner"
-            className="flex items-center justify-between gap-3 bg-blue-50 border-b border-blue-100 px-4 py-1.5 text-xs text-slate-700"
+            className="flex items-center justify-between gap-3 bg-blue-50 border-b border-blue-100 px-4 py-1.5 text-xs text-ink"
         >
             <div className="flex items-center gap-2 min-w-0">
                 {source.avatar_url ? (
@@ -283,7 +283,7 @@ export default function ShareReferralBanner() {
                     You arrived via <strong>{sharerLabelDisplay}</strong>{' '}
                     {user ? '— follow them?' : '— sign in to follow them.'}
                     {!user ? (
-                        <span className="hidden sm:inline text-slate-500">
+                        <span className="hidden sm:inline text-ink-soft">
                             {' '}Signing in also lets you save events across devices,
                             see who else is going, share your calendar, rate events
                             and get notifications.
@@ -292,7 +292,7 @@ export default function ShareReferralBanner() {
                 </p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-                <label className="flex items-center gap-1.5 text-[11px] text-slate-600 select-none">
+                <label className="flex items-center gap-1.5 text-[11px] text-ink-soft select-none">
                     <input
                         type="checkbox"
                         data-testid="share-referral-opt-in"
@@ -307,7 +307,7 @@ export default function ShareReferralBanner() {
                         type="button"
                         onClick={handleConfirm}
                         disabled={status.kind === 'redeeming'}
-                        className="bg-blue-500 px-2.5 py-0.5 text-[11px] font-semibold text-white hover:bg-blue-600 transition disabled:opacity-60"
+                        className="bg-action px-2.5 py-0.5 text-[11px] font-semibold text-white hover:bg-action transition disabled:opacity-60"
                     >
                         {status.kind === 'redeeming' ? 'Following…' : 'Continue'}
                     </button>
@@ -321,7 +321,7 @@ export default function ShareReferralBanner() {
                             // effect above.
                             if (followOptIn) setIntent(shareCode);
                         }}
-                        className="bg-blue-500 px-2.5 py-0.5 text-[11px] font-semibold text-white hover:bg-blue-600 transition"
+                        className="bg-action px-2.5 py-0.5 text-[11px] font-semibold text-white hover:bg-action transition"
                     >
                         Sign in
                     </Link>
@@ -330,7 +330,7 @@ export default function ShareReferralBanner() {
                     type="button"
                     onClick={handleDismiss}
                     aria-label="Dismiss share-referral banner"
-                    className="text-slate-400 hover:text-slate-600 text-base leading-none px-1"
+                    className="text-muted hover:text-ink-soft text-base leading-none px-1"
                 >
                     ×
                 </button>

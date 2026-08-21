@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CalendarEvent } from '../types';
 import RailEventCard from './RailEventCard';
+import ScrollDotsIndicator from './ScrollDots';
+import { useScrollDots } from '../hooks/useScrollDots';
 import { isTrendingScore } from '../utils/trending';
 
 type ForYouLens = 'you-might-like' | 'friends' | 'new';
@@ -86,6 +88,13 @@ export default function ForYouRail({
     // partially off-screen.
     const scrollerRef = useRef<HTMLDivElement | null>(null);
 
+    const { dotCount, activeIndex, scrollToIndex } = useScrollDots(scrollerRef, [
+        collapsed,
+        activeLens,
+        displayCap,
+        lensState[activeLens].events.length,
+    ]);
+
     useEffect(() => {
         if (availableLenses.length === 0) return;
         if (!availableLenses.includes(activeLens)) {
@@ -125,8 +134,8 @@ export default function ForYouRail({
     const allScoresForLens = visibleEvents.map((event) => event.popularity_score ?? 0);
 
     return (
-        <section className={`border border-blue-100 bg-white shadow-sm ${className}`} data-testid="for-you-rail">
-            <div className="flex w-full items-center gap-2 border-b border-blue-50 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+        <section className={`border border-blue-100 bg-surface shadow-sm ${className}`} data-testid="for-you-rail">
+            <div className="flex w-full items-center gap-2 border-b border-blue-50 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-action">
                 <button
                     type="button"
                     className="inline-flex shrink-0 items-center gap-1 hover:text-blue-900 focus:outline-none"
@@ -154,8 +163,8 @@ export default function ForYouRail({
                                     data-testid={`for-you-lens-tab-${lens}`}
                                     onClick={() => setActiveLens(lens)}
                                     className={`shrink-0 px-1.5 py-px text-[11px] font-medium transition border ${isActive
-                                        ? 'bg-white border-blue-300 text-blue-700 shadow-sm'
-                                        : 'bg-blue-50 border-blue-100 text-blue-600 hover:bg-white hover:border-blue-300'}`}
+                                        ? 'bg-surface border-blue-300 text-action shadow-sm'
+                                        : 'bg-blue-50 border-blue-100 text-action hover:bg-surface hover:border-blue-300'}`}
                                 >
                                     {LENS_LABELS[lens]}
                                 </button>
@@ -165,7 +174,7 @@ export default function ForYouRail({
                 )}
                 <button
                     type="button"
-                    className="ml-auto shrink-0 text-xs text-slate-500 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    className="ml-auto shrink-0 text-xs text-ink-soft hover:text-ink focus:outline-none focus:ring-2 focus:ring-blue-300"
                     onClick={() => setCollapsed((value) => !value)}
                     aria-hidden="true"
                     tabIndex={-1}
@@ -174,7 +183,7 @@ export default function ForYouRail({
                 </button>
             </div>
             {!collapsed && (
-                <div ref={scrollerRef} className="flex gap-2 overflow-x-auto px-2 py-2" aria-label={`${LENS_LABELS[activeLens]} events`}>
+                <div ref={scrollerRef} className="flex gap-2 overflow-x-auto scrollbar-hide px-2 py-2" aria-label={`${LENS_LABELS[activeLens]} events`}>
                     {visibleEvents.map((event) => {
                         const isNew = !!unseenStateEnabled && !!newEventIds?.has(event.event_id);
                         const isTrending = trendingEnabled
@@ -201,13 +210,22 @@ export default function ForYouRail({
                             onClick={handleMoreClick}
                             disabled={active.loading && !hasLocalMore}
                             data-testid="for-you-load-more"
-                            className="flex w-[110px] shrink-0 items-center justify-center self-stretch border border-dashed border-blue-300 bg-blue-50/40 text-center text-[11px] font-semibold text-blue-600 shadow-sm transition hover:border-blue-500 hover:bg-blue-50 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-wait disabled:opacity-60"
+                            className="flex w-[110px] shrink-0 items-center justify-center self-stretch border border-dashed border-blue-300 bg-blue-50/40 text-center text-[11px] font-semibold text-action shadow-sm transition hover:border-action hover:bg-blue-50 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-wait disabled:opacity-60"
                             aria-label={`Show more ${LENS_LABELS[activeLens].toLowerCase()} events`}
                         >
                             {active.loading && !hasLocalMore ? 'Loading…' : '+ more'}
                         </button>
                     )}
                 </div>
+            )}
+            {!collapsed && (
+                <ScrollDotsIndicator
+                    count={dotCount}
+                    activeIndex={activeIndex}
+                    onSelect={scrollToIndex}
+                    label={`${LENS_LABELS[activeLens]} events scroll position`}
+                    className="pb-1"
+                />
             )}
         </section>
     );

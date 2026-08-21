@@ -159,13 +159,13 @@ function CellSwitch({
             className={
                 // eslint-disable-next-line no-restricted-syntax -- circular toggle switch is an allowed exception
                 'relative shrink-0 inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-60 ' +
-                (checked ? 'bg-blue-500' : 'bg-slate-300')
+                (checked ? 'bg-action' : 'bg-slate-300')
             }
         >
             <span
                 className={
                     // eslint-disable-next-line no-restricted-syntax -- circular toggle thumb is an allowed exception
-                    'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ' +
+                    'inline-block h-4 w-4 transform rounded-full bg-surface shadow transition-transform ' +
                     (checked ? 'translate-x-4' : 'translate-x-0.5')
                 }
             />
@@ -263,13 +263,13 @@ export default function NotificationSettings() {
     };
 
     return (
-        <section className="border border-slate-200 bg-white p-4 mb-3">
+        <section className="border border-line bg-surface p-4 mb-3">
             <div className="flex items-baseline justify-between gap-4 mb-3">
-                <h2 className="text-sm font-semibold text-slate-900">
+                <h2 className="text-sm font-semibold text-ink">
                     Notifications &amp; email
                 </h2>
                 <span
-                    className="text-[11px] text-slate-400"
+                    className="text-[11px] text-muted"
                     role="status"
                     aria-live="polite"
                 >
@@ -277,14 +277,14 @@ export default function NotificationSettings() {
                 </span>
             </div>
 
-            <p className="text-[11px] text-slate-500 mb-3">
+            <p className="text-[11px] text-ink-soft mb-3">
                 In-app notifications always appear. Toggle email or push per feature.
             </p>
 
-            <div className="overflow-hidden border border-slate-200">
+            <div className="overflow-hidden border border-line">
                 <table className="w-full text-xs">
                     <thead>
-                        <tr className="bg-slate-50 text-slate-500">
+                        <tr className="bg-canvas text-ink-soft">
                             <th className="text-left font-medium px-3 py-2">
                                 Feature
                             </th>
@@ -299,13 +299,13 @@ export default function NotificationSettings() {
                             <tr
                                 key={f.key}
                                 id={f.anchor}
-                                className="border-t border-slate-100 align-top"
+                                className="border-t border-card-line align-top"
                             >
                                 <td className="px-3 py-3">
-                                    <div className="font-medium text-slate-900">
+                                    <div className="font-medium text-ink">
                                         {f.label}
                                     </div>
-                                    <div className="text-[11px] text-slate-500">
+                                    <div className="text-[11px] text-ink-soft">
                                         {f.description}
                                     </div>
                                 </td>
@@ -342,7 +342,7 @@ export default function NotificationSettings() {
                     type="button"
                     onClick={pauseAll}
                     disabled={saving === 'pause-all'}
-                    className="text-xs text-slate-600 hover:text-slate-800 underline underline-offset-2 disabled:text-slate-400"
+                    className="text-xs text-ink-soft hover:text-ink underline underline-offset-2 disabled:text-muted"
                 >
                     {saving === 'pause-all' ? 'Pausing…' : 'Pause all notifications'}
                 </button>
@@ -350,11 +350,11 @@ export default function NotificationSettings() {
 
             <div
                 id="notify-email-digest"
-                className="pt-3 mt-3 border-t border-slate-100 flex items-start justify-between gap-3"
+                className="pt-3 mt-3 border-t border-card-line flex items-start justify-between gap-3"
             >
                 <div>
-                    <div className="font-medium text-slate-900 text-xs">Email digest</div>
-                    <div className="text-[11px] text-slate-500">
+                    <div className="font-medium text-ink text-xs">Email digest</div>
+                    <div className="text-[11px] text-ink-soft">
                         Master switch for the combined activity digest email. Off stops
                         the digest entirely, whatever the per-feature email toggles say.
                     </div>
@@ -371,27 +371,27 @@ export default function NotificationSettings() {
                 />
             </div>
 
-            <div className="pt-3 mt-3 border-t border-slate-100">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">
+            <div className="pt-3 mt-3 border-t border-card-line">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft mb-1.5">
                     Timezone
                 </div>
-                <p className="text-xs text-slate-600">
+                <p className="text-xs text-ink-soft">
                     Reminder times are shown in{' '}
-                    <span className="font-mono text-slate-800">{storedTz}</span>.
+                    <span className="font-mono text-ink">{storedTz}</span>.
                 </p>
                 {detectedTz !== storedTz && (
                     <button
                         type="button"
                         disabled={saving === 'timezone'}
                         onClick={() => patchOne('timezone', detectedTz)}
-                        className="mt-2 text-xs text-blue-600 hover:text-blue-700 disabled:text-slate-400"
+                        className="mt-2 text-xs text-action hover:text-action disabled:text-muted"
                     >
                         Use my detected timezone ({detectedTz})
                     </button>
                 )}
             </div>
 
-            {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
+            {error && <p className="mt-3 text-xs text-danger">{error}</p>}
         </section>
     );
 }

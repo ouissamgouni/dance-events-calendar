@@ -67,18 +67,18 @@ export default function AddressAutocomplete({ value, onChange, onSelect, searchF
                 onChange={handleChange}
                 onFocus={() => suggestions.length > 0 && setOpen(true)}
                 placeholder="Type an address…"
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-md border border-line px-3 py-2 text-sm placeholder:text-muted focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
             />
             {loading && (
-                <span className="absolute right-2 top-2.5 text-xs text-slate-400">…</span>
+                <span className="absolute right-2 top-2.5 text-xs text-muted">…</span>
             )}
             {open && suggestions.length > 0 && (
-                <ul className="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow-lg">
+                <ul className="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-md border border-line bg-surface shadow-lg">
                     {suggestions.map((s, i) => (
                         <li
                             key={i}
                             onClick={() => handleSelect(s)}
-                            className="cursor-pointer px-3 py-2 text-sm text-slate-700 hover:bg-blue-50"
+                            className="cursor-pointer px-3 py-2 text-sm text-ink hover:bg-blue-50"
                         >
                             {s.display_name}
                         </li>

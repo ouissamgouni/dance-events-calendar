@@ -68,22 +68,22 @@ export default function ReferralCard({ compact = false }: ReferralCardProps) {
 
     if (compact) {
         return (
-            <section className="border border-slate-200 bg-white p-6 mb-4">
-                <h2 className="text-base font-semibold text-slate-900 mb-1">
+            <section className="border border-line bg-surface p-6 mb-4">
+                <h2 className="text-base font-semibold text-ink mb-1">
                     Invite friends
                 </h2>
-                <p className="text-xs text-slate-600 mb-3">
+                <p className="text-xs text-ink-soft mb-3">
                     Anyone who joins with your link becomes mutual friends with you.
                 </p>
                 {error && (
-                    <div className="mb-3 border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                    <div className="mb-3 border border-line bg-canvas px-3 py-2 text-xs text-ink">
                         {error}
                     </div>
                 )}
-                {statLine && <p className="mb-3 text-xs text-slate-500">{statLine}</p>}
+                {statLine && <p className="mb-3 text-xs text-ink-soft">{statLine}</p>}
                 <Link
                     to="/invite"
-                    className="inline-block bg-blue-500 px-4 py-2 text-xs font-medium text-white hover:bg-blue-600"
+                    className="inline-block bg-action px-4 py-2 text-xs font-medium text-white hover:bg-action"
                 >
                     Invite a friend
                 </Link>
@@ -92,24 +92,24 @@ export default function ReferralCard({ compact = false }: ReferralCardProps) {
     }
 
     return (
-        <section className="border border-slate-200 bg-white p-6 mb-4">
-            <h2 className="text-base font-semibold text-slate-900 mb-1">
+        <section className="border border-line bg-surface p-6 mb-4">
+            <h2 className="text-base font-semibold text-ink mb-1">
                 Invite friends
             </h2>
-            <p className="text-xs text-slate-600 mb-3">
+            <p className="text-xs text-ink-soft mb-3">
                 Anyone who joins with your link becomes mutual friends with you.
             </p>
             {error && (
-                <div className="mb-3 border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                <div className="mb-3 border border-line bg-canvas px-3 py-2 text-xs text-ink">
                     {error}
                 </div>
             )}
             {data === null && !error ? (
-                <p className="text-sm text-slate-400">Loading…</p>
+                <p className="text-sm text-muted">Loading…</p>
             ) : data ? (
                 <>
                     <div className="mb-4 flex justify-center">
-                        <div className="border border-slate-200 p-3">
+                        <div className="border border-line p-3">
                             <QRCodeSVG value={data.url} size={200} />
                         </div>
                     </div>
@@ -120,24 +120,24 @@ export default function ReferralCard({ compact = false }: ReferralCardProps) {
                             value={data.url}
                             onFocus={(e) => e.currentTarget.select()}
                             aria-label="Referral URL"
-                            className="flex-1 border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700"
+                            className="flex-1 border border-line bg-canvas px-2 py-1 text-xs text-ink"
                         />
                         <button
                             type="button"
                             onClick={() => void copy()}
-                            className="border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                            className="border border-line bg-surface px-3 py-1 text-xs font-medium text-ink hover:bg-canvas"
                         >
                             {copied ? 'Copied!' : 'Copy'}
                         </button>
                         <button
                             type="button"
                             onClick={() => void share()}
-                            className="bg-blue-500 px-3 py-1 text-xs font-medium text-white hover:bg-blue-600"
+                            className="bg-action px-3 py-1 text-xs font-medium text-white hover:bg-action"
                         >
                             Share
                         </button>
                     </div>
-                    <p className="mt-2 text-xs text-slate-500">{statLine}</p>
+                    <p className="mt-2 text-xs text-ink-soft">{statLine}</p>
                 </>
             ) : null}
         </section>

@@ -51,9 +51,9 @@ export default function BioEditor({ handle }: { handle: string | null }) {
 
     if (!handle) {
         return (
-            <div className="mt-3 border-t border-slate-100 pt-3">
-                <div className="text-xs font-medium text-slate-700 mb-0.5">Bio</div>
-                <p className="text-xs text-slate-500">
+            <div className="mt-3 border-t border-card-line pt-3">
+                <div className="text-xs font-medium text-ink mb-0.5">Bio</div>
+                <p className="text-xs text-ink-soft">
                     Pick a handle above to add a bio to your public profile.
                 </p>
             </div>
@@ -83,24 +83,24 @@ export default function BioEditor({ handle }: { handle: string | null }) {
     };
 
     return (
-        <div className="mt-3 border-t border-slate-100 pt-3">
+        <div className="mt-3 border-t border-card-line pt-3">
             <button
                 type="button"
                 onClick={() => setExpanded((v) => !v)}
-                className="flex items-center gap-1 text-xs font-medium text-slate-700 hover:text-slate-900 w-full"
+                className="flex items-center gap-1 text-xs font-medium text-ink hover:text-ink w-full"
             >
                 <span>Bio</span>
-                <span className="text-slate-400 ml-auto">{expanded ? '▲' : '▼'}</span>
+                <span className="text-muted ml-auto">{expanded ? '▲' : '▼'}</span>
             </button>
             {expanded && (
                 <div className="mt-2">
-                    <p className="text-xs text-slate-500 mb-1.5">
+                    <p className="text-xs text-ink-soft mb-1.5">
                         A short blurb shown on your public profile. {BIO_MAX} characters max.
                     </p>
                     {loading ? (
-                        <p className="text-xs text-slate-500">Loading…</p>
+                        <p className="text-xs text-ink-soft">Loading…</p>
                     ) : !profile ? (
-                        <p className="text-xs text-slate-500">{error || 'Unavailable.'}</p>
+                        <p className="text-xs text-ink-soft">{error || 'Unavailable.'}</p>
                     ) : (
                         <>
                             <textarea
@@ -109,13 +109,13 @@ export default function BioEditor({ handle }: { handle: string | null }) {
                                 rows={3}
                                 maxLength={BIO_MAX + 50 /* allow paste-overflow then warn */}
                                 placeholder="Tell people what you're into…"
-                                className="w-full text-xs border border-slate-200 px-2 py-1.5 focus:outline-none focus:border-blue-500"
+                                className="w-full text-xs border border-line px-2 py-1.5 focus:outline-none focus:border-action"
                             />
                             <div className="mt-1 flex items-center justify-between gap-2">
                                 <span
                                     className={
                                         'text-xs ' +
-                                        (overLimit ? 'text-red-600' : 'text-slate-400')
+                                        (overLimit ? 'text-danger' : 'text-muted')
                                     }
                                 >
                                     {remaining} characters left
@@ -125,7 +125,7 @@ export default function BioEditor({ handle }: { handle: string | null }) {
                                         <button
                                             type="button"
                                             onClick={() => setBio(profile.bio ?? '')}
-                                            className="text-xs text-slate-600 hover:text-slate-900"
+                                            className="text-xs text-ink-soft hover:text-ink"
                                         >
                                             Cancel
                                         </button>
@@ -134,14 +134,14 @@ export default function BioEditor({ handle }: { handle: string | null }) {
                                         type="button"
                                         onClick={save}
                                         disabled={!dirty || saving || overLimit}
-                                        className="text-xs px-3 py-1 bg-blue-500 text-white disabled:opacity-50"
+                                        className="text-xs px-3 py-1 bg-action text-white disabled:opacity-50"
                                     >
                                         {saving ? 'Saving…' : 'Save bio'}
                                     </button>
                                 </div>
                             </div>
                             {error && (
-                                <p className="mt-1 text-xs text-red-600">{error}</p>
+                                <p className="mt-1 text-xs text-danger">{error}</p>
                             )}
                         </>
                     )}

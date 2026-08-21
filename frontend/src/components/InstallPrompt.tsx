@@ -165,7 +165,7 @@ export default function InstallPrompt() {
                         <button
                             type="button"
                             onClick={dismissPush}
-                            className="text-xs font-medium text-orange-700 bg-white/30 hover:bg-white/50 px-3 py-2 rounded transition"
+                            className="text-xs font-medium text-orange-700 bg-surface/30 hover:bg-surface/50 px-3 py-2 rounded transition"
                         >
                             Not now
                         </button>
@@ -246,7 +246,7 @@ export function InstallPromptCard({
                     <button
                         type="button"
                         onClick={onDismiss}
-                        className="text-xs font-medium text-orange-700 bg-white/30 hover:bg-white/50 px-3 py-2 rounded transition"
+                        className="text-xs font-medium text-orange-700 bg-surface/30 hover:bg-surface/50 px-3 py-2 rounded transition"
                     >
                         Not now
                     </button>

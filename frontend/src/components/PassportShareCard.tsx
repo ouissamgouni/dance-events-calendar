@@ -173,7 +173,7 @@ function StatCell({ value, label }: { value: number | string; label: string }) {
     return (
         <div style={{ flex: 1 }} className="border border-slate-700 bg-slate-800 px-2 py-3 text-center">
             <div className="text-2xl font-bold text-white tabular-nums leading-none">{value}</div>
-            <div className="mt-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">{label}</div>
+            <div className="mt-1 text-[10px] font-medium uppercase tracking-wide text-muted">{label}</div>
         </div>
     );
 }
@@ -189,7 +189,7 @@ function CardActivityStrip({ scoped }: { scoped: ScopedPassport }) {
                     <div key={i} className={`aspect-square rounded-sm ${LEVEL_RAMP_DARK[activityLevel(count)]}`} />
                 ))}
             </div>
-            <div className="mt-1 grid grid-cols-12 gap-1 text-center text-[8px] leading-none text-slate-500">
+            <div className="mt-1 grid grid-cols-12 gap-1 text-center text-[8px] leading-none text-ink-soft">
                 {MONTH_INITIALS.map((m, i) => (
                     <span key={i}>{m}</span>
                 ))}
@@ -208,7 +208,7 @@ function CardActivityMatrix({ scoped }: { scoped: ScopedPassport }) {
             <div className="grid w-full gap-1" style={{ gridTemplateColumns: 'auto repeat(12, minmax(0, 1fr))' }}>
                 <span />
                 {MONTH_INITIALS.map((m, i) => (
-                    <span key={`h-${i}`} className="text-center text-[8px] leading-none text-slate-500">
+                    <span key={`h-${i}`} className="text-center text-[8px] leading-none text-ink-soft">
                         {m}
                     </span>
                 ))}
@@ -223,7 +223,7 @@ function CardActivityMatrix({ scoped }: { scoped: ScopedPassport }) {
 function CardMatrixRow({ year, cells }: { year: number; cells: number[] }) {
     return (
         <>
-            <span className="pr-1 text-right text-[9px] leading-none tabular-nums text-slate-500">{year}</span>
+            <span className="pr-1 text-right text-[9px] leading-none tabular-nums text-ink-soft">{year}</span>
             {cells.map((count, i) => (
                 <div key={i} className={`aspect-square rounded-sm ${LEVEL_RAMP_DARK[activityLevel(count)]}`} />
             ))}
@@ -260,7 +260,7 @@ export default function PassportShareCard({
             className="flex flex-col justify-between bg-slate-900 p-6 text-white"
         >
             <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted">
                     ✦ Movida · Dance Passport
                 </div>
                 <div className="mt-3 flex items-start justify-between gap-3">
@@ -271,7 +271,7 @@ export default function PassportShareCard({
                     <p className="mt-4 max-w-[90%] text-right text-sm font-medium leading-tight text-blue-300">
                         {headline}
                         {dancingSinceLine && (
-                            <p className="mt-1 text-xs font-medium text-slate-400">{dancingSinceLine}</p>
+                            <p className="mt-1 text-xs font-medium text-muted">{dancingSinceLine}</p>
                         )}
                     </p>
                 </div>
@@ -281,7 +281,7 @@ export default function PassportShareCard({
                 <div className="border border-slate-700 bg-slate-800 p-6 text-center">
                     <div className="text-4xl">💃</div>
                     <p className="mt-3 text-base font-semibold text-white">Just getting started</p>
-                    <p className="mt-1 text-xs text-slate-400">
+                    <p className="mt-1 text-xs text-muted">
                         The dance journey begins. Follow along on Movida.
                     </p>
                 </div>
@@ -321,13 +321,13 @@ export default function PassportShareCard({
                                         <span className="block text-[11px] font-semibold leading-tight text-slate-100">
                                             {b.label}
                                             {b.tag && (
-                                                <span className="ml-1 align-middle text-[8px] font-medium uppercase tracking-wide text-slate-500">
+                                                <span className="ml-1 align-middle text-[8px] font-medium uppercase tracking-wide text-ink-soft">
                                                     {b.tag}
                                                 </span>
                                             )}
                                         </span>
                                         {b.description && (
-                                            <span className="mt-0.5 block text-[10px] leading-tight text-slate-400">
+                                            <span className="mt-0.5 block text-[10px] leading-tight text-muted">
                                                 {b.description}
                                             </span>
                                         )}
@@ -340,12 +340,12 @@ export default function PassportShareCard({
             )}
 
             <div className="flex items-center gap-3 border-t border-slate-700 pt-4">
-                <div className="bg-white p-1.5">
+                <div className="bg-surface p-1.5">
                     <QRCodeSVG value={profileUrl} size={44} level="M" />
                 </div>
                 <div className="min-w-0">
                     <p className="text-xs font-semibold text-white">Scan to see my dance journey</p>
-                    <p className="truncate text-[11px] text-slate-400">{linkLabel(profileUrl, handle)}</p>
+                    <p className="truncate text-[11px] text-muted">{linkLabel(profileUrl, handle)}</p>
                 </div>
             </div>
         </div>

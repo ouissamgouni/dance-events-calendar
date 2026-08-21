@@ -32,3 +32,146 @@ attendances:
   - { event_id: evt-ux-025, email: rita@example.com, share_audience: public }
   - { event_id: evt-ux-026, email: samir@example.com, share_audience: public }
   - { event_id: evt-ux-028, email: frank@example.com, share_publicly: true }
+
+  # ── Going across the extended 2-year / all-continent dataset ──────
+  # Records by viewer's friends + one-way followees so the People filter
+  # ("Friends" vs "Following") surfaces different sets across the globe.
+  - { event_id: evt-ux-029, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-031, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-ux-031, email: nia@example.com, share_publicly: true }
+  - { event_id: evt-ux-033, email: alice@example.com, share_audience: friends }
+  - { event_id: evt-ux-033, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-ux-034, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-ux-037, email: hugo@example.com, share_publicly: true }
+  - { event_id: evt-ux-040, email: nia@example.com, share_audience: public }
+  - { event_id: evt-ux-044, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-ux-048, email: samir@example.com, share_audience: public }
+  - { event_id: evt-ux-050, email: pablo@example.com, share_audience: public }
+  # North America
+  - { event_id: evt-ux-051, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-ux-052, email: quinn@example.com, share_audience: public }
+  - { event_id: evt-ux-053, email: tara@example.com, share_audience: public }
+  - { event_id: evt-ux-055, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-ux-058, email: ulysses@example.com, share_audience: public }
+  # Asia
+  - { event_id: evt-ux-059, email: hugo@example.com, share_publicly: true }
+  - { event_id: evt-ux-061, email: omar@example.com, share_audience: friends }
+  - { event_id: evt-ux-064, email: s01@example.com, share_audience: public }
+  - { event_id: evt-ux-066, email: rita@example.com, share_audience: public }
+  # South America
+  - { event_id: evt-ux-067, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-069, email: s02@example.com, share_audience: public }
+  - { event_id: evt-ux-072, email: emma@example.com, share_publicly: true }
+  # Africa + Oceania
+  - { event_id: evt-ux-074, email: s03@example.com, share_audience: public }
+  - { event_id: evt-ux-077, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-ux-079, email: gina@example.com, share_publicly: true }
+
+  # Strangers (outside viewer's graph) — control so the People filter
+  # correctly EXCLUDES them while they still count toward "going".
+  - { event_id: evt-ux-033, email: bob@example.com, share_publicly: true }
+  - { event_id: evt-ux-052, email: t01@example.com, share_audience: public }
+  - { event_id: evt-ux-061, email: t02@example.com, share_audience: public }
+  - { event_id: evt-ux-069, email: t03@example.com, share_audience: public }
+
+  # ── Trending Europe Events (high attendance) ─────────────────────
+  # Berlin Salsa House Festival (evt-ux-081) - trending with 18+ attendees
+  - { event_id: evt-ux-081, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-081, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-ux-081, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-ux-081, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-ux-081, email: hugo@example.com, share_audience: public }
+  - { event_id: evt-ux-081, email: pablo@example.com, share_audience: public }
+  - { event_id: evt-ux-081, email: quinn@example.com, share_audience: public }
+  - { event_id: evt-ux-081, email: rita@example.com, share_audience: public }
+  - { event_id: evt-ux-081, email: samir@example.com, share_audience: public }
+  - { event_id: evt-ux-081, email: tara@example.com, share_audience: public }
+  - { event_id: evt-ux-081, email: ulysses@example.com, share_audience: public }
+  - { event_id: evt-ux-081, email: nia@example.com, share_publicly: true }
+  - { event_id: evt-ux-081, email: omar@example.com, share_audience: public }
+  - { event_id: evt-ux-081, email: s01@example.com, share_audience: public }
+  - { event_id: evt-ux-081, email: s02@example.com, share_audience: public }
+  - { event_id: evt-ux-081, email: s03@example.com, share_audience: public }
+  - { event_id: evt-ux-081, email: s04@example.com, share_audience: public }
+  - { event_id: evt-ux-081, email: s05@example.com, share_audience: public }
+
+  # Paris Bachata Speakeasy Social (evt-ux-082) - trending with 15+ attendees
+  - { event_id: evt-ux-082, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-082, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-ux-082, email: rita@example.com, share_publicly: true }
+  - { event_id: evt-ux-082, email: frank@example.com, share_audience: public }
+  - { event_id: evt-ux-082, email: gina@example.com, share_audience: public }
+  - { event_id: evt-ux-082, email: hugo@example.com, share_audience: public }
+  - { event_id: evt-ux-082, email: pablo@example.com, share_audience: public }
+  - { event_id: evt-ux-082, email: quinn@example.com, share_audience: public }
+  - { event_id: evt-ux-082, email: samir@example.com, share_audience: public }
+  - { event_id: evt-ux-082, email: nia@example.com, share_audience: public }
+  - { event_id: evt-ux-082, email: s01@example.com, share_audience: public }
+  - { event_id: evt-ux-082, email: s02@example.com, share_audience: public }
+  - { event_id: evt-ux-082, email: s03@example.com, share_audience: public }
+  - { event_id: evt-ux-082, email: s04@example.com, share_audience: public }
+  - { event_id: evt-ux-082, email: s05@example.com, share_audience: public }
+
+  # Barcelona Urban Salsa Festival (evt-ux-083) - trending with 20+ attendees
+  - { event_id: evt-ux-083, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-083, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-ux-083, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-ux-083, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-ux-083, email: hugo@example.com, share_publicly: true }
+  - { event_id: evt-ux-083, email: pablo@example.com, share_audience: public }
+  - { event_id: evt-ux-083, email: quinn@example.com, share_audience: public }
+  - { event_id: evt-ux-083, email: rita@example.com, share_audience: public }
+  - { event_id: evt-ux-083, email: samir@example.com, share_audience: public }
+  - { event_id: evt-ux-083, email: tara@example.com, share_audience: public }
+  - { event_id: evt-ux-083, email: ulysses@example.com, share_audience: public }
+  - { event_id: evt-ux-083, email: nia@example.com, share_audience: public }
+  - { event_id: evt-ux-083, email: omar@example.com, share_audience: public }
+  - { event_id: evt-ux-083, email: s01@example.com, share_audience: public }
+  - { event_id: evt-ux-083, email: s02@example.com, share_audience: public }
+  - { event_id: evt-ux-083, email: s03@example.com, share_audience: public }
+  - { event_id: evt-ux-083, email: s04@example.com, share_audience: public }
+  - { event_id: evt-ux-083, email: s05@example.com, share_audience: public }
+  - { event_id: evt-ux-083, email: bob@example.com, share_audience: public }
+  - { event_id: evt-ux-083, email: t01@example.com, share_audience: public }
+
+  # Amsterdam Kizomba Summer Social (evt-ux-084) - trending with 16+ attendees
+  - { event_id: evt-ux-084, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-084, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-ux-084, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-ux-084, email: frank@example.com, share_audience: public }
+  - { event_id: evt-ux-084, email: hugo@example.com, share_audience: public }
+  - { event_id: evt-ux-084, email: pablo@example.com, share_audience: public }
+  - { event_id: evt-ux-084, email: quinn@example.com, share_audience: public }
+  - { event_id: evt-ux-084, email: rita@example.com, share_audience: public }
+  - { event_id: evt-ux-084, email: samir@example.com, share_audience: public }
+  - { event_id: evt-ux-084, email: tara@example.com, share_audience: public }
+  - { event_id: evt-ux-084, email: nia@example.com, share_audience: public }
+  - { event_id: evt-ux-084, email: omar@example.com, share_audience: public }
+  - { event_id: evt-ux-084, email: s01@example.com, share_audience: public }
+  - { event_id: evt-ux-084, email: s02@example.com, share_audience: public }
+  - { event_id: evt-ux-084, email: s03@example.com, share_audience: public }
+  - { event_id: evt-ux-084, email: s04@example.com, share_audience: public }
+
+  # Madrid International Dance Weekend (evt-ux-085) - trending with 22+ attendees
+  - { event_id: evt-ux-085, email: alice@example.com, share_publicly: true }
+  - { event_id: evt-ux-085, email: emma@example.com, share_publicly: true }
+  - { event_id: evt-ux-085, email: frank@example.com, share_publicly: true }
+  - { event_id: evt-ux-085, email: gina@example.com, share_publicly: true }
+  - { event_id: evt-ux-085, email: hugo@example.com, share_publicly: true }
+  - { event_id: evt-ux-085, email: nia@example.com, share_publicly: true }
+  - { event_id: evt-ux-085, email: pablo@example.com, share_audience: public }
+  - { event_id: evt-ux-085, email: quinn@example.com, share_audience: public }
+  - { event_id: evt-ux-085, email: rita@example.com, share_audience: public }
+  - { event_id: evt-ux-085, email: samir@example.com, share_audience: public }
+  - { event_id: evt-ux-085, email: tara@example.com, share_audience: public }
+  - { event_id: evt-ux-085, email: ulysses@example.com, share_audience: public }
+  - { event_id: evt-ux-085, email: omar@example.com, share_audience: public }
+  - { event_id: evt-ux-085, email: s01@example.com, share_audience: public }
+  - { event_id: evt-ux-085, email: s02@example.com, share_audience: public }
+  - { event_id: evt-ux-085, email: s03@example.com, share_audience: public }
+  - { event_id: evt-ux-085, email: s04@example.com, share_audience: public }
+  - { event_id: evt-ux-085, email: s05@example.com, share_audience: public }
+  - { event_id: evt-ux-085, email: bob@example.com, share_audience: public }
+  - { event_id: evt-ux-085, email: t01@example.com, share_audience: public }
+  - { event_id: evt-ux-085, email: t02@example.com, share_audience: public }
+  - { event_id: evt-ux-085, email: t03@example.com, share_audience: public }

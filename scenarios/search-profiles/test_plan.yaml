@@ -1,0 +1,173 @@
+test_plan:
+  name: "Search Profiles — reusable Area + Dance + Reach presets in the Filters sheet"
+  description: >
+    Verify the "Search profile" feature in the Explore Filters sheet. A search
+    profile is a reusable preset of THREE dimensions only — Area, Dance styles,
+    and Reach. Dates, People, and More filters are NOT part of a profile and
+    must never change when a profile is applied, saved, or updated.
+
+    Core rule under test: filtering is temporary by default. A profile changes
+    only when the viewer explicitly saves or edits it. Changing Area/Dance/Reach
+    away from every saved profile surfaces a derived "Custom" state (and a small
+    "Save" action); returning the selection to a saved combination re-selects
+    that profile automatically.
+
+    In this codebase search profiles ARE interest profiles: the `is_active`
+    profile is the "Default" search profile. "Update default profile" overwrites
+    its Area/Dance/Reach; "Save as new profile" creates another profile with
+    notifications OFF by default.
+
+    The viewer is pre-seeded with two profiles (see
+    db-interest-profiles.yaml): "Default" (wide Europe bbox, no dance filter,
+    International) and "Barcelona salsa" (tight Barcelona bbox, Salsa,
+    International). Events are split into a Barcelona cluster and an
+    elsewhere-in-Europe cluster so profile switches visibly change the list.
+
+  preconditions:
+    - "Run with: task start:scenario SCENARIO=search-profiles"
+    - "Sign in as viewer@example.com (DEV_AUTH=true)."
+    - >
+      Cookie banner: accept "Personalization" so /api/auth/* and
+      /api/interest-profiles/* are not blocked by the consent gate.
+    - >
+      Anonymous check (step 12) uses a fresh incognito window with NO sign-in.
+
+  steps:
+    # ── Picker: default selection + applying a saved profile ─────────────
+    - id: 1
+      title: "Open the Filters sheet; Search profile group is present"
+      description: >
+        Sign in as viewer. Open the Explore Filters sheet (mobile: filter
+        button; desktop: the same modal). Look for the grouped rows.
+      expected: >
+        Rows are grouped under uppercase headings: DATES, SEARCH PROFILE
+        (a profile selector row + Area + Dance styles + Reach), and OTHER
+        FILTERS (People + More filters). The selector row (data-testid
+        `search-profile-selector`) shows the current profile name.
+
+    - id: 2
+      title: "Selector reflects the active Default profile on first open"
+      description: >
+        Read the selector row label.
+      expected: >
+        Because the effective Area/Dance/Reach equals the seeded is_active
+        "Default" profile, the selector shows "Default" (NOT "Custom").
+
+    - id: 3
+      title: "Open the profile picker"
+      description: >
+        Tap the selector row.
+      expected: >
+        The picker (data-testid `search-profile-picker`) opens above the sheet.
+        It lists a "Custom" row first (radio + one-line Area · Dance · Reach
+        summary, no pencil), then "Default" and "Barcelona salsa" rows (each a
+        radio + name + summary + edit pencil), then a "Create new profile"
+        action. The radio next to "Default" is selected.
+
+    - id: 4
+      title: "Apply the Barcelona salsa profile"
+      description: >
+        Tap the "Barcelona salsa" row (data-testid `search-profile-apply-<id>`).
+      expected: >
+        The picker and sheet close. The map/list reframe to Barcelona and the
+        Explore list shows ONLY the Barcelona cluster
+        (evt-sp-bcn-001, evt-sp-bcn-002). Dance = Salsa, Reach = International.
+        Dates, People and More filters are unchanged from before.
+
+    - id: 5
+      title: "Selector now reads Barcelona salsa"
+      description: >
+        Re-open the Filters sheet and read the selector row.
+      expected: >
+        The selector shows "Barcelona salsa"; its radio is selected in the
+        picker. No "Custom" is shown.
+
+    # ── Custom state + Save-as-new ───────────────────────────────────────
+    - id: 6
+      title: "Changing Dance styles surfaces Custom + a Save action"
+      description: >
+        In the Dance styles row, ADD Bachata (keep Salsa). Return to the section
+        list.
+      expected: >
+        The selector row now reads "Custom". A small secondary "Save" text
+        action (data-testid `search-profile-save-action`) appears under the
+        SEARCH PROFILE group. The Berlin Bachata event (evt-sp-eu-002) does NOT
+        appear because the area is still the Barcelona bbox.
+
+    - id: 7
+      title: "Save-as-new keeps notifications OFF by default"
+      description: >
+        Tap the "Save" action → choose "Save as new profile"
+        (data-testid `search-profile-save-new`). In the editor, set the name to
+        "Barcelona salsa+bachata" and Save (data-testid
+        `search-profile-save-draft`). Do NOT touch the matches/notify checkbox.
+      expected: >
+        POST /api/interest-profiles is issued with matches_enabled=false and
+        is_active=false. The flow closes. The selector now reads
+        "Barcelona salsa+bachata" (the live selection matches the new profile).
+        Dates/People/More unchanged.
+
+    # ── Update default ───────────────────────────────────────────────────
+    - id: 8
+      title: "Update default profile overwrites the is_active profile"
+      description: >
+        Apply the "Default" profile from the picker, then widen/adjust the Area
+        (e.g. draw a slightly different bbox) so the selector reads "Custom".
+        Tap "Save" → "Update default profile"
+        (data-testid `search-profile-update-default`).
+      expected: >
+        PUT /api/interest-profiles/<active id> is issued overwriting the active
+        profile's Area/Dance/Reach with the current values. The flow closes and
+        the selector re-reads "Default" (the live selection now matches the
+        updated default). Reloading the page preserves the new default.
+
+    # ── Edit + delete ────────────────────────────────────────────────────
+    - id: 9
+      title: "Edit a saved profile via the pencil (without applying it)"
+      description: >
+        Open the picker. Tap the pencil on "Barcelona salsa"
+        (data-testid `search-profile-edit-<id>`).
+      expected: >
+        The editor opens pre-filled with that profile's name/Area/Dance/Reach —
+        WITHOUT changing the live search. Rename to "BCN salsa" and Save.
+        The saved profile updates; the live Explore results are unchanged.
+
+    - id: 10
+      title: "Delete a saved profile"
+      description: >
+        Open the picker, edit "Barcelona salsa+bachata", tap "Delete profile"
+        (data-testid `search-profile-delete`), confirm in the dialog.
+      expected: >
+        DELETE /api/interest-profiles/<id> is issued. The profile disappears
+        from the picker. The is_active "Default" profile and any live selection
+        remain intact.
+
+    # ── Invariants ───────────────────────────────────────────────────────
+    - id: 11
+      title: "Dates / People / More are never touched by profile actions"
+      description: >
+        Before starting, set a specific Date range and a People filter and open
+        a couple of More filters. Then apply a profile, save-as-new, and update
+        default in turn.
+      expected: >
+        After each profile action the Date range, People selection and More
+        filters remain exactly as set. Only Area/Dance/Reach change.
+
+    - id: 12
+      title: "Anonymous users see no selector, Save, or Custom"
+      description: >
+        Open a fresh incognito window WITHOUT signing in. Open the Filters sheet.
+      expected: >
+        The SEARCH PROFILE group shows only the Area / Dance / Reach rows editing
+        the single localStorage default — there is NO profile selector row, NO
+        "Save" action, and NO "Custom" label.
+
+    # ── Desktop parity ───────────────────────────────────────────────────
+    - id: 13
+      title: "Desktop modal mirrors the mobile flow"
+      description: >
+        Repeat steps 3–7 on a desktop-width viewport (the Filters render as a
+        centered modal).
+      expected: >
+        The picker, Save sheet, and editor render as centered cards stacked
+        above the Filters modal, with identical behavior to mobile.

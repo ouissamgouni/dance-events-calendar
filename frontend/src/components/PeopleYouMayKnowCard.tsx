@@ -11,13 +11,15 @@
  * row of cards ("Build your tribe" on the /for-you page) instead of the
  * default vertical list used by the "My network" Suggestions tab.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
     fetchMySuggestions,
     followUser,
     type FoFSuggestionItem,
 } from '../api';
+import ScrollDotsIndicator from './ScrollDots';
+import { useScrollDots } from '../hooks/useScrollDots';
 
 interface PeopleYouMayKnowCardProps {
     variant?: 'list' | 'trail';
@@ -82,15 +84,18 @@ export default function PeopleYouMayKnowCard({ variant = 'list', onResult }: Peo
         }
     }, []);
 
+    const scrollerRef = useRef<HTMLDivElement>(null);
+    const { dotCount, activeIndex, scrollToIndex } = useScrollDots(scrollerRef, [variant, items?.length ?? 0]);
+
     if (items === null || items.length === 0) return null;
 
     if (variant === 'trail') {
         return (
             <section data-testid="for-you-build-your-tribe">
-                <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-sm font-semibold text-slate-700">
+                <div className="flex w-full items-center justify-between border-b border-line px-2.5 py-1 text-sm font-semibold text-ink">
                     <span>Build your tribe</span>
                 </div>
-                <div className="flex gap-2 overflow-x-auto px-2 py-2" aria-label="Build your tribe">
+                <div ref={scrollerRef} className="flex gap-2 overflow-x-auto scrollbar-hide px-2 py-2" aria-label="Build your tribe">
                     {items.map((it) => {
                         const name = it.display_name || `@${it.handle}`;
                         const previewHead = it.mutual_friends_preview[0];
@@ -98,7 +103,7 @@ export default function PeopleYouMayKnowCard({ variant = 'list', onResult }: Peo
                         return (
                             <div
                                 key={it.handle}
-                                className="flex w-[140px] shrink-0 flex-col items-center gap-1 border border-slate-200 bg-white px-2 py-2 text-center"
+                                className="flex w-[140px] shrink-0 flex-col items-center gap-1 border border-line bg-surface px-2 py-2 text-center"
                             >
                                 <Link to={`/u/${it.handle}`} className="flex flex-col items-center gap-1">
                                     {it.avatar_url ? (
@@ -110,7 +115,7 @@ export default function PeopleYouMayKnowCard({ variant = 'list', onResult }: Peo
                                     ) : (
                                         <div className="h-8 w-8 rounded-full bg-slate-200" />
                                     )}
-                                    <span className="flex max-w-[120px] items-center gap-1 truncate text-xs font-medium text-slate-900">
+                                    <span className="flex max-w-[120px] items-center gap-1 truncate text-xs font-medium text-ink">
                                         {name}
                                         {it.is_verified_organizer && (
                                             <img
@@ -132,7 +137,7 @@ export default function PeopleYouMayKnowCard({ variant = 'list', onResult }: Peo
                                         )}
                                     </span>
                                 </Link>
-                                <span className="max-w-[120px] truncate text-[10px] text-slate-500">
+                                <span className="max-w-[120px] truncate text-[10px] text-ink-soft">
                                     {previewHead ? (
                                         <>
                                             Followed by @{previewHead}
@@ -147,7 +152,7 @@ export default function PeopleYouMayKnowCard({ variant = 'list', onResult }: Peo
                                     onClick={() => void onFollow(it.handle)}
                                     disabled={pending === it.handle}
                                     aria-label={`Follow ${it.handle}`}
-                                    className="w-full bg-blue-500 px-2 py-1 text-[11px] font-medium text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="w-full bg-action px-2 py-1 text-[11px] font-medium text-white hover:bg-action disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     {pending === it.handle ? '…' : 'Follow'}
                                 </button>
@@ -155,13 +160,19 @@ export default function PeopleYouMayKnowCard({ variant = 'list', onResult }: Peo
                         );
                     })}
                 </div>
+                <ScrollDotsIndicator
+                    count={dotCount}
+                    activeIndex={activeIndex}
+                    onSelect={scrollToIndex}
+                    label="Build your tribe scroll position"
+                />
             </section>
         );
     }
 
     return (
-        <section className="border border-slate-200 bg-white p-6 mb-4">
-            <h2 className="text-base font-semibold text-slate-900 mb-3">
+        <section className="border border-line bg-surface p-6 mb-4">
+            <h2 className="text-base font-semibold text-ink mb-3">
                 People you may know
             </h2>
             <ul className="divide-y divide-slate-100">
@@ -185,7 +196,7 @@ export default function PeopleYouMayKnowCard({ variant = 'list', onResult }: Peo
                             )}
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1">
-                                    <span className="text-sm font-medium text-slate-900 truncate">
+                                    <span className="text-sm font-medium text-ink truncate">
                                         {it.display_name || it.handle}
                                     </span>
                                     {it.is_verified_organizer && (
@@ -207,7 +218,7 @@ export default function PeopleYouMayKnowCard({ variant = 'list', onResult }: Peo
                                         />
                                     )}
                                 </div>
-                                <div className="text-xs text-slate-500 truncate">
+                                <div className="text-xs text-ink-soft truncate">
                                     {previewHead ? (
                                         <>
                                             Followed by @{previewHead}
@@ -223,7 +234,7 @@ export default function PeopleYouMayKnowCard({ variant = 'list', onResult }: Peo
                                 onClick={() => void onFollow(it.handle)}
                                 disabled={pending === it.handle}
                                 aria-label={`Follow ${it.handle}`}
-                                className="bg-blue-500 px-3 py-1 text-xs font-medium text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="bg-action px-3 py-1 text-xs font-medium text-white hover:bg-action disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {pending === it.handle ? '…' : 'Follow'}
                             </button>
@@ -236,7 +247,7 @@ export default function PeopleYouMayKnowCard({ variant = 'list', onResult }: Peo
                     type="button"
                     onClick={() => void loadMore()}
                     disabled={loadingMore}
-                    className="mt-3 w-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="mt-3 w-full border border-line px-3 py-1.5 text-xs font-medium text-ink hover:bg-canvas disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {loadingMore ? 'Loading…' : 'Show more'}
                 </button>

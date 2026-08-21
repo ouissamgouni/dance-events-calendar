@@ -262,10 +262,10 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
 
             {/* Panel */}
             <div
-                className={`fixed top-0 right-0 h-full w-[520px] max-w-full bg-white shadow-xl border-l border-gray-200 z-[60] flex flex-col transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
+                className={`fixed top-0 right-0 h-full w-[520px] max-w-full bg-surface shadow-xl border-l border-line z-[60] flex flex-col transform transition-transform duration-200 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
             >
                 {/* Header */}
-                <div className="flex items-start justify-between px-5 py-3 border-b border-gray-200 bg-gray-50 shrink-0">
+                <div className="flex items-start justify-between px-5 py-3 border-b border-line bg-canvas shrink-0">
                     <div className="flex-1 min-w-0 mr-3">
                         {editingTitle ? (
                             <input
@@ -276,27 +276,27 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                 onBlur={handleTitleBlur}
                                 onKeyDown={handleTitleKeyDown}
                                 disabled={savingTitle}
-                                className="w-full text-sm font-semibold text-gray-900 border-b border-rose-300 bg-transparent focus:outline-none"
+                                className="w-full text-sm font-semibold text-ink border-b border-rose-300 bg-transparent focus:outline-none"
                             />
                         ) : (
                             <p
-                                className="text-sm font-semibold text-gray-900 leading-snug truncate cursor-text hover:bg-gray-100 -mx-1 px-1 rounded transition"
+                                className="text-sm font-semibold text-ink leading-snug truncate cursor-text hover:bg-canvas -mx-1 px-1 rounded transition"
                                 onClick={() => event && setEditingTitle(true)}
                                 title="Click to edit title"
                             >
                                 {loading ? 'Loading…' : (event?.title ?? '—')}
                             </p>
                         )}
-                        <p className="text-[10px] text-gray-400 mt-0.5 uppercase tracking-wide">Event detail · admin</p>
+                        <p className="text-[10px] text-muted mt-0.5 uppercase tracking-wide">Event detail · admin</p>
                         {event && (
-                            <p className="text-[10px] text-gray-400 mt-0.5 font-mono truncate" title={event.event_id}>
+                            <p className="text-[10px] text-muted mt-0.5 font-mono truncate" title={event.event_id}>
                                 ID: {event.event_id}
                             </p>
                         )}
                         {event && (
                             <div className="flex gap-1 mt-1">
                                 {event.is_blocked && (
-                                    <span className="text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.5 font-medium uppercase tracking-wide">Blocked</span>
+                                    <span className="text-[10px] bg-slate-200 text-ink px-1.5 py-0.5 font-medium uppercase tracking-wide">Blocked</span>
                                 )}
                                 {event.is_hidden && !event.is_blocked && (
                                     <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 font-medium uppercase tracking-wide">Hidden</span>
@@ -308,7 +308,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                         <button
                             onClick={handleManualRefresh}
                             disabled={loading || !event}
-                            className="text-gray-400 hover:text-gray-600 disabled:opacity-40 p-1"
+                            className="text-muted hover:text-ink-soft disabled:opacity-40 p-1"
                             title="Refresh event"
                             aria-label="Refresh event"
                         >
@@ -329,7 +329,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                         </button>
                         <button
                             onClick={onClose}
-                            className="text-gray-400 hover:text-gray-600 text-sm leading-none p-1"
+                            className="text-muted hover:text-ink-soft text-sm leading-none p-1"
                             aria-label="Close"
                         >
                             ✕
@@ -340,10 +340,10 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto px-5 py-4">
                     {loading && (
-                        <p className="text-xs text-gray-400 text-center mt-8">Loading event…</p>
+                        <p className="text-xs text-muted text-center mt-8">Loading event…</p>
                     )}
                     {error && (
-                        <p className="text-xs text-red-500 text-center mt-8">Failed to load event.</p>
+                        <p className="text-xs text-danger text-center mt-8">Failed to load event.</p>
                     )}
                     {event && (
                         <>
@@ -371,7 +371,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                                     {g.events
                                                         .filter((ev) => ev.event_id !== event.event_id)
                                                         .map((ev) => (
-                                                            <li key={ev.event_id} className="text-xs text-slate-700">
+                                                            <li key={ev.event_id} className="text-xs text-ink">
                                                                 {ev.title} — {new Date(ev.start).toLocaleString()}
                                                             </li>
                                                         ))}
@@ -381,7 +381,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                                         <button
                                                             disabled={duplicateActing === g.id}
                                                             onClick={() => handleKeepDuplicate(g.id, event.event_id)}
-                                                            className="text-[11px] bg-blue-500 text-white px-2 py-1 hover:bg-blue-600 disabled:opacity-50"
+                                                            className="text-[11px] bg-action text-white px-2 py-1 hover:bg-action disabled:opacity-50"
                                                         >
                                                             Keep this event
                                                         </button>
@@ -412,8 +412,8 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                                         <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 bg-teal-100 text-teal-700">
                                                             {g.status}
                                                         </span>
-                                                        <span className="font-medium text-xs text-slate-700">{g.canonical_title}</span>
-                                                        <span className="text-[10px] text-slate-500">{g.events.length} event(s)</span>
+                                                        <span className="font-medium text-xs text-ink">{g.canonical_title}</span>
+                                                        <span className="text-[10px] text-ink-soft">{g.events.length} event(s)</span>
                                                     </div>
                                                     <button
                                                         disabled={seriesActing}
@@ -443,7 +443,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                                             onChange={(e) => setSeriesSearch(e.target.value)}
                                                             onKeyDown={(e) => { if (e.key === 'Enter') runSeriesSearch(); }}
                                                             placeholder="Search series by title…"
-                                                            className="flex-1 text-xs border border-slate-300 px-2 py-1"
+                                                            className="flex-1 text-xs border border-line px-2 py-1"
                                                         />
                                                         <button
                                                             onClick={runSeriesSearch}
@@ -454,23 +454,23 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                                         </button>
                                                     </div>
                                                     {seriesSearchResults.length > 0 && (
-                                                        <div className="max-h-40 overflow-y-auto border border-slate-200 bg-white">
+                                                        <div className="max-h-40 overflow-y-auto border border-line bg-surface">
                                                             {seriesSearchResults.map((s) => (
                                                                 <button
                                                                     key={s.id}
                                                                     onClick={() => handleAddToSeries(s.id)}
                                                                     disabled={seriesActing}
-                                                                    className="flex w-full items-center justify-between gap-2 border-b border-slate-100 px-2 py-1.5 text-left last:border-b-0 hover:bg-teal-50 disabled:opacity-50"
+                                                                    className="flex w-full items-center justify-between gap-2 border-b border-card-line px-2 py-1.5 text-left last:border-b-0 hover:bg-teal-50 disabled:opacity-50"
                                                                 >
-                                                                    <span className="min-w-0 flex-1 truncate text-[11px] text-slate-700">{s.canonical_title}</span>
-                                                                    <span className="text-[10px] text-slate-400">{s.events.length} · {s.status}</span>
+                                                                    <span className="min-w-0 flex-1 truncate text-[11px] text-ink">{s.canonical_title}</span>
+                                                                    <span className="text-[10px] text-muted">{s.events.length} · {s.status}</span>
                                                                 </button>
                                                             ))}
                                                         </div>
                                                     )}
                                                     <button
                                                         onClick={() => { setAddSeriesOpen(false); setSeriesSearch(''); setSeriesSearchResults([]); }}
-                                                        className="text-[10px] text-slate-500 hover:text-slate-700"
+                                                        className="text-[10px] text-ink-soft hover:text-ink"
                                                     >
                                                         Cancel
                                                     </button>
@@ -480,15 +480,15 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                     )}
                                 </div>
                             )}
-                            <div className="mt-4 border border-gray-200 overflow-hidden">
+                            <div className="mt-4 border border-line overflow-hidden">
                                 {event.latitude != null && event.longitude != null ? (
                                     <div className="h-[300px]">
                                         <EventMap events={[event]} />
                                     </div>
                                 ) : (
-                                    <div className="px-3 py-4 bg-slate-50">
-                                        <p className="text-xs font-medium text-slate-700">Map unavailable</p>
-                                        <p className="mt-1 text-xs text-slate-500">
+                                    <div className="px-3 py-4 bg-canvas">
+                                        <p className="text-xs font-medium text-ink">Map unavailable</p>
+                                        <p className="mt-1 text-xs text-ink-soft">
                                             {event.location
                                                 ? 'This event has a location text but is not geocoded yet.'
                                                 : 'This event has no location set yet.'}
@@ -496,17 +496,17 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                     </div>
                                 )}
                             </div>
-                            <div className="mt-4 border border-slate-200 overflow-hidden">
+                            <div className="mt-4 border border-line overflow-hidden">
                                 <button
                                     type="button"
                                     onClick={() => setCommunityExpanded((v) => !v)}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-slate-50 transition"
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-canvas transition"
                                 >
-                                    <span className="text-slate-400 text-[10px]">{communityExpanded ? '▾' : '▸'}</span>
-                                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Community Experience</span>
+                                    <span className="text-muted text-[10px]">{communityExpanded ? '▾' : '▸'}</span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-soft">Community Experience</span>
                                 </button>
                                 {communityExpanded && (
-                                    <div className="border-t border-slate-200 px-3 pb-3">
+                                    <div className="border-t border-line px-3 pb-3">
                                         <EventReviewsSection
                                             eventId={event.event_id}
                                             isPast={new Date(event.end).getTime() < Date.now()}
@@ -514,17 +514,17 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                     </div>
                                 )}
                             </div>
-                            <div className="mt-4 border border-slate-200 overflow-hidden">
+                            <div className="mt-4 border border-line overflow-hidden">
                                 <button
                                     type="button"
                                     onClick={() => setMessagesExpanded((v) => !v)}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-slate-50 transition"
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-canvas transition"
                                 >
-                                    <span className="text-slate-400 text-[10px]">{messagesExpanded ? '▾' : '▸'}</span>
-                                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Messages</span>
+                                    <span className="text-muted text-[10px]">{messagesExpanded ? '▾' : '▸'}</span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-soft">Messages</span>
                                 </button>
                                 {messagesExpanded && (
-                                    <div className="border-t border-slate-200 px-3 pb-3">
+                                    <div className="border-t border-line px-3 pb-3">
                                         <EventMessagesSection
                                             eventId={event.event_id}
                                             isPast={new Date(event.end).getTime() < Date.now()}
@@ -538,7 +538,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
 
                 {/* Footer */}
                 {event && (
-                    <div className="shrink-0 border-t border-gray-200 bg-gray-50 px-5 py-2.5 flex flex-col gap-2">
+                    <div className="shrink-0 border-t border-line bg-canvas px-5 py-2.5 flex flex-col gap-2">
                         <div className="flex items-center gap-3">
                             <Link
                                 to={`/event/${event.event_id}`}
@@ -554,17 +554,17 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                             /* Blocked state — only restore */
                             confirmAction === 'restore' ? (
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xs text-gray-600">Restore this event?</span>
+                                    <span className="text-xs text-ink-soft">Restore this event?</span>
                                     <button
                                         onClick={handleRestore}
                                         disabled={actionLoading}
-                                        className="text-xs px-2 py-1 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                                        className="text-xs px-2 py-1 bg-surface border border-line text-ink hover:bg-canvas disabled:opacity-50"
                                     >
                                         Yes, restore
                                     </button>
                                     <button
                                         onClick={() => setConfirmAction(null)}
-                                        className="text-xs px-2 py-1 text-gray-400 hover:text-gray-600"
+                                        className="text-xs px-2 py-1 text-muted hover:text-ink-soft"
                                     >
                                         Cancel
                                     </button>
@@ -572,7 +572,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                             ) : (
                                 <button
                                     onClick={() => setConfirmAction('restore')}
-                                    className="text-xs px-2 py-1 border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 self-start"
+                                    className="text-xs px-2 py-1 border border-line bg-surface text-ink hover:bg-canvas self-start"
                                 >
                                     Restore
                                 </button>
@@ -583,23 +583,23 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                 <button
                                     onClick={handleUnhide}
                                     disabled={actionLoading}
-                                    className="text-xs px-2 py-1 border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                                    className="text-xs px-2 py-1 border border-line bg-surface text-ink hover:bg-canvas disabled:opacity-50"
                                 >
                                     Unhide
                                 </button>
                                 {confirmAction === 'block' ? (
                                     <div className="flex items-center gap-2">
-                                        <span className="text-xs text-gray-600">Permanently remove?</span>
+                                        <span className="text-xs text-ink-soft">Permanently remove?</span>
                                         <button
                                             onClick={handleBlock}
                                             disabled={actionLoading}
-                                            className="text-xs px-2 py-1 bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+                                            className="text-xs px-2 py-1 bg-danger hover:bg-danger/90 text-white disabled:opacity-50"
                                         >
                                             Yes, remove
                                         </button>
                                         <button
                                             onClick={() => setConfirmAction(null)}
-                                            className="text-xs px-2 py-1 text-gray-400 hover:text-gray-600"
+                                            className="text-xs px-2 py-1 text-muted hover:text-ink-soft"
                                         >
                                             Cancel
                                         </button>
@@ -607,7 +607,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                 ) : (
                                     <button
                                         onClick={() => setConfirmAction('block')}
-                                        className="text-xs px-2 py-1 bg-red-600 hover:bg-red-700 text-white"
+                                        className="text-xs px-2 py-1 bg-danger hover:bg-danger/90 text-white"
                                     >
                                         Permanently Remove
                                     </button>
@@ -619,23 +619,23 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                 <button
                                     onClick={handleHide}
                                     disabled={actionLoading}
-                                    className="text-xs px-2 py-1 border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                                    className="text-xs px-2 py-1 border border-line bg-surface text-ink hover:bg-canvas disabled:opacity-50"
                                 >
                                     Hide
                                 </button>
                                 {confirmAction === 'block' ? (
                                     <div className="flex items-center gap-2">
-                                        <span className="text-xs text-gray-600">Permanently remove?</span>
+                                        <span className="text-xs text-ink-soft">Permanently remove?</span>
                                         <button
                                             onClick={handleBlock}
                                             disabled={actionLoading}
-                                            className="text-xs px-2 py-1 bg-red-600 hover:bg-red-700 text-white disabled:opacity-50"
+                                            className="text-xs px-2 py-1 bg-danger hover:bg-danger/90 text-white disabled:opacity-50"
                                         >
                                             Yes, remove
                                         </button>
                                         <button
                                             onClick={() => setConfirmAction(null)}
-                                            className="text-xs px-2 py-1 text-gray-400 hover:text-gray-600"
+                                            className="text-xs px-2 py-1 text-muted hover:text-ink-soft"
                                         >
                                             Cancel
                                         </button>
@@ -643,7 +643,7 @@ export default function AdminEventDetailPanel({ eventId, onClose, onEventUpdated
                                 ) : (
                                     <button
                                         onClick={() => setConfirmAction('block')}
-                                        className="text-xs px-2 py-1 bg-red-600 hover:bg-red-700 text-white"
+                                        className="text-xs px-2 py-1 bg-danger hover:bg-danger/90 text-white"
                                     >
                                         Permanently Remove
                                     </button>

@@ -1,24 +1,35 @@
-# Follow graph for Explorer UX social filtering.
-# Bob has mutual friends plus one-way followees so the "Following" and
-# "Friends" filters produce visibly different event sets.
+# Follow graph for Explorer UX social filtering, centred on `viewer`.
+# `viewer` has mutual friends plus one-way followees so the "Following" and
+# "Friends" people filters produce visibly different event sets.
 follows:
-  - { follower: alice, followee: bob }
-  - { follower: bob, followee: alice }
-  - { follower: emma, followee: bob }
-  - { follower: bob, followee: emma }
-  - { follower: frank, followee: bob }
-  - { follower: bob, followee: frank }
-  - { follower: gina, followee: bob }
-  - { follower: bob, followee: gina }
-  - { follower: hugo, followee: bob }
-  - { follower: bob, followee: hugo }
-  - { follower: nia, followee: bob }
-  - { follower: bob, followee: nia }
-  - { follower: omar, followee: bob }
-  - { follower: bob, followee: omar }
-  - { follower: bob, followee: pablo }
-  - { follower: bob, followee: quinn }
-  - { follower: bob, followee: rita }
-  - { follower: bob, followee: samir }
-  - { follower: bob, followee: tara }
-  - { follower: bob, followee: ulysses }
+  # ── Mutual friends (viewer <-> X) — 6 people ────────────────────
+  - { follower: viewer, followee: alice }
+  - { follower: alice, followee: viewer }
+  - { follower: viewer, followee: emma }
+  - { follower: emma, followee: viewer }
+  - { follower: viewer, followee: frank }
+  - { follower: frank, followee: viewer }
+  - { follower: viewer, followee: gina }
+  - { follower: gina, followee: viewer }
+  - { follower: viewer, followee: hugo }
+  - { follower: hugo, followee: viewer }
+  - { follower: viewer, followee: nia }
+  - { follower: nia, followee: viewer }
+  # ── One-way following (viewer -> X, not followed back) — 10 people ─
+  - { follower: viewer, followee: omar }
+  - { follower: viewer, followee: pablo }
+  - { follower: viewer, followee: quinn }
+  - { follower: viewer, followee: rita }
+  - { follower: viewer, followee: samir }
+  - { follower: viewer, followee: tara }
+  - { follower: viewer, followee: ulysses }
+  - { follower: viewer, followee: s01 }
+  - { follower: viewer, followee: s02 }
+  - { follower: viewer, followee: s03 }
+  # ── Friends-of-friends links (so FoF suggestions have signal) ────
+  - { follower: alice, followee: emma }
+  - { follower: emma, followee: frank }
+  - { follower: gina, followee: hugo }
+  - { follower: hugo, followee: nia }
+  - { follower: alice, followee: samir }
+  - { follower: frank, followee: tara }

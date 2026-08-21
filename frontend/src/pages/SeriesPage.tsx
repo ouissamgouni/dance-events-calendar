@@ -78,14 +78,14 @@ export default function SeriesPage() {
     };
 
     if (loading) {
-        return <div className="max-w-lg mx-auto p-4 text-sm text-slate-500">Loading series…</div>;
+        return <div className="max-w-lg mx-auto p-4 text-sm text-ink-soft">Loading series…</div>;
     }
 
     if (error || !series || !asAggregate) {
         return (
             <div className="max-w-lg mx-auto p-4 space-y-3">
                 <button onClick={handleBack} className="text-xs text-sky-700 hover:text-sky-900">← Back</button>
-                <p className="text-sm text-slate-600">This series could not be found.</p>
+                <p className="text-sm text-ink-soft">This series could not be found.</p>
             </div>
         );
     }
@@ -99,8 +99,8 @@ export default function SeriesPage() {
             <button onClick={handleBack} className="text-xs text-sky-700 hover:text-sky-900">← Back</button>
 
             <header>
-                <h1 className="text-lg font-semibold text-slate-800">{series.canonical_title}</h1>
-                <p className="text-[11px] text-slate-500">
+                <h1 className="text-lg font-semibold text-ink">{series.canonical_title}</h1>
+                <p className="text-[11px] text-ink-soft">
                     Recurring series · {series.edition_count} edition{series.edition_count === 1 ? '' : 's'} ·{' '}
                     {series.total_review_count} review{series.total_review_count === 1 ? '' : 's'}
                 </p>
@@ -109,31 +109,31 @@ export default function SeriesPage() {
             <ExperienceBreakdown aggregate={asAggregate} aspectLabels={aspectLabels} editionCount={series.reviewed_edition_count} />
 
             <section className="space-y-2">
-                <h2 className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Editions</h2>
+                <h2 className="text-xs font-semibold text-ink uppercase tracking-wide">Editions</h2>
                 <ul className="space-y-1.5">
                     {series.editions.map((e) => (
                         <li key={e.event_id}>
                             <Link
                                 to={`/event/${e.event_id}`}
-                                className="flex items-center justify-between gap-2 border border-slate-200 bg-slate-50 px-2.5 py-1.5 hover:bg-slate-100"
+                                className="flex items-center justify-between gap-2 border border-line bg-canvas px-2.5 py-1.5 hover:bg-canvas"
                             >
                                 <div className="min-w-0">
-                                    <div className="text-xs font-medium text-slate-700 truncate">{e.title}</div>
-                                    <div className="text-[10px] text-slate-400">
+                                    <div className="text-xs font-medium text-ink truncate">{e.title}</div>
+                                    <div className="text-[10px] text-muted">
                                         {new Date(e.start).toLocaleDateString()}
                                     </div>
                                 </div>
                                 <div className="shrink-0 text-right">
                                     {e.review_count === 0 ? (
-                                        <span className="text-[10px] text-slate-400">No reviews</span>
+                                        <span className="text-[10px] text-muted">No reviews</span>
                                     ) : (
                                         <>
-                                            <div className="text-[11px] font-medium text-slate-700">
+                                            <div className="text-[11px] font-medium text-ink">
                                                 {e.display_state === 'full' && e.mood_label
                                                     ? `${aspectMood(e.average_mood).emoji} ${e.mood_label}`
                                                     : 'Early feedback'}
                                             </div>
-                                            <div className="text-[10px] text-slate-500 tabular-nums">
+                                            <div className="text-[10px] text-ink-soft tabular-nums">
                                                 {e.review_count} review{e.review_count === 1 ? '' : 's'}
                                             </div>
                                         </>

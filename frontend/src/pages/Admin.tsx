@@ -51,11 +51,11 @@ function AdminInfoTooltip({ label }: { label: string }) {
                 type="button"
                 aria-label={label}
                 title={label}
-                className="inline-flex h-4 w-4 items-center justify-center border border-gray-300 bg-white text-[10px] font-semibold leading-none text-gray-500 hover:border-blue-300 hover:text-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-300"
+                className="inline-flex h-4 w-4 items-center justify-center border border-line bg-surface text-[10px] font-semibold leading-none text-ink-soft hover:border-blue-300 hover:text-action focus:outline-none focus:ring-1 focus:ring-blue-300"
             >
                 ?
             </button>
-            <span className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 hidden w-72 -translate-y-1/2 border border-gray-200 bg-white px-2 py-1.5 text-[10px] font-normal leading-snug text-gray-600 shadow-lg group-hover:block group-focus-within:block">
+            <span className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 hidden w-72 -translate-y-1/2 border border-line bg-surface px-2 py-1.5 text-[10px] font-normal leading-snug text-ink-soft shadow-lg group-hover:block group-focus-within:block">
                 {label}
             </span>
         </span>
@@ -113,21 +113,21 @@ function FeatureEmailCard({
     };
 
     return (
-        <div className="border border-gray-100 p-3 space-y-3">
+        <div className="border border-card-line p-3 space-y-3">
             {headerRight ? (
                 <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">{label}</span>
+                    <span className="text-[11px] font-semibold text-ink uppercase tracking-wide">{label}</span>
                     {headerRight}
                 </div>
             ) : (
-                <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">{label}</span>
+                <span className="text-[11px] font-semibold text-ink uppercase tracking-wide">{label}</span>
             )}
-            <p className="text-[10px] text-gray-400">{description}</p>
+            <p className="text-[10px] text-muted">{description}</p>
             {subline}
             {feature && (
-                <div className="flex items-center gap-4 border-t border-gray-100 pt-2.5">
-                    <span className="text-[11px] font-medium text-gray-700">Email delivery</span>
-                    <label className="flex items-center gap-1 text-[10px] text-gray-500">
+                <div className="flex items-center gap-4 border-t border-card-line pt-2.5">
+                    <span className="text-[11px] font-medium text-ink">Email delivery</span>
+                    <label className="flex items-center gap-1 text-[10px] text-ink-soft">
                         <input
                             type="checkbox"
                             aria-label={`${label} instant email`}
@@ -136,7 +136,7 @@ function FeatureEmailCard({
                         />
                         Instant
                     </label>
-                    <label className="flex items-center gap-1 text-[10px] text-gray-500">
+                    <label className="flex items-center gap-1 text-[10px] text-ink-soft">
                         <input
                             type="checkbox"
                             aria-label={`${label} digest email`}
@@ -147,10 +147,10 @@ function FeatureEmailCard({
                     </label>
                 </div>
             )}
-            <div className="border-t border-gray-100 pt-2.5 space-y-1.5">
+            <div className="border-t border-card-line pt-2.5 space-y-1.5">
                 <div>
-                    <span className="text-[11px] font-medium text-gray-700">Send now</span>
-                    <p className="text-[10px] text-gray-400">
+                    <span className="text-[11px] font-medium text-ink">Send now</span>
+                    <p className="text-[10px] text-muted">
                         Replay this feature's pending activity for the selected users immediately,
                         bypassing the schedule and once-per-day dedup gate.
                     </p>
@@ -161,7 +161,7 @@ function FeatureEmailCard({
                     placeholder="Search email, handle, or name"
                 />
                 <div className="flex items-center gap-2">
-                    <label className="text-[10px] text-gray-500" htmlFor={`${feature ?? 'combined'}-now-max`}>Max per user</label>
+                    <label className="text-[10px] text-ink-soft" htmlFor={`${feature ?? 'combined'}-now-max`}>Max per user</label>
                     <input
                         id={`${feature ?? 'combined'}-now-max`}
                         type="number"
@@ -170,9 +170,9 @@ function FeatureEmailCard({
                         value={maxPerUser ?? ''}
                         onChange={(e) => setMaxPerUser(e.target.value === '' ? undefined : Number(e.target.value))}
                         placeholder="all"
-                        className="w-16 text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                        className="w-16 text-[11px] border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
                     />
-                    <label className="flex items-center gap-1 text-[10px] text-gray-500" htmlFor={`${feature ?? 'combined'}-now-resend`} title="Force re-sending notifications already emailed/pushed">
+                    <label className="flex items-center gap-1 text-[10px] text-ink-soft" htmlFor={`${feature ?? 'combined'}-now-resend`} title="Force re-sending notifications already emailed/pushed">
                         <input
                             id={`${feature ?? 'combined'}-now-resend`}
                             type="checkbox"
@@ -185,13 +185,13 @@ function FeatureEmailCard({
                         type="button"
                         onClick={send}
                         disabled={users.length === 0 || busy}
-                        className="ml-auto text-[11px] px-2.5 py-1 rounded bg-emerald-600 text-white disabled:bg-gray-300 hover:bg-emerald-700"
+                        className="ml-auto text-[11px] px-2.5 py-1 rounded bg-success text-white disabled:bg-gray-300 hover:bg-success/90"
                     >
                         {busy ? 'Sending…' : `Send now${users.length ? ` (${users.length})` : ''}`}
                     </button>
                 </div>
                 {localMsg && (
-                    <div className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 p-2">
+                    <div className="text-[10px] text-success bg-emerald-50 border border-emerald-200 p-2">
                         {localMsg}
                     </div>
                 )}
@@ -1226,14 +1226,14 @@ export default function Admin() {
     const tabBtnClass = (tab: AdminTab) =>
         `text-[11px] font-medium px-2 py-1 sm:px-2.5 transition border ${activeTab === tab
             ? 'bg-gray-800 text-white border-gray-800 hover:bg-gray-700'
-            : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
+            : 'bg-gray-100 text-ink-soft border-line hover:bg-canvas'
         }`;
 
     return (
         <div className="mx-auto max-w-7xl px-5 py-6">
             {/* ── Header ── */}
             <div className="mb-5 space-y-2">
-                <h1 className="-mt-2 text-sm font-semibold text-gray-900 uppercase tracking-wide">Admin</h1>
+                <h1 className="-mt-2 text-sm font-semibold text-ink uppercase tracking-wide">Admin</h1>
                 <div className="flex flex-wrap items-start gap-2 sm:items-start sm:justify-between">
                     <div className="flex items-center gap-1.5 sm:gap-2">
                         <button onClick={() => changeTab('data')} className={tabBtnClass('data')}>Data</button>
@@ -1245,12 +1245,12 @@ export default function Admin() {
                     <div className="ml-auto flex min-w-0 flex-col items-end gap-1">
                         <button
                             onClick={handleLogout}
-                            className="whitespace-nowrap bg-gray-100 text-gray-600 text-[11px] font-medium px-2.5 py-1 hover:bg-gray-200 transition border border-gray-200"
+                            className="whitespace-nowrap bg-gray-100 text-ink-soft text-[11px] font-medium px-2.5 py-1 hover:bg-canvas transition border border-line"
                         >
                             Logout
                         </button>
                         {user && (
-                            <span className="max-w-[82vw] break-all text-right text-[11px] text-gray-400 sm:max-w-none">{user.email}</span>
+                            <span className="max-w-[82vw] break-all text-right text-[11px] text-muted sm:max-w-none">{user.email}</span>
                         )}
                     </div>
                 </div>
@@ -1261,13 +1261,13 @@ export default function Admin() {
                 <div className="mb-4 flex items-center gap-2 flex-wrap">
                     <button
                         onClick={() => { setEventsPanelPreset('all'); setEventsPanelCalendarId(''); setEventsPanelOpen(true); }}
-                        className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
+                        className="inline-flex items-center gap-1.5 bg-surface border border-line text-ink-soft text-[11px] font-medium px-2.5 py-1.5 hover:bg-canvas transition"
                     >
                         Events
                     </button>
                     <button
                         onClick={() => { setEventsPanelPreset('pending'); setEventsPanelOpen(true); }}
-                        className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
+                        className="inline-flex items-center gap-1.5 bg-surface border border-line text-ink-soft text-[11px] font-medium px-2.5 py-1.5 hover:bg-canvas transition"
                     >
                         Pending Review
                         {pendingReviewCount > 0 && (
@@ -1283,7 +1283,7 @@ export default function Admin() {
                                 fetchAdminTagGroups().then(setTagGroups).catch(() => { });
                             }
                         }}
-                        className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
+                        className="inline-flex items-center gap-1.5 bg-surface border border-line text-ink-soft text-[11px] font-medium px-2.5 py-1.5 hover:bg-canvas transition"
                     >
                         Suggestions
                         {suggestions.filter((s) => s.status === 'pending').length > 0 && (
@@ -1294,7 +1294,7 @@ export default function Admin() {
                     </button>
                     <button
                         onClick={() => { setUnsyncedPanelOpen(true); }}
-                        className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
+                        className="inline-flex items-center gap-1.5 bg-surface border border-line text-ink-soft text-[11px] font-medium px-2.5 py-1.5 hover:bg-canvas transition"
                     >
                         Unsynced
                         {suggestions.filter((s) => s.status === 'approved' && !s.synced_to_google).length > 0 && (
@@ -1305,7 +1305,7 @@ export default function Admin() {
                     </button>
                     <button
                         onClick={() => setTagSuggestionsPanelOpen(true)}
-                        className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
+                        className="inline-flex items-center gap-1.5 bg-surface border border-line text-ink-soft text-[11px] font-medium px-2.5 py-1.5 hover:bg-canvas transition"
                     >
                         Tag Suggestions
                         {tagSuggestionCount > 0 && (
@@ -1316,7 +1316,7 @@ export default function Admin() {
                     </button>
                     <button
                         onClick={() => setPromoCodesPanelOpen(true)}
-                        className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
+                        className="inline-flex items-center gap-1.5 bg-surface border border-line text-ink-soft text-[11px] font-medium px-2.5 py-1.5 hover:bg-canvas transition"
                     >
                         Promo Codes
                         {promoCodesPendingCount > 0 && (
@@ -1328,7 +1328,7 @@ export default function Admin() {
                     {organizerClaimsEnabled && (
                         <button
                             onClick={() => setOrganizerClaimsPanelOpen(true)}
-                            className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
+                            className="inline-flex items-center gap-1.5 bg-surface border border-line text-ink-soft text-[11px] font-medium px-2.5 py-1.5 hover:bg-canvas transition"
                         >
                             Organizer Claims
                             {organizerClaimsPendingCount > 0 && (
@@ -1340,7 +1340,7 @@ export default function Admin() {
                     )}
                     <button
                         onClick={() => setFeedbackPanelOpen(true)}
-                        className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
+                        className="inline-flex items-center gap-1.5 bg-surface border border-line text-ink-soft text-[11px] font-medium px-2.5 py-1.5 hover:bg-canvas transition"
                     >
                         Feedback
                         {feedbackPendingCount > 0 && (
@@ -1351,7 +1351,7 @@ export default function Admin() {
                     </button>
                     <button
                         onClick={() => setDuplicatesPanelOpen(true)}
-                        className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
+                        className="inline-flex items-center gap-1.5 bg-surface border border-line text-ink-soft text-[11px] font-medium px-2.5 py-1.5 hover:bg-canvas transition"
                     >
                         Duplicates
                         {duplicatesPendingCount > 0 && (
@@ -1362,7 +1362,7 @@ export default function Admin() {
                     </button>
                     <button
                         onClick={() => setSeriesPanelOpen(true)}
-                        className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
+                        className="inline-flex items-center gap-1.5 bg-surface border border-line text-ink-soft text-[11px] font-medium px-2.5 py-1.5 hover:bg-canvas transition"
                     >
                         Series
                         {seriesPendingCount > 0 && (
@@ -1373,7 +1373,7 @@ export default function Admin() {
                     </button>
                     <button
                         onClick={() => { setEventsPanelPreset('ungeolocated'); setEventsPanelOpen(true); }}
-                        className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 transition"
+                        className="inline-flex items-center gap-1.5 bg-surface border border-line text-ink-soft text-[11px] font-medium px-2.5 py-1.5 hover:bg-canvas transition"
                     >
                         Ungeolocated
                         {ungeolocatedCount > 0 && (
@@ -1386,16 +1386,16 @@ export default function Admin() {
             )}
 
             {message && (
-                <p className="mb-4 bg-blue-50 border border-blue-100 px-3 py-1.5 text-[11px] text-blue-700">{message}</p>
+                <p className="mb-4 bg-blue-50 border border-blue-100 px-3 py-1.5 text-[11px] text-action">{message}</p>
             )}
 
             {/* ── Data Tab ── */}
             {activeTab === 'data' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
                     {/* Left col (1/3): Calendar Sources */}
-                    <div className="border border-gray-200 bg-white flex flex-col">
-                        <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50">
-                            <h2 className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Calendar Sources</h2>
+                    <div className="border border-line bg-surface flex flex-col">
+                        <div className="px-4 py-2.5 border-b border-card-line bg-canvas">
+                            <h2 className="text-[11px] font-semibold text-ink uppercase tracking-wide">Calendar Sources</h2>
                         </div>
                         <div className="p-4 flex flex-col flex-1 gap-3">
                             {/* Discover + Add Calendar Input row */}
@@ -1413,7 +1413,7 @@ export default function Admin() {
                                     onChange={(e) => setNewCalId(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && handleAddCalendar()}
                                     placeholder="Calendar ID (e.g. user@gmail.com)"
-                                    className="flex-1 min-w-0 border border-gray-200 px-2.5 py-1.5 text-[11px] text-gray-700 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    className="flex-1 min-w-0 border border-line px-2.5 py-1.5 text-[11px] text-ink placeholder:text-muted focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
                                 />
                                 <button
                                     onClick={handleAddCalendar}
@@ -1427,9 +1427,9 @@ export default function Admin() {
                             {/* Calendar List */}
                             <div className="flex-1 min-h-0 max-h-80 overflow-y-auto sm:max-h-none sm:overflow-visible">
                                 {loading ? (
-                                    <p className="text-[11px] text-gray-400">Loading…</p>
+                                    <p className="text-[11px] text-muted">Loading…</p>
                                 ) : calendars.length === 0 ? (
-                                    <p className="text-[11px] text-gray-400">No calendars. Use "Discover" to find them.</p>
+                                    <p className="text-[11px] text-muted">No calendars. Use "Discover" to find them.</p>
                                 ) : (
                                     <ul className="divide-y divide-gray-100">
                                         {calendars.map((cal) => (
@@ -1455,11 +1455,11 @@ export default function Admin() {
                                                                         if (e.key === 'Escape') setEditingCalId(null);
                                                                     }}
                                                                     autoFocus
-                                                                    className="text-[11px] font-medium text-gray-700 border border-blue-400 px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 w-full"
+                                                                    className="text-[11px] font-medium text-ink border border-blue-400 px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-action w-full"
                                                                 />
                                                             ) : (
                                                                 <span
-                                                                    className="text-[11px] font-medium text-gray-700 cursor-pointer hover:text-blue-600 transition block truncate"
+                                                                    className="text-[11px] font-medium text-ink cursor-pointer hover:text-action transition block truncate"
                                                                     onClick={() => handleNameEdit(cal)}
                                                                     title={cal.calendar_id}
                                                                 >
@@ -1472,8 +1472,8 @@ export default function Admin() {
                                                         <button
                                                             onClick={() => handleToggle(cal)}
                                                             className={`text-[10px] font-medium px-2 py-0.5 transition ${cal.enabled
-                                                                ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                                                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                                                ? 'bg-emerald-50 text-success hover:bg-emerald-100'
+                                                                : 'bg-gray-100 text-muted hover:bg-canvas'
                                                                 }`}
                                                             title="Whether the background job syncs new events from this calendar"
                                                         >
@@ -1482,8 +1482,8 @@ export default function Admin() {
                                                         <button
                                                             onClick={() => handleToggleShowEvents(cal)}
                                                             className={`text-[10px] font-medium px-2 py-0.5 transition ${cal.show_events
-                                                                ? 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-                                                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                                                ? 'bg-blue-50 text-action hover:bg-blue-100'
+                                                                : 'bg-gray-100 text-muted hover:bg-canvas'
                                                                 }`}
                                                             title="Whether this calendar's already-synced events are shown publicly"
                                                         >
@@ -1493,8 +1493,8 @@ export default function Admin() {
                                                             <button
                                                                 onClick={() => setOpenMenuCalId((prev) => (prev === cal.calendar_id ? null : cal.calendar_id))}
                                                                 className={`flex h-5 w-5 items-center justify-center border transition ${openMenuCalId === cal.calendar_id
-                                                                    ? 'bg-gray-100 border-gray-300 text-gray-700'
-                                                                    : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
+                                                                    ? 'bg-gray-100 border-line text-ink'
+                                                                    : 'bg-surface border-line text-ink-soft hover:bg-canvas'
                                                                     }`}
                                                                 title="More actions"
                                                                 aria-label="More actions"
@@ -1510,17 +1510,17 @@ export default function Admin() {
                                                             {openMenuCalId === cal.calendar_id && (
                                                                 <>
                                                                     <div className="fixed inset-0 z-10" onClick={() => setOpenMenuCalId(null)} />
-                                                                    <div className="absolute right-0 top-full z-20 mt-1 w-40 border border-gray-200 bg-white shadow-lg">
+                                                                    <div className="absolute right-0 top-full z-20 mt-1 w-40 border border-line bg-surface shadow-lg">
                                                                         <button
                                                                             onClick={() => { setOpenMenuCalId(null); handleShowCalendarEvents(cal.calendar_id); }}
-                                                                            className="block w-full px-3 py-1.5 text-left text-[11px] text-gray-700 hover:bg-gray-50"
+                                                                            className="block w-full px-3 py-1.5 text-left text-[11px] text-ink hover:bg-canvas"
                                                                             title="Show all events from this calendar"
                                                                         >
                                                                             Events
                                                                         </button>
                                                                         <button
                                                                             onClick={() => { setOpenMenuCalId(null); handleToggleDefaultTags(cal.calendar_id); }}
-                                                                            className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-[11px] hover:bg-gray-50 ${expandedDefaultTagsCalId === cal.calendar_id ? 'text-violet-700' : 'text-gray-700'
+                                                                            className={`flex w-full items-center justify-between px-3 py-1.5 text-left text-[11px] hover:bg-canvas ${expandedDefaultTagsCalId === cal.calendar_id ? 'text-violet-700' : 'text-ink'
                                                                                 }`}
                                                                             title="Configure default tags for new events from this calendar"
                                                                         >
@@ -1533,7 +1533,7 @@ export default function Admin() {
                                                                         </button>
                                                                         <button
                                                                             onClick={() => { setOpenMenuCalId(null); setExpandedRulesCalId((prev) => (prev === cal.calendar_id ? null : cal.calendar_id)); }}
-                                                                            className={`block w-full px-3 py-1.5 text-left text-[11px] hover:bg-gray-50 ${expandedRulesCalId === cal.calendar_id ? 'text-indigo-700' : 'text-gray-700'
+                                                                            className={`block w-full px-3 py-1.5 text-left text-[11px] hover:bg-canvas ${expandedRulesCalId === cal.calendar_id ? 'text-indigo-700' : 'text-ink'
                                                                                 }`}
                                                                             title="Manage per-calendar curation (auto-add events to managed users' lists)"
                                                                         >
@@ -1547,7 +1547,7 @@ export default function Admin() {
                                                 </div>
                                                 {expandedDefaultTagsCalId === cal.calendar_id && (
                                                     <div className="mt-2 pl-6">
-                                                        <p className="text-[10px] text-gray-400 mb-1.5">
+                                                        <p className="text-[10px] text-muted mb-1.5">
                                                             Default tags — applied to new events synced from this calendar:
                                                         </p>
                                                         <div className="flex flex-wrap gap-1">
@@ -1560,7 +1560,7 @@ export default function Admin() {
                                                                             onClick={() => handleToggleDefaultTag(cal.calendar_id, tag.id)}
                                                                             className={`text-[10px] px-2 py-0.5 border transition ${active
                                                                                 ? 'text-white border-transparent'
-                                                                                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                                                                                : 'bg-surface border-line text-ink-soft hover:bg-canvas'
                                                                                 }`}
                                                                             style={active ? { backgroundColor: tag.color || '#7c3aed', borderColor: tag.color || '#7c3aed' } : {}}
                                                                         >
@@ -1570,7 +1570,7 @@ export default function Admin() {
                                                                 })
                                                             )}
                                                             {tagGroups.length === 0 && (
-                                                                <span className="text-[10px] text-gray-400">No tags configured yet.</span>
+                                                                <span className="text-[10px] text-muted">No tags configured yet.</span>
                                                             )}
                                                         </div>
                                                     </div>
@@ -1585,61 +1585,61 @@ export default function Admin() {
                             </div>
 
                             {/* Sync controls — under calendar list */}
-                            <div className="border-t border-gray-100 pt-3 space-y-2">
+                            <div className="border-t border-card-line pt-3 space-y-2">
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                     <label
-                                        className="inline-flex items-center gap-1 text-[11px] text-gray-600"
+                                        className="inline-flex items-center gap-1 text-[11px] text-ink-soft"
                                         title="Lower bound for fetching events from upstream calendars. Used on Reseed and on the first-ever sync of each calendar (or after a sync token expires). Incremental syncs always return only changes since the last successful fetch."
                                     >
-                                        <span className="text-gray-500">From</span>
+                                        <span className="text-ink-soft">From</span>
                                         <input
                                             type="date"
                                             value={syncSinceDate}
                                             onChange={(e) => handleSyncSinceDateChange(e.target.value)}
-                                            className="border border-gray-200 px-1.5 py-1 text-[11px] text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            className="border border-line px-1.5 py-1 text-[11px] text-ink focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
                                         />
                                     </label>
                                     <button
                                         onClick={() => handleSync('incremental')}
                                         disabled={!!busy || enabledCount === 0}
-                                        className="bg-blue-600 text-white text-[11px] font-medium px-3 py-1.5 hover:bg-blue-700 disabled:opacity-50 transition"
+                                        className="bg-action text-white text-[11px] font-medium px-3 py-1.5 hover:bg-action-strong disabled:opacity-50 transition"
                                     >
                                         {busy === 'sync' ? 'Syncing…' : `Sync Now (${enabledCount})`}
                                     </button>
                                     <button
                                         onClick={() => handleSync('reseed')}
                                         disabled={!!busy || enabledCount === 0}
-                                        className="bg-white border border-gray-300 text-gray-700 text-[11px] font-medium px-2.5 py-1.5 hover:bg-gray-50 disabled:opacity-50 transition"
+                                        className="bg-surface border border-line text-ink text-[11px] font-medium px-2.5 py-1.5 hover:bg-canvas disabled:opacity-50 transition"
                                         title="Clear all sync tokens and re-fetch every event from the configured From date forward."
                                     >
                                         Reseed
                                     </button>
                                 </div>
 
-                                <div className="border border-gray-100 bg-gray-50 px-2.5 py-2 space-y-2">
+                                <div className="border border-card-line bg-canvas px-2.5 py-2 space-y-2">
                                     <div className="flex items-center justify-between gap-2">
-                                        <span className="text-[11px] font-medium text-gray-700">Auto sync</span>
+                                        <span className="text-[11px] font-medium text-ink">Auto sync</span>
                                         <button
                                             onClick={handleToggleAutoSync}
-                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${autoSyncEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${autoSyncEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                         >
-                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${autoSyncEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${autoSyncEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                         </button>
                                     </div>
                                     <div className="flex items-center justify-between gap-2">
-                                        <span className="text-[11px] text-gray-500">Mode</span>
+                                        <span className="text-[11px] text-ink-soft">Mode</span>
                                         <select
                                             value={autoSyncMode}
                                             onChange={(e) => handleAutoSyncModeChange(e.target.value as SyncMode)}
                                             disabled={!autoSyncEnabled}
-                                            className="border border-gray-200 px-1.5 py-0.5 text-[11px] text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400"
+                                            className="border border-line px-1.5 py-0.5 text-[11px] text-ink focus:border-action focus:outline-none focus:ring-1 focus:ring-action disabled:bg-gray-100 disabled:text-muted"
                                         >
                                             <option value="incremental">Incremental</option>
                                             <option value="reseed">Reseed</option>
                                         </select>
                                     </div>
                                     <div className="flex items-center justify-between gap-2">
-                                        <span className="text-[11px] text-gray-500">Interval</span>
+                                        <span className="text-[11px] text-ink-soft">Interval</span>
                                         <div className="flex items-center gap-1">
                                             <input
                                                 type="number"
@@ -1648,9 +1648,9 @@ export default function Admin() {
                                                 value={syncInterval}
                                                 onChange={(e) => setSyncInterval(Number(e.target.value))}
                                                 disabled={!autoSyncEnabled}
-                                                className="w-14 border border-gray-200 px-1.5 py-0.5 text-[11px] text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400"
+                                                className="w-14 border border-line px-1.5 py-0.5 text-[11px] text-ink focus:border-action focus:outline-none focus:ring-1 focus:ring-action disabled:bg-gray-100 disabled:text-muted"
                                             />
-                                            <span className="text-[11px] text-gray-400">min</span>
+                                            <span className="text-[11px] text-muted">min</span>
                                             <button
                                                 onClick={handleSyncIntervalSave}
                                                 disabled={!autoSyncEnabled || !!busy || syncInterval < 1 || syncInterval > 1440}
@@ -1696,7 +1696,7 @@ export default function Admin() {
                             onClick={() => setActiveConfigTab('events-settings')}
                             className={`text-[11px] font-medium px-2.5 py-1 transition border ${activeConfigTab === 'events-settings'
                                 ? 'bg-gray-800 text-white border-gray-800 hover:bg-gray-700'
-                                : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
+                                : 'bg-gray-100 text-ink-soft border-line hover:bg-canvas'
                                 }`}
                         >
                             Events settings
@@ -1705,7 +1705,7 @@ export default function Admin() {
                             onClick={() => setActiveConfigTab('feature-flags')}
                             className={`text-[11px] font-medium px-2.5 py-1 transition border ${activeConfigTab === 'feature-flags'
                                 ? 'bg-gray-800 text-white border-gray-800 hover:bg-gray-700'
-                                : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
+                                : 'bg-gray-100 text-ink-soft border-line hover:bg-canvas'
                                 }`}
                         >
                             Feature flags
@@ -1714,7 +1714,7 @@ export default function Admin() {
                             onClick={() => setActiveConfigTab('tag-categories')}
                             className={`text-[11px] font-medium px-2.5 py-1 transition border ${activeConfigTab === 'tag-categories'
                                 ? 'bg-gray-800 text-white border-gray-800 hover:bg-gray-700'
-                                : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
+                                : 'bg-gray-100 text-ink-soft border-line hover:bg-canvas'
                                 }`}
                         >
                             Tag categories
@@ -1723,7 +1723,7 @@ export default function Admin() {
                             onClick={() => setActiveConfigTab('notifications')}
                             className={`text-[11px] font-medium px-2.5 py-1 transition border ${activeConfigTab === 'notifications'
                                 ? 'bg-gray-800 text-white border-gray-800 hover:bg-gray-700'
-                                : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200'
+                                : 'bg-gray-100 text-ink-soft border-line hover:bg-canvas'
                                 }`}
                         >
                             Notifications
@@ -1732,13 +1732,13 @@ export default function Admin() {
 
                     {/* Events Settings Tab */}
                     {activeConfigTab === 'events-settings' && (
-                        <div className="border border-gray-200 bg-white">
-                            <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50">
-                                <h2 className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Settings</h2>
+                        <div className="border border-line bg-surface">
+                            <div className="px-4 py-2.5 border-b border-card-line bg-canvas">
+                                <h2 className="text-[11px] font-semibold text-ink uppercase tracking-wide">Settings</h2>
                             </div>
                             <div className="p-4 space-y-3 max-w-2xl">
                                 <div>
-                                    <label className="text-[11px] font-medium text-gray-500 block mb-1">
+                                    <label className="text-[11px] font-medium text-ink-soft block mb-1">
                                         Show events since
                                     </label>
                                     <div className="flex gap-1.5">
@@ -1746,7 +1746,7 @@ export default function Admin() {
                                             type="date"
                                             value={sinceDate}
                                             onChange={(e) => setSinceDate(e.target.value)}
-                                            className="flex-1 border border-gray-200 px-2.5 py-1.5 text-[11px] text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            className="flex-1 border border-line px-2.5 py-1.5 text-[11px] text-ink focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
                                         />
                                         <button
                                             onClick={handleSinceDateSave}
@@ -1756,14 +1756,14 @@ export default function Admin() {
                                             {busy === 'since' ? '…' : 'Save'}
                                         </button>
                                     </div>
-                                    <p className="mt-1 text-[10px] text-gray-400">
+                                    <p className="mt-1 text-[10px] text-muted">
                                         Display only — events older than this date are hidden in the calendar shown to users.
                                     </p>
                                 </div>
-                                <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                                <div className="flex items-center justify-between pt-2 border-t border-card-line">
                                     <div>
-                                        <span className="text-[11px] font-medium text-gray-700">Event bar color</span>
-                                        <p className="text-[10px] text-gray-400">Background of event bars in the calendar</p>
+                                        <span className="text-[11px] font-medium text-ink">Event bar color</span>
+                                        <p className="text-[10px] text-muted">Background of event bars in the calendar</p>
                                     </div>
                                     <div className="flex items-center gap-1.5">
                                         <input
@@ -1771,7 +1771,7 @@ export default function Admin() {
                                             value={eventColorBarColor}
                                             onChange={(e) => setEventColorBarColor(e.target.value)}
                                             onBlur={(e) => handleEventColorBarColorChange(e.target.value)}
-                                            className="h-6 w-8 cursor-pointer border border-gray-200 rounded p-0"
+                                            className="h-6 w-8 cursor-pointer border border-line rounded p-0"
                                             aria-label="Event bar color picker"
                                         />
                                         <input
@@ -1781,43 +1781,43 @@ export default function Admin() {
                                             onBlur={(e) => handleEventColorBarColorChange(e.target.value)}
                                             onKeyDown={(e) => e.key === 'Enter' && handleEventColorBarColorChange(eventColorBarColor)}
                                             placeholder="#64748b"
-                                            className="w-20 text-[11px] font-mono text-gray-900 border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                            className="w-20 text-[11px] font-mono text-ink border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
                                         />
                                     </div>
                                 </div>
-                                <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                                <div className="flex items-center justify-between pt-2 border-t border-card-line">
                                     <div>
-                                        <span className="text-[11px] font-medium text-gray-700">Tag pill order</span>
-                                        <p className="text-[10px] text-gray-400">Hero pills always come first</p>
+                                        <span className="text-[11px] font-medium text-ink">Tag pill order</span>
+                                        <p className="text-[10px] text-muted">Hero pills always come first</p>
                                     </div>
                                     <select
                                         value={tagSortMode}
                                         onChange={(e) => handleTagSortModeChange(e.target.value as 'group' | 'event_count')}
-                                        className="text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                        className="text-[11px] border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
                                     >
                                         <option value="group">By group</option>
                                         <option value="event_count">By event count</option>
                                     </select>
                                 </div>
-                                <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                                <div className="flex items-center justify-between pt-2 border-t border-card-line">
                                     <div>
-                                        <span className="text-[11px] font-medium text-gray-700">Explorer default period</span>
-                                        <p className="text-[10px] text-gray-400">Used for fresh visits and Clear all</p>
+                                        <span className="text-[11px] font-medium text-ink">Explorer default period</span>
+                                        <p className="text-[10px] text-muted">Used for fresh visits and Clear all</p>
                                     </div>
                                     <select
                                         value={defaultExplorerPeriod}
                                         onChange={(e) => handleDefaultExplorerPeriodChange(e.target.value as DateRangePresetKey)}
-                                        className="text-[11px] border border-gray-200 px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        className="text-[11px] border border-line px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-action"
                                     >
                                         {DATE_RANGE_PRESET_CHOICES.map((choice) => (
                                             <option key={choice.key} value={choice.key}>{choice.label}</option>
                                         ))}
                                     </select>
                                 </div>
-                                <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                                <div className="flex items-center justify-between pt-2 border-t border-card-line">
                                     <div>
-                                        <span className="text-[11px] font-medium text-gray-700">Mood headline threshold (reviews)</span>
-                                        <p className="text-[10px] text-gray-400">Minimum reviews before an event/series shows a computed "Overall Mood" label; below this it shows "Early feedback" (1–1000)</p>
+                                        <span className="text-[11px] font-medium text-ink">Mood headline threshold (reviews)</span>
+                                        <p className="text-[10px] text-muted">Minimum reviews before an event/series shows a computed "Overall Mood" label; below this it shows "Early feedback" (1–1000)</p>
                                     </div>
                                     <input
                                         type="number"
@@ -1827,7 +1827,7 @@ export default function Admin() {
                                         onChange={(e) => setReviewMoodMinReviews(Number(e.target.value))}
                                         onBlur={(e) => handleReviewMoodMinReviewsChange(Number(e.target.value))}
                                         onKeyDown={(e) => e.key === 'Enter' && handleReviewMoodMinReviewsChange(reviewMoodMinReviews)}
-                                        className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                        className="w-16 text-right text-[11px] border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
                                         aria-label="Mood headline minimum reviews"
                                     />
                                 </div>
@@ -1837,33 +1837,33 @@ export default function Admin() {
 
                     {/* Feature Flags Tab */}
                     {activeConfigTab === 'feature-flags' && (
-                        <div className="border border-gray-200 bg-white">
-                            <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50">
-                                <h2 className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Feature Flags</h2>
+                        <div className="border border-line bg-surface">
+                            <div className="px-4 py-2.5 border-b border-card-line bg-canvas">
+                                <h2 className="text-[11px] font-semibold text-ink uppercase tracking-wide">Feature Flags</h2>
                             </div>
                             <div className="p-4 space-y-3 max-w-4xl">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <span className="text-[11px] font-medium text-gray-700">Show prices</span>
-                                        <p className="text-[10px] text-gray-400">Price badges on events</p>
+                                        <span className="text-[11px] font-medium text-ink">Show prices</span>
+                                        <p className="text-[10px] text-muted">Price badges on events</p>
                                     </div>
                                     <button
                                         onClick={handleTogglePrices}
-                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${showPrices ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${showPrices ? 'bg-success' : 'bg-gray-300'}`}
                                     >
-                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${showPrices ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${showPrices ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <span className="text-[11px] font-medium text-gray-700">Show ratings</span>
-                                        <p className="text-[10px] text-gray-400">Star ratings and reviews</p>
+                                        <span className="text-[11px] font-medium text-ink">Show ratings</span>
+                                        <p className="text-[10px] text-muted">Star ratings and reviews</p>
                                     </div>
                                     <button
                                         onClick={handleToggleRatings}
-                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${showRatings ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${showRatings ? 'bg-success' : 'bg-gray-300'}`}
                                     >
-                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${showRatings ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${showRatings ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
 
@@ -1871,42 +1871,42 @@ export default function Admin() {
                                 The old "Show popularity" toggle was merged in:
                                 trending_enabled now drives both the badge surface
                                 AND the threshold/cap knobs. */}
-                                <div className="border border-gray-200 bg-gray-50/40 p-3 space-y-2">
+                                <div className="border border-line bg-canvas/40 p-3 space-y-2">
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <div className="inline-flex items-center gap-1">
-                                                <span className="text-[11px] font-semibold text-gray-700">Trending</span>
+                                                <span className="text-[11px] font-semibold text-ink">Trending</span>
                                                 <AdminInfoTooltip label={TRENDING_TOOLTIP} />
                                             </div>
-                                            <p className="text-[10px] text-gray-400">
+                                            <p className="text-[10px] text-muted">
                                                 Drives the 🔥 chip, the orange map ring, and the "Popular" sort.
                                             </p>
                                         </div>
                                         <button
                                             onClick={handleToggleTrending}
-                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${trendingEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${trendingEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                         >
-                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${trendingEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${trendingEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                         </button>
                                     </div>
                                     {trendingEnabled && (
                                         <>
                                             <div className="flex items-center justify-between mt-1 pl-1">
                                                 <div>
-                                                    <span className="text-[11px] font-medium text-gray-600">Trending banner</span>
-                                                    <p className="text-[10px] text-gray-400">Highlights top trending events in the filtered Explorer scope.</p>
+                                                    <span className="text-[11px] font-medium text-ink-soft">Trending banner</span>
+                                                    <p className="text-[10px] text-muted">Highlights top trending events in the filtered Explorer scope.</p>
                                                 </div>
                                                 <button
                                                     onClick={handleToggleTrendingBanner}
-                                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${trendingBannerEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${trendingBannerEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                                 >
-                                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${trendingBannerEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${trendingBannerEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                                 </button>
                                             </div>
                                             <div className="flex items-center justify-between mt-1 pl-1">
                                                 <div>
-                                                    <span className="text-[11px] font-medium text-gray-600">🔥 Popular threshold</span>
-                                                    <p className="text-[10px] text-gray-400">Min popularity score required to show the badge</p>
+                                                    <span className="text-[11px] font-medium text-ink-soft">🔥 Popular threshold</span>
+                                                    <p className="text-[10px] text-muted">Min popularity score required to show the badge</p>
                                                 </div>
                                                 <input
                                                     type="number"
@@ -1916,13 +1916,13 @@ export default function Admin() {
                                                     onChange={(e) => setPopularityThreshold(Number(e.target.value))}
                                                     onBlur={(e) => handlePopularityThresholdChange(Number(e.target.value))}
                                                     onKeyDown={(e) => e.key === 'Enter' && handlePopularityThresholdChange(popularityThreshold)}
-                                                    className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                                    className="w-16 text-right text-[11px] border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
                                                 />
                                             </div>
                                             <div className="flex items-center justify-between mt-1 pl-1">
                                                 <div>
-                                                    <span className="text-[11px] font-medium text-gray-600">Trending window (days)</span>
-                                                    <p className="text-[10px] text-gray-400">Only count signals from the last N days</p>
+                                                    <span className="text-[11px] font-medium text-ink-soft">Trending window (days)</span>
+                                                    <p className="text-[10px] text-muted">Only count signals from the last N days</p>
                                                 </div>
                                                 <input
                                                     type="number"
@@ -1932,13 +1932,13 @@ export default function Admin() {
                                                     onChange={(e) => setTrendingWindowDays(Number(e.target.value))}
                                                     onBlur={(e) => handleTrendingWindowDaysChange(Number(e.target.value))}
                                                     onKeyDown={(e) => e.key === 'Enter' && handleTrendingWindowDaysChange(trendingWindowDays)}
-                                                    className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                                    className="w-16 text-right text-[11px] border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
                                                 />
                                             </div>
                                             <div className="flex items-center justify-between mt-1 pl-1">
                                                 <div>
-                                                    <span className="text-[11px] font-medium text-gray-600">Trending floor (going)</span>
-                                                    <p className="text-[10px] text-gray-400">
+                                                    <span className="text-[11px] font-medium text-ink-soft">Trending floor (going)</span>
+                                                    <p className="text-[10px] text-muted">
                                                         Min RSVPs required to be eligible. Anti-view-bait gate;
                                                         events below this floor get score 0.
                                                     </p>
@@ -1951,13 +1951,13 @@ export default function Admin() {
                                                     onChange={(e) => setTrendingFloorGoing(Number(e.target.value))}
                                                     onBlur={(e) => handleTrendingFloorGoingChange(Number(e.target.value))}
                                                     onKeyDown={(e) => e.key === 'Enter' && handleTrendingFloorGoingChange(trendingFloorGoing)}
-                                                    className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                                    className="w-16 text-right text-[11px] border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
                                                 />
                                             </div>
                                             <div className="flex items-center justify-between mt-1 pl-1">
                                                 <div>
-                                                    <span className="text-[11px] font-medium text-gray-600">Trending top N</span>
-                                                    <p className="text-[10px] text-gray-400">
+                                                    <span className="text-[11px] font-medium text-ink-soft">Trending top N</span>
+                                                    <p className="text-[10px] text-muted">
                                                         Absolute cap: never decorate more than N events as Trending,
                                                         no matter how many are visible.
                                                     </p>
@@ -1970,16 +1970,16 @@ export default function Admin() {
                                                     onChange={(e) => setTrendingTopN(Number(e.target.value))}
                                                     onBlur={(e) => handleTrendingTopNChange(Number(e.target.value))}
                                                     onKeyDown={(e) => e.key === 'Enter' && handleTrendingTopNChange(trendingTopN)}
-                                                    className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                                    className="w-16 text-right text-[11px] border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
                                                 />
                                             </div>
                                             <div className="flex items-center justify-between mt-1 pl-1">
                                                 <div>
                                                     <div className="inline-flex items-center gap-1">
-                                                        <span className="text-[11px] font-medium text-gray-600">Trending top %</span>
+                                                        <span className="text-[11px] font-medium text-ink-soft">Trending top %</span>
                                                         <AdminInfoTooltip label={TRENDING_TOP_PERCENT_TOOLTIP} />
                                                     </div>
-                                                    <p className="text-[10px] text-gray-400">
+                                                    <p className="text-[10px] text-muted">
                                                         Relative cap (1-100). Effective decoration count is
                                                         min(top N, ceil(visible × %  ⁄ 100)). Keeps the chip rare
                                                         on small lists.
@@ -1993,7 +1993,7 @@ export default function Admin() {
                                                     onChange={(e) => setTrendingTopPercent(Number(e.target.value))}
                                                     onBlur={(e) => handleTrendingTopPercentChange(Number(e.target.value))}
                                                     onKeyDown={(e) => e.key === 'Enter' && handleTrendingTopPercentChange(trendingTopPercent)}
-                                                    className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                                    className="w-16 text-right text-[11px] border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
                                                 />
                                             </div>
                                         </>
@@ -2003,102 +2003,102 @@ export default function Admin() {
                                 {/* Adoption-boost: Following badge (Track 1) */}
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <span className="text-[11px] font-medium text-gray-700">Following badge</span>
-                                        <p className="text-[10px] text-gray-400">Avatar/dot when a mutual friend is going or saved</p>
+                                        <span className="text-[11px] font-medium text-ink">Following badge</span>
+                                        <p className="text-[10px] text-muted">Avatar/dot when a mutual friend is going or saved</p>
                                     </div>
                                     <button
                                         onClick={handleToggleFollowingBadge}
-                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${followingBadgeEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${followingBadgeEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                     >
-                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${followingBadgeEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${followingBadgeEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
 
                                 {/* Adoption-boost: New event markers (Track 2) */}
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <span className="text-[11px] font-medium text-gray-700">New event markers</span>
-                                        <p className="text-[10px] text-gray-400">Dot + bold title for events added after the viewer's baseline</p>
+                                        <span className="text-[11px] font-medium text-ink">New event markers</span>
+                                        <p className="text-[10px] text-muted">Dot + bold title for events added after the viewer's baseline</p>
                                     </div>
                                     <button
                                         onClick={handleToggleUnseenState}
                                         aria-label="Toggle new event markers"
-                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${unseenStateEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${unseenStateEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                     >
-                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${unseenStateEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${unseenStateEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
 
                                 {/* Explorer "For you" discovery rail */}
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <span className="text-[11px] font-medium text-gray-700">For you rail</span>
-                                        <p className="text-[10px] text-gray-400">Collapsible Explorer rail with You might like/Friends going/New lenses</p>
+                                        <span className="text-[11px] font-medium text-ink">For you rail</span>
+                                        <p className="text-[10px] text-muted">Collapsible Explorer rail with You might like/Friends going/New lenses</p>
                                     </div>
                                     <button
                                         onClick={handleToggleForYouRail}
                                         aria-label="Toggle for you rail"
-                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${forYouRailEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${forYouRailEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                     >
-                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${forYouRailEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${forYouRailEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
 
                                 {/* Explorer "Your next events" rail */}
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <span className="text-[11px] font-medium text-gray-700">Your next events rail</span>
-                                        <p className="text-[10px] text-gray-400">Explorer rail showing the viewer's own saved/going events</p>
+                                        <span className="text-[11px] font-medium text-ink">Your next events rail</span>
+                                        <p className="text-[10px] text-muted">Explorer rail showing the viewer's own saved/going events</p>
                                     </div>
                                     <button
                                         onClick={handleToggleYourNextEventsRail}
                                         aria-label="Toggle your next events rail"
-                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${yourNextEventsRailEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${yourNextEventsRailEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                     >
-                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${yourNextEventsRailEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${yourNextEventsRailEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
 
                                 {/* Tribe > Calendars "Your Network" going snapshot */}
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <span className="text-[11px] font-medium text-gray-700">Network going snapshot</span>
-                                        <p className="text-[10px] text-gray-400">Tribe &gt; Calendars header showing upcoming events people you follow are going to</p>
+                                        <span className="text-[11px] font-medium text-ink">Network going snapshot</span>
+                                        <p className="text-[10px] text-muted">Tribe &gt; Calendars header showing upcoming events people you follow are going to</p>
                                     </div>
                                     <button
                                         onClick={handleToggleNetworkGoingSnapshot}
                                         aria-label="Toggle network going snapshot"
-                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${networkGoingSnapshotEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${networkGoingSnapshotEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                     >
-                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${networkGoingSnapshotEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${networkGoingSnapshotEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
 
                                 {/* User contributions: promo codes */}
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <span className="text-[11px] font-medium text-gray-700">Promo codes</span>
-                                        <p className="text-[10px] text-gray-400">Let users submit promo codes per event. Admin-moderated.</p>
+                                        <span className="text-[11px] font-medium text-ink">Promo codes</span>
+                                        <p className="text-[10px] text-muted">Let users submit promo codes per event. Admin-moderated.</p>
                                     </div>
                                     <button
                                         onClick={handleTogglePromoCodes}
-                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${promoCodesEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${promoCodesEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                     >
-                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${promoCodesEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${promoCodesEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
 
                                 {/* User contributions: organizer claims */}
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <span className="text-[11px] font-medium text-gray-700">Organizer claims</span>
-                                        <p className="text-[10px] text-gray-400">Let users request organizer badge + claim per-event ownership. Admin-moderated.</p>
+                                        <span className="text-[11px] font-medium text-ink">Organizer claims</span>
+                                        <p className="text-[10px] text-muted">Let users request organizer badge + claim per-event ownership. Admin-moderated.</p>
                                     </div>
                                     <button
                                         onClick={handleToggleOrganizerClaims}
-                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${organizerClaimsEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${organizerClaimsEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                     >
-                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${organizerClaimsEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${organizerClaimsEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                     </button>
                                 </div>
                             </div>
@@ -2107,41 +2107,41 @@ export default function Admin() {
 
                     {/* Tag Categories Tab */}
                     {activeConfigTab === 'tag-categories' && (
-                        <div className="border border-gray-200 bg-white lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto">
+                        <div className="border border-line bg-surface lg:max-h-[calc(100vh-200px)] lg:overflow-y-auto">
                             <AdminTagCategories />
                         </div>
                     )}
 
                     {/* Notifications Tab */}
                     {activeConfigTab === 'notifications' && (
-                        <div className="border border-gray-200 bg-white">
-                            <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50">
-                                <h2 className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Notifications</h2>
+                        <div className="border border-line bg-surface">
+                            <div className="px-4 py-2.5 border-b border-card-line bg-canvas">
+                                <h2 className="text-[11px] font-semibold text-ink uppercase tracking-wide">Notifications</h2>
                             </div>
                             <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
                                 {/* Interest-match */}
-                                <div className="border border-gray-100 p-3 space-y-3">
+                                <div className="border border-card-line p-3 space-y-3">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Interest-match</span>
+                                        <span className="text-[11px] font-semibold text-ink uppercase tracking-wide">Interest-match</span>
                                         <button
                                             onClick={handleToggleInterestMatchNotifs}
                                             aria-label="Toggle interest notifications"
-                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${interestMatchNotifsEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${interestMatchNotifsEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                         >
-                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${interestMatchNotifsEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${interestMatchNotifsEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                         </button>
                                     </div>
-                                    <p className="text-[10px] text-gray-400">Alert users when a new event matches their interest profile</p>
+                                    <p className="text-[10px] text-muted">Alert users when a new event matches their interest profile</p>
                                     {toggleCounts && (
-                                        <p className="text-[10px] text-gray-500">
+                                        <p className="text-[10px] text-ink-soft">
                                             {toggleCounts.interest_match.email} email · {toggleCounts.interest_match.push} push enabled
                                             {' '}(of {toggleCounts.total_users} users)
                                         </p>
                                     )}
-                                    <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
+                                    <div className="flex items-center justify-between border-t border-card-line pt-2.5">
                                         <div>
-                                            <span className="text-[11px] font-medium text-gray-700">Max events per email</span>
-                                            <p className="text-[10px] text-gray-400">Events beyond this hide behind a "Discover more" link (1–50)</p>
+                                            <span className="text-[11px] font-medium text-ink">Max events per email</span>
+                                            <p className="text-[10px] text-muted">Events beyond this hide behind a "Discover more" link (1–50)</p>
                                         </div>
                                         <input
                                             type="number"
@@ -2151,13 +2151,13 @@ export default function Admin() {
                                             onChange={(e) => setInterestMatchMaxEventsPerEmail(Number(e.target.value))}
                                             onBlur={(e) => handleInterestMatchMaxEventsChange(Number(e.target.value))}
                                             onKeyDown={(e) => e.key === 'Enter' && handleInterestMatchMaxEventsChange(interestMatchMaxEventsPerEmail)}
-                                            className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                            className="w-16 text-right text-[11px] border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
                                             aria-label="Max events per interest-match email"
                                         />
                                     </div>
-                                    <div className="flex items-center gap-4 border-t border-gray-100 pt-2.5">
-                                        <span className="text-[11px] font-medium text-gray-700">Email delivery</span>
-                                        <label className="flex items-center gap-1 text-[10px] text-gray-500">
+                                    <div className="flex items-center gap-4 border-t border-card-line pt-2.5">
+                                        <span className="text-[11px] font-medium text-ink">Email delivery</span>
+                                        <label className="flex items-center gap-1 text-[10px] text-ink-soft">
                                             <input
                                                 type="checkbox"
                                                 aria-label="Interest matches instant email"
@@ -2166,7 +2166,7 @@ export default function Admin() {
                                             />
                                             Instant
                                         </label>
-                                        <label className="flex items-center gap-1 text-[10px] text-gray-500">
+                                        <label className="flex items-center gap-1 text-[10px] text-ink-soft">
                                             <input
                                                 type="checkbox"
                                                 aria-label="Interest matches digest email"
@@ -2176,10 +2176,10 @@ export default function Admin() {
                                             Digest
                                         </label>
                                     </div>
-                                    <div className="border-t border-gray-100 pt-2.5 space-y-1.5">
+                                    <div className="border-t border-card-line pt-2.5 space-y-1.5">
                                         <div>
-                                            <span className="text-[11px] font-medium text-gray-700">Force-send interest matches</span>
-                                            <p className="text-[10px] text-gray-400">
+                                            <span className="text-[11px] font-medium text-ink">Force-send interest matches</span>
+                                            <p className="text-[10px] text-muted">
                                                 Scan for interest-profile matches over a custom lookback window for selected
                                                 users and deliver immediately, bypassing the 24h scan window and digest schedule.
                                             </p>
@@ -2190,7 +2190,7 @@ export default function Admin() {
                                             placeholder="Search email, handle, or name"
                                         />
                                         <div className="flex items-center gap-2">
-                                            <label className="text-[10px] text-gray-500" htmlFor="force-send-lookback">Lookback (hours)</label>
+                                            <label className="text-[10px] text-ink-soft" htmlFor="force-send-lookback">Lookback (hours)</label>
                                             <input
                                                 id="force-send-lookback"
                                                 type="number"
@@ -2198,13 +2198,13 @@ export default function Admin() {
                                                 max={720}
                                                 value={forceSendLookbackHours}
                                                 onChange={(e) => { setForceSendLookbackHours(Number(e.target.value)); setPreviewResults(null); }}
-                                                className="w-20 text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                                className="w-20 text-[11px] border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
                                             />
                                             <button
                                                 type="button"
                                                 onClick={handlePreviewInterestMatches}
                                                 disabled={forceSendUsers.length === 0 || previewBusy || forceSendBusy}
-                                                className="ml-auto text-[11px] px-2.5 py-1 rounded border border-emerald-600 text-emerald-700 disabled:border-gray-300 disabled:text-gray-400 hover:bg-emerald-50"
+                                                className="ml-auto text-[11px] px-2.5 py-1 rounded border border-emerald-600 text-success disabled:border-line disabled:text-muted hover:bg-emerald-50"
                                             >
                                                 {previewBusy ? 'Previewing…' : 'Preview'}
                                             </button>
@@ -2212,14 +2212,14 @@ export default function Admin() {
                                                 type="button"
                                                 onClick={handleForceSendInterestMatches}
                                                 disabled={forceSendUsers.length === 0 || forceSendBusy}
-                                                className="text-[11px] px-2.5 py-1 rounded bg-emerald-600 text-white disabled:bg-gray-300 hover:bg-emerald-700"
+                                                className="text-[11px] px-2.5 py-1 rounded bg-success text-white disabled:bg-gray-300 hover:bg-success/90"
                                             >
                                                 {forceSendBusy ? 'Sending…' : `Force send${forceSendUsers.length ? ` (${forceSendUsers.length})` : ''}`}
                                             </button>
                                         </div>
                                         {previewResults && (
-                                            <div className="text-[10px] text-gray-600 bg-gray-50 border border-gray-100 p-2 space-y-1">
-                                                <div className="text-gray-400">
+                                            <div className="text-[10px] text-ink-soft bg-canvas border border-card-line p-2 space-y-1">
+                                                <div className="text-muted">
                                                     {previewResults.candidates_scanned} candidate event(s) in window globally (all users, not just selected)
                                                 </div>
                                                 {previewResults.results.map((r) => (
@@ -2231,7 +2231,7 @@ export default function Admin() {
                                             </div>
                                         )}
                                         {forceSendMessage && (
-                                            <div className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 p-2">
+                                            <div className="text-[10px] text-success bg-emerald-50 border border-emerald-200 p-2">
                                                 {forceSendMessage}
                                             </div>
                                         )}
@@ -2239,28 +2239,28 @@ export default function Admin() {
                                 </div>
 
                                 {/* Event reminders */}
-                                <div className="border border-gray-100 p-3 space-y-3">
+                                <div className="border border-card-line p-3 space-y-3">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Event reminders</span>
+                                        <span className="text-[11px] font-semibold text-ink uppercase tracking-wide">Event reminders</span>
                                         <button
                                             onClick={handleToggleReminders}
                                             aria-label="Toggle event reminders"
-                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${eventRemindersEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${eventRemindersEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                         >
-                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${eventRemindersEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${eventRemindersEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                         </button>
                                     </div>
-                                    <p className="text-[10px] text-gray-400">Pre-event nudge (in-app + email) for saved / going users</p>
+                                    <p className="text-[10px] text-muted">Pre-event nudge (in-app + email) for saved / going users</p>
                                     {toggleCounts && (
-                                        <p className="text-[10px] text-gray-500">
+                                        <p className="text-[10px] text-ink-soft">
                                             {toggleCounts.event_reminders.email} email · {toggleCounts.event_reminders.push} push enabled
                                             {' '}(of {toggleCounts.total_users} users)
                                         </p>
                                     )}
-                                    <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
+                                    <div className="flex items-center justify-between border-t border-card-line pt-2.5">
                                         <div>
-                                            <span className="text-[11px] font-medium text-gray-700">Reminder lead time (hours)</span>
-                                            <p className="text-[10px] text-gray-400">How far ahead of an event's start to fire the reminder (1–720)</p>
+                                            <span className="text-[11px] font-medium text-ink">Reminder lead time (hours)</span>
+                                            <p className="text-[10px] text-muted">How far ahead of an event's start to fire the reminder (1–720)</p>
                                         </div>
                                         <input
                                             type="number"
@@ -2270,14 +2270,14 @@ export default function Admin() {
                                             onChange={(e) => setReminderLeadHours(Number(e.target.value))}
                                             onBlur={(e) => handleReminderLeadHoursChange(Number(e.target.value))}
                                             onKeyDown={(e) => e.key === 'Enter' && handleReminderLeadHoursChange(reminderLeadHours)}
-                                            className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                            className="w-16 text-right text-[11px] border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
                                             aria-label="Reminder lead time in hours"
                                         />
                                     </div>
-                                    <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
+                                    <div className="flex items-center justify-between border-t border-card-line pt-2.5">
                                         <div>
-                                            <span className="text-[11px] font-medium text-gray-700">"Ask a question" CTA threshold</span>
-                                            <p className="text-[10px] text-gray-400">Min "Going" attendees before a reminder includes an "Ask a question" link (1–10000)</p>
+                                            <span className="text-[11px] font-medium text-ink">"Ask a question" CTA threshold</span>
+                                            <p className="text-[10px] text-muted">Min "Going" attendees before a reminder includes an "Ask a question" link (1–10000)</p>
                                         </div>
                                         <input
                                             type="number"
@@ -2287,35 +2287,35 @@ export default function Admin() {
                                             onChange={(e) => setEventMessageCtaMinGoing(Number(e.target.value))}
                                             onBlur={(e) => handleEventMessageCtaMinGoingChange(Number(e.target.value))}
                                             onKeyDown={(e) => e.key === 'Enter' && handleEventMessageCtaMinGoingChange(eventMessageCtaMinGoing)}
-                                            className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                            className="w-16 text-right text-[11px] border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
                                             aria-label="Ask a question CTA going threshold"
                                         />
                                     </div>
                                 </div>
 
                                 {/* Review prompt */}
-                                <div className="border border-gray-100 p-3 space-y-3">
+                                <div className="border border-card-line p-3 space-y-3">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Review prompt</span>
+                                        <span className="text-[11px] font-semibold text-ink uppercase tracking-wide">Review prompt</span>
                                         <button
                                             onClick={handleToggleReviewPrompt}
                                             aria-label="Toggle review prompt"
-                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${reviewPromptEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${reviewPromptEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                         >
-                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${reviewPromptEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${reviewPromptEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                         </button>
                                     </div>
-                                    <p className="text-[10px] text-gray-400">Post-event "how was it?" nudge (in-app + email) for going users who haven't rated yet</p>
+                                    <p className="text-[10px] text-muted">Post-event "how was it?" nudge (in-app + email) for going users who haven't rated yet</p>
                                     {toggleCounts && (
-                                        <p className="text-[10px] text-gray-500">
+                                        <p className="text-[10px] text-ink-soft">
                                             {toggleCounts.review_prompt.email} email · {toggleCounts.review_prompt.push} push enabled
                                             {' '}(of {toggleCounts.total_users} users)
                                         </p>
                                     )}
-                                    <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
+                                    <div className="flex items-center justify-between border-t border-card-line pt-2.5">
                                         <div>
-                                            <span className="text-[11px] font-medium text-gray-700">Delay after event ends (hours)</span>
-                                            <p className="text-[10px] text-gray-400">How long after an event's end to fire the prompt (1–720)</p>
+                                            <span className="text-[11px] font-medium text-ink">Delay after event ends (hours)</span>
+                                            <p className="text-[10px] text-muted">How long after an event's end to fire the prompt (1–720)</p>
                                         </div>
                                         <input
                                             type="number"
@@ -2325,14 +2325,14 @@ export default function Admin() {
                                             onChange={(e) => setReviewPromptDelayHours(Number(e.target.value))}
                                             onBlur={(e) => handleReviewPromptDelayHoursChange(Number(e.target.value))}
                                             onKeyDown={(e) => e.key === 'Enter' && handleReviewPromptDelayHoursChange(reviewPromptDelayHours)}
-                                            className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                            className="w-16 text-right text-[11px] border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
                                             aria-label="Review prompt delay in hours"
                                         />
                                     </div>
-                                    <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
+                                    <div className="flex items-center justify-between border-t border-card-line pt-2.5">
                                         <div>
-                                            <span className="text-[11px] font-medium text-gray-700">Scan lookback (hours)</span>
-                                            <p className="text-[10px] text-gray-400">How far past the delay window to scan for newly-eligible events each tick (1–720)</p>
+                                            <span className="text-[11px] font-medium text-ink">Scan lookback (hours)</span>
+                                            <p className="text-[10px] text-muted">How far past the delay window to scan for newly-eligible events each tick (1–720)</p>
                                         </div>
                                         <input
                                             type="number"
@@ -2342,14 +2342,14 @@ export default function Admin() {
                                             onChange={(e) => setReviewPromptLookbackHours(Number(e.target.value))}
                                             onBlur={(e) => handleReviewPromptLookbackHoursChange(Number(e.target.value))}
                                             onKeyDown={(e) => e.key === 'Enter' && handleReviewPromptLookbackHoursChange(reviewPromptLookbackHours)}
-                                            className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                            className="w-16 text-right text-[11px] border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
                                             aria-label="Review prompt lookback in hours"
                                         />
                                     </div>
-                                    <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
+                                    <div className="flex items-center justify-between border-t border-card-line pt-2.5">
                                         <div>
-                                            <span className="text-[11px] font-medium text-gray-700">"Share your experience" window (days)</span>
-                                            <p className="text-[10px] text-gray-400">How far back attended-but-unreviewed events surface in the "For you" trail (1–3650)</p>
+                                            <span className="text-[11px] font-medium text-ink">"Share your experience" window (days)</span>
+                                            <p className="text-[10px] text-muted">How far back attended-but-unreviewed events surface in the "For you" trail (1–3650)</p>
                                         </div>
                                         <input
                                             type="number"
@@ -2359,31 +2359,31 @@ export default function Admin() {
                                             onChange={(e) => setForYouReviewWindowDays(Number(e.target.value))}
                                             onBlur={(e) => handleForYouReviewWindowDaysChange(Number(e.target.value))}
                                             onKeyDown={(e) => e.key === 'Enter' && handleForYouReviewWindowDaysChange(forYouReviewWindowDays)}
-                                            className="w-16 text-right text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                            className="w-16 text-right text-[11px] border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
                                             aria-label="Share your experience review window in days"
                                         />
                                     </div>
-                                    <div className="border-t border-gray-100 pt-2.5 space-y-1.5">
+                                    <div className="border-t border-card-line pt-2.5 space-y-1.5">
                                         <div>
-                                            <span className="text-[11px] font-medium text-gray-700">Send now</span>
-                                            <p className="text-[10px] text-gray-400">
+                                            <span className="text-[11px] font-medium text-ink">Send now</span>
+                                            <p className="text-[10px] text-muted">
                                                 Fire the "how was it?" prompt for a specific event to hand-picked
                                                 attendees now, bypassing the delay window. Non-attendees and users
                                                 who already rated are skipped; per-channel opt-outs are respected.
                                             </p>
                                         </div>
                                         {reviewNowEvent ? (
-                                            <div className="flex items-center gap-2 text-[11px] border border-gray-200 rounded px-2 py-1">
+                                            <div className="flex items-center gap-2 text-[11px] border border-line rounded px-2 py-1">
                                                 <span className="min-w-0 flex-1 truncate">
-                                                    <span className="font-medium text-gray-800">{reviewNowEvent.title}</span>
+                                                    <span className="font-medium text-ink">{reviewNowEvent.title}</span>
                                                     {reviewNowEvent.start && (
-                                                        <span className="text-gray-400"> · {new Date(reviewNowEvent.start).toLocaleDateString()}</span>
+                                                        <span className="text-muted"> · {new Date(reviewNowEvent.start).toLocaleDateString()}</span>
                                                     )}
                                                 </span>
                                                 <button
                                                     type="button"
                                                     onClick={() => { setReviewNowEvent(null); setReviewNowMessage(''); }}
-                                                    className="text-gray-400 hover:text-gray-600"
+                                                    className="text-muted hover:text-ink-soft"
                                                     aria-label="Clear selected event"
                                                 >
                                                     ✕
@@ -2396,11 +2396,11 @@ export default function Admin() {
                                                     value={reviewNowQuery}
                                                     onChange={(e) => setReviewNowQuery(e.target.value)}
                                                     placeholder="Search past event by title"
-                                                    className="w-full text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                                    className="w-full text-[11px] border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
                                                     aria-label="Search event for review prompt"
                                                 />
                                                 {reviewNowSearchResults.length > 0 && (
-                                                    <ul className="absolute z-10 mt-0.5 w-full max-h-48 overflow-auto bg-white border border-gray-200 rounded shadow">
+                                                    <ul className="absolute z-10 mt-0.5 w-full max-h-48 overflow-auto bg-surface border border-line rounded shadow">
                                                         {reviewNowSearchResults.map((ev) => (
                                                             <li key={ev.event_id}>
                                                                 <button
@@ -2411,11 +2411,11 @@ export default function Admin() {
                                                                         setReviewNowSearchResults([]);
                                                                         setReviewNowMessage('');
                                                                     }}
-                                                                    className="w-full text-left text-[11px] px-2 py-1 hover:bg-gray-50"
+                                                                    className="w-full text-left text-[11px] px-2 py-1 hover:bg-canvas"
                                                                 >
-                                                                    <span className="font-medium text-gray-800">{ev.title}</span>
+                                                                    <span className="font-medium text-ink">{ev.title}</span>
                                                                     {ev.start && (
-                                                                        <span className="text-gray-400"> · {new Date(ev.start).toLocaleDateString()}</span>
+                                                                        <span className="text-muted"> · {new Date(ev.start).toLocaleDateString()}</span>
                                                                     )}
                                                                 </button>
                                                             </li>
@@ -2425,15 +2425,15 @@ export default function Admin() {
                                             </div>
                                         )}
                                         {reviewNowEvent && (
-                                            <div className="border border-gray-200 rounded">
-                                                <div className="flex items-center justify-between px-2 py-1 border-b border-gray-100">
-                                                    <span className="text-[10px] font-medium text-gray-600">
+                                            <div className="border border-line rounded">
+                                                <div className="flex items-center justify-between px-2 py-1 border-b border-card-line">
+                                                    <span className="text-[10px] font-medium text-ink-soft">
                                                         Attendees{reviewNowCandidates.length ? ` (${reviewNowCandidates.length})` : ''}
                                                     </span>
                                                     {reviewNowCandidates.some((c) => !c.already_rated) && (
                                                         <button
                                                             type="button"
-                                                            className="text-[10px] text-emerald-700 hover:underline"
+                                                            className="text-[10px] text-success hover:underline"
                                                             onClick={() => {
                                                                 setReviewNowMessage('');
                                                                 const selectable = reviewNowCandidates.filter((c) => !c.already_rated);
@@ -2447,9 +2447,9 @@ export default function Admin() {
                                                     )}
                                                 </div>
                                                 {reviewNowCandidatesLoading ? (
-                                                    <p className="text-[10px] text-gray-400 px-2 py-2">Loading attendees…</p>
+                                                    <p className="text-[10px] text-muted px-2 py-2">Loading attendees…</p>
                                                 ) : reviewNowCandidates.length === 0 ? (
-                                                    <p className="text-[10px] text-gray-400 px-2 py-2">No attendees for this event.</p>
+                                                    <p className="text-[10px] text-muted px-2 py-2">No attendees for this event.</p>
                                                 ) : (
                                                     <ul className="max-h-40 overflow-auto divide-y divide-gray-50">
                                                         {reviewNowCandidates.map((c) => {
@@ -2457,7 +2457,7 @@ export default function Admin() {
                                                             return (
                                                                 <li key={c.user_id}>
                                                                     <label
-                                                                        className={`flex items-center gap-2 px-2 py-1 text-[11px] ${c.already_rated ? 'text-gray-300' : 'text-gray-700 hover:bg-gray-50 cursor-pointer'}`}
+                                                                        className={`flex items-center gap-2 px-2 py-1 text-[11px] ${c.already_rated ? 'text-gray-300' : 'text-ink hover:bg-canvas cursor-pointer'}`}
                                                                         title={c.already_rated ? 'Already rated — will be skipped' : undefined}
                                                                     >
                                                                         <input
@@ -2475,9 +2475,9 @@ export default function Admin() {
                                                                         />
                                                                         <span className="min-w-0 flex-1 truncate">
                                                                             {c.name || c.handle || c.email}
-                                                                            <span className="text-gray-400"> · {c.email}</span>
+                                                                            <span className="text-muted"> · {c.email}</span>
                                                                         </span>
-                                                                        {c.already_rated && <span className="text-[9px] text-gray-400">rated</span>}
+                                                                        {c.already_rated && <span className="text-[9px] text-muted">rated</span>}
                                                                     </label>
                                                                 </li>
                                                             );
@@ -2487,7 +2487,7 @@ export default function Admin() {
                                             </div>
                                         )}
                                         <div className="flex items-center gap-2">
-                                            <label className="flex items-center gap-1 text-[10px] text-gray-500" htmlFor="review-now-resend" title="Re-send email/push even to users already prompted for this event">
+                                            <label className="flex items-center gap-1 text-[10px] text-ink-soft" htmlFor="review-now-resend" title="Re-send email/push even to users already prompted for this event">
                                                 <input
                                                     id="review-now-resend"
                                                     type="checkbox"
@@ -2500,13 +2500,13 @@ export default function Admin() {
                                                 type="button"
                                                 onClick={handleSendReviewPromptNow}
                                                 disabled={!reviewNowEvent || reviewNowUsers.length === 0 || reviewNowBusy}
-                                                className="ml-auto text-[11px] px-2.5 py-1 rounded bg-emerald-600 text-white disabled:bg-gray-300 hover:bg-emerald-700"
+                                                className="ml-auto text-[11px] px-2.5 py-1 rounded bg-success text-white disabled:bg-gray-300 hover:bg-success/90"
                                             >
                                                 {reviewNowBusy ? 'Sending…' : `Send now${reviewNowUsers.length ? ` (${reviewNowUsers.length})` : ''}`}
                                             </button>
                                         </div>
                                         {reviewNowMessage && (
-                                            <div className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 p-2">
+                                            <div className="text-[10px] text-success bg-emerald-50 border border-emerald-200 p-2">
                                                 {reviewNowMessage}
                                             </div>
                                         )}
@@ -2514,27 +2514,27 @@ export default function Admin() {
                                 </div>
 
                                 {/* Activity digest */}
-                                <div className="border border-gray-100 p-3 space-y-3">
+                                <div className="border border-card-line p-3 space-y-3">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Activity digest</span>
+                                        <span className="text-[11px] font-semibold text-ink uppercase tracking-wide">Activity digest</span>
                                         <button
                                             onClick={handleToggleActivityEmail}
                                             aria-label="Toggle activity digest"
-                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${activityDigestEmailEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${activityDigestEmailEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                         >
-                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${activityDigestEmailEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${activityDigestEmailEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                         </button>
                                     </div>
-                                    <p className="text-[10px] text-gray-400">Batched summary of new friends / follows / saves</p>
+                                    <p className="text-[10px] text-muted">Batched summary of new friends / follows / saves</p>
                                     {toggleCounts && (
-                                        <p className="text-[10px] text-gray-500">
+                                        <p className="text-[10px] text-ink-soft">
                                             {toggleCounts.activity_digest.email} email · {toggleCounts.activity_digest.push} push enabled
                                             {' '}(of {toggleCounts.total_users} users)
                                         </p>
                                     )}
-                                    <div className="border-t border-gray-100 pt-2.5 space-y-1">
-                                        <span className="text-[11px] font-medium text-gray-700">Schedule</span>
-                                        <p className="text-[10px] text-gray-400">
+                                    <div className="border-t border-card-line pt-2.5 space-y-1">
+                                        <span className="text-[11px] font-medium text-ink">Schedule</span>
+                                        <p className="text-[10px] text-muted">
                                             Format: <code className="font-mono">dow[,dow] @ HH:MM</code> — interpreted in each user's timezone.
                                         </p>
                                         <input
@@ -2544,32 +2544,32 @@ export default function Admin() {
                                             onBlur={(e) => handleDigestScheduleChange(e.target.value)}
                                             onKeyDown={(e) => e.key === 'Enter' && handleDigestScheduleChange(digestSchedule)}
                                             placeholder="tue,fri @ 09:00"
-                                            className="w-full text-[11px] font-mono border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                            className="w-full text-[11px] font-mono border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
                                             aria-label="Digest schedule"
                                         />
                                     </div>
-                                    <p className="text-[10px] text-gray-400 border-t border-gray-100 pt-2.5">
+                                    <p className="text-[10px] text-muted border-t border-card-line pt-2.5">
                                         Each activity feature has its own card below with an Instant/Digest
                                         email toggle and a scoped "Send now". In-app and push are always
                                         immediate.
                                     </p>
-                                    <div className="border-t border-gray-100 pt-2.5 space-y-2">
+                                    <div className="border-t border-card-line pt-2.5 space-y-2">
                                         <div className="flex items-center justify-between">
-                                            <span className="text-[11px] font-medium text-gray-700">Combined digest (v2)</span>
+                                            <span className="text-[11px] font-medium text-ink">Combined digest (v2)</span>
                                             <button
                                                 onClick={handleToggleDigestV2}
                                                 aria-label="Toggle combined digest v2"
-                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${digestV2Enabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${digestV2Enabled ? 'bg-success' : 'bg-gray-300'}`}
                                             >
-                                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${digestV2Enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${digestV2Enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                             </button>
                                         </div>
-                                        <p className="text-[10px] text-gray-400">
+                                        <p className="text-[10px] text-muted">
                                             On: one balanced, card-styled email per recipient merging every
                                             eligible feature. Off: separate per-feature list emails.
                                         </p>
                                         <div className="flex items-center gap-2">
-                                            <label className="text-[10px] text-gray-500" htmlFor="digest-per-kind-cap">Per-kind cap</label>
+                                            <label className="text-[10px] text-ink-soft" htmlFor="digest-per-kind-cap">Per-kind cap</label>
                                             <input
                                                 id="digest-per-kind-cap"
                                                 type="number"
@@ -2579,9 +2579,9 @@ export default function Admin() {
                                                 onChange={(e) => setDigestPerKindCap(Number(e.target.value))}
                                                 onBlur={(e) => handleDigestPerKindCapChange(Number(e.target.value))}
                                                 aria-label="Digest per-kind cap"
-                                                className="w-16 text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                                className="w-16 text-[11px] border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
                                             />
-                                            <label className="text-[10px] text-gray-500" htmlFor="digest-max-items">Max items</label>
+                                            <label className="text-[10px] text-ink-soft" htmlFor="digest-max-items">Max items</label>
                                             <input
                                                 id="digest-max-items"
                                                 type="number"
@@ -2591,7 +2591,7 @@ export default function Admin() {
                                                 onChange={(e) => setDigestMaxItems(Number(e.target.value))}
                                                 onBlur={(e) => handleDigestMaxItemsChange(Number(e.target.value))}
                                                 aria-label="Digest max items"
-                                                className="w-16 text-[11px] border border-gray-200 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                                                className="w-16 text-[11px] border border-line rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-success"
                                             />
                                         </div>
                                     </div>
@@ -2668,13 +2668,13 @@ export default function Admin() {
                                         <button
                                             onClick={handleToggleMilestoneNotifications}
                                             aria-label="Toggle milestone notifications"
-                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${milestoneNotificationsEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${milestoneNotificationsEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                         >
-                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${milestoneNotificationsEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${milestoneNotificationsEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                         </button>
                                     )}
                                     subline={toggleCounts && (
-                                        <p className="text-[10px] text-gray-500">
+                                        <p className="text-[10px] text-ink-soft">
                                             {toggleCounts.milestones.email} email · {toggleCounts.milestones.push} push enabled
                                             {' '}(of {toggleCounts.total_users} users)
                                         </p>
@@ -2682,24 +2682,24 @@ export default function Admin() {
                                 />
 
                                 {/* Web push */}
-                                <div className="border border-gray-100 p-3 space-y-3">
+                                <div className="border border-card-line p-3 space-y-3">
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">Web push</span>
+                                        <span className="text-[11px] font-semibold text-ink uppercase tracking-wide">Web push</span>
                                         <button
                                             onClick={handleToggleWebpush}
                                             aria-label="Toggle web push"
-                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${webPushEnabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${webPushEnabled ? 'bg-success' : 'bg-gray-300'}`}
                                         >
-                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition ${webPushEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${webPushEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                                         </button>
                                     </div>
-                                    <p className="text-[10px] text-gray-400">Requires VAPID keys configured server-side</p>
-                                    <div className="flex items-center justify-between border-t border-gray-100 pt-2.5">
+                                    <p className="text-[10px] text-muted">Requires VAPID keys configured server-side</p>
+                                    <div className="flex items-center justify-between border-t border-card-line pt-2.5">
                                         <div>
-                                            <span className="text-[11px] font-medium text-gray-700">Registered users</span>
-                                            <p className="text-[10px] text-gray-400">Accounts with at least one active push subscription</p>
+                                            <span className="text-[11px] font-medium text-ink">Registered users</span>
+                                            <p className="text-[10px] text-muted">Accounts with at least one active push subscription</p>
                                         </div>
-                                        <span className="text-[13px] font-semibold text-gray-700">
+                                        <span className="text-[13px] font-semibold text-ink">
                                             {webPushSubscriberCount ?? '—'}
                                         </span>
                                     </div>

@@ -28,15 +28,15 @@ interface ToastContextValue {
 const ToastContext = createContext<ToastContextValue | null>(null);
 
 const VARIANT_STYLES: Record<ToastVariant, string> = {
-    info: 'bg-white border-slate-200 text-slate-900',
-    success: 'bg-white border-emerald-200 text-slate-900',
-    warning: 'bg-white border-amber-200 text-slate-900',
-    error: 'bg-white border-rose-200 text-slate-900',
+    info: 'bg-surface border-line text-ink',
+    success: 'bg-surface border-emerald-200 text-ink',
+    warning: 'bg-surface border-amber-200 text-ink',
+    error: 'bg-surface border-rose-200 text-ink',
 };
 
 const VARIANT_DOT: Record<ToastVariant, string> = {
     info: 'bg-slate-400',
-    success: 'bg-emerald-500',
+    success: 'bg-success',
     warning: 'bg-amber-500',
     error: 'bg-rose-500',
 };
@@ -97,7 +97,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                             <div className="flex-1 min-w-0">
                                 <div className="font-medium leading-tight">{t.title}</div>
                                 {t.message && (
-                                    <div className="text-slate-600 text-xs mt-0.5 break-words">{t.message}</div>
+                                    <div className="text-ink-soft text-xs mt-0.5 break-words">{t.message}</div>
                                 )}
                                 {t.action && (
                                     <button
@@ -114,7 +114,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                             <button
                                 onClick={() => dismiss(t.id)}
                                 aria-label="Dismiss"
-                                className="text-slate-400 hover:text-slate-600 -mr-1 -mt-0.5 text-base leading-none"
+                                className="text-muted hover:text-ink-soft -mr-1 -mt-0.5 text-base leading-none"
                             >
                                 ×
                             </button>

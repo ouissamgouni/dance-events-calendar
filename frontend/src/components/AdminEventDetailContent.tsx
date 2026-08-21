@@ -43,7 +43,7 @@ export function VisibilityOverrideControl({
     return (
         <div className="flex items-center gap-1.5">
             {label && (
-                <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</span>
+                <span className="text-[11px] font-medium uppercase tracking-wide text-ink-soft">{label}</span>
             )}
             <div className="flex">
                 {options.map((opt) => {
@@ -55,8 +55,8 @@ export function VisibilityOverrideControl({
                             disabled={disabled}
                             onClick={() => onChange(opt.val)}
                             className={`px-2 py-0.5 text-[11px] border disabled:opacity-50 ${active
-                                ? 'bg-blue-500 border-blue-500 text-white'
-                                : 'bg-white border-slate-200 text-slate-600 hover:border-blue-500 hover:text-blue-500'
+                                ? 'bg-action border-action text-white'
+                                : 'bg-surface border-line text-ink-soft hover:border-action hover:text-action'
                                 }`}
                         >
                             {opt.label}
@@ -175,7 +175,7 @@ export default function AdminEventDetailContent({
     };
 
     const EditHint = () => (
-        <span className="opacity-0 group-hover:opacity-40 absolute top-0.5 right-0 text-slate-400 text-[10px] pointer-events-none select-none">
+        <span className="opacity-0 group-hover:opacity-40 absolute top-0.5 right-0 text-muted text-[10px] pointer-events-none select-none">
             ✏
         </span>
     );
@@ -195,15 +195,15 @@ export default function AdminEventDetailContent({
     return (
         <div className="space-y-2">
             {/* Calendar + review status (admin-only) */}
-            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                <label className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-canvas px-3 py-2">
+                <label className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-ink-soft">
                     Calendar
                 </label>
                 <select
                     value={event.calendar_id}
                     disabled={saving}
                     onChange={(e) => saveField({ calendar_id: e.target.value })}
-                    className="rounded border border-slate-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
+                    className="rounded border border-line bg-surface px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
                 >
                     {!currentCalendar && (
                         <option value={event.calendar_id}>{event.calendar_id}</option>
@@ -216,19 +216,19 @@ export default function AdminEventDetailContent({
                 </select>
                 {currentCalendar?.color && (
                     <span
-                        className="inline-block h-3 w-3 rounded-full border border-slate-300"
+                        className="inline-block h-3 w-3 rounded-full border border-line"
                         style={{ backgroundColor: currentCalendar.color }}
                         title={currentCalendar.color}
                     />
                 )}
 
                 <div className="ml-auto flex items-center gap-1.5">
-                    <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500">Review</span>
+                    <span className="text-[11px] font-medium uppercase tracking-wide text-ink-soft">Review</span>
                     <select
                         value={event.review_status ?? 'pending'}
                         disabled={saving}
                         onChange={(e) => saveField({ review_status: e.target.value })}
-                        className="rounded border border-slate-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
+                        className="rounded border border-line bg-surface px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
                     >
                         <option value="pending">pending</option>
                         <option value="reviewed">reviewed</option>
@@ -239,8 +239,8 @@ export default function AdminEventDetailContent({
             {/* Date */}
             <div>
                 {editingField === 'datetime' ? (
-                    <div className="space-y-2 rounded-lg bg-slate-50 p-3 border border-slate-200">
-                        <label className="flex items-center gap-2 text-xs text-slate-600">
+                    <div className="space-y-2 rounded-lg bg-canvas p-3 border border-line">
+                        <label className="flex items-center gap-2 text-xs text-ink-soft">
                             <input
                                 type="checkbox"
                                 checked={editAllDay}
@@ -250,22 +250,22 @@ export default function AdminEventDetailContent({
                             All day
                         </label>
                         <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] text-slate-400 uppercase tracking-wide">Start</label>
+                            <label className="text-[10px] text-muted uppercase tracking-wide">Start</label>
                             <input
                                 type={editAllDay ? 'date' : 'datetime-local'}
                                 value={editAllDay ? editStart.slice(0, 10) : editStart}
                                 onChange={(e) => setEditStart(e.target.value)}
-                                className="border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
+                                className="border border-line rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
                             />
-                            <label className="text-[10px] text-slate-400 uppercase tracking-wide">End</label>
+                            <label className="text-[10px] text-muted uppercase tracking-wide">End</label>
                             <input
                                 type={editAllDay ? 'date' : 'datetime-local'}
                                 value={editAllDay ? editEnd.slice(0, 10) : editEnd}
                                 onChange={(e) => setEditEnd(e.target.value)}
-                                className="border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
+                                className="border border-line rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
                             />
                         </div>
-                        {saveError && <p className="text-[10px] text-red-500">{saveError}</p>}
+                        {saveError && <p className="text-[10px] text-danger">{saveError}</p>}
                         <div className="flex gap-2 pt-1">
                             <button
                                 disabled={saving}
@@ -278,16 +278,16 @@ export default function AdminEventDetailContent({
                             >
                                 {saving ? 'Saving…' : 'Save'}
                             </button>
-                            <button onClick={cancelEdit} className="text-[11px] text-slate-500 hover:text-slate-700 px-2">Cancel</button>
+                            <button onClick={cancelEdit} className="text-[11px] text-ink-soft hover:text-ink px-2">Cancel</button>
                         </div>
                     </div>
                 ) : (
                     <div className="flex items-center gap-2 flex-wrap">
                         <div
-                            className="group relative cursor-pointer hover:bg-slate-50 -mx-2 px-2 py-1 rounded transition"
+                            className="group relative cursor-pointer hover:bg-canvas -mx-2 px-2 py-1 rounded transition"
                             onClick={startDatetimeEdit}
                         >
-                            <p className="text-slate-500 text-xs">
+                            <p className="text-ink-soft text-xs">
                                 🗓 {event.all_day
                                     ? formatDate(start)
                                     : `${formatDate(start)} · ${formatTime(start)} – ${formatTime(end)}`}
@@ -295,7 +295,7 @@ export default function AdminEventDetailContent({
                             <EditHint />
                         </div>
                         {event.view_count > 0 && (
-                            <span className="ml-auto inline-flex items-center gap-1 bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                            <span className="ml-auto inline-flex items-center gap-1 bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-ink-soft">
                                 <svg viewBox="0 0 20 20" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
                                     <path d="M2 10s2.5-5 8-5 8 5 8 5-2.5 5-8 5-8-5-8-5Z" strokeLinejoin="round" />
                                     <circle cx="10" cy="10" r="2.25" />
@@ -320,7 +320,7 @@ export default function AdminEventDetailContent({
                             setEditLocationDirty(false);
                         }}
                     />
-                    {saveError && <p className="text-[10px] text-red-500 mt-1">{saveError}</p>}
+                    {saveError && <p className="text-[10px] text-danger mt-1">{saveError}</p>}
                     <div className="flex gap-2">
                         <button
                             disabled={saving}
@@ -334,12 +334,12 @@ export default function AdminEventDetailContent({
                             }}
                             className="text-[11px] font-medium px-2.5 py-1 bg-rose-500 text-white rounded hover:bg-rose-600 disabled:opacity-50 transition"
                         >{saving ? 'Saving…' : 'Save'}</button>
-                        <button onClick={cancelEdit} className="text-[11px] text-slate-500 hover:text-slate-700 px-2">Cancel</button>
+                        <button onClick={cancelEdit} className="text-[11px] text-ink-soft hover:text-ink px-2">Cancel</button>
                     </div>
                 </div>
             ) : event.location ? (
                 <div className="group relative cursor-pointer" onClick={startLocationEdit}>
-                    <p className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 transition">
+                    <p className="flex items-start gap-2 rounded-lg bg-canvas px-3 py-2 text-xs text-ink hover:bg-canvas transition">
                         <span className="mt-0.5 flex items-center gap-1">
                             📍
                             <LocationBadge size="sm" location={event.location} latitude={event.latitude} longitude={event.longitude} />
@@ -367,38 +367,38 @@ export default function AdminEventDetailContent({
                             }}
                             disabled={retryingGeo}
                             title="Retry geocoding"
-                            className="shrink-0 self-start text-[10px] font-medium px-1.5 py-0.5 border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-50 transition"
+                            className="shrink-0 self-start text-[10px] font-medium px-1.5 py-0.5 border border-line bg-surface text-ink-soft hover:bg-canvas disabled:opacity-50 transition"
                         >{retryingGeo ? '…' : retryGeoMsg ?? '↻ Retry geoloc'}</button>
                     </p>
                     <EditHint />
                 </div>
             ) : (
                 <div
-                    className="cursor-pointer text-[11px] text-slate-400 hover:text-slate-600 border border-dashed border-slate-200 rounded-lg px-3 py-2 transition"
+                    className="cursor-pointer text-[11px] text-muted hover:text-ink-soft border border-dashed border-line rounded-lg px-3 py-2 transition"
                     onClick={startLocationEdit}
                 >+ Add location</div>
             )}
 
             {/* Tags (collapsible, auto-saves on toggle) */}
-            <div className="border border-slate-200 rounded-lg bg-slate-50 overflow-hidden">
+            <div className="border border-line rounded-lg bg-canvas overflow-hidden">
                 <button
                     type="button"
                     onClick={() => setTagsExpanded((v) => !v)}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-slate-100 transition"
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-canvas transition"
                 >
-                    <span className="text-slate-400 text-[10px]">{tagsExpanded ? '▾' : '▸'}</span>
-                    <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Tags</span>
+                    <span className="text-muted text-[10px]">{tagsExpanded ? '▾' : '▸'}</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-soft">Tags</span>
                     {!tagsExpanded && event.tags?.length > 0 && (
                         <span className="flex-1 min-w-0">
                             <TagBadges tags={event.tags} maxVisible={event.tags.length} forceBadge forceColored />
                         </span>
                     )}
                     {!tagsExpanded && (!event.tags || event.tags.length === 0) && (
-                        <span className="text-[11px] text-slate-400 italic">none</span>
+                        <span className="text-[11px] text-muted italic">none</span>
                     )}
                 </button>
                 {tagsExpanded && (
-                    <div className="border-t border-slate-200 bg-white max-h-72 overflow-y-auto p-3">
+                    <div className="border-t border-line bg-surface max-h-72 overflow-y-auto p-3">
                         <InlineTagsPicker
                             eventId={event.event_id}
                             currentTags={event.tags || []}
@@ -424,14 +424,14 @@ export default function AdminEventDetailContent({
                         onBlur={() => handleTextBlur('description', editValue)}
                         onKeyDown={(e) => { if (e.key === 'Escape') { cancelledRef.current = true; cancelEdit(); } }}
                         rows={6}
-                        className={`w-full border border-slate-300 rounded p-2 leading-relaxed text-slate-600 resize-y focus:outline-none focus:ring-1 focus:ring-rose-300 ${compact ? 'text-xs' : 'text-sm'}`}
+                        className={`w-full border border-line rounded p-2 leading-relaxed text-ink-soft resize-y focus:outline-none focus:ring-1 focus:ring-rose-300 ${compact ? 'text-xs' : 'text-sm'}`}
                     />
-                    {saving && <p className="text-[10px] text-slate-400 mt-1">Saving…</p>}
-                    {saveError && <p className="text-[10px] text-red-500 mt-1">{saveError}</p>}
+                    {saving && <p className="text-[10px] text-muted mt-1">Saving…</p>}
+                    {saveError && <p className="text-[10px] text-danger mt-1">{saveError}</p>}
                 </div>
             ) : event.description ? (
                 <div
-                    className="group relative cursor-text rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 hover:bg-slate-100 transition"
+                    className="group relative cursor-text rounded-lg border border-line bg-canvas px-3 py-2 hover:bg-canvas transition"
                     onClick={() => startEdit('description', event.description ?? '')}
                 >
                     <ExpandableDescription text={event.description} compact={compact} />
@@ -439,16 +439,16 @@ export default function AdminEventDetailContent({
                 </div>
             ) : (
                 <div
-                    className="cursor-pointer text-[11px] text-slate-400 hover:text-slate-600 border border-dashed border-slate-200 rounded-lg px-3 py-2 transition"
+                    className="cursor-pointer text-[11px] text-muted hover:text-ink-soft border border-dashed border-line rounded-lg px-3 py-2 transition"
                     onClick={() => startEdit('description', '')}
                 >+ Add description</div>
             )}
 
             {/* Links */}
             {editingField === 'links' ? (
-                <div className="space-y-2 border-t border-slate-100 pt-3">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Links</p>
-                    <div className="rounded-lg bg-slate-50 p-3 border border-slate-200 space-y-2">
+                <div className="space-y-2 border-t border-card-line pt-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">Links</p>
+                    <div className="rounded-lg bg-canvas p-3 border border-line space-y-2">
                         {editLinks.map((link, i) => (
                             <div key={i} className="flex gap-1.5">
                                 <input
@@ -456,19 +456,19 @@ export default function AdminEventDetailContent({
                                     value={link.url}
                                     onChange={(e) => setEditLinks((prev) => prev.map((l, j) => j === i ? { ...l, url: e.target.value } : l))}
                                     placeholder="https://…"
-                                    className="flex-1 rounded border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
+                                    className="flex-1 rounded border border-line px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
                                 />
                                 <input
                                     type="text"
                                     value={link.label}
                                     onChange={(e) => setEditLinks((prev) => prev.map((l, j) => j === i ? { ...l, label: e.target.value } : l))}
                                     placeholder="Label"
-                                    className="w-20 rounded border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
+                                    className="w-20 rounded border border-line px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setEditLinks((prev) => prev.filter((_, j) => j !== i))}
-                                    className="text-slate-400 hover:text-red-500 px-1 text-sm leading-none"
+                                    className="text-muted hover:text-danger px-1 text-sm leading-none"
                                 >✕</button>
                             </div>
                         ))}
@@ -476,10 +476,10 @@ export default function AdminEventDetailContent({
                             <button
                                 type="button"
                                 onClick={() => setEditLinks((prev) => [...prev, { url: '', label: '' }])}
-                                className="text-[11px] text-slate-500 hover:text-slate-700"
+                                className="text-[11px] text-ink-soft hover:text-ink"
                             >+ Add link</button>
                         )}
-                        {saveError && <p className="text-[10px] text-red-500">{saveError}</p>}
+                        {saveError && <p className="text-[10px] text-danger">{saveError}</p>}
                         <div className="flex gap-2 pt-1">
                             <button
                                 disabled={saving}
@@ -491,16 +491,16 @@ export default function AdminEventDetailContent({
                                 }}
                                 className="text-[11px] font-medium px-2.5 py-1 bg-rose-500 text-white rounded hover:bg-rose-600 disabled:opacity-50 transition"
                             >{saving ? 'Saving…' : 'Save'}</button>
-                            <button onClick={cancelEdit} className="text-[11px] text-slate-500 hover:text-slate-700 px-2">Cancel</button>
+                            <button onClick={cancelEdit} className="text-[11px] text-ink-soft hover:text-ink px-2">Cancel</button>
                         </div>
                     </div>
                 </div>
             ) : structuredLinks ? (
                 <div
-                    className="space-y-1.5 border-t border-slate-100 pt-3 group relative cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded transition"
+                    className="space-y-1.5 border-t border-card-line pt-3 group relative cursor-pointer hover:bg-canvas -mx-2 px-2 rounded transition"
                     onClick={() => { setEditLinks(structuredLinks.map((l) => ({ url: l.url, label: l.label ?? '' }))); setEditingField('links'); }}
                 >
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Links</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">Links</p>
                     <div className="flex flex-wrap gap-1.5">
                         {structuredLinks.map((link, i) => (
                             <a
@@ -509,7 +509,7 @@ export default function AdminEventDetailContent({
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 transition"
+                                className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-ink hover:bg-canvas transition"
                             >🔗 {link.label || deriveLinkLabel(link.url)}</a>
                         ))}
                     </div>
@@ -517,34 +517,34 @@ export default function AdminEventDetailContent({
                 </div>
             ) : fallbackLinks.length > 0 ? (
                 <div
-                    className="space-y-1.5 border-t border-slate-100 pt-3 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded transition"
+                    className="space-y-1.5 border-t border-card-line pt-3 cursor-pointer hover:bg-canvas -mx-2 px-2 rounded transition"
                     onClick={() => { setEditLinks(fallbackLinks.map((url) => ({ url, label: '' }))); setEditingField('links'); }}
                 >
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Links (from description)</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">Links (from description)</p>
                     {fallbackLinks.map((url) => (
-                        <span key={url} className="block text-slate-600 text-xs truncate">{url}</span>
+                        <span key={url} className="block text-ink-soft text-xs truncate">{url}</span>
                     ))}
                 </div>
             ) : (
                 <div
-                    className="cursor-pointer text-[11px] text-slate-400 hover:text-slate-600 border border-dashed border-slate-200 rounded px-3 py-1.5 transition w-fit"
+                    className="cursor-pointer text-[11px] text-muted hover:text-ink-soft border border-dashed border-line rounded px-3 py-1.5 transition w-fit"
                     onClick={() => { setEditLinks([]); setEditingField('links'); }}
                 >+ Add links</div>
             )}
 
             {/* Price (collapsible: price settings + section visibility override) */}
-            <div className="border border-slate-200 rounded-lg bg-slate-50 overflow-hidden">
+            <div className="border border-line rounded-lg bg-canvas overflow-hidden">
                 <div className="w-full flex items-center gap-2 px-3 py-1.5">
                     <button
                         type="button"
                         onClick={() => setPriceExpanded((v) => !v)}
                         className="flex flex-1 min-w-0 items-center gap-2 text-left hover:opacity-80 transition"
                     >
-                        <span className="text-slate-400 text-[10px]">{priceExpanded ? '▾' : '▸'}</span>
-                        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Price</span>
+                        <span className="text-muted text-[10px]">{priceExpanded ? '▾' : '▸'}</span>
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-soft">Price</span>
                         {!priceExpanded && (
                             event.price_is_free ? (
-                                <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                                <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-success">
                                     Free
                                 </span>
                             ) : event.price_min != null ? (
@@ -554,7 +554,7 @@ export default function AdminEventDetailContent({
                                         : `${event.price_currency ?? ''} ${event.price_min}`}
                                 </span>
                             ) : (
-                                <span className="text-[11px] text-slate-400 italic">not set</span>
+                                <span className="text-[11px] text-muted italic">not set</span>
                             )
                         )}
                     </button>
@@ -565,15 +565,15 @@ export default function AdminEventDetailContent({
                     />
                 </div>
                 {priceExpanded && (
-                    <div className="border-t border-slate-200 bg-white p-3">
+                    <div className="border-t border-line bg-surface p-3">
                         {editingField !== 'price' ? (
                             (event.price_is_free || event.price_min != null) ? (
                                 <div
-                                    className="group relative cursor-pointer hover:bg-slate-50 -mx-2 px-2 py-1 rounded transition flex items-center gap-2 flex-wrap w-fit"
+                                    className="group relative cursor-pointer hover:bg-canvas -mx-2 px-2 py-1 rounded transition flex items-center gap-2 flex-wrap w-fit"
                                     onClick={startPriceEdit}
                                 >
                                     {event.price_is_free && (
-                                        <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                                        <span className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-success">
                                             Free
                                         </span>
                                     )}
@@ -588,13 +588,13 @@ export default function AdminEventDetailContent({
                                 </div>
                             ) : (
                                 <div
-                                    className="cursor-pointer text-[11px] text-slate-400 hover:text-slate-600 border border-dashed border-slate-200 rounded px-3 py-1.5 transition w-fit"
+                                    className="cursor-pointer text-[11px] text-muted hover:text-ink-soft border border-dashed border-line rounded px-3 py-1.5 transition w-fit"
                                     onClick={startPriceEdit}
                                 >+ Add price</div>
                             )
                         ) : (
                             <div className="space-y-2">
-                                <label className="flex items-center gap-2 text-xs text-slate-600">
+                                <label className="flex items-center gap-2 text-xs text-ink-soft">
                                     <input
                                         type="checkbox"
                                         checked={editIsFree}
@@ -610,26 +610,26 @@ export default function AdminEventDetailContent({
                                             placeholder="Min"
                                             value={editPriceMin}
                                             onChange={(e) => setEditPriceMin(e.target.value)}
-                                            className="w-20 border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
+                                            className="w-20 border border-line rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
                                         />
-                                        <span className="text-xs text-slate-400">–</span>
+                                        <span className="text-xs text-muted">–</span>
                                         <input
                                             type="number"
                                             placeholder="Max"
                                             value={editPriceMax}
                                             onChange={(e) => setEditPriceMax(e.target.value)}
-                                            className="w-20 border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
+                                            className="w-20 border border-line rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
                                         />
                                         <input
                                             type="text"
                                             placeholder="EUR"
                                             value={editCurrency}
                                             onChange={(e) => setEditCurrency(e.target.value)}
-                                            className="w-16 border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
+                                            className="w-16 border border-line rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-rose-300"
                                         />
                                     </div>
                                 )}
-                                {saveError && <p className="text-[10px] text-red-500">{saveError}</p>}
+                                {saveError && <p className="text-[10px] text-danger">{saveError}</p>}
                                 <div className="flex gap-2 pt-1">
                                     <button
                                         disabled={saving}
@@ -647,7 +647,7 @@ export default function AdminEventDetailContent({
                                         }}
                                         className="text-[11px] font-medium px-2.5 py-1 bg-rose-500 text-white rounded hover:bg-rose-600 disabled:opacity-50 transition"
                                     >{saving ? 'Saving…' : 'Save'}</button>
-                                    <button onClick={cancelEdit} className="text-[11px] text-slate-500 hover:text-slate-700 px-2">Cancel</button>
+                                    <button onClick={cancelEdit} className="text-[11px] text-ink-soft hover:text-ink px-2">Cancel</button>
                                 </div>
                             </div>
                         )}

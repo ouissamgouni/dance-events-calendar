@@ -558,7 +558,7 @@ export default function OnboardingWizard() {
 
     return (
         <div className="mx-auto max-w-2xl px-4 py-4">
-            <div className="border border-slate-200 bg-white p-3">
+            <div className="border border-line bg-surface p-3">
                 {/* Progress */}
                 <div
                     className="flex items-center gap-1.5"
@@ -571,7 +571,7 @@ export default function OnboardingWizard() {
                     {STEPS.map((k, i) => (
                         <span
                             key={k}
-                            className={`h-1.5 flex-1 transition ${i <= stepIndex ? 'bg-blue-500' : 'bg-slate-200'}`}
+                            className={`h-1.5 flex-1 transition ${i <= stepIndex ? 'bg-action' : 'bg-slate-200'}`}
                         />
                     ))}
                 </div>
@@ -584,20 +584,20 @@ export default function OnboardingWizard() {
                             onClick={goBack}
                             disabled={advancing}
                             aria-label="Back"
-                            className="shrink-0 -ml-1 text-2xl leading-none text-slate-500 hover:text-slate-700 disabled:opacity-50"
+                            className="shrink-0 -ml-1 text-2xl leading-none text-ink-soft hover:text-ink disabled:opacity-50"
                         >
                             ←
                         </button>
                     )}
-                    <h1 className="flex-1 text-base font-semibold text-slate-900">{stepTitle[step]}</h1>
-                    <span className="shrink-0 text-[11px] uppercase tracking-wide text-slate-400">
+                    <h1 className="flex-1 text-base font-semibold text-ink">{stepTitle[step]}</h1>
+                    <span className="shrink-0 text-[11px] uppercase tracking-wide text-muted">
                         Step {stepIndex + 1} of {STEPS.length}
                     </span>
                 </div>
-                <p className="mt-0.5 text-xs text-slate-600">{stepHint[step]}</p>
+                <p className="mt-0.5 text-xs text-ink-soft">{stepHint[step]}</p>
 
                 {error && (
-                    <div className="mt-3 border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                    <div className="mt-3 border border-line bg-canvas px-3 py-2 text-xs text-ink">
                         {error}
                     </div>
                 )}
@@ -607,13 +607,13 @@ export default function OnboardingWizard() {
                     {step === 'styles' && (
                         <>
                             <section>
-                                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
                                     Dance styles
                                 </label>
                                 {tagsLoading ? (
-                                    <p className="text-sm text-slate-400">Loading tags…</p>
+                                    <p className="text-sm text-muted">Loading tags…</p>
                                 ) : !danceGroup ? (
-                                    <p className="text-sm text-slate-500">No dance-style tags are available yet.</p>
+                                    <p className="text-sm text-ink-soft">No dance-style tags are available yet.</p>
                                 ) : (
                                     <TagsPicker
                                         tagGroups={[danceGroup]}
@@ -626,13 +626,13 @@ export default function OnboardingWizard() {
                                 )}
                             </section>
                             <section>
-                                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
                                     Event scale
                                 </label>
                                 {tagsLoading ? (
-                                    <p className="text-sm text-slate-400">Loading…</p>
+                                    <p className="text-sm text-muted">Loading…</p>
                                 ) : !reachGroup ? (
-                                    <p className="text-sm text-slate-500">No reach tags are available yet.</p>
+                                    <p className="text-sm text-ink-soft">No reach tags are available yet.</p>
                                 ) : (
                                     <TagsPicker
                                         tagGroups={[reachGroup]}
@@ -669,22 +669,22 @@ export default function OnboardingWizard() {
                                 <button
                                     type="button"
                                     onClick={() => jumpTo('styles', 'area')}
-                                    className="flex w-full items-center gap-2 border border-slate-200 bg-white px-3 py-1.5 text-left hover:bg-slate-50"
+                                    className="flex w-full items-center gap-2 border border-line bg-surface px-3 py-1.5 text-left hover:bg-canvas"
                                 >
-                                    <IconStyles className="h-4 w-4 shrink-0 text-slate-400" />
+                                    <IconStyles className="h-4 w-4 shrink-0 text-muted" />
                                     <div className="min-w-0 flex-1">
                                         {selectedProfileTags.length > 0 ? (
                                             <TagChips tags={selectedProfileTags} />
                                         ) : (
-                                            <span className="text-xs text-slate-400">No styles yet — tap to choose</span>
+                                            <span className="text-xs text-muted">No styles yet — tap to choose</span>
                                         )}
                                     </div>
-                                    <span className="shrink-0 text-xs font-medium text-blue-600">Edit</span>
+                                    <span className="shrink-0 text-xs font-medium text-action">Edit</span>
                                 </button>
                             )}
                             areaNameControl={(
                                 <div className="flex shrink-0 items-center gap-1.5">
-                                    <label htmlFor="onboarding-area-name" className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                                    <label htmlFor="onboarding-area-name" className="text-[10px] font-medium uppercase tracking-wide text-ink-soft">
                                         Name
                                     </label>
                                     <input
@@ -696,7 +696,7 @@ export default function OnboardingWizard() {
                                         maxLength={10}
                                         placeholder="Area name"
                                         size={10}
-                                        className="w-24 border border-slate-300 bg-white px-1.5 py-1 text-[11px] text-slate-700 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        className="w-24 border border-line bg-surface px-1.5 py-1 text-[11px] text-ink placeholder:text-muted focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
                                     />
                                 </div>
                             )}
@@ -716,13 +716,13 @@ export default function OnboardingWizard() {
                                     }}
                                     placeholder="Search by name or @handle"
                                     aria-label="Search users"
-                                    className="w-full border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
+                                    className="w-full border border-line bg-surface px-3 py-2 text-sm focus:border-blue-400 focus:outline-none"
                                 />
                                 {userSearch.trim().length >= 2 && (
-                                    <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-80 overflow-auto border border-slate-200 bg-white shadow-lg">
-                                        {userSearching && <p className="px-3 py-2 text-xs text-slate-500">Searching…</p>}
+                                    <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-80 overflow-auto border border-line bg-surface shadow-lg">
+                                        {userSearching && <p className="px-3 py-2 text-xs text-ink-soft">Searching…</p>}
                                         {!userSearching && userResults.length === 0 && (
-                                            <p className="px-3 py-2 text-xs text-slate-500">No matches.</p>
+                                            <p className="px-3 py-2 text-xs text-ink-soft">No matches.</p>
                                         )}
                                         {userResults.map((u) => {
                                             const handle = u.handle ?? '';
@@ -732,24 +732,24 @@ export default function OnboardingWizard() {
                                             return (
                                                 <div
                                                     key={handle || u.display_name}
-                                                    className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50"
+                                                    className="flex items-center gap-2 px-3 py-2 hover:bg-canvas"
                                                 >
                                                     <Avatar url={u.avatar_url} size={7} />
                                                     <div className="min-w-0 flex-1">
                                                         <div className="flex items-center gap-1">
-                                                            <span className="truncate text-sm font-medium text-slate-900">
+                                                            <span className="truncate text-sm font-medium text-ink">
                                                                 {u.display_name || `@${handle}`}
                                                             </span>
                                                             {u.is_verified_organizer && (
                                                                 <img src="/orga.png" alt="" title="Verified organizer" className="h-3.5 w-3.5 object-contain" />
                                                             )}
                                                         </div>
-                                                        <div className="truncate text-[11px] text-slate-500">
+                                                        <div className="truncate text-[11px] text-ink-soft">
                                                             @{handle} · {u.subscribers_count} subscriber{u.subscribers_count === 1 ? '' : 's'}
                                                         </div>
                                                     </div>
                                                     {isDone ? (
-                                                        <span className="shrink-0 border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-500">
+                                                        <span className="shrink-0 border border-line bg-canvas px-2 py-1 text-xs font-medium text-ink-soft">
                                                             {status === 'requested' ? 'Requested' : 'Following'}
                                                         </span>
                                                     ) : (
@@ -757,7 +757,7 @@ export default function OnboardingWizard() {
                                                             type="button"
                                                             disabled={!handle || isBusy}
                                                             onClick={() => void followFromSearch(u)}
-                                                            className="shrink-0 border border-blue-500 bg-blue-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                                            className="shrink-0 border border-action bg-action px-2.5 py-1 text-xs font-medium text-white hover:bg-action disabled:cursor-not-allowed disabled:opacity-50"
                                                         >
                                                             {isBusy ? 'Following…' : 'Follow'}
                                                         </button>
@@ -769,11 +769,11 @@ export default function OnboardingWizard() {
                                 )}
                             </div>
                             {followItems === null ? (
-                                <p className="text-sm text-slate-400">Loading suggestions…</p>
+                                <p className="text-sm text-muted">Loading suggestions…</p>
                             ) : followItems.length === 0 ? (
-                                <p className="text-sm text-slate-500">No suggestions yet — search above to find people.</p>
+                                <p className="text-sm text-ink-soft">No suggestions yet — search above to find people.</p>
                             ) : (
-                                <ul className="max-h-64 divide-y divide-slate-100 overflow-y-auto border border-slate-200 bg-white">
+                                <ul className="max-h-64 divide-y divide-slate-100 overflow-y-auto border border-line bg-surface">
                                     {followItems.map((u) => {
                                         const handle = u.handle ?? '';
                                         const status = followStatus[handle] ?? (u.is_followed_by_viewer ? 'followed' : 'idle');
@@ -781,18 +781,18 @@ export default function OnboardingWizard() {
                                         const isBusy = status === 'following' || status === 'unfollowing';
                                         return (
                                             <li key={handle || u.display_name}>
-                                                <div className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-slate-50">
+                                                <div className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-canvas">
                                                     <Avatar url={u.avatar_url} size={7} />
                                                     <div className="min-w-0 flex-1">
                                                         <div className="flex items-center gap-1">
-                                                            <span className="truncate text-sm font-medium text-slate-900">
+                                                            <span className="truncate text-sm font-medium text-ink">
                                                                 {u.display_name || handle}
                                                             </span>
                                                             {u.is_verified_organizer && (
                                                                 <img src="/orga.png" alt="" title="Verified organizer" className="h-3.5 w-3.5 object-contain" />
                                                             )}
                                                         </div>
-                                                        <div className="truncate text-[11px] text-slate-500">@{handle}</div>
+                                                        <div className="truncate text-[11px] text-ink-soft">@{handle}</div>
                                                     </div>
                                                     <button
                                                         type="button"
@@ -802,8 +802,8 @@ export default function OnboardingWizard() {
                                                         className={
                                                             'border px-2.5 py-1 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 ' +
                                                             (isDone
-                                                                ? 'border-blue-500 bg-blue-500 text-white'
-                                                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50')
+                                                                ? 'border-action bg-action text-white'
+                                                                : 'border-line bg-surface text-ink hover:bg-canvas')
                                                         }
                                                     >
                                                         {isBusy
@@ -826,13 +826,13 @@ export default function OnboardingWizard() {
                                 Optional — a separate “near home” profile with its own tighter radius.
                             </p>
                             <section>
-                                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
                                     Dance styles
                                 </label>
                                 {tagsLoading ? (
-                                    <p className="text-sm text-slate-400">Loading tags…</p>
+                                    <p className="text-sm text-muted">Loading tags…</p>
                                 ) : !danceGroup ? (
-                                    <p className="text-sm text-slate-500">No dance-style tags are available yet.</p>
+                                    <p className="text-sm text-ink-soft">No dance-style tags are available yet.</p>
                                 ) : (
                                     <TagsPicker
                                         tagGroups={[danceGroup]}
@@ -846,7 +846,7 @@ export default function OnboardingWizard() {
                                 )}
                             </section>
                             <section>
-                                <label htmlFor="onboarding-local-city" className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                                <label htmlFor="onboarding-local-city" className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
                                     City
                                 </label>
                                 {popularCities.length > 0 && (
@@ -859,8 +859,8 @@ export default function OnboardingWizard() {
                                                 className={
                                                     'shrink-0 whitespace-nowrap border px-2 py-1 text-xs transition ' +
                                                     (cityLabel === c.city
-                                                        ? 'border-blue-500 bg-blue-500 text-white'
-                                                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50')
+                                                        ? 'border-action bg-action text-white'
+                                                        : 'border-line bg-surface text-ink hover:bg-canvas')
                                                 }
                                             >
                                                 {c.city}
@@ -878,10 +878,10 @@ export default function OnboardingWizard() {
                                             onFocus={() => { if (citySuggestions.length > 0) setCitySuggestOpen(true); }}
                                             onBlur={() => window.setTimeout(() => setCitySuggestOpen(false), 150)}
                                             placeholder="Search a city (e.g. Berlin, Lisbon)"
-                                            className="w-full border border-slate-300 px-2 py-1.5 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                            className="w-full border border-line px-2 py-1.5 text-xs focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
                                         />
                                         {citySuggestOpen && citySuggestions.length > 0 && (
-                                            <ul className="absolute left-0 right-0 top-full z-10 mt-1 max-h-56 overflow-auto border border-slate-200 bg-white shadow-sm">
+                                            <ul className="absolute left-0 right-0 top-full z-10 mt-1 max-h-56 overflow-auto border border-line bg-surface shadow-sm">
                                                 {citySuggestions.map((s) => (
                                                     <li key={`${s.latitude},${s.longitude}`}>
                                                         <button
@@ -893,7 +893,7 @@ export default function OnboardingWizard() {
                                                                 setCitySearch(s.display_name);
                                                                 setCitySuggestOpen(false);
                                                             }}
-                                                            className="block w-full truncate px-2 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-100"
+                                                            className="block w-full truncate px-2 py-1.5 text-left text-xs text-ink hover:bg-canvas"
                                                         >
                                                             {s.display_name}
                                                         </button>
@@ -902,14 +902,14 @@ export default function OnboardingWizard() {
                                             </ul>
                                         )}
                                         {citySearching && (
-                                            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-slate-400">…</span>
+                                            <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-muted">…</span>
                                         )}
                                     </div>
                                     <button
                                         type="button"
                                         onClick={handleUseCurrentLocation}
                                         disabled={geoLoading}
-                                        className="shrink-0 whitespace-nowrap border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                        className="shrink-0 whitespace-nowrap border border-line bg-surface px-2 py-1.5 text-xs text-ink hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                         {geoLoading ? 'Locating…' : 'Use my location'}
                                     </button>
@@ -919,21 +919,21 @@ export default function OnboardingWizard() {
                             {pin ? (
                                 <>
                                     <div className="flex items-center justify-between gap-2 text-xs">
-                                        <span className="truncate font-medium text-slate-700">{cityLabel.trim() || 'Selected location'}</span>
+                                        <span className="truncate font-medium text-ink">{cityLabel.trim() || 'Selected location'}</span>
                                         <button
                                             type="button"
                                             onClick={clearLocalLocation}
-                                            className="shrink-0 font-medium text-slate-500 hover:text-slate-700"
+                                            className="shrink-0 font-medium text-ink-soft hover:text-ink"
                                         >
                                             Remove location
                                         </button>
                                     </div>
                                     <section>
                                         <div className="mb-1 flex items-center justify-between gap-3">
-                                            <label htmlFor="onboarding-local-radius" className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                                            <label htmlFor="onboarding-local-radius" className="text-[11px] font-medium uppercase tracking-wide text-ink-soft">
                                                 Radius
                                             </label>
-                                            <span className="text-xs font-medium text-slate-700">{radiusKm} km</span>
+                                            <span className="text-xs font-medium text-ink">{radiusKm} km</span>
                                         </div>
                                         <input
                                             id="onboarding-local-radius"
@@ -947,7 +947,7 @@ export default function OnboardingWizard() {
                                         />
                                     </section>
                                     <section>
-                                        <div className="h-40 w-full overflow-hidden border border-slate-200">
+                                        <div className="h-40 w-full overflow-hidden border border-line">
                                             <MapContainer
                                                 center={[pin.lat, pin.lng]}
                                                 zoom={10}
@@ -973,8 +973,8 @@ export default function OnboardingWizard() {
                                             </MapContainer>
                                         </div>
                                     </section>
-                                    <section className="border border-slate-200 bg-slate-50 p-3">
-                                        <label className="flex items-start gap-2 text-sm text-slate-800">
+                                    <section className="border border-line bg-canvas p-3">
+                                        <label className="flex items-start gap-2 text-sm text-ink">
                                             <input
                                                 type="checkbox"
                                                 checked={localMatchesEnabled}
@@ -983,7 +983,7 @@ export default function OnboardingWizard() {
                                             />
                                             <span>
                                                 <span className="block font-medium">Alert me about near-home matches</span>
-                                                <span className="mt-0.5 block text-xs text-slate-500">
+                                                <span className="mt-0.5 block text-xs text-ink-soft">
                                                     Get an email when a new event matches this local profile.
                                                 </span>
                                             </span>
@@ -991,7 +991,7 @@ export default function OnboardingWizard() {
                                     </section>
                                 </>
                             ) : (
-                                <p className="text-xs text-slate-500">
+                                <p className="text-xs text-ink-soft">
                                     Pick a city or use your location to see the coverage box.
                                 </p>
                             )}
@@ -1002,27 +1002,27 @@ export default function OnboardingWizard() {
                     {step === 'recap' && (
                         <div className="space-y-3">
                             <RecapSection title="Default search profile" onEdit={() => jumpTo('styles')}>
-                                <RecapItem icon={<IconStyles className="h-4 w-4 text-slate-400" />}>
+                                <RecapItem icon={<IconStyles className="h-4 w-4 text-muted" />}>
                                     <TagChips tags={selectedProfileTags} />
                                 </RecapItem>
                                 <div className="flex items-center gap-2">
                                     <div className="min-w-0 flex-1">
                                         <AreaMiniMap area={prefs.area ?? DEFAULT_AREA_BBOX} />
-                                        <span className="mt-1 flex items-center gap-1 text-[11px] text-slate-500">
-                                            <IconPin className="h-3 w-3 shrink-0 text-slate-400" />
+                                        <span className="mt-1 flex items-center gap-1 text-[11px] text-ink-soft">
+                                            <IconPin className="h-3 w-3 shrink-0 text-muted" />
                                             <span className="truncate">{prefs.area?.label ?? DEFAULT_AREA_BBOX.label}</span>
                                         </span>
                                     </div>
-                                    <span className="flex shrink-0 items-center gap-1 text-xs text-slate-800">
-                                        <IconBell className="h-3 w-3 text-slate-400" />
+                                    <span className="flex shrink-0 items-center gap-1 text-xs text-ink">
+                                        <IconBell className="h-3 w-3 text-muted" />
                                         {matchesEnabled ? 'Alerts on' : 'Alerts off'}
                                     </span>
                                 </div>
                             </RecapSection>
 
                             <RecapSection title="Local search profile" onEdit={() => jumpTo('local')}>
-                                <RecapItem icon={<IconPin className="h-4 w-4 text-slate-400" />}>
-                                    <span className="truncate text-xs text-slate-800">
+                                <RecapItem icon={<IconPin className="h-4 w-4 text-muted" />}>
+                                    <span className="truncate text-xs text-ink">
                                         {localCreated
                                             ? `${cityLabel.trim() || 'Local'} · ${radiusKm} km${localMatchesEnabled ? ' · alerts on' : ''}`
                                             : 'Skipped'}
@@ -1036,14 +1036,14 @@ export default function OnboardingWizard() {
                                         {followedUsers.map((u) => (
                                             <div key={u.handle ?? u.display_name} className="flex shrink-0 flex-col items-center gap-0.5" title={u.display_name || `@${u.handle ?? ''}`}>
                                                 <Avatar url={u.avatar_url} size={10} />
-                                                <span className="max-w-[64px] truncate text-[10px] text-slate-500">
+                                                <span className="max-w-[64px] truncate text-[10px] text-ink-soft">
                                                     {u.display_name || `@${u.handle ?? ''}`}
                                                 </span>
                                             </div>
                                         ))}
                                     </div>
                                 ) : (
-                                    <span className="text-sm text-slate-500">None yet</span>
+                                    <span className="text-sm text-ink-soft">None yet</span>
                                 )}
                             </RecapSection>
                         </div>
@@ -1060,7 +1060,7 @@ export default function OnboardingWizard() {
                                 type="button"
                                 onClick={handleSkip}
                                 disabled={advancing}
-                                className="border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="border border-line bg-surface px-4 py-2 text-sm text-ink-soft hover:bg-canvas disabled:cursor-not-allowed disabled:opacity-50"
 
                             >
                                 Skip for now
@@ -1069,7 +1069,7 @@ export default function OnboardingWizard() {
                                 type="button"
                                 onClick={() => void handleContinue()}
                                 disabled={!canContinue}
-                                className="flex-1 bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex-1 bg-action px-4 py-2 text-sm font-medium text-white hover:bg-action disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {advancing ? 'Saving…' : 'Save this profile'}
                             </button>
@@ -1080,7 +1080,7 @@ export default function OnboardingWizard() {
                                 type="button"
                                 onClick={() => void handleContinue()}
                                 disabled={!canContinue}
-                                className="flex-1 bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="flex-1 bg-action px-4 py-2 text-sm font-medium text-white hover:bg-action disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {advancing ? 'Saving…' : step === 'recap' ? 'Start exploring' : returnTo ? 'Done' : 'Continue'}
                             </button>
@@ -1089,7 +1089,7 @@ export default function OnboardingWizard() {
                                     type="button"
                                     onClick={handleSkip}
                                     disabled={advancing}
-                                    className="border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                                    className="border border-line bg-surface px-4 py-2 text-sm text-ink-soft hover:bg-canvas disabled:opacity-50"
                                 >
                                     Skip
                                 </button>
@@ -1128,7 +1128,7 @@ function AreaMiniMap({ area }: { area: PreferredAreaPayload }) {
         [area.max_lat, area.max_lng],
     ];
     return (
-        <div className="h-20 w-full overflow-hidden border border-slate-200">
+        <div className="h-20 w-full overflow-hidden border border-line">
             <MapContainer
                 bounds={bounds}
                 boundsOptions={{ padding: [8, 8] }}
@@ -1149,13 +1149,13 @@ function AreaMiniMap({ area }: { area: PreferredAreaPayload }) {
 
 /** Horizontally-scrollable row of tag chips; never wraps so the recap stays compact. */
 function TagChips({ tags }: { tags: Tag[] }) {
-    if (tags.length === 0) return <span className="text-sm text-slate-500">—</span>;
+    if (tags.length === 0) return <span className="text-sm text-ink-soft">—</span>;
     return (
         <div className="flex flex-nowrap gap-1 overflow-x-auto scrollbar-hide">
             {tags.map((t) => (
                 <span
                     key={t.id}
-                    className="shrink-0 whitespace-nowrap border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-700"
+                    className="shrink-0 whitespace-nowrap border border-line bg-canvas px-1.5 py-0.5 text-[11px] text-ink"
                 >
                     {t.label}
                 </span>
@@ -1166,13 +1166,13 @@ function TagChips({ tags }: { tags: Tag[] }) {
 
 function RecapSection({ title, onEdit, children }: { title: string; onEdit: () => void; children: ReactNode }) {
     return (
-        <div className="border border-slate-200 bg-white px-3 py-2">
+        <div className="border border-line bg-surface px-3 py-2">
             <div className="mb-1.5 flex items-center justify-between gap-3">
-                <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{title}</div>
+                <div className="text-[11px] font-medium uppercase tracking-wide text-ink-soft">{title}</div>
                 <button
                     type="button"
                     onClick={onEdit}
-                    className="shrink-0 text-xs font-medium text-blue-600 hover:text-blue-700"
+                    className="shrink-0 text-xs font-medium text-action hover:text-action"
                 >
                     Edit
                 </button>

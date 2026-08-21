@@ -47,7 +47,7 @@ export default function AreaFilterChip({ state }: AreaFilterChipProps) {
         );
     }
 
-    const prefix = state.kind === 'default' ? '' : 'Your area:';
+    const prefix = state.kind === 'default' ? '' : 'Your profile area:';
     const icon = state.kind === 'default' ? '🧭' : '📍';
 
     return (

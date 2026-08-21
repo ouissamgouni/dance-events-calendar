@@ -145,22 +145,22 @@ export default function CalendarCurationRulesPanel({ calendarId }: Props) {
 
     return (
         <div className="mt-2 pl-6 space-y-2">
-            <p className="text-[10px] text-gray-400">
+            <p className="text-[10px] text-muted">
                 Curation rules — synced events from this calendar are auto-added to each target's
                 Saved/Going list. Targets must be flagged "managed".
             </p>
             {error && (
-                <p className="text-[10px] text-red-600">{error}</p>
+                <p className="text-[10px] text-danger">{error}</p>
             )}
             {loading ? (
-                <p className="text-[10px] text-gray-400">Loading…</p>
+                <p className="text-[10px] text-muted">Loading…</p>
             ) : rules.length === 0 ? (
-                <p className="text-[10px] text-gray-400">No rules yet.</p>
+                <p className="text-[10px] text-muted">No rules yet.</p>
             ) : (
                 <ul className="space-y-1">
                     {rules.map((r) => (
                         <li key={r.id} className="flex items-center gap-2 text-[10px]">
-                            <span className="font-medium text-gray-700 truncate min-w-0">
+                            <span className="font-medium text-ink truncate min-w-0">
                                 @{r.target_handle ?? r.target_user_id.slice(0, 8)}
                             </span>
                             <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200">
@@ -174,7 +174,7 @@ export default function CalendarCurationRulesPanel({ calendarId }: Props) {
                                         e.target.value as '' | AdminBulkEngagementAudience,
                                     )
                                 }
-                                className="text-[10px] border border-gray-200 px-1 py-0.5 bg-white"
+                                className="text-[10px] border border-line px-1 py-0.5 bg-surface"
                                 title="Audience override; empty = target's profile default"
                             >
                                 <option value="">default</option>
@@ -185,15 +185,15 @@ export default function CalendarCurationRulesPanel({ calendarId }: Props) {
                             <button
                                 onClick={() => handleToggle(r)}
                                 className={`text-[10px] font-medium px-2 py-0.5 transition ${r.enabled
-                                    ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                    ? 'bg-emerald-50 text-success hover:bg-emerald-100'
+                                    : 'bg-gray-100 text-muted hover:bg-canvas'
                                     }`}
                             >
                                 {r.enabled ? 'On' : 'Off'}
                             </button>
                             <button
                                 onClick={() => setDeleteRule(r)}
-                                className="text-[10px] text-red-600 hover:text-red-800"
+                                className="text-[10px] text-danger hover:text-red-800"
                                 title="Delete rule"
                             >
                                 ×
@@ -203,11 +203,11 @@ export default function CalendarCurationRulesPanel({ calendarId }: Props) {
                 </ul>
             )}
 
-            <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-gray-100">
+            <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-card-line">
                 <select
                     value={newHandle}
                     onChange={(e) => setNewHandle(e.target.value)}
-                    className="text-[10px] border border-gray-200 px-1 py-0.5 bg-white"
+                    className="text-[10px] border border-line px-1 py-0.5 bg-surface"
                     aria-label="Curator account"
                 >
                     {managedUsers.length === 0 ? (
@@ -221,7 +221,7 @@ export default function CalendarCurationRulesPanel({ calendarId }: Props) {
                 <select
                     value={newKind}
                     onChange={(e) => setNewKind(e.target.value as AdminBulkEngagementKind)}
-                    className="text-[10px] border border-gray-200 px-1 py-0.5 bg-white"
+                    className="text-[10px] border border-line px-1 py-0.5 bg-surface"
                 >
                     <option value="save">Saved</option>
                     <option value="going">Going</option>
@@ -231,7 +231,7 @@ export default function CalendarCurationRulesPanel({ calendarId }: Props) {
                     onChange={(e) =>
                         setNewAudience(e.target.value as '' | AdminBulkEngagementAudience)
                     }
-                    className="text-[10px] border border-gray-200 px-1 py-0.5 bg-white"
+                    className="text-[10px] border border-line px-1 py-0.5 bg-surface"
                 >
                     <option value="">default</option>
                     <option value="public">public</option>
@@ -241,7 +241,7 @@ export default function CalendarCurationRulesPanel({ calendarId }: Props) {
                 <button
                     onClick={handleAdd}
                     disabled={saving || !newHandle.trim()}
-                    className="text-[10px] font-medium px-2 py-0.5 bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50"
+                    className="text-[10px] font-medium px-2 py-0.5 bg-action text-white hover:bg-action disabled:opacity-50"
                 >
                     {saving ? '…' : 'Add'}
                 </button>

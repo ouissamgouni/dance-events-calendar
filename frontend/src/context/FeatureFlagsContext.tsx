@@ -42,6 +42,9 @@ interface FeatureFlags {
     trendingTrailRichEnabled: boolean;
     /** Number of tags to render inline per event card. */
     tagsPerCard: number;
+    /** Experiment: two-line, icon-prefixed filter summary bar with the
+     * Map/Calendar controls pinned to its right. */
+    summaryTwoLineEnabled: boolean;
 }
 
 const defaultFlags: FeatureFlags = {
@@ -67,6 +70,7 @@ const defaultFlags: FeatureFlags = {
     tagBadgeColored: false,
     trendingTrailRichEnabled: false,
     tagsPerCard: 3,
+    summaryTwoLineEnabled: false,
 };
 
 const FeatureFlagsContext = createContext<FeatureFlags>(defaultFlags);
@@ -100,6 +104,7 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     tagBadgeColored: s.tag_badge_colored ?? false,
                     trendingTrailRichEnabled: s.trending_trail_rich_enabled ?? false,
                     tagsPerCard: s.tags_per_card ?? 3,
+                    summaryTwoLineEnabled: s.summary_two_line_enabled ?? false,
                 });
             })
             .catch(() => {

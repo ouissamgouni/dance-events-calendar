@@ -160,14 +160,14 @@ export default function ProfilePage() {
 
     if (loading) {
         return (
-            <div className="max-w-3xl mx-auto p-6 text-slate-500">Loading…</div>
+            <div className="max-w-3xl mx-auto p-6 text-ink-soft">Loading…</div>
         );
     }
 
     if (error || !profile) {
         return (
             <div className="max-w-3xl mx-auto p-6">
-                <div className="border border-slate-200 bg-slate-50 p-4 text-slate-700">
+                <div className="border border-line bg-canvas p-4 text-ink">
                     {error || 'User not found'}
                 </div>
             </div>
@@ -210,7 +210,7 @@ function ProfileHeader({
         month: 'long',
     });
     return (
-        <div className="border border-slate-200 bg-white px-4 py-4 sm:px-5">
+        <div className="border border-line bg-surface px-4 py-4 sm:px-5">
             <div className="flex min-w-0 items-start gap-3 sm:gap-4">
                 <Avatar
                     url={profile.avatar_url}
@@ -220,7 +220,7 @@ function ProfileHeader({
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
-                                <h1 className="truncate text-lg font-semibold leading-tight text-slate-900 sm:text-xl">
+                                <h1 className="truncate text-lg font-semibold leading-tight text-ink sm:text-xl">
                                     {profile.display_name || `@${profile.handle}`}
                                 </h1>
                                 {profile.is_verified_organizer && (
@@ -230,7 +230,7 @@ function ProfileHeader({
                                     <CuratorBadge />
                                 )}
                             </div>
-                            <div className="mt-0.5 text-sm leading-tight text-slate-500">@{profile.handle}</div>
+                            <div className="mt-0.5 text-sm leading-tight text-ink-soft">@{profile.handle}</div>
                         </div>
                         {!profile.is_self && (
                             <div className="flex shrink-0 items-stretch gap-1">
@@ -254,27 +254,27 @@ function ProfileHeader({
                             </div>
                         )}
                     </div>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600">
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-soft">
                         <span>
-                            <strong className="text-slate-900">{profile.followers_count}</strong>{' '}
+                            <strong className="text-ink">{profile.followers_count}</strong>{' '}
                             followers
                         </span>
                         <span>
-                            <strong className="text-slate-900">{profile.following_count}</strong>{' '}
+                            <strong className="text-ink">{profile.following_count}</strong>{' '}
                             following
                         </span>
                         {!profile.is_self && profile.mutual_friend_count > 0 && (
                             <span>
-                                <strong className="text-slate-900">
+                                <strong className="text-ink">
                                     {profile.mutual_friend_count}
                                 </strong>{' '}
                                 mutual friend{profile.mutual_friend_count === 1 ? '' : 's'}
                             </span>
                         )}
-                        <span className="whitespace-nowrap text-slate-400">Joined {memberSince}</span>
+                        <span className="whitespace-nowrap text-muted">Joined {memberSince}</span>
                     </div>
                     {profile.bio && (
-                        <p className="mt-2 text-sm text-slate-700 whitespace-pre-line break-words">
+                        <p className="mt-2 text-sm text-ink whitespace-pre-line break-words">
                             {profile.bio}
                         </p>
                     )}
@@ -290,11 +290,11 @@ function ProfileHeader({
                         !profile.is_self &&
                         (profile.mutual_friends_who_follow ?? 0) > 0 && (
                             <p
-                                className="mt-1.5 inline-block border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-700"
+                                className="mt-1.5 inline-block border border-line bg-canvas px-2 py-1 text-[11px] text-ink"
                                 data-testid="mutual-friends-who-follow-pill"
                             >
                                 Followed by{' '}
-                                <strong className="text-slate-900">
+                                <strong className="text-ink">
                                     {profile.mutual_friends_who_follow}
                                 </strong>{' '}
                                 of your friend{profile.mutual_friends_who_follow === 1 ? '' : 's'}
@@ -333,7 +333,7 @@ function FollowHintBanner({
         message = "They haven't followed back yet — they won't see you as a friend.";
     }
     return (
-        <div className="text-xs text-slate-500 max-w-xs leading-snug">
+        <div className="text-xs text-ink-soft max-w-xs leading-snug">
             {message}
         </div>
     );
@@ -380,8 +380,8 @@ function FollowButton({
     }
     const baseCls = 'shrink-0 px-3.5 py-1.5 text-sm font-medium transition disabled:opacity-50';
     const cls = primary
-        ? `${baseCls} bg-blue-500 text-white hover:bg-blue-600`
-        : `${baseCls} border border-slate-200 bg-white text-slate-700 hover:bg-slate-50`;
+        ? `${baseCls} bg-action text-white hover:bg-action`
+        : `${baseCls} border border-line bg-surface text-ink hover:bg-canvas`;
     return (
         <button type="button" className={cls} onClick={onClick} disabled={busy}>
             {label}
@@ -402,8 +402,8 @@ function NotifyBellToggle({
         ? 'Notifications on — click to mute'
         : 'Notifications muted — click to enable';
     const cls = enabled
-        ? 'shrink-0 px-2 border border-slate-200 bg-white text-blue-500 hover:bg-slate-50 transition disabled:opacity-50 flex items-center justify-center'
-        : 'shrink-0 px-2 border border-slate-200 bg-white text-slate-400 hover:bg-slate-50 transition disabled:opacity-50 flex items-center justify-center';
+        ? 'shrink-0 px-2 border border-line bg-surface text-action hover:bg-canvas transition disabled:opacity-50 flex items-center justify-center'
+        : 'shrink-0 px-2 border border-line bg-surface text-muted hover:bg-canvas transition disabled:opacity-50 flex items-center justify-center';
     return (
         <button
             type="button"
@@ -431,7 +431,7 @@ function NotifyBellToggle({
 function VerifiedBadge() {
     return (
         <span
-            className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs text-blue-700"
+            className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs text-action"
             title="Admin-verified organizer"
         >
             <img
@@ -448,7 +448,7 @@ function VerifiedBadge() {
 function CuratorBadge() {
     return (
         <span
-            className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs text-blue-700"
+            className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs text-action"
             title="Editorial curator"
         >
             <img
@@ -474,7 +474,7 @@ function Avatar({ url, name }: { url: string | null; name: string }) {
     }
     const initial = (name || '?').trim().charAt(0).toUpperCase();
     return (
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-200 text-lg font-semibold text-slate-600">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-200 text-lg font-semibold text-ink-soft">
             {initial}
         </div>
     );
@@ -483,8 +483,8 @@ function Avatar({ url, name }: { url: string | null; name: string }) {
 function SocialLinks({ profile }: { profile: PublicProfile }) {
     if (!profile.instagram_url && !profile.facebook_url) return null;
     return (
-        <div className="border border-slate-200 bg-white p-4">
-            <div className="text-xs uppercase tracking-wide text-slate-500 mb-2">
+        <div className="border border-line bg-surface p-4">
+            <div className="text-xs uppercase tracking-wide text-ink-soft mb-2">
                 Links
             </div>
             <div className="flex flex-wrap gap-2">
@@ -493,7 +493,7 @@ function SocialLinks({ profile }: { profile: PublicProfile }) {
                         href={profile.instagram_url}
                         target="_blank"
                         rel="noopener noreferrer nofollow"
-                        className="text-sm text-blue-600 hover:underline"
+                        className="text-sm text-action hover:underline"
                     >
                         Instagram
                     </a>
@@ -503,13 +503,13 @@ function SocialLinks({ profile }: { profile: PublicProfile }) {
                         href={profile.facebook_url}
                         target="_blank"
                         rel="noopener noreferrer nofollow"
-                        className="text-sm text-blue-600 hover:underline"
+                        className="text-sm text-action hover:underline"
                     >
                         Facebook
                     </a>
                 )}
             </div>
-            <p className="mt-2 text-xs text-slate-400">
+            <p className="mt-2 text-xs text-muted">
                 Links added by the user. Not verified by Movida.
             </p>
         </div>
@@ -562,8 +562,8 @@ function ProfileTabs({ profile }: { profile: PublicProfile }) {
     }
 
     return (
-        <div className="border border-slate-200 bg-white">
-            <div className="flex border-b border-slate-200">
+        <div className="border border-line bg-surface">
+            <div className="flex border-b border-line">
                 {tabs.map((k) => (
                     <button
                         key={k}
@@ -572,8 +572,8 @@ function ProfileTabs({ profile }: { profile: PublicProfile }) {
                         className={
                             'px-4 py-3 text-sm font-medium transition ' +
                             (active === k
-                                ? 'text-blue-600 border-b-2 border-blue-500'
-                                : 'text-slate-500 hover:text-slate-700')
+                                ? 'text-action border-b-2 border-action'
+                                : 'text-ink-soft hover:text-ink')
                         }
                     >
                         {TAB_LABELS[k]}
@@ -610,8 +610,8 @@ function PassportTabContent({ handle }: { handle: string }) {
         return () => { cancelled = true; };
     }, [handle]);
 
-    if (loading && !data) return <div className="text-sm text-slate-500 p-2">Loading…</div>;
-    if (error) return <div className="text-sm text-slate-500 p-2">{error}</div>;
+    if (loading && !data) return <div className="text-sm text-ink-soft p-2">Loading…</div>;
+    if (error) return <div className="text-sm text-ink-soft p-2">{error}</div>;
     if (!data) return null;
     return (
         <PassportView
@@ -644,8 +644,8 @@ function SuggestedTabContent({ handle }: { handle: string }) {
         return () => { cancelled = true; };
     }, [handle]);
 
-    if (loading && !data) return <div className="text-sm text-slate-500 p-2">Loading…</div>;
-    if (error) return <div className="text-sm text-slate-500 p-2">{error}</div>;
+    if (loading && !data) return <div className="text-sm text-ink-soft p-2">Loading…</div>;
+    if (error) return <div className="text-sm text-ink-soft p-2">{error}</div>;
     const items = data?.items ?? [];
     if (items.length === 0) return <EmptyTabState tab="suggested" />;
     return (
@@ -687,8 +687,8 @@ function CalendarTabContent({ handle }: { handle: string }) {
         return all.filter((it) => it.intent === 'saved' || it.intent === 'both');
     }, [data, chip]);
 
-    if (loading && !data) return <div className="text-sm text-slate-500 p-2">Loading…</div>;
-    if (error) return <div className="text-sm text-slate-500 p-2">{error}</div>;
+    if (loading && !data) return <div className="text-sm text-ink-soft p-2">Loading…</div>;
+    if (error) return <div className="text-sm text-ink-soft p-2">{error}</div>;
 
     return (
         <div className="space-y-3">
@@ -701,15 +701,15 @@ function CalendarTabContent({ handle }: { handle: string }) {
                         className={
                             'px-3 py-1 text-xs font-medium border transition ' +
                             (chip === c
-                                ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50')
+                                ? 'border-action bg-blue-50 text-action'
+                                : 'border-line bg-surface text-ink-soft hover:bg-canvas')
                         }
                         aria-pressed={chip === c}
                     >
                         {CALENDAR_CHIP_LABELS[c]}
                     </button>
                 ))}
-                <label className="ml-auto flex items-center gap-2 text-xs text-slate-600 select-none">
+                <label className="ml-auto flex items-center gap-2 text-xs text-ink-soft select-none">
                     <input
                         type="checkbox"
                         className="h-3.5 w-3.5"
@@ -735,9 +735,9 @@ function CalendarTabContent({ handle }: { handle: string }) {
 function ProfileCalendarRow({ item }: { item: ProfileCalendarItem }) {
     const badge =
         item.intent === 'both'
-            ? { label: 'Going · Saved', cls: 'bg-blue-50 text-blue-700' }
+            ? { label: 'Going · Saved', cls: 'bg-blue-50 text-action' }
             : item.intent === 'going'
-                ? { label: 'Going', cls: 'bg-emerald-50 text-emerald-700' }
+                ? { label: 'Going', cls: 'bg-emerald-50 text-success' }
                 : { label: 'Saved', cls: 'bg-amber-50 text-amber-700' };
     const start = new Date(item.event.start);
     const dateLabel = start.toLocaleString(undefined, {
@@ -752,7 +752,7 @@ function ProfileCalendarRow({ item }: { item: ProfileCalendarItem }) {
             <div className="flex items-start justify-between gap-2">
                 <Link
                     to={`/event/${item.event.event_id}`}
-                    className="block text-sm font-medium text-slate-900 hover:text-blue-600 truncate"
+                    className="block text-sm font-medium text-ink hover:text-action truncate"
                 >
                     {item.event.title}
                 </Link>
@@ -770,7 +770,7 @@ function ProfileCalendarRow({ item }: { item: ProfileCalendarItem }) {
                     </span>
                 </div>
             </div>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-ink-soft">
                 {dateLabel}
                 {item.event.location ? ` · ${item.event.location}` : ''}
             </p>
@@ -785,7 +785,7 @@ function EmptyCalendarState({ chip }: { chip: CalendarChip }) {
             : chip === 'saved'
                 ? 'No saved events yet.'
                 : 'No events on this calendar yet.';
-    return <p className="text-sm text-slate-500 p-2">{message}</p>;
+    return <p className="text-sm text-ink-soft p-2">{message}</p>;
 }
 
 function ProfileEventRow({ event }: { event: CalendarEvent }) {
@@ -801,11 +801,11 @@ function ProfileEventRow({ event }: { event: CalendarEvent }) {
         <li className="px-2 py-2">
             <Link
                 to={`/event/${event.event_id}`}
-                className="block text-sm font-medium text-slate-900 hover:text-blue-600 truncate"
+                className="block text-sm font-medium text-ink hover:text-action truncate"
             >
                 {event.title}
             </Link>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-ink-soft">
                 {dateLabel}
                 {event.location ? ` · ${event.location}` : ''}
             </p>
@@ -818,7 +818,7 @@ function EmptyTabState({ tab }: { tab: TabKey }) {
         tab === 'calendar'
             ? 'No events on this calendar yet.'
             : 'No approved suggestions yet.';
-    return <p className="text-sm text-slate-500 p-2">{message}</p>;
+    return <p className="text-sm text-ink-soft p-2">{message}</p>;
 }
 
 function MutualSubscribersLine({
@@ -832,14 +832,14 @@ function MutualSubscribersLine({
     const named = previews.slice(0, 3);
     const remaining = Math.max(0, total - named.length);
     return (
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-ink-soft">
             Subscribed to by{' '}
             {named.map((u, i) => (
                 <span key={u.handle}>
                     {i > 0 ? (i === named.length - 1 && remaining === 0 ? ' and ' : ', ') : ''}
                     <Link
                         to={`/u/${u.handle}`}
-                        className="text-slate-700 hover:text-blue-600"
+                        className="text-ink hover:text-action"
                     >
                         {u.display_name || `@${u.handle}`}
                     </Link>
@@ -848,7 +848,7 @@ function MutualSubscribersLine({
             {remaining > 0 && (
                 <>
                     {' and '}
-                    <span className="text-slate-700">
+                    <span className="text-ink">
                         {remaining} other{remaining === 1 ? '' : 's'}
                     </span>
                 </>
@@ -864,8 +864,8 @@ function PassportTabPlaceholder({ visibility }: { visibility: string }) {
             ? 'This dancer keeps their Dance Passport private.'
             : 'This dancer shares their Dance Passport with friends only. Follow each other to view.';
     return (
-        <div className="text-slate-500">
-            <div className="inline-flex items-center gap-2 text-slate-600">
+        <div className="text-ink-soft">
+            <div className="inline-flex items-center gap-2 text-ink-soft">
                 <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path
                         fillRule="evenodd"
@@ -885,8 +885,8 @@ function PrivateTabPlaceholder({ visibility }: { visibility: 'friends' | 'public
             ? 'Only this user’s friends can see this. Follow each other to view.'
             : 'This user keeps this private.';
     return (
-        <div className="text-slate-500">
-            <div className="inline-flex items-center gap-2 text-slate-600">
+        <div className="text-ink-soft">
+            <div className="inline-flex items-center gap-2 text-ink-soft">
                 <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                     <path
                         fillRule="evenodd"
@@ -897,7 +897,7 @@ function PrivateTabPlaceholder({ visibility }: { visibility: 'friends' | 'public
                 <span>{message}</span>
             </div>
             <div className="mt-3">
-                <Link to="/" className="text-blue-600 hover:underline text-sm">
+                <Link to="/" className="text-action hover:underline text-sm">
                     ← Back to events
                 </Link>
             </div>

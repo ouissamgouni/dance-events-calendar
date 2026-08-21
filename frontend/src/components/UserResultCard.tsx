@@ -52,14 +52,14 @@ export default function UserResultCard({
 }: UserResultCardProps) {
     const isRich = variant === 'rich';
     const baseCls =
-        'flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 w-full text-left ' +
-        (active ? 'bg-slate-50' : '');
+        'flex items-center gap-2 px-3 py-2 text-sm hover:bg-canvas w-full text-left ' +
+        (active ? 'bg-canvas' : '');
 
     const body = (
         <>
             <Avatar url={user.avatar_url} name={user.display_name || user.handle} />
             <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1 text-slate-900 truncate">
+                <div className="flex items-center gap-1 text-ink truncate">
                     <span className="truncate">
                         {user.display_name || `@${user.handle}`}
                     </span>
@@ -82,17 +82,17 @@ export default function UserResultCard({
                         />
                     )}
                     {isRich && user.is_friend && (
-                        <span className="ml-1 px-1 text-[10px] bg-blue-50 text-blue-700 border border-blue-200">
+                        <span className="ml-1 px-1 text-[10px] bg-blue-50 text-action border border-blue-200">
                             Friend
                         </span>
                     )}
                     {isRich && !user.is_friend && user.is_followed_by_viewer && (
-                        <span className="ml-1 px-1 text-[10px] bg-slate-100 text-slate-600 border border-slate-200">
+                        <span className="ml-1 px-1 text-[10px] bg-slate-100 text-ink-soft border border-line">
                             Following
                         </span>
                     )}
                 </div>
-                <div className="text-[11px] text-slate-500 truncate">
+                <div className="text-[11px] text-ink-soft truncate">
                     @{user.handle}
                     {typeof user.subscribers_count === 'number' && (
                         <>
@@ -149,7 +149,7 @@ function Avatar({ url, name }: { url: string | null; name: string }) {
     const initial = (name || '?').trim().charAt(0).toUpperCase();
     return (
         // eslint-disable-next-line no-restricted-syntax -- avatar
-        <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-semibold shrink-0">
+        <div className="w-7 h-7 rounded-full bg-slate-200 text-ink-soft flex items-center justify-center text-xs font-semibold shrink-0">
             {initial}
         </div>
     );

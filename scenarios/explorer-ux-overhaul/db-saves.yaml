@@ -8,3 +8,35 @@ saves:
   - { event_id: evt-ux-011, email: t05@example.com, audience: public }
   - { event_id: evt-ux-020, email: nia@example.com, audience: friends }
   - { event_id: evt-ux-024, email: omar@example.com, audience: friends }
+
+  # ── Interested across the extended 2-year / all-continent dataset ─
+  # "Interested" (saves) by viewer's friends + one-way followees so the
+  # People filter with the "interested" intent surfaces distinct events.
+  - { event_id: evt-ux-030, email: alice@example.com, audience: public }
+  - { event_id: evt-ux-033, email: gina@example.com, audience: friends }
+  - { event_id: evt-ux-034, email: hugo@example.com, audience: public }
+  - { event_id: evt-ux-037, email: emma@example.com, audience: friends }
+  - { event_id: evt-ux-040, email: frank@example.com, audience: public }
+  - { event_id: evt-ux-045, email: nia@example.com, audience: public }
+  - { event_id: evt-ux-048, email: pablo@example.com, audience: public }
+  - { event_id: evt-ux-050, email: quinn@example.com, audience: public }
+  # North America
+  - { event_id: evt-ux-052, email: alice@example.com, audience: friends }
+  - { event_id: evt-ux-053, email: samir@example.com, audience: public }
+  - { event_id: evt-ux-055, email: rita@example.com, audience: public }
+  - { event_id: evt-ux-058, email: emma@example.com, audience: friends }
+  # Asia
+  - { event_id: evt-ux-061, email: hugo@example.com, audience: public }
+  - { event_id: evt-ux-064, email: tara@example.com, audience: public }
+  - { event_id: evt-ux-066, email: s01@example.com, audience: public }
+  # South America
+  - { event_id: evt-ux-067, email: gina@example.com, audience: public }
+  - { event_id: evt-ux-068, email: ulysses@example.com, audience: public }
+  - { event_id: evt-ux-072, email: frank@example.com, audience: friends }
+  # Africa + Oceania
+  - { event_id: evt-ux-074, email: s02@example.com, audience: public }
+  - { event_id: evt-ux-077, email: emma@example.com, audience: public }
+  - { event_id: evt-ux-079, email: nia@example.com, audience: public }
+  # Interested by a one-way followee with a friends-only audience — a
+  # privacy control that viewer should NOT see (viewer isn't their friend).
+  - { event_id: evt-ux-061, email: omar@example.com, audience: friends }

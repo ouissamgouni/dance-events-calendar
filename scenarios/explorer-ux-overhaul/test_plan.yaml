@@ -21,12 +21,18 @@ test_plan:
          controls. The trigger badges the active-filter count and
          the sheet footer shows "Show N events" tied to the live
          count. Desktop (≥ lg) keeps the inline filter stack.
-      5. The map has a fullscreen toggle (⤢ / ×) that promotes the
-         map to a fixed full-viewport surface, and a "Search this
-         area" pill appears at the top of the map whenever the
-         viewer pans / zooms to a custom bounds — clicking it
-         applies that bounds as a session override (cleared via
-         the SummaryBar area chip × or "Clear all").
+      5. The map has a fullscreen toggle (⤴ / ×) on DESKTOP that promotes
+         the map to a fixed full-viewport surface. On mobile/tablet
+         (< lg) the Explorer is timeline-first: a short map miniature
+         sits below the filter chips; tapping it (or the Map icon
+         toggle in the SummaryBar) opens a fullscreen map with a
+         compact "← [Filters] [area]" header and a bottom
+         "View list · N" CTA. A "Search this area" pill appears at the
+         top of the map whenever the viewer pans / zooms to a custom
+         bounds — clicking it applies that bounds as a session override
+         (cleared via the SummaryBar area chip × or "Clear all"). The
+         area is edited via a dedicated area picker sheet reached from
+         the SummaryBar area chip.
       6. The first non-past event card shows a subtle pulse on its
          Save/Going action cluster plus a dismissible blue-50 hint
          panel ("Tap the bookmark to save events to your calendar,
@@ -45,13 +51,28 @@ test_plan:
   preconditions:
     - "Run with: task start:scenario SCENARIO=explorer-ux-overhaul"
     - >
-      Seed (db-events.yaml) has 28 events distributed across Europe,
-      nearby regions, and a few global outliers, plus attendance,
-      saves, follows, and tracking data borrowed from the
-      map-clustering fixture style. ≥ 21 events sit inside the
-      default 3-month window so the Show-more CTA appears immediately;
-      weeks 14–20 include both in-scope European events and global
-      outliers for next-available-events / show-all testing.
+      Seed (db-events.yaml) has ~80 events spanning a rolling 2-year
+      horizon (weeks 0–103) across every continent — Europe-heavy
+      (~55%) with North America, Asia, South America, Africa, Oceania,
+      and the Middle East represented. Events are mostly salsa with
+      reach:international, and carry the production tag taxonomy
+      (dance-style / format / reach / level / venue / scale / misc)
+      copied verbatim into the scenario's tags.yaml. Roughly 60% are
+      paid (price_min/max in region-appropriate currencies) and ~40%
+      are free. Enough events sit inside the default 3-month window so
+      the Show-more CTA appears immediately; later weeks provide
+      next-available-events / show-all and long-horizon testing.
+    - >
+      The social graph is centred on the signed-in user `viewer`
+      (db-follows.yaml): 6 mutual friends (alice, emma, frank, gina,
+      hugo, nia) and 10 one-way followees (omar, pablo, quinn, rita,
+      samir, tara, ulysses, s01–s03). Going (db-attendances.yaml) and
+      interested (db-saves.yaml) records by these people are spread
+      across the global dataset so the People filter's Friends vs
+      Following (and going vs interested) intents surface visibly
+      different event sets. Out-of-graph users (bob, s04/s05, t01–t05)
+      act as controls, and a few friends-only records verify privacy
+      hiding.
     - >
       First run on a clean browser profile — localStorage key
       `explorer.coachmark.saveGoing.shown` MUST be unset so the
@@ -59,7 +80,7 @@ test_plan:
 
   steps:
     - id: 1
-      title: "Default landing: 3-month window, day grouping, Show-more CTA"
+      title: "Default landing: 3-month window, timeline rail, Show-more CTA"
       description: >
         Open / (Home) as an anonymous visitor on a desktop viewport
         (≥ lg, 1280×800). Do not change any filter.
@@ -70,9 +91,10 @@ test_plan:
             - no tag chips, no location chip, no interest chip, no "Clear all" link
               (no removable filters yet),
             - no result-count tail; counts live in the list header.
-        • The EventListPanel renders sticky day headers
-          (data-testid="event-list-day-header") with a count tail
-          "(N)" — e.g. the Friday cluster shows "(3)".
+        • Each EventListPanel card renders a left date rail
+          (data-testid="event-card-rail") with weekday, month and day
+          number plus a dot on a continuous timeline line. There are no
+          sticky day headers (data-testid="event-list-day-header").
         • Exactly 10 cards render; below them a centered
           "Show 10 more" button (data-testid="event-list-show-more")
           is visible. No next-available-events CTA yet.
@@ -151,6 +173,12 @@ test_plan:
         • A "Filters" trigger button is visible above the list
           (square, secondary style) showing the active filter
           content compact enough to sit above the map/list.
+        • The SummaryBar also shows an area chip
+          (data-testid="summary-chip-area") and, on mobile, a Map
+          view toggle icon (data-testid="summary-map-toggle") that
+          opens the fullscreen map. As the bar narrows, tag chips
+          collapse into a "+N" chip and then an "N filters" chip
+          (data-mode="full"/"collapsed"/"minimal").
         • Tapping it opens a bottom-sheet
           (data-testid="filter-sheet") with header "Filters" and a
           close × (aria-label="Close filters").
@@ -168,18 +196,46 @@ test_plan:
         • Pressing Escape OR tapping the backdrop closes the sheet.
           Body scroll is locked while open.
 
+    - id: "5b"
+      title: "Mobile map miniature → fullscreen map → View list"
+      description: >
+        Still at 390×844, look below the filter chips, then tap the map
+        miniature (or the SummaryBar Map toggle). Tap a marker, tap
+        another marker, pan the map, then tap the back arrow.
+      expected: >
+        • A ~120px map miniature sits below the filter chips, above the
+          list; the list is the default view (no List/Map tabs).
+        • Tapping it opens a fullscreen map with a "← [Filters] [area]"
+          sticky header (data-testid="map-fullscreen-header") and a
+          bottom "View list · N" CTA (data-testid="map-view-list"); no
+          preview/toast shows initially.
+        • Tapping a marker shows a compact bottom preview (name, date,
+          location, tags, people going, Save, Details); tapping another
+          pin replaces it; tapping/panning the map dismisses it.
+        • Panning surfaces the "Search this area" pill; committing it
+          refreshes pins + count and the bottom CTA returns to
+          "View list · N".
+        • The back arrow (data-testid="map-fullscreen-back") and the
+          View list CTA return to the previous Explorer list state with
+          filters, area, sorting, and scroll preserved.
+        • Tapping the area chip/label opens the area picker sheet
+          (data-testid="area-sheet") with My area / Anywhere presets and
+          a mini-map bbox selector; Apply is a session override, and
+          "Set as my default area" persists to the profile.
+
     - id: 6
-      title: "Map fullscreen toggle + Search-this-area pill"
+      title: "Map fullscreen toggle (desktop) + Search-this-area pill"
       description: >
         Back on desktop. Locate the map shell
         (data-testid="explorer-map-shell").
       expected: >
-        • A ⤢ toggle (data-testid="explorer-map-fullscreen-toggle"
-          OR "map-fullscreen-toggle", secondary square 8×8) sits
-          top-right of the map. Clicking it sets
-          `data-fullscreen="true"` and the shell becomes
+        • On DESKTOP a ⤴ toggle (data-testid="map-fullscreen-toggle",
+          secondary square 8×8) sits top-right of the map. Clicking it
+          sets `data-fullscreen="true"` and the shell becomes
           `fixed inset-0 z-[8000] bg-white`. Toggle icon flips to
-          ×. Clicking × restores the embedded shell.
+          ×. Clicking × restores the embedded shell. On mobile the
+          entry point is the map miniature / SummaryBar Map toggle
+          instead of this ⤴ button.
         • Pan the map (drag) to New York (lat ~40.76, lng ~-73.99),
           or any city away from the current effective area.
           A "Search this area" pill

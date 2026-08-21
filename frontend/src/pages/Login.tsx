@@ -174,8 +174,8 @@ export default function Login() {
 
     if (loading || authMode === null) {
         return (
-            <div className="flex min-h-screen items-center justify-center bg-slate-50">
-                <p className="text-slate-400">Loading…</p>
+            <div className="flex min-h-screen items-center justify-center bg-canvas">
+                <p className="text-muted">Loading…</p>
             </div>
         );
     }
@@ -187,17 +187,17 @@ export default function Login() {
     ];
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10 sm:py-16">
+        <div className="flex min-h-screen items-center justify-center bg-canvas px-4 py-10 sm:py-16">
             <div className="w-full max-w-md">
-                <div className="border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+                <div className="border border-line bg-surface p-6 shadow-sm sm:p-8">
                     <div className="text-center">
-                        <h1 className="text-2xl font-bold text-slate-900">Sign in to Movida</h1>
-                        <p className="mt-2 text-sm text-slate-500">
+                        <h1 className="text-2xl font-bold text-ink">Sign in to Movida</h1>
+                        <p className="mt-2 text-sm text-ink-soft">
                             Save events, see who’s going, and sync everything across your devices.
                         </p>
                     </div>
 
-                    <ul className="mt-6 space-y-2.5 text-sm text-slate-600">
+                    <ul className="mt-6 space-y-2.5 text-sm text-ink-soft">
                         {benefits.map((benefit) => (
                             <li key={benefit} className="flex items-start gap-2.5">
                                 <svg
@@ -206,7 +206,7 @@ export default function Login() {
                                     stroke="currentColor"
                                     strokeWidth={2}
                                     aria-hidden="true"
-                                    className="mt-0.5 h-4 w-4 flex-none text-blue-500"
+                                    className="mt-0.5 h-4 w-4 flex-none text-action"
                                 >
                                     <path d="M4 10.5 8 14.5 16 5.5" strokeLinecap="round" strokeLinejoin="round" />
                                 </svg>
@@ -227,16 +227,16 @@ export default function Login() {
                                             <button
                                                 key={u.email}
                                                 onClick={() => handleDevLoginAs(u.email, u.name)}
-                                                className="border border-slate-200 bg-white px-4 py-2 text-left text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+                                                className="border border-line bg-surface px-4 py-2 text-left text-sm font-medium text-ink shadow-sm transition hover:bg-canvas"
                                             >
                                                 Sign in as {u.name}
-                                                <span className="ml-2 text-xs text-slate-400">{u.email}</span>
+                                                <span className="ml-2 text-xs text-muted">{u.email}</span>
                                             </button>
                                         ))}
                                     </div>
                                 )}
                                 <form onSubmit={handleCustomDevLogin} className="flex flex-col gap-2">
-                                    <label className="text-xs text-slate-500" htmlFor="dev-email">
+                                    <label className="text-xs text-ink-soft" htmlFor="dev-email">
                                         Or sign in as another email:
                                     </label>
                                     <div className="flex gap-2">
@@ -247,11 +247,11 @@ export default function Login() {
                                             value={customEmail}
                                             onChange={(e) => setCustomEmail(e.target.value)}
                                             placeholder="user@example.com"
-                                            className="flex-1 border border-slate-300 px-3 py-2 text-sm"
+                                            className="flex-1 border border-line px-3 py-2 text-sm"
                                         />
                                         <button
                                             type="submit"
-                                            className="border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+                                            className="border border-line bg-surface px-3 py-2 text-sm font-medium text-ink shadow-sm transition hover:bg-canvas"
                                         >
                                             Sign in
                                         </button>
@@ -263,7 +263,7 @@ export default function Login() {
                             <div ref={buttonRef} className="flex justify-center" />
                         )}
 
-                        <div className="flex items-center gap-3 text-xs text-slate-400">
+                        <div className="flex items-center gap-3 text-xs text-muted">
                             <span className="h-px flex-1 bg-slate-200" />
                             or
                             <span className="h-px flex-1 bg-slate-200" />
@@ -271,7 +271,7 @@ export default function Login() {
 
                         {emailStep === 'email' ? (
                             <form onSubmit={handleSendCode} className="flex flex-col gap-2">
-                                <label className="text-xs font-medium text-slate-500" htmlFor="login-email">
+                                <label className="text-xs font-medium text-ink-soft" htmlFor="login-email">
                                     Sign in with an email code
                                 </label>
                                 <input
@@ -282,12 +282,12 @@ export default function Login() {
                                     value={emailValue}
                                     onChange={(e) => setEmailValue(e.target.value)}
                                     placeholder="you@example.com"
-                                    className="w-full border border-slate-300 px-3 py-2 text-sm"
+                                    className="w-full border border-line px-3 py-2 text-sm"
                                 />
                                 <button
                                     type="submit"
                                     disabled={emailBusy}
-                                    className="w-full bg-blue-500 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="w-full bg-action px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-action disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     {emailBusy ? 'Sending…' : 'Send code'}
                                 </button>
@@ -295,7 +295,7 @@ export default function Login() {
                         ) : (
                             <form onSubmit={handleVerifyCode} className="flex flex-col gap-3">
                                 <div className="flex flex-col gap-1.5">
-                                    <label className="text-xs font-medium text-slate-500" htmlFor="login-code">
+                                    <label className="text-xs font-medium text-ink-soft" htmlFor="login-code">
                                         Enter the 6-digit code
                                     </label>
                                     <input
@@ -310,21 +310,21 @@ export default function Login() {
                                         value={codeValue}
                                         onChange={(e) => setCodeValue(e.target.value.replace(/\D/g, ''))}
                                         placeholder="••••••"
-                                        className="w-full border border-slate-300 px-3 py-2.5 text-center font-mono text-xl tracking-[0.5em]"
+                                        className="w-full border border-line px-3 py-2.5 text-center font-mono text-xl tracking-[0.5em]"
                                     />
                                 </div>
                                 <button
                                     type="submit"
                                     disabled={emailBusy}
-                                    className="w-full bg-blue-500 px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="w-full bg-action px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-action disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                     {emailBusy ? 'Verifying…' : 'Verify & sign in'}
                                 </button>
-                                <div className="flex items-center justify-between text-xs text-slate-500">
+                                <div className="flex items-center justify-between text-xs text-ink-soft">
                                     <button
                                         type="button"
                                         onClick={resetEmailFlow}
-                                        className="underline hover:text-slate-700"
+                                        className="underline hover:text-ink"
                                     >
                                         Use a different email
                                     </button>
@@ -332,14 +332,14 @@ export default function Login() {
                                         type="button"
                                         disabled={emailBusy || resendLeft > 0}
                                         onClick={handleSendCode}
-                                        className="underline hover:text-slate-700 disabled:no-underline disabled:opacity-50"
+                                        className="underline hover:text-ink disabled:no-underline disabled:opacity-50"
                                     >
                                         {resendLeft > 0 ? `Resend in ${resendLeft}s` : 'Resend code'}
                                     </button>
                                 </div>
                             </form>
                         )}
-                        {emailNotice && <p className="text-sm text-slate-600">{emailNotice}</p>}
+                        {emailNotice && <p className="text-sm text-ink-soft">{emailNotice}</p>}
                         {devCode && (
                             <p className="border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
                                 Dev mode: your code is <strong className="font-mono">{devCode}</strong>

@@ -30,7 +30,7 @@ function Avatar({ attendee, size = 'md' }: { attendee: Attendee; size?: 'sm' | '
     return (
         <span
             title={name}
-            className={`${px} rounded-full bg-slate-300 text-slate-700 font-semibold flex items-center justify-center ring-2 ring-white`}
+            className={`${px} rounded-full bg-slate-300 text-ink font-semibold flex items-center justify-center ring-2 ring-white`}
         >
             {initial}
         </span>
@@ -86,7 +86,7 @@ export default function AttendeeList({ eventId, initialSummary, expanded = false
     }, [eventId, expanded, user?.user_id, invalidationKey]);
 
     if (loading && !summary) {
-        return <div ref={containerRef} id="attendees" className="text-xs text-slate-400">Loading attendees…</div>;
+        return <div ref={containerRef} id="attendees" className="text-xs text-muted">Loading attendees…</div>;
     }
     if (error || !summary) {
         return null;
@@ -95,17 +95,17 @@ export default function AttendeeList({ eventId, initialSummary, expanded = false
     // Logged-out: show only total counts + sign-in CTA.
     if (!user) {
         if (summary.total_going === 0 && summary.total_saved === 0) {
-            return <div ref={containerRef} id="attendees" className="text-xs text-slate-500">No interest yet — be the first.</div>;
+            return <div ref={containerRef} id="attendees" className="text-xs text-ink-soft">No interest yet — be the first.</div>;
         }
         return (
-            <div ref={containerRef} id="attendees" className="text-xs text-slate-600 space-y-1">
+            <div ref={containerRef} id="attendees" className="text-xs text-ink-soft space-y-1">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     <span><span className="font-medium">{summary.total_going}</span> going</span>
                     <span className="text-slate-300">·</span>
                     <span><span className="font-medium">{summary.total_saved}</span> saved</span>
                 </div>
                 {summary.total_going > 0 && (
-                    <div className="text-slate-500">Sign in to see who's going.</div>
+                    <div className="text-ink-soft">Sign in to see who's going.</div>
                 )}
             </div>
         );
@@ -120,14 +120,14 @@ export default function AttendeeList({ eventId, initialSummary, expanded = false
 
     return (
         <div ref={containerRef} id="attendees" className="space-y-2 scroll-mt-4">
-            <div className="text-xs text-slate-600 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <div className="text-xs text-ink-soft flex flex-wrap items-center gap-x-2 gap-y-0.5">
                 <span><span className="font-medium">{summary.total_going}</span> going</span>
                 <span className="text-slate-300">·</span>
                 <span><span className="font-medium">{summary.total_saved}</span> saved</span>
             </div>
 
             {attendees.length === 0 ? (
-                <div className="text-[10px] text-slate-500">
+                <div className="text-[10px] text-ink-soft">
                     No one has shared their name yet — be the first by marking yourself going publicly.
                 </div>
             ) : (
@@ -136,7 +136,7 @@ export default function AttendeeList({ eventId, initialSummary, expanded = false
                         const inner = (
                             <>
                                 <Avatar attendee={a} size="sm" />
-                                <span className="text-xs text-slate-800 whitespace-nowrap">
+                                <span className="text-xs text-ink whitespace-nowrap">
                                     {a.display_name ?? 'Attendee'}
                                 </span>
                             </>
@@ -144,12 +144,12 @@ export default function AttendeeList({ eventId, initialSummary, expanded = false
                         return (
                             <li
                                 key={a.user_id}
-                                className="bg-slate-50 rounded-full pl-0.5 pr-2.5 py-0.5"
+                                className="bg-canvas rounded-full pl-0.5 pr-2.5 py-0.5"
                             >
                                 {a.handle ? (
                                     <Link
                                         to={`/u/${a.handle}`}
-                                        className="flex items-center gap-1.5 hover:bg-slate-100 -m-px rounded-full"
+                                        className="flex items-center gap-1.5 hover:bg-canvas -m-px rounded-full"
                                         title={`View @${a.handle}'s profile`}
                                     >
                                         {inner}
@@ -163,7 +163,7 @@ export default function AttendeeList({ eventId, initialSummary, expanded = false
                         );
                     })}
                     {!expanded && hiddenCount > 0 && (
-                        <li className="text-xs text-slate-500">+{hiddenCount} more</li>
+                        <li className="text-xs text-ink-soft">+{hiddenCount} more</li>
                     )}
                     {tooMany && (
                         <li>

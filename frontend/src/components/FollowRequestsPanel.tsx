@@ -88,7 +88,7 @@ export default function FollowRequestsPanel() {
             data-testid="follow-requests-panel"
             className="mb-4 border border-blue-200 bg-blue-50 p-3"
         >
-            <h3 className="text-sm font-semibold text-slate-800 mb-2">
+            <h3 className="text-sm font-semibold text-ink mb-2">
                 Follow requests ({items.length})
             </h3>
             <ul className="space-y-2">
@@ -109,16 +109,16 @@ export default function FollowRequestsPanel() {
                         )}
                         <Link
                             to={`/u/${it.handle}`}
-                            className="flex-1 text-sm text-slate-800 hover:underline"
+                            className="flex-1 text-sm text-ink hover:underline"
                         >
                             {it.display_name || `@${it.handle}`}
-                            <span className="ml-1 text-slate-500">@{it.handle}</span>
+                            <span className="ml-1 text-ink-soft">@{it.handle}</span>
                         </Link>
                         <button
                             type="button"
                             disabled={busy === it.handle}
                             onClick={() => void onApprove(it.handle)}
-                            className="px-2 py-1 text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                            className="px-2 py-1 text-xs font-medium bg-action text-white hover:bg-action-strong disabled:opacity-50"
                             data-testid={`approve-${it.handle}`}
                         >
                             Approve
@@ -127,7 +127,7 @@ export default function FollowRequestsPanel() {
                             type="button"
                             disabled={busy === it.handle}
                             onClick={() => void onDecline(it.handle)}
-                            className="px-2 py-1 text-xs font-medium border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                            className="px-2 py-1 text-xs font-medium border border-line bg-surface text-ink-soft hover:bg-canvas disabled:opacity-50"
                             data-testid={`decline-${it.handle}`}
                         >
                             Decline
@@ -136,7 +136,7 @@ export default function FollowRequestsPanel() {
                 ))}
             </ul>
             {error && (
-                <p className="mt-2 text-xs text-red-600" role="alert">
+                <p className="mt-2 text-xs text-danger" role="alert">
                     {error}
                 </p>
             )}

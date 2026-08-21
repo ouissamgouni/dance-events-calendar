@@ -16,12 +16,12 @@ interface Props {
 function statusBadge(status: string) {
     const colors: Record<string, string> = {
         pending: 'bg-amber-100 text-amber-700',
-        approved: 'bg-emerald-100 text-emerald-700',
-        rejected: 'bg-slate-200 text-slate-700',
+        approved: 'bg-emerald-100 text-success',
+        rejected: 'bg-slate-200 text-ink',
     };
     return (
         <span
-            className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 ${colors[status] ?? 'bg-gray-100 text-gray-600'
+            className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 ${colors[status] ?? 'bg-gray-100 text-ink-soft'
                 }`}
         >
             {status}
@@ -207,7 +207,7 @@ export default function OrganizerClaimSection({ handle }: Props) {
         : 'Become a verified organizer';
 
     return (
-        <section className="rounded-lg border border-slate-200 bg-white p-6 mb-6">
+        <section className="rounded-lg border border-line bg-surface p-6 mb-6">
             <button
                 type="button"
                 onClick={() => setCollapsed((v) => !v)}
@@ -216,19 +216,19 @@ export default function OrganizerClaimSection({ handle }: Props) {
             >
                 <div className="flex items-center gap-2">
                     <span
-                        className={`inline-block text-slate-400 transition-transform ${collapsed ? '' : 'rotate-90'}`}
+                        className={`inline-block text-muted transition-transform ${collapsed ? '' : 'rotate-90'}`}
                         aria-hidden="true"
                     >
                         ▶
                     </span>
-                    <h2 className="text-base text-sm font-semibold text-slate-900">
+                    <h2 className="text-base text-sm font-semibold text-ink">
                         {headerTitle}
                     </h2>
                 </div>
                 <div className="flex items-center gap-1">
                     {(pendingBadgeClaim || pendingEventsClaim) && statusBadge('pending')}
                     {isVerifiedOrganizer && (
-                        <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 bg-emerald-100 text-emerald-700 inline-flex items-center gap-1">
+                        <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 bg-emerald-100 text-success inline-flex items-center gap-1">
                             <img
                                 src="/orga.png"
                                 alt=""
@@ -243,12 +243,12 @@ export default function OrganizerClaimSection({ handle }: Props) {
             {!collapsed && (
                 <>
                     {error && (
-                        <div className="text-xs bg-red-50 border border-red-200 text-red-700 p-2 mb-3">
+                        <div className="text-xs bg-red-50 border border-red-200 text-danger p-2 mb-3">
                             {error}
                         </div>
                     )}
                     {message && (
-                        <div className="text-xs bg-emerald-50 border border-emerald-200 text-emerald-700 p-2 mb-3">
+                        <div className="text-xs bg-emerald-50 border border-emerald-200 text-success p-2 mb-3">
                             {message}
                         </div>
                     )}
@@ -256,7 +256,7 @@ export default function OrganizerClaimSection({ handle }: Props) {
                     {/* Flow A — not yet verified: badge claim form. */}
                     {!isVerifiedOrganizer && (
                         <>
-                            <p className="text-xs text-slate-500 mb-3">
+                            <p className="text-xs text-ink-soft mb-3">
                                 Request the verified-organizer badge. Once approved
                                 you'll be able to claim individual events you
                                 organize.
@@ -279,7 +279,7 @@ export default function OrganizerClaimSection({ handle }: Props) {
                                     <button
                                         disabled={submitting}
                                         onClick={submitBadge}
-                                        className="bg-blue-500 text-white text-xs px-3 py-1.5 hover:bg-blue-600 disabled:opacity-50"
+                                        className="bg-action text-white text-xs px-3 py-1.5 hover:bg-action disabled:opacity-50"
                                     >
                                         {submitting
                                             ? 'Submitting…'
@@ -300,7 +300,7 @@ export default function OrganizerClaimSection({ handle }: Props) {
                     {/* Flow B — already verified: events claim form. */}
                     {isVerifiedOrganizer && (
                         <>
-                            <p className="text-xs text-slate-500 mb-3">
+                            <p className="text-xs text-ink-soft mb-3">
                                 Search the catalogue and pick the events you
                                 organize. On approval, each event will be
                                 attributed to you and added to your public
@@ -317,7 +317,7 @@ export default function OrganizerClaimSection({ handle }: Props) {
 
                             {!pendingEventsClaim && (
                                 <div className="mb-4">
-                                    <div className="text-xs font-medium text-slate-700 mb-1">
+                                    <div className="text-xs font-medium text-ink mb-1">
                                         Find events ({picked.length} picked, max 20)
                                     </div>
                                     <div className="relative">
@@ -326,18 +326,18 @@ export default function OrganizerClaimSection({ handle }: Props) {
                                             value={searchQ}
                                             onChange={(e) => setSearchQ(e.target.value)}
                                             placeholder="Type at least 2 characters…"
-                                            className="w-full text-xs border border-slate-300 px-2 py-1.5 focus:outline-none focus:border-blue-500"
+                                            className="w-full text-xs border border-line px-2 py-1.5 focus:outline-none focus:border-action"
                                         />
                                         {(searching || searchResults.length > 0) && (
-                                            <div className="absolute left-0 right-0 mt-1 z-10 bg-white border border-slate-200 shadow-lg max-h-56 overflow-y-auto">
+                                            <div className="absolute left-0 right-0 mt-1 z-10 bg-surface border border-line shadow-lg max-h-56 overflow-y-auto">
                                                 {searching && (
-                                                    <div className="text-xs text-slate-400 px-2 py-1.5">
+                                                    <div className="text-xs text-muted px-2 py-1.5">
                                                         Searching…
                                                     </div>
                                                 )}
                                                 {!searching &&
                                                     searchResults.length === 0 && (
-                                                        <div className="text-xs text-slate-400 px-2 py-1.5">
+                                                        <div className="text-xs text-muted px-2 py-1.5">
                                                             No matches.
                                                         </div>
                                                     )}
@@ -351,18 +351,18 @@ export default function OrganizerClaimSection({ handle }: Props) {
                                                             key={r.event_id}
                                                             disabled={already || picked.length >= 20}
                                                             onClick={() => pickEvent(r)}
-                                                            className="w-full text-left flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            className="w-full text-left flex items-center gap-2 px-2 py-1.5 hover:bg-canvas disabled:opacity-50 disabled:cursor-not-allowed"
                                                         >
-                                                            <span className="flex-1 text-xs text-slate-700 truncate">
+                                                            <span className="flex-1 text-xs text-ink truncate">
                                                                 {r.title}
                                                             </span>
                                                             {r.start && (
-                                                                <span className="text-[10px] text-slate-400">
+                                                                <span className="text-[10px] text-muted">
                                                                     {new Date(r.start).toLocaleDateString()}
                                                                 </span>
                                                             )}
                                                             {already && (
-                                                                <span className="text-[10px] text-emerald-600">
+                                                                <span className="text-[10px] text-success">
                                                                     added
                                                                 </span>
                                                             )}
@@ -374,24 +374,24 @@ export default function OrganizerClaimSection({ handle }: Props) {
                                     </div>
 
                                     {picked.length > 0 && (
-                                        <ul className="mt-2 border border-slate-200 max-h-48 overflow-y-auto divide-y divide-slate-100">
+                                        <ul className="mt-2 border border-line max-h-48 overflow-y-auto divide-y divide-slate-100">
                                             {picked.map((p) => (
                                                 <li
                                                     key={p.event_id}
                                                     className="flex items-center gap-2 px-2 py-1.5"
                                                 >
-                                                    <span className="flex-1 text-xs text-slate-700 truncate">
+                                                    <span className="flex-1 text-xs text-ink truncate">
                                                         {p.title}
                                                     </span>
                                                     {p.start && (
-                                                        <span className="text-[10px] text-slate-400">
+                                                        <span className="text-[10px] text-muted">
                                                             {new Date(p.start).toLocaleDateString()}
                                                         </span>
                                                     )}
                                                     <button
                                                         type="button"
                                                         onClick={() => removePicked(p.event_id)}
-                                                        className="text-[11px] text-red-600 hover:text-red-700"
+                                                        className="text-[11px] text-danger hover:text-danger"
                                                     >
                                                         Remove
                                                     </button>
@@ -404,7 +404,7 @@ export default function OrganizerClaimSection({ handle }: Props) {
                                         <button
                                             disabled={submitting || picked.length === 0}
                                             onClick={submitEvents}
-                                            className="bg-blue-500 text-white text-xs px-3 py-1.5 hover:bg-blue-600 disabled:opacity-50"
+                                            className="bg-action text-white text-xs px-3 py-1.5 hover:bg-action disabled:opacity-50"
                                         >
                                             {submitting
                                                 ? 'Submitting…'
@@ -417,36 +417,36 @@ export default function OrganizerClaimSection({ handle }: Props) {
                     )}
 
                     {loading && (
-                        <div className="text-xs text-slate-400">Loading…</div>
+                        <div className="text-xs text-muted">Loading…</div>
                     )}
 
                     {claims.length > 0 && (
                         <div>
-                            <div className="text-xs font-medium text-slate-700 mb-1">
+                            <div className="text-xs font-medium text-ink mb-1">
                                 My claims
                             </div>
-                            <ul className="divide-y divide-slate-100 border border-slate-200">
+                            <ul className="divide-y divide-slate-100 border border-line">
                                 {claims.map((c) => (
                                     <li key={c.id} className="p-2">
                                         <div className="flex items-center justify-between gap-2">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 {kindBadge(c.kind)}
                                                 {statusBadge(c.status)}
-                                                <span className="text-[11px] text-slate-500">
+                                                <span className="text-[11px] text-ink-soft">
                                                     {new Date(c.created_at).toLocaleString()}
                                                 </span>
                                             </div>
                                             {c.status === 'pending' && (
                                                 <button
                                                     onClick={() => cancel(c.id)}
-                                                    className="text-[11px] text-red-600 hover:text-red-700"
+                                                    className="text-[11px] text-danger hover:text-danger"
                                                 >
                                                     Cancel
                                                 </button>
                                             )}
                                         </div>
                                         {c.events.length > 0 && (
-                                            <ul className="mt-1 ml-1 text-[11px] text-slate-600">
+                                            <ul className="mt-1 ml-1 text-[11px] text-ink-soft">
                                                 {c.events.map((e) => (
                                                     <li
                                                         key={e.event_id}
@@ -462,7 +462,7 @@ export default function OrganizerClaimSection({ handle }: Props) {
                                             </ul>
                                         )}
                                         {c.admin_notes && (
-                                            <div className="mt-1 text-[11px] italic text-slate-500">
+                                            <div className="mt-1 text-[11px] italic text-ink-soft">
                                                 Admin notes: {c.admin_notes}
                                             </div>
                                         )}

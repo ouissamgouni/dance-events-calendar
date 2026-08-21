@@ -87,10 +87,10 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
         const colors: Record<string, string> = {
             pending: 'bg-amber-50 text-amber-700 border-amber-200',
             approved: 'bg-sky-50 text-sky-700 border-sky-200',
-            rejected: 'bg-slate-100 text-slate-600 border-slate-300',
+            rejected: 'bg-slate-100 text-ink-soft border-line',
         };
         return (
-            <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 border ${colors[status] ?? 'bg-slate-100 text-slate-600 border-slate-300'}`}>
+            <span className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 border ${colors[status] ?? 'bg-slate-100 text-ink-soft border-line'}`}>
                 {status}
             </span>
         );
@@ -102,7 +102,7 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
             onClick={onClose}
         >
             <div
-                className="bg-white shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto border border-slate-200"
+                className="bg-surface shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto border border-line"
                 onClick={(e) => e.stopPropagation()}
                 role="dialog"
                 aria-modal="true"
@@ -111,15 +111,15 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
                 <div className="p-4 space-y-3">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h2 className="text-base font-semibold text-slate-800">Review feedback</h2>
-                            <p className="text-[11px] text-slate-500 mt-0.5">{rating.event_title || rating.event_id}</p>
+                            <h2 className="text-base font-semibold text-ink">Review feedback</h2>
+                            <p className="text-[11px] text-ink-soft mt-0.5">{rating.event_title || rating.event_id}</p>
                         </div>
                         <div className="flex items-center gap-2">
                             {statusBadge(rating.comment_status)}
                             <button
                                 onClick={onClose}
                                 aria-label="Close"
-                                className="text-slate-400 hover:text-slate-600 text-xl leading-none"
+                                className="text-muted hover:text-ink-soft text-xl leading-none"
                             >
                                 ×
                             </button>
@@ -129,13 +129,13 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
                     {/* Overall sentiment */}
                     <div className="flex items-center gap-2">
                         {rating.overall_sentiment && (
-                            <span className="text-sm text-slate-700">
+                            <span className="text-sm text-ink">
                                 {SENTIMENT_META[rating.overall_sentiment].emoji}{' '}
                                 {SENTIMENT_META[rating.overall_sentiment].label}
                             </span>
                         )}
                         {rating.status === 'rejected' && (
-                            <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 border border-slate-300 bg-slate-100 text-slate-600">
+                            <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 border border-line bg-slate-100 text-ink-soft">
                                 review hidden
                             </span>
                         )}
@@ -149,10 +149,10 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
                     {/* Aspect ratings */}
                     {Object.keys(rating.aspect_scores).length > 0 && (
                         <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Aspect ratings</label>
+                            <label className="block text-xs font-medium text-ink-soft mb-1">Aspect ratings</label>
                             <div className="flex flex-wrap gap-1.5">
                                 {Object.entries(rating.aspect_scores).map(([slug, score]) => (
-                                    <span key={slug} className="px-1.5 py-0.5 text-[10px] bg-slate-50 text-slate-700 border border-slate-200">
+                                    <span key={slug} className="px-1.5 py-0.5 text-[10px] bg-canvas text-ink border border-line">
                                         {slug}: {score}/5
                                     </span>
                                 ))}
@@ -163,10 +163,10 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
                     {/* Comment */}
                     {rating.comment && (
                         <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">
-                                Comment <span className="font-normal text-slate-400">({rating.comment_status})</span>
+                            <label className="block text-xs font-medium text-ink-soft mb-1">
+                                Comment <span className="font-normal text-muted">({rating.comment_status})</span>
                             </label>
-                            <p className="text-xs text-slate-800 bg-slate-50 border border-slate-200 p-2 whitespace-pre-wrap">
+                            <p className="text-xs text-ink bg-canvas border border-line p-2 whitespace-pre-wrap">
                                 {rating.comment}
                             </p>
                         </div>
@@ -175,12 +175,12 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
                     {/* Aspect + audience tags */}
                     {(rating.aspect_tags.length > 0 || rating.audience_tags.length > 0) && (
                         <div>
-                            <label className="block text-xs font-medium text-slate-600 mb-1">Tags</label>
+                            <label className="block text-xs font-medium text-ink-soft mb-1">Tags</label>
                             <div className="flex flex-wrap gap-1">
                                 {rating.aspect_tags.map((t) => (
                                     <span
                                         key={`a-${t.id}`}
-                                        className={`px-1.5 py-0.5 text-[10px] border ${t.polarity === 'negative' ? 'bg-slate-100 text-slate-600 border-slate-300' : 'bg-sky-50 text-sky-700 border-sky-200'}`}
+                                        className={`px-1.5 py-0.5 text-[10px] border ${t.polarity === 'negative' ? 'bg-slate-100 text-ink-soft border-line' : 'bg-sky-50 text-sky-700 border-sky-200'}`}
                                     >
                                         {t.label}
                                     </span>
@@ -188,7 +188,7 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
                                 {rating.audience_tags.map((t) => (
                                     <span
                                         key={`u-${t.id}`}
-                                        className="px-1.5 py-0.5 text-[10px] bg-white text-slate-600 border border-slate-300"
+                                        className="px-1.5 py-0.5 text-[10px] bg-surface text-ink-soft border border-line"
                                     >
                                         {t.label}
                                     </span>
@@ -198,28 +198,28 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
                     )}
 
                     {/* Reviewer */}
-                    <div className="text-xs text-slate-600 grid grid-cols-2 gap-1">
+                    <div className="text-xs text-ink-soft grid grid-cols-2 gap-1">
                         <div>
-                            <span className="text-slate-400">Reviewer:</span>{' '}
+                            <span className="text-muted">Reviewer:</span>{' '}
                             {rating.is_anonymous ? 'Anonymous' : (rating.user_email || rating.user_display_name || 'Unknown')}
                         </div>
                         <div>
-                            <span className="text-slate-400">Submitted:</span>{' '}
+                            <span className="text-muted">Submitted:</span>{' '}
                             {new Date(rating.created_at).toLocaleString()}
                         </div>
                         {rating.submitter_country && (
                             <div>
-                                <span className="text-slate-400">Country:</span> {rating.submitter_country}
+                                <span className="text-muted">Country:</span> {rating.submitter_country}
                             </div>
                         )}
                         {rating.submitter_ip && (
                             <div>
-                                <span className="text-slate-400">IP:</span> <span className="font-mono">{rating.submitter_ip}</span>
+                                <span className="text-muted">IP:</span> <span className="font-mono">{rating.submitter_ip}</span>
                             </div>
                         )}
                         {rating.submitter_user_agent && (
                             <div className="col-span-2 truncate">
-                                <span className="text-slate-400">UA:</span>{' '}
+                                <span className="text-muted">UA:</span>{' '}
                                 <span className="font-mono text-[10px]">{rating.submitter_user_agent}</span>
                             </div>
                         )}
@@ -227,17 +227,17 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
 
                     {/* Admin notes */}
                     <div>
-                        <label className="block text-xs font-medium text-slate-600 mb-1">Admin notes</label>
+                        <label className="block text-xs font-medium text-ink-soft mb-1">Admin notes</label>
                         <textarea
                             value={adminNotes}
                             onChange={(e) => setAdminNotes(e.target.value)}
                             rows={2}
                             placeholder="Optional notes…"
-                            className="w-full border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-sky-400"
+                            className="w-full border border-line px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-sky-400"
                         />
                     </div>
 
-                    {error && <p className="text-xs text-slate-700">{error}</p>}
+                    {error && <p className="text-xs text-ink">{error}</p>}
 
                     {/* Actions */}
                     <div className="flex gap-2">
@@ -251,13 +251,13 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
                         <button
                             onClick={handleReject}
                             disabled={submitting || rating.comment_status === 'rejected'}
-                            className="flex-1 border border-slate-300 text-slate-700 text-xs px-3 py-1.5 hover:bg-slate-50 disabled:opacity-50"
+                            className="flex-1 border border-line text-ink text-xs px-3 py-1.5 hover:bg-canvas disabled:opacity-50"
                         >
                             Reject comment
                         </button>
                         <button
                             onClick={onClose}
-                            className="border border-slate-300 text-slate-600 text-xs px-3 py-1.5 hover:bg-slate-50"
+                            className="border border-line text-ink-soft text-xs px-3 py-1.5 hover:bg-canvas"
                         >
                             Close
                         </button>
@@ -266,15 +266,15 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
                     {/* Linked tag suggestions */}
                     {rating.linked_tag_suggestion_ids.length > 0 && (
                         <div className="border-t pt-3">
-                            <h3 className="text-xs font-semibold text-slate-700 mb-2">
+                            <h3 className="text-xs font-semibold text-ink mb-2">
                                 Linked tag suggestions ({rating.linked_tag_suggestion_ids.length})
                             </h3>
                             {loadingLinked ? (
-                                <p className="text-[11px] text-slate-400">Loading…</p>
+                                <p className="text-[11px] text-muted">Loading…</p>
                             ) : (
                                 <ul className="space-y-2">
                                     {linked.map((s) => (
-                                        <li key={s.id} className="border border-slate-200 bg-slate-50 p-2 text-xs">
+                                        <li key={s.id} className="border border-line bg-canvas p-2 text-xs">
                                             <div className="flex items-center justify-between gap-2">
                                                 <div className="flex-1 min-w-0">
                                                     {s.tag ? (
@@ -282,7 +282,7 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
                                                             {s.tag.group_label}: {s.tag.label}
                                                         </span>
                                                     ) : s.free_text ? (
-                                                        <span className="italic text-slate-500">&ldquo;{s.free_text}&rdquo;</span>
+                                                        <span className="italic text-ink-soft">&ldquo;{s.free_text}&rdquo;</span>
                                                     ) : null}
                                                 </div>
                                                 {statusBadge(s.status)}
@@ -299,7 +299,7 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
                                                     )}
                                                     <button
                                                         onClick={() => handleRejectSuggestion(s.id)}
-                                                        className="border border-slate-300 text-slate-700 px-2 py-0.5 text-[10px] hover:bg-slate-50"
+                                                        className="border border-line text-ink px-2 py-0.5 text-[10px] hover:bg-canvas"
                                                     >
                                                         Reject
                                                     </button>

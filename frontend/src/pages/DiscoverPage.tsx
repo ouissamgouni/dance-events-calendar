@@ -93,8 +93,8 @@ export default function DiscoverPage() {
     return (
         <div className="max-w-3xl mx-auto p-6 space-y-8">
             <div>
-                <h1 className="text-xl font-semibold text-slate-900">Discover people</h1>
-                <p className="text-sm text-slate-500 mt-1">
+                <h1 className="text-xl font-semibold text-ink">Discover people</h1>
+                <p className="text-sm text-ink-soft mt-1">
                     Find dancers, organizers, and venues to follow.
                 </p>
             </div>
@@ -106,38 +106,38 @@ export default function DiscoverPage() {
                     onChange={(e) => setQ(e.target.value)}
                     placeholder="Search by name or handle…"
                     autoFocus
-                    className="w-full text-sm border border-slate-200 px-3 py-2 focus:outline-none focus:border-blue-500"
+                    className="w-full text-sm border border-line px-3 py-2 focus:outline-none focus:border-action"
                 />
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="mt-2 text-xs text-ink-soft">
                     Can’t find them?{' '}
                     <Link
                         to="/invite"
-                        className="font-semibold text-blue-600 hover:text-blue-700"
+                        className="font-semibold text-action hover:text-action"
                     >
                         Invite a friend →
                     </Link>
                 </p>
                 <div className="mt-4">
                     {trimmedQ.length === 0 ? null : trimmedQ.length < 2 ? (
-                        <p className="text-xs text-slate-500">
+                        <p className="text-xs text-ink-soft">
                             Type at least two characters to search.
                         </p>
                     ) : loading ? (
-                        <p className="text-sm text-slate-500">Searching…</p>
+                        <p className="text-sm text-ink-soft">Searching…</p>
                     ) : error ? (
-                        <p className="text-sm text-red-600">{error}</p>
+                        <p className="text-sm text-danger">{error}</p>
                     ) : !results || results.length === 0 ? (
                         <div className="space-y-3">
-                            <p className="text-sm text-slate-500">
+                            <p className="text-sm text-ink-soft">
                                 No users match “{trimmedQ}”.
                             </p>
                             {(curatorsLoading || curatorResults.length > 0) && (
                                 <section>
-                                    <h2 className="text-xs font-semibold text-slate-700 uppercase mb-2">
+                                    <h2 className="text-xs font-semibold text-ink uppercase mb-2">
                                         Suggestions
                                     </h2>
                                     {curatorsLoading ? (
-                                        <p className="text-sm text-slate-500">Loading…</p>
+                                        <p className="text-sm text-ink-soft">Loading…</p>
                                     ) : (
                                         <UserGrid users={curatorResults} />
                                     )}
@@ -158,13 +158,13 @@ export default function DiscoverPage() {
 
 function AnonDiscoverHint() {
     return (
-        <section className="border border-slate-200 bg-slate-50 p-3 flex items-center justify-between gap-3">
-            <p className="text-sm text-slate-600">
+        <section className="border border-line bg-canvas p-3 flex items-center justify-between gap-3">
+            <p className="text-sm text-ink-soft">
                 Sign in to see more people from your network.
             </p>
             <Link
                 to="/login"
-                className="bg-blue-500 text-white hover:bg-blue-600 px-3 py-1 text-xs font-semibold"
+                className="bg-action text-white hover:bg-action px-3 py-1 text-xs font-semibold"
             >
                 Sign in
             </Link>
@@ -247,13 +247,13 @@ function DefaultDiscoverSections() {
     const suggestions = suggestedUsers ?? [];
 
     if (loading) {
-        return <p className="text-sm text-slate-500">Loading suggestions…</p>;
+        return <p className="text-sm text-ink-soft">Loading suggestions…</p>;
     }
 
     if (suggestions.length === 0) {
         return (
-            <section className="border border-slate-200 bg-slate-50 p-3">
-                <p className="text-sm text-slate-600">
+            <section className="border border-line bg-canvas p-3">
+                <p className="text-sm text-ink-soft">
                     Search by name or handle, or check the suggested people if any.
                 </p>
 
@@ -268,7 +268,7 @@ function DefaultDiscoverSections() {
         <div className="space-y-6">
             <section>
                 <div className="mb-2 flex items-center justify-between gap-2">
-                    <h2 className="text-base font-semibold text-slate-900">
+                    <h2 className="text-base font-semibold text-ink">
                         Suggestions
                     </h2>
                     {canShuffle && (
@@ -276,13 +276,13 @@ function DefaultDiscoverSections() {
                             type="button"
                             onClick={() => void handleShuffle()}
                             disabled={busy}
-                            className="text-xs font-semibold text-blue-600 hover:text-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="text-xs font-semibold text-action hover:text-action disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             Shuffle
                         </button>
                     )}
                 </div>
-                <p className="text-xs text-slate-500 mb-3">
+                <p className="text-xs text-ink-soft mb-3">
                     People followed by your network and curated accounts you may want to follow.
                 </p>
                 <UserGrid
@@ -295,7 +295,7 @@ function DefaultDiscoverSections() {
                         type="button"
                         onClick={() => void handleShowMore()}
                         disabled={busy}
-                        className="mt-4 w-full border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="mt-4 w-full border border-line px-3 py-1.5 text-xs font-medium text-ink hover:bg-canvas disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {busy ? 'Loading…' : 'Show more'}
                     </button>
@@ -321,13 +321,13 @@ function UserGrid({
             {users.map((u) => (
                 <li
                     key={u.handle}
-                    className="border border-slate-200 bg-white p-3 flex items-center gap-3"
+                    className="border border-line bg-surface p-3 flex items-center gap-3"
                 >
                     <Avatar url={u.avatar_url} name={u.display_name || u.handle} />
                     <div className="min-w-0 flex-1">
                         <Link
                             to={`/u/${u.handle}`}
-                            className="block text-sm font-medium text-slate-900 hover:text-blue-600 truncate"
+                            className="block text-sm font-medium text-ink hover:text-action truncate"
                         >
                             {u.display_name || `@${u.handle}`}
                             {u.is_verified_organizer && (
@@ -357,7 +357,7 @@ function UserGrid({
                             onClick={() => onFollow(u.handle)}
                             disabled={pendingFollow === u.handle}
                             aria-label={`Follow ${u.handle}`}
-                            className="bg-blue-500 px-3 py-1 text-xs font-medium text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                            className="bg-action px-3 py-1 text-xs font-medium text-white hover:bg-action disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                         >
                             {pendingFollow === u.handle ? '…' : 'Follow'}
                         </button>
@@ -374,16 +374,16 @@ function UserMeta({ user }: { user: DiscoverUser }) {
     return (
         <div className="min-w-0">
             {previewHead && (
-                <div className="text-xs text-slate-500 truncate">
+                <div className="text-xs text-ink-soft truncate">
                     Followed by @{previewHead}
                     {previewRest > 0 && ` + ${previewRest} more`}
                 </div>
             )}
-            <div className="text-xs text-slate-500 truncate">
+            <div className="text-xs text-ink-soft truncate">
                 @{user.handle} · {user.subscribers_count} subscriber
                 {user.subscribers_count === 1 ? '' : 's'}
                 {user.is_subscribed && (
-                    <span className="ml-1 text-emerald-600">
+                    <span className="ml-1 text-success">
                         · subscribed
                     </span>
                 )}
@@ -404,7 +404,7 @@ function Avatar({ url, name }: { url: string | null; name: string }) {
     }
     const initial = (name || '?').trim().charAt(0).toUpperCase();
     return (
-        <div className="w-10 h-10 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-sm font-semibold shrink-0">  {/* eslint-disable-line no-restricted-syntax -- avatar */}
+        <div className="w-10 h-10 rounded-full bg-slate-200 text-ink-soft flex items-center justify-center text-sm font-semibold shrink-0">  {/* eslint-disable-line no-restricted-syntax -- avatar */}
             {initial}
         </div>
     );

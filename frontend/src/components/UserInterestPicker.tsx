@@ -192,9 +192,9 @@ export default function UserInterestPicker({ onPick, onClose }: Props) {
     return (
         <div
             ref={containerRef}
-            className="absolute z-50 mt-1 w-72 max-w-[calc(100vw-1rem)] bg-white border border-slate-200 shadow-lg"
+            className="absolute z-50 mt-1 w-72 max-w-[calc(100vw-1rem)] bg-surface border border-line shadow-lg"
         >
-            <div className="p-2 border-b border-slate-100">
+            <div className="p-2 border-b border-card-line">
                 <input
                     ref={inputRef}
                     type="search"
@@ -203,15 +203,15 @@ export default function UserInterestPicker({ onPick, onClose }: Props) {
                     onKeyDown={onKeyDown}
                     placeholder="Search people you follow…"
                     aria-label="Search people you follow"
-                    className="w-full text-xs px-2 py-1 border border-slate-200 focus:outline-none focus:border-blue-500"
+                    className="w-full text-xs px-2 py-1 border border-line focus:outline-none focus:border-action"
                 />
             </div>
             <div className="max-h-80 overflow-auto">
                 {loading && (
-                    <div className="p-3 text-xs text-slate-500">Loading…</div>
+                    <div className="p-3 text-xs text-ink-soft">Loading…</div>
                 )}
                 {!loading && rows.length === 0 && suggestions.length === 0 && (
-                    <div className="p-3 text-xs text-slate-500">
+                    <div className="p-3 text-xs text-ink-soft">
                         {debounced.trim().length >= 2
                             ? `No users match “${debounced.trim()}”.`
                             : "You're not following anyone yet."}
@@ -234,7 +234,7 @@ export default function UserInterestPicker({ onPick, onClose }: Props) {
                                             e.stopPropagation();
                                             void handleFollow(u.handle);
                                         }}
-                                        className="px-2 py-0.5 text-[11px] bg-blue-500 text-white border border-blue-500 hover:bg-blue-600"
+                                        className="px-2 py-0.5 text-[11px] bg-action text-white border border-action hover:bg-action"
                                     >
                                         Follow
                                     </button>
@@ -244,11 +244,11 @@ export default function UserInterestPicker({ onPick, onClose }: Props) {
                     ))}
                 {!loading && rows.length === 0 && suggestions.length > 0 && (
                     <>
-                        <div className="px-3 pt-3 pb-1 border-t border-slate-100">
-                            <div className="text-[11px] font-semibold text-slate-700 uppercase">
+                        <div className="px-3 pt-3 pb-1 border-t border-card-line">
+                            <div className="text-[11px] font-semibold text-ink uppercase">
                                 Suggestions
                             </div>
-                            <div className="text-[11px] text-slate-500">
+                            <div className="text-[11px] text-ink-soft">
                                 Curators you can follow
                             </div>
                         </div>
@@ -268,7 +268,7 @@ export default function UserInterestPicker({ onPick, onClose }: Props) {
                                                 e.stopPropagation();
                                                 void handleFollow(u.handle);
                                             }}
-                                            className="px-2 py-0.5 text-[11px] bg-blue-500 text-white border border-blue-500 hover:bg-blue-600"
+                                            className="px-2 py-0.5 text-[11px] bg-action text-white border border-action hover:bg-action"
                                         >
                                             Follow
                                         </button>

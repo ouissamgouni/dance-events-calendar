@@ -49,7 +49,7 @@ export default function MySubscribersBadge({
                 onClick={() => setOpen(true)}
                 className={
                     className ??
-                    'inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-700 hover:text-blue-700 hover:bg-slate-100 transition'
+                    'inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-ink hover:text-action hover:bg-canvas transition'
                 }
                 aria-label={`See ${count} subscriber${count === 1 ? '' : 's'} to your calendar`}
                 title="See who subscribed to your calendar"
@@ -136,17 +136,17 @@ function SubscribersModal({
             onClick={onClose}
         >
             <div
-                className="w-full max-w-md bg-white rounded-lg shadow-xl overflow-hidden"
+                className="w-full max-w-md bg-surface rounded-lg shadow-xl overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-                    <h3 className="text-sm font-semibold text-slate-900">
+                <div className="flex items-center justify-between border-b border-line px-4 py-3">
+                    <h3 className="text-sm font-semibold text-ink">
                         Subscribers to my calendar
                     </h3>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="text-slate-400 hover:text-slate-700 text-xl leading-none"
+                        className="text-muted hover:text-ink text-xl leading-none"
                         aria-label="Close"
                     >
                         ×
@@ -154,11 +154,11 @@ function SubscribersModal({
                 </div>
                 <div className="max-h-[60vh] overflow-y-auto">
                     {error ? (
-                        <p className="p-4 text-sm text-red-700">{error}</p>
+                        <p className="p-4 text-sm text-danger">{error}</p>
                     ) : items === null ? (
-                        <p className="p-4 text-sm text-slate-500">Loading…</p>
+                        <p className="p-4 text-sm text-ink-soft">Loading…</p>
                     ) : items.length === 0 ? (
-                        <p className="p-4 text-sm text-slate-500">
+                        <p className="p-4 text-sm text-ink-soft">
                             No one is subscribed to your calendar yet. Share your
                             profile to grow your audience.
                         </p>
@@ -176,7 +176,7 @@ function SubscribersModal({
                                                 className="w-8 h-8 rounded-full object-cover bg-slate-100"
                                             />
                                         ) : (
-                                            <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-sm font-semibold">
+                                            <div className="w-8 h-8 rounded-full bg-slate-200 text-ink-soft flex items-center justify-center text-sm font-semibold">
                                                 {initial}
                                             </div>
                                         )}
@@ -184,11 +184,11 @@ function SubscribersModal({
                                             <Link
                                                 to={`/u/${s.handle}`}
                                                 onClick={onClose}
-                                                className="block truncate text-sm font-medium text-slate-900 hover:text-blue-600"
+                                                className="block truncate text-sm font-medium text-ink hover:text-action"
                                             >
                                                 {name}
                                             </Link>
-                                            <div className="text-xs text-slate-500 truncate">
+                                            <div className="text-xs text-ink-soft truncate">
                                                 @{s.handle}
                                             </div>
                                         </div>
@@ -196,7 +196,7 @@ function SubscribersModal({
                                             type="button"
                                             onClick={() => handleRemove(s.handle)}
                                             disabled={busyHandle === s.handle}
-                                            className="shrink-0 border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600 hover:bg-red-50 hover:border-red-200 hover:text-red-700 transition disabled:opacity-50"
+                                            className="shrink-0 border border-line bg-surface px-2 py-0.5 text-xs text-ink-soft hover:bg-red-50 hover:border-red-200 hover:text-danger transition disabled:opacity-50"
                                             title="Remove this subscriber"
                                         >
                                             {busyHandle === s.handle ? '…' : 'Remove'}

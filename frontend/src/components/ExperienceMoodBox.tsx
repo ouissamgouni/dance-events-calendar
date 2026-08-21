@@ -41,25 +41,25 @@ export default function ExperienceMoodBox({
     const positivePct = Math.round(positivePercentage ?? 0);
 
     return (
-        <div className="border border-slate-200 bg-slate-50 px-3 py-2.5 space-y-1">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+        <div className="border border-line bg-canvas px-3 py-2.5 space-y-1">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft">
                 {label}
             </div>
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                 {displayState === 'full' && moodLabel ? (
-                    <span className="text-sm font-bold text-slate-900">
+                    <span className="text-sm font-bold text-ink">
                         {emoji} {usually ? `Usually ${moodLabel.toLowerCase()}` : moodLabel}
                     </span>
                 ) : (
-                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
                         Early feedback
                     </span>
                 )}
-                <span className="text-xs text-slate-600">
-                    <span className="font-semibold text-slate-800 tabular-nums">{positivePct}%</span> rated it Great or Amazing
+                <span className="text-xs text-ink-soft">
+                    <span className="font-semibold text-ink tabular-nums">{positivePct}%</span> rated it Great or Amazing
                 </span>
             </div>
-            <div className="text-[11px] text-slate-400">{subline}</div>
+            <div className="text-[11px] text-muted">{subline}</div>
             {link && (
                 <Link
                     to={link.to}

@@ -9,7 +9,6 @@ interface ExplorerEventSearchProps {
     onSelectEvent: (eventId: string) => void;
     triggerLabel?: string;
     compact?: boolean;
-    onDark?: boolean;
     className?: string;
     /** Render a smaller trigger button (used inline in the passport Timeline tab). */
     small?: boolean;
@@ -79,7 +78,6 @@ export default function ExplorerEventSearch({
     onSelectEvent,
     triggerLabel = 'Search events',
     compact = false,
-    onDark = false,
     className = '',
     small = false,
     includePast = false,
@@ -214,22 +212,22 @@ export default function ExplorerEventSearch({
     };
 
     const panelClassName = compact
-        ? 'fixed left-3 right-3 z-[8600] border border-slate-200 bg-white shadow-lg'
-        : 'absolute right-0 top-full z-[8600] mt-1 w-80 max-w-[calc(100vw-2rem)] border border-slate-200 bg-white shadow-lg';
+        ? 'fixed left-3 right-3 z-[8600] border border-line bg-surface shadow-lg'
+        : 'absolute right-0 top-full z-[8600] mt-1 w-80 max-w-[calc(100vw-2rem)] border border-line bg-surface shadow-lg';
     const panelStyle = compact ? { top: compactPanelTop } : undefined;
 
     // Desktop inline mode: show input directly instead of trigger button
-    const isDesktopInline = !compact && !small && !onDark;
+    const isDesktopInline = !compact && !small;
 
     return (
         <div ref={containerRef} className={`relative ${className}`}>
             {/* Desktop inline: show input directly */}
             {isDesktopInline && (
-                <div className="hidden sm:flex items-center gap-2 border border-gray-600 bg-gray-700 px-2 py-1">
+                <div className="hidden sm:flex items-center gap-2 border border-line bg-canvas px-2 py-1">
                     <svg
                         viewBox="0 0 20 20"
                         fill="currentColor"
-                        className="h-4 w-4 text-gray-400 flex-shrink-0"
+                        className="h-4 w-4 text-muted flex-shrink-0"
                         aria-hidden="true"
                     >
                         <path
@@ -247,10 +245,10 @@ export default function ExplorerEventSearch({
                         onFocus={() => setOpen(true)}
                         placeholder={headerInline && effectiveIncludePast ? 'Search past events' : triggerLabel}
                         aria-label={triggerLabel}
-                        className="flex-1 bg-transparent text-xs text-white placeholder:text-gray-400 focus:outline-none"
+                        className="flex-1 bg-transparent text-xs text-ink placeholder:text-muted focus:outline-none"
                     />
                     {headerInline && pastToggle && (
-                        <label className="flex items-center gap-1 text-[11px] text-gray-300 whitespace-nowrap select-none">
+                        <label className="flex items-center gap-1 text-[11px] text-ink-soft whitespace-nowrap select-none">
                             <input
                                 type="checkbox"
                                 checked={pastChecked}
@@ -272,26 +270,24 @@ export default function ExplorerEventSearch({
                     onClick={() => setOpen((value) => !value)}
                     aria-label={triggerLabel}
                     title={triggerLabel}
-                    className={onDark
-                        ? 'inline-flex items-center justify-center w-7 h-7 text-white hover:text-gray-200 transition'
-                        : compact
-                            ? 'inline-flex h-6 w-6 items-center justify-center border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 transition'
-                            : small
-                                ? 'inline-flex items-center justify-center gap-1 whitespace-nowrap border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 transition'
-                                : 'inline-flex items-center justify-center gap-1.5 whitespace-nowrap border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition'}
+                    className={compact
+                        ? 'inline-flex h-11 w-11 items-center justify-center text-ink-soft hover:text-ink transition'
+                        : small
+                            ? 'inline-flex items-center justify-center gap-1 whitespace-nowrap border border-line bg-surface px-2 py-1 text-xs font-medium text-ink hover:bg-canvas transition'
+                            : 'inline-flex items-center justify-center gap-1.5 whitespace-nowrap border border-line bg-surface px-2.5 py-1.5 text-sm font-medium text-ink hover:bg-canvas transition'}
                     data-testid="explorer-event-search-trigger"
                 >
-                    <img src="/search.png" alt="" aria-hidden="true" className={onDark ? 'h-4 w-4 invert' : small ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
-                    {!compact && !onDark && <span>{triggerLabel}</span>}
+                    <img src="/search.png" alt="" aria-hidden="true" className={compact ? 'h-6 w-6' : small ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+                    {!compact && <span>{triggerLabel}</span>}
                 </button>
             )}
             {open && (
                 <div className={panelClassName} style={panelStyle}>
                     {!headerInline && (
-                        <div className="border-b border-slate-200 p-2">
+                        <div className="border-b border-line p-2">
                             <div className="flex items-center gap-2">
                                 {pastToggle && (
-                                    <label className="flex items-center gap-1 text-xs text-slate-600 whitespace-nowrap select-none">
+                                    <label className="flex items-center gap-1 text-xs text-ink-soft whitespace-nowrap select-none">
                                         <input
                                             type="checkbox"
                                             checked={pastChecked}
@@ -302,11 +298,11 @@ export default function ExplorerEventSearch({
                                         Include past
                                     </label>
                                 )}
-                                <div className="flex flex-1 items-center gap-2 border border-slate-300 bg-white px-2 py-1.5">
+                                <div className="flex flex-1 items-center gap-2 border border-line bg-surface px-2 py-1.5">
                                     <svg
                                         viewBox="0 0 20 20"
                                         fill="currentColor"
-                                        className="h-4 w-4 text-slate-400"
+                                        className="h-4 w-4 text-muted"
                                         aria-hidden="true"
                                     >
                                         <path
@@ -323,23 +319,23 @@ export default function ExplorerEventSearch({
                                         onKeyDown={onKeyDown}
                                         placeholder={effectiveIncludePast ? 'Search past events by title' : 'Search upcoming events by title'}
                                         aria-label={effectiveIncludePast ? 'Search past events by title' : 'Search upcoming events by title'}
-                                        className="w-full bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                                        className="w-full bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
                                     />
                                 </div>
                             </div>
                         </div>
                     )}
-                    <div className="max-h-80 overflow-auto bg-slate-50 px-2 py-1.5">
+                    <div className="max-h-80 overflow-auto bg-canvas px-2 py-1.5">
                         {term.length < 2 && (
-                            <div className="bg-white p-3 text-xs text-slate-500">
+                            <div className="bg-surface p-3 text-xs text-ink-soft">
                                 Type at least 2 letters to find {includePast ? 'past' : 'upcoming'} events.
                             </div>
                         )}
                         {term.length >= 2 && loading && (
-                            <div className="bg-white p-3 text-xs text-slate-500">Searching…</div>
+                            <div className="bg-surface p-3 text-xs text-ink-soft">Searching…</div>
                         )}
                         {term.length >= 2 && !loading && visibleResults.length === 0 && (
-                            <div className="bg-white p-3 text-xs text-slate-500">
+                            <div className="bg-surface p-3 text-xs text-ink-soft">
                                 No {effectiveIncludePast ? 'past' : 'upcoming'} events match “{term}”.
                                 {effectiveIncludePast && (
                                     <>
@@ -347,7 +343,7 @@ export default function ExplorerEventSearch({
                                         <Link
                                             to="/calendar"
                                             onClick={reset}
-                                            className="font-medium text-blue-600 hover:underline"
+                                            className="font-medium text-action hover:underline"
                                         >
                                             Browse the calendar
                                         </Link>{' '}
@@ -365,11 +361,11 @@ export default function ExplorerEventSearch({
                                         type="button"
                                         onClick={() => selectEvent(row.event_id)}
                                         data-testid={`explorer-event-search-result-${index}`}
-                                        className={`mb-1.5 flex w-full flex-col items-start gap-0.5 border bg-white px-3 py-2 text-left last:mb-0 hover:bg-slate-50 ${index === activeIdx ? 'border-blue-300 ring-2 ring-blue-300' : 'border-slate-200'}`}
+                                        className={`mb-1.5 flex w-full flex-col items-start gap-0.5 border bg-surface px-3 py-2 text-left last:mb-0 hover:bg-canvas ${index === activeIdx ? 'border-blue-300 ring-2 ring-blue-300' : 'border-line'}`}
                                     >
-                                        <span className="text-sm font-medium text-slate-900">{row.title}</span>
+                                        <span className="text-sm font-medium text-ink">{row.title}</span>
                                         {(when || row.location) && (
-                                            <span className="text-xs text-slate-500">
+                                            <span className="text-xs text-ink-soft">
                                                 {[when, row.location].filter(Boolean).join(' · ')}
                                             </span>
                                         )}
@@ -402,14 +398,14 @@ export default function ExplorerEventSearch({
                         })}
                     </div>
                     {includePast && onOpenSubmitEvent && (
-                        <div className="border-t border-slate-200 bg-white px-3 py-2 text-center text-xs">
+                        <div className="border-t border-line bg-surface px-3 py-2 text-center text-xs">
                             <button
                                 type="button"
                                 onClick={() => {
                                     onOpenSubmitEvent();
                                     reset();
                                 }}
-                                className="font-medium text-blue-600 hover:underline"
+                                className="font-medium text-action hover:underline"
                             >
                                 Missing event? Add it
                             </button>

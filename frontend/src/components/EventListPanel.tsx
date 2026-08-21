@@ -82,6 +82,9 @@ interface EventListPanelProps {
      * times if the viewer scrolls it out and back.
      */
     onMarkSeen?: (eventId: string) => void;
+    /** Optional content rendered at the very top of the scrolling list
+     * (e.g. the trending trail rail). Scrolls away with the results. */
+    headerSlot?: React.ReactNode;
 }
 
 export interface EventListCardProps {
@@ -105,12 +108,15 @@ export interface EventListCardProps {
     tagsAsBadge?: boolean;
     /** When true, the card gets a muted grey background (past events). */
     isPast?: boolean;
+    /** When true, render the left date rail (timeline layout) and move the
+        attendee avatar stack onto its own line. */
+    timeline?: boolean;
 }
 
 function PriceBadge({ event }: { event: CalendarEvent }) {
     if (event.price_is_free) {
         return (
-            <span className="inline-flex items-center gap-1 bg-slate-100 px-1.5 py-px text-[10px] font-medium leading-3 text-slate-600">
+            <span className="inline-flex items-center gap-1 bg-slate-100 px-1.5 py-px text-[10px] font-medium leading-3 text-ink-soft">
                 <img src="/price-tag.png" alt="" aria-hidden="true" className="w-2.5 h-2.5 object-contain" />
                 Free
             </span>
@@ -122,7 +128,7 @@ function PriceBadge({ event }: { event: CalendarEvent }) {
             ? `${sign}${event.price_min}–${sign}${event.price_max}`
             : `${sign}${event.price_min}`;
         return (
-            <span className="inline-flex items-center gap-1 bg-slate-100 px-1.5 py-px text-[10px] font-medium leading-3 text-slate-600">
+            <span className="inline-flex items-center gap-1 bg-slate-100 px-1.5 py-px text-[10px] font-medium leading-3 text-ink-soft">
                 <img src="/price-tag.png" alt="" aria-hidden="true" className="w-2.5 h-2.5 object-contain" />
                 {priceText}
             </span>
@@ -191,34 +197,18 @@ const formatCardDate = (d: Date) =>
 const formatCardTime = (d: Date) =>
     d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 
+/** Short weekday label for the timeline rail, e.g. "SAT". */
+const formatRailWeekday = (d: Date) =>
+    d.toLocaleDateString(undefined, { weekday: 'short' }).toUpperCase();
+
+/** Short month label for the timeline rail, e.g. "AUG". */
+const formatRailMonth = (d: Date) =>
+    d.toLocaleDateString(undefined, { month: 'short' }).toUpperCase();
+
 /** Initial number of events to render before the user taps Show more. */
 const INITIAL_VISIBLE = 10;
 /** How many additional events each Show more click reveals. */
 const SHOW_MORE_INCREMENT = 10;
-
-/** Local YYYY-MM-DD key used to bucket events into day groups. */
-function localDayKey(d: Date): string {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-}
-
-/**
- * Human-friendly day header label: "Today", "Tomorrow", or weekday + date.
- * Keeps the user oriented inside long, day-grouped lists.
- */
-function formatDayHeader(d: Date): string {
-    const today = new Date();
-    const todayKey = localDayKey(today);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(today.getDate() + 1);
-    const tomorrowKey = localDayKey(tomorrow);
-    const key = localDayKey(d);
-    if (key === todayKey) return 'Today';
-    if (key === tomorrowKey) return 'Tomorrow';
-    return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-}
 
 function CardEngagementBadges({ eventId, showRatings }: { eventId: string; showRatings: boolean }) {
     const agg = useRatingAggregate(eventId);
@@ -234,7 +224,7 @@ function CardEngagementBadges({ eventId, showRatings }: { eventId: string; showR
                     onClick={(e) => e.stopPropagation()}
                     title="See reviews"
                     aria-label={`${reviews} review${reviews === 1 ? '' : 's'}`}
-                    className="flex items-center gap-1 text-slate-500 hover:text-slate-700"
+                    className="flex items-center gap-1 text-ink-soft hover:text-ink"
                 >
                     <img src="/star.png" alt="" aria-hidden="true" className="h-3.5 w-3.5 object-contain" />
                     <span className="tabular-nums text-[10px] font-medium">{reviews}</span>
@@ -246,7 +236,7 @@ function CardEngagementBadges({ eventId, showRatings }: { eventId: string; showR
                     onClick={(e) => e.stopPropagation()}
                     title="See messages"
                     aria-label={`${messages} message${messages === 1 ? '' : 's'}`}
-                    className="flex items-center gap-1 text-slate-500 hover:text-slate-700"
+                    className="flex items-center gap-1 text-ink-soft hover:text-ink"
                 >
                     <img src="/comment.png" alt="" aria-hidden="true" className="h-3.5 w-3.5 object-contain" />
                     <span className="tabular-nums text-[10px] font-medium">{messages}</span>
@@ -275,10 +265,20 @@ export function EventListCard({
     cardRef,
     tagsAsBadge = false,
     isPast = false,
+    timeline = false,
 }: EventListCardProps) {
     const { tagsPerCard } = useFeatureFlags();
     const priceVisible = isPriceSectionVisible(event, showPrices);
     const start = new Date(event.start);
+    const end = new Date(event.end);
+    // Multi-day events must surface the end date, not just an end time, or a
+    // range like "1:00 PM – 5:00 AM" reads as same-day when it isn't.
+    const sameDay = start.toDateString() === end.toDateString();
+    const timelineWhen = event.all_day
+        ? (sameDay ? 'All day' : `Until ${formatCardDate(new Date(end.getTime() - 1))}`)
+        : (sameDay
+            ? `${formatCardTime(start)} – ${formatCardTime(end)}`
+            : `${formatCardTime(start)} – ${formatCardDate(end)}, ${formatCardTime(end)}`);
     const onMap = isOnMap(event, mapBounds);
     const offMapBadge = !onMap ? (
         <span className="event-card-offmap-badge" role="img" aria-label="Off map" title="Off map">
@@ -292,13 +292,24 @@ export function EventListCard({
                 ref={cardRef}
                 role="button"
                 tabIndex={0}
-                // eslint-disable-next-line no-restricted-syntax -- rounded event cards per explicit design request (Explorer list)
-                className={`event-card rounded-md${onMap ? '' : ' event-card-offmap'}${isHighlighted ? ' event-card-highlighted' : ''}${isPast ? ' event-card-past' : ''}`}
+                className={`event-card${timeline ? ' event-card-timeline' : ''}${onMap ? '' : ' event-card-offmap'}${isHighlighted ? ' event-card-highlighted' : ''}${isPast ? ' event-card-past' : ''}`}
                 onClick={() => onEventClick(event)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onEventClick(event); } }}
                 onMouseEnter={() => onEventHover?.(event.event_id)}
                 onMouseLeave={() => onEventHover?.(null)}
             >
+                {timeline && (
+                    <div className="event-card-rail" aria-hidden="true" data-testid="event-card-rail">
+                        <div className="event-card-rail-date">
+                            <span className="event-card-rail-weekday">{formatRailWeekday(start)}</span>
+                            <span className="event-card-rail-month">{formatRailMonth(start)}</span>
+                            <span className="event-card-rail-day">{start.getDate()}</span>
+                        </div>
+                        <div className="event-card-rail-track">
+                            <span className="event-card-rail-dot" />
+                        </div>
+                    </div>
+                )}
                 <div className="event-card-content relative">
                     <h4
                         className={`event-card-title${isNew ? ' font-semibold' : ''}`}
@@ -306,7 +317,7 @@ export function EventListCard({
                     >
                         {isNew && (
                             <span
-                                className="inline-block h-1.5 w-1.5 bg-blue-500 mr-1.5 align-middle"
+                                className="inline-block h-1.5 w-1.5 bg-action mr-1.5 align-middle"
                                 style={{ borderRadius: '9999px' }}
                                 aria-label="New"
                                 data-testid="new-event-dot"
@@ -327,14 +338,18 @@ export function EventListCard({
                     )}
                     <div className="flex items-center gap-8">
                         <p className="event-card-date shrink-0">
-                            {event.all_day ? formatCardDate(start) : `${formatCardDate(start)} · ${formatCardTime(start)}`}
+                            {timeline
+                                ? timelineWhen
+                                : (event.all_day ? formatCardDate(start) : `${formatCardDate(start)} · ${formatCardTime(start)}`)}
                         </p>
-                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                            <AttendeeAvatarStack
-                                eventId={event.event_id}
-                                friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
-                            />
-                        </div>
+                        {!timeline && (
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                <AttendeeAvatarStack
+                                    eventId={event.event_id}
+                                    friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
+                                />
+                            </div>
+                        )}
                     </div>
                     {(priceVisible || event.has_active_promo_codes || event.location) ? (
                         <p className="event-card-location gap-1.5">
@@ -355,6 +370,14 @@ export function EventListCard({
                                 <img src="/location-off.png" alt="" aria-hidden="true" className="event-card-offmap-icon" />
                             </span>
                         )
+                    )}
+                    {timeline && (
+                        <div className="mt-1.5 flex items-center gap-1.5 min-w-0">
+                            <AttendeeAvatarStack
+                                eventId={event.event_id}
+                                friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
+                            />
+                        </div>
                     )}
                     {event.tags?.length > 0 && (
                         <div className="mt-1 flex items-center justify-between gap-2">
@@ -408,6 +431,7 @@ export default function EventListPanel({
     onMarkSeen,
     tagsAsBadge = false,
     orderByFollows = false,
+    headerSlot,
 }: EventListPanelProps) {
     const { user } = useAuth();
     const { isSaved } = useSavedEvents();
@@ -608,6 +632,7 @@ export default function EventListPanel({
 
     return (
         <div className="event-list-panel">
+            {headerSlot}
             <div className="event-list-header">
                 <span className="event-list-count">
                     {`${totalCount} Events`}
@@ -634,11 +659,11 @@ export default function EventListPanel({
                             aria-pressed={effectiveNewOnly}
                             data-testid="new-events-only-chip"
                             className={`sort-btn inline-flex items-center gap-1 border px-1.5 py-0.5 ${effectiveNewOnly
-                                ? 'border-blue-500 bg-blue-500 text-white'
-                                : 'border-slate-300 bg-white text-slate-600 hover:border-slate-400'}`}
+                                ? 'border-action bg-action text-white'
+                                : 'border-line bg-surface text-ink-soft hover:border-line'}`}
                         >
                             {/* eslint-disable-next-line no-restricted-syntax -- small status dot */}
-                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" aria-hidden="true" />
+                            <span className="inline-block h-1.5 w-1.5 rounded-full bg-action" aria-hidden="true" />
                             <span className="sm:hidden">{newCount} New</span>
                             <span className="hidden sm:inline">New only</span>
                         </button>
@@ -653,10 +678,10 @@ export default function EventListPanel({
                             className="event-list-empty bg-blue-50 border border-blue-100 p-4 m-3 text-center"
                             data-testid="event-list-empty"
                         >
-                            <p className="text-sm font-medium text-slate-800">
+                            <p className="text-sm font-medium text-ink">
                                 No events match your filters
                             </p>
-                            <p className="text-xs text-slate-600 mt-1">
+                            <p className="text-xs text-ink-soft mt-1">
                                 Try finding the next matching events or clearing filters.
                             </p>
                             <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
@@ -665,7 +690,7 @@ export default function EventListPanel({
                                         type="button"
                                         onClick={handleExtendPeriodClick}
                                         disabled={extendingPeriod || futureLookupPending || nextPeriodEventCount === 0}
-                                        className="inline-flex items-center bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="inline-flex items-center bg-action hover:bg-action text-white text-xs font-semibold px-3 py-1.5 shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
                                         data-testid="event-list-empty-extend"
                                     >
                                         {extendingPeriod
@@ -681,7 +706,7 @@ export default function EventListPanel({
                                     <button
                                         type="button"
                                         onClick={onClearFilters}
-                                        className="inline-flex items-center border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-1.5 transition"
+                                        className="inline-flex items-center border border-line bg-surface hover:bg-canvas text-ink text-xs font-semibold px-3 py-1.5 transition"
                                         data-testid="event-list-empty-clear"
                                     >
                                         Clear filters
@@ -691,7 +716,7 @@ export default function EventListPanel({
                                     <button
                                         type="button"
                                         onClick={onSuggestEvent}
-                                        className="inline-flex items-center border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-1.5 transition"
+                                        className="inline-flex items-center border border-line bg-surface hover:bg-canvas text-ink text-xs font-semibold px-3 py-1.5 transition"
                                     >
                                         + Suggest an event
                                     </button>
@@ -701,63 +726,18 @@ export default function EventListPanel({
                     ) : (
                         <>
                             {(() => {
-                                // When sorting by date, render sticky day-group headers so the
-                                // user can scan the list day-by-day. Past events (when present)
-                                // still get their existing divider above the past block.
-                                const groupByDay = sortBy === 'date' && !orderByFollows;
-                                let lastDayKey: string | null = null;
+                                // Timeline layout: each card carries its own left date rail
+                                // (weekday / month / day + dot on a continuous line), so no
+                                // sticky day-group headers are needed. Past events still get
+                                // their divider above the past block.
                                 return renderedEvents.map((event, idx) => {
                                     const isHighlighted = hoveredEventId === event.event_id;
                                     const isNew = newEnabled && !!newEventIds?.has(event.event_id);
-                                    const start = new Date(event.start);
-                                    const dayKey = localDayKey(start);
                                     const isPast = !!pastEventIds?.has(event.event_id);
-                                    const showDayHeader =
-                                        groupByDay && !isPast && dayKey !== lastDayKey;
-                                    if (showDayHeader) {
-                                        lastDayKey = dayKey;
-                                        return (
-                                            <Fragment key={event.event_id}>
-                                                {idx === firstPastIndex && (
-                                                    <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wide border-t border-slate-200 mt-2">
-                                                        Past events
-                                                    </div>
-                                                )}
-                                                <div
-                                                    className="sticky top-0 z-[5] flex items-center gap-2 bg-slate-50 border-b border-slate-300 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-600"
-                                                    data-testid="event-list-day-header"
-                                                    data-day={dayKey}
-                                                >
-                                                    <span>{formatDayHeader(start)}</span>
-                                                </div>
-                                                <EventListCard
-                                                    event={event}
-                                                    mapBounds={mapBounds}
-                                                    onEventClick={onEventClick}
-                                                    showPrices={showPrices}
-                                                    showPopularity={showPopularity && trendingEnabled}
-                                                    popularityThreshold={popularityThreshold}
-                                                    trendingTopN={trendingTopN}
-                                                    trendingTopPercent={trendingTopPercent}
-                                                    allViewCounts={allViewCounts}
-                                                    followingBadgeEnabled={followingBadgeEnabled}
-                                                    showRatings={!!showRatings}
-                                                    isSavedFlag={isSaved(event.event_id)}
-                                                    isHighlighted={isHighlighted}
-                                                    isNew={isNew}
-                                                    onEventHover={onEventHover}
-                                                    cardRef={observeCardForSeen(event.event_id)}
-                                                    tagsAsBadge={tagsAsBadge}
-                                                    isPast={isPast}
-                                                />
-                                            </Fragment>
-                                        );
-                                    }
-                                    if (isPast) lastDayKey = null;
                                     return (
                                         <Fragment key={event.event_id}>
                                             {idx === firstPastIndex && (
-                                                <div className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wide border-t border-slate-200 mt-2">
+                                                <div className="px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-t border-line mt-2">
                                                     Past events
                                                 </div>
                                             )}
@@ -780,6 +760,7 @@ export default function EventListPanel({
                                                 cardRef={observeCardForSeen(event.event_id)}
                                                 tagsAsBadge={tagsAsBadge}
                                                 isPast={isPast}
+                                                timeline
                                             />
                                         </Fragment>
                                     );
@@ -794,23 +775,23 @@ export default function EventListPanel({
                                 .github/instructions/frontend.instructions.md. */}
                             {showAnonymousMoreEventsGate && (
                                 <div className="m-3 border border-blue-100 bg-blue-50 p-4" data-testid="event-list-more-events-gate">
-                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-700">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wide text-action">
                                         More events available
                                     </p>
-                                    <p className="mt-1 text-sm font-medium text-slate-800">
+                                    <p className="mt-1 text-sm font-medium text-ink">
                                         Sign in to unlock {hiddenEventCount} more {hiddenEventCount === 1 ? 'event' : 'events'}.
                                     </p>
-                                    <p className="mt-1 text-xs text-slate-600">
+                                    <p className="mt-1 text-xs text-ink-soft">
                                         You are viewing the anonymous preview. Sign in to keep exploring from this point.
                                     </p>
                                     <div className="mt-3 flex flex-wrap items-center gap-2">
                                         <Link
                                             to={`/login?next=${next}`}
-                                            className="inline-flex items-center justify-center bg-blue-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-600"
+                                            className="inline-flex items-center justify-center bg-action px-3 py-2 text-xs font-semibold text-white transition hover:bg-action"
                                         >
                                             Sign in to see more
                                         </Link>
-                                        <span className="text-[11px] text-slate-500">
+                                        <span className="text-[11px] text-ink-soft">
                                             {remainingInPeriod > 0
                                                 ? `${remainingInPeriod} more in this view`
                                                 : `${hiddenEventCount} more in the next available window`}
@@ -823,7 +804,7 @@ export default function EventListPanel({
                                     <button
                                         type="button"
                                         onClick={() => setVisibleCount((n) => n + SHOW_MORE_INCREMENT)}
-                                        className="inline-flex items-center justify-center border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-2 transition"
+                                        className="inline-flex items-center justify-center border border-line bg-surface hover:bg-canvas text-ink text-xs font-semibold px-3 py-2 transition"
                                         data-testid="event-list-show-more"
                                     >
                                         + {Math.min(SHOW_MORE_INCREMENT, remainingInPeriod)} more
@@ -836,7 +817,7 @@ export default function EventListPanel({
                                         type="button"
                                         onClick={handleExtendPeriodClick}
                                         disabled={extendingPeriod || futureLookupPending || nextPeriodEventCount === 0}
-                                        className="inline-flex items-center justify-center border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-2 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="inline-flex items-center justify-center border border-line bg-surface hover:bg-canvas text-ink text-xs font-semibold px-3 py-2 transition disabled:opacity-50 disabled:cursor-not-allowed"
                                         data-testid="event-list-extend-period"
                                     >
                                         {extendingPeriod
@@ -877,10 +858,10 @@ function ActionCountCluster({ eventId, isSavedFlag, isPast = false }: { eventId:
                     appearance="icon"
                     size="sm"
                     stopPropagation
-                    className={isSavedFlag ? 'text-slate-700' : ''}
+                    className={isSavedFlag ? 'text-ink' : ''}
                 />
                 {savedCount > 0 && (
-                    <span className="text-[11px] text-slate-500 -ml-0.5 mr-1 tabular-nums" aria-label={`${savedCount} saved`}>
+                    <span className="text-[11px] text-ink-soft -ml-0.5 mr-1 tabular-nums" aria-label={`${savedCount} saved`}>
                         {savedCount}
                     </span>
                 )}
@@ -894,7 +875,7 @@ function ActionCountCluster({ eventId, isSavedFlag, isPast = false }: { eventId:
                     isPast={isPast}
                 />
                 {goingCount > 0 && (
-                    <span className="text-[11px] text-emerald-700 -ml-0.5 mr-1 tabular-nums" aria-label={`${goingCount} ${isPast ? 'attended' : 'going'}`}>
+                    <span className="text-[11px] text-success -ml-0.5 mr-1 tabular-nums" aria-label={`${goingCount} ${isPast ? 'attended' : 'going'}`}>
                         {goingCount}
                     </span>
                 )}

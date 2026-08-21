@@ -170,13 +170,13 @@ export default function UserSearchBox() {
                     onClick={() => setMobileExpanded(true)}
                     aria-label="Search users"
                     title="Search users"
-                    className="inline-flex items-center justify-center w-7 h-7 text-white hover:text-gray-200 transition"
+                    className="inline-flex items-center justify-center w-11 h-11 text-ink-soft hover:text-ink transition"
                 >
                     <img
                         src="/find-user.png"
                         alt=""
                         aria-hidden="true"
-                        className="h-4 w-4 invert"
+                        className="h-6 w-6"
                     />
                 </button>
             )}
@@ -191,7 +191,7 @@ export default function UserSearchBox() {
                             // Auto-collapse if user taps away with no query.
                             if (q === '') setMobileExpanded(false);
                         }}
-                        className="w-40 sm:w-48 text-xs px-2 py-1 bg-gray-700 text-white placeholder:text-gray-400 border border-gray-600 focus:outline-none focus:border-blue-400"
+                        className="w-40 sm:w-48 text-xs px-2 py-1 bg-canvas text-ink placeholder:text-muted border border-line focus:outline-none focus:border-action"
                     />
                     <button
                         type="button"
@@ -199,7 +199,7 @@ export default function UserSearchBox() {
                         onClick={reset}
                         aria-label="Close search"
                         title="Close search"
-                        className="inline-flex items-center justify-center w-6 h-6 text-white hover:text-gray-200 transition"
+                        className="inline-flex items-center justify-center w-9 h-9 text-ink-soft hover:text-ink transition"
                     >
                         <svg
                             viewBox="0 0 20 20"
@@ -218,27 +218,27 @@ export default function UserSearchBox() {
             )}
 
             {showDropdown && (
-                <div className="absolute right-0 mt-1 w-64 max-w-[calc(100vw-1rem)] bg-white border border-slate-200 shadow-lg z-50 max-h-80 overflow-auto">
+                <div className="absolute right-0 mt-1 w-64 max-w-[calc(100vw-1rem)] bg-surface border border-line shadow-lg z-50 max-h-80 overflow-auto">
                     {term.length === 0 && (
                         <Link
                             to="/tribe/discover"
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={reset}
-                            className="block px-3 py-2 hover:bg-slate-50"
+                            className="block px-3 py-2 hover:bg-canvas"
                         >
-                            <div className="text-xs font-medium text-slate-900">
+                            <div className="text-xs font-medium text-ink">
                                 Find people
                             </div>
-                            <div className="text-[11px] text-slate-500">
+                            <div className="text-[11px] text-ink-soft">
                                 Browse suggestions and curated calendars
                             </div>
                         </Link>
                     )}
                     {loading && (
-                        <div className="p-3 text-xs text-slate-500">Searching…</div>
+                        <div className="p-3 text-xs text-ink-soft">Searching…</div>
                     )}
                     {!loading && term.length >= 2 && results.length === 0 && (
-                        <div className="p-3 text-xs text-slate-500">
+                        <div className="p-3 text-xs text-ink-soft">
                             No users match “{term}”.
                         </div>
                     )}
@@ -248,13 +248,13 @@ export default function UserSearchBox() {
                         ))}
                     {!loading && results.length === 0 && (suggestionsLoading || suggestions.length > 0) && (
                         <>
-                            <div className="px-3 pt-3 pb-1 border-t border-slate-100">
-                                <div className="text-[11px] font-semibold text-slate-700 uppercase">
+                            <div className="px-3 pt-3 pb-1 border-t border-card-line">
+                                <div className="text-[11px] font-semibold text-ink uppercase">
                                     Suggestions
                                 </div>
                             </div>
                             {suggestionsLoading ? (
-                                <div className="p-3 text-xs text-slate-500">Loading…</div>
+                                <div className="p-3 text-xs text-ink-soft">Loading…</div>
                             ) : (
                                 suggestions.map((u, i) => (
                                     <UserRow
@@ -271,7 +271,7 @@ export default function UserSearchBox() {
                         <Link
                             to={`/tribe/discover?q=${encodeURIComponent(term)}`}
                             onClick={reset}
-                            className="block px-3 py-2 text-xs text-blue-600 hover:bg-slate-50 border-t border-slate-100"
+                            className="block px-3 py-2 text-xs text-action hover:bg-canvas border-t border-card-line"
                         >
                             See more on Discover →
                         </Link>
@@ -281,7 +281,7 @@ export default function UserSearchBox() {
                             to="/invite"
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={reset}
-                            className="block px-3 py-2 text-xs text-blue-600 hover:bg-slate-50 border-t border-slate-100"
+                            className="block px-3 py-2 text-xs text-action hover:bg-canvas border-t border-card-line"
                         >
                             Can’t find them? Invite a friend →
                         </Link>
@@ -306,13 +306,13 @@ function UserRow({
             to={`/u/${user.handle}`}
             onClick={onClick}
             className={
-                'flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-slate-50 ' +
-                (active ? 'bg-slate-50' : '')
+                'flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-canvas ' +
+                (active ? 'bg-canvas' : '')
             }
         >
             <Avatar url={user.avatar_url} name={user.display_name || user.handle} />
             <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1 text-slate-900 truncate">
+                <div className="flex items-center gap-1 text-ink truncate">
                     <span className="truncate">
                         {user.display_name || `@${user.handle}`}
                     </span>
@@ -335,7 +335,7 @@ function UserRow({
                         />
                     )}
                 </div>
-                <div className="text-[11px] text-slate-500 truncate">
+                <div className="text-[11px] text-ink-soft truncate">
                     @{user.handle} · {user.subscribers_count} subscriber
                     {user.subscribers_count === 1 ? '' : 's'}
                 </div>
@@ -356,7 +356,7 @@ function Avatar({ url, name }: { url: string | null; name: string }) {
     }
     const initial = (name || '?').trim().charAt(0).toUpperCase();
     return (
-        <div className="w-7 h-7 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-semibold shrink-0">  {/* eslint-disable-line no-restricted-syntax -- avatar */}
+        <div className="w-7 h-7 rounded-full bg-slate-200 text-ink-soft flex items-center justify-center text-xs font-semibold shrink-0">  {/* eslint-disable-line no-restricted-syntax -- avatar */}
             {initial}
         </div>
     );

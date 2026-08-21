@@ -1,0 +1,35 @@
+# Seeds the viewer's search profiles so the Filters sheet profile picker is
+# deterministic from the FIRST sign-in — no manual Settings step needed.
+#
+# In this codebase "search profiles" ARE interest profiles; the `is_active`
+# profile is the "Default" search profile that seeds Explore's Area + Dance +
+# Reach. Every signed-in user auto-gets a permissive "Default" profile on
+# first login (whole-Europe bbox, no dance tags, reach=international,
+# matches_enabled=false); bootstrap is idempotent and skips creating it once
+# a profile already exists here.
+interest_profiles:
+  # Default (is_active) — wide "Europe & nearby" bbox, no dance restriction.
+  # This is the "Default" search profile the picker shows first.
+  - user: viewer@example.com
+    label: "Default"
+    min_lat: 24
+    min_lng: -18
+    max_lat: 69
+    max_lng: 50
+    dance_tags: []
+    reach_tags: ["reach:international"]
+    matches_enabled: false
+    is_active: true
+
+  # Saved named preset — tight Barcelona bbox + Salsa + International.
+  # Notifications OFF (matches_enabled=false) per the browse-created default.
+  - user: viewer@example.com
+    label: "Barcelona salsa"
+    min_lat: 41.30
+    min_lng: 2.05
+    max_lat: 41.47
+    max_lng: 2.25
+    dance_tags: ["dance-style:salsa"]
+    reach_tags: ["reach:international"]
+    matches_enabled: false
+    is_active: false

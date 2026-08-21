@@ -111,10 +111,10 @@ export default function NotificationsPage({ socialOnly = false }: { socialOnly?:
         <div className="max-w-2xl mx-auto px-4 py-6">
             {!socialOnly && (
                 <div className="flex items-center justify-between mb-4">
-                    <h1 className="text-lg font-semibold text-slate-900">
+                    <h1 className="text-lg font-semibold text-ink">
                         Notifications
                         {unreadCount > 0 && (
-                            <span className="ml-2 text-xs text-slate-500 font-normal">
+                            <span className="ml-2 text-xs text-ink-soft font-normal">
                                 ({unreadCount} unread)
                             </span>
                         )}
@@ -123,7 +123,7 @@ export default function NotificationsPage({ socialOnly = false }: { socialOnly?:
                         type="button"
                         onClick={handleMarkAll}
                         disabled={busyAll || unreadCount === 0}
-                        className="text-xs text-blue-600 hover:text-blue-700 disabled:text-slate-400 disabled:cursor-not-allowed"
+                        className="text-xs text-action hover:text-action disabled:text-muted disabled:cursor-not-allowed"
                     >
                         {busyAll ? 'Marking…' : 'Mark all read'}
                     </button>
@@ -188,19 +188,19 @@ export default function NotificationsPage({ socialOnly = false }: { socialOnly?:
             </div>
 
             {error && (
-                <div className="mb-3 border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                <div className="mb-3 border border-red-200 bg-red-50 px-3 py-2 text-sm text-danger">
                     {error}
                 </div>
             )}
 
             {items === null ? (
-                <p className="text-sm text-slate-400">Loading…</p>
+                <p className="text-sm text-muted">Loading…</p>
             ) : items.length === 0 ? (
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-ink-soft">
                     No notifications yet.
                 </p>
             ) : (
-                <ul className="divide-y divide-slate-100 border border-slate-200 bg-white">
+                <ul className="divide-y divide-slate-100 border border-line bg-surface">
                     {items.map((n) => (
                         <NotificationRow
                             key={n.id}
@@ -231,8 +231,8 @@ function KindChip({
             onClick={onClick}
             className={
                 active
-                    ? 'px-3 py-1.5 border border-blue-500 bg-blue-500 text-white'
-                    : 'px-3 py-1.5 border border-slate-200 bg-white text-slate-600 hover:border-blue-500 hover:text-blue-500'
+                    ? 'px-3 py-1.5 border border-action bg-action text-white'
+                    : 'px-3 py-1.5 border border-line bg-surface text-ink-soft hover:border-action hover:text-action'
             }
         >
             {label}

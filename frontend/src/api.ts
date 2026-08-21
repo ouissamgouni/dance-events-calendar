@@ -230,6 +230,9 @@ export interface SiteSettings {
     for_you_rail_enabled?: boolean;
     your_next_events_rail_enabled?: boolean;
     network_going_snapshot_enabled?: boolean;
+    /** Experiment: two-line, icon-prefixed filter summary bar with the
+     * Map/Calendar controls pinned to its right. */
+    summary_two_line_enabled?: boolean;
     suggest_event_required_dance_group_id?: number | null;
     suggest_event_required_reach_group_id?: number | null;
     tag_as_badge_enabled?: boolean;

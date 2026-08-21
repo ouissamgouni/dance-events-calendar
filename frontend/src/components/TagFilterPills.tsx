@@ -1,4 +1,4 @@
-import { Fragment, useMemo } from 'react';
+import { useMemo } from 'react';
 import type { TagGroup } from '../types';
 
 interface Props {
@@ -135,29 +135,30 @@ export default function TagFilterPills({
 
     if (!groupRows.length) return null;
 
+    const showLabels = groupRows.length > 1;
+
     const renderPill = (tag: EnrichedTag) => {
         const active = activeTagIds.has(tag.id);
         const displayCount = countOverrides?.get(tag.id) ?? tag.event_count ?? null;
         const disabled = !active && displayCount === 0;
-        const c = tag._groupColor;
         return (
             <button
                 key={tag.id}
                 onClick={() => { if (!disabled) onToggle(tag.id); }}
                 disabled={disabled}
                 aria-disabled={disabled}
-                className={`inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap px-2 py-px text-[11px] font-medium transition-colors border ${active ? 'text-white shadow-sm' : 'text-gray-700'
-                    } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
-                style={
-                    active
-                        ? { backgroundColor: c, borderColor: c }
-                        : { backgroundColor: `${c}30`, borderColor: `${c}50` }
-                }
+                aria-pressed={active}
+                // eslint-disable-next-line no-restricted-syntax -- pill-shaped tag chips match the provided filter-sheet design reference
+                className={`relative flex w-full items-center justify-between rounded-full border-2 px-3 py-2 text-xs font-medium transition ${active ? 'border-blue-600 bg-blue-50 text-gray-900' : 'border-gray-300 bg-white text-gray-900 hover:bg-gray-50'
+                    } ${disabled ? 'cursor-not-allowed opacity-40' : ''}`}
             >
-                {tag.label}
-                {displayCount != null && (
-                    <span className={`text-[9px] font-semibold ${active ? 'opacity-80' : 'opacity-60'}`}>
-                        {displayCount}
+                <span className="truncate text-center flex-1">{tag.label}</span>
+                {active && (
+                    // eslint-disable-next-line no-restricted-syntax -- checkmark badge inside selected pill
+                    <span className="ml-2 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600">
+                        <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-white" aria-hidden="true">
+                            <path fillRule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0l-3.5-3.5a1 1 0 1 1 1.4-1.4l2.8 2.79 6.8-6.8a1 1 0 0 1 1.4 0Z" clipRule="evenodd" />
+                        </svg>
                     </span>
                 )}
             </button>
@@ -165,37 +166,30 @@ export default function TagFilterPills({
     };
 
     return (
-        <div className="flex flex-col gap-1.5">
+        <div className="flex flex-col gap-3">
+            {groupRows.map((row) => (
+                <div key={row.key} className="flex flex-col gap-2">
+                    {showLabels && (
+                        <span className="text-[11px] font-bold uppercase tracking-wide text-ink-soft">
+                            {row.label}
+                        </span>
+                    )}
+                    <div className="grid grid-cols-3 gap-2.5">
+                        {row.tags.map(renderPill)}
+                    </div>
+                </div>
+            ))}
             {activeTagIds.size > 0 && (
-                <div className="flex justify-end">
+                <div className="flex justify-end pt-2">
                     <button
                         onClick={onClear}
-                        className="inline-flex items-center gap-1 text-[11px] font-medium text-rose-500 hover:text-rose-700"
-                        aria-label="Clear tag filters"
+                        className="text-xs font-medium text-ink-soft hover:text-ink transition"
+                        aria-label="Clear selection"
                     >
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3">
-                            <path fillRule="evenodd" d="M4.22 4.22a.75.75 0 0 1 1.06 0L10 8.94l4.72-4.72a.75.75 0 1 1 1.06 1.06L11.06 10l4.72 4.72a.75.75 0 1 1-1.06 1.06L10 11.06l-4.72 4.72a.75.75 0 0 1-1.06-1.06L8.94 10 4.22 5.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
-                        </svg>
-                        Clear tags
+                        Clear selection
                     </button>
                 </div>
             )}
-            {/* 2-column grid: label column | horizontally-scrollable tags column.
-                `auto-rows` fixes each row's height so `max-h-24` (3 * 1.75rem
-                rows + 2 * 0.375rem gaps = 6rem) shows exactly 3 groups by
-                default, with the rest reachable via vertical scroll. */}
-            <div className="grid grid-cols-[max-content_1fr] auto-rows-[1.75rem] items-center gap-x-2 gap-y-1.5 max-h-24 overflow-y-auto pr-1">
-                {groupRows.map((row) => (
-                    <Fragment key={row.key}>
-                        <span className="shrink-0 whitespace-nowrap text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                            {row.label}
-                        </span>
-                        <div className="flex min-w-0 flex-nowrap items-center gap-1 overflow-x-auto scrollbar-hide py-0.5">
-                            {row.tags.map(renderPill)}
-                        </div>
-                    </Fragment>
-                ))}
-            </div>
             {trailingSlot}
         </div>
     );

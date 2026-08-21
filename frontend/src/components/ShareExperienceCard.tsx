@@ -43,20 +43,20 @@ export default function ShareExperienceCard({ review, onReviewed }: Props) {
     };
 
     return (
-        <div className="flex w-[212px] shrink-0 flex-col justify-between border border-slate-200 bg-white p-2.5 text-xs">
-            <p className="text-slate-700">
-                You attended <span className="font-semibold text-slate-900">{title}</span> {attendedWhen(review.event_start)}.
+        <div className="flex w-[212px] shrink-0 flex-col justify-between border border-line bg-surface p-2.5 text-xs">
+            <p className="text-ink">
+                You attended <span className="font-semibold text-ink">{title}</span> {attendedWhen(review.event_start)}.
             </p>
             <div className="mt-2 flex items-center justify-between gap-2">
                 <button
                     type="button"
                     onClick={handleReviewClick}
-                    className="inline-flex shrink-0 items-center justify-center bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    className="inline-flex shrink-0 items-center justify-center bg-action px-3 py-1.5 text-xs font-semibold text-white hover:bg-action focus:outline-none focus:ring-2 focus:ring-blue-300"
                 >
                     Review
                 </button>
                 {review.friend_proof && (
-                    <span className="text-right text-[10px] leading-tight text-slate-500">
+                    <span className="text-right text-[10px] leading-tight text-ink-soft">
                         Reviewed by {review.friend_proof}
                     </span>
                 )}

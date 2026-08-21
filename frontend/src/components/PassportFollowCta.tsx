@@ -92,7 +92,7 @@ export default function PassportFollowCta({
                         // ignore storage errors
                     }
                 }}
-                className="inline-flex items-center gap-1.5 border border-blue-600 bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700"
+                className="inline-flex items-center gap-1.5 border border-action bg-action px-3 py-1.5 text-sm font-medium text-white hover:bg-action-strong"
             >
                 Sign in to follow {who}
             </Link>
@@ -101,7 +101,7 @@ export default function PassportFollowCta({
 
     if (following || pending === 'approved') {
         return (
-            <span className="inline-flex items-center gap-1.5 border border-slate-300 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-600">
+            <span className="inline-flex items-center gap-1.5 border border-line bg-canvas px-3 py-1.5 text-sm font-medium text-ink-soft">
                 Following
             </span>
         );
@@ -109,7 +109,7 @@ export default function PassportFollowCta({
 
     if (pending === 'pending') {
         return (
-            <span className="inline-flex items-center gap-1.5 border border-slate-300 bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-600">
+            <span className="inline-flex items-center gap-1.5 border border-line bg-canvas px-3 py-1.5 text-sm font-medium text-ink-soft">
                 Request sent
             </span>
         );
@@ -140,7 +140,7 @@ export default function PassportFollowCta({
             type="button"
             onClick={handleFollow}
             disabled={busy}
-            className="inline-flex items-center gap-1.5 border border-blue-600 bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 border border-action bg-action px-3 py-1.5 text-sm font-medium text-white hover:bg-action-strong disabled:opacity-60"
         >
             {busy ? 'Following…' : `Follow ${who}`}
         </button>

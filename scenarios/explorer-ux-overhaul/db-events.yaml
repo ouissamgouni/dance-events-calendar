@@ -32,7 +32,16 @@ events:
     start: w0 Fri 20:00
     end: w0 Fri 23:00
     price_is_free: true
-    tags: ["format:social", "dance-style:salsa", "level:all-levels", reach:international]
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "dance-style:mambo",
+        "level:all-levels",
+        reach:international,
+        "venue:indoor",
+        "scale:medium",
+      ]
   - id: evt-ux-002
     calendar_id: bachata-cal-002
     title: Berlin Bachata Sensual Night
@@ -45,7 +54,16 @@ events:
     start: w0 Fri 21:00
     end: w0 Sat 01:00
     price_is_free: true
-    tags: ["format:social", "dance-style:bachata", "level:all-levels", reach:local]
+    tags:
+      [
+        "format:social",
+        "dance-style:bachata",
+        "dance-style:kizomba",
+        "level:all-levels",
+        reach:local,
+        "venue:indoor",
+        "misc:trip",
+      ]
   - id: evt-ux-003
     calendar_id: salsa-cal-001
     title: Madrid Salsa Beginner Class
@@ -58,7 +76,15 @@ events:
     start: w0 Fri 19:00
     end: w0 Fri 20:30
     price_is_free: true
-    tags: ["format:class", "dance-style:salsa", "level:beginner-friendly", reach:regional]
+    tags:
+      [
+        "format:class",
+        "dance-style:salsa",
+        "level:beginner-friendly",
+        reach:regional,
+        "venue:indoor",
+        "scale:small",
+      ]
 
   # ── Week 0 — Saturday + Sunday ────────────────────────────────────
   - id: evt-ux-004
@@ -73,7 +99,16 @@ events:
     start: w0 Sat 14:00
     end: w0 Sat 17:00
     price_is_free: true
-    tags: ["format:workshop", "dance-style:salsa", "level:intermediate", reach:local]
+    tags:
+      [
+        "format:workshop",
+        "dance-style:salsa",
+        "dance-style:cuban",
+        "level:intermediate",
+        reach:local,
+        "venue:outdoor",
+        "scale:medium",
+      ]
   - id: evt-ux-005
     calendar_id: bachata-cal-002
     title: Rome Bachata Sunday Social
@@ -86,7 +121,16 @@ events:
     start: w0 Sun 19:00
     end: w0 Sun 23:00
     price_is_free: true
-    tags: ["format:social", "dance-style:bachata", "level:all-levels", reach:international]
+    tags:
+      [
+        "format:social",
+        "dance-style:bachata",
+        "dance-style:semba",
+        "level:all-levels",
+        reach:international,
+        "venue:indoor",
+        "misc:trip",
+      ]
 
   # ── Week 1 ───────────────────────────────────────────────────────
   - id: evt-ux-006
@@ -101,7 +145,15 @@ events:
     start: w1 Mon 20:00
     end: w1 Mon 22:00
     price_is_free: true
-    tags: ["format:practice", "dance-style:salsa", reach:local]
+    tags:
+      [
+        "format:practice",
+        "dance-style:salsa",
+        "dance-style:rueda",
+        reach:local,
+        "venue:indoor",
+        "level:intermediate",
+      ]
   - id: evt-ux-007
     calendar_id: bachata-cal-002
     title: Vienna Bachata Wednesday Class
@@ -114,7 +166,16 @@ events:
     start: w1 Wed 19:30
     end: w1 Wed 21:00
     price_is_free: true
-    tags: ["format:class", "dance-style:bachata", "level:beginner-friendly", reach:international]
+    tags:
+      [
+        "format:class",
+        "dance-style:bachata",
+        "dance-style:kizomba",
+        "level:beginner-friendly",
+        reach:international,
+        "venue:indoor",
+        "scale:small",
+      ]
   - id: evt-ux-008
     calendar_id: salsa-cal-001
     title: Prague Salsa Friday Social
@@ -127,7 +188,16 @@ events:
     start: w1 Fri 21:00
     end: w1 Sat 01:00
     price_is_free: true
-    tags: ["format:social", "dance-style:salsa", reach:international]
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "dance-style:mambo",
+        reach:international,
+        "venue:indoor",
+        "scale:large",
+        "level:all-levels",
+      ]
 
   # ── Week 2 ───────────────────────────────────────────────────────
   - id: evt-ux-009
@@ -142,7 +212,16 @@ events:
     start: w2 Tue 19:00
     end: w2 Tue 21:00
     price_is_free: true
-    tags: ["format:class", "dance-style:salsa", reach:regional]
+    tags:
+      [
+        "format:class",
+        "dance-style:salsa",
+        "dance-style:cuban",
+        reach:regional,
+        "venue:indoor",
+        "level:intermediate",
+        "scale:small",
+      ]
   - id: evt-ux-010
     calendar_id: bachata-cal-002
     title: Copenhagen Bachata Thursday Workshop
@@ -155,7 +234,16 @@ events:
     start: w2 Thu 19:00
     end: w2 Thu 22:00
     price_is_free: true
-    tags: ["format:workshop", "dance-style:bachata", reach:regional]
+    tags:
+      [
+        "format:workshop",
+        "dance-style:bachata",
+        "dance-style:zouk",
+        reach:regional,
+        "venue:indoor",
+        "level:intermediate",
+        "scale:medium",
+      ]
   - id: evt-ux-011
     calendar_id: salsa-cal-001
     title: London Salsa Saturday Festival Preview
@@ -168,7 +256,17 @@ events:
     start: w2 Sat 20:00
     end: w2 Sun 02:00
     price_is_free: true
-    tags: ["format:social", "dance-style:salsa", reach:local]
+    tags:
+      [
+        "format:social",
+        "format:day-social",
+        "dance-style:salsa",
+        reach:local,
+        "venue:indoor",
+        "scale:large",
+        "level:all-levels",
+        "misc:live-band",
+      ]
 
   # ── Week 4 ───────────────────────────────────────────────────────
   - id: evt-ux-012
@@ -183,7 +281,16 @@ events:
     start: w4 Mon 20:00
     end: w4 Mon 22:00
     price_is_free: true
-    tags: ["format:practice", "dance-style:salsa", reach:international]
+    tags:
+      [
+        "format:practice",
+        "dance-style:salsa",
+        "dance-style:rueda",
+        reach:international,
+        "venue:indoor",
+        "level:intermediate",
+        "scale:medium",
+      ]
   - id: evt-ux-013
     calendar_id: bachata-cal-002
     title: Zurich Bachata Friday Social
@@ -196,7 +303,17 @@ events:
     start: w4 Fri 21:00
     end: w4 Sat 01:00
     price_is_free: true
-    tags: ["format:social", "dance-style:bachata", reach:regional]
+    tags:
+      [
+        "format:social",
+        "dance-style:bachata",
+        "dance-style:semba",
+        reach:regional,
+        "venue:indoor",
+        "level:intermediate",
+        "scale:medium",
+        "misc:trip",
+      ]
   - id: evt-ux-014
     calendar_id: salsa-cal-001
     title: Milan Salsa Workshop Weekend
@@ -209,7 +326,17 @@ events:
     start: w4 Sat 14:00
     end: w4 Sat 18:00
     price_is_free: true
-    tags: ["format:workshop", "dance-style:salsa", reach:local]
+    tags:
+      [
+        "format:workshop",
+        "dance-style:salsa",
+        "dance-style:mambo",
+        reach:local,
+        "venue:indoor",
+        "level:intermediate",
+        "scale:medium",
+        "misc:food",
+      ]
 
   # ── Week 6 ───────────────────────────────────────────────────────
   - id: evt-ux-015
@@ -224,7 +351,16 @@ events:
     start: w6 Wed 20:00
     end: w6 Wed 23:00
     price_is_free: true
-    tags: ["format:social", "dance-style:salsa", reach:international]
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "dance-style:cuban",
+        reach:international,
+        "venue:indoor",
+        "level:all-levels",
+        "scale:medium",
+      ]
   - id: evt-ux-016
     calendar_id: bachata-cal-002
     title: Stockholm Bachata Sensual Workshop
@@ -237,7 +373,17 @@ events:
     start: w6 Sat 15:00
     end: w6 Sat 18:00
     price_is_free: true
-    tags: ["format:workshop", "dance-style:bachata", reach:regional]
+    tags:
+      [
+        "format:workshop",
+        "dance-style:bachata",
+        "dance-style:kizomba",
+        reach:regional,
+        "venue:indoor",
+        "level:intermediate",
+        "scale:small",
+        "misc:trip",
+      ]
   - id: evt-ux-017
     calendar_id: salsa-cal-001
     title: Athens Salsa Late Night Social
@@ -250,7 +396,16 @@ events:
     start: w6 Sat 22:00
     end: w6 Sun 03:00
     price_is_free: true
-    tags: ["format:social", "dance-style:salsa", reach:international]
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "dance-style:mambo",
+        reach:international,
+        "venue:indoor",
+        "level:advanced",
+        "scale:large",
+      ]
 
   # ── Week 8 ───────────────────────────────────────────────────────
   - id: evt-ux-018
@@ -265,7 +420,16 @@ events:
     start: w8 Mon 19:00
     end: w8 Mon 20:30
     price_is_free: true
-    tags: ["format:class", "dance-style:salsa", "level:beginner-friendly", reach:local]
+    tags:
+      [
+        "format:class",
+        "dance-style:salsa",
+        "dance-style:rueda",
+        "level:beginner-friendly",
+        reach:local,
+        "venue:indoor",
+        "scale:small",
+      ]
   - id: evt-ux-019
     calendar_id: bachata-cal-002
     title: Tel Aviv Bachata Thursday Drop-in
@@ -278,7 +442,16 @@ events:
     start: w8 Thu 19:30
     end: w8 Thu 21:00
     price_is_free: true
-    tags: ["format:class", "dance-style:bachata", reach:international]
+    tags:
+      [
+        "format:class",
+        "dance-style:bachata",
+        "dance-style:zouk",
+        reach:international,
+        "venue:indoor",
+        "level:beginner-friendly",
+        "scale:small",
+      ]
   - id: evt-ux-020
     calendar_id: salsa-cal-001
     title: Marrakech Salsa Friday Big Social
@@ -291,7 +464,16 @@ events:
     start: w8 Fri 21:00
     end: w8 Sat 02:00
     price_is_free: true
-    tags: ["format:social", "dance-style:salsa", reach:local]
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "dance-style:mambo",
+        reach:local,
+        "venue:indoor",
+        "scale:large",
+        "level:all-levels",
+      ]
   - id: evt-ux-021
     calendar_id: bachata-cal-002
     title: Dublin Bachata Sunday Brunch
@@ -304,7 +486,17 @@ events:
     start: w8 Sun 12:00
     end: w8 Sun 15:00
     price_is_free: true
-    tags: ["format:social", "dance-style:bachata", reach:local]
+    tags:
+      [
+        "format:social",
+        "format:day-social",
+        "dance-style:bachata",
+        reach:local,
+        "venue:indoor",
+        "scale:medium",
+        "level:all-levels",
+        "misc:food",
+      ]
 
   # ── Week 10 ──────────────────────────────────────────────────────
   - id: evt-ux-022
@@ -319,7 +511,18 @@ events:
     start: w10 Sat 10:00
     end: w10 Sat 17:00
     price_is_free: true
-    tags: ["format:workshop", "dance-style:salsa", "level:intermediate", reach:international]
+    tags:
+      [
+        "format:workshop",
+        "format:bootcamp",
+        "dance-style:salsa",
+        "dance-style:cuban",
+        "level:intermediate",
+        reach:international,
+        "venue:indoor",
+        "scale:medium",
+        "misc:trip",
+      ]
   - id: evt-ux-023
     calendar_id: bachata-cal-002
     title: Budapest Bachata Festival Pre-party
@@ -332,7 +535,18 @@ events:
     start: w10 Fri 22:00
     end: w10 Sat 03:00
     price_is_free: true
-    tags: ["format:social", "dance-style:bachata", reach:international]
+    tags:
+      [
+        "format:social",
+        "format:festival",
+        "dance-style:bachata",
+        "dance-style:semba",
+        reach:international,
+        "venue:indoor",
+        "scale:large",
+        "level:all-levels",
+        "misc:trip",
+      ]
 
   # ── Beyond default 3 months (Extend Period reveals these) ────────
   - id: evt-ux-024
@@ -347,7 +561,18 @@ events:
     start: w14 Sat 19:00
     end: w14 Sun 04:00
     price_is_free: true
-    tags: ["format:social", "dance-style:salsa", reach:international]
+    tags:
+      [
+        "format:social",
+        "format:festival",
+        "dance-style:salsa",
+        "dance-style:mambo",
+        reach:international,
+        "venue:indoor",
+        "scale:large",
+        "level:all-levels",
+        "misc:live-band",
+      ]
   - id: evt-ux-025
     calendar_id: bachata-cal-002
     title: Copenhagen Bachata Spring Workshop Weekend
@@ -360,7 +585,18 @@ events:
     start: w16 Sat 11:00
     end: w16 Sun 18:00
     price_is_free: true
-    tags: ["format:workshop", "dance-style:bachata", reach:local]
+    tags:
+      [
+        "format:workshop",
+        "format:weekender",
+        "dance-style:bachata",
+        "dance-style:kizomba",
+        reach:local,
+        "venue:indoor",
+        "scale:medium",
+        "level:intermediate",
+        "misc:trip",
+      ]
   - id: evt-ux-026
     calendar_id: salsa-cal-001
     title: Montreal Salsa Late Spring Social
@@ -373,7 +609,17 @@ events:
     start: w18 Fri 21:00
     end: w18 Sat 02:00
     price_is_free: true
-    tags: ["format:social", "dance-style:salsa", reach:regional]
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "dance-style:cuban",
+        reach:regional,
+        "venue:indoor",
+        "scale:medium",
+        "level:all-levels",
+        "misc:trip",
+      ]
   - id: evt-ux-027
     calendar_id: bachata-cal-002
     title: Cape Town Bachata Summer Kickoff
@@ -386,7 +632,18 @@ events:
     start: w20 Sat 20:00
     end: w20 Sun 01:00
     price_is_free: true
-    tags: ["format:social", "dance-style:bachata", reach:local]
+    tags:
+      [
+        "format:social",
+        "format:pool-party",
+        "dance-style:bachata",
+        "dance-style:zouk",
+        reach:local,
+        "venue:outdoor",
+        "scale:large",
+        "level:all-levels",
+        "misc:beach-side",
+      ]
 
   # ── Far-away event for the "Search this area" pill ───────────────
   # New York — outside the default Europe & nearby area, visible after
@@ -403,7 +660,1229 @@ events:
     start: w2 Sat 21:00
     end: w2 Sun 02:00
     price_is_free: true
-    tags: ["format:social", "dance-style:salsa", reach:local]
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "dance-style:mambo",
+        "reach:local",
+        "venue:rooftop",
+        "scale:large",
+        "level:all-levels",
+        "misc:trip",
+      ]
+
+  # ══ Extended dataset (evt-ux-029..080) ══════════════════════════════
+  # ~2-year horizon (w22–w103), all continents, Europe-heavy, mostly salsa
+  # + reach:international, with a realistic paid/free mix and richer tags
+  # (venue / scale / level / misc) to exercise the "More filters" surface.
+
+  # ── Europe (evt-ux-029..050) ──────────────────────────────────────
+  - id: evt-ux-029
+    calendar_id: salsa-cal-001
+    title: Kraków Salsa Rynek Social
+    description: |
+      Old-town salsa social on the main square with a mixed local-and-visitor crowd and a social-first DJ set.
+    location: Rynek Glowny, Kraków, Poland
+    latitude: 50.0647
+    longitude: 19.9450
+    start: w22 Fri 21:00
+    end: w22 Sat 01:00
+    price_is_free: false
+    price_min: 10
+    price_max: 15
+    price_currency: PLN
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "reach:regional",
+        "venue:indoor",
+        "level:all-levels",
+      ]
+  - id: evt-ux-030
+    calendar_id: bachata-cal-002
+    title: Valencia Bachata Beach Workshop
+    description: |
+      Daytime bachata workshop near the marina focused on musicality and clean transitions before an open practice.
+    location: La Marina, Valencia, Spain
+    latitude: 39.4699
+    longitude: -0.3763
+    start: w24 Sat 12:00
+    end: w24 Sat 16:00
+    price_is_free: false
+    price_min: 20
+    price_max: 25
+    price_currency: EUR
+    tags:
+      [
+        "format:workshop",
+        "dance-style:bachata",
+        "reach:local",
+        "venue:outdoor",
+        "level:intermediate",
+      ]
+  - id: evt-ux-031
+    calendar_id: salsa-cal-001
+    title: Naples Salsa Seafront Social
+    description: |
+      Warm seafront salsa night with a festive local crowd and a long social block by the bay.
+    location: Lungomare, Naples, Italy
+    latitude: 40.8518
+    longitude: 14.2681
+    start: w26 Sat 21:00
+    end: w26 Sun 01:00
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "reach:international",
+        "venue:outdoor",
+        "misc:beach-side",
+      ]
+  - id: evt-ux-032
+    calendar_id: bachata-cal-002
+    title: Hamburg Kizomba Harbour Night
+    description: |
+      Intimate kizomba social in a harbour-side studio with a mellow, connection-focused playlist.
+    location: St. Pauli, Hamburg, Germany
+    latitude: 53.5511
+    longitude: 9.9937
+    start: w28 Fri 21:00
+    end: w28 Sat 01:00
+    price_is_free: false
+    price_min: 12
+    price_max: 12
+    price_currency: EUR
+    tags:
+      [
+        "format:social",
+        "dance-style:kizomba",
+        "dance-style:semba",
+        reach:regional,
+        "venue:indoor",
+        "scale:small",
+        "level:intermediate",
+        "misc:trip",
+      ]
+  - id: evt-ux-033
+    calendar_id: salsa-cal-001
+    title: Lyon Salsa Festival Weekend
+    description: |
+      International salsa festival weekend with workshops by day and packed party rooms at night.
+    location: Presqu'île, Lyon, France
+    latitude: 45.7640
+    longitude: 4.8357
+    start: w30 Sat 15:00
+    end: w30 Sun 04:00
+    price_is_free: false
+    price_min: 60
+    price_max: 95
+    price_currency: EUR
+    tags:
+      [
+        "format:festival",
+        "dance-style:salsa",
+        "reach:international",
+        "scale:large",
+        "level:all-levels",
+      ]
+  - id: evt-ux-034
+    calendar_id: salsa-cal-001
+    title: Seville Salsa Congress Gala
+    description: |
+      Flagship salsa congress gala night with guest artists and a grand ballroom social floor.
+    location: Triana, Seville, Spain
+    latitude: 37.3891
+    longitude: -5.9845
+    start: w32 Sat 20:00
+    end: w32 Sun 05:00
+    price_is_free: false
+    price_min: 75
+    price_max: 120
+    price_currency: EUR
+    tags:
+      [
+        "format:festival",
+        "dance-style:salsa",
+        "reach:international",
+        "scale:large",
+        "misc:live-band",
+      ]
+  - id: evt-ux-035
+    calendar_id: bachata-cal-002
+    title: Munich Bachata After-work Social
+    description: |
+      Relaxed after-work bachata social with an easy start and a steady late-evening floor.
+    location: Glockenbach, Munich, Germany
+    latitude: 48.1351
+    longitude: 11.5820
+    start: w34 Thu 20:00
+    end: w34 Fri 00:00
+    price_is_free: false
+    price_min: 8
+    price_max: 10
+    price_currency: EUR
+    tags:
+      [
+        "format:social",
+        "dance-style:bachata",
+        "dance-style:zouk",
+        reach:regional,
+        "venue:indoor",
+        "scale:medium",
+        "level:intermediate",
+      ]
+  - id: evt-ux-036
+    calendar_id: bachata-cal-002
+    title: Gothenburg Zouk Practice Lab
+    description: |
+      Free brazilian zouk practice lab with guided rounds and open floor time between drills.
+    location: Haga, Gothenburg, Sweden
+    latitude: 57.7089
+    longitude: 11.9746
+    start: w36 Tue 19:00
+    end: w36 Tue 21:30
+    price_is_free: true
+    tags:
+      [
+        "format:practice",
+        "dance-style:zouk",
+        "dance-style:semba",
+        reach:local,
+        "level:intermediate",
+        "scale:small",
+        "venue:indoor",
+      ]
+  - id: evt-ux-037
+    calendar_id: salsa-cal-001
+    title: Zagreb Salsa Rooftop Social
+    description: |
+      Rooftop salsa social with skyline views and an international summer crowd.
+    location: Gornji Grad, Zagreb, Croatia
+    latitude: 45.8150
+    longitude: 15.9819
+    start: w38 Fri 21:00
+    end: w38 Sat 01:00
+    price_is_free: false
+    price_min: 8
+    price_max: 12
+    price_currency: EUR
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "reach:international",
+        "venue:rooftop",
+        "misc:trip",
+      ]
+  - id: evt-ux-038
+    calendar_id: salsa-cal-001
+    title: Bucharest Salsa Saturday Night
+    description: |
+      Busy Saturday salsa social in the old town with a regional crowd and a strong DJ line-up.
+    location: Lipscani, Bucharest, Romania
+    latitude: 44.4268
+    longitude: 26.1025
+    start: w40 Sat 21:00
+    end: w40 Sun 02:00
+    price_is_free: false
+    price_min: 30
+    price_max: 40
+    price_currency: RON
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "dance-style:mambo",
+        reach:regional,
+        "scale:medium",
+        "venue:indoor",
+        "level:intermediate",
+      ]
+  - id: evt-ux-039
+    calendar_id: bachata-cal-002
+    title: Sofia Bachata Beginner Class
+    description: |
+      Free beginner-friendly bachata class covering the basics before a short social.
+    location: Center, Sofia, Bulgaria
+    latitude: 42.6977
+    longitude: 23.3219
+    start: w42 Wed 19:00
+    end: w42 Wed 21:00
+    price_is_free: true
+    tags:
+      [
+        "format:class",
+        "dance-style:bachata",
+        "dance-style:kizomba",
+        reach:local,
+        "level:beginner-friendly",
+        "scale:small",
+        "venue:indoor",
+      ]
+  - id: evt-ux-040
+    calendar_id: salsa-cal-001
+    title: Helsinki Salsa Winter Social
+    description: |
+      Cosy winter salsa social with an international crowd escaping the cold for a warm floor.
+    location: Kallio, Helsinki, Finland
+    latitude: 60.1699
+    longitude: 24.9384
+    start: w44 Sat 20:00
+    end: w44 Sun 00:00
+    price_is_free: false
+    price_min: 12
+    price_max: 15
+    price_currency: EUR
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "reach:international",
+        "venue:indoor",
+      ]
+  - id: evt-ux-041
+    calendar_id: bachata-cal-002
+    title: Oslo Bachata Fjord Social
+    description: |
+      Bachata social with a friendly regional crowd and a mellow sensual set.
+    location: Grünerløkka, Oslo, Norway
+    latitude: 59.9139
+    longitude: 10.7522
+    start: w46 Fri 21:00
+    end: w46 Sat 01:00
+    price_is_free: false
+    price_min: 150
+    price_max: 200
+    price_currency: NOK
+    tags:
+      [
+        "format:social",
+        "dance-style:bachata",
+        "dance-style:semba",
+        reach:regional,
+        "venue:indoor",
+        "scale:medium",
+        "level:intermediate",
+        "misc:trip",
+      ]
+  - id: evt-ux-042
+    calendar_id: salsa-cal-001
+    title: Rotterdam Rueda Flash Practice
+    description: |
+      Free outdoor rueda flash practice with a caller and rotating circles in the park.
+    location: Het Park, Rotterdam, Netherlands
+    latitude: 51.9244
+    longitude: 4.4777
+    start: w48 Sun 15:00
+    end: w48 Sun 17:00
+    price_is_free: true
+    tags:
+      [
+        "format:practice",
+        "format:day-social",
+        "dance-style:rueda",
+        "reach:local",
+        "venue:outdoor",
+        "scale:medium",
+        "level:all-levels",
+      ]
+  - id: evt-ux-043
+    calendar_id: salsa-cal-001
+    title: Geneva Salsa International Workshop
+    description: |
+      International salsa workshop day with visiting instructors and an evening social.
+    location: Pâquis, Geneva, Switzerland
+    latitude: 46.2044
+    longitude: 6.1432
+    start: w50 Sat 13:00
+    end: w50 Sat 22:00
+    price_is_free: false
+    price_min: 45
+    price_max: 60
+    price_currency: CHF
+    tags:
+      [
+        "format:workshop",
+        "dance-style:salsa",
+        "reach:international",
+        "level:advanced",
+        "scale:medium",
+      ]
+  - id: evt-ux-044
+    calendar_id: salsa-cal-001
+    title: Nice Salsa Beach Sunset Social
+    description: |
+      Sunset salsa social right on the promenade with an international summer crowd.
+    location: Promenade des Anglais, Nice, France
+    latitude: 43.7102
+    longitude: 7.2620
+    start: w52 Sat 18:00
+    end: w52 Sat 23:00
+    price_is_free: false
+    price_min: 10
+    price_max: 10
+    price_currency: EUR
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "reach:international",
+        "venue:outdoor",
+        "misc:beach-side",
+      ]
+  - id: evt-ux-045
+    calendar_id: bachata-cal-002
+    title: Málaga Bachata Festival
+    description: |
+      Coastal bachata festival with pool parties by day and international socials at night.
+    location: Malagueta, Málaga, Spain
+    latitude: 36.7213
+    longitude: -4.4213
+    start: w54 Fri 16:00
+    end: w54 Sun 06:00
+    price_is_free: false
+    price_min: 70
+    price_max: 110
+    price_currency: EUR
+    tags:
+      [
+        "format:festival",
+        "dance-style:bachata",
+        "reach:international",
+        "format:pool-party",
+        "scale:large",
+      ]
+  - id: evt-ux-046
+    calendar_id: salsa-cal-001
+    title: Bologna Salsa Portico Social
+    description: |
+      Free salsa social under the porticoes with a warm regional crowd.
+    location: Quadrilatero, Bologna, Italy
+    latitude: 44.4949
+    longitude: 11.3426
+    start: w56 Sat 21:00
+    end: w56 Sun 01:00
+    price_is_free: true
+    tags:
+      ["format:social", "dance-style:salsa", "reach:regional", "scale:small"]
+  - id: evt-ux-047
+    calendar_id: bachata-cal-002
+    title: Ghent Kizomba Canal Social
+    description: |
+      Kizomba social by the canals with a small, welcoming local crowd.
+    location: Patershol, Ghent, Belgium
+    latitude: 51.0543
+    longitude: 3.7174
+    start: w58 Fri 20:30
+    end: w58 Sat 00:30
+    price_is_free: false
+    price_min: 10
+    price_max: 12
+    price_currency: EUR
+    tags:
+      [
+        "format:social",
+        "dance-style:kizomba",
+        "dance-style:semba",
+        reach:local,
+        "scale:small",
+        "venue:indoor",
+        "level:intermediate",
+      ]
+  - id: evt-ux-048
+    calendar_id: salsa-cal-001
+    title: Tallinn Salsa Weekender
+    description: |
+      Compact salsa weekender with workshops, socials and an international guest crowd.
+    location: Vanalinn, Tallinn, Estonia
+    latitude: 59.4370
+    longitude: 24.7536
+    start: w60 Sat 12:00
+    end: w60 Sun 23:00
+    price_is_free: false
+    price_min: 55
+    price_max: 80
+    price_currency: EUR
+    tags:
+      [
+        "format:weekender",
+        "dance-style:salsa",
+        "reach:international",
+        "scale:medium",
+      ]
+  - id: evt-ux-049
+    calendar_id: bachata-cal-002
+    title: Thessaloniki Bachata Seaside Social
+    description: |
+      Free seaside bachata social with a regional summer crowd and a long open floor.
+    location: Ladadika, Thessaloniki, Greece
+    latitude: 40.6401
+    longitude: 22.9444
+    start: w62 Sat 21:00
+    end: w62 Sun 01:00
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "dance-style:bachata",
+        "reach:regional",
+        "venue:outdoor",
+      ]
+  - id: evt-ux-050
+    calendar_id: salsa-cal-001
+    title: Ljubljana Salsa Riverside Social
+    description: |
+      Riverside salsa social with an international crowd and a relaxed summer vibe.
+    location: Old Town, Ljubljana, Slovenia
+    latitude: 46.0569
+    longitude: 14.5058
+    start: w64 Fri 21:00
+    end: w64 Sat 01:00
+    price_is_free: false
+    price_min: 8
+    price_max: 10
+    price_currency: EUR
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "reach:international",
+        "venue:outdoor",
+      ]
+
+  # ── North America (evt-ux-051..058) ───────────────────────────────
+  - id: evt-ux-051
+    calendar_id: salsa-cal-001
+    title: Toronto Salsa Waterfront Social
+    description: |
+      International salsa social on the waterfront with a big, diverse city crowd.
+    location: Harbourfront, Toronto, Canada
+    latitude: 43.6532
+    longitude: -79.3832
+    start: w25 Sat 21:00
+    end: w25 Sun 02:00
+    price_is_free: false
+    price_min: 20
+    price_max: 25
+    price_currency: CAD
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "reach:international",
+        "scale:large",
+      ]
+  - id: evt-ux-052
+    calendar_id: salsa-cal-001
+    title: Mexico City Salsa Festival
+    description: |
+      Huge salsa festival with live bands and international guest artists across several rooms.
+    location: Condesa, Mexico City, Mexico
+    latitude: 19.4326
+    longitude: -99.1332
+    start: w33 Sat 16:00
+    end: w33 Sun 05:00
+    price_is_free: false
+    price_min: 400
+    price_max: 700
+    price_currency: MXN
+    tags:
+      [
+        "format:festival",
+        "dance-style:salsa",
+        "reach:international",
+        "misc:live-band",
+        "scale:large",
+      ]
+  - id: evt-ux-053
+    calendar_id: salsa-cal-001
+    title: Los Angeles Salsa Congress
+    description: |
+      West-coast salsa congress with On1/On2 rooms and a late international social.
+    location: Downtown, Los Angeles, USA
+    latitude: 34.0522
+    longitude: -118.2437
+    start: w41 Sat 15:00
+    end: w41 Sun 04:00
+    price_is_free: false
+    price_min: 90
+    price_max: 150
+    price_currency: USD
+    tags:
+      [
+        "format:festival",
+        "dance-style:mambo",
+        "reach:international",
+        "scale:large",
+        "level:advanced",
+      ]
+  - id: evt-ux-054
+    calendar_id: bachata-cal-002
+    title: Chicago Bachata Loft Social
+    description: |
+      Regional bachata social in a downtown loft with a sensual-leaning playlist.
+    location: West Loop, Chicago, USA
+    latitude: 41.8781
+    longitude: -87.6298
+    start: w49 Fri 21:00
+    end: w49 Sat 01:00
+    price_is_free: false
+    price_min: 15
+    price_max: 20
+    price_currency: USD
+    tags:
+      ["format:social", "dance-style:bachata", "reach:regional", "venue:indoor"]
+  - id: evt-ux-055
+    calendar_id: salsa-cal-001
+    title: Miami Salsa Pool Party
+    description: |
+      Daytime salsa pool party with an international crowd and a live percussion set.
+    location: South Beach, Miami, USA
+    latitude: 25.7617
+    longitude: -80.1918
+    start: w57 Sat 13:00
+    end: w57 Sat 19:00
+    price_is_free: false
+    price_min: 30
+    price_max: 45
+    price_currency: USD
+    tags:
+      [
+        "format:pool-party",
+        "dance-style:salsa",
+        "reach:international",
+        "venue:pool",
+        "misc:beach-side",
+      ]
+  - id: evt-ux-056
+    calendar_id: bachata-cal-002
+    title: San Francisco Bachata Workshop
+    description: |
+      Bachata technique workshop with a small local crowd and a focused improver track.
+    location: Mission, San Francisco, USA
+    latitude: 37.7749
+    longitude: -122.4194
+    start: w65 Sat 14:00
+    end: w65 Sat 18:00
+    price_is_free: false
+    price_min: 35
+    price_max: 45
+    price_currency: USD
+    tags:
+      [
+        "format:workshop",
+        "dance-style:bachata",
+        "reach:local",
+        "level:intermediate",
+        "scale:small",
+      ]
+  - id: evt-ux-057
+    calendar_id: salsa-cal-001
+    title: Vancouver Salsa Sunday Social
+    description: |
+      Free Sunday salsa social with a friendly regional crowd and an easy open floor.
+    location: Gastown, Vancouver, Canada
+    latitude: 49.2827
+    longitude: -123.1207
+    start: w73 Sun 19:00
+    end: w73 Sun 23:00
+    price_is_free: true
+    tags:
+      ["format:social", "dance-style:salsa", "reach:regional", "scale:small"]
+  - id: evt-ux-058
+    calendar_id: salsa-cal-001
+    title: Havana Cuban Salsa Festival
+    description: |
+      Casino and rueda festival in the heart of Havana with international dancers and live son.
+    location: Habana Vieja, Havana, Cuba
+    latitude: 23.1136
+    longitude: -82.3666
+    start: w81 Sat 18:00
+    end: w81 Sun 04:00
+    price_is_free: false
+    price_min: 80
+    price_max: 130
+    price_currency: USD
+    tags:
+      [
+        "format:festival",
+        "dance-style:cuban",
+        "reach:international",
+        "misc:live-band",
+        "misc:trip",
+      ]
+
+  # ── Asia (evt-ux-059..066) ────────────────────────────────────────
+  - id: evt-ux-059
+    calendar_id: salsa-cal-001
+    title: Tokyo Salsa Skyline Social
+    description: |
+      High-rise salsa social with an international crowd and a polished city-event feel.
+    location: Shinjuku, Tokyo, Japan
+    latitude: 35.6762
+    longitude: 139.6503
+    start: w27 Sat 20:00
+    end: w27 Sun 00:00
+    price_is_free: false
+    price_min: 3000
+    price_max: 4000
+    price_currency: JPY
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "reach:international",
+        "venue:rooftop",
+        "scale:medium",
+      ]
+  - id: evt-ux-060
+    calendar_id: bachata-cal-002
+    title: Singapore Bachata River Social
+    description: |
+      Riverside bachata social with a regional crowd and a warm, humid open-air floor.
+    location: Clarke Quay, Singapore
+    latitude: 1.3521
+    longitude: 103.8198
+    start: w35 Fri 20:00
+    end: w35 Sat 00:00
+    price_is_free: false
+    price_min: 20
+    price_max: 25
+    price_currency: SGD
+    tags:
+      [
+        "format:social",
+        "dance-style:bachata",
+        "reach:regional",
+        "venue:outdoor",
+      ]
+  - id: evt-ux-061
+    calendar_id: salsa-cal-001
+    title: Bangkok Salsa Festival
+    description: |
+      International salsa festival with tropical pool parties and late-night socials.
+    location: Sukhumvit, Bangkok, Thailand
+    latitude: 13.7563
+    longitude: 100.5018
+    start: w43 Sat 15:00
+    end: w43 Sun 03:00
+    price_is_free: false
+    price_min: 1500
+    price_max: 2500
+    price_currency: THB
+    tags:
+      [
+        "format:festival",
+        "dance-style:salsa",
+        "reach:international",
+        "format:pool-party",
+        "scale:large",
+      ]
+  - id: evt-ux-062
+    calendar_id: salsa-cal-001
+    title: Seoul Salsa Weeknight Social
+    description: |
+      Local salsa social in a downtown studio with a friendly, dance-first crowd.
+    location: Hongdae, Seoul, South Korea
+    latitude: 37.5665
+    longitude: 126.9780
+    start: w51 Thu 20:00
+    end: w51 Fri 00:00
+    price_is_free: false
+    price_min: 15000
+    price_max: 20000
+    price_currency: KRW
+    tags: ["format:social", "dance-style:salsa", "reach:local", "venue:indoor"]
+  - id: evt-ux-063
+    calendar_id: bachata-cal-002
+    title: Bengaluru Bachata Workshop
+    description: |
+      Free bachata workshop with a growing regional scene and an enthusiastic beginner track.
+    location: Indiranagar, Bengaluru, India
+    latitude: 12.9716
+    longitude: 77.5946
+    start: w59 Sat 16:00
+    end: w59 Sat 19:00
+    price_is_free: true
+    tags:
+      [
+        "format:workshop",
+        "dance-style:bachata",
+        "reach:regional",
+        "level:beginner-friendly",
+      ]
+  - id: evt-ux-064
+    calendar_id: salsa-cal-001
+    title: Shanghai Salsa Bund Social
+    description: |
+      International salsa social overlooking the Bund with a mixed expat-and-local crowd.
+    location: The Bund, Shanghai, China
+    latitude: 31.2304
+    longitude: 121.4737
+    start: w67 Sat 20:00
+    end: w67 Sun 00:00
+    price_is_free: false
+    price_min: 100
+    price_max: 150
+    price_currency: CNY
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "reach:international",
+        "venue:rooftop",
+      ]
+  - id: evt-ux-065
+    calendar_id: salsa-cal-001
+    title: Manila Salsa Bay Social
+    description: |
+      Free bayside salsa social with a lively regional crowd and live percussion.
+    location: Malate, Manila, Philippines
+    latitude: 14.5995
+    longitude: 120.9842
+    start: w75 Sat 20:00
+    end: w75 Sun 00:00
+    price_is_free: true
+    tags:
+      ["format:social", "dance-style:salsa", "reach:regional", "misc:live-band"]
+  - id: evt-ux-066
+    calendar_id: bachata-cal-002
+    title: Dubai Bachata Desert Festival
+    description: |
+      Glossy international bachata festival with rooftop socials and a pool-party afternoon.
+    location: Marina, Dubai, UAE
+    latitude: 25.2048
+    longitude: 55.2708
+    start: w83 Fri 16:00
+    end: w83 Sun 03:00
+    price_is_free: false
+    price_min: 300
+    price_max: 500
+    price_currency: AED
+    tags:
+      [
+        "format:festival",
+        "dance-style:bachata",
+        "reach:international",
+        "venue:rooftop",
+        "scale:large",
+      ]
+
+  # ── South America (evt-ux-067..072) ───────────────────────────────
+  - id: evt-ux-067
+    calendar_id: salsa-cal-001
+    title: Buenos Aires Salsa Milonga House
+    description: |
+      International salsa social in a classic dance house with a passionate late-night crowd.
+    location: San Telmo, Buenos Aires, Argentina
+    latitude: -34.6037
+    longitude: -58.3816
+    start: w29 Sat 22:00
+    end: w29 Sun 04:00
+    price_is_free: false
+    price_min: 5000
+    price_max: 8000
+    price_currency: ARS
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "reach:international",
+        "scale:medium",
+      ]
+  - id: evt-ux-068
+    calendar_id: bachata-cal-002
+    title: São Paulo Zouk Festival
+    description: |
+      Major brazilian zouk festival with international artists and marathon-style socials.
+    location: Vila Madalena, São Paulo, Brazil
+    latitude: -23.5505
+    longitude: -46.6333
+    start: w45 Fri 18:00
+    end: w45 Sun 06:00
+    price_is_free: false
+    price_min: 200
+    price_max: 350
+    price_currency: BRL
+    tags:
+      [
+        "format:festival",
+        "dance-style:zouk",
+        "reach:international",
+        "scale:large",
+        "level:advanced",
+      ]
+  - id: evt-ux-069
+    calendar_id: salsa-cal-001
+    title: Bogotá Salsa Congress
+    description: |
+      High-energy salsa congress with Cali-style shows and a huge international social.
+    location: Chapinero, Bogotá, Colombia
+    latitude: 4.7110
+    longitude: -74.0721
+    start: w53 Sat 15:00
+    end: w53 Sun 04:00
+    price_is_free: false
+    price_min: 120000
+    price_max: 200000
+    price_currency: COP
+    tags:
+      [
+        "format:festival",
+        "dance-style:salsa",
+        "reach:international",
+        "misc:live-band",
+        "scale:large",
+      ]
+  - id: evt-ux-070
+    calendar_id: bachata-cal-002
+    title: Santiago Bachata Andes Social
+    description: |
+      Regional bachata social with a warm crowd and a mountain-city summer feel.
+    location: Bellavista, Santiago, Chile
+    latitude: -33.4489
+    longitude: -70.6693
+    start: w61 Fri 21:00
+    end: w61 Sat 01:00
+    price_is_free: true
+    tags:
+      ["format:social", "dance-style:bachata", "reach:regional", "scale:small"]
+  - id: evt-ux-071
+    calendar_id: salsa-cal-001
+    title: Lima Salsa Barranco Night
+    description: |
+      Local salsa night in the bohemian quarter with live son and a dance-first crowd.
+    location: Barranco, Lima, Peru
+    latitude: -12.0464
+    longitude: -77.0428
+    start: w77 Sat 21:00
+    end: w77 Sun 02:00
+    price_is_free: false
+    price_min: 40
+    price_max: 60
+    price_currency: PEN
+    tags: ["format:social", "dance-style:son", "reach:local", "misc:live-band"]
+  - id: evt-ux-072
+    calendar_id: salsa-cal-001
+    title: Medellín Salsa Festival
+    description: |
+      International salsa festival in the city of eternal spring with open-air socials.
+    location: El Poblado, Medellín, Colombia
+    latitude: 6.2442
+    longitude: -75.5812
+    start: w90 Sat 16:00
+    end: w90 Sun 04:00
+    price_is_free: false
+    price_min: 100000
+    price_max: 180000
+    price_currency: COP
+    tags:
+      [
+        "format:festival",
+        "dance-style:salsa",
+        "reach:international",
+        "venue:outdoor",
+        "scale:large",
+      ]
+
+  # ── Africa (evt-ux-073..076) ──────────────────────────────────────
+  - id: evt-ux-073
+    calendar_id: salsa-cal-001
+    title: Nairobi Salsa Rooftop Social
+    description: |
+      Free rooftop salsa social with a growing regional scene and a warm evening crowd.
+    location: Westlands, Nairobi, Kenya
+    latitude: -1.2921
+    longitude: 36.8219
+    start: w47 Sat 19:00
+    end: w47 Sat 23:00
+    price_is_free: true
+    tags:
+      ["format:social", "dance-style:salsa", "reach:regional", "venue:rooftop"]
+  - id: evt-ux-074
+    calendar_id: bachata-cal-002
+    title: Lagos Kizomba Beach Social
+    description: |
+      International kizomba beach social with a live-band set and a festive coastal crowd.
+    location: Victoria Island, Lagos, Nigeria
+    latitude: 6.5244
+    longitude: 3.3792
+    start: w63 Sat 18:00
+    end: w63 Sun 00:00
+    price_is_free: false
+    price_min: 8000
+    price_max: 12000
+    price_currency: NGN
+    tags:
+      [
+        "format:social",
+        "dance-style:kizomba",
+        "reach:international",
+        "venue:outdoor",
+        "misc:beach-side",
+      ]
+  - id: evt-ux-075
+    calendar_id: salsa-cal-001
+    title: Accra Salsa Community Workshop
+    description: |
+      Free community salsa workshop building the local scene with a beginner-friendly track.
+    location: Osu, Accra, Ghana
+    latitude: 5.6037
+    longitude: -0.1870
+    start: w79 Sat 15:00
+    end: w79 Sat 18:00
+    price_is_free: true
+    tags:
+      [
+        "format:workshop",
+        "dance-style:salsa",
+        "reach:local",
+        "level:beginner-friendly",
+      ]
+  - id: evt-ux-076
+    calendar_id: bachata-cal-002
+    title: Cairo Bachata Nile Festival
+    description: |
+      International bachata festival with Nile-view socials and a rooftop after-party.
+    location: Zamalek, Cairo, Egypt
+    latitude: 30.0444
+    longitude: 31.2357
+    start: w87 Fri 17:00
+    end: w87 Sun 02:00
+    price_is_free: false
+    price_min: 1200
+    price_max: 2000
+    price_currency: EGP
+    tags:
+      [
+        "format:festival",
+        "dance-style:bachata",
+        "reach:international",
+        "venue:rooftop",
+        "scale:medium",
+      ]
+
+  # ── Oceania (evt-ux-077..080) ─────────────────────────────────────
+  - id: evt-ux-077
+    calendar_id: salsa-cal-001
+    title: Sydney Salsa Harbour Festival
+    description: |
+      International salsa festival by the harbour with pool parties and headline socials.
+    location: Darling Harbour, Sydney, Australia
+    latitude: -33.8688
+    longitude: 151.2093
+    start: w55 Sat 15:00
+    end: w55 Sun 03:00
+    price_is_free: false
+    price_min: 120
+    price_max: 190
+    price_currency: AUD
+    tags:
+      [
+        "format:festival",
+        "dance-style:salsa",
+        "reach:international",
+        "format:pool-party",
+        "scale:large",
+      ]
+  - id: evt-ux-078
+    calendar_id: bachata-cal-002
+    title: Melbourne Bachata Laneway Social
+    description: |
+      Regional bachata social in a laneway studio with a friendly, sensual-leaning crowd.
+    location: Fitzroy, Melbourne, Australia
+    latitude: -37.8136
+    longitude: 144.9631
+    start: w71 Fri 21:00
+    end: w71 Sat 01:00
+    price_is_free: false
+    price_min: 15
+    price_max: 20
+    price_currency: AUD
+    tags:
+      ["format:social", "dance-style:bachata", "reach:regional", "venue:indoor"]
+  - id: evt-ux-079
+    calendar_id: salsa-cal-001
+    title: Auckland Salsa Waterfront Social
+    description: |
+      International salsa social on the waterfront with a warm, welcoming island crowd.
+    location: Wynyard Quarter, Auckland, New Zealand
+    latitude: -36.8485
+    longitude: 174.7633
+    start: w98 Sat 20:00
+    end: w98 Sun 00:00
+    price_is_free: false
+    price_min: 20
+    price_max: 25
+    price_currency: NZD
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "reach:international",
+        "venue:outdoor",
+      ]
+  - id: evt-ux-080
+    calendar_id: salsa-cal-001
+    title: Brisbane Salsa Riverstage Workshop
+    description: |
+      Free open-air salsa workshop by the river with a local crowd and a relaxed practice.
+    location: South Bank, Brisbane, Australia
+    latitude: -27.4698
+    longitude: 153.0251
+    start: w103 Sat 15:00
+    end: w103 Sat 18:00
+    price_is_free: true
+    tags:
+      [
+        "format:workshop",
+        "dance-style:salsa",
+        "reach:local",
+        "venue:outdoor",
+        "level:all-levels",
+      ]
+
+  # ── Trending Europe Events (evt-ux-081..085) ──────────────────────
+  - id: evt-ux-081
+    calendar_id: salsa-cal-001
+    title: Berlin Salsa House Festival
+    description: |
+      Explosive multi-room salsa festival in Berlin's Friedrichshain district with international headliners, live bands, and packed dance floors across the entire weekend.
+      This year's edition is already trending with early registrations from across Europe; expect a buzzing crowd and high-energy socials all night.
+    location: Friedrichshain, Berlin, Germany
+    latitude: 52.5100
+    longitude: 13.4450
+    start: w5 Fri 20:00
+    end: w5 Sun 03:00
+    price_is_free: false
+    price_min: 45
+    price_max: 85
+    price_currency: EUR
+    tags:
+      [
+        "format:festival",
+        "dance-style:salsa",
+        "dance-style:mambo",
+        "reach:international",
+        "venue:indoor",
+        "scale:large",
+        "level:all-levels",
+        "misc:live-band",
+      ]
+
+  - id: evt-ux-082
+    calendar_id: bachata-cal-002
+    title: Paris Bachata Speakeasy Social
+    description: |
+      Trending intimate bachata social in a hidden Marais speakeasy with mood lighting, craft cocktails, and a highly curated sensual playlist.
+      Word-of-mouth has made this the most sought-after weeknight social in Paris right now, with regulars and visitors mixing freely on the small floor.
+    location: Le Marais, Paris, France
+    latitude: 48.8597
+    longitude: 2.3644
+    start: w4 Wed 21:00
+    end: w4 Thu 02:00
+    price_is_free: false
+    price_min: 15
+    price_max: 18
+    price_currency: EUR
+    tags:
+      [
+        "format:social",
+        "dance-style:bachata",
+        "dance-style:kizomba",
+        "reach:international",
+        "venue:indoor",
+        "scale:small",
+        "level:intermediate",
+        "misc:trip",
+      ]
+
+  - id: evt-ux-083
+    calendar_id: salsa-cal-001
+    title: Barcelona Urban Salsa Festival
+    description: |
+      Cutting-edge urban salsa festival merging street culture with club socials, featuring emerging choreographers, freestyle battles, and late-night socials.
+      Already gaining momentum on social media with trending hashtags and influencer visibility; expect a younger, creative crowd.
+    location: Poble-Sec, Barcelona, Spain
+    latitude: 41.3720
+    longitude: 2.1630
+    start: w7 Sat 18:00
+    end: w7 Sun 06:00
+    price_is_free: false
+    price_min: 50
+    price_max: 90
+    price_currency: EUR
+    tags:
+      [
+        "format:festival",
+        "dance-style:salsa",
+        "dance-style:mambo",
+        "reach:international",
+        "venue:indoor",
+        "scale:large",
+        "level:all-levels",
+        "misc:live-band",
+      ]
+
+  - id: evt-ux-084
+    calendar_id: bachata-cal-002
+    title: Amsterdam Kizomba Summer Social
+    description: |
+      Trendy kizomba social on Amsterdam's canal ring with outdoor seating, summer vibes, and an international crowd of serious dancers.
+      This is the must-attend kizomba event of the season with capacity nearly full and strong attendance from across Europe.
+    location: Canal Ring, Amsterdam, Netherlands
+    latitude: 52.3676
+    longitude: 4.9041
+    start: w6 Fri 20:30
+    end: w6 Sat 02:30
+    price_is_free: false
+    price_min: 18
+    price_max: 22
+    price_currency: EUR
+    tags:
+      [
+        "format:social",
+        "dance-style:kizomba",
+        "dance-style:semba",
+        "reach:international",
+        "venue:outdoor",
+        "scale:medium",
+        "level:intermediate",
+        "misc:trip",
+      ]
+
+  - id: evt-ux-085
+    calendar_id: salsa-cal-001
+    title: Madrid International Dance Weekend
+    description: |
+      Premier international dance weekend in Madrid's Malasaña quarter with curated workshops by world-class instructors, headliner socials, and a packed festival atmosphere.
+      Currently trending across dance communities with travelers planning around this destination event; high energy and cosmopolitan crowd expected.
+    location: Malasaña, Madrid, Spain
+    latitude: 40.4300
+    longitude: -3.7050
+    start: w9 Fri 18:00
+    end: w9 Sun 04:00
+    price_is_free: false
+    price_min: 75
+    price_max: 130
+    price_currency: EUR
+    tags:
+      [
+        "format:festival",
+        "format:weekender",
+        "dance-style:salsa",
+        "dance-style:bachata",
+        "dance-style:mambo",
+        "reach:international",
+        "venue:indoor",
+        "scale:large",
+        "level:all-levels",
+        "misc:live-band",
+        "misc:trip",
+      ]
 
 # Social proof seeds. Mirrors the map-clustering fixture style so Explorer
 # cards and pins show saved/going counts, following badges, and popularity.

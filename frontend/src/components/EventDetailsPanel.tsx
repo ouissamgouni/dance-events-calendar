@@ -33,14 +33,14 @@ export default function EventDetailsPanel({
 }: Props) {
     const [confirmRemove, setConfirmRemove] = useState(false);
     const surfaceClassName = surface === 'card'
-        ? 'rounded-2xl bg-white shadow-2xl border border-slate-200'
+        ? 'rounded-card bg-surface shadow-2xl border border-line'
         : '';
 
     return (
         <div className={`flex flex-col ${surfaceClassName} ${className}`.trim()}>
-            <div className="flex items-start justify-between border-b border-slate-100 px-6 pt-5 pb-4">
+            <div className="flex items-start justify-between border-b border-card-line px-6 pt-5 pb-4">
                 <div className="min-w-0 flex-1 mr-3">
-                    <h2 className="text-lg font-bold text-slate-900 leading-snug">
+                    <h2 className="text-lg font-bold text-ink leading-snug">
                         {event.title}
                     </h2>
                 </div>
@@ -50,7 +50,7 @@ export default function EventDetailsPanel({
                     {onHide && (
                         <button
                             onClick={onHide}
-                            className="text-xs px-2 py-1 border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                            className="text-xs px-2 py-1 border border-line bg-surface text-ink hover:bg-canvas"
                             title="Hide event"
                         >
                             Hide
@@ -59,16 +59,16 @@ export default function EventDetailsPanel({
                     {onPermanentlyRemove && (
                         confirmRemove ? (
                             <>
-                                <span className="text-xs text-gray-600">Remove?</span>
+                                <span className="text-xs text-ink-soft">Remove?</span>
                                 <button
                                     onClick={() => { setConfirmRemove(false); onPermanentlyRemove(); }}
-                                    className="text-xs px-2 py-1 bg-red-600 hover:bg-red-700 text-white"
+                                    className="text-xs px-2 py-1 bg-danger hover:bg-danger/90 text-white"
                                 >
                                     Yes
                                 </button>
                                 <button
                                     onClick={() => setConfirmRemove(false)}
-                                    className="text-xs px-2 py-1 text-gray-400 hover:text-gray-600"
+                                    className="text-xs px-2 py-1 text-muted hover:text-ink-soft"
                                 >
                                     Cancel
                                 </button>
@@ -76,7 +76,7 @@ export default function EventDetailsPanel({
                         ) : (
                             <button
                                 onClick={() => setConfirmRemove(true)}
-                                className="text-xs px-2 py-1 bg-red-600 hover:bg-red-700 text-white"
+                                className="text-xs px-2 py-1 bg-danger hover:bg-danger/90 text-white"
                             >
                                 Remove
                             </button>
@@ -85,7 +85,7 @@ export default function EventDetailsPanel({
                     {onClose && (
                         <button
                             onClick={onClose}
-                            className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+                            className="rounded-full p-1 text-muted hover:bg-canvas hover:text-ink-soft transition"
                             aria-label="Close"
                         >
                             ✕
@@ -96,10 +96,10 @@ export default function EventDetailsPanel({
             <div className={`modal-scroll overflow-y-auto overscroll-contain px-6 py-4 ${bodyClassName}`.trim()}>
                 <EventDetailContent event={event} onEdit={onEdit} compact={true} />
             </div>
-            <div className="border-t border-slate-100 px-6 py-3 flex justify-end">
+            <div className="border-t border-card-line px-6 py-3 flex justify-end">
                 <Link
                     to={`/event/${event.event_id}${source ? `?src=${source}` : ''}`}
-                    className="text-xs text-blue-600 hover:text-blue-700 hover:underline"
+                    className="text-xs text-action hover:text-action hover:underline"
                 >
                     See full details →
                 </Link>

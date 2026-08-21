@@ -172,7 +172,7 @@ export default function RateEventButton({
             {countText
                 ? (
                     <span className="tabular-nums">
-                        Reviews <span className="text-slate-400">({countText})</span>
+                        Reviews <span className="text-muted">({countText})</span>
                         {hasRated && commentStatus === 'pending' && (
                             <span className="ml-1.5 pl-1.5 border-l border-amber-300 text-[11px] text-amber-700">
                                 Your comment pending
@@ -186,24 +186,24 @@ export default function RateEventButton({
         </>
     ) : appearance === 'count' ? (
         <>
-            <span className={`tabular-nums font-medium text-slate-500 ${size === 'sm' ? 'text-[10px]' : 'text-xs'}`}>{aggCount}</span>
+            <span className={`tabular-nums font-medium text-ink-soft ${size === 'sm' ? 'text-[10px]' : 'text-xs'}`}>{aggCount}</span>
             <img src="/message.png" alt="" aria-hidden="true" className={iconSizeClass} />
         </>
     ) : (
         <>
             {ReviewIcon}
             {countText && (
-                <span className={`tabular-nums font-medium text-slate-700 ${size === 'sm' ? 'text-[10px]' : 'text-xs'}`}>{countText}</span>
+                <span className={`tabular-nums font-medium text-ink ${size === 'sm' ? 'text-[10px]' : 'text-xs'}`}>{countText}</span>
             )}
             {dotColor && <span className={`absolute top-0 right-0 w-1.5 h-1.5 ${dotColor}`} />}
         </>
     );
 
     const buttonClasses = appearance === 'pill'
-        ? `text-xs px-3 py-1 transition flex items-center gap-1.5 border ${hasAggregate || hasRated ? 'text-sky-700 bg-sky-50 border-sky-200 hover:bg-sky-100' : 'text-slate-600 bg-white border-slate-300 hover:bg-slate-50'} ${className}`.trim()
+        ? `text-xs px-3 py-1 transition flex items-center gap-1.5 border ${hasAggregate || hasRated ? 'text-sky-700 bg-sky-50 border-sky-200 hover:bg-sky-100' : 'text-ink-soft bg-surface border-line hover:bg-canvas'} ${className}`.trim()
         : appearance === 'count'
-            ? `inline-flex items-center gap-1 text-slate-500 hover:text-slate-700 ${className}`.trim()
-            : `transition relative inline-flex items-center gap-0.5 ${size === 'sm' ? 'p-1' : 'p-1.5'} ${hasAggregate || hasRated ? 'text-sky-600 hover:text-sky-700' : 'text-slate-300 hover:text-slate-500'} ${className}`.trim();
+            ? `inline-flex items-center gap-1 text-ink-soft hover:text-ink ${className}`.trim()
+            : `transition relative inline-flex items-center gap-0.5 ${size === 'sm' ? 'p-1' : 'p-1.5'} ${hasAggregate || hasRated ? 'text-sky-600 hover:text-sky-700' : 'text-slate-300 hover:text-ink-soft'} ${className}`.trim();
 
     // Upcoming editions can't be reviewed — hide the button entirely (except the
     // read-only "count" appearance, which is naturally empty).
@@ -265,12 +265,12 @@ export default function RateEventButton({
             {button}
             {showSignIn && !user && (
                 <div
-                    className="absolute z-50 top-full mt-2 right-0 w-56 border border-slate-200 bg-white shadow-lg p-3 text-xs"
+                    className="absolute z-50 top-full mt-2 right-0 w-56 border border-line bg-surface shadow-lg p-3 text-xs"
                     onClick={(e) => e.stopPropagation()}
                     onMouseDown={(e) => e.stopPropagation()}
                 >
-                    <p className="text-slate-700 font-medium">Sign in to rate</p>
-                    <p className="text-slate-500 mt-1">Share your feedback and help others find great events.</p>
+                    <p className="text-ink font-medium">Sign in to rate</p>
+                    <p className="text-ink-soft mt-1">Share your feedback and help others find great events.</p>
                     <div className="mt-2 flex gap-2">
                         <Link
                             to={`/login?next=${encodeURIComponent(location.pathname + location.search + location.hash)}`}
@@ -280,7 +280,7 @@ export default function RateEventButton({
                         </Link>
                         <button
                             onClick={() => setShowSignIn(false)}
-                            className="border border-slate-300 text-slate-600 px-2 py-1 hover:bg-slate-50"
+                            className="border border-line text-ink-soft px-2 py-1 hover:bg-canvas"
                         >
                             Close
                         </button>

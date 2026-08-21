@@ -189,6 +189,7 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         network_going_snapshot_enabled=_get_bool_setting(
             session, "network_going_snapshot_enabled", default=True
         ),
+        summary_two_line_enabled=_get_bool_setting(session, "summary_two_line_enabled"),
         suggest_event_required_dance_group_id=_get_optional_int_setting(
             session, "suggest_event_required_dance_group_id"
         ),
@@ -370,6 +371,11 @@ def update_settings(
 
     if body.unseen_state_enabled is not None:
         _set_bool_setting(session, "unseen_state_enabled", body.unseen_state_enabled)
+
+    if body.summary_two_line_enabled is not None:
+        _set_bool_setting(
+            session, "summary_two_line_enabled", body.summary_two_line_enabled
+        )
 
     if body.trending_enabled is not None:
         _set_bool_setting(session, "trending_enabled", body.trending_enabled)

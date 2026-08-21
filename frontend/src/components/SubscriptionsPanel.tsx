@@ -64,7 +64,7 @@ export default function SubscriptionsPanel({
 
     if (error) {
         return (
-            <div className="border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+            <div className="border border-line bg-canvas p-3 text-sm text-ink">
                 {error}
             </div>
         );
@@ -73,7 +73,7 @@ export default function SubscriptionsPanel({
     if (!items || items.length === 0) {
         if (!showEmpty) return null;
         return (
-            <p className={embedded ? 'text-xs text-slate-500' : 'text-sm text-slate-500'}>
+            <p className={embedded ? 'text-xs text-ink-soft' : 'text-sm text-ink-soft'}>
                 You haven't subscribed to any calendars yet. Visit a user's
                 profile and click <span className="font-medium">Subscribe</span>{' '}
                 to follow their calendar.
@@ -96,8 +96,8 @@ export default function SubscriptionsPanel({
     if (embedded) return list;
 
     return (
-        <section className="border border-slate-200 bg-white">
-            <div className="px-3 py-2 border-b border-slate-100 text-xs font-medium uppercase tracking-wide text-slate-500">
+        <section className="border border-line bg-surface">
+            <div className="px-3 py-2 border-b border-card-line text-xs font-medium uppercase tracking-wide text-ink-soft">
                 Calendars you subscribe to
             </div>
             {list}
@@ -134,7 +134,7 @@ function SubscriptionRow({
                 />
             ) : (
                 <div
-                    className={`${avatarSize} rounded-full bg-slate-200 text-slate-600 flex items-center justify-center font-semibold ${initialCls}`}
+                    className={`${avatarSize} rounded-full bg-slate-200 text-ink-soft flex items-center justify-center font-semibold ${initialCls}`}
                 >
                     {initial}
                 </div>
@@ -142,7 +142,7 @@ function SubscriptionRow({
             <div className="min-w-0 flex-1">
                 <Link
                     to={`/u/${sub.handle}`}
-                    className={`block truncate font-medium text-slate-900 hover:text-blue-600 ${textCls}`}
+                    className={`block truncate font-medium text-ink hover:text-action ${textCls}`}
                 >
                     {name}
                     {sub.is_verified_organizer && (
@@ -156,7 +156,7 @@ function SubscriptionRow({
                     )}
                 </Link>
                 {!sub.can_view_calendar && (
-                    <div className="text-xs text-slate-400">
+                    <div className="text-xs text-muted">
                         No longer available — visibility was tightened.
                     </div>
                 )}

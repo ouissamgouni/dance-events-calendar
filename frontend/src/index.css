@@ -31,6 +31,26 @@
   }
 }
 
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
 @utility animate-slide-up {
   animation: slide-up 0.25s ease-out;
 }
@@ -39,11 +59,50 @@
   animation: slide-in-right 0.25s ease-out;
 }
 
+@utility animate-slide-left {
+  animation: slide-in-left 0.25s ease-out;
+}
+
+@utility animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+/* ── Design-system tokens (Light theme) ────────────────
+   Tailwind v4 CSS-first theme. Emits utilities like bg-brand,
+   text-ink, border-line, rounded-card, etc. Semantic names map
+   to the app's colour roles rather than raw palette steps. */
+@theme {
+  --color-brand: #a22e43;
+  /* Movida / brand */
+  --color-action: #2563eb;
+  /* action / selected / link */
+  --color-action-strong: #1d4ed8;
+  /* action hover/pressed */
+  --color-ink: #172033;
+  /* main text */
+  --color-ink-soft: #667085;
+  /* secondary text */
+  --color-muted: #98a2b3;
+  /* muted */
+  --color-canvas: #f7f9fc;
+  /* app background */
+  --color-surface: #ffffff;
+  /* surface / card */
+  --color-line: #e4e7ec;
+  /* border */
+  --color-card-line: #eaecf0;
+  /* card border */
+  --color-success: #079455;
+  /* success / going */
+  --color-danger: #d92d20;
+  /* error / destructive */
+  --radius-card: 14px;
+}
+
 :root {
   --color-primary: #475569;
   --color-accent: #4f46e5;
   --color-accent-light: #818cf8;
-  --color-surface: #f8fafc;
 }
 
 html,
@@ -55,8 +114,8 @@ body {
   margin: 0;
   font-family: Inter, system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
-  background: var(--color-surface);
-  color: #1e293b;
+  background: var(--color-canvas);
+  color: var(--color-ink);
   /* The app shell is a fixed, non-scrolling container (see #root). Locking
      body scroll here removes the whole class of "content scrolled, bottom
      nav pushed below the fold" bugs on mobile/PWA — the body can never
@@ -88,6 +147,12 @@ body {
 .explorer-map-shell {
   isolation: isolate;
   contain: layout paint;
+}
+
+/* In map mode the fullscreen header overlays the top of the map; push the
+   Leaflet zoom controls down so they aren't hidden behind the filter bar. */
+.explorer-map-shell[data-fullscreen="true"] .leaflet-top {
+  top: 56px;
 }
 
 .map-selected-event-card .event-card {
@@ -362,7 +427,7 @@ body {
 }
 
 .filter-sheet-panel {
-  max-height: min(70dvh, calc(100dvh - 2.75rem));
+  max-height: min(80dvh, calc(100dvh - 2.75rem));
   padding-bottom: env(safe-area-inset-bottom);
 }
 
@@ -641,8 +706,8 @@ body {
   width: 100%;
   text-align: left;
   padding: 0.6rem 0.85rem;
-  border: 1px solid #f1f5f9;
-  border-radius: 0.75rem;
+  border: 1px solid var(--color-card-line);
+  border-radius: var(--radius-card);
   background: transparent;
   cursor: pointer;
   transition: background 0.15s;
@@ -651,32 +716,32 @@ body {
 }
 
 .event-card:hover {
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--color-surface);
 }
 
 .event-card-highlighted {
-  background: rgba(255, 255, 255, 0.6) !important;
-  box-shadow: inset 3px 0 0 #3b82f6;
+  background: var(--color-surface) !important;
+  box-shadow: inset 3px 0 0 var(--color-action);
 }
 
 .event-card-highlighted:hover {
-  background: rgba(255, 255, 255, 0.8) !important;
+  background: var(--color-surface) !important;
 }
 
 .event-card-past {
-  background: #f1f5f9;
+  background: var(--color-canvas);
 }
 
 .event-card-past:hover {
-  background: #e2e8f0;
+  background: var(--color-line);
 }
 
 .event-card-user-going {
-  box-shadow: inset 3px 0 0 #86efac;
+  box-shadow: inset 3px 0 0 var(--color-success);
 }
 
 .event-card-user-saved {
-  box-shadow: inset 3px 0 0 #94a3b8;
+  box-shadow: inset 3px 0 0 var(--color-muted);
 }
 
 .event-card-offmap-badge {
@@ -767,7 +832,7 @@ body {
 .event-card-title {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--color-ink);
   line-height: 1.3;
   margin: 0;
   padding-right: 7rem;
@@ -779,7 +844,7 @@ body {
 
 .event-card-date {
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--color-ink-soft);
   margin: 0.125rem 0 0;
 }
 
@@ -788,7 +853,7 @@ body {
   align-items: center;
   min-width: 0;
   font-size: 0.75rem;
-  color: #94a3b8;
+  color: var(--color-muted);
   margin: 0.125rem 0 0;
 }
 
@@ -797,6 +862,115 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Timeline layout: a continuous date + line gutter on the left, with each
+   event rendered as its own bordered card. The outer row carries no chrome so
+   the rail line reads as one unbroken timeline behind the separated cards. */
+.event-card-timeline {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  align-items: stretch;
+  gap: 0;
+}
+
+.event-card-timeline:hover {
+  background: transparent;
+}
+
+/* No card border or fill — events are separated only by a subtle bottom line.
+   Chrome lives on the content column so the rail line stays in its gutter. */
+.event-card-timeline .event-card-content {
+  border-bottom: 1px solid var(--color-line);
+  padding: 0.7rem 0.25rem;
+  transition: box-shadow 0.15s;
+}
+
+.event-card-timeline.event-card-highlighted {
+  background: transparent !important;
+  box-shadow: none;
+}
+
+.event-card-timeline.event-card-highlighted .event-card-content {
+  box-shadow: inset 3px 0 0 var(--color-brand);
+}
+
+.event-card-timeline.event-card-past .event-card-content {
+  opacity: 0.65;
+}
+
+.event-card-rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 2.75rem;
+  align-self: stretch;
+}
+
+/* One continuous line down the centre of the gutter, behind the date + dot,
+   so the timeline reads as unbroken across the (gap-less) rows. */
+.event-card-rail::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--color-card-line);
+}
+
+.event-card-rail-date {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  line-height: 1.25;
+  padding: 0.7rem 0.2rem 0.3rem;
+  background: var(--color-canvas);
+}
+
+.event-card-rail-weekday,
+.event-card-rail-month,
+.event-card-rail-day {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.event-card-rail-weekday {
+  color: var(--color-brand);
+}
+
+.event-card-rail-month,
+.event-card-rail-day {
+  color: var(--color-ink-soft);
+}
+
+/* Holds the dot on the line, just below the date. */
+.event-card-rail-track {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  width: 100%;
+}
+
+.event-card-rail-dot {
+  margin-top: 0.15rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--color-brand);
+  box-shadow: 0 0 0 3px var(--color-canvas);
 }
 
 @media (max-width: 639px) {
@@ -811,5 +985,13 @@ body {
 
   .event-card-title {
     line-height: 1.25;
+  }
+
+  .event-card-timeline .event-card-content {
+    padding: 0.5rem 0.75rem 0.5rem 0.25rem;
+  }
+
+  .event-card-rail {
+    width: 2.4rem;
   }
 }

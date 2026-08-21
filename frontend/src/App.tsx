@@ -67,15 +67,15 @@ export default function App() {
               <PreferencesProvider>
                 <RatingAggregatesProvider>
                   <MessageCountsProvider>
-                  <MyRatingsProvider>
-                    <AttendingEventsProvider>
-                      <PwaInstallProvider>
-                        <QaTestPlanProvider>
-                          <AppShell />
-                        </QaTestPlanProvider>
-                      </PwaInstallProvider>
-                    </AttendingEventsProvider>
-                  </MyRatingsProvider>
+                    <MyRatingsProvider>
+                      <AttendingEventsProvider>
+                        <PwaInstallProvider>
+                          <QaTestPlanProvider>
+                            <AppShell />
+                          </QaTestPlanProvider>
+                        </PwaInstallProvider>
+                      </AttendingEventsProvider>
+                    </MyRatingsProvider>
                   </MessageCountsProvider>
                 </RatingAggregatesProvider>
               </PreferencesProvider>
@@ -122,20 +122,18 @@ function AppShell() {
           className="flex flex-col h-full"
           style={qaPinnedWidth ? { marginRight: qaPinnedWidth, transition: 'margin-right 0.2s ease' } : { transition: 'margin-right 0.2s ease' }}
         >
-          <div
-            className="flex items-center justify-between bg-slate-900 px-4 py-1.5"
-            style={{ paddingTop: 'calc(0.375rem + env(safe-area-inset-top))' }}
+          <header
+            className="flex items-center justify-between gap-2 bg-surface border-b border-line px-3 sm:px-4"
+            style={{ height: 'calc(64px + env(safe-area-inset-top))', paddingTop: 'env(safe-area-inset-top)' }}
           >
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5">
-                <Link to="/" reloadDocument>
-                  <img src="/movida.png" alt="Movida" className="h-6 w-6" />
-                </Link>
-                <Link to="/" reloadDocument className="text-sm font-bold text-white tracking-tight hover:text-gray-200 transition">Movida</Link>
-              </div>
+            <div className="flex items-center gap-3 min-w-0">
+              <Link to="/" reloadDocument className="flex items-center gap-2 shrink-0">
+                <img src="/movida.png" alt="Movida" className="h-9 w-9 object-contain shrink-0" />
+                <span className="text-[21px] font-bold leading-none tracking-tight">Movida</span>
+              </Link>
               <DesktopNav />
             </div>
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-1 sm:gap-2">
               {/* Desktop: inline event search, mirroring the people search box */}
               <ExplorerEventSearch
                 className="hidden sm:block w-64"
@@ -148,7 +146,6 @@ function AppShell() {
               <ExplorerEventSearch
                 className="sm:hidden"
                 compact
-                onDark
                 pastToggle
                 onSelectEvent={(eventId) => navigate(`/event/${eventId}`)}
                 triggerLabel="Search events"
@@ -157,7 +154,7 @@ function AppShell() {
               <NotificationBell />
               <HeaderUserMenu />
             </div>
-          </div>
+          </header>
           <SignUpBanner />
           <ShareReferralBanner />
           <OnboardingGate />
@@ -240,13 +237,13 @@ function AppShell() {
               </Routes>
             </Suspense>
             <footer className="py-3 text-center flex items-center justify-center gap-3">
-              <Link to="/privacy" className="text-[11px] text-gray-400 hover:text-gray-600 transition">
+              <Link to="/privacy" className="text-[11px] text-muted hover:text-ink-soft transition">
                 Privacy Policy
               </Link>
               <span className="text-[11px] text-gray-300" aria-hidden="true">·</span>
               <a
                 href="mailto:support@joinmovida.com?subject=Movida%20feedback"
-                className="text-[11px] text-gray-400 hover:text-gray-600 transition"
+                className="text-[11px] text-muted hover:text-ink-soft transition"
               >
                 Send feedback
               </a>

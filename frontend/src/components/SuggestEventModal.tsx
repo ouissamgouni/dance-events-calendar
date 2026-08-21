@@ -76,12 +76,12 @@ function TagPillPreview({ label, color }: { label: string; color?: string | null
 }
 
 const inputCls =
-    'border border-slate-300 px-2 py-1.5 text-xs placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500';
+    'border border-line px-2 py-1.5 text-xs placeholder:text-muted focus:border-action focus:outline-none focus:ring-1 focus:ring-action';
 const inputClsFull = `w-full ${inputCls}`;
 const btnPrimary =
-    'bg-blue-500 px-4 py-2 text-xs font-medium text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition';
+    'bg-action px-4 py-2 text-xs font-medium text-white hover:bg-action disabled:opacity-50 disabled:cursor-not-allowed transition';
 const btnSecondary =
-    'border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition';
+    'border border-line bg-surface px-4 py-2 text-xs font-medium text-ink hover:bg-canvas transition';
 
 function SectionHeader({
     title,
@@ -100,14 +100,14 @@ function SectionHeader({
         <button
             type="button"
             onClick={onToggle}
-            className="flex w-full items-start justify-between gap-3 border-b border-slate-100 px-0 pb-2 text-left"
+            className="flex w-full items-start justify-between gap-3 border-b border-card-line px-0 pb-2 text-left"
             aria-expanded={open}
         >
             <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted">
                     {!open && valid ? (
                         <span
-                            className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[9px] text-white"
+                            className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full bg-success text-[9px] text-white"
                             aria-label="Complete"
                         >
                             ✓
@@ -115,9 +115,9 @@ function SectionHeader({
                     ) : null}
                     <span>{title}</span>
                 </div>
-                {summary ? <div className="mt-1 min-w-0 text-[11px] text-slate-500">{summary}</div> : null}
+                {summary ? <div className="mt-1 min-w-0 text-[11px] text-ink-soft">{summary}</div> : null}
             </div>
-            <span className="shrink-0 text-slate-400">{open ? '▾' : '▸'}</span>
+            <span className="shrink-0 text-muted">{open ? '▾' : '▸'}</span>
         </button>
     );
 }
@@ -436,10 +436,10 @@ export default function SuggestEventModal({ onClose }: Props) {
     if (success) {
         return (
             <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
-                <div className="w-full max-w-md bg-white p-8 text-center shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <div className="w-full max-w-md bg-surface p-8 text-center shadow-2xl" onClick={(e) => e.stopPropagation()}>
                     <div className="mb-3 text-4xl">🎉</div>
-                    <h2 className="mb-2 text-base font-bold text-slate-900">Thank you!</h2>
-                    <p className="mb-4 text-xs text-slate-600">
+                    <h2 className="mb-2 text-base font-bold text-ink">Thank you!</h2>
+                    <p className="mb-4 text-xs text-ink-soft">
                         {user ? 'Your event is live and under review.' : 'Thank you! Your suggestion is under review.'}
                     </p>
                     <button onClick={onClose} className={btnPrimary}>
@@ -456,8 +456,8 @@ export default function SuggestEventModal({ onClose }: Props) {
         const locLabel = location.trim() ? locationPreview(location) : null;
         return (
             <div className="min-w-0">
-                <div className="truncate font-medium text-slate-700">{title}</div>
-                <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-slate-500">
+                <div className="truncate font-medium text-ink">{title}</div>
+                <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-ink-soft">
                     {locLabel ? <span className="truncate">{locLabel}</span> : null}
                     {locLabel && dateLabel ? <span aria-hidden="true">·</span> : null}
                     {dateLabel ? <span className="shrink-0">{dateLabel}</span> : null}
@@ -518,25 +518,25 @@ export default function SuggestEventModal({ onClose }: Props) {
                 return (
                     <div className="space-y-3 pt-3">
                         <div>
-                            <label className="mb-1 block font-medium text-slate-600">Title *</label>
+                            <label className="mb-1 block font-medium text-ink-soft">Title *</label>
                             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event name" className={inputClsFull} />
                         </div>
                         <div className="grid gap-3 md:grid-cols-2">
                             <div>
-                                <label className="mb-1 block font-medium text-slate-600">Start *</label>
+                                <label className="mb-1 block font-medium text-ink-soft">Start *</label>
                                 <input type={allDay ? 'date' : 'datetime-local'} value={start} onChange={(e) => setStart(e.target.value)} className={inputClsFull} />
                             </div>
                             <div>
-                                <label className="mb-1 block font-medium text-slate-600">End *</label>
+                                <label className="mb-1 block font-medium text-ink-soft">End *</label>
                                 <input type={allDay ? 'date' : 'datetime-local'} value={end} onChange={(e) => setEnd(e.target.value)} className={inputClsFull} />
                             </div>
                         </div>
-                        <label className="flex items-center gap-2 text-slate-600">
-                            <input type="checkbox" checked={allDay} onChange={(e) => handleAllDayChange(e.target.checked)} className="border-slate-300" />
+                        <label className="flex items-center gap-2 text-ink-soft">
+                            <input type="checkbox" checked={allDay} onChange={(e) => handleAllDayChange(e.target.checked)} className="border-line" />
                             All day
                         </label>
                         <div>
-                            <label className="mb-1 block font-medium text-slate-600">Location *</label>
+                            <label className="mb-1 block font-medium text-ink-soft">Location *</label>
                             <AddressAutocomplete
                                 value={location}
                                 onChange={(value) => {
@@ -580,14 +580,14 @@ export default function SuggestEventModal({ onClose }: Props) {
                                     <input aria-label="Link URL" type="url" value={link.url} onChange={(e) => handleLinkChange(index, 'url', e.target.value)} placeholder="https://…" className={`${inputCls} min-w-0 flex-1`} />
                                     <input aria-label="Link label" type="text" value={link.label} onChange={(e) => handleLinkChange(index, 'label', e.target.value)} placeholder="Label" className={`${inputCls} w-28 shrink-0`} />
                                     {links.length > 1 ? (
-                                        <button type="button" onClick={() => removeLink(index)} className="px-1 text-slate-400 hover:text-slate-700" aria-label="Remove link">✕</button>
+                                        <button type="button" onClick={() => removeLink(index)} className="px-1 text-muted hover:text-ink" aria-label="Remove link">✕</button>
                                     ) : (
                                         <span className="w-3 shrink-0" aria-hidden="true" />
                                     )}
                                 </div>
                             ))}
                             {links.length < 3 ? (
-                                <button type="button" onClick={addLink} className="text-blue-600 hover:text-blue-700">+ Add link</button>
+                                <button type="button" onClick={addLink} className="text-action hover:text-action">+ Add link</button>
                             ) : null}
                         </div>
                         {attempted.links && validateLinks() ? <p className={warningCls}>{validateLinks()}</p> : null}
@@ -602,29 +602,29 @@ export default function SuggestEventModal({ onClose }: Props) {
                         {requiredGroups.length > 0 ? (
                             <div className="space-y-4">
                                 <div>
-                                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Required tags</p>
+                                    <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted">Required tags</p>
                                     {requiredDanceGroup ? (
-                                        <div className="mb-3 border border-slate-200 bg-slate-50 p-3">
-                                            <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">{requiredDanceGroup.label}</div>
+                                        <div className="mb-3 border border-line bg-canvas p-3">
+                                            <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-ink-soft">{requiredDanceGroup.label}</div>
                                             <TagsPicker tagGroups={[requiredDanceGroup]} value={tagsValue} onChange={setTagsValue} searchable={false} allowFreeText={false} />
                                         </div>
                                     ) : null}
                                     {requiredReachGroup ? (
-                                        <div className="border border-slate-200 bg-slate-50 p-3">
-                                            <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">{requiredReachGroup.label}</div>
+                                        <div className="border border-line bg-canvas p-3">
+                                            <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-ink-soft">{requiredReachGroup.label}</div>
                                             <TagsPicker tagGroups={[requiredReachGroup]} value={tagsValue} onChange={setTagsValue} searchable={false} allowFreeText={false} />
                                         </div>
                                     ) : null}
                                 </div>
-                                <div className="border border-slate-200 p-3">
+                                <div className="border border-line p-3">
                                     <button
                                         type="button"
                                         onClick={() => setTagsOpen((value) => !value)}
                                         className="flex w-full items-center justify-between text-left"
                                         aria-expanded={tagsOpen}
                                     >
-                                        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">+More tags{tagsCount > 0 ? ` · ${tagsCount}` : ''}</span>
-                                        <span className="text-slate-400">{tagsOpen ? '▾' : '▸'}</span>
+                                        <span className="text-[10px] font-semibold uppercase tracking-wide text-muted">+More tags{tagsCount > 0 ? ` · ${tagsCount}` : ''}</span>
+                                        <span className="text-muted">{tagsOpen ? '▾' : '▸'}</span>
                                     </button>
                                     {tagsOpen ? (
                                         <div className="mt-3">
@@ -634,7 +634,7 @@ export default function SuggestEventModal({ onClose }: Props) {
                                 </div>
                             </div>
                         ) : (
-                            <div className="border border-slate-200 p-3">
+                            <div className="border border-line p-3">
                                 <TagsPicker tagGroups={tagGroups} value={tagsValue} onChange={setTagsValue} />
                             </div>
                         )}
@@ -647,9 +647,9 @@ export default function SuggestEventModal({ onClose }: Props) {
             case 'price':
                 return (
                     <div className="space-y-4 pt-3">
-                        <div className="border border-slate-200 p-3">
-                            <label className="mb-2 flex items-center gap-2 text-slate-600">
-                                <input type="checkbox" checked={priceIsFree} onChange={(e) => setPriceIsFree(e.target.checked)} className="border-slate-300" />
+                        <div className="border border-line p-3">
+                            <label className="mb-2 flex items-center gap-2 text-ink-soft">
+                                <input type="checkbox" checked={priceIsFree} onChange={(e) => setPriceIsFree(e.target.checked)} className="border-line" />
                                 Free event
                             </label>
                             {!priceIsFree ? (
@@ -674,7 +674,7 @@ export default function SuggestEventModal({ onClose }: Props) {
             case 'promo':
                 return (
                     <div className="space-y-4 pt-3">
-                        <div className="border border-slate-200 p-3">
+                        <div className="border border-line p-3">
                             <div className="space-y-2">
                                 <input type="text" value={promoCode} onChange={(e) => setPromoCode(e.target.value)} placeholder="Promo code" className={inputClsFull} />
                                 <input type="url" value={promoSourceUrl} onChange={(e) => setPromoSourceUrl(e.target.value)} placeholder="https://…" className={inputClsFull} />
@@ -691,20 +691,20 @@ export default function SuggestEventModal({ onClose }: Props) {
                 return (
                     <div className="space-y-4 pt-3">
                         {user ? (
-                            <div className="border border-slate-200 p-3">
+                            <div className="border border-line p-3">
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                                    <label className="flex items-center gap-2 text-xs text-ink cursor-pointer">
                                         <input type="checkbox" checked={going} onChange={(e) => setGoing(e.target.checked)} />
                                         Mark me going by default
                                     </label>
                                     {going ? (
-                                        <div className="inline-flex shrink-0 overflow-hidden border border-slate-300">
+                                        <div className="inline-flex shrink-0 overflow-hidden border border-line">
                                             {(['friends', 'public', 'private'] as const).map((option) => (
                                                 <button
                                                     key={option}
                                                     type="button"
                                                     onClick={() => setGoingAudience(option)}
-                                                    className={`px-2 py-1 text-[11px] capitalize transition-colors ${goingAudience === option ? 'bg-blue-500 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                                                    className={`px-2 py-1 text-[11px] capitalize transition-colors ${goingAudience === option ? 'bg-action text-white' : 'bg-surface text-ink-soft hover:bg-canvas'}`}
                                                 >
                                                     {option}
                                                 </button>
@@ -714,7 +714,7 @@ export default function SuggestEventModal({ onClose }: Props) {
                                 </div>
                             </div>
                         ) : (
-                            <div className="border border-slate-200 p-3 text-xs text-slate-600">
+                            <div className="border border-line p-3 text-xs text-ink-soft">
                                 Sign in to default the Going toggle for your submission.
                             </div>
                         )}
@@ -727,13 +727,13 @@ export default function SuggestEventModal({ onClose }: Props) {
 
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
-            <div className="flex w-full max-w-2xl flex-col bg-white shadow-2xl max-h-[90vh] text-xs" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center justify-between border-b border-slate-100 px-6 pt-5 pb-4">
+            <div className="flex w-full max-w-2xl flex-col bg-surface shadow-2xl max-h-[90vh] text-xs" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between border-b border-card-line px-6 pt-5 pb-4">
                     <div>
-                        <h2 className="text-sm font-bold text-slate-900">Suggest an Event</h2>
-                        <p className="mt-1 text-[11px] text-slate-500">Complete each section, then it collapses.</p>
+                        <h2 className="text-sm font-bold text-ink">Suggest an Event</h2>
+                        <p className="mt-1 text-[11px] text-ink-soft">Complete each section, then it collapses.</p>
                     </div>
-                    <button onClick={onClose} className="p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600" aria-label="Close">✕</button>
+                    <button onClick={onClose} className="p-1 text-muted transition hover:bg-canvas hover:text-ink-soft" aria-label="Close">✕</button>
                 </div>
 
                 <div className="overflow-y-auto overscroll-contain px-6 py-4 text-xs">
@@ -760,7 +760,7 @@ export default function SuggestEventModal({ onClose }: Props) {
                                                         ? renderPromoSummary()
                                                         : renderRsvpSummary();
                             return (
-                                <section key={step.key} className="border-b border-slate-200 pb-4 last:border-b-0">
+                                <section key={step.key} className="border-b border-line pb-4 last:border-b-0">
                                     <SectionHeader
                                         title={step.title}
                                         summary={!open ? summary : undefined}
@@ -774,16 +774,16 @@ export default function SuggestEventModal({ onClose }: Props) {
                         })}
                     </div>
 
-                    <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
+                    <div className="mt-4 space-y-3 border-t border-card-line pt-4">
                         <div>
-                            <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Contact</div>
+                            <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted">Contact</div>
                             <div className="grid gap-3 md:grid-cols-2">
                                 <input type="text" value={submitterName} onChange={(e) => setSubmitterName(e.target.value)} placeholder="Your name" className={inputClsFull} />
                                 <input type="email" value={submitterEmail} onChange={(e) => setSubmitterEmail(e.target.value)} placeholder="Your email" className={inputClsFull} />
                             </div>
                         </div>
                         <div className="flex items-center justify-between gap-2">
-                            {error ? <p className="bg-slate-100 px-2 py-1 text-xs text-slate-700">{error}</p> : <div />}
+                            {error ? <p className="bg-slate-100 px-2 py-1 text-xs text-ink">{error}</p> : <div />}
                             <div className="flex gap-2">
                                 <button onClick={onClose} className={btnSecondary}>Cancel</button>
                                 <button onClick={handleSubmit} className={btnPrimary} disabled={submitting}>

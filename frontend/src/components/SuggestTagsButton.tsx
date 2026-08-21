@@ -123,20 +123,20 @@ export default function SuggestTagsButton({
                 aria-hidden="true"
             />
 
-            {error && <p className="text-xs text-slate-700 bg-slate-100 px-2 py-1">{error}</p>}
+            {error && <p className="text-xs text-ink bg-slate-100 px-2 py-1">{error}</p>}
 
             {!isEmbedded && (
                 <div className="flex gap-2">
                     <button
                         onClick={handleSubmit}
                         disabled={submitting || totalCount === 0}
-                        className="flex-1 bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                        className="flex-1 bg-action px-3 py-1.5 text-sm font-medium text-white hover:bg-action-strong disabled:opacity-50"
                     >
                         {submitting ? 'Submitting…' : totalCount > 0 ? `Submit ${totalCount} suggestion${totalCount !== 1 ? 's' : ''}` : 'Submit'}
                     </button>
                     <button
                         onClick={onClose}
-                        className="border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+                        className="border border-line px-3 py-1.5 text-sm text-ink-soft hover:bg-canvas"
                     >
                         Cancel
                     </button>
@@ -156,18 +156,18 @@ export default function SuggestTagsButton({
             }}
         >
             <div
-                className="w-full max-w-md max-h-[90vh] overflow-y-auto border border-slate-200 bg-white shadow-xl"
+                className="w-full max-w-md max-h-[90vh] overflow-y-auto border border-line bg-surface shadow-xl"
                 onClick={(event) => event.stopPropagation()}
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="suggest-tags-title"
             >
-                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-                    <h2 id="suggest-tags-title" className="text-sm font-semibold text-slate-800">Suggest tags</h2>
+                <div className="flex items-center justify-between border-b border-card-line px-4 py-3">
+                    <h2 id="suggest-tags-title" className="text-sm font-semibold text-ink">Suggest tags</h2>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="text-xl leading-none text-slate-400 hover:text-slate-600"
+                        className="text-xl leading-none text-muted hover:text-ink-soft"
                         aria-label="Close suggest tags"
                     >
                         ×
@@ -175,10 +175,10 @@ export default function SuggestTagsButton({
                 </div>
                 {success ? (
                     <div className="p-5 text-center space-y-3">
-                        <p className="text-emerald-600 font-medium text-sm">
+                        <p className="text-success font-medium text-sm">
                             Thank you! {totalCount} suggestion{totalCount !== 1 ? 's' : ''} submitted.
                         </p>
-                        <button onClick={onClose} className="bg-blue-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-blue-700">
+                        <button onClick={onClose} className="bg-action px-4 py-1.5 text-xs font-medium text-white hover:bg-action-strong">
                             Close
                         </button>
                     </div>

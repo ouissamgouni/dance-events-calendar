@@ -258,15 +258,15 @@ export default function AdminTagCategories() {
     };
 
     return (
-        <div className="mt-6 border border-gray-200 bg-white">
-            <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-                <h2 className="text-[11px] font-semibold text-gray-700 uppercase tracking-wide">
+        <div className="mt-6 border border-line bg-surface">
+            <div className="px-4 py-2.5 border-b border-card-line bg-canvas flex items-center justify-between">
+                <h2 className="text-[11px] font-semibold text-ink uppercase tracking-wide">
                     Tag Categories
                 </h2>
                 {!addingGroup ? (
                     <button
                         onClick={() => setAddingGroup(true)}
-                        className="text-gray-400 hover:text-gray-700 text-sm font-bold leading-none transition"
+                        className="text-muted hover:text-ink text-sm font-bold leading-none transition"
                         title="Add category"
                     >
                         +
@@ -283,12 +283,12 @@ export default function AdminTagCategories() {
                             }}
                             autoFocus
                             placeholder="Category name"
-                            className="border border-gray-300 px-2 py-0.5 text-[11px] text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 w-32"
+                            className="border border-line px-2 py-0.5 text-[11px] text-ink focus:border-action focus:outline-none focus:ring-1 focus:ring-action w-32"
                         />
                         <select
                             value={newGroupScope}
                             onChange={(e) => setNewGroupScope(e.target.value as 'event' | 'aspect' | 'audience')}
-                            className="border border-gray-300 px-1 py-0.5 text-[10px] text-gray-700 bg-white focus:outline-none"
+                            className="border border-line px-1 py-0.5 text-[10px] text-ink bg-surface focus:outline-none"
                             title="Category scope"
                         >
                             <option value="event">Event</option>
@@ -304,7 +304,7 @@ export default function AdminTagCategories() {
                         </button>
                         <button
                             onClick={() => { setAddingGroup(false); setNewGroupLabel(''); }}
-                            className="text-gray-400 hover:text-gray-600 text-[10px] px-1"
+                            className="text-muted hover:text-ink-soft text-[10px] px-1"
                         >
                             ✕
                         </button>
@@ -320,9 +320,9 @@ export default function AdminTagCategories() {
                     <p className="mb-2 text-[11px] text-rose-600">{tagActionError}</p>
                 )}
                 {loading ? (
-                    <p className="text-[11px] text-gray-400">Loading…</p>
+                    <p className="text-[11px] text-muted">Loading…</p>
                 ) : groups.length === 0 ? (
-                    <p className="text-[11px] text-gray-400">No tag categories yet.</p>
+                    <p className="text-[11px] text-muted">No tag categories yet.</p>
                 ) : (
                     <div className="space-y-3">
                         {groups.map((group, idx) => {
@@ -331,7 +331,7 @@ export default function AdminTagCategories() {
                             return (
                                 <div
                                     key={group.id}
-                                    className={`border border-gray-200 rounded ${bgClass} ${!group.enabled ? 'opacity-50' : ''} ${dragOverGroupId === group.id ? 'ring-2 ring-blue-300 ring-offset-1' : ''} ${tagDropTargetGroupId === group.id ? 'ring-2 ring-emerald-400 ring-offset-1' : ''}`}
+                                    className={`border border-line rounded ${bgClass} ${!group.enabled ? 'opacity-50' : ''} ${dragOverGroupId === group.id ? 'ring-2 ring-blue-300 ring-offset-1' : ''} ${tagDropTargetGroupId === group.id ? 'ring-2 ring-success ring-offset-1' : ''}`}
                                     draggable
                                     onDragStart={() => {
                                         setDraggingGroupId(group.id);
@@ -364,9 +364,9 @@ export default function AdminTagCategories() {
                                     }}
                                 >
                                     {/* Category header */}
-                                    <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100/60">
+                                    <div className="flex items-center gap-2 px-3 py-2 border-b border-card-line/60">
                                         <span
-                                            className="text-gray-400 cursor-grab active:cursor-grabbing select-none"
+                                            className="text-muted cursor-grab active:cursor-grabbing select-none"
                                             title="Drag to reorder category"
                                             aria-label="Drag to reorder category"
                                         >
@@ -374,10 +374,10 @@ export default function AdminTagCategories() {
                                         </span>
                                         <button
                                             onClick={() => handleToggleGroup(group.id, !group.enabled)}
-                                            className={`relative inline-flex h-4 w-7 items-center rounded-full transition shrink-0 ${group.enabled ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                            className={`relative inline-flex h-4 w-7 items-center rounded-full transition shrink-0 ${group.enabled ? 'bg-success' : 'bg-gray-300'}`}
                                             title={group.enabled ? 'Disable category' : 'Enable category'}
                                         >
-                                            <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition ${group.enabled ? 'translate-x-3' : 'translate-x-0.5'}`} />
+                                            <span className={`inline-block h-3 w-3 transform rounded-full bg-surface transition ${group.enabled ? 'translate-x-3' : 'translate-x-0.5'}`} />
                                         </button>
                                         <input
                                             type="color"
@@ -387,14 +387,14 @@ export default function AdminTagCategories() {
                                             title="Change category color"
                                         />
                                         <label
-                                            className="inline-flex items-center gap-1 text-[10px] font-medium text-gray-500 shrink-0"
+                                            className="inline-flex items-center gap-1 text-[10px] font-medium text-ink-soft shrink-0"
                                             title="Show this category during onboarding preferences"
                                         >
                                             <input
                                                 type="checkbox"
                                                 checked={group.onboarding_eligible}
                                                 onChange={(e) => handleToggleOnboardingEligible(group.id, e.target.checked)}
-                                                className="h-3 w-3 border border-gray-300 accent-blue-500"
+                                                className="h-3 w-3 border border-line accent-blue-500"
                                             />
                                             Onboarding
                                         </label>
@@ -409,26 +409,26 @@ export default function AdminTagCategories() {
                                                     if (e.key === 'Escape') setEditingGroupId(null);
                                                 }}
                                                 autoFocus
-                                                className="text-[11px] font-semibold text-gray-700 border border-blue-400 px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 flex-1 min-w-0 bg-white"
+                                                className="text-[11px] font-semibold text-ink border border-blue-400 px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-action flex-1 min-w-0 bg-surface"
                                             />
                                         ) : (
                                             <span
-                                                className="text-[11px] font-semibold text-gray-700 cursor-pointer hover:text-blue-600 transition truncate"
+                                                className="text-[11px] font-semibold text-ink cursor-pointer hover:text-action transition truncate"
                                                 onClick={() => handleGroupLabelEdit(group)}
                                             >
                                                 {group.label}
                                             </span>
                                         )}
                                         {(group.scope ?? 'event') !== 'event' && (
-                                            <span className="text-[9px] font-semibold uppercase px-1 py-0.5 border border-gray-300 bg-white/70 text-gray-500 shrink-0">
+                                            <span className="text-[9px] font-semibold uppercase px-1 py-0.5 border border-line bg-surface/70 text-ink-soft shrink-0">
                                                 {group.scope}
                                             </span>
                                         )}
                                     </div>
 
                                     {(group.scope ?? 'event') === 'aspect' && (
-                                        <div className="px-3 py-1.5 border-b border-gray-100/60 flex items-center gap-1.5">
-                                            <label className="text-[9px] font-medium uppercase tracking-wide text-gray-400 shrink-0">
+                                        <div className="px-3 py-1.5 border-b border-card-line/60 flex items-center gap-1.5">
+                                            <label className="text-[9px] font-medium uppercase tracking-wide text-muted shrink-0">
                                                 Show when
                                             </label>
                                             <input
@@ -436,7 +436,7 @@ export default function AdminTagCategories() {
                                                 defaultValue={(group.condition_tag_slugs ?? []).join(', ')}
                                                 onBlur={(e) => handleConditionSave(group.id, e.target.value)}
                                                 placeholder="always (e.g. format:workshop)"
-                                                className="flex-1 min-w-0 border border-gray-300 px-1.5 py-0.5 text-[10px] text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                                className="flex-1 min-w-0 border border-line px-1.5 py-0.5 text-[10px] text-ink bg-surface focus:outline-none focus:ring-1 focus:ring-action"
                                                 title="Comma-separated group:tag slugs. Empty = always offered."
                                             />
                                         </div>
@@ -476,7 +476,7 @@ export default function AdminTagCategories() {
                                                                 if (e.key === 'Escape') setEditingTagId(null);
                                                             }}
                                                             autoFocus
-                                                            className="bg-white/20 text-white text-[10px] font-medium border-b border-white/60 focus:outline-none w-20 placeholder-white/60"
+                                                            className="bg-surface/20 text-white text-[10px] font-medium border-b border-white/60 focus:outline-none w-20 placeholder-white/60"
                                                             onClick={(e) => e.stopPropagation()}
                                                         />
                                                     ) : (
@@ -489,7 +489,7 @@ export default function AdminTagCategories() {
                                                         </span>
                                                     )}
                                                     <span
-                                                        className="inline-flex items-center justify-center rounded-full bg-white/30 text-[9px] font-semibold min-w-[14px] h-[14px] px-0.5"
+                                                        className="inline-flex items-center justify-center rounded-full bg-surface/30 text-[9px] font-semibold min-w-[14px] h-[14px] px-0.5"
                                                     >
                                                         {tag.event_count}
                                                     </span>
@@ -569,12 +569,12 @@ export default function AdminTagCategories() {
                                                         }}
                                                         autoFocus
                                                         placeholder="Tag name"
-                                                        className="border border-gray-300 rounded-full px-2 py-0.5 text-[10px] text-gray-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 w-20 bg-white"
+                                                        className="border border-line rounded-full px-2 py-0.5 text-[10px] text-ink focus:border-action focus:outline-none focus:ring-1 focus:ring-action w-20 bg-surface"
                                                     />
                                                     <button
                                                         onClick={() => handleAddTag(group.id)}
                                                         disabled={!(newTagInputs[group.id] || '').trim()}
-                                                        className="text-[10px] text-blue-600 hover:text-blue-800 font-medium disabled:opacity-40"
+                                                        className="text-[10px] text-action hover:text-blue-800 font-medium disabled:opacity-40"
                                                     >
                                                         ✓
                                                     </button>
@@ -586,7 +586,7 @@ export default function AdminTagCategories() {
                                                                 return next;
                                                             })
                                                         }
-                                                        className="text-[10px] text-gray-400 hover:text-gray-600"
+                                                        className="text-[10px] text-muted hover:text-ink-soft"
                                                     >
                                                         ✕
                                                     </button>
@@ -599,7 +599,7 @@ export default function AdminTagCategories() {
                                                             [group.id]: '',
                                                         }))
                                                     }
-                                                    className="inline-flex items-center justify-center rounded-full border border-dashed border-gray-300 text-gray-400 hover:border-gray-400 hover:text-gray-600 w-5 h-5 text-xs transition"
+                                                    className="inline-flex items-center justify-center rounded-full border border-dashed border-line text-muted hover:border-line hover:text-ink-soft w-5 h-5 text-xs transition"
                                                     title="Add tag"
                                                 >
                                                     +

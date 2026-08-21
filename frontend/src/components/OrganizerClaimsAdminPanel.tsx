@@ -17,12 +17,12 @@ type KindFilter = typeof KIND_FILTERS[number];
 function statusBadge(status: string) {
     const colors: Record<string, string> = {
         pending: 'bg-amber-100 text-amber-700',
-        approved: 'bg-emerald-100 text-emerald-700',
-        rejected: 'bg-slate-200 text-slate-700',
+        approved: 'bg-emerald-100 text-success',
+        rejected: 'bg-slate-200 text-ink',
     };
     return (
         <span
-            className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 ${colors[status] ?? 'bg-gray-100 text-gray-600'
+            className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 ${colors[status] ?? 'bg-gray-100 text-ink-soft'
                 }`}
         >
             {status}
@@ -147,27 +147,27 @@ export default function OrganizerClaimsAdminPanel({ isOpen, onClose }: Props) {
                 onClick={onClose}
                 aria-hidden="true"
             />
-            <div className="w-full max-w-3xl bg-white shadow-xl flex flex-col">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-                    <h2 className="text-sm font-semibold text-slate-800">
+            <div className="w-full max-w-3xl bg-surface shadow-xl flex flex-col">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-line">
+                    <h2 className="text-sm font-semibold text-ink">
                         Organizer claims
                     </h2>
                     <button
                         onClick={onClose}
-                        className="text-slate-400 hover:text-slate-700 text-sm px-2"
+                        className="text-muted hover:text-ink text-sm px-2"
                     >
                         ✕
                     </button>
                 </div>
 
-                <div className="flex border-b border-slate-200">
+                <div className="flex border-b border-line">
                     {TABS.map((t) => (
                         <button
                             key={t}
                             onClick={() => setActiveTab(t)}
                             className={`px-3 py-2 text-xs font-medium capitalize ${activeTab === t
-                                ? 'text-blue-600 border-b-2 border-blue-500'
-                                : 'text-slate-500 hover:text-slate-700'
+                                ? 'text-action border-b-2 border-action'
+                                : 'text-ink-soft hover:text-ink'
                                 }`}
                         >
                             {t}
@@ -175,7 +175,7 @@ export default function OrganizerClaimsAdminPanel({ isOpen, onClose }: Props) {
                     ))}
                 </div>
 
-                <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-200 text-[11px] text-slate-500">
+                <div className="flex items-center gap-2 px-3 py-2 border-b border-line text-[11px] text-ink-soft">
                     <span>Kind:</span>
                     {KIND_FILTERS.map((k) => (
                         <button
@@ -184,7 +184,7 @@ export default function OrganizerClaimsAdminPanel({ isOpen, onClose }: Props) {
                             onClick={() => setKindFilter(k)}
                             className={`px-2 py-0.5 capitalize ${kindFilter === k
                                 ? 'bg-slate-800 text-white'
-                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                : 'bg-slate-100 text-ink-soft hover:bg-canvas'
                                 }`}
                         >
                             {k === 'badge'
@@ -197,18 +197,18 @@ export default function OrganizerClaimsAdminPanel({ isOpen, onClose }: Props) {
                 </div>
 
                 {error && (
-                    <div className="px-4 py-2 text-xs text-red-600 border-b border-red-200 bg-red-50">
+                    <div className="px-4 py-2 text-xs text-danger border-b border-red-200 bg-red-50">
                         {error}
                     </div>
                 )}
 
                 <div className="flex-1 overflow-y-auto">
                     {loading ? (
-                        <div className="p-6 text-center text-xs text-slate-400">
+                        <div className="p-6 text-center text-xs text-muted">
                             Loading…
                         </div>
                     ) : rows.length === 0 ? (
-                        <div className="p-6 text-center text-xs text-slate-400">
+                        <div className="p-6 text-center text-xs text-muted">
                             No claims
                         </div>
                     ) : (
@@ -281,7 +281,7 @@ function ClaimRow({
                 )}
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-sm text-slate-900">
+                        <span className="font-medium text-sm text-ink">
                             {claim.user_handle
                                 ? `@${claim.user_handle}`
                                 : claim.user_display_name ?? claim.user_email ?? 'user'}
@@ -295,12 +295,12 @@ function ClaimRow({
                             {isBadgeClaim ? 'Verified badge' : 'Events'}
                         </span>
                         {statusBadge(claim.status)}
-                        <span className="text-[10px] text-slate-400">
+                        <span className="text-[10px] text-muted">
                             {new Date(claim.created_at).toLocaleString()}
                         </span>
                     </div>
                     {claim.user_bio && (
-                        <p className="mt-1 text-xs text-slate-600 line-clamp-3">
+                        <p className="mt-1 text-xs text-ink-soft line-clamp-3">
                             {claim.user_bio}
                         </p>
                     )}
@@ -310,7 +310,7 @@ function ClaimRow({
                                 href={claim.user_instagram_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline"
+                                className="text-action hover:underline"
                             >
                                 Instagram
                             </a>
@@ -320,7 +320,7 @@ function ClaimRow({
                                 href={claim.user_facebook_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline"
+                                className="text-action hover:underline"
                             >
                                 Facebook
                             </a>
@@ -331,11 +331,11 @@ function ClaimRow({
 
             {isEventsClaim && claim.events.length > 0 && (
                 <>
-                    <div className="mt-3 text-[11px] text-slate-500">
+                    <div className="mt-3 text-[11px] text-ink-soft">
                         Approving an event attributes it to this user and adds it
                         to their public calendar as Going.
                     </div>
-                    <ul className="mt-2 divide-y divide-slate-100 border border-slate-200">
+                    <ul className="mt-2 divide-y divide-slate-100 border border-line">
                         {claim.events.map((ev) => (
                             <EventDecisionRow
                                 key={ev.event_id}
@@ -382,7 +382,7 @@ function ClaimRow({
                 placeholder="Admin notes (shown to claimer)"
                 rows={2}
                 maxLength={500}
-                className="mt-2 w-full text-xs border border-slate-300 px-2 py-1 focus:outline-none focus:border-blue-400"
+                className="mt-2 w-full text-xs border border-line px-2 py-1 focus:outline-none focus:border-blue-400"
             />
 
             {claim.status === 'pending' && (
@@ -390,7 +390,7 @@ function ClaimRow({
                     <button
                         disabled={saving || !dirty}
                         onClick={onSave}
-                        className="text-[11px] bg-blue-500 text-white px-3 py-1 hover:bg-blue-600 disabled:opacity-50"
+                        className="text-[11px] bg-action text-white px-3 py-1 hover:bg-action disabled:opacity-50"
                     >
                         {saving ? 'Saving…' : 'Save decision'}
                     </button>
@@ -411,11 +411,11 @@ function EventDecisionRow({ ev, decision, disabled, onSet }: EventRowProps) {
     return (
         <li className="p-2 flex items-center gap-2 text-xs">
             <div className="flex-1 min-w-0">
-                <div className="truncate text-slate-800">
+                <div className="truncate text-ink">
                     {ev.event_title ?? ev.event_id}
                 </div>
                 {ev.event_start && (
-                    <div className="text-[10px] text-slate-400">
+                    <div className="text-[10px] text-muted">
                         {new Date(ev.event_start).toLocaleString()}
                     </div>
                 )}
@@ -429,11 +429,11 @@ function EventDecisionRow({ ev, decision, disabled, onSet }: EventRowProps) {
                         onClick={() => onSet(d)}
                         className={`px-2 py-0.5 text-[10px] uppercase font-semibold ${decision === d
                             ? d === 'approved'
-                                ? 'bg-blue-500 text-white'
+                                ? 'bg-action text-white'
                                 : d === 'rejected'
-                                    ? 'bg-red-600 text-white'
-                                    : 'bg-slate-300 text-slate-700'
-                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                    ? 'bg-danger text-white'
+                                    : 'bg-slate-300 text-ink'
+                            : 'bg-slate-100 text-ink-soft hover:bg-canvas'
                             } disabled:opacity-50`}
                     >
                         {d}

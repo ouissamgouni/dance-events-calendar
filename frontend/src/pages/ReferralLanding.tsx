@@ -74,25 +74,25 @@ export default function ReferralLanding() {
 
     return (
         <div className="mx-auto max-w-md px-4 py-12 text-center">
-            <h1 className="text-xl font-semibold text-slate-900 mb-3">
+            <h1 className="text-xl font-semibold text-ink mb-3">
                 Welcome to Movida
             </h1>
             {!user && !loading && (
-                <p className="text-sm text-slate-600">
+                <p className="text-sm text-ink-soft">
                     Sign in to accept your invite…
                 </p>
             )}
             {user && status.kind === 'idle' && (
-                <p className="text-sm text-slate-600">Linking you up…</p>
+                <p className="text-sm text-ink-soft">Linking you up…</p>
             )}
             {status.kind === 'redeemed' && status.inviter && (
                 <>
-                    <p className="text-sm text-slate-700">
+                    <p className="text-sm text-ink">
                         You and <strong>@{status.inviter}</strong> are now {status.mutual ? 'mutual friends' : 'connected'}.
                     </p>
                     <Link
                         to="/"
-                        className="mt-4 inline-block bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
+                        className="mt-4 inline-block bg-action px-4 py-2 text-sm font-medium text-white hover:bg-action"
                     >
                         Explore events
                     </Link>
@@ -100,19 +100,19 @@ export default function ReferralLanding() {
             )}
             {status.kind === 'redeemed' && !status.inviter && (
                 <>
-                    <p className="text-sm text-slate-600">
+                    <p className="text-sm text-ink-soft">
                         That invite link isn't valid anymore.
                     </p>
                     <Link
                         to="/"
-                        className="mt-4 inline-block bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
+                        className="mt-4 inline-block bg-action px-4 py-2 text-sm font-medium text-white hover:bg-action"
                     >
                         Continue
                     </Link>
                 </>
             )}
             {status.kind === 'error' && (
-                <div className="border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                <div className="border border-line bg-canvas px-3 py-2 text-sm text-ink">
                     {status.message}
                 </div>
             )}

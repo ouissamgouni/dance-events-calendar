@@ -11,6 +11,8 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import EventMap from './EventMap';
 import PassportActivityHeatmap from './PassportActivityHeatmap';
+import ScrollDotsIndicator from './ScrollDots';
+import { useScrollDots } from '../hooks/useScrollDots';
 import type {
     PassportConsistency,
     PassportMapEvent,
@@ -79,14 +81,14 @@ function StatCard({
     action?: { label: string; onClick: () => void };
 }) {
     return (
-        <div className="border border-slate-200 bg-white p-2 text-center">
-            <div className="text-lg font-semibold text-slate-900 tabular-nums">{value}</div>
-            <div className="mt-0.5 text-[11px] leading-tight text-slate-500">
+        <div className="border border-line bg-surface p-2 text-center">
+            <div className="text-lg font-semibold text-ink tabular-nums">{value}</div>
+            <div className="mt-0.5 text-[11px] leading-tight text-ink-soft">
                 {onLabelClick ? (
                     <button
                         type="button"
                         onClick={onLabelClick}
-                        className="font-medium text-blue-600 underline hover:text-blue-700"
+                        className="font-medium text-action underline hover:text-action"
                     >
                         {label}
                     </button>
@@ -98,7 +100,7 @@ function StatCard({
                 <button
                     type="button"
                     onClick={action.onClick}
-                    className="mt-0.5 text-[10px] font-medium text-blue-600 hover:underline"
+                    className="mt-0.5 text-[10px] font-medium text-action hover:underline"
                 >
                     {action.label} →
                 </button>
@@ -124,8 +126,8 @@ function TabButton({
             onClick={onClick}
             className={
                 active
-                    ? 'border-b-2 border-blue-500 px-4 py-2 text-sm font-semibold text-slate-900'
-                    : 'border-b-2 border-transparent px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700'
+                    ? 'border-b-2 border-action px-4 py-2 text-sm font-semibold text-ink'
+                    : 'border-b-2 border-transparent px-4 py-2 text-sm font-medium text-ink-soft hover:text-ink'
             }
         >
             {children}
@@ -153,17 +155,17 @@ function SummaryHeader({
     const cadence =
         stats.avg_gap_days == null ? null : Math.max(1, Math.round(stats.avg_gap_days));
     return (
-        <header className="border border-slate-200 bg-slate-900 p-6 text-white">
+        <header className="bg-brand p-6 text-white">
             <h1 className="text-lg font-semibold">{title}</h1>
             <p className="mt-2 text-2xl font-semibold tabular-nums">{parts.join(' · ')}</p>
             {cadence != null && (
-                <p className="mt-1 font-semibold text-sm text-slate-200 tabular-nums">
+                <p className="mt-1 font-semibold text-sm text-white/80 tabular-nums">
                     1 event every {cadence} {cadence === 1 ? 'day' : 'days'}
                 </p>
             )}
             <div className="mt-1 flex items-center justify-between gap-4">
                 {dancingSinceSlot ?? (
-                    <p className="text-xs text-slate-300">
+                    <p className="text-xs text-white/70">
                         Dancing since {formatDate(stats.dancing_since ?? stats.member_since)}
                     </p>
                 )}
@@ -200,12 +202,12 @@ function FilterableEventMap({
     function optionClass(active: boolean): string {
         return active
             ? 'flex w-full items-center justify-between bg-slate-900 px-2 py-1.5 text-left text-sm font-medium text-white'
-            : 'flex w-full items-center justify-between px-2 py-1.5 text-left text-sm text-slate-700 hover:bg-slate-50';
+            : 'flex w-full items-center justify-between px-2 py-1.5 text-left text-sm text-ink hover:bg-canvas';
     }
 
     return (
         <div className="grid gap-4 md:grid-cols-[minmax(0,220px)_1fr]">
-            <div className="border border-slate-200 bg-white p-1">
+            <div className="border border-line bg-surface p-1">
                 <ul className="max-h-[360px] space-y-0.5 overflow-y-auto">
                     <li>
                         <button
@@ -230,11 +232,11 @@ function FilterableEventMap({
                         </li>
                     ))}
                     {entries.length === 0 && (
-                        <li className="px-2 py-1.5 text-xs text-slate-400">{emptyLabel}</li>
+                        <li className="px-2 py-1.5 text-xs text-muted">{emptyLabel}</li>
                     )}
                 </ul>
             </div>
-            <div className="h-[360px] border border-slate-200">
+            <div className="h-[360px] border border-line">
                 <EventMap
                     events={filtered}
                     minimalPopup
@@ -294,12 +296,12 @@ function TimelineRow({ item, anchorMonth, highlighted }: { item: PassportTimelin
             <span className="absolute left-[1px] top-[6px] h-3 w-3 rounded-full bg-slate-300 ring-2 ring-white" aria-hidden />
             <Link
                 to={`/event/${item.event_id}`}
-                className={`group block py-1 hover:bg-slate-50 ${highlighted ? 'bg-blue-50 ring-2 ring-blue-400' : ''}`}
+                className={`group block py-1 hover:bg-canvas ${highlighted ? 'bg-blue-50 ring-2 ring-blue-400' : ''}`}
             >
-                <div className="text-sm font-semibold text-slate-900 group-hover:text-blue-600">
+                <div className="text-sm font-semibold text-ink group-hover:text-action">
                     {item.title}
                 </div>
-                <div className="text-xs text-slate-500">
+                <div className="text-xs text-ink-soft">
                     {formatDate(item.start)}
                     {place ? ` · ${place}` : item.location ? ` · ${item.location}` : ''}
                 </div>
@@ -316,15 +318,15 @@ function TimelineMarkerRow({ markers }: { markers: PassportTimelineMarker[] }) {
                 🏅
             </span>
             {single ? (
-                <div className="max-w-[420px] text-xs leading-5 text-slate-600">
-                    <span className="font-semibold text-slate-700">{single.name}</span>
+                <div className="max-w-[420px] text-xs leading-5 text-ink-soft">
+                    <span className="font-semibold text-ink">{single.name}</span>
                     {(single.label ?? TIMELINE_MILESTONE[single.key]?.label) && (
                         <> · {single.label ?? TIMELINE_MILESTONE[single.key]?.label}</>
                     )}
                 </div>
             ) : (
-                <div className="max-w-[420px] text-xs leading-5 text-slate-600">
-                    <div className="font-medium text-slate-700">
+                <div className="max-w-[420px] text-xs leading-5 text-ink-soft">
+                    <div className="font-medium text-ink">
                         {markers.length} milestones unlocked
                     </div>
                     <ul className="mt-0.5 space-y-0.5 pl-4">
@@ -335,7 +337,7 @@ function TimelineMarkerRow({ markers }: { markers: PassportTimelineMarker[] }) {
                             return (
                                 <li key={m.key}>
                                     <span aria-hidden>{icon}</span>{' '}
-                                    <span className="font-semibold text-slate-700">{m.name}</span>
+                                    <span className="font-semibold text-ink">{m.name}</span>
                                     {label && <> · {label}</>}
                                 </li>
                             );
@@ -355,7 +357,7 @@ function MilestoneBadge({ milestone }: { milestone: PassportMilestone }) {
             className={
                 unlocked
                     ? 'flex h-full flex-col border border-amber-300 bg-amber-50 p-2 text-center'
-                    : 'flex h-full flex-col border border-slate-200 bg-white p-2 text-center'
+                    : 'flex h-full flex-col border border-line bg-surface p-2 text-center'
             }
             title={milestone.description}
         >
@@ -365,22 +367,22 @@ function MilestoneBadge({ milestone }: { milestone: PassportMilestone }) {
             <div
                 className={
                     unlocked
-                        ? 'mt-1 text-xs font-semibold text-slate-900'
-                        : 'mt-1 text-xs font-medium text-slate-400'
+                        ? 'mt-1 text-xs font-semibold text-ink'
+                        : 'mt-1 text-xs font-medium text-muted'
                 }
             >
                 {milestone.name}
             </div>
             {unlocked ? (
-                <div className="mt-0.5 text-[10px] leading-tight text-slate-500">
+                <div className="mt-0.5 text-[10px] leading-tight text-ink-soft">
                     {milestone.achieved_description}
                 </div>
             ) : (
                 <>
-                    <div className="mt-0.5 text-[10px] leading-tight text-slate-400">
+                    <div className="mt-0.5 text-[10px] leading-tight text-muted">
                         {milestone.description}
                     </div>
-                    <div className="mt-1 text-[10px] font-semibold tabular-nums text-slate-500">
+                    <div className="mt-1 text-[10px] font-semibold tabular-nums text-ink-soft">
                         {remaining} more to unlock
                     </div>
                 </>
@@ -416,17 +418,19 @@ function MilestoneCategoryRow({
     milestones: PassportMilestone[];
 }) {
     const unlockedCount = milestones.filter((m) => m.unlocked).length;
+    const scrollerRef = useRef<HTMLDivElement>(null);
+    const { dotCount, activeIndex, scrollToIndex } = useScrollDots(scrollerRef, [milestones.length]);
     return (
         <div>
             <div className="mb-1.5 flex items-baseline justify-between">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
                     {label}
                 </h3>
-                <span className="text-[11px] tabular-nums text-slate-400">
+                <span className="text-[11px] tabular-nums text-muted">
                     {unlockedCount}/{milestones.length}
                 </span>
             </div>
-            <div className="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1">
+            <div ref={scrollerRef} className="-mx-1 flex snap-x gap-2 overflow-x-auto scrollbar-hide px-1 pb-1">
                 {milestones.map((m) => (
                     <div
                         key={m.key}
@@ -436,6 +440,12 @@ function MilestoneCategoryRow({
                     </div>
                 ))}
             </div>
+            <ScrollDotsIndicator
+                count={dotCount}
+                activeIndex={activeIndex}
+                onSelect={scrollToIndex}
+                label={`${label} scroll position`}
+            />
         </div>
     );
 }
@@ -456,7 +466,7 @@ function MilestonesGrid({
         return (
             <div className="space-y-4">
                 {consistencyRow}
-                <div className="border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+                <div className="border border-line bg-surface p-6 text-center text-sm text-ink-soft">
                     No milestones yet.
                 </div>
             </div>
@@ -477,7 +487,7 @@ function MilestonesGrid({
     const unlockedCount = milestones.filter((m) => m.unlocked).length;
     return (
         <>
-            <div className="mb-2 text-xs tabular-nums text-slate-400">
+            <div className="mb-2 text-xs tabular-nums text-muted">
                 {unlockedCount}/{milestones.length} unlocked
             </div>
             <div className="space-y-4">
@@ -530,7 +540,7 @@ function ConsistencyCard({ card }: { card: ConsistencyCardModel }) {
             className={
                 card.earned
                     ? 'flex h-full flex-col border border-amber-300 bg-amber-50 p-2 text-center'
-                    : 'flex h-full flex-col border border-slate-200 bg-white p-2 text-center'
+                    : 'flex h-full flex-col border border-line bg-surface p-2 text-center'
             }
         >
             <div className={card.earned ? 'text-xl' : 'text-xl opacity-30 grayscale'}>
@@ -539,8 +549,8 @@ function ConsistencyCard({ card }: { card: ConsistencyCardModel }) {
             <div
                 className={
                     card.earned
-                        ? 'mt-1 text-xs font-semibold text-slate-900'
-                        : 'mt-1 text-xs font-medium text-slate-400'
+                        ? 'mt-1 text-xs font-semibold text-ink'
+                        : 'mt-1 text-xs font-medium text-muted'
                 }
             >
                 {card.name}
@@ -548,20 +558,20 @@ function ConsistencyCard({ card }: { card: ConsistencyCardModel }) {
             <div
                 className={
                     card.earned
-                        ? 'mt-0.5 text-[10px] leading-tight tabular-nums text-slate-500'
-                        : 'mt-0.5 text-[10px] leading-tight text-slate-400'
+                        ? 'mt-0.5 text-[10px] leading-tight tabular-nums text-ink-soft'
+                        : 'mt-0.5 text-[10px] leading-tight text-muted'
                 }
             >
                 {card.activeLine}
             </div>
             {card.earned
                 ? card.period && (
-                    <div className="mt-0.5 text-[10px] leading-tight text-slate-400">
+                    <div className="mt-0.5 text-[10px] leading-tight text-muted">
                         {card.period}
                     </div>
                 )
                 : card.remaining != null && (
-                    <div className="mt-1 text-[10px] font-semibold tabular-nums text-slate-500">
+                    <div className="mt-1 text-[10px] font-semibold tabular-nums text-ink-soft">
                         {card.remaining} more to unlock
                     </div>
                 )}
@@ -570,6 +580,7 @@ function ConsistencyCard({ card }: { card: ConsistencyCardModel }) {
 }
 
 function ConsistencyTrailRow({ consistency }: { consistency: PassportConsistency }) {
+    const scrollerRef = useRef<HTMLDivElement>(null);
     const cards: ConsistencyCardModel[] = [
         ...consistency.earned.map((c) => ({
             key: c.key,
@@ -588,18 +599,19 @@ function ConsistencyTrailRow({ consistency }: { consistency: PassportConsistency
             remaining: Math.max(0, c.threshold - c.active_months),
         })),
     ];
+    const { dotCount, activeIndex, scrollToIndex } = useScrollDots(scrollerRef, [cards.length]);
     if (cards.length === 0) return null;
     return (
         <div>
             <div className="mb-1.5 flex items-baseline justify-between">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
                     Consistency
                 </h3>
-                <span className="text-[11px] tabular-nums text-slate-400">
+                <span className="text-[11px] tabular-nums text-muted">
                     Current · {consistency.active_months}/{consistency.window} active months
                 </span>
             </div>
-            <div className="-mx-1 flex snap-x gap-2 overflow-x-auto px-1 pb-1">
+            <div ref={scrollerRef} className="-mx-1 flex snap-x gap-2 overflow-x-auto scrollbar-hide px-1 pb-1">
                 {cards.map((c) => (
                     <div
                         key={c.key}
@@ -609,6 +621,12 @@ function ConsistencyTrailRow({ consistency }: { consistency: PassportConsistency
                     </div>
                 ))}
             </div>
+            <ScrollDotsIndicator
+                count={dotCount}
+                activeIndex={activeIndex}
+                onSelect={scrollToIndex}
+                label="Consistency scroll position"
+            />
         </div>
     );
 }
@@ -773,7 +791,7 @@ export default function PassportView({
             <SummaryHeader data={data} title={title} actions={headerActions} dancingSinceSlot={dancingSinceSlot} />
 
             <section ref={tabsRef}>
-                <div role="tablist" className="flex border-b border-slate-200">
+                <div role="tablist" className="flex border-b border-line">
                     {shown.map((s) => (
                         <TabButton key={s} active={tab === s} onClick={() => setTab(s)}>
                             {SECTION_LABELS[s]}
@@ -831,7 +849,7 @@ export default function PassportView({
                                 highlightMonth={highlightMonth}
                             />
                             {timelineItems.length === 0 ? (
-                                <div className="border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+                                <div className="border border-line bg-surface p-6 text-center text-sm text-ink-soft">
                                     No attended events yet.
                                 </div>
                             ) : (
@@ -862,7 +880,7 @@ export default function PassportView({
                                     type="button"
                                     onClick={onLoadMoreTimeline}
                                     disabled={loadingMoreTimeline}
-                                    className="mt-4 w-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                                    className="mt-4 w-full border border-line bg-surface px-4 py-2 text-sm font-medium text-ink hover:bg-canvas disabled:opacity-50"
                                 >
                                     {loadingMoreTimeline ? 'Loading…' : 'Show more'}
                                 </button>
@@ -871,7 +889,7 @@ export default function PassportView({
                     )}
                     {tab === 'cities' && has('cities') && (
                         mapEvents === null ? (
-                            <div className="border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+                            <div className="border border-line bg-surface p-6 text-center text-sm text-ink-soft">
                                 Loading map…
                             </div>
                         ) : (
@@ -880,7 +898,7 @@ export default function PassportView({
                     )}
                     {tab === 'countries' && has('countries') && (
                         mapEvents === null ? (
-                            <div className="border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+                            <div className="border border-line bg-surface p-6 text-center text-sm text-ink-soft">
                                 Loading map…
                             </div>
                         ) : (

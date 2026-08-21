@@ -38,7 +38,7 @@ const SIZE_STYLES: Record<AttendeeAvatarStackSize, SizeStyles> = {
         initial: 'text-[10px]',
         ring: 'ring-2',
         icon: 'w-3.5 h-3.5',
-        link: 'inline-flex items-center gap-1.5 text-[11px] text-slate-500 hover:text-slate-700',
+        link: 'inline-flex items-center gap-1.5 text-[11px] text-ink-soft hover:text-ink',
         stack: 'flex -space-x-1.5',
         // Mobile shows the compact "+N" form to save room inside the
         // event card; the "more" word appears on sm+ screens.
@@ -49,7 +49,7 @@ const SIZE_STYLES: Record<AttendeeAvatarStackSize, SizeStyles> = {
         initial: 'text-[8px]',
         ring: 'ring-1',
         icon: 'w-2.5 h-2.5',
-        link: 'inline-flex items-center gap-1 text-[10px] text-slate-500 hover:text-slate-700',
+        link: 'inline-flex items-center gap-1 text-[10px] text-ink-soft hover:text-ink',
         stack: 'flex -space-x-1',
         overflowMoreOnDesktop: false,
     },
@@ -82,7 +82,7 @@ function MiniAvatar({
         );
     }
     const initial = (person.display_name?.trim()[0] ?? '?').toUpperCase();
-    const bg = isFriend ? 'bg-blue-50 text-blue-500' : 'bg-slate-300 text-slate-700';
+    const bg = isFriend ? 'bg-blue-50 text-action' : 'bg-slate-300 text-ink';
     return (
         <span
             title={person.display_name ?? undefined}
@@ -127,7 +127,7 @@ function PeopleIcon({ className, color = 'text-blue-400' }: { className: string;
  * Anonymous viewers see only aggregate social proof, with identities
  * gated behind sign-in.
  */
-export default function AttendeeAvatarStack({ eventId, max = 5, friendsPreview, size = 'md' }: Props) {
+export default function AttendeeAvatarStack({ eventId, max = 3, friendsPreview, size = 'md' }: Props) {
     const { user } = useAuth();
     const location = useLocation();
     const summary = useAttendanceSummary(eventId);
@@ -155,12 +155,12 @@ export default function AttendeeAvatarStack({ eventId, max = 5, friendsPreview, 
                 <Link
                     to={`/login?next=${next}`}
                     onClick={(e) => e.stopPropagation()}
-                    className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[11px] text-slate-500 hover:text-blue-700"
+                    className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[11px] text-ink-soft hover:text-action"
                     title={totalGoing === 1 ? '1 person is going — sign in to see who' : `${totalGoing} people are going — sign in to see who`}
                     data-testid="anonymous-attendee-prompt"
                 >
                     <span>{goingCopy}</span>
-                    <PeopleIcon className="h-3.5 w-3.5 shrink-0" color="text-slate-400" />
+                    <PeopleIcon className="h-3.5 w-3.5 shrink-0" color="text-muted" />
                 </Link>
             );
         }
@@ -181,7 +181,7 @@ export default function AttendeeAvatarStack({ eventId, max = 5, friendsPreview, 
             title={namesTitle}
             data-testid={hasFriend ? 'attendee-track-with-friends' : 'attendee-track'}
         >
-            <PeopleIcon className={styles.icon} color={hasFriend ? 'text-blue-400' : 'text-slate-400'} />
+            <PeopleIcon className={styles.icon} color={hasFriend ? 'text-blue-400' : 'text-muted'} />
             <span className={styles.stack}>
                 {shown.map((p, i) => (
                     <MiniAvatar key={p.user_id} person={p} z={shown.length - i} isFriend={p.isFriend} styles={styles} />

@@ -1,0 +1,93 @@
+# Events for the search-profiles scenario. Two geographic clusters so the
+# viewer can tell area/dance changes apart in the Explore list + map:
+#
+#   * Barcelona cluster (evt-sp-bcn-*) — matches the saved "Barcelona salsa"
+#     profile (bbox around Barcelona, dance-style:salsa, reach:international).
+#   * Elsewhere-in-Europe cluster (evt-sp-eu-*) — Salsa + Bachata events
+#     across Paris / Berlin / Milano so switching to the wide "Default"
+#     profile widens the visible set, and toggling Bachata changes it again.
+base_week: 0
+events:
+  # ── Barcelona cluster ────────────────────────────────────────────
+  - id: evt-sp-bcn-001
+    calendar_id: salsa-cal-sp-001
+    title: Barcelona Salsa Rooftop Social
+    description: |
+      Salsa social in central Barcelona. Matches the saved "Barcelona salsa"
+      search profile (Barcelona bbox + Salsa + International).
+    location: Rooftop Club, Carrer de Mallorca 200, Barcelona, Spain
+    latitude: 41.3954
+    longitude: 2.1620
+    start: w0 Fri 21:00
+    end: w0 Sat 01:00
+    price_is_free: true
+    tags:
+      - dance-style:salsa
+      - reach:international
+
+  - id: evt-sp-bcn-002
+    calendar_id: salsa-cal-sp-001
+    title: Barcelona Salsa Beach Party
+    description: |
+      Beach-side salsa social. Also inside the Barcelona profile bbox.
+    location: Beach Bar, Passeig Marítim 10, Barcelona, Spain
+    latitude: 41.3785
+    longitude: 2.1925
+    start: w0 Sat 20:00
+    end: w0 Sun 00:00
+    price_is_free: false
+    price_min: 10
+    price_currency: EUR
+    tags:
+      - dance-style:salsa
+      - reach:international
+
+  # ── Elsewhere in Europe (only visible under the wide Default profile) ──
+  - id: evt-sp-eu-001
+    calendar_id: salsa-cal-sp-001
+    title: Paris Salsa Friday
+    description: |
+      Salsa social in Paris — outside the Barcelona bbox, so it only appears
+      once the viewer switches to the wide "Default" search profile.
+    location: Dance Studio, 10 Rue de Rivoli, Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    start: w0 Fri 21:00
+    end: w0 Sat 01:00
+    price_is_free: true
+    tags:
+      - dance-style:salsa
+      - reach:regional
+
+  - id: evt-sp-eu-002
+    calendar_id: salsa-cal-sp-001
+    title: Berlin Bachata Sensual Night
+    description: |
+      Bachata social in Berlin. Only appears when the profile/filters include
+      Bachata (used to prove Dance-style edits change the result set).
+    location: Sala Rossa, Torstraße 1, Berlin, Germany
+    latitude: 52.5200
+    longitude: 13.4050
+    start: w0 Sat 20:00
+    end: w0 Sun 00:00
+    price_is_free: false
+    price_min: 12
+    price_currency: EUR
+    tags:
+      - dance-style:bachata
+      - reach:regional
+
+  - id: evt-sp-eu-003
+    calendar_id: salsa-cal-sp-001
+    title: Milano Salsa Sunday Matinée
+    description: |
+      Salsa social in Milano — another wide-Default-only card.
+    location: Studio Milano, Via Torino 5, Milano, Italy
+    latitude: 45.4642
+    longitude: 9.1900
+    start: w0 Sun 18:00
+    end: w0 Sun 22:00
+    price_is_free: true
+    tags:
+      - dance-style:salsa
+      - reach:local

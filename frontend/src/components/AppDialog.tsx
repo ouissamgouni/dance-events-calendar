@@ -37,20 +37,20 @@ export function ConfirmDialog({
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="app-dialog-title"
-                className="w-full max-w-sm border border-slate-200 bg-white shadow-xl"
+                className="w-full max-w-sm border border-line bg-surface shadow-xl"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="border-b border-slate-100 px-4 py-3">
-                    <h2 id="app-dialog-title" className="text-sm font-semibold text-slate-900">{title}</h2>
+                <div className="border-b border-card-line px-4 py-3">
+                    <h2 id="app-dialog-title" className="text-sm font-semibold text-ink">{title}</h2>
                 </div>
                 <div className="px-4 py-3">
-                    <p className="whitespace-pre-line text-sm text-slate-600">{message}</p>
+                    <p className="whitespace-pre-line text-sm text-ink-soft">{message}</p>
                 </div>
-                <div className="flex justify-end gap-2 border-t border-slate-100 px-4 py-3">
+                <div className="flex justify-end gap-2 border-t border-card-line px-4 py-3">
                     <button
                         type="button"
                         onClick={onCancel}
-                        className="border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                        className="border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:bg-canvas"
                     >
                         {cancelLabel}
                     </button>
@@ -58,8 +58,8 @@ export function ConfirmDialog({
                         type="button"
                         onClick={onConfirm}
                         className={destructive
-                            ? 'bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700'
-                            : 'bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600'}
+                            ? 'bg-danger px-3 py-1.5 text-sm font-medium text-white hover:bg-danger/90'
+                            : 'bg-action px-3 py-1.5 text-sm font-medium text-white hover:bg-action'}
                     >
                         {confirmLabel}
                     </button>
@@ -95,18 +95,18 @@ export function PromptDialog({
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="app-prompt-title"
-                className="w-full max-w-sm border border-slate-200 bg-white shadow-xl"
+                className="w-full max-w-sm border border-line bg-surface shadow-xl"
                 onClick={(e) => e.stopPropagation()}
                 onSubmit={(e) => {
                     e.preventDefault();
                     onConfirm(value);
                 }}
             >
-                <div className="border-b border-slate-100 px-4 py-3">
-                    <h2 id="app-prompt-title" className="text-sm font-semibold text-slate-900">{title}</h2>
+                <div className="border-b border-card-line px-4 py-3">
+                    <h2 id="app-prompt-title" className="text-sm font-semibold text-ink">{title}</h2>
                 </div>
                 <div className="space-y-3 px-4 py-3">
-                    <p className="whitespace-pre-line text-sm text-slate-600">{message}</p>
+                    <p className="whitespace-pre-line text-sm text-ink-soft">{message}</p>
                     <input
                         type="text"
                         autoFocus
@@ -114,22 +114,22 @@ export function PromptDialog({
                         maxLength={maxLength}
                         placeholder={placeholder}
                         onChange={(e) => setValue(e.target.value)}
-                        className="w-full border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        className="w-full border border-line px-3 py-2 text-sm text-ink focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
                     />
                 </div>
-                <div className="flex justify-end gap-2 border-t border-slate-100 px-4 py-3">
+                <div className="flex justify-end gap-2 border-t border-card-line px-4 py-3">
                     <button
                         type="button"
                         onClick={onCancel}
-                        className="border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                        className="border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink hover:bg-canvas"
                     >
                         {cancelLabel}
                     </button>
                     <button
                         type="submit"
                         className={destructive
-                            ? 'bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700'
-                            : 'bg-blue-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-600'}
+                            ? 'bg-danger px-3 py-1.5 text-sm font-medium text-white hover:bg-danger/90'
+                            : 'bg-action px-3 py-1.5 text-sm font-medium text-white hover:bg-action'}
                     >
                         {confirmLabel}
                     </button>

@@ -175,10 +175,10 @@ export default function SaveEventButton({
             role="dialog"
             aria-label="Saved event visibility"
             style={{ position: 'fixed', top: popoverPos.top, left: popoverPos.left, width: POPOVER_WIDTH }}
-            className="z-[12000] border border-slate-200 bg-white p-3 shadow-xl text-left"
+            className="z-[12000] border border-line bg-surface p-3 shadow-xl text-left"
         >
-            <p className="text-xs font-medium text-slate-800 mb-2">Edit visibility</p>
-            <p className="text-[11px] text-slate-600 mb-2">
+            <p className="text-xs font-medium text-ink mb-2">Edit visibility</p>
+            <p className="text-[11px] text-ink-soft mb-2">
                 Who can see you saved this event?
             </p>
             <AudiencePicker
@@ -187,7 +187,7 @@ export default function SaveEventButton({
                 size="full"
                 ariaLabel="Saved event visibility"
             />
-            <p className="text-[11px] text-slate-500 mt-1.5">
+            <p className="text-[11px] text-ink-soft mt-1.5">
                 {pendingAudience === 'public'
                     ? 'Anyone who can view your profile will see this in your saved list.'
                     : pendingAudience === 'friends'
@@ -205,7 +205,7 @@ export default function SaveEventButton({
                 <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setPopoverOpen(false); }}
-                    className="text-xs px-2 py-1 text-slate-600 hover:bg-slate-100"
+                    className="text-xs px-2 py-1 text-ink-soft hover:bg-canvas"
                 >
                     Close
                 </button>
@@ -228,7 +228,7 @@ export default function SaveEventButton({
                 <button
                     ref={buttonRef}
                     onClick={handleClick}
-                    className={`text-xs rounded-full px-3 py-1 transition flex items-center gap-1 ${saved ? 'text-slate-800 bg-slate-200 hover:bg-slate-300' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'} ${className}`.trim()}
+                    className={`text-xs rounded-full px-3 py-1 transition flex items-center gap-1 ${saved ? 'text-ink bg-slate-200 hover:bg-slate-300' : 'text-ink-soft bg-slate-100 hover:bg-canvas'} ${className}`.trim()}
                     aria-label={saved ? 'Edit saved visibility' : 'Save event'}
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
@@ -248,7 +248,7 @@ export default function SaveEventButton({
             <button
                 ref={buttonRef}
                 onClick={handleClick}
-                className={`rounded-full transition ${size === 'sm' ? 'p-0.5' : 'p-1.5'} ${saved ? 'text-slate-700 hover:text-slate-900' : 'text-slate-300 hover:text-slate-500'} ${className}`.trim()}
+                className={`rounded-full transition ${size === 'sm' ? 'p-0.5' : 'p-1.5'} ${saved ? 'text-ink hover:text-ink' : 'text-slate-300 hover:text-ink-soft'} ${className}`.trim()}
                 aria-label={saved ? 'Edit saved visibility' : 'Save event'}
             >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className={iconSizeClass}>

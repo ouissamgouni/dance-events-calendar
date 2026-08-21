@@ -218,13 +218,13 @@ export default function NetworkPanel() {
     return (
         <section
             id="network"
-            className="border border-slate-200 bg-white p-4 mb-3 scroll-mt-4"
+            className="border border-line bg-surface p-4 mb-3 scroll-mt-4"
         >
             <FollowRequestsPanel />
             <div
                 role="tablist"
                 aria-label="My network"
-                className="flex gap-0.5 mb-3 border-b border-slate-200 overflow-x-auto scrollbar-none"
+                className="flex gap-0.5 mb-3 border-b border-line overflow-x-auto scrollbar-none"
             >
                 {(Object.keys(TAB_LABELS) as Tab[]).map((t) => {
                     const active = t === tab;
@@ -238,13 +238,13 @@ export default function NetworkPanel() {
                             aria-selected={active}
                             onClick={() => handleTabClick(t)}
                             className={`shrink-0 px-2.5 py-1.5 text-xs font-medium border-b-2 -mb-px whitespace-nowrap ${active
-                                ? 'border-blue-500 text-blue-600'
-                                : 'border-transparent text-slate-600 hover:text-slate-900'
+                                ? 'border-action text-action'
+                                : 'border-transparent text-ink-soft hover:text-ink'
                                 }`}
                         >
                             {TAB_LABELS[t]}
                             {typeof count === 'number' && (
-                                <span className="ml-1 text-xs text-slate-400">
+                                <span className="ml-1 text-xs text-muted">
                                     {count}
                                 </span>
                             )}
@@ -255,7 +255,7 @@ export default function NetworkPanel() {
 
             <div className="max-h-80 overflow-y-auto">
                 {error ? (
-                    <p className="text-xs text-red-600">{error}</p>
+                    <p className="text-xs text-danger">{error}</p>
                 ) : tab === 'leaderboard' ? (
                     <LeaderboardView
                         period={leaderboardPeriod}
@@ -266,9 +266,9 @@ export default function NetworkPanel() {
                         data={leaderboard}
                     />
                 ) : current === null ? (
-                    <p className="text-xs text-slate-400">Loading…</p>
+                    <p className="text-xs text-muted">Loading…</p>
                 ) : current.items.length === 0 ? (
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-ink-soft">
                         {tab === 'friends'
                             ? "You don't have any friends yet. Friends are users who follow you back."
                             : tab === 'followers'
@@ -292,14 +292,14 @@ export default function NetworkPanel() {
                                             className="w-8 h-8 rounded-full object-cover bg-slate-100"
                                         />
                                     ) : (
-                                        <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-semibold">
+                                        <div className="w-8 h-8 rounded-full bg-slate-200 text-ink-soft flex items-center justify-center text-xs font-semibold">
                                             {initial}
                                         </div>
                                     )}
                                     <div className="min-w-0 flex-1">
                                         <Link
                                             to={`/u/${u.handle}`}
-                                            className="block truncate text-xs font-medium text-slate-900 hover:text-blue-500"
+                                            className="block truncate text-xs font-medium text-ink hover:text-action"
                                         >
                                             {name}
                                             {u.is_verified_organizer && (
@@ -312,10 +312,10 @@ export default function NetworkPanel() {
                                                 />
                                             )}
                                         </Link>
-                                        <div className="text-xs text-slate-500 truncate">
+                                        <div className="text-xs text-ink-soft truncate">
                                             @{u.handle}
                                             {u.is_friend && tab !== 'friends' && (
-                                                <span className="ml-1.5 text-emerald-600">
+                                                <span className="ml-1.5 text-success">
                                                     · friend
                                                 </span>
                                             )}
@@ -328,7 +328,7 @@ export default function NetworkPanel() {
                                                     type="button"
                                                     onClick={() => handleFollowBack(u)}
                                                     disabled={pending === u.handle}
-                                                    className="shrink-0 bg-blue-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-blue-600 disabled:opacity-50"
+                                                    className="shrink-0 bg-action px-2.5 py-1 text-xs font-semibold text-white hover:bg-action disabled:opacity-50"
                                                 >
                                                     {pending === u.handle ? '…' : 'Follow back'}
                                                 </button>
@@ -337,7 +337,7 @@ export default function NetworkPanel() {
                                                 type="button"
                                                 onClick={() => handleRemove(u)}
                                                 disabled={pending === u.handle}
-                                                className="shrink-0 border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                                                className="shrink-0 border border-line px-2 py-1 text-xs font-medium text-ink hover:bg-canvas disabled:opacity-50"
                                             >
                                                 {pending === u.handle
                                                     ? '…'
@@ -385,7 +385,7 @@ function LeaderboardView({
             <div
                 role="radiogroup"
                 aria-label="Leaderboard period"
-                className="inline-flex border border-slate-200 mb-3"
+                className="inline-flex border border-line mb-3"
             >
                 {(Object.keys(PERIOD_LABEL) as LeaderboardPeriod[]).map((p) => {
                     const active = p === period;
@@ -397,10 +397,10 @@ function LeaderboardView({
                             aria-checked={active}
                             onClick={() => onPeriodChange(p)}
                             className={
-                                'px-2.5 py-1 text-xs font-medium border-l first:border-l-0 border-slate-200 ' +
+                                'px-2.5 py-1 text-xs font-medium border-l first:border-l-0 border-line ' +
                                 (active
-                                    ? 'bg-blue-500 text-white'
-                                    : 'bg-white text-slate-600 hover:bg-slate-50')
+                                    ? 'bg-action text-white'
+                                    : 'bg-surface text-ink-soft hover:bg-canvas')
                             }
                         >
                             {PERIOD_LABEL[p]}
@@ -409,9 +409,9 @@ function LeaderboardView({
                 })}
             </div>
             {data === null ? (
-                <p className="text-sm text-slate-400">Loading…</p>
+                <p className="text-sm text-muted">Loading…</p>
             ) : data.items.length === 0 ? (
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-ink-soft">
                     No Going activity from your friends in this window.
                 </p>
             ) : (
@@ -424,7 +424,7 @@ function LeaderboardView({
                                 key={row.handle}
                                 className="flex items-center gap-3 py-2"
                             >
-                                <span className="w-6 text-right text-xs font-semibold text-slate-500">
+                                <span className="w-6 text-right text-xs font-semibold text-ink-soft">
                                     {row.rank}
                                 </span>
                                 {row.avatar_url ? (
@@ -434,13 +434,13 @@ function LeaderboardView({
                                         className="w-8 h-8 rounded-full object-cover bg-slate-100"
                                     />
                                 ) : (
-                                    <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center text-xs font-semibold">
+                                    <div className="w-8 h-8 rounded-full bg-slate-200 text-ink-soft flex items-center justify-center text-xs font-semibold">
                                         {initial}
                                     </div>
                                 )}
                                 <Link
                                     to={`/u/${row.handle}`}
-                                    className="flex-1 truncate text-xs font-medium text-slate-900 hover:text-blue-600"
+                                    className="flex-1 truncate text-xs font-medium text-ink hover:text-action"
                                 >
                                     {name}
                                     {row.is_verified_organizer && (
@@ -453,7 +453,7 @@ function LeaderboardView({
                                         />
                                     )}
                                 </Link>
-                                <span className="shrink-0 text-xs text-slate-500">
+                                <span className="shrink-0 text-xs text-ink-soft">
                                     {row.going_count} going
                                 </span>
                             </li>

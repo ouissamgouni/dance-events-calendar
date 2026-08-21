@@ -76,7 +76,7 @@ export default function ExperienceBreakdown({ aggregate, aspectLabels = {}, edit
             {/* Numeric mood breakdown — collapsed by default, directly under the headline */}
             {sentimentTotal > 0 && (
                 <details className="text-xs">
-                    <summary className="cursor-pointer text-[9px] font-semibold uppercase tracking-wide text-slate-500 select-none">
+                    <summary className="cursor-pointer text-[9px] font-semibold uppercase tracking-wide text-ink-soft select-none">
                         Show mood breakdown
                     </summary>
                     <div className="space-y-1 mt-1.5">
@@ -85,11 +85,11 @@ export default function ExperienceBreakdown({ aggregate, aspectLabels = {}, edit
                             const pct = sentimentTotal > 0 ? Math.round((count / sentimentTotal) * 100) : 0;
                             return (
                                 <div key={s.value} className="flex items-center gap-2 text-xs">
-                                    <span className="w-28 shrink-0 text-slate-600">{s.emoji} {s.label}</span>
+                                    <span className="w-28 shrink-0 text-ink-soft">{s.emoji} {s.label}</span>
                                     <div className="flex-1 h-2 bg-slate-200 overflow-hidden">
                                         <div className="h-full bg-sky-500" style={{ width: `${pct}%` }} />
                                     </div>
-                                    <span className="w-8 text-right text-slate-500 tabular-nums">{count}</span>
+                                    <span className="w-8 text-right text-ink-soft tabular-nums">{count}</span>
                                 </div>
                             );
                         })}
@@ -101,13 +101,13 @@ export default function ExperienceBreakdown({ aggregate, aspectLabels = {}, edit
 
             {/* Community summary — each group on one horizontally scrollable line */}
             {(appreciated.length > 0 || mentioned.length > 0 || recommendedFor.length > 0) && (
-                <div className="space-y-3 border-t border-slate-100 pt-4">
+                <div className="space-y-3 border-t border-card-line pt-4">
                     {appreciated.length > 0 && (
                         <div>
-                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">People appreciated</div>
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft mb-1.5">People appreciated</div>
                             <div className="flex gap-1.5 overflow-x-auto pb-1">
                                 {appreciated.map((t) => (
-                                    <span key={t.tag_id} className="shrink-0 whitespace-nowrap rounded-full bg-green-50 text-green-800 px-2 py-0.5 text-[11px]">
+                                    <span key={t.tag_id} className="shrink-0 whitespace-nowrap rounded-full bg-green-50 text-success px-2 py-0.5 text-[11px]">
                                         {t.label} ({t.count})
                                     </span>
                                 ))}
@@ -116,7 +116,7 @@ export default function ExperienceBreakdown({ aggregate, aspectLabels = {}, edit
                     )}
                     {mentioned.length > 0 && (
                         <div>
-                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Good to know</div>
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft mb-1.5">Good to know</div>
                             <div className="flex gap-1.5 overflow-x-auto pb-1">
                                 {mentioned.map((t) => (
                                     <span key={t.tag_id} className="shrink-0 whitespace-nowrap rounded-full bg-orange-50 text-orange-800 px-2 py-0.5 text-[11px]">
@@ -128,10 +128,10 @@ export default function ExperienceBreakdown({ aggregate, aspectLabels = {}, edit
                     )}
                     {recommendedFor.length > 0 && (
                         <div>
-                            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Best suited for</div>
+                            <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft mb-1.5">Best suited for</div>
                             <div className="flex gap-1.5 overflow-x-auto pb-1">
                                 {recommendedFor.map((t) => (
-                                    <span key={t.tag_id} className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 text-slate-600 px-2 py-0.5 text-[11px]">
+                                    <span key={t.tag_id} className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 text-ink-soft px-2 py-0.5 text-[11px]">
                                         {t.label} ({t.count})
                                     </span>
                                 ))}
@@ -143,15 +143,15 @@ export default function ExperienceBreakdown({ aggregate, aspectLabels = {}, edit
 
             {/* By aspect — one horizontally scrollable line of badges */}
             {aspects.length > 0 && (
-                <div className="border-t border-slate-100 pt-4">
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1.5">Ratings by area</div>
+                <div className="border-t border-card-line pt-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft mb-1.5">Ratings by area</div>
                     <div className="flex gap-1.5 overflow-x-auto pb-1">
                         {aspects.map((a) => {
                             const m = aspectMood(a.average);
                             return (
                                 <span
                                     key={a.aspect_slug}
-                                    className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 text-slate-700 px-2 py-0.5 text-[11px]"
+                                    className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 text-ink px-2 py-0.5 text-[11px]"
                                 >
                                     {aspectLabel(a.aspect_slug)} {m.emoji} {m.label} ({a.count})
                                 </span>

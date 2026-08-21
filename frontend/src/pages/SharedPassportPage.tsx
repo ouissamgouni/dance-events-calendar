@@ -41,30 +41,30 @@ export default function SharedPassportPage() {
     return (
         <div className="min-h-screen bg-[#f8fafc]">
             <main className="mx-auto max-w-3xl px-4 py-6">
-                <Link to="/" className="text-sm text-blue-600 hover:underline">
+                <Link to="/" className="text-sm text-action hover:underline">
                     ← Browse events
                 </Link>
 
                 {loading && (
-                    <div className="mt-4 border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+                    <div className="mt-4 border border-line bg-surface p-6 text-center text-sm text-ink-soft">
                         Loading passport…
                     </div>
                 )}
 
                 {!loading && notFound && (
-                    <div className="mt-4 border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+                    <div className="mt-4 border border-line bg-surface p-6 text-center text-sm text-ink-soft">
                         This passport link is no longer available.
                     </div>
                 )}
 
                 {!loading && signinRequired && (
-                    <div className="mt-4 border border-slate-200 bg-white p-6 text-center">
-                        <p className="text-sm text-slate-600">
+                    <div className="mt-4 border border-line bg-surface p-6 text-center">
+                        <p className="text-sm text-ink-soft">
                             This passport is shared with signed-in dancers only.
                         </p>
                         <Link
                             to="/login"
-                            className="mt-4 inline-block bg-blue-500 px-4 py-2 text-sm font-medium text-white hover:bg-blue-600"
+                            className="mt-4 inline-block bg-action px-4 py-2 text-sm font-medium text-white hover:bg-action"
                         >
                             Sign in to view
                         </Link>

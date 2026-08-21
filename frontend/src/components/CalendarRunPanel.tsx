@@ -22,13 +22,13 @@ import type {
 import AdminEventDetailPanel from './AdminEventDetailPanel';
 
 const STATUS_BADGE: Record<string, string> = {
-    running: 'bg-blue-100 text-blue-700',
+    running: 'bg-blue-100 text-action',
     abort_requested: 'bg-amber-100 text-amber-700',
-    completed: 'bg-emerald-100 text-emerald-700',
+    completed: 'bg-emerald-100 text-success',
     warning: 'bg-amber-100 text-amber-700',
-    failed: 'bg-red-100 text-red-700',
-    aborted: 'bg-gray-100 text-gray-600',
-    queued: 'bg-gray-100 text-gray-500',
+    failed: 'bg-red-100 text-danger',
+    aborted: 'bg-gray-100 text-ink-soft',
+    queued: 'bg-gray-100 text-ink-soft',
 };
 
 const FAILURE_TYPE_LABEL: Record<FailureType, string> = {
@@ -187,7 +187,7 @@ export default function CalendarRunPanel({
             {onBack && (
                 <button
                     onClick={onBack}
-                    className="text-xs text-gray-500 hover:text-gray-800 inline-flex items-center gap-1"
+                    className="text-xs text-ink-soft hover:text-ink inline-flex items-center gap-1"
                 >
                     ← Back to Job
                 </button>
@@ -197,11 +197,11 @@ export default function CalendarRunPanel({
             <div>
                 <div className="flex items-center justify-between gap-3 mb-1">
                     <div className="flex items-center gap-2 min-w-0">
-                        <h3 className="text-sm font-semibold text-gray-900 truncate">
+                        <h3 className="text-sm font-semibold text-ink truncate">
                             {cal.calendar_name}
                         </h3>
                         <span
-                            className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_BADGE[cal.status] ?? 'bg-gray-100 text-gray-500'
+                            className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${STATUS_BADGE[cal.status] ?? 'bg-gray-100 text-ink-soft'
                                 }`}
                         >
                             {cal.status}
@@ -211,19 +211,19 @@ export default function CalendarRunPanel({
                         <button
                             onClick={onRetry}
                             disabled={retrying}
-                            className="text-[11px] px-2.5 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                            className="text-[11px] px-2.5 py-1 rounded bg-action text-white hover:bg-action-strong disabled:opacity-50"
                         >
                             {retrying ? 'Retrying…' : 'Retry'}
                         </button>
                     )}
                 </div>
                 {showCalendarId && (
-                    <div className="text-[10px] text-gray-400 font-mono truncate">{cal.calendar_id}</div>
+                    <div className="text-[10px] text-muted font-mono truncate">{cal.calendar_id}</div>
                 )}
             </div>
 
             {/* Stat row */}
-            <div className="bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+            <div className="bg-canvas border border-card-line rounded-lg px-3 py-2">
                 <div className="grid grid-cols-3 sm:grid-cols-7 gap-3">
                     <Stat
                         label="Duration"
@@ -233,9 +233,9 @@ export default function CalendarRunPanel({
                     <Stat
                         label="New"
                         value={synced.length > 0 ? `+${synced.length}` : 0}
-                        tone="text-emerald-600"
+                        tone="text-success"
                     />
-                    <Stat label="Updated" value={updated.length} tone="text-blue-600" />
+                    <Stat label="Updated" value={updated.length} tone="text-action" />
                     {unchanged.length > 0 && (
                         <Stat label="Unchanged" value={unchanged.length} />
                     )}
@@ -261,24 +261,24 @@ export default function CalendarRunPanel({
 
             {/* Calendar-level error */}
             {cal.error && (
-                <div className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded px-2.5 py-1.5">
+                <div className="text-[11px] text-danger bg-red-50 border border-red-200 rounded px-2.5 py-1.5">
                     {cal.error}
                 </div>
             )}
 
             {/* Tabs */}
-            <div className="border-b border-gray-200 -mx-4 px-4 flex items-center gap-1 overflow-x-auto">
+            <div className="border-b border-line -mx-4 px-4 flex items-center gap-1 overflow-x-auto">
                 {tabs.map((t) => (
                     <button
                         key={t.id}
                         onClick={() => setTab(t.id)}
                         className={`px-2.5 py-1.5 text-xs font-medium border-b-2 -mb-px whitespace-nowrap ${tab === t.id
-                            ? 'border-gray-900 text-gray-900'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
+                            ? 'border-gray-900 text-ink'
+                            : 'border-transparent text-ink-soft hover:text-ink'
                             }`}
                     >
                         {t.label}{' '}
-                        <span className="text-gray-400 font-normal">({counts[t.id]})</span>
+                        <span className="text-muted font-normal">({counts[t.id]})</span>
                     </button>
                 ))}
             </div>
@@ -335,16 +335,16 @@ function Stat({
 }) {
     return (
         <div>
-            <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">
+            <div className="text-[10px] text-ink-soft uppercase tracking-wide mb-0.5">
                 {label}
             </div>
-            <div className={`text-sm font-semibold ${(typeof value === 'number' && value === 0) ? 'text-gray-400' : (tone || 'text-gray-900')}`}>{value}</div>
+            <div className={`text-sm font-semibold ${(typeof value === 'number' && value === 0) ? 'text-muted' : (tone || 'text-ink')}`}>{value}</div>
         </div>
     );
 }
 
 function levelClass(level: string) {
-    if (level === 'ERROR') return 'bg-red-500/20 text-red-300';
+    if (level === 'ERROR') return 'bg-danger/20 text-red-300';
     if (level === 'WARNING') return 'bg-amber-500/20 text-amber-300';
     if (level === 'INFO') return 'bg-sky-500/20 text-sky-300';
     if (level === 'DEBUG') return 'bg-gray-500/20 text-gray-300';
@@ -354,11 +354,11 @@ function levelClass(level: string) {
 // Higher-contrast variant for the filter chips (rendered on a light background,
 // where the dark-mode `text-*-300` shade used inside the log rows is too pale).
 function levelChipClass(level: string) {
-    if (level === 'ERROR') return 'bg-red-100 text-red-700';
+    if (level === 'ERROR') return 'bg-red-100 text-danger';
     if (level === 'WARNING') return 'bg-amber-100 text-amber-800';
     if (level === 'INFO') return 'bg-sky-100 text-sky-800';
-    if (level === 'DEBUG') return 'bg-gray-200 text-gray-700';
-    return 'bg-gray-200 text-gray-700';
+    if (level === 'DEBUG') return 'bg-gray-200 text-ink';
+    return 'bg-gray-200 text-ink';
 }
 
 type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';
@@ -377,8 +377,8 @@ function PipelineStagesStrip({
     const visibleStages = stageOrder.filter((s) => stageStats?.[s]);
     if (visibleStages.length === 0) return null;
     return (
-        <div className="px-3 py-2 border border-gray-100 rounded bg-gray-50">
-            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1">
+        <div className="px-3 py-2 border border-card-line rounded bg-canvas">
+            <p className="text-[10px] font-medium text-muted uppercase tracking-wide mb-1">
                 Pipeline stages
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -395,23 +395,23 @@ function PipelineStagesStrip({
                             key={s}
                             className={`px-2 py-1 rounded border ${isCurrent
                                 ? 'border-blue-300 bg-blue-50'
-                                : 'border-gray-200 bg-white'
+                                : 'border-line bg-surface'
                                 }`}
                         >
-                            <div className="text-[10px] font-medium text-gray-700 capitalize">
+                            <div className="text-[10px] font-medium text-ink capitalize">
                                 {STAGE_LABEL[s] ?? s}
                                 {isCurrent && (
-                                    <span className="ml-1 text-blue-500 animate-pulse">●</span>
+                                    <span className="ml-1 text-action animate-pulse">●</span>
                                 )}
                             </div>
                             <div className="flex items-center gap-2 text-[10px] mt-0.5">
-                                {stat.processed > 0 && <span className="text-emerald-600">{stat.processed} ✓</span>}
+                                {stat.processed > 0 && <span className="text-success">{stat.processed} ✓</span>}
                                 {isOptional ? (
                                     // For link/price stages, "skip + fail" =
                                     // events with no link / no price text \u2014
                                     // not problems, just not applicable.
                                     (stat.skipped + stat.failed > 0) && (
-                                        <span className="text-gray-400">
+                                        <span className="text-muted">
                                             {stat.skipped + stat.failed} N/A
                                         </span>
                                     )
@@ -424,10 +424,10 @@ function PipelineStagesStrip({
                                 ) : (
                                     <>
                                         {stat.skipped > 0 && (
-                                            <span className="text-gray-400">{stat.skipped} skip</span>
+                                            <span className="text-muted">{stat.skipped} skip</span>
                                         )}
                                         {stat.failed > 0 && (
-                                            <span className="text-red-500">{stat.failed} fail</span>
+                                            <span className="text-danger">{stat.failed} fail</span>
                                         )}
                                     </>
                                 )}
@@ -437,7 +437,7 @@ function PipelineStagesStrip({
                 })}
             </div>
             {currentOperation && (
-                <p className="text-[10px] text-blue-600 italic mt-1.5">{currentOperation}</p>
+                <p className="text-[10px] text-action italic mt-1.5">{currentOperation}</p>
             )}
         </div>
     );
@@ -482,7 +482,7 @@ function LogsList({ logs }: { logs: LogEntry[] | JobLogEntry[] }) {
                             onClick={() => toggleLevel(lvl)}
                             className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded border transition ${on
                                 ? `${levelChipClass(lvl)} border-transparent`
-                                : 'bg-transparent text-gray-400 border-gray-200 hover:text-gray-600'
+                                : 'bg-transparent text-muted border-line hover:text-ink-soft'
                                 }`}
                         >
                             {lvl}
@@ -493,11 +493,11 @@ function LogsList({ logs }: { logs: LogEntry[] | JobLogEntry[] }) {
             </div>
 
             {!logs || logs.length === 0 ? (
-                <div className="rounded bg-gray-900 text-gray-400 italic px-3 py-3 text-[11px] font-mono">
+                <div className="rounded bg-gray-900 text-muted italic px-3 py-3 text-[11px] font-mono">
                     No log entries.
                 </div>
             ) : filtered.length === 0 ? (
-                <div className="rounded bg-gray-900 text-gray-500 italic px-3 py-3 text-[11px] font-mono">
+                <div className="rounded bg-gray-900 text-ink-soft italic px-3 py-3 text-[11px] font-mono">
                     No logs match the selected levels.
                 </div>
             ) : (
@@ -507,7 +507,7 @@ function LogsList({ logs }: { logs: LogEntry[] | JobLogEntry[] }) {
                             key={i}
                             className="px-2.5 py-1.5 flex items-start gap-2 text-[11px] font-mono"
                         >
-                            <span className="text-gray-500 text-[10px] flex-shrink-0 w-16">
+                            <span className="text-ink-soft text-[10px] flex-shrink-0 w-16">
                                 {formatTimeShort(l.timestamp)}
                             </span>
                             <span
@@ -543,11 +543,11 @@ function EventsList({
     const rows = useMemo(() => events.slice(page * PAGE, (page + 1) * PAGE), [events, page]);
 
     if (events.length === 0) {
-        return <div className="text-[11px] text-gray-400">{emptyLabel}</div>;
+        return <div className="text-[11px] text-muted">{emptyLabel}</div>;
     }
     return (
         <div className="space-y-2">
-            <div className="divide-y divide-gray-100 border border-gray-100 rounded">
+            <div className="divide-y divide-gray-100 border border-card-line rounded">
                 {rows.map((e, i) => (
                     <div key={`${e.event_id}-${i}`} className="px-2.5 py-1.5">
                         <div className="flex items-baseline gap-2 min-w-0">
@@ -555,13 +555,13 @@ function EventsList({
                                 type="button"
                                 onClick={() => onOpenEvent?.(e.event_id)}
                                 title={e.event_id}
-                                className="text-[10px] font-mono text-blue-600 hover:underline flex-shrink-0"
+                                className="text-[10px] font-mono text-action hover:underline flex-shrink-0"
                             >
                                 {e.event_id.slice(0, 8)}
                             </button>
-                            <div className="text-[11px] text-gray-900 truncate">{e.title}</div>
+                            <div className="text-[11px] text-ink truncate">{e.title}</div>
                         </div>
-                        <div className="text-[10px] text-gray-500 flex items-center gap-2">
+                        <div className="text-[10px] text-ink-soft flex items-center gap-2">
                             {e.start_dt && <span>{formatTime(e.start_dt)}</span>}
                             {e.location && (
                                 <>
@@ -589,7 +589,7 @@ function EventsList({
                             )}
                         </div>
                         {showError && e.error && (
-                            <div className="text-[10px] text-red-600 mt-1 break-words">
+                            <div className="text-[10px] text-danger mt-1 break-words">
                                 {e.error}
                             </div>
                         )}
@@ -601,17 +601,17 @@ function EventsList({
                     <button
                         onClick={() => setPage((p) => Math.max(0, p - 1))}
                         disabled={page === 0}
-                        className="px-2 py-1 border border-gray-200 rounded disabled:opacity-50"
+                        className="px-2 py-1 border border-line rounded disabled:opacity-50"
                     >
                         Prev
                     </button>
-                    <span className="text-gray-500">
+                    <span className="text-ink-soft">
                         Page {page + 1} of {totalPages}
                     </span>
                     <button
                         onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                         disabled={page >= totalPages - 1}
-                        className="px-2 py-1 border border-gray-200 rounded disabled:opacity-50"
+                        className="px-2 py-1 border border-line rounded disabled:opacity-50"
                     >
                         Next
                     </button>
@@ -625,7 +625,7 @@ function FailuresTab({ failures, onOpenEvent }: { failures: FailureEntry[]; onOp
     const [typeFilter, setTypeFilter] = useState<FailureType | 'all'>('all');
 
     if (failures.length === 0) {
-        return <div className="text-[11px] text-gray-400">No failures recorded.</div>;
+        return <div className="text-[11px] text-muted">No failures recorded.</div>;
     }
 
     const counts = failures.reduce<Record<string, number>>((acc, f) => {
@@ -646,7 +646,7 @@ function FailuresTab({ failures, onOpenEvent }: { failures: FailureEntry[]; onOp
                     onClick={() => setTypeFilter('all')}
                     className={`text-[11px] font-medium px-2 py-0.5 rounded border transition ${typeFilter === 'all'
                         ? 'bg-gray-900 text-white border-gray-900'
-                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                        : 'bg-surface text-ink-soft border-line hover:bg-canvas'
                         }`}
                 >
                     All ({failures.length})
@@ -657,7 +657,7 @@ function FailuresTab({ failures, onOpenEvent }: { failures: FailureEntry[]; onOp
                         onClick={() => setTypeFilter(t)}
                         className={`text-[11px] font-medium px-2 py-0.5 rounded border transition ${typeFilter === t
                             ? 'bg-gray-900 text-white border-gray-900'
-                            : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                            : 'bg-surface text-ink-soft border-line hover:bg-canvas'
                             }`}
                     >
                         {FAILURE_TYPE_LABEL[t] ?? t} ({counts[t]})
@@ -665,7 +665,7 @@ function FailuresTab({ failures, onOpenEvent }: { failures: FailureEntry[]; onOp
                 ))}
             </div>
 
-            <div className="divide-y divide-gray-100 border border-gray-100 rounded">
+            <div className="divide-y divide-gray-100 border border-card-line rounded">
                 {filtered.map((f, i) => (
                     <div key={`${f.event_id}-${f.type}-${i}`} className="px-3 py-2">
                         <div className="flex items-center gap-2 mb-0.5">
@@ -676,14 +676,14 @@ function FailuresTab({ failures, onOpenEvent }: { failures: FailureEntry[]; onOp
                                 type="button"
                                 onClick={() => onOpenEvent?.(f.event_id)}
                                 title={f.event_id}
-                                className="text-[10px] font-mono text-blue-600 hover:underline"
+                                className="text-[10px] font-mono text-action hover:underline"
                             >
                                 {f.event_id.slice(0, 8)}
                             </button>
-                            <span className="text-sm text-gray-900 truncate">{f.title}</span>
+                            <span className="text-sm text-ink truncate">{f.title}</span>
                         </div>
-                        <div className="text-[11px] text-gray-500 break-words">{f.message}</div>
-                        <div className="text-[10px] text-gray-400 mt-0.5">
+                        <div className="text-[11px] text-ink-soft break-words">{f.message}</div>
+                        <div className="text-[10px] text-muted mt-0.5">
                             {formatTimeShort(f.timestamp)} · stage: {f.stage}
                         </div>
                     </div>

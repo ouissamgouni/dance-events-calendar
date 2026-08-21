@@ -44,7 +44,7 @@ function SectionTabs({ tabs, pathname, hub }: { tabs: SectionTab[]; pathname: st
     return (
         <nav
             aria-label="Section"
-            className="flex items-center gap-1 overflow-x-auto border-b border-slate-200 px-4 scrollbar-none"
+            className="flex items-center gap-1 overflow-x-auto border-b border-line px-4 scrollbar-none"
         >
             {tabs.map((t) => {
                 // The hub tab (e.g. /mine) matches its own path exactly so it
@@ -58,8 +58,8 @@ function SectionTabs({ tabs, pathname, hub }: { tabs: SectionTab[]; pathname: st
                         to={t.path}
                         aria-current={active ? 'page' : undefined}
                         className={`shrink-0 -mb-px border-b-2 px-3 py-2.5 text-sm font-medium transition ${active
-                            ? 'border-blue-500 text-blue-600'
-                            : 'border-transparent text-slate-500 hover:text-slate-700'
+                            ? 'border-action text-action'
+                            : 'border-transparent text-ink-soft hover:text-ink'
                             }`}
                     >
                         {t.label}
@@ -87,12 +87,12 @@ export default function SectionLayout({ section }: { section: SectionKey }) {
         return (
             <div className="min-h-full bg-[#f8fafc]">
                 <div className="mx-auto max-w-3xl px-4 py-4">
-                    <div className="border border-blue-100 bg-blue-50 p-4 text-sm text-slate-700">
-                        <p className="mb-2 font-medium text-slate-800">{gate.title}</p>
-                        <p className="mb-3 text-slate-600">{gate.body}</p>
+                    <div className="border border-blue-100 bg-blue-50 p-4 text-sm text-ink">
+                        <p className="mb-2 font-medium text-ink">{gate.title}</p>
+                        <p className="mb-3 text-ink-soft">{gate.body}</p>
                         <Link
                             to={`/login?next=${encodeURIComponent(pathname)}`}
-                            className="inline-flex items-center bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                            className="inline-flex items-center bg-action px-3 py-1.5 text-xs font-semibold text-white hover:bg-action focus:outline-none focus:ring-2 focus:ring-blue-300"
                         >
                             Sign in
                         </Link>
@@ -104,8 +104,8 @@ export default function SectionLayout({ section }: { section: SectionKey }) {
 
     return (
         <div className="min-h-full bg-[#f8fafc]">
-            <div className="border-b border-slate-200 bg-white px-4 pt-1">
-                {title && <h1 className="px-1 pb-1 pt-1 text-xl font-semibold text-slate-900">{title}</h1>}
+            <div className="border-b border-line bg-surface px-4 pt-1">
+                {title && <h1 className="px-1 pb-1 pt-1 text-xl font-semibold text-ink">{title}</h1>}
                 <SectionTabs tabs={tabs} pathname={pathname} hub={hub} />
             </div>
             <Outlet />

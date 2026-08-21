@@ -77,7 +77,7 @@ function Avatar({
     }
     return (
         <span
-            className={`${px} rounded-full bg-slate-200 text-slate-600 font-semibold flex items-center justify-center`}
+            className={`${px} rounded-full bg-slate-200 text-ink-soft font-semibold flex items-center justify-center`}
             aria-hidden="true"
         >
             {name.trim()[0]?.toUpperCase() ?? '?'}
@@ -92,9 +92,9 @@ function variantClasses(variant: ChipVariant): string {
         case 'friend':
             return 'bg-blue-50 border border-blue-100 text-blue-900';
         case 'fof':
-            return 'bg-white border border-slate-200 text-slate-800';
+            return 'bg-surface border border-line text-ink';
         case 'other':
-            return 'bg-slate-50 border border-slate-200 text-slate-700';
+            return 'bg-canvas border border-line text-ink';
     }
 }
 
@@ -169,7 +169,7 @@ function FollowChipButton({
                 <span
                     title={`Follow request pending for @${handle}`}
                     aria-label={`Follow request pending for @${handle}`}
-                    className="inline-flex items-center justify-center px-2 py-0.5 text-[11px] leading-none text-slate-500 border border-slate-200 bg-white"
+                    className="inline-flex items-center justify-center px-2 py-0.5 text-[11px] leading-none text-ink-soft border border-line bg-surface"
                 >
                     Requested
                 </span>
@@ -180,7 +180,7 @@ function FollowChipButton({
                 <span
                     title={`Following @${handle}`}
                     aria-label={`Following @${handle}`}
-                    className="inline-flex items-center justify-center px-2 py-0.5 text-[11px] leading-none text-slate-500 border border-slate-200 bg-white"
+                    className="inline-flex items-center justify-center px-2 py-0.5 text-[11px] leading-none text-ink-soft border border-line bg-surface"
                 >
                     Following
                 </span>
@@ -196,7 +196,7 @@ function FollowChipButton({
                 disabled={busy}
                 title={label}
                 aria-label={label}
-                className="inline-flex items-center justify-center px-2 py-0.5 text-[11px] leading-none bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center justify-center px-2 py-0.5 text-[11px] leading-none bg-action text-white hover:bg-action disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 {busy ? 'Following…' : errored ? 'Retry' : 'Follow'}
             </button>
@@ -209,7 +209,7 @@ function FollowChipButton({
             <span
                 title={`Following @${handle}`}
                 aria-label={`Following @${handle}`}
-                className="inline-flex items-center justify-center h-4 w-4 text-[10px] leading-none text-slate-500 border border-slate-200 bg-white"
+                className="inline-flex items-center justify-center h-4 w-4 text-[10px] leading-none text-ink-soft border border-line bg-surface"
             >
                 ✓
             </span>
@@ -221,7 +221,7 @@ function FollowChipButton({
             <span
                 title={`Follow request pending for @${handle}`}
                 aria-label={`Follow request pending for @${handle}`}
-                className="inline-flex items-center justify-center h-4 w-4 text-[10px] leading-none text-slate-400 border border-slate-200 bg-white"
+                className="inline-flex items-center justify-center h-4 w-4 text-[10px] leading-none text-muted border border-line bg-surface"
             >
                 ·
             </span>
@@ -240,7 +240,7 @@ function FollowChipButton({
             disabled={busy}
             title={label}
             aria-label={label}
-            className="inline-flex items-center justify-center h-4 w-4 text-[10px] leading-none bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center justify-center h-4 w-4 text-[10px] leading-none bg-action text-white hover:bg-action disabled:opacity-50 disabled:cursor-not-allowed"
         >
             {busy ? '…' : errored ? '↻' : '+'}
         </button>
@@ -288,7 +288,7 @@ function FofChip({ a }: { a: FofGoingAttendee }) {
                 className="text-xs whitespace-nowrap"
             />
             {a.via_friend_handle && (
-                <span className="text-[10px] text-slate-500 whitespace-nowrap">
+                <span className="text-[10px] text-ink-soft whitespace-nowrap">
                     · via{' '}
                     <Link
                         to={`/u/${a.via_friend_handle}`}
@@ -320,7 +320,7 @@ function OtherChip({ a, isSelf = false }: { a: Attendee; isSelf?: boolean }) {
                 className="text-xs whitespace-nowrap"
             />
             {isSelf ? (
-                <span className="text-[10px] text-slate-500">(you)</span>
+                <span className="text-[10px] text-ink-soft">(you)</span>
             ) : (
                 <FollowChipButton handle={a.handle} initialStatus={a.viewer_follow_status} />
             )}
@@ -438,7 +438,7 @@ export default function InterestSection({ eventId, eventTitle, isPast = false }:
 
     if (summaryLoading && !summary) {
         return (
-            <div className="border-t border-slate-100 pt-3 text-xs text-slate-400">
+            <div className="border-t border-card-line pt-3 text-xs text-muted">
                 Loading interest…
             </div>
         );
@@ -453,7 +453,7 @@ export default function InterestSection({ eventId, eventTitle, isPast = false }:
             type="button"
             onClick={() => setCollapsed((v) => !v)}
             aria-expanded={!collapsed}
-            className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500 hover:text-slate-700"
+            className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-ink-soft hover:text-ink"
         >
             <span
                 aria-hidden="true"
@@ -468,7 +468,7 @@ export default function InterestSection({ eventId, eventTitle, isPast = false }:
                 className="w-4 h-4 object-contain"
             />
             Interest
-            <span className="normal-case font-normal text-slate-600">
+            <span className="normal-case font-normal text-ink-soft">
                 {summary.total_going} {isPast ? 'attended' : 'going'} ·{' '}
                 {summary.total_saved} saved
             </span>
@@ -485,14 +485,14 @@ export default function InterestSection({ eventId, eventTitle, isPast = false }:
     if (!user) {
         return (
             <section
-                className="border-t border-slate-100 pt-3 text-xs"
+                className="border-t border-card-line pt-3 text-xs"
                 data-testid="interest-section"
             >
                 <div className="mb-2">{Header}</div>
                 {!collapsed && (
                     <>
                         {summary.total_going > 0 && (
-                            <div className="text-slate-500 mt-1">
+                            <div className="text-ink-soft mt-1">
                                 {isPast ? 'Sign in to see who attended.' : "Sign in to see who's going."}
                             </div>
                         )}
@@ -513,14 +513,14 @@ export default function InterestSection({ eventId, eventTitle, isPast = false }:
 
     return (
         <section
-            className="border-t border-slate-100 pt-3 space-y-2 text-xs"
+            className="border-t border-card-line pt-3 space-y-2 text-xs"
             data-testid="interest-section"
         >
             {Header}
             {!collapsed && (
                 <>
                     {isEmpty ? (
-                        <div className="text-[11px] text-slate-500">
+                        <div className="text-[11px] text-ink-soft">
                             No one has shared their name yet — be the first by marking
                             yourself {isPast ? 'attended' : 'going'} publicly.
                         </div>
@@ -572,7 +572,7 @@ export default function InterestSection({ eventId, eventTitle, isPast = false }:
                                     <button
                                         type="button"
                                         onClick={() => setModalOpen(true)}
-                                        className="text-xs text-blue-600 hover:text-blue-700 hover:underline"
+                                        className="text-xs text-action hover:text-action hover:underline"
                                         data-testid="interest-show-all"
                                     >
                                         Show all {totalShown} →
@@ -617,7 +617,7 @@ function BucketRow({
 }) {
     return (
         <div data-testid={testid}>
-            <div className="text-[10px] uppercase tracking-wide text-slate-400 mb-1">
+            <div className="text-[10px] uppercase tracking-wide text-muted mb-1">
                 {label} ({count})
             </div>
             <ul className="flex gap-2 items-center overflow-x-auto pb-1 -mb-1">
@@ -668,12 +668,12 @@ function GoingModal({
                 aria-modal="true"
                 aria-label={`${isPast ? 'Attended' : 'Going to'} ${eventTitle}`}
                 onClick={(e) => e.stopPropagation()}
-                className="bg-white border border-slate-200 shadow-lg w-full sm:max-w-md max-h-[80vh] flex flex-col text-xs"
+                className="bg-surface border border-line shadow-lg w-full sm:max-w-md max-h-[80vh] flex flex-col text-xs"
                 data-testid="interest-modal"
             >
-                <div className="flex items-start justify-between p-3 border-b border-slate-200">
+                <div className="flex items-start justify-between p-3 border-b border-line">
                     <div className="min-w-0">
-                        <h2 className="text-sm font-semibold text-slate-800 truncate">
+                        <h2 className="text-sm font-semibold text-ink truncate">
                             {isPast ? 'Attended' : 'Going to'} "{eventTitle}"
                         </h2>
                     </div>
@@ -681,7 +681,7 @@ function GoingModal({
                         type="button"
                         onClick={onClose}
                         aria-label="Close"
-                        className="text-slate-400 hover:text-slate-600 text-xl leading-none px-1"
+                        className="text-muted hover:text-ink-soft text-xl leading-none px-1"
                     >
                         ×
                     </button>
@@ -700,7 +700,7 @@ function GoingModal({
                                 display_name={a.display_name}
                                 avatar_url={a.avatar_url}
                                 action={
-                                    <span className="text-[10px] uppercase tracking-wide text-blue-700 px-2 py-0.5 border border-blue-100 bg-blue-50">
+                                    <span className="text-[10px] uppercase tracking-wide text-action px-2 py-0.5 border border-blue-100 bg-blue-50">
                                         Friend ✓
                                     </span>
                                 }
@@ -753,7 +753,7 @@ function GoingModal({
                                     avatar_url={a.avatar_url}
                                     action={
                                         isSelf ? (
-                                            <span className="text-[11px] text-slate-500">(you)</span>
+                                            <span className="text-[11px] text-ink-soft">(you)</span>
                                         ) : (
                                             <FollowChipButton handle={a.handle} variant="text" initialStatus={a.viewer_follow_status} />
                                         )
@@ -762,7 +762,7 @@ function GoingModal({
                             );
                         })}
                         {anonymousTail > 0 && (
-                            <li className="px-3 py-2 text-[11px] text-slate-500">
+                            <li className="px-3 py-2 text-[11px] text-ink-soft">
                                 +{anonymousTail} anonymous public {isPast ? 'attended' : 'going'}
                             </li>
                         )}
@@ -787,11 +787,11 @@ function ModalSection({
 }) {
     return (
         <div>
-            <div className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-slate-100 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            <div className="sticky top-0 z-10 bg-surface/95 backdrop-blur border-b border-card-line px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
                 {label} ({count})
             </div>
             {count === 0 ? (
-                <div className="px-3 py-2 text-[11px] text-slate-400">
+                <div className="px-3 py-2 text-[11px] text-muted">
                     {emptyCopy}
                 </div>
             ) : (
@@ -823,19 +823,19 @@ function ModalRow({
                 size="sm"
             />
             <div className="min-w-0 flex-1">
-                <div className="text-xs text-slate-800 truncate">
+                <div className="text-xs text-ink truncate">
                     <NameLink
                         handle={handle}
                         display_name={display_name}
                     />
                     {handle && (
-                        <span className="text-[10px] text-slate-400 ml-1">
+                        <span className="text-[10px] text-muted ml-1">
                             @{handle}
                         </span>
                     )}
                 </div>
                 {subline && (
-                    <div className="text-[10px] text-slate-500 mt-0.5">
+                    <div className="text-[10px] text-ink-soft mt-0.5">
                         {subline}
                     </div>
                 )}

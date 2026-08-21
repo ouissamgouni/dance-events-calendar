@@ -113,22 +113,22 @@ export default function NotificationsPanel({
                 role="dialog"
                 aria-label="Notifications"
                 aria-modal="true"
-                className="w-full sm:max-w-sm h-[80vh] sm:h-full bg-white shadow-xl flex flex-col animate-slide-up sm:animate-slide-right"
+                className="w-full sm:max-w-sm h-[80vh] sm:h-full bg-surface shadow-xl flex flex-col animate-slide-up sm:animate-slide-right"
             >
                 {/* Drag handle — mobile only visual affordance */}
                 <div className="sm:hidden flex justify-center pt-2 pb-1 shrink-0">
                     <div className="h-1 w-10 bg-slate-300" />
                 </div>
 
-                <div className="flex items-center justify-between px-4 py-3 sm:px-3 sm:py-2 border-b border-slate-200 shrink-0">
-                    <h2 className="text-sm font-semibold text-slate-900">
+                <div className="flex items-center justify-between px-4 py-3 sm:px-3 sm:py-2 border-b border-line shrink-0">
+                    <h2 className="text-sm font-semibold text-ink">
                         Notifications
                     </h2>
                     <div className="flex items-center gap-3">
                         <button
                             type="button"
                             onClick={handleMarkAll}
-                            className="text-xs text-blue-600 hover:text-blue-700"
+                            className="text-xs text-action hover:text-action"
                         >
                             Mark all read
                         </button>
@@ -136,7 +136,7 @@ export default function NotificationsPanel({
                             type="button"
                             onClick={onClose}
                             aria-label="Close"
-                            className="text-slate-400 hover:text-slate-600 text-xl leading-none p-1"
+                            className="text-muted hover:text-ink-soft text-xl leading-none p-1"
                         >
                             ×
                         </button>
@@ -145,11 +145,11 @@ export default function NotificationsPanel({
 
                 <div className="flex-1 overflow-y-auto overscroll-contain">
                     {error ? (
-                        <div className="px-4 py-3 text-xs text-red-600">{error}</div>
+                        <div className="px-4 py-3 text-xs text-danger">{error}</div>
                     ) : items === null ? (
-                        <p className="px-4 py-3 text-xs text-slate-400">Loading…</p>
+                        <p className="px-4 py-3 text-xs text-muted">Loading…</p>
                     ) : items.length === 0 ? (
-                        <p className="px-4 py-6 text-xs text-slate-500 text-center">
+                        <p className="px-4 py-6 text-xs text-ink-soft text-center">
                             No notifications yet.
                         </p>
                     ) : (
@@ -184,13 +184,13 @@ export default function NotificationsPanel({
 
                 {/* Safe-area padding keeps footer clear of the iOS home indicator */}
                 <div
-                    className="border-t border-slate-200 px-4 py-3 sm:px-3 sm:py-2 text-center shrink-0"
+                    className="border-t border-line px-4 py-3 sm:px-3 sm:py-2 text-center shrink-0"
                     style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
                 >
                     <Link
                         to="/notifications"
                         onClick={onClose}
-                        className="text-xs text-blue-600 hover:text-blue-700"
+                        className="text-xs text-action hover:text-action"
                     >
                         See all notifications →
                     </Link>

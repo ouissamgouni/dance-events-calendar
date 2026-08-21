@@ -48,10 +48,10 @@ export default function EventTagEditor({ eventId, currentTags, onUpdated }: Prop
 
     return (
         <div className="space-y-2">
-            <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Tags</h4>
+            <h4 className="text-xs font-semibold text-ink-soft uppercase tracking-wider">Tags</h4>
             {tagGroups.map((group) => (
                 <div key={group.slug}>
-                    <p className="text-xs text-gray-500 mb-0.5">{group.label}</p>
+                    <p className="text-xs text-ink-soft mb-0.5">{group.label}</p>
                     <div className="flex flex-wrap gap-1">
                         {group.tags.map((tag) => {
                             const active = selectedIds.has(tag.id);
@@ -60,7 +60,7 @@ export default function EventTagEditor({ eventId, currentTags, onUpdated }: Prop
                                 <button
                                     key={tag.id}
                                     onClick={() => toggle(tag.id)}
-                                    className={`rounded-full px-2 py-0.5 text-xs border transition-colors ${active ? 'text-white' : 'bg-white'
+                                    className={`rounded-full px-2 py-0.5 text-xs border transition-colors ${active ? 'text-white' : 'bg-surface'
                                         }`}
                                     style={
                                         active
@@ -79,7 +79,7 @@ export default function EventTagEditor({ eventId, currentTags, onUpdated }: Prop
                 <button
                     onClick={save}
                     disabled={saving}
-                    className="rounded bg-blue-500 px-3 py-1 text-xs font-medium text-white hover:bg-blue-600 disabled:opacity-50"
+                    className="rounded bg-action px-3 py-1 text-xs font-medium text-white hover:bg-action disabled:opacity-50"
                 >
                     {saving ? 'Saving…' : 'Save Tags'}
                 </button>

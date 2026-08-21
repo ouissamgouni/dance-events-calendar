@@ -65,7 +65,7 @@ export default function ShareButton({ eventId, title, url, className }: ShareBut
             aria-label={canNativeShare ? 'Share' : 'Copy link'}
             className={
                 className ??
-                'text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded px-2.5 py-1 transition shrink-0'
+                'text-xs text-ink-soft hover:text-ink bg-slate-100 hover:bg-canvas rounded px-2.5 py-1 transition shrink-0'
             }
         >
             {canNativeShare ? (

@@ -204,7 +204,7 @@ function ProfileCard({
 
     return (
         <div
-            className={`border p-3 ${profile.is_active ? 'border-blue-300 bg-blue-50/30' : 'border-slate-200'}`}
+            className={`border p-3 ${profile.is_active ? 'border-blue-300 bg-blue-50/30' : 'border-line'}`}
             data-testid="interest-profile-card"
         >
             {/* Header: expand + label on the left; Edit/Delete/Active/Notify on the right. */}
@@ -216,11 +216,11 @@ function ProfileCard({
                     className="min-w-0 flex-1 text-left"
                 >
                     <div className="flex items-center gap-2">
-                        <span className="text-slate-400 text-xs" aria-hidden="true">{expanded ? '▾' : '▸'}</span>
-                        <p className="truncate text-sm font-medium text-slate-900">{profile.label}</p>
+                        <span className="text-muted text-xs" aria-hidden="true">{expanded ? '▾' : '▸'}</span>
+                        <p className="truncate text-sm font-medium text-ink">{profile.label}</p>
                     </div>
                     {!expanded && (
-                        <p className="mt-0.5 pl-5 text-xs text-slate-600">
+                        <p className="mt-0.5 pl-5 text-xs text-ink-soft">
                             {danceLabels.length ? danceLabels.join(', ') : 'Any dance style'}
                             {' · '}
                             {reachLabels.length ? reachLabels.join('/') : 'Any scale'}
@@ -233,7 +233,7 @@ function ProfileCard({
                     <button
                         type="button"
                         onClick={openEditor}
-                        className="text-blue-600 hover:text-blue-700"
+                        className="text-action hover:text-action"
                     >
                         Edit
                     </button>
@@ -241,12 +241,12 @@ function ProfileCard({
                         type="button"
                         onClick={() => setConfirmDeleteOpen(true)}
                         disabled={saving}
-                        className="text-red-600 hover:text-red-700 disabled:text-slate-400"
+                        className="text-danger hover:text-danger disabled:text-muted"
                     >
                         Delete
                     </button>
                     <label
-                        className="flex items-center gap-1.5 text-slate-500"
+                        className="flex items-center gap-1.5 text-ink-soft"
                         title={profile.is_active ? 'Currently active — activate another profile to swap' : 'Make this profile filter your Explorer and For You results'}
                     >
                         <input
@@ -263,9 +263,9 @@ function ProfileCard({
             </div>
 
             {expanded && (
-                <div className="mt-3 space-y-3 border-t border-slate-100 pt-3">
+                <div className="mt-3 space-y-3 border-t border-card-line pt-3">
                     <div>
-                        <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500 mb-1">
+                        <label className="block text-[11px] font-medium uppercase tracking-wide text-ink-soft mb-1">
                             Label
                         </label>
                         <div className="flex items-center gap-2">
@@ -275,10 +275,10 @@ function ProfileCard({
                                 value={labelDraft}
                                 onChange={(e) => setLabelDraft(e.target.value)}
                                 aria-label="Profile label"
-                                className="flex-1 border border-slate-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                className="flex-1 border border-line px-2 py-1 text-xs focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
                             />
                             <span
-                                className={`text-[11px] transition-opacity ${savedFlash ? 'text-emerald-600 opacity-100' : 'opacity-0'}`}
+                                className={`text-[11px] transition-opacity ${savedFlash ? 'text-success opacity-100' : 'opacity-0'}`}
                                 role="status"
                                 aria-live="polite"
                             >
@@ -338,7 +338,7 @@ function ProfileCard({
                 </div>
             )}
 
-            {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+            {error && <p className="mt-2 text-xs text-danger">{error}</p>}
 
             <ConfirmDialog
                 open={confirmDeleteOpen}
@@ -487,19 +487,19 @@ export default function InterestProfilesManager() {
     };
 
     return (
-        <div className="mt-4 pt-4 border-t border-slate-200" data-testid="interest-profiles-manager">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-2">
+        <div className="mt-4 pt-4 border-t border-line" data-testid="interest-profiles-manager">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft mb-2">
                 Profiles
             </div>
-            <p className="text-xs text-slate-600 mb-2">
+            <p className="text-xs text-ink-soft mb-2">
                 Your active profile filters the Explorer and For You results. Matching events always appear in-app; getting them by email or push requires{' '}
                 <strong>Email → Interest matches</strong> (or the push equivalent) in Notifications.
             </p>
 
             {profiles === null ? (
-                <p className="text-xs text-slate-400">Loading…</p>
+                <p className="text-xs text-muted">Loading…</p>
             ) : profiles.length === 0 ? (
-                <p className="text-xs text-slate-600 mb-2">
+                <p className="text-xs text-ink-soft mb-2">
                     You don't have any profiles yet. Add one to filter results and get notified about matching events.
                 </p>
             ) : (
@@ -526,12 +526,12 @@ export default function InterestProfilesManager() {
                 type="button"
                 onClick={handleAdd}
                 disabled={adding}
-                className="bg-blue-500 text-white px-3 py-1.5 text-xs font-medium hover:bg-blue-600 disabled:bg-slate-300"
+                className="bg-action text-white px-3 py-1.5 text-xs font-medium hover:bg-action disabled:bg-slate-300"
             >
                 {adding ? 'Adding…' : '+ Add profile'}
             </button>
 
-            {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+            {error && <p className="mt-2 text-xs text-danger">{error}</p>}
         </div>
     );
 }

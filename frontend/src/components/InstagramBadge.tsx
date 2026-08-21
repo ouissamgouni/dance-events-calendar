@@ -6,7 +6,7 @@ export default function InstagramBadge() {
             rel="noopener noreferrer"
             aria-label="Follow @ogouni.dance on Instagram"
             title="Follow @ogouni.dance on Instagram"
-            className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs text-muted hover:text-white transition-colors"
         >
             <svg
                 xmlns="http://www.w3.org/2000/svg"

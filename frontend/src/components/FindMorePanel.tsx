@@ -15,10 +15,10 @@ export default function FindMorePanel({ children, className = '' }: FindMorePane
     const [collapsed, setCollapsed] = useState(false);
     return (
         <section
-            className={`border border-blue-100 bg-white shadow-sm ${className}`}
+            className={`border border-blue-100 bg-surface shadow-sm ${className}`}
             data-testid="find-more-panel"
         >
-            <div className="flex w-full items-center gap-2 border-b border-blue-50 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+            <div className="flex w-full items-center gap-2 border-b border-blue-50 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-action">
                 <button
                     type="button"
                     className="inline-flex shrink-0 items-center gap-1 hover:text-blue-900 focus:outline-none"
@@ -36,7 +36,7 @@ export default function FindMorePanel({ children, className = '' }: FindMorePane
                 </button>
                 <button
                     type="button"
-                    className="ml-auto shrink-0 text-xs text-slate-500 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    className="ml-auto shrink-0 text-xs text-ink-soft hover:text-ink focus:outline-none focus:ring-2 focus:ring-blue-300"
                     onClick={() => setCollapsed((value) => !value)}
                     aria-hidden="true"
                     tabIndex={-1}

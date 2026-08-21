@@ -20,6 +20,15 @@ interface Props {
     mapHeightClass?: string;
     /** Optional event pins plotted on the map (e.g. a worldwide preview). */
     markers?: Array<{ id: string; lat: number; lng: number }>;
+    /** Render the built-in preset pill row above the map. Default true. */
+    showPresets?: boolean;
+    /** Commit the box live on every pan/zoom instead of showing a centered
+     * "Save area" button. Used by the filter sheet where the footer CTA
+     * applies the result. */
+    autoCommit?: boolean;
+    /** Recenter the map on this point (e.g. a geocoded search result). The
+     * guide box keeps its on-screen size, so the resulting bbox follows. */
+    centerOverride?: { lat: number; lng: number; zoom?: number } | null;
 }
 
 const GUIDE_INSET_X_RATIO = 0.2;
@@ -30,7 +39,7 @@ const GUIDE_INSET_Y_RATIO = 0.22;
  * The map moves underneath a fixed guide box; saving converts that on-screen
  * guide into geographic bounds so the interaction matches what users see.
  */
-export default function AreaMapPicker({ value, onChange, onUseCurrentView, controlsStart, mapHeightClass = 'h-72', markers }: Props) {
+export default function AreaMapPicker({ value, onChange, onUseCurrentView, controlsStart, mapHeightClass = 'h-72', markers, showPresets = true, autoCommit = false, centerOverride }: Props) {
     const initial = value ?? DEFAULT_AREA_BBOX;
     const initialAreaRef = useRef(initial);
     const lastAppliedExternalRef = useRef<PreferredAreaPayload>(initial);
@@ -54,6 +63,12 @@ export default function AreaMapPicker({ value, onChange, onUseCurrentView, contr
     const baselineRef = useRef<PreferredAreaPayload | null>(null);
     const valueLabelRef = useRef(value?.label ?? null);
     useEffect(() => { valueLabelRef.current = value?.label ?? null; }, [value?.label]);
+    // Read autoCommit/onChange through refs so the Leaflet listener effect
+    // doesn't re-bind (and reset its baseline) on every parent render.
+    const autoCommitRef = useRef(autoCommit);
+    useEffect(() => { autoCommitRef.current = autoCommit; }, [autoCommit]);
+    const onChangeRef = useRef(onChange);
+    useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
 
     const initialBounds = useMemo<L.LatLngBoundsExpression>(
         () => [
@@ -179,6 +194,14 @@ export default function AreaMapPicker({ value, onChange, onUseCurrentView, contr
                 return;
             }
             if (nearlyEqual(area, baselineRef.current)) return;
+            if (autoCommitRef.current) {
+                // Live-apply mode: commit the new box straight away so the
+                // sheet's event count tracks the pan/zoom.
+                baselineRef.current = area;
+                lastAppliedExternalRef.current = area;
+                onChangeRef.current(area);
+                return;
+            }
             setDirty(true);
         };
         map.on('moveend', handler);
@@ -189,6 +212,16 @@ export default function AreaMapPicker({ value, onChange, onUseCurrentView, contr
         };
     }, [computeGuideArea, mapReady]);
 
+    // Recenter on an external point (geocoded search result) while keeping the
+    // guide box's on-screen size; the moveend that follows recomputes the bbox
+    // (and auto-commits it when in live-apply mode).
+    useEffect(() => {
+        if (!mapReady || !centerOverride) return;
+        const map = mapRef.current;
+        if (!map) return;
+        map.setView([centerOverride.lat, centerOverride.lng], centerOverride.zoom ?? 9, { animate: true });
+    }, [centerOverride, mapReady]);
+
     // Preset pills reposition the box over a predefined region. We keep the
     // existing baseline so the resulting move registers as dirty and the
     // centered "Save area" button appears for the user to confirm.
@@ -198,19 +231,21 @@ export default function AreaMapPicker({ value, onChange, onUseCurrentView, contr
 
     return (
         <div>
-            <div className="mb-2 flex flex-nowrap items-center gap-1 overflow-x-auto scrollbar-hide">
-                {AREA_PRESETS.map((preset) => (
-                    <button
-                        key={preset.label}
-                        type="button"
-                        onClick={() => handlePreset(preset)}
-                        className="shrink-0 whitespace-nowrap border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-700 hover:bg-slate-50"
-                    >
-                        {preset.label === 'Worldwide' ? '🌐' : preset.label}
-                    </button>
-                ))}
-            </div>
-            <div className={`relative ${mapHeightClass} w-full max-w-md overflow-hidden border border-slate-300`}>
+            {showPresets && (
+                <div className="mb-2 flex flex-nowrap items-center gap-1 overflow-x-auto scrollbar-hide">
+                    {AREA_PRESETS.map((preset) => (
+                        <button
+                            key={preset.label}
+                            type="button"
+                            onClick={() => handlePreset(preset)}
+                            className="shrink-0 whitespace-nowrap border border-line bg-surface px-1.5 py-0.5 text-[10px] font-medium text-ink hover:bg-canvas"
+                        >
+                            {preset.label === 'Worldwide' ? '🌐' : preset.label}
+                        </button>
+                    ))}
+                </div>
+            )}
+            <div className={`relative ${mapHeightClass} w-full max-w-md overflow-hidden border border-line`}>
                 <MapContainer
                     bounds={initialBounds}
                     style={{ height: '100%', width: '100%' }}
@@ -239,19 +274,28 @@ export default function AreaMapPicker({ value, onChange, onUseCurrentView, contr
                 </MapContainer>
                 <div
                     ref={guideRef}
-                    className="pointer-events-none absolute inset-x-[20%] inset-y-[22%] border-2 border-blue-500 bg-blue-500/10 shadow-[0_0_0_9999px_rgba(15,23,42,0.12)]"
+                    className="pointer-events-none absolute inset-x-[20%] inset-y-[22%] border-2 border-dashed border-action bg-action/10 shadow-[0_0_0_9999px_rgba(15,23,42,0.12)]"
                     aria-hidden="true"
                 >
-                    <div className="absolute left-2 top-2 bg-white/90 px-2 py-1 text-[11px] font-medium text-blue-700">
-                        Area to save
-                    </div>
+                    {/* Round corner handles to echo a draggable selection. */}
+                    {/* eslint-disable no-restricted-syntax -- circular selection handles per the design reference */}
+                    <span className="absolute -left-[6px] -top-[6px] h-3 w-3 rounded-full border-2 border-action bg-white" />
+                    <span className="absolute -right-[6px] -top-[6px] h-3 w-3 rounded-full border-2 border-action bg-white" />
+                    <span className="absolute -bottom-[6px] -left-[6px] h-3 w-3 rounded-full border-2 border-action bg-white" />
+                    <span className="absolute -bottom-[6px] -right-[6px] h-3 w-3 rounded-full border-2 border-action bg-white" />
+                    {/* eslint-enable no-restricted-syntax */}
+                    {!autoCommit && (
+                        <div className="absolute left-2 top-2 bg-surface/90 px-2 py-1 text-[11px] font-medium text-action">
+                            Area to save
+                        </div>
+                    )}
                 </div>
-                {dirty && (
+                {dirty && !autoCommit && (
                     <div className="pointer-events-none absolute inset-0 z-[500] flex items-center justify-center">
                         <button
                             type="button"
                             onClick={handleSave}
-                            className="pointer-events-auto bg-blue-500 px-3 py-2 text-xs font-semibold text-white shadow-lg hover:bg-blue-600"
+                            className="pointer-events-auto bg-action px-3 py-2 text-xs font-semibold text-white shadow-lg hover:bg-action"
                             data-testid="area-save-current"
                         >
                             Save area

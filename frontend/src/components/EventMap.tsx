@@ -84,7 +84,7 @@ function followingChip(count: number): string {
 }
 
 /** Build the HTML for the new-event dot (top-right). Blue dot matches the
- * new-event affordance on the cards (`bg-blue-500`). */
+ * new-event affordance on the cards (`bg-action`). */
 function newEventDot(): string {
     return `<span style="position:absolute;right:-2px;top:-2px;width:8px;height:8px;border-radius:9999px;background:#3b82f6;border:1.5px solid white;box-sizing:content-box;"></span>`;
 }
@@ -214,6 +214,9 @@ interface Props {
      * buttons) that snaps the map back to these coordinates. Used on the
      * event detail page to return to the event's own location after panning. */
     recenterTo?: [number, number] | null;
+    /** Compact preview mode: hides the zoom buttons and the tile
+     * attribution so the map reads as a small, non-chrome miniature. */
+    compact?: boolean;
 }
 
 interface PopupPortal {
@@ -245,14 +248,14 @@ function EventPopupContent({ event, followingCount, showFollowingOverlay, showRa
     return (
         <div className="space-y-1.5 text-xs min-w-[180px]">
             <p
-                className="font-semibold text-sm cursor-pointer hover:text-slate-600"
+                className="font-semibold text-sm cursor-pointer hover:text-ink-soft"
                 onClick={() => { onMarkSeen?.(event.event_id); onEventClick?.(event); }}
             >
                 {event.title}
             </p>
-            <p className="text-slate-500">{formatDate(event)}</p>
+            <p className="text-ink-soft">{formatDate(event)}</p>
             {event.location && (
-                <p className="text-slate-600">📍 {event.location}</p>
+                <p className="text-ink-soft">📍 {event.location}</p>
             )}
             {!minimalPopup && followingCount > 0 && (
                 <AttendeeAvatarStack
@@ -264,7 +267,7 @@ function EventPopupContent({ event, followingCount, showFollowingOverlay, showRa
                 <TagBadges tags={event.tags} maxVisible={3} />
             )}
             {!minimalPopup && showRatings && hasReviews && (
-                <div className="text-slate-700">
+                <div className="text-ink">
                     {aggregate.display_state === 'full' && aggregate.mood_label ? (
                         <span>
                             {aspectMood(aggregate.average_mood).emoji}{' '}
@@ -272,11 +275,11 @@ function EventPopupContent({ event, followingCount, showFollowingOverlay, showRa
                             ({aggregate.count})
                         </span>
                     ) : (
-                        <span className="text-slate-500">Early feedback ({aggregate.count})</span>
+                        <span className="text-ink-soft">Early feedback ({aggregate.count})</span>
                     )}
                 </div>
             )}
-            <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+            <div className="flex items-center justify-between pt-1 border-t border-card-line">
                 {minimalPopup ? (
                     <span />
                 ) : (
@@ -287,7 +290,7 @@ function EventPopupContent({ event, followingCount, showFollowingOverlay, showRa
                 )}
                 <Link
                     to={`/event/${event.event_id}${detailLinkSource ? `?src=${detailLinkSource}` : ''}`}
-                    className="text-[10px] font-medium text-blue-500 hover:text-blue-600"
+                    className="text-[10px] font-medium text-action hover:text-action"
                 >
                     Details →
                 </Link>
@@ -851,7 +854,7 @@ function MarkerClusterLayer({
     );
 }
 
-export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, preserveViewport, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true, minimalPopup = false, recenterTo = null }: Props) {
+export default function EventMap({ events, focusedEvent, onEventClick, onBoundsChange, hoveredEventId, onEventHover, detailLinkSource, areaOverlay, autoFitToken, flyToArea, flyToAreaToken, initialArea, preserveViewport, newEventIds, popularityThreshold = 10, onMarkSeen, disablePopups = false, onMarkerSelect, showFollowingBadgeOverlay = true, showTrendingOverlay = true, minimalPopup = false, recenterTo = null, compact = false }: Props) {
     const { showRatings, eventColorBarColor, followingBadgeEnabled, unseenStateEnabled, trendingEnabled, trendingTopN, trendingTopPercent } = useFeatureFlags();
     const markerRefs = useRef(new Map<string, L.Marker>());
     const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
@@ -890,17 +893,23 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
 
     const formatDate = useCallback((e: CalendarEvent) => {
         const start = new Date(e.start);
-        const date = start.toLocaleDateString(undefined, {
+        const end = new Date(e.end);
+        const dateStr = (d: Date) => d.toLocaleDateString(undefined, {
             weekday: 'short',
             month: 'short',
             day: 'numeric',
         });
-        if (e.all_day) return date;
-        const time = start.toLocaleTimeString(undefined, {
+        const timeStr = (d: Date) => d.toLocaleTimeString(undefined, {
             hour: 'numeric',
             minute: '2-digit',
         });
-        return `${date} · ${time}`;
+        // Multi-day events show the end date so the span reads correctly.
+        const sameDay = start.toDateString() === end.toDateString();
+        if (e.all_day) {
+            return sameDay ? dateStr(start) : `${dateStr(start)} – ${dateStr(new Date(end.getTime() - 1))}`;
+        }
+        const base = `${dateStr(start)} · ${timeStr(start)}`;
+        return sameDay ? base : `${base} – ${dateStr(end)}, ${timeStr(end)}`;
     }, []);
 
     return (
@@ -913,6 +922,8 @@ export default function EventMap({ events, focusedEvent, onEventClick, onBoundsC
             zoomSnap={0.5}
             zoomDelta={0.5}
             wheelPxPerZoomLevel={120}
+            zoomControl={!compact}
+            attributionControl={!compact}
         >
             <TileLayer
                 attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'

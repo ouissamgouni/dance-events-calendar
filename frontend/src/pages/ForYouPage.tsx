@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { CalendarEvent, PendingReview } from '../types';
 import { fetchEventsByIds, fetchMyPendingReviews } from '../api';
@@ -16,6 +16,8 @@ import YourNextEventsRail from '../components/YourNextEventsRail';
 import RailEventCard from '../components/RailEventCard';
 import ShareExperienceCard from '../components/ShareExperienceCard';
 import PeopleYouMayKnowCard from '../components/PeopleYouMayKnowCard';
+import ScrollDotsIndicator from '../components/ScrollDots';
+import { useScrollDots } from '../hooks/useScrollDots';
 
 const DISPLAY_CAP = 5;
 
@@ -60,6 +62,8 @@ function LensTrail(props: LensTrailProps) {
     const hasLocalMore = events.length > visibleEvents.length;
     const showMoreTile = hasLocalMore || hasMore;
     const allScores = visibleEvents.map((event) => event.popularity_score ?? 0);
+    const scrollerRef = useRef<HTMLDivElement>(null);
+    const { dotCount, activeIndex, scrollToIndex } = useScrollDots(scrollerRef, [displayCap, events.length]);
 
     const handleMore = () => {
         if (hasLocalMore) {
@@ -71,16 +75,16 @@ function LensTrail(props: LensTrailProps) {
 
     return (
         <section data-testid={testId}>
-            <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-sm font-semibold text-slate-700">
+            <div className="flex w-full items-center justify-between border-b border-line px-2.5 py-1 text-sm font-semibold text-ink">
                 <span>{title}</span>
                 {headerRight}
             </div>
             {events.length === 0 ? (
-                <div className="px-2.5 py-3 text-xs text-slate-500">
+                <div className="px-2.5 py-3 text-xs text-ink-soft">
                     {emptyContent ?? 'Nothing here yet.'}
                 </div>
             ) : (
-                <div className="flex gap-2 overflow-x-auto px-2 py-2" aria-label={title}>
+                <div ref={scrollerRef} className="flex gap-2 overflow-x-auto scrollbar-hide px-2 py-2" aria-label={title}>
                     {visibleEvents.map((event) => {
                         const isNew = unseenStateEnabled && newEventIds.has(event.event_id);
                         const isTrending = trendingEnabled
@@ -104,12 +108,20 @@ function LensTrail(props: LensTrailProps) {
                             type="button"
                             onClick={handleMore}
                             disabled={loading && !hasLocalMore}
-                            className="flex w-[110px] shrink-0 items-center justify-center self-stretch bg-slate-50 text-center text-[11px] font-semibold text-blue-600 transition hover:bg-slate-100 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-wait disabled:opacity-60"
+                            className="flex w-[110px] shrink-0 items-center justify-center self-stretch bg-canvas text-center text-[11px] font-semibold text-action transition hover:bg-canvas hover:text-action focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-wait disabled:opacity-60"
                         >
                             {loading && !hasLocalMore ? 'Loading…' : '+ more'}
                         </button>
                     )}
                 </div>
+            )}
+            {events.length > 0 && (
+                <ScrollDotsIndicator
+                    count={dotCount}
+                    activeIndex={activeIndex}
+                    onSelect={scrollToIndex}
+                    label={`${title} scroll position`}
+                />
             )}
         </section>
     );
@@ -271,6 +283,9 @@ export default function ForYouPage() {
         setPendingReviews((prev) => prev.filter((r) => r.event_id !== eventId));
     }, []);
 
+    const shareScrollerRef = useRef<HTMLDivElement>(null);
+    const shareDots = useScrollDots(shareScrollerRef, [pendingReviews.length]);
+
     const handleEventClick = useCallback((evt: CalendarEvent) => {
         markSeen(evt.event_id);
         trackView(evt.event_id, 'for-you');
@@ -282,14 +297,14 @@ export default function ForYouPage() {
     return (
         <div className="min-h-screen bg-[#f8fafc]">
             <main className="mx-auto max-w-7xl px-4 py-4 sm:py-6">
-                <h1 className="mb-3 text-xl font-semibold text-slate-900">For You</h1>
+                <h1 className="mb-3 text-xl font-semibold text-ink">For You</h1>
                 {!user ? (
-                    <div className="bg-blue-50 border border-blue-100 p-4 text-sm text-slate-700">
-                        <p className="mb-2 font-medium text-slate-800">Personalised events for you</p>
-                        <p className="mb-3 text-slate-600">Sign in to see events tailored to your saved area, dance styles and friends.</p>
+                    <div className="bg-blue-50 border border-blue-100 p-4 text-sm text-ink">
+                        <p className="mb-2 font-medium text-ink">Personalised events for you</p>
+                        <p className="mb-3 text-ink-soft">Sign in to see events tailored to your saved area, dance styles and friends.</p>
                         <Link
                             to={`/login?next=${encodeURIComponent('/for-you')}`}
-                            className="inline-flex items-center bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                            className="inline-flex items-center bg-action px-3 py-1.5 text-xs font-semibold text-white hover:bg-action focus:outline-none focus:ring-2 focus:ring-blue-300"
                         >
                             Sign in
                         </Link>
@@ -311,7 +326,7 @@ export default function ForYouPage() {
                             emptyContent={(
                                 <>
                                     Save a few dance styles in your profile to see recommendations here.{' '}
-                                    <Link to="/account#preferences" className="font-semibold text-blue-600 hover:text-blue-700">
+                                    <Link to="/account#preferences" className="font-semibold text-action hover:text-action">
                                         Update your preferences
                                     </Link>
                                 </>
@@ -338,7 +353,7 @@ export default function ForYouPage() {
                             headerRight={(
                                 <Link
                                     to="/tribe/calendars"
-                                    className="text-[11px] font-semibold text-blue-600 hover:text-blue-700"
+                                    className="text-[11px] font-semibold text-action hover:text-action"
                                 >
                                     See in explorer
                                 </Link>
@@ -349,7 +364,7 @@ export default function ForYouPage() {
                                         <p className="mb-2">You&apos;re not following anyone yet.</p>
                                         <Link
                                             to="/tribe/discover"
-                                            className="inline-flex items-center bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                            className="inline-flex items-center bg-action px-3 py-1.5 text-xs font-semibold text-white hover:bg-action focus:outline-none focus:ring-2 focus:ring-blue-300"
                                         >
                                             Build your tribe
                                         </Link>
@@ -373,10 +388,10 @@ export default function ForYouPage() {
                         />
                         {pendingReviews.length > 0 && (
                             <section data-testid="for-you-share-your-experience">
-                                <div className="flex w-full items-center justify-between border-b border-slate-300 px-2.5 py-1 text-sm font-semibold text-slate-700">
+                                <div className="flex w-full items-center justify-between border-b border-line px-2.5 py-1 text-sm font-semibold text-ink">
                                     <span>Share your experience</span>
                                 </div>
-                                <div className="flex gap-2 overflow-x-auto px-2 py-2" aria-label="Share your experience">
+                                <div ref={shareScrollerRef} className="flex gap-2 overflow-x-auto scrollbar-hide px-2 py-2" aria-label="Share your experience">
                                     {pendingReviews.map((review) => (
                                         <ShareExperienceCard
                                             key={review.event_id}
@@ -385,6 +400,12 @@ export default function ForYouPage() {
                                         />
                                     ))}
                                 </div>
+                                <ScrollDotsIndicator
+                                    count={shareDots.dotCount}
+                                    activeIndex={shareDots.activeIndex}
+                                    onSelect={shareDots.scrollToIndex}
+                                    label="Share your experience scroll position"
+                                />
                             </section>
                         )}
                         <LensTrail

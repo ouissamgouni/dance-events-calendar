@@ -139,7 +139,7 @@ export default function TagsPicker({
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search tags…"
-                    className="w-full border border-slate-300 px-2 py-1 text-xs placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="w-full border border-line px-2 py-1 text-xs placeholder:text-muted focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
                 />
             )}
 
@@ -151,7 +151,7 @@ export default function TagsPicker({
                         onClick={() => setActiveGroupSlug('all')}
                         className={`px-2 py-0.5 text-[11px] font-medium border transition-colors ${activeGroupSlug === 'all'
                             ? 'bg-slate-700 text-white border-slate-700'
-                            : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                            : 'bg-surface text-ink-soft border-line hover:bg-canvas'
                             }`}
                     >
                         All
@@ -201,7 +201,7 @@ export default function TagsPicker({
                                 </p>
                             )}
                             {allFiltered ? (
-                                <p className="text-[11px] text-slate-400 italic">No tags available.</p>
+                                <p className="text-[11px] text-muted italic">No tags available.</p>
                             ) : (
                                 <div className={wrap ? 'flex flex-wrap gap-1' : 'flex flex-nowrap gap-1 overflow-x-auto scrollbar-hide pb-0.5'}>
                                     {group.tags.map((tag) => {
@@ -230,21 +230,21 @@ export default function TagsPicker({
                 })}
 
                 {totalTagsAcrossGroups === 0 && search.trim() && (
-                    <p className="text-[11px] text-slate-400 italic">No tags match "{search}".</p>
+                    <p className="text-[11px] text-muted italic">No tags match "{search}".</p>
                 )}
             </div>
 
             {/* Single "Suggest new" section: category selector + text box */}
             {allowFreeText && enabledGroups.length > 0 && (
-                <div className="border-t border-slate-200 pt-2 mt-2 space-y-1.5">
-                    <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                <div className="border-t border-line pt-2 mt-2 space-y-1.5">
+                    <p className="text-[10px] font-medium uppercase tracking-wide text-ink-soft">
                         Suggest new tag
                     </p>
                     <div className="flex gap-1.5">
                         <select
                             value={newTagGroupSlug}
                             onChange={(e) => setNewTagGroupSlug(e.target.value)}
-                            className="border border-slate-300 px-1.5 py-1 text-[11px] focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 shrink-0 max-w-[40%]"
+                            className="border border-line px-1.5 py-1 text-[11px] focus:border-action focus:outline-none focus:ring-1 focus:ring-action shrink-0 max-w-[40%]"
                         >
                             {enabledGroups.map((g) => (
                                 <option key={g.slug} value={g.slug}>{g.label}</option>
@@ -262,13 +262,13 @@ export default function TagsPicker({
                             }}
                             placeholder="New tag…"
                             maxLength={100}
-                            className="flex-1 min-w-0 border border-slate-300 px-2 py-1 text-[11px] placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="flex-1 min-w-0 border border-line px-2 py-1 text-[11px] placeholder:text-muted focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
                         />
                         <button
                             type="button"
                             onClick={addNewTag}
                             disabled={!newTagText.trim() || !newTagGroupSlug}
-                            className="bg-blue-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-blue-700 disabled:opacity-50 shrink-0"
+                            className="bg-action px-2 py-1 text-[11px] font-medium text-white hover:bg-action-strong disabled:opacity-50 shrink-0"
                         >
                             Add
                         </button>
@@ -287,7 +287,7 @@ export default function TagsPicker({
                                     <button
                                         type="button"
                                         onClick={() => setFreeText(entry.slug, '')}
-                                        className="text-slate-400 hover:text-slate-700"
+                                        className="text-muted hover:text-ink"
                                         aria-label={`Remove ${entry.text}`}
                                     >
                                         ✕

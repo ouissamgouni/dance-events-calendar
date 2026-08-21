@@ -242,3 +242,120 @@ views:
       country: Netherlands,
       city: Amsterdam,
     }
+
+  # ── Popularity across the extended global dataset ─────────────────
+  # A spread of views on flagship international events (festivals /
+  # congresses) so Popular sort and trending overlays stay meaningful
+  # once the horizon and geography expand.
+  - {
+      event_id: evt-ux-033,
+      device_id: seed-ux-view-035,
+      source: explorer-list,
+      country: France,
+      city: Lyon,
+    }
+  - {
+      event_id: evt-ux-033,
+      device_id: seed-ux-view-036,
+      source: explorer-map,
+      country: Spain,
+      city: Barcelona,
+    }
+  - {
+      event_id: evt-ux-034,
+      device_id: seed-ux-view-037,
+      source: explorer-list,
+      country: Spain,
+      city: Seville,
+    }
+  - {
+      event_id: evt-ux-052,
+      device_id: seed-ux-view-038,
+      source: explorer-list,
+      country: Mexico,
+      city: Mexico City,
+    }
+  - {
+      event_id: evt-ux-052,
+      device_id: seed-ux-view-039,
+      source: shared-link,
+      country: United States,
+      city: Los Angeles,
+    }
+  - {
+      event_id: evt-ux-053,
+      device_id: seed-ux-view-040,
+      source: explorer-map,
+      country: United States,
+      city: Los Angeles,
+    }
+  - {
+      event_id: evt-ux-058,
+      device_id: seed-ux-view-041,
+      source: explorer-list,
+      country: Cuba,
+      city: Havana,
+    }
+  - {
+      event_id: evt-ux-061,
+      device_id: seed-ux-view-042,
+      source: explorer-list,
+      country: Thailand,
+      city: Bangkok,
+    }
+  - {
+      event_id: evt-ux-066,
+      device_id: seed-ux-view-043,
+      source: explorer-map,
+      country: United Arab Emirates,
+      city: Dubai,
+    }
+  - {
+      event_id: evt-ux-068,
+      device_id: seed-ux-view-044,
+      source: explorer-list,
+      country: Brazil,
+      city: São Paulo,
+    }
+  - {
+      event_id: evt-ux-069,
+      device_id: seed-ux-view-045,
+      source: shared-link,
+      country: Colombia,
+      city: Bogotá,
+    }
+  - {
+      event_id: evt-ux-072,
+      device_id: seed-ux-view-046,
+      source: explorer-list,
+      country: Colombia,
+      city: Medellín,
+    }
+  - {
+      event_id: evt-ux-077,
+      device_id: seed-ux-view-047,
+      source: explorer-map,
+      country: Australia,
+      city: Sydney,
+    }
+  - {
+      event_id: evt-ux-077,
+      device_id: seed-ux-view-048,
+      source: explorer-list,
+      country: Australia,
+      city: Melbourne,
+    }
+  - {
+      event_id: evt-ux-045,
+      device_id: seed-ux-view-049,
+      source: explorer-list,
+      country: Spain,
+      city: Málaga,
+    }
+  - {
+      event_id: evt-ux-051,
+      device_id: seed-ux-view-050,
+      source: explorer-map,
+      country: Canada,
+      city: Toronto,
+    }

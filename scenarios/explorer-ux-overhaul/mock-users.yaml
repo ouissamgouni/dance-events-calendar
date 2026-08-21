@@ -1,7 +1,7 @@
 # Explorer UX overhaul scenario — richer cast for the Explorer social
-# surfaces. Bob is the signed-in viewer used to exercise following / friends
-# filters, attendance overlays, save counts, and popularity alongside the
-# mobile-first Explorer UI.
+# surfaces. `viewer` is the signed-in user used to exercise following /
+# friends filters, attendance overlays, save counts, and popularity
+# alongside the mobile-first Explorer UI. `bob` is an out-of-graph control.
 users:
   - email: viewer@example.com
     name: Viewer Explorer

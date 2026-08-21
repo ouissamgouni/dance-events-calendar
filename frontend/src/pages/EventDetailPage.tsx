@@ -189,16 +189,16 @@ export default function EventDetailPage() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-slate-50">
-                <p className="text-slate-500">Loading event…</p>
+            <div className="flex items-center justify-center min-h-screen bg-canvas">
+                <p className="text-ink-soft">Loading event…</p>
             </div>
         );
     }
 
     if (error || !event) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 gap-4">
-                <p className="text-slate-600 text-lg">Event not found</p>
+            <div className="flex flex-col items-center justify-center min-h-screen bg-canvas gap-4">
+                <p className="text-ink-soft text-lg">Event not found</p>
                 <button onClick={handleBack} className="text-rose-600 hover:underline text-sm">← Back</button>
             </div>
         );
@@ -264,7 +264,7 @@ export default function EventDetailPage() {
                 <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
             </Helmet>
 
-            <div className="min-h-screen bg-slate-50 overflow-x-hidden">
+            <div className="min-h-screen bg-canvas overflow-x-hidden">
                 <div className="mx-auto max-w-5xl px-4 py-8">
                     {/* Back link */}
                     <button
@@ -285,12 +285,12 @@ export default function EventDetailPage() {
                                 onBlur={handleTitleBlur}
                                 onKeyDown={handleTitleKeyDown}
                                 disabled={savingTitle}
-                                className="w-full text-2xl font-bold text-slate-900 leading-tight border-b-2 border-rose-300 bg-transparent focus:outline-none py-1"
+                                className="w-full text-2xl font-bold text-ink leading-tight border-b-2 border-rose-300 bg-transparent focus:outline-none py-1"
                             />
                         </div>
                     ) : (
                         <h1
-                            className={`text-2xl font-bold text-slate-900 leading-tight mb-6 ${editMode && user?.is_admin ? 'cursor-text hover:bg-slate-100 -mx-2 px-2 py-1 rounded transition' : ''}`}
+                            className={`text-2xl font-bold text-ink leading-tight mb-6 ${editMode && user?.is_admin ? 'cursor-text hover:bg-canvas -mx-2 px-2 py-1 rounded transition' : ''}`}
                             onClick={editMode && user?.is_admin ? () => setEditingTitle(true) : undefined}
                             title={editMode && user?.is_admin ? 'Click to edit title' : undefined}
                         >
@@ -304,7 +304,7 @@ export default function EventDetailPage() {
                     <div className="flex flex-col lg:flex-row gap-6">
                         {/* Left: event details card */}
                         <div className="lg:w-2/3 min-w-0">
-                            <article className="bg-white rounded-2xl shadow-lg overflow-hidden">
+                            <article className="bg-surface rounded-card shadow-lg overflow-hidden">
                                 <div className="px-6 py-5">
                                     {editMode && user?.is_admin ? (
                                         <AdminEventDetailContent
@@ -344,7 +344,7 @@ export default function EventDetailPage() {
                                 {/* Actions bar — primary CTA (Going) is visually emphasised; the
                                     rest are secondary. A sticky mobile bar mirrors the primary
                                     action so users don't have to scroll back up to convert. */}
-                                <div className="border-t border-slate-100 px-4 py-3 flex items-center gap-2 flex-wrap">
+                                <div className="border-t border-card-line px-4 py-3 flex items-center gap-2 flex-wrap">
                                     <GoingButton eventId={event.event_id} appearance="pill" isPast={isPast} />
                                     <SaveEventButton eventId={event.event_id} appearance="pill" />
                                     <ShareButton
@@ -361,7 +361,7 @@ export default function EventDetailPage() {
                                                     .getElementById('messages')
                                                     ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                                             }}
-                                            className="inline-flex items-center gap-1 text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 transition shrink-0"
+                                            className="inline-flex items-center gap-1 text-xs text-ink-soft hover:text-ink bg-slate-100 hover:bg-canvas px-2.5 py-1 transition shrink-0"
                                             aria-label="Ask a question"
                                         >
                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
@@ -377,7 +377,7 @@ export default function EventDetailPage() {
                                                 if (!tagGroups.length) fetchTagGroups().then(setTagGroups).catch(() => { });
                                                 setShowSuggestTags((v) => !v);
                                             }}
-                                            className="text-xs text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 transition shrink-0"
+                                            className="text-xs text-ink-soft hover:text-ink bg-slate-100 hover:bg-canvas px-2.5 py-1 transition shrink-0"
                                         >
                                             Suggest{' '}
                                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="inline h-3.5 w-3.5 align-[-1px]">
@@ -390,7 +390,7 @@ export default function EventDetailPage() {
                                             onClick={() => setEditMode((m) => !m)}
                                             className={`ml-auto inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition shrink-0 ${editMode
                                                 ? 'bg-slate-800 text-white hover:bg-slate-700'
-                                                : 'bg-white border border-slate-300 text-slate-600 hover:bg-slate-50 hover:border-slate-400'
+                                                : 'bg-surface border border-line text-ink-soft hover:bg-canvas hover:border-line'
                                                 }`}
                                         >
                                             {editMode ? (
@@ -419,7 +419,7 @@ export default function EventDetailPage() {
                             so the map bottom lines up with the overview card. */}
                         {event.latitude != null && event.longitude != null && (
                             <div className="lg:w-1/3">
-                                <div className="h-[240px] lg:h-full lg:min-h-[240px] rounded-xl overflow-hidden shadow-sm">
+                                <div className="h-[240px] lg:h-full lg:min-h-[240px] rounded-card overflow-hidden shadow-sm">
                                     <EventMap
                                         events={[event]}
                                         recenterTo={[event.latitude, event.longitude]}
@@ -437,21 +437,21 @@ export default function EventDetailPage() {
                     {isPast ? (
                         <>
                             {showRatings && (
-                                <div id="community" className="mt-6 bg-white rounded-2xl shadow-lg px-6 py-5">
+                                <div id="community" className="mt-6 bg-surface rounded-card shadow-lg px-6 py-5">
                                     <EventReviewsSection collapsible eventId={event.event_id} isPast={isPast} onAggregateLoaded={(a) => setReviewCount(a?.count ?? 0)} onOpenReviewForm={() => setReviewOpenToken((t) => t + 1)} refreshToken={reviewsRefreshToken} />
                                 </div>
                             )}
-                            <div className="mt-6 bg-white rounded-2xl shadow-lg px-6 py-5">
+                            <div className="mt-6 bg-surface rounded-card shadow-lg px-6 py-5">
                                 <EventMessagesSection collapsible eventId={event.event_id} isPast={isPast} openComposeToken={askComposeToken} />
                             </div>
                         </>
                     ) : (
                         <>
-                            <div className="mt-6 bg-white rounded-2xl shadow-lg px-6 py-5">
+                            <div className="mt-6 bg-surface rounded-card shadow-lg px-6 py-5">
                                 <EventMessagesSection collapsible eventId={event.event_id} isPast={isPast} openComposeToken={askComposeToken} />
                             </div>
                             {showRatings && (
-                                <div id="community" className="mt-6 bg-white rounded-2xl shadow-lg px-6 py-5">
+                                <div id="community" className="mt-6 bg-surface rounded-card shadow-lg px-6 py-5">
                                     <EventReviewsSection collapsible eventId={event.event_id} isPast={isPast} onAggregateLoaded={(a) => setReviewCount(a?.count ?? 0)} onOpenReviewForm={() => setReviewOpenToken((t) => t + 1)} refreshToken={reviewsRefreshToken} />
                                 </div>
                             )}
@@ -463,7 +463,7 @@ export default function EventDetailPage() {
                     every primary affordance (Going, Save, Rate, Share) is
                     reachable without scrolling. Hidden on lg+ where the
                     in-card action bar is visible alongside the description. */}
-                <div className="lg:hidden fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur px-3 py-2 shadow-[0_-2px_8px_rgba(0,0,0,0.04)] flex items-center gap-2 overflow-x-auto">
+                <div className="lg:hidden fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 backdrop-blur px-3 py-2 shadow-[0_-2px_8px_rgba(0,0,0,0.04)] flex items-center gap-2 overflow-x-auto">
                     <GoingButton eventId={event.event_id} appearance="pill" isPast={isPast} />
                     <SaveEventButton eventId={event.event_id} appearance="pill" />
                     {showRatings && (

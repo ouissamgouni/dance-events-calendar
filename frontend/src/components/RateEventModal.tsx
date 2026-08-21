@@ -58,7 +58,7 @@ function aspectTagClasses(polarity: string | null | undefined, selected: boolean
     }
     return selected
         ? 'bg-green-200 text-green-900 border-green-400 ring-1 ring-green-500'
-        : `bg-green-50 text-green-800 border-green-200 ${atCap ? 'opacity-40' : 'hover:border-green-400'}`;
+        : `bg-green-50 text-success border-green-200 ${atCap ? 'opacity-40' : 'hover:border-green-400'}`;
 }
 
 /** Segmented "mood" scale reused for the overall step. */
@@ -107,7 +107,7 @@ function audienceIcon(tag: Tag): { icon: string; label: string } {
 function chipClass(selected: boolean): string {
     return selected
         ? `${CHIP_BASE} bg-sky-100 text-sky-800 border-sky-300`
-        : `${CHIP_BASE} bg-white text-slate-600 border-slate-200 hover:border-sky-200 hover:bg-sky-50`;
+        : `${CHIP_BASE} bg-surface text-ink-soft border-line hover:border-sky-200 hover:bg-sky-50`;
 }
 
 /** Rounded, light segmented mood/rating control shared by the overall step and each aspect. */
@@ -133,7 +133,7 @@ function SegmentedMood<T>({
                         role="radio"
                         aria-checked={sel}
                         onClick={() => onSelect(it.value)}
-                        className={`flex-1 flex flex-col items-center gap-1 rounded-2xl border px-1 py-2.5 text-[11px] transition ${sel ? 'bg-sky-100 text-sky-800 border-sky-300' : 'bg-white text-slate-500 border-slate-200 hover:border-sky-200 hover:bg-sky-50'}`}
+                        className={`flex-1 flex flex-col items-center gap-1 rounded-card border px-1 py-2.5 text-[11px] transition ${sel ? 'bg-sky-100 text-sky-800 border-sky-300' : 'bg-surface text-ink-soft border-line hover:border-sky-200 hover:bg-sky-50'}`}
                     >
                         <span className="text-xl leading-none">{it.emoji}</span>
                         {it.label}
@@ -418,7 +418,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                 onClick={onClose}
             >
                 <div
-                    className="bg-white shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto border border-slate-200"
+                    className="bg-surface shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto border border-line"
                     onClick={(e) => e.stopPropagation()}
                     role="dialog"
                     aria-modal="true"
@@ -427,8 +427,8 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                     {thanks ? (
                         <div className="p-5 text-center space-y-3">
                             <div className="text-3xl">🙌</div>
-                            <h2 className="text-base font-semibold text-slate-800">Thanks for your feedback!</h2>
-                            <p className="text-xs text-slate-600">
+                            <h2 className="text-base font-semibold text-ink">Thanks for your feedback!</h2>
+                            <p className="text-xs text-ink-soft">
                                 Your review is live. Any comment you added will appear once it's checked by our team.
                             </p>
                             <button
@@ -441,22 +441,22 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                     ) : mode === 'view' && initialRating ? (
                         <div className="p-4 space-y-3">
                             <div className="flex items-center justify-between">
-                                <h2 className="text-base font-semibold text-slate-800">Your review</h2>
+                                <h2 className="text-base font-semibold text-ink">Your review</h2>
                                 <button
                                     onClick={onClose}
                                     aria-label="Close"
-                                    className="shrink-0 text-slate-400 hover:text-slate-600 text-xl leading-none"
+                                    className="shrink-0 text-muted hover:text-ink-soft text-xl leading-none"
                                 >
                                     ×
                                 </button>
                             </div>
                             {sentiment && (
-                                <p className="text-sm text-slate-700">
+                                <p className="text-sm text-ink">
                                     {SENTIMENT_META[sentiment].emoji} {SENTIMENT_META[sentiment].label}
                                 </p>
                             )}
                             {trimmedComment && (
-                                <p className="text-sm text-slate-700 whitespace-pre-wrap break-words">{trimmedComment}</p>
+                                <p className="text-sm text-ink whitespace-pre-wrap break-words">{trimmedComment}</p>
                             )}
                             {commentStatus === 'pending' && (
                                 <p className="text-[11px] text-amber-700">Your comment is pending moderation.</p>
@@ -466,19 +466,19 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                                     {viewAspectTags.map((t) => (
                                         <span
                                             key={`a-${t.id}`}
-                                            className={`rounded-full px-2 py-0.5 text-[11px] ${t.polarity === 'negative' ? 'bg-orange-50 text-orange-800' : 'bg-green-50 text-green-800'}`}
+                                            className={`rounded-full px-2 py-0.5 text-[11px] ${t.polarity === 'negative' ? 'bg-orange-50 text-orange-800' : 'bg-green-50 text-success'}`}
                                         >
                                             {t.label}
                                         </span>
                                     ))}
                                     {viewAudienceTags.map((t) => (
-                                        <span key={`u-${t.id}`} className="rounded-full px-2 py-0.5 text-[11px] bg-slate-100 text-slate-600">
+                                        <span key={`u-${t.id}`} className="rounded-full px-2 py-0.5 text-[11px] bg-slate-100 text-ink-soft">
                                             {t.label}
                                         </span>
                                     ))}
                                 </div>
                             )}
-                            {error && <p className="text-xs text-slate-700">{error}</p>}
+                            {error && <p className="text-xs text-ink">{error}</p>}
                             <div className="flex items-center gap-2 pt-1">
                                 <button
                                     type="button"
@@ -491,7 +491,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                                     type="button"
                                     onClick={handleDelete}
                                     disabled={submitting}
-                                    className="rounded-full border border-slate-200 text-slate-700 text-sm px-4 py-2 hover:bg-slate-50 disabled:opacity-50"
+                                    className="rounded-full border border-line text-ink text-sm px-4 py-2 hover:bg-canvas disabled:opacity-50"
                                 >
                                     Delete
                                 </button>
@@ -506,23 +506,23 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                                         onClick={goBack}
                                         disabled={submitting}
                                         aria-label="Back"
-                                        className="shrink-0 -ml-1 text-slate-500 hover:text-slate-700 text-2xl leading-none disabled:opacity-50"
+                                        className="shrink-0 -ml-1 text-ink-soft hover:text-ink text-2xl leading-none disabled:opacity-50"
                                     >
                                         ←
                                     </button>
                                 )}
-                                <h2 className="flex-1 text-lg font-semibold text-slate-900">{stepTitle}</h2>
+                                <h2 className="flex-1 text-lg font-semibold text-ink">{stepTitle}</h2>
                                 <button
                                     onClick={onClose}
                                     aria-label="Close"
-                                    className="shrink-0 text-slate-400 hover:text-slate-600 text-xl leading-none"
+                                    className="shrink-0 text-muted hover:text-ink-soft text-xl leading-none"
                                 >
                                     ×
                                 </button>
                             </div>
 
                             {current.kind === 'intro' && eventTitle && (
-                                <p className="-mt-2 text-xs text-slate-500">
+                                <p className="-mt-2 text-xs text-ink-soft">
                                     Rate your experience at {eventTitle}
                                 </p>
                             )}
@@ -548,7 +548,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                             {current.kind === 'intro' && (
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                        <label className="block text-sm font-semibold text-ink mb-2">
                                             Your overall experience
                                         </label>
                                         <SegmentedMood
@@ -561,9 +561,9 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
 
                                     {sentiment && offeredAspects.length > 0 && (
                                         <div>
-                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                            <label className="block text-sm font-semibold text-ink mb-2">
                                                 {'What stood out — good or bad?'}{' '}
-                                                <span className="text-[11px] font-normal text-slate-400">(optional — pick what shaped it)</span>
+                                                <span className="text-[11px] font-normal text-muted">(optional — pick what shaped it)</span>
                                             </label>
                                             <div className="flex flex-wrap gap-2.5">
                                                 {offeredAspects.map((g) => {
@@ -598,7 +598,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                                 return (
                                     <div className="space-y-4">
                                         <div>
-                                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                            <label className="block text-sm font-semibold text-ink mb-2">
                                                 How was the {g.label.toLowerCase()}?
                                             </label>
                                             <SegmentedMood
@@ -677,9 +677,9 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                                         onChange={(e) => setComment(e.target.value.slice(0, MAX_COMMENT))}
                                         rows={4}
                                         placeholder="Tell others about the event…"
-                                        className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky-300"
+                                        className="w-full rounded-card border border-line px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-sky-300"
                                     />
-                                    <div className="mt-0.5 text-right text-[10px] text-slate-400 tabular-nums">
+                                    <div className="mt-0.5 text-right text-[10px] text-muted tabular-nums">
                                         {comment.length}/{MAX_COMMENT}
                                     </div>
                                 </div>
@@ -687,18 +687,18 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
 
                             {/* Identity */}
                             {current.kind === 'identity' && (
-                                <div className="inline-flex overflow-hidden rounded-full border border-slate-200 text-sm">
+                                <div className="inline-flex overflow-hidden rounded-full border border-line text-sm">
                                     <button
                                         type="button"
                                         onClick={() => setIdentity('name')}
-                                        className={`px-4 py-1.5 ${identity === 'name' ? 'bg-sky-100 text-sky-800' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                                        className={`px-4 py-1.5 ${identity === 'name' ? 'bg-sky-100 text-sky-800' : 'bg-surface text-ink-soft hover:bg-canvas'}`}
                                     >
                                         {user?.name ?? user?.email ?? 'My name'}
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => setIdentity('anonymous')}
-                                        className={`px-4 py-1.5 border-l border-slate-200 ${identity === 'anonymous' ? 'bg-sky-100 text-sky-800' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                                        className={`px-4 py-1.5 border-l border-line ${identity === 'anonymous' ? 'bg-sky-100 text-sky-800' : 'bg-surface text-ink-soft hover:bg-canvas'}`}
                                     >
                                         Anonymous
                                     </button>
@@ -716,7 +716,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                                 aria-hidden="true"
                             />
 
-                            {error && <p className="text-xs text-slate-700">{error}</p>}
+                            {error && <p className="text-xs text-ink">{error}</p>}
 
                             {/* Footer */}
                             <div className="flex items-center gap-2 pt-1">
@@ -744,7 +744,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                                         type="button"
                                         onClick={handleDelete}
                                         disabled={submitting}
-                                        className="rounded-full border border-slate-200 text-slate-700 text-sm px-4 py-2 hover:bg-slate-50 disabled:opacity-50"
+                                        className="rounded-full border border-line text-ink text-sm px-4 py-2 hover:bg-canvas disabled:opacity-50"
                                     >
                                         Delete
                                     </button>

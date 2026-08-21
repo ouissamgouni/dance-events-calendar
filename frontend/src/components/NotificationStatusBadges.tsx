@@ -7,9 +7,9 @@
  */
 
 const DOT_ON =
-    'inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-[9px] font-semibold text-emerald-700';
+    'inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-[9px] font-semibold text-success';
 const DOT_OFF =
-    'inline-flex h-4 w-4 items-center justify-center rounded-full bg-gray-100 text-[9px] font-semibold text-gray-400';
+    'inline-flex h-4 w-4 items-center justify-center rounded-full bg-gray-100 text-[9px] font-semibold text-muted';
 
 function Dot({ on, letter, title }: { on: boolean; letter: string; title: string }) {
     return (
