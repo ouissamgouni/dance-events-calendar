@@ -41,6 +41,7 @@ import { clampArea, DEFAULT_AREA_BBOX } from '../constants/area';
 import { useAuth } from '../context/AuthContext';
 import { usePreferences } from '../context/PreferencesContext';
 import type { Tag, TagGroup } from '../types';
+export { default } from '../components/onboarding/OnboardingFlow';
 
 const RADIUS_MIN_KM = 5;
 const RADIUS_MAX_KM = 150;
@@ -84,7 +85,7 @@ function MapRecenter({ pin, radiusKm }: { pin: { lat: number; lng: number }; rad
     return null;
 }
 
-export default function OnboardingWizard() {
+export function LegacyOnboardingWizard() {
     const navigate = useNavigate();
     const [sp] = useSearchParams();
     const next = sp.get('next') || '/';
