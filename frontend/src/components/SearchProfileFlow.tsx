@@ -38,8 +38,8 @@ export interface SearchProfileFlowProps {
 
     /** Apply a saved profile's Area + Dance + Reach to the live search. */
     onApplyProfile: (profile: InterestProfile) => void;
-    /** Overwrite the default (active) profile with the live Area/Dance/Reach. */
-    onUpdateDefault: () => Promise<void>;
+    /** Update the selected profile with the live Area/Dance/Reach. */
+    onUpdateProfile: (profile: InterestProfile) => Promise<void>;
     createProfile: (payload: InterestProfilePayload) => Promise<InterestProfile>;
     updateProfile: (id: number, payload: InterestProfileUpdatePayload) => Promise<InterestProfile>;
     deleteProfile: (id: number) => Promise<void>;
@@ -127,7 +127,7 @@ export default function SearchProfileFlow({
     reachGroup,
     localTagId,
     onApplyProfile,
-    onUpdateDefault,
+    onUpdateProfile,
     createProfile,
     updateProfile,
     deleteProfile,
@@ -138,6 +138,7 @@ export default function SearchProfileFlow({
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [confirmDelete, setConfirmDelete] = useState(false);
+    const [targetProfileId, setTargetProfileId] = useState<number | null>(null);
 
     // Reset to the requested entry step each time the flow opens.
     useEffect(() => {
@@ -146,14 +147,21 @@ export default function SearchProfileFlow({
             setEditingId(null);
             setDraft(null);
             setError(null);
+            // When opening the save step, preselect the active profile (default).
+            if (initialStep === 'save') {
+                const activeProfile = (profiles ?? []).find((p) => p.is_active);
+                setTargetProfileId(activeProfile?.id ?? null);
+            } else {
+                setTargetProfileId(null);
+            }
         }
-    }, [open, initialStep]);
+    }, [open, initialStep, profiles]);
 
     if (!open) return null;
 
     const draftFromCurrent = (label: string): EditDraft => ({
         label,
-        area: { ...(current.area ?? DEFAULT_AREA_BBOX), label },
+        area: { ...(current.area ?? DEFAULT_AREA_BBOX), label: currentAreaLabel },
         dance: { selectedTagIds: [...current.danceIds], freeTexts: {} },
         reach: { selectedTagIds: [...current.reachIds], freeTexts: {} },
         matchesEnabled: false,
@@ -182,7 +190,7 @@ export default function SearchProfileFlow({
                 min_lng: profile.min_lng,
                 max_lat: profile.max_lat,
                 max_lng: profile.max_lng,
-                label: profile.label,
+                label: profile.area_label,
             },
             dance: { selectedTagIds: [...profile.dance_tag_ids], freeTexts: {} },
             reach: { selectedTagIds: [...profile.reach_tag_ids], freeTexts: {} },
@@ -193,12 +201,18 @@ export default function SearchProfileFlow({
 
     const handleSaveDraft = async () => {
         if (!draft) return;
-        const name = draft.label.trim() || 'New profile';
+        const name = draft.label.trim();
+        const areaName = draft.area.label.trim();
+        if (!name || !areaName) {
+            setError('Profile name and area name are required.');
+            return;
+        }
         setBusy(true);
         setError(null);
         try {
             const base = {
                 label: name,
+                area_label: areaName,
                 min_lat: draft.area.min_lat,
                 min_lng: draft.area.min_lng,
                 max_lat: draft.area.max_lat,
@@ -207,8 +221,13 @@ export default function SearchProfileFlow({
                 reach_tag_ids: draft.reach.selectedTagIds,
                 matches_enabled: draft.matchesEnabled,
             };
-            if (editingId != null) await updateProfile(editingId, base);
-            else await createProfile(base);
+            if (editingId != null) {
+                const updated = await updateProfile(editingId, base);
+                if (selectedProfileId === editingId) onApplyProfile(updated);
+            } else {
+                const created = await createProfile(base);
+                onApplyProfile(created);
+            }
             onClose();
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to save profile');
@@ -231,14 +250,19 @@ export default function SearchProfileFlow({
         }
     };
 
-    const handleUpdateDefault = async () => {
+    const handleUpdateProfile = async () => {
+        const selectedProfile = (profiles ?? []).find((p) => p.id === targetProfileId);
+        if (!selectedProfile) {
+            setError('No profile selected.');
+            return;
+        }
         setBusy(true);
         setError(null);
         try {
-            await onUpdateDefault();
+            await onUpdateProfile(selectedProfile);
             onClose();
         } catch (e) {
-            setError(e instanceof Error ? e.message : 'Failed to update default profile');
+            setError(e instanceof Error ? e.message : 'Failed to update profile');
         } finally {
             setBusy(false);
         }
@@ -249,15 +273,17 @@ export default function SearchProfileFlow({
         return (
             <FlowShell title="Choose search profile" onBack={onClose}>
                 <ul className="flex flex-col gap-1" data-testid="search-profile-picker">
-                    <li className="flex items-start gap-3 px-2 py-3">
-                        <Radio checked={selectedProfileId === 'custom'} />
-                        <div className="min-w-0 flex-1">
-                            <p className="text-xs font-medium text-ink">Custom</p>
-                            <p className="mt-0.5 truncate text-xs text-ink-soft">
-                                {summarizeSelection(current, currentAreaLabel, danceGroup, reachGroup)}
-                            </p>
-                        </div>
-                    </li>
+                    {selectedProfileId === 'custom' && (
+                        <li className="flex items-start gap-3 px-2 py-3">
+                            <Radio checked />
+                            <div className="min-w-0 flex-1">
+                                <p className="text-xs font-medium text-ink">Current search</p>
+                                <p className="mt-0.5 truncate text-xs text-ink-soft">
+                                    {summarizeSelection(current, currentAreaLabel, danceGroup, reachGroup)}
+                                </p>
+                            </div>
+                        </li>
+                    )}
                     {(profiles ?? []).map((profile) => (
                         <li key={profile.id} className="flex items-start gap-3">
                             <button
@@ -304,29 +330,59 @@ export default function SearchProfileFlow({
 
     // ── Save sheet ───────────────────────────────────────────────────────
     if (step === 'save') {
+        const profileList = profiles ?? [];
         return (
             <FlowShell title="Save search profile" onBack={onClose}>
                 <div className="flex flex-col gap-3" data-testid="search-profile-save">
-                    <button
-                        type="button"
-                        onClick={handleUpdateDefault}
-                        disabled={busy}
-                        className="rounded-card border border-line bg-surface p-4 text-left hover:bg-canvas disabled:opacity-50"
-                        data-testid="search-profile-update-default"
-                    >
-                        <p className="text-sm font-semibold text-ink">Update default profile</p>
-                        <p className="mt-1 text-xs text-ink-soft">
-                            Replace the default profile's Area, Dance styles, and Reach with the current settings.
-                        </p>
-                    </button>
+                    {profileList.length > 0 && (
+                        <>
+                            <div>
+                                <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-ink-soft">
+                                    Profile to update
+                                </label>
+                                <div className="flex flex-col gap-1 rounded-card border border-line bg-surface p-2">
+                                    {profileList.map((profile) => (
+                                        <button
+                                            key={profile.id}
+                                            type="button"
+                                            onClick={() => setTargetProfileId(profile.id)}
+                                            className="flex items-center gap-3 px-2 py-2.5 text-left text-ink hover:bg-canvas transition-colors"
+                                            data-testid={`search-profile-target-${profile.id}`}
+                                        >
+                                            <span className="h-4 w-4 shrink-0 rounded border-2 border-current flex items-center justify-center">
+                                                {targetProfileId === profile.id && (
+                                                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                                                )}
+                                            </span>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="truncate text-xs font-medium">{profile.label}</p>
+                                                {profile.is_active && (
+                                                    <p className="text-xs opacity-75">Default</p>
+                                                )}
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={handleUpdateProfile}
+                                disabled={busy || targetProfileId === null}
+                                className="rounded-card border border-line bg-surface px-3 py-2.5 text-sm font-medium text-ink hover:bg-canvas disabled:opacity-50"
+                                data-testid="search-profile-update"
+                            >
+                                {busy ? 'Updating…' : 'Update selected profile'}
+                            </button>
+                        </>
+                    )}
                     <button
                         type="button"
                         onClick={() => openCreate(true)}
                         disabled={busy}
-                        className="rounded-card border border-line bg-surface p-4 text-left hover:bg-canvas disabled:opacity-50"
+                        className="rounded-card border border-line bg-surface px-3 py-2.5 text-left hover:bg-canvas disabled:opacity-50"
                         data-testid="search-profile-save-new"
                     >
-                        <p className="text-sm font-semibold text-ink">Save as new profile</p>
+                        <p className="text-sm font-medium text-ink">Save as new profile</p>
                         <p className="mt-1 text-xs text-ink-soft">
                             Create a new search profile with the current settings.
                         </p>
@@ -359,6 +415,7 @@ export default function SearchProfileFlow({
                             type="text"
                             value={draft.label}
                             onChange={(e) => setDraft({ ...draft, label: e.target.value })}
+                            maxLength={120}
                             aria-label="Profile name"
                             className="w-full border border-line px-2 py-2 text-sm focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
                         />
@@ -371,7 +428,7 @@ export default function SearchProfileFlow({
                         reachValue={draft.reach}
                         onDanceChange={(v) => setDraft({ ...draft, dance: v })}
                         onReachChange={(v) => setDraft({ ...draft, reach: v })}
-                        area={{ ...draft.area, label: draft.label }}
+                        area={draft.area}
                         onAreaChange={(next) =>
                             setDraft({
                                 ...draft,
@@ -380,10 +437,28 @@ export default function SearchProfileFlow({
                                     min_lng: next.min_lng,
                                     max_lat: next.max_lat,
                                     max_lng: next.max_lng,
-                                    label: draft.label,
+                                    label: next.label,
                                 },
                             })
                         }
+                        areaNameControl={(
+                            <div>
+                                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
+                                    Area name
+                                </label>
+                                <input
+                                    type="text"
+                                    value={draft.area.label}
+                                    onChange={(e) => setDraft({
+                                        ...draft,
+                                        area: { ...draft.area, label: e.target.value },
+                                    })}
+                                    maxLength={120}
+                                    aria-label="Area name"
+                                    className="w-full border border-line px-2 py-2 text-sm focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
+                                />
+                            </div>
+                        )}
                         matchesEnabled={draft.matchesEnabled}
                         onMatchesEnabledChange={(v) => setDraft({ ...draft, matchesEnabled: v })}
                         matchesHint="Get an email when a new event matches this profile. You can change this anytime."

@@ -48,7 +48,7 @@ const DANCE_GROUP = {
 const REACH_GROUP = {
     id: 2,
     slug: 'reach',
-    label: 'Event scale',
+    label: 'Event reach',
     color: '#7c3aed',
     allow_multiple: true,
     tags: [
@@ -121,11 +121,12 @@ describe('SummaryBar', () => {
         window.ResizeObserver = OriginalResizeObserver;
     });
 
-    it('renders the area chip and opens the area picker on click', async () => {
+    it('renders the area chip with a pin icon and opens the area picker on click', async () => {
         const onEditArea = vi.fn();
         render(<SummaryBar {...baseProps({ onEditArea })} />);
         const chip = screen.getByTestId('summary-chip-area');
         expect(chip).toHaveTextContent('Europe & nearby');
+        expect(chip.querySelector('img[src="/pin.png"]')).toBeInTheDocument();
         await userEvent.click(chip);
         expect(onEditArea).toHaveBeenCalledTimes(1);
     });
@@ -234,6 +235,9 @@ describe('SummaryBar', () => {
                 })}
             />,
         );
+        const bar = screen.getByTestId('summary-bar');
+        expect(bar).toHaveAttribute('data-variant', 'single');
+        expect(bar.querySelector('.flex-wrap')).toBeNull();
         // Wide: all five primary pills fit; only Format folds → +1.
         setBarWidth(1000);
         expect(screen.getByTestId('summary-chip-period')).toBeInTheDocument();
@@ -252,59 +256,5 @@ describe('SummaryBar', () => {
         expect(screen.queryByTestId('summary-chip-reach')).toBeNull();
         expect(screen.queryByTestId('summary-chip-people')).toBeNull();
         expect(screen.getByTestId('summary-open-filters')).toHaveTextContent('+4');
-    });
-
-    it('reserves the right-slot view controls so they are always rendered', () => {
-        mockPillWidth(80);
-        render(
-            <SummaryBar
-                {...baseProps({ activeTagIds: new Set([10, 20]), onOpenFilters: vi.fn() })}
-                rightSlot={<span data-testid="view-icons">icons</span>}
-            />,
-        );
-        setBarWidth(300);
-        expect(screen.getByTestId('view-icons')).toBeInTheDocument();
-        expect(screen.getByTestId('summary-open-filters')).toBeInTheDocument();
-    });
-
-    describe('two-line variant', () => {
-        it('marks the bar as two-line, wraps chips, and prefixes text chips with icons', () => {
-            render(<SummaryBar {...baseProps({ activeTagIds: new Set([10]), onEditDance: vi.fn(), twoLine: true })} />);
-            const bar = screen.getByTestId('summary-bar');
-            expect(bar).toHaveAttribute('data-variant', 'two-line');
-            expect(bar.querySelector('.flex-wrap')).not.toBeNull();
-            // period / area / dance now lead with an icon.
-            expect(screen.getByTestId('summary-chip-period').querySelector('svg')).not.toBeNull();
-            expect(screen.getByTestId('summary-chip-area').querySelector('svg')).not.toBeNull();
-            expect(screen.getByTestId('summary-chip-dance').querySelector('svg')).not.toBeNull();
-        });
-
-        it('folds chips that would spill past two lines into the "+X ⚙" gear', () => {
-            mockPillWidth(80);
-            render(
-                <SummaryBar
-                    {...baseProps({
-                        activeTagIds: new Set([10, 20]),
-                        onEditPeople: vi.fn(),
-                        interestSource: 'follows',
-                        onOpenFilters: vi.fn(),
-                        twoLine: true,
-                    })}
-                />,
-            );
-            // Wide: all five primaries fit within two lines; gear has no overflow.
-            setBarWidth(1000);
-            expect(screen.getByTestId('summary-chip-people')).toBeInTheDocument();
-            expect(screen.getByTestId('summary-open-filters')).not.toHaveTextContent('+');
-
-            // Narrow: only Date + Area + Dance fit in two rows; Reach + People fold → +2.
-            setBarWidth(200);
-            expect(screen.getByTestId('summary-chip-period')).toBeInTheDocument();
-            expect(screen.getByTestId('summary-chip-area')).toBeInTheDocument();
-            expect(screen.getByTestId('summary-chip-dance')).toBeInTheDocument();
-            expect(screen.queryByTestId('summary-chip-reach')).toBeNull();
-            expect(screen.queryByTestId('summary-chip-people')).toBeNull();
-            expect(screen.getByTestId('summary-open-filters')).toHaveTextContent('+2');
-        });
     });
 });

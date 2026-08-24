@@ -136,7 +136,7 @@ function AppShell() {
             <div className="flex items-center gap-1 sm:gap-2">
               {/* Desktop: inline event search, mirroring the people search box */}
               <ExplorerEventSearch
-                className="hidden sm:block w-64"
+                className="hidden lg:block w-64"
                 pastToggle
                 headerInline
                 onSelectEvent={(eventId) => navigate(`/event/${eventId}`)}
@@ -144,7 +144,7 @@ function AppShell() {
               />
               {/* Mobile: compact icon trigger opening a panel */}
               <ExplorerEventSearch
-                className="sm:hidden"
+                className="lg:hidden"
                 compact
                 pastToggle
                 onSelectEvent={(eventId) => navigate(`/event/${eventId}`)}

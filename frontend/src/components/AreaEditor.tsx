@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { GeocodeSuggestion, PreferredAreaPayload } from '../api';
+import type { GeocodeSuggestion, InterestProfile, PreferredAreaPayload } from '../api';
 import { searchSuggestionAddress } from '../api';
 import { AREA_PRESETS, clampArea, DEFAULT_AREA_BBOX, type AreaBbox } from '../constants/area';
 import AreaMapPicker from './AreaMapPicker';
+import PresetSection from './PresetSection';
+import PresetCard from './PresetCard';
+import RegionPill from './RegionPill';
+import ScrollDotsIndicator from './ScrollDots';
+import { useScrollDots } from '../hooks/useScrollDots';
 
 // AreaEditor — the search-area sub-editor body used inside the FilterSheet's
 // "Area" section. Applies live: picking a preset, searching a place, or
@@ -22,9 +27,6 @@ const CHIP_LABELS: Record<string, string> = {
     'South America': 'S. America',
 };
 
-// Continents surfaced before the "More" toggle expands the rest.
-const PRIMARY_PRESET_COUNT = 3;
-
 export interface AreaEditorProps {
     /** Current effective area, or ``null`` when browsing worldwide. */
     value: PreferredAreaPayload | null;
@@ -32,6 +34,8 @@ export interface AreaEditorProps {
     myArea: PreferredAreaPayload;
     /** Display name for the saved-area chip (defaults to "My area"). */
     myAreaLabel?: string;
+    /** Saved profile areas offered as area-only shortcuts. */
+    profileAreas?: InterestProfile[] | null;
     /** Apply the chosen area for this session (``null`` = worldwide). */
     onApply: (area: PreferredAreaPayload | null) => void;
     /** Persist the chosen area to the user's profile (explicit opt-in). */
@@ -40,11 +44,10 @@ export interface AreaEditorProps {
     eventCount?: number;
 }
 
-export default function AreaEditor({ value, myArea, myAreaLabel, onApply, onSetDefault, eventCount }: AreaEditorProps) {
+export default function AreaEditor({ value, myArea, myAreaLabel, profileAreas, onApply, onSetDefault, eventCount }: AreaEditorProps) {
     const myAreaText = myAreaLabel ?? 'My area';
     const anywhere = value == null;
     const [savingDefault, setSavingDefault] = useState(false);
-    const [moreOpen, setMoreOpen] = useState(false);
     const [query, setQuery] = useState('');
     const [suggestions, setSuggestions] = useState<GeocodeSuggestion[]>([]);
     const [searchOpen, setSearchOpen] = useState(false);
@@ -52,6 +55,8 @@ export default function AreaEditor({ value, myArea, myAreaLabel, onApply, onSetD
     const [centerOverride, setCenterOverride] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
     const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
     const searchBoxRef = useRef<HTMLDivElement>(null);
+    const pendingSearchLabelRef = useRef<string | null>(null);
+    const regionsScrollerRef = useRef<HTMLDivElement>(null);
 
     const isMyArea = !anywhere
         && value!.min_lat === myArea.min_lat
@@ -59,27 +64,40 @@ export default function AreaEditor({ value, myArea, myAreaLabel, onApply, onSetD
         && value!.max_lat === myArea.max_lat
         && value!.max_lng === myArea.max_lng;
 
-    // Continent quick-picks (Worldwide is surfaced as the "Anywhere" chip).
+    // Continents (exclude "Worldwide", always show all for REGIONS section).
     const continents = AREA_PRESETS.filter((preset) => preset.label !== 'Worldwide');
-    const primaryContinents = continents.slice(0, PRIMARY_PRESET_COUNT);
-    const extraContinents = continents.slice(PRIMARY_PRESET_COUNT);
+    const { dotCount, activeIndex, scrollToIndex } = useScrollDots(regionsScrollerRef, [continents.length]);
     const matchesPreset = (preset: AreaBbox): boolean => !anywhere
         && value!.min_lat === preset.min_lat
         && value!.min_lng === preset.min_lng
         && value!.max_lat === preset.max_lat
         && value!.max_lng === preset.max_lng;
+    const matchesProfileArea = (profile: InterestProfile): boolean => !anywhere
+        && value!.label === profile.area_label
+        && value!.min_lat === profile.min_lat
+        && value!.min_lng === profile.min_lng
+        && value!.max_lat === profile.max_lat
+        && value!.max_lng === profile.max_lng;
+    const myAreaMatchesProfile = !!profileAreas?.some((profile) =>
+        profile.min_lat === myArea.min_lat
+        && profile.min_lng === myArea.min_lng
+        && profile.max_lat === myArea.max_lat
+        && profile.max_lng === myArea.max_lng
+    );
+    const applyProfileArea = (profile: InterestProfile) => onApply({
+        label: profile.area_label,
+        min_lat: profile.min_lat,
+        min_lng: profile.min_lng,
+        max_lat: profile.max_lat,
+        max_lng: profile.max_lng,
+    });
 
     const matchedPreset = anywhere ? null : continents.find(matchesPreset) ?? null;
     const currentLabel = anywhere
         ? 'Anywhere'
         : isMyArea
             ? myAreaText
-            : (matchedPreset?.label ?? 'Custom area');
-
-    const chipClass = (active: boolean): string =>
-        `rounded-full border px-3 py-1.5 text-xs font-medium transition ${active
-            ? 'border-action bg-action/5 text-action'
-            : 'border-line bg-surface text-ink hover:bg-canvas'}`;
+            : (matchedPreset?.label ?? value!.label ?? 'Custom area');
 
     const runSearch = useCallback(async (q: string) => {
         if (q.trim().length < 3) {
@@ -109,6 +127,7 @@ export default function AreaEditor({ value, myArea, myAreaLabel, onApply, onSetD
 
     const handlePickSuggestion = (s: GeocodeSuggestion) => {
         setQuery(s.display_name);
+        pendingSearchLabelRef.current = s.display_name.slice(0, 120);
         setSuggestions([]);
         setSearchOpen(false);
         // Recenter the map on the place; the picker's live-apply commits the
@@ -202,66 +221,69 @@ export default function AreaEditor({ value, myArea, myAreaLabel, onApply, onSetD
                 )}
             </div>
 
-            {/* Preset chips. */}
-            <div className="flex flex-wrap items-center gap-2">
-                <button
-                    type="button"
-                    onClick={() => onApply(myArea)}
-                    className={chipClass(isMyArea)}
-                    data-testid="area-editor-my-area"
-                >
-                    {myAreaText}
-                </button>
-                {primaryContinents.map((preset) => (
-                    <button
-                        key={preset.label}
-                        type="button"
-                        onClick={() => onApply(preset)}
-                        className={chipClass(matchesPreset(preset))}
-                        data-testid={`area-editor-preset-${preset.label.toLowerCase().replace(/\s+/g, '-')}`}
-                    >
-                        {CHIP_LABELS[preset.label] ?? preset.label}
-                    </button>
-                ))}
-                {moreOpen && extraContinents.map((preset) => (
-                    <button
-                        key={preset.label}
-                        type="button"
-                        onClick={() => onApply(preset)}
-                        className={chipClass(matchesPreset(preset))}
-                        data-testid={`area-editor-preset-${preset.label.toLowerCase().replace(/\s+/g, '-')}`}
-                    >
-                        {CHIP_LABELS[preset.label] ?? preset.label}
-                    </button>
-                ))}
-                {moreOpen && (
-                    <button
-                        type="button"
-                        onClick={() => onApply(null)}
-                        className={chipClass(anywhere)}
-                        data-testid="area-editor-anywhere"
-                    >
-                        Anywhere
-                    </button>
+            {/* Preset sections: YOUR AREAS and REGIONS. */}
+            {/* YOUR AREAS: profiles + my area as cards. */}
+            <PresetSection title="Your Areas">
+                {/* My area card (if not duplicate profile). */}
+                {!myAreaMatchesProfile && (
+                    <PresetCard
+                        label={myAreaText}
+                        subLabel="Default area"
+                        isActive={isMyArea}
+                        onClick={() => onApply(myArea)}
+                        testId="area-editor-my-area"
+                    />
                 )}
-                <button
-                    type="button"
-                    onClick={() => setMoreOpen((v) => !v)}
-                    className={`inline-flex items-center gap-1 ${chipClass(false)}`}
-                    aria-expanded={moreOpen}
-                    data-testid="area-editor-more"
-                >
-                    More
-                    <svg viewBox="0 0 20 20" fill="currentColor" className={`h-3.5 w-3.5 transition-transform ${moreOpen ? 'rotate-180' : ''}`} aria-hidden="true">
-                        <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clipRule="evenodd" />
-                    </svg>
-                </button>
+                {/* Profile area cards. */}
+                {profileAreas?.map((profile) => (
+                    <PresetCard
+                        key={profile.id}
+                        label={profile.area_label}
+                        subLabel={`From your '${profile.label}' profile`}
+                        isActive={matchesProfileArea(profile)}
+                        onClick={() => applyProfileArea(profile)}
+                        testId={`area-editor-profile-area-${profile.id}`}
+                    />
+                ))}
+            </PresetSection>
+
+            {/* REGIONS: continents + anywhere as pills with horizontal scroll. */}
+            <div className="flex flex-col gap-3">
+                <h3 className="text-[11px] font-bold uppercase tracking-wide text-ink-soft">Regions</h3>
+                <div ref={regionsScrollerRef} className="flex gap-2 overflow-x-auto scrollbar-hide px-2 py-2" aria-label="Regions carousel">
+                    {continents.map((preset) => (
+                        <RegionPill
+                            key={preset.label}
+                            label={CHIP_LABELS[preset.label] ?? preset.label}
+                            isActive={matchesPreset(preset)}
+                            onClick={() => onApply(preset)}
+                            testId={`area-editor-preset-${preset.label.toLowerCase().replace(/\s+/g, '-')}`}
+                        />
+                    ))}
+                    {/* Anywhere option (Worldwide area). */}
+                    <RegionPill
+                        label="Anywhere"
+                        isActive={anywhere}
+                        onClick={() => onApply(null)}
+                        testId="area-editor-anywhere"
+                    />
+                </div>
+                <ScrollDotsIndicator
+                    count={dotCount}
+                    activeIndex={activeIndex}
+                    onSelect={scrollToIndex}
+                    label="Regions carousel pages"
+                />
             </div>
 
             {/* Map picker (drag/zoom to a custom area). */}
             <AreaMapPicker
                 value={anywhere ? WORLDWIDE_AREA : value!}
-                onChange={(area) => onApply(area)}
+                onChange={(area) => {
+                    const searchLabel = pendingSearchLabelRef.current;
+                    pendingSearchLabelRef.current = null;
+                    onApply(searchLabel ? { ...area, label: searchLabel } : area);
+                }}
                 mapHeightClass="h-72"
                 showPresets={false}
                 autoCommit

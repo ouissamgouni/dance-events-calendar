@@ -168,7 +168,7 @@ export default function AttendeeAvatarStack({ eventId, max = 3, friendsPreview, 
         return null;
     }
 
-    const totalKnown = (summary?.total_going ?? 0) + (friends.length > (summary?.preview_attendees.length ?? 0) ? friends.length : 0);
+    const totalKnown = summary?.total_going ?? 0;
     const overflow = Math.max(0, totalKnown - shown.length);
     const hasFriend = friends.length > 0;
     const namesTitle = `${shown.map((p) => p.display_name ?? 'Attendee').join(', ')}${overflow > 0 ? ` and ${overflow} more` : ''}`;

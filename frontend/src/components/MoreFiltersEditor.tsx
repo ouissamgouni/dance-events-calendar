@@ -9,6 +9,8 @@ interface MoreFiltersEditorProps {
     selCount: (group: TagGroup) => number;
     /** Short summary of the current selection for a group. */
     summary: (group: TagGroup) => string;
+    /** Map of group slugs to icon ReactNodes. */
+    groupIcons?: Record<string, React.ReactNode>;
 }
 
 /**
@@ -17,7 +19,7 @@ interface MoreFiltersEditorProps {
  * surface (with a back affordance). Layout only — selection logic lives in the
  * pill picker passed via {@link MoreFiltersEditorProps.renderGroup}.
  */
-export default function MoreFiltersEditor({ groups, renderGroup, selCount, summary }: MoreFiltersEditorProps) {
+export default function MoreFiltersEditor({ groups, renderGroup, selCount, summary, groupIcons }: MoreFiltersEditorProps) {
     const [activeId, setActiveId] = useState<number | null>(null);
     const active = groups.find((g) => g.id === activeId) ?? null;
 
@@ -51,6 +53,9 @@ export default function MoreFiltersEditor({ groups, renderGroup, selCount, summa
                             className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-canvas"
                             data-testid={`more-filters-row-${g.id}`}
                         >
+                            {groupIcons?.[g.slug] && (
+                                <span className="shrink-0 text-ink-soft">{groupIcons[g.slug]}</span>
+                            )}
                             <span className="text-[15px] font-medium text-ink">{g.label}</span>
                             <span className={`ml-auto truncate text-xs ${n > 0 ? 'text-ink-soft' : 'text-muted'}`}>
                                 {value}

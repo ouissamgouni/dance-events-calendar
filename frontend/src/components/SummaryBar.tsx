@@ -59,15 +59,6 @@ export interface SummaryBarProps {
     // nothing extra is active) so the full filter sheet is always reachable.
     onOpenFilters?: () => void;
 
-    // View controls (Map/Calendar icons) rendered on the right after a subtle
-    // divider. Their width is reserved BEFORE fitting pills, so they never
-    // disappear as more filters become active. Used by sticky Explore.
-    rightSlot?: React.ReactNode;
-
-    // Experiment variant: render chips over up to two wrapping lines, always
-    // icon-prefixed, with rightSlot pinned to the right. Overflow past two
-    // lines folds into the "+X ⚙" gear (never exceeds two lines).
-    twoLine?: boolean;
 }
 
 function formatPeriodLabel(startDate: string, endDate: string): string {
@@ -171,52 +162,28 @@ const peopleIcon = (
         <path d="M13 6.2a2.2 2.2 0 0 1 0 4.2M14 12.4c2 .4 3.5 1.8 3.5 3.6" />
     </svg>
 );
-// Reach line icons — Local (pin) / Regional (concentric) / International (globe).
-const reachLocalIcon = (
-    <svg aria-hidden="true" viewBox="0 0 20 20" className={ICON_CLS} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M10 18s6-5.3 6-10a6 6 0 1 0-12 0c0 4.7 6 10 6 10z" />
-        <circle cx="10" cy="8" r="2" />
-    </svg>
-);
-const reachRegionalIcon = (
-    <svg aria-hidden="true" viewBox="0 0 20 20" className={ICON_CLS} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="10" cy="10" r="7" />
-        <circle cx="10" cy="10" r="3.4" />
-        <circle cx="10" cy="10" r="0.6" fill="currentColor" stroke="none" />
-    </svg>
-);
-const reachInternationalIcon = (
-    <svg aria-hidden="true" viewBox="0 0 20 20" className={ICON_CLS} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="10" cy="10" r="7.2" />
-        <path d="M2.8 10h14.4M10 2.8c2 2 3 4.6 3 7.2s-1 5.2-3 7.2c-2-2-3-4.6-3-7.2s1-5.2 3-7.2z" />
-    </svg>
-);
 
-// Icons used only by the two-line variant, where every chip is prefixed.
-const periodIcon = (
-    <svg aria-hidden="true" viewBox="0 0 20 20" className={ICON_CLS} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="4" width="14" height="13" rx="2" />
-        <path d="M3 8h14M7 2.5v3M13 2.5v3" />
-    </svg>
-);
-const areaIcon = (
-    <svg aria-hidden="true" viewBox="0 0 20 20" className={ICON_CLS} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M10 18s6-5.3 6-10a6 6 0 1 0-12 0c0 4.7 6 10 6 10z" />
-        <circle cx="10" cy="8" r="2" />
-    </svg>
-);
-const danceIcon = (
-    <svg aria-hidden="true" viewBox="0 0 20 20" className={ICON_CLS} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M7 15.5V5.5l8-2v9" />
-        <circle cx="5" cy="15.5" r="2" />
-        <circle cx="13" cy="12.5" r="2" />
-    </svg>
-);
+// Get the PNG image path for a reach tag based on its label.
+function reachIconSrcFor(tagLabel: string): string {
+    const l = tagLabel.toLowerCase();
+    if (l.includes('local')) return '/local-reach.png';
+    if (l.includes('regional')) return '/regional-reach.png';
+    return '/international-reach.png';
+}
 
 function reachIconFor(group: TagGroup, activeTagIds: Set<number>): React.ReactNode {
     // Pick the narrowest (most specific) selected tag: Local < Regional < International.
     const selected = group.tags.filter((t) => activeTagIds.has(t.id));
-    if (selected.length === 0) return reachInternationalIcon;
+    if (selected.length === 0) {
+        return (
+            <img
+                src="/international-reach.png"
+                alt="International reach"
+                className={ICON_CLS}
+                aria-hidden="true"
+            />
+        );
+    }
     const rank = (label: string) => {
         const l = label.toLowerCase();
         if (l.includes('local')) return 1;
@@ -225,10 +192,16 @@ function reachIconFor(group: TagGroup, activeTagIds: Set<number>): React.ReactNo
         return 4;
     };
     const top = selected.reduce((best, t) => (rank(t.label) < rank(best.label) ? t : best), selected[0]);
-    const l = top.label.toLowerCase();
-    if (l.includes('local')) return reachLocalIcon;
-    if (l.includes('regional')) return reachRegionalIcon;
-    return reachInternationalIcon;
+    const src = reachIconSrcFor(top.label);
+    const altText = `${top.label} reach`;
+    return (
+        <img
+            src={src}
+            alt={altText}
+            className={ICON_CLS}
+            aria-hidden="true"
+        />
+    );
 }
 
 type CandidateKey = 'period' | 'area' | 'dance' | 'reach' | 'people';
@@ -254,8 +227,6 @@ export default function SummaryBar(props: SummaryBarProps) {
         interestUserHandles,
         onEditPeople,
         onOpenFilters,
-        rightSlot,
-        twoLine = false,
     } = props;
 
     const danceSel = useMemo(() => {
@@ -318,7 +289,6 @@ export default function SummaryBar(props: SummaryBarProps) {
 
     // ---- Measurement-based collapse -----------------------------------
     const containerRef = useRef<HTMLDivElement>(null);
-    const rightRef = useRef<HTMLDivElement>(null);
     const ghostRowRef = useRef<HTMLDivElement>(null);
     const [containerWidth, setContainerWidth] = useState(0);
     const [visibleCount, setVisibleCount] = useState(candidates.length);
@@ -342,45 +312,22 @@ export default function SummaryBar(props: SummaryBarProps) {
         const ghostChildren = ghostRowRef.current ? Array.from(ghostRowRef.current.children) : [];
         const widths = candidates.map((_, i) => (ghostChildren[i] as HTMLElement | undefined)?.offsetWidth ?? 0);
         const gearW = (ghostChildren[candidates.length] as HTMLElement | undefined)?.offsetWidth ?? 0;
-        const rightW = rightRef.current?.offsetWidth ?? 0;
         // No usable measurement yet (e.g. jsdom / first paint): show everything.
         if (containerWidth <= 0 || gearW <= 0 || widths.some((w) => w <= 0)) {
             setVisibleCount(candidates.length);
             return;
         }
-        let count: number;
-        if (twoLine) {
-            // Wrap chips over up to two rows; the gear (worst-case width) must
-            // fit after the last visible chip. Drop chips from the right until
-            // the whole sequence packs into two rows.
-            const rowWidth = containerWidth - (rightW > 0 ? rightW + GAP : 0);
-            const rowsNeeded = (items: number[]): number => {
-                let rows = 1;
-                let used = 0;
-                for (const w of items) {
-                    if (used === 0) used = w;
-                    else if (used + GAP + w <= rowWidth) used += GAP + w;
-                    else { rows += 1; used = w; }
-                }
-                return rows;
-            };
-            count = candidates.length;
-            while (count > 0 && rowsNeeded([...widths.slice(0, count), gearW]) > 2) {
-                count -= 1;
-            }
-        } else {
-            // Reserve the always-present gear pill + the right view controls first.
-            let avail = containerWidth - gearW - GAP - (rightW > 0 ? rightW + GAP : 0);
-            count = 0;
-            for (let i = 0; i < widths.length; i += 1) {
-                const next = widths[i] + GAP;
-                if (avail - next < 0) break;
-                avail -= next;
-                count += 1;
-            }
+        // Reserve the always-present Filters pill before fitting candidates.
+        let avail = containerWidth - gearW - GAP;
+        let count = 0;
+        for (let i = 0; i < widths.length; i += 1) {
+            const next = widths[i] + GAP;
+            if (avail - next < 0) break;
+            avail -= next;
+            count += 1;
         }
         setVisibleCount(count);
-    }, [candidates, containerWidth, foldedRemainingCount, danceSel.label, areaLabel, startDate, endDate, peopleLabel, reachSelCount, rightSlot, twoLine]);
+    }, [candidates, containerWidth, foldedRemainingCount, danceSel.label, areaLabel, startDate, endDate, peopleLabel, reachSelCount]);
 
     const hiddenActivePrimaries = Math.max(0, candidates.length - visibleCount);
     const extraCount = foldedRemainingCount + hiddenActivePrimaries;
@@ -393,7 +340,6 @@ export default function SummaryBar(props: SummaryBarProps) {
                 return (
                     <Pill
                         key="period"
-                        icon={twoLine ? periodIcon : undefined}
                         label={formatPeriodLabel(startDate, endDate)}
                         onClick={onEditPeriod}
                         testId={tid('summary-chip-period')}
@@ -403,7 +349,7 @@ export default function SummaryBar(props: SummaryBarProps) {
                 return (
                     <Pill
                         key="area"
-                        icon={twoLine ? areaIcon : undefined}
+                        icon={<img src="/pin.png" alt="" aria-hidden="true" className={ICON_CLS} />}
                         label={areaLabel}
                         className="max-w-[88px] sm:max-w-none"
                         onClick={onEditArea}
@@ -416,7 +362,6 @@ export default function SummaryBar(props: SummaryBarProps) {
                 return (
                     <Pill
                         key="dance"
-                        icon={twoLine ? danceIcon : undefined}
                         label={danceSel.label}
                         title={`Dance styles: ${danceSel.label}`}
                         onClick={onEditDance}
@@ -476,21 +421,15 @@ export default function SummaryBar(props: SummaryBarProps) {
             ref={containerRef}
             className={`summary-bar relative w-full bg-surface border-y border-line px-2 py-2 overflow-hidden ${onOpenFilters ? 'cursor-pointer' : ''} ${className}`}
             data-testid="summary-bar"
-            data-variant={twoLine ? 'two-line' : 'single'}
+            data-variant="single"
             aria-label="Active filters"
             onClick={handleBarClick}
         >
             <div className="flex items-center gap-1.5 min-w-0">
-                <div className={`flex ${twoLine ? 'flex-wrap' : ''} items-center gap-1.5 min-w-0 flex-1`}>
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
                     {visibleKeys.map((k) => buildPill(k))}
                     {buildGear(extraCount)}
                 </div>
-                {rightSlot && (
-                    <div ref={rightRef} className="flex items-center gap-1 shrink-0">
-                        <span aria-hidden="true" className="mx-1 h-5 w-px bg-line" />
-                        {rightSlot}
-                    </div>
-                )}
             </div>
 
             {/* Hidden measurement layer: full-width copies of every candidate

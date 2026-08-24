@@ -4,7 +4,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, Response
 from slowapi import Limiter
-from sqlalchemy import func
+from sqlalchemy import case, exists, func, or_
 from sqlmodel import Session, col, select
 
 from backend.api.deps import (
@@ -19,6 +19,7 @@ from backend.api.schemas import (
     EventBatchRequest,
     EventOrganizerMini,
     EventResponse,
+    EventSearchResponse,
 )
 from backend.api.routes.tags import get_event_tags
 from backend.db.database import get_session
@@ -862,7 +863,7 @@ def get_events(
     return response
 
 
-@router.get("/search", response_model=list[dict])
+@router.get("/search", response_model=list[EventSearchResponse])
 @limiter.limit("60/minute")
 def search_events(
     request: Request,
@@ -873,31 +874,71 @@ def search_events(
     session: Session = Depends(get_session),
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
-    """Lightweight public title typeahead for events.
+    """Lightweight public event typeahead.
 
-    Returns up to ``limit`` (non-deleted, non-hidden) events matching ``q``
-    against ``title`` (case-insensitive substring). By default only
+    Returns up to ``limit`` (non-deleted, non-hidden) events matching every
+    query token against the title, city, country, or an enabled tag. By default only
     *upcoming* events are returned (the public explorer + organizer
     event-claim picker); pass ``include_past=true`` to also match events
     that have already started (used by the admin review-prompt force-send,
-    which targets events that have ended). Payload is intentionally minimal:
-    ``{event_id, title, start, location}``.
+    which targets events that have ended). Payload is intentionally minimal
+    and includes match context for the finder.
 
     When ``exclude_attended`` is set for an authenticated caller (the passport
     "add a past event" picker), events the user has already logged as attended
     are filtered out *before* the limit is applied, so a non-attended match is
     never hidden behind the caller's already-attended events.
     """
-    needle = q.strip()
+    needle = " ".join(q.split())
     if not needle:
         return []
-    like = f"%{needle}%"
+    tokens = needle.split()
+
+    def tag_matches(pattern: str):
+        return exists(
+            select(EventTag.event_id)
+            .join(Tag, EventTag.tag_id == Tag.id)
+            .join(TagGroup, Tag.group_id == TagGroup.id)
+            .where(EventTag.event_id == CachedEvent.event_id)
+            .where(Tag.enabled.is_(True))  # type: ignore[union-attr]
+            .where(TagGroup.enabled.is_(True))  # type: ignore[union-attr]
+            .where(col(Tag.label).ilike(pattern))
+        )
+
+    token_predicates = []
+    for token in tokens:
+        pattern = f"%{token}%"
+        token_predicates.append(
+            or_(
+                col(CachedEvent.title).ilike(pattern),
+                col(CachedEvent.city).ilike(pattern),
+                col(CachedEvent.country).ilike(pattern),
+                tag_matches(pattern),
+            )
+        )
+
+    whole_pattern = f"%{needle}%"
+    title_exact_rank = case(
+        (func.lower(col(CachedEvent.title)) == needle.lower(), 0), else_=1
+    )
+    title_prefix_rank = case((col(CachedEvent.title).ilike(f"{needle}%"), 0), else_=1)
+    title_match_rank = case((col(CachedEvent.title).ilike(whole_pattern), 0), else_=1)
+    place_match_rank = case(
+        (
+            or_(
+                col(CachedEvent.city).ilike(whole_pattern),
+                col(CachedEvent.country).ilike(whole_pattern),
+            ),
+            0,
+        ),
+        else_=1,
+    )
     now = datetime.now(UTC).replace(tzinfo=None)
     stmt = (
         select(CachedEvent)
         .where(CachedEvent.deleted_at.is_(None))  # type: ignore[union-attr]
         .where(CachedEvent.is_hidden.is_(False))  # type: ignore[union-attr]
-        .where(col(CachedEvent.title).ilike(like))
+        .where(*token_predicates)
     )
     if exclude_attended and current_user is not None:
         attended_ids = session.exec(
@@ -910,20 +951,63 @@ def search_events(
     if include_past:
         # Most-recent-first so recently-ended events (the review-prompt
         # targets) surface at the top of the typeahead.
-        stmt = stmt.order_by(col(CachedEvent.start).desc())
+        stmt = stmt.order_by(
+            title_exact_rank,
+            title_prefix_rank,
+            title_match_rank,
+            place_match_rank,
+            col(CachedEvent.start).desc(),
+            col(CachedEvent.event_id),
+        )
     else:
         stmt = stmt.where(CachedEvent.start >= now).order_by(
-            col(CachedEvent.start).asc()
+            title_exact_rank,
+            title_prefix_rank,
+            title_match_rank,
+            place_match_rank,
+            col(CachedEvent.start).asc(),
+            col(CachedEvent.event_id),
         )
     rows = session.exec(stmt.limit(limit)).all()
+
+    tags_by_event = get_event_tags(session, [event.event_id for event in rows])
+    lowered_tokens = [token.casefold() for token in tokens]
+
+    def text_matches(value: Optional[str]) -> bool:
+        lowered = (value or "").casefold()
+        return any(token in lowered for token in lowered_tokens)
+
     return [
-        {
-            "event_id": e.event_id,
-            "title": e.title,
-            "start": e.start.isoformat() if e.start else None,
-            "location": e.location,
-        }
-        for e in rows
+        EventSearchResponse(
+            event_id=event.event_id,
+            title=event.title,
+            start=event.start,
+            location=event.location,
+            city=event.city,
+            country=event.country,
+            matched_fields=[
+                field
+                for field, matched in (
+                    ("title", text_matches(event.title)),
+                    ("city", text_matches(event.city)),
+                    ("country", text_matches(event.country)),
+                    (
+                        "tag",
+                        any(
+                            text_matches(tag.label)
+                            for tag in tags_by_event.get(event.event_id, [])
+                        ),
+                    ),
+                )
+                if matched
+            ],
+            matched_tags=[
+                tag.label
+                for tag in tags_by_event.get(event.event_id, [])
+                if text_matches(tag.label)
+            ],
+        )
+        for event in rows
     ]
 
 

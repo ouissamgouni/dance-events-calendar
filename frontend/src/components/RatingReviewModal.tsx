@@ -180,7 +180,7 @@ export default function RatingReviewModal({ rating, onClose, onUpdated }: Props)
                                 {rating.aspect_tags.map((t) => (
                                     <span
                                         key={`a-${t.id}`}
-                                        className={`px-1.5 py-0.5 text-[10px] border ${t.polarity === 'negative' ? 'bg-slate-100 text-ink-soft border-line' : 'bg-sky-50 text-sky-700 border-sky-200'}`}
+                                        className={`px-1.5 py-0.5 text-[10px] border ${t.polarity === 'positive' ? 'bg-sky-50 text-sky-700 border-sky-200' : t.polarity === 'negative' ? 'bg-orange-50 text-orange-800 border-orange-200' : 'bg-slate-100 text-ink-soft border-line'}`}
                                     >
                                         {t.label}
                                     </span>

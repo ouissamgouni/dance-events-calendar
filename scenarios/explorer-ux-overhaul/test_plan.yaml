@@ -143,22 +143,21 @@ test_plan:
           SummaryBar, the cards return, and the panel disappears.
 
     - id: 4
-      title: "SummaryBar chips are interactive + truthful"
+      title: "One-line SummaryBar chips are interactive + truthful"
       description: >
         Apply two tag filters (e.g. "dance-style:salsa" +
         "format:social") and one interest filter (Following @alice).
       expected: >
-        • Two tag chips render in the SummaryBar with × removers
-          (data-testid="summary-chip-tag-{id}"); clicking × removes
-          only that tag (URL `tag_ids` updates, others stay).
-        • An interest chip renders
-          (data-testid="summary-chip-interest") with × clearing the
-          `interest_source`/`interest_kind`/handle URL params.
-        • A "Clear all" link appears
-          (data-testid="summary-clear-all") and removes ALL
-          removable filters (tags + interest + area override +
-          non-default date range) in one click; the count returns
-          to the full default result set.
+        • The bar remains exactly one line and never wraps or scrolls
+          horizontally. Visible chips follow Date → Area → Dance →
+          Reach → People priority.
+        • Each visible chip opens its matching FilterSheet section.
+          The final filter chip opens the main Filters sheet.
+        • Narrow the viewport until chips no longer fit. Lower-priority
+          active filters disappear and the final chip reads `+X`, where X
+          counts hidden primary filter groups plus active secondary groups.
+        • Widen the viewport until nothing is hidden or folded. The final
+          chip shows only the regular filter icon, without a `+0` label.
         • Whenever the list is capped, the EventListPanel header reads
           "Displayed 10 / N" (or the current rendered count), and when
           filters narrow the set the denominator narrows too.
@@ -173,12 +172,12 @@ test_plan:
         • A "Filters" trigger button is visible above the list
           (square, secondary style) showing the active filter
           content compact enough to sit above the map/list.
-        • The SummaryBar also shows an area chip
-          (data-testid="summary-chip-area") and, on mobile, a Map
-          view toggle icon (data-testid="summary-map-toggle") that
-          opens the fullscreen map. As the bar narrows, tag chips
-          collapse into a "+N" chip and then an "N filters" chip
-          (data-mode="full"/"collapsed"/"minimal").
+        • The sticky SummaryBar remains one line. Its area chip uses
+          data-testid="summary-chip-area" and overflow folds into the
+          final `+X` filter chip.
+        • A fixed bottom-right icon capsule
+          (data-testid="view-switcher") sits above the BottomNav and
+          safe-area inset. In List it contains only Map + Calendar.
         • Tapping it opens a bottom-sheet
           (data-testid="filter-sheet") with header "Filters" and a
           close × (aria-label="Close filters").
@@ -197,27 +196,24 @@ test_plan:
           Body scroll is locked while open.
 
     - id: "5b"
-      title: "Mobile map miniature → fullscreen map → View list"
+      title: "Contextual view capsule → fullscreen map → List"
       description: >
-        Still at 390×844, look below the filter chips, then tap the map
-        miniature (or the SummaryBar Map toggle). Tap a marker, tap
-        another marker, pan the map, then tap the back arrow.
+        Still at 390×844, tap Map in the bottom-right view capsule. Tap
+        a marker, tap another marker, pan the map, then tap List in the
+        same capsule.
       expected: >
-        • A ~120px map miniature sits below the filter chips, above the
-          list; the list is the default view (no List/Map tabs).
-        • Tapping it opens a fullscreen map with a "← [Filters] [area]"
-          sticky header (data-testid="map-fullscreen-header") and a
-          bottom "View list · N" CTA (data-testid="map-view-list"); no
-          preview/toast shows initially.
+        • Map opens fullscreen with the one-line filter header
+          (data-testid="map-fullscreen-header"). The old back arrow and
+          labeled "View list" CTA are absent.
+        • The capsule now contains only List + Calendar, with the same
+          fixed 40×40 icon button dimensions used in every view.
         • Tapping a marker shows a compact bottom preview (name, date,
           location, tags, people going, Save, Details); tapping another
           pin replaces it; tapping/panning the map dismisses it.
         • Panning surfaces the "Search this area" pill; committing it
-          refreshes pins + count and the bottom CTA returns to
-          "View list · N".
-        • The back arrow (data-testid="map-fullscreen-back") and the
-          View list CTA return to the previous Explorer list state with
-          filters, area, sorting, and scroll preserved.
+          refreshes pins + count without moving the view capsule.
+        • The List icon returns to Explorer list state with filters,
+          area, sorting, and the shared date range preserved.
         • Tapping the area chip/label opens the area picker sheet
           (data-testid="area-sheet") with My area / Anywhere presets and
           a mini-map bbox selector; Apply is a session override, and
@@ -247,6 +243,26 @@ test_plan:
           chip. evt-ux-028 (New York Salsa Rooftop Social) appears
           when the map area is committed or the user switches to
           worldwide/show-all browsing.
+
+    - id: "6b"
+      title: "Calendar dates stay synchronized across views"
+      description: >
+        Open Calendar from List, navigate to the next period, edit Dates
+        from the period chip, then switch Calendar → Map → Calendar → Map → List.
+      expected: >
+        • Calendar's capsule contains only List + Map. The embedded map
+          and its existing calendar/map layout toggle remain available.
+        • Prev / next / today updates `start_date` and `end_date` to the
+          exact visible grid, including adjacent-month spillover dates.
+          The URL/filter range uses an inclusive end date.
+        • The period chip displays that exact range and opens the Dates
+          section in the main FilterSheet.
+        • Choosing a Dates range moves Calendar to the selected first date;
+          once rendered, the full visible grid becomes the active range.
+        • Calendar → Map opens `/?view=map`; Map → Calendar opens `/calendar`
+          with `view=map` removed; Map → List removes `view=map`.
+          Date, area, tag, and People filters remain active, and List/Map
+          results use the same timeframe last displayed by Calendar.
 
     - id: 7
       title: "Coachmark dismissal persists"

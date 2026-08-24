@@ -99,7 +99,8 @@ def test_create_interest_profile_area(client, tags):
     _login(client, email="alice@example.com")
 
     payload = {
-        "label": "My Area",
+        "label": "Local salsa",
+        "area_label": "Lisbon",
         "min_lat": 35.0,
         "min_lng": -10.0,
         "max_lat": 45.0,
@@ -111,7 +112,8 @@ def test_create_interest_profile_area(client, tags):
     resp = client.post("/api/interest-profiles", json=payload)
     assert resp.status_code == 201, resp.text
     data = resp.json()
-    assert data["label"] == "My Area"
+    assert data["label"] == "Local salsa"
+    assert data["area_label"] == "Lisbon"
     assert data["dance_tag_ids"] == [salsa.id]
     assert data["reach_tag_ids"] == [regional.id]
     assert data["matches_enabled"] is True
@@ -184,6 +186,7 @@ def test_patch_interest_profile_partial_update(client, tags):
     assert patch_resp.status_code == 200, patch_resp.text
     data = patch_resp.json()
     assert data["label"] == "Renamed"
+    assert data["area_label"] == "Original"
     assert data["dance_tag_ids"] == [salsa.id]
     assert data["reach_tag_ids"] == [regional.id]
     # Untouched geo fields preserved.
@@ -195,6 +198,24 @@ def test_patch_interest_profile_not_found(client):
     _login(client, email="alice@example.com")
     resp = client.patch("/api/interest-profiles/999999", json={"label": "X"})
     assert resp.status_code == 404
+
+
+@pytest.mark.unit
+def test_patch_area_label_does_not_rename_profile(client):
+    _login(client, email="alice@example.com")
+    created = client.post(
+        "/api/interest-profiles",
+        json=_minimal_area_payload(label="Weekend salsa", area_label="Lisbon"),
+    ).json()
+
+    resp = client.patch(
+        f"/api/interest-profiles/{created['id']}",
+        json={"area_label": "Greater Lisbon"},
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["label"] == "Weekend salsa"
+    assert resp.json()["area_label"] == "Greater Lisbon"
 
 
 # --- DELETE /api/interest-profiles/{id} -------------------------------------

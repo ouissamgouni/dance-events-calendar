@@ -1,7 +1,9 @@
 import type { EventRatingAggregate } from '../types';
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { SENTIMENTS } from '../utils/reviewSentiment';
+import { useScrollDots } from '../hooks/useScrollDots';
 import ExperienceMoodBox from './ExperienceMoodBox';
+import ScrollDotsIndicator from './ScrollDots';
 
 /** Map a 1–5 aspect average to the matching mood (Amazing→5 … Bad→1). */
 export const aspectMood = (avg: number) => SENTIMENTS[Math.min(4, Math.max(0, 5 - Math.round(avg)))];
@@ -22,6 +24,26 @@ interface Props {
     moodHeadline?: ReactNode;
 }
 
+function ReviewRail({ title, itemCount, children }: { title: string; itemCount: number; children: ReactNode }) {
+    const scrollerRef = useRef<HTMLDivElement>(null);
+    const { dotCount, activeIndex, scrollToIndex } = useScrollDots(scrollerRef, [itemCount]);
+
+    return (
+        <div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft mb-1.5">{title}</div>
+            <div ref={scrollerRef} className="flex gap-1.5 overflow-x-auto pb-1">
+                {children}
+            </div>
+            <ScrollDotsIndicator
+                count={dotCount}
+                activeIndex={activeIndex}
+                onSelect={scrollToIndex}
+                label={`${title} scroll position`}
+            />
+        </div>
+    );
+}
+
 /**
  * Public "Community Experience" breakdown. Leads with an overall-mood headline
  * (label + "X% rated it Great or Amazing" + review count), then the community
@@ -36,7 +58,10 @@ export default function ExperienceBreakdown({ aggregate, aspectLabels = {}, edit
     );
     const aspects = aggregate.aspects ?? [];
     const appreciated = aggregate.top_positive_tags ?? [];
-    const mentioned = aggregate.top_negative_tags ?? [];
+    const mentioned = [
+        ...(aggregate.top_neutral_tags ?? []).map((tag, index) => ({ tag, negative: false, index })),
+        ...(aggregate.top_negative_tags ?? []).map((tag, index) => ({ tag, negative: true, index })),
+    ].sort((a, b) => b.tag.count - a.tag.count || Number(a.negative) - Number(b.negative) || a.index - b.index);
     const recommendedFor = aggregate.top_audience_tags ?? [];
 
     if (
@@ -103,40 +128,34 @@ export default function ExperienceBreakdown({ aggregate, aspectLabels = {}, edit
             {(appreciated.length > 0 || mentioned.length > 0 || recommendedFor.length > 0) && (
                 <div className="space-y-3 border-t border-card-line pt-4">
                     {appreciated.length > 0 && (
-                        <div>
-                            <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft mb-1.5">People appreciated</div>
-                            <div className="flex gap-1.5 overflow-x-auto pb-1">
-                                {appreciated.map((t) => (
-                                    <span key={t.tag_id} className="shrink-0 whitespace-nowrap rounded-full bg-green-50 text-success px-2 py-0.5 text-[11px]">
-                                        {t.label} ({t.count})
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
+                        <ReviewRail title="People appreciated" itemCount={appreciated.length}>
+                            {appreciated.map((t) => (
+                                <span key={t.tag_id} className="shrink-0 whitespace-nowrap rounded-full bg-green-50 text-success px-2 py-0.5 text-[11px]">
+                                    {t.label} ({t.count})
+                                </span>
+                            ))}
+                        </ReviewRail>
                     )}
                     {mentioned.length > 0 && (
-                        <div>
-                            <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft mb-1.5">Good to know</div>
-                            <div className="flex gap-1.5 overflow-x-auto pb-1">
-                                {mentioned.map((t) => (
-                                    <span key={t.tag_id} className="shrink-0 whitespace-nowrap rounded-full bg-orange-50 text-orange-800 px-2 py-0.5 text-[11px]">
-                                        {t.label} ({t.count})
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
+                        <ReviewRail title="People mentioned" itemCount={mentioned.length}>
+                            {mentioned.map(({ tag, negative }) => (
+                                <span
+                                    key={tag.tag_id}
+                                    className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] ${negative ? 'bg-orange-50 text-orange-800' : 'bg-slate-100 text-ink-soft'}`}
+                                >
+                                    {tag.label} ({tag.count})
+                                </span>
+                            ))}
+                        </ReviewRail>
                     )}
                     {recommendedFor.length > 0 && (
-                        <div>
-                            <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft mb-1.5">Best suited for</div>
-                            <div className="flex gap-1.5 overflow-x-auto pb-1">
-                                {recommendedFor.map((t) => (
-                                    <span key={t.tag_id} className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 text-ink-soft px-2 py-0.5 text-[11px]">
-                                        {t.label} ({t.count})
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
+                        <ReviewRail title="Best suited for" itemCount={recommendedFor.length}>
+                            {recommendedFor.map((t) => (
+                                <span key={t.tag_id} className="shrink-0 whitespace-nowrap rounded-full bg-slate-100 text-ink-soft px-2 py-0.5 text-[11px]">
+                                    {t.label} ({t.count})
+                                </span>
+                            ))}
+                        </ReviewRail>
                     )}
                 </div>
             )}
@@ -144,8 +163,7 @@ export default function ExperienceBreakdown({ aggregate, aspectLabels = {}, edit
             {/* By aspect — one horizontally scrollable line of badges */}
             {aspects.length > 0 && (
                 <div className="border-t border-card-line pt-4">
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-ink-soft mb-1.5">Ratings by area</div>
-                    <div className="flex gap-1.5 overflow-x-auto pb-1">
+                    <ReviewRail title="Ratings by area" itemCount={aspects.length}>
                         {aspects.map((a) => {
                             const m = aspectMood(a.average);
                             return (
@@ -157,7 +175,7 @@ export default function ExperienceBreakdown({ aggregate, aspectLabels = {}, edit
                                 </span>
                             );
                         })}
-                    </div>
+                    </ReviewRail>
                 </div>
             )}
         </div>

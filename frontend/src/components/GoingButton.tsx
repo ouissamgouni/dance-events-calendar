@@ -186,11 +186,11 @@ export default function GoingButton({
         if (user) {
             // Resolve default audience for this RSVP. Priority order:
             //   1. ``user.share_attendance_default_audience`` (the
-            //      account-level default; defaults to ``friends`` per
-            //      privacy-by-default — see User model). When the user
-            //      explicitly set this in /account it MUST win over any
-            //      stale ``audience.lastUsed`` localStorage hint from
-            //      a previous one-off choice.
+            //      account-level default; defaults to ``public`` so
+            //      attendee lists populate by default — see User model).
+            //      When the user explicitly set this in /account it MUST
+            //      win over any stale ``audience.lastUsed`` localStorage
+            //      hint from a previous one-off choice.
             //   2. ``audience.lastUsed.<user_id>`` localStorage hint
             //      (Phase C — last explicit per-event choice; only used
             //      when the account-level default is unset).
@@ -198,7 +198,7 @@ export default function GoingButton({
             const defaultAudience: ShareAudience =
                 user.share_attendance_default_audience
                 ?? getLastUsedAudience(user.user_id)
-                ?? (user.share_attendance_default === false ? 'private' : 'friends');
+                ?? (user.share_attendance_default === false ? 'private' : 'public');
             // Always RSVP immediately with the default audience — no extra
             // confirmation click. The post-RSVP popover surfaces an inline
             // picker so the user can change visibility on the fly.

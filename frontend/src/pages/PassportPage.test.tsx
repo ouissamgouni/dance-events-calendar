@@ -369,7 +369,7 @@ describe('PassportPage', () => {
         fireEvent.click(addTrigger)
 
         // Type a query and pick the returned past event.
-        const input = await screen.findByLabelText('Search past events by title')
+        const input = await screen.findByLabelText('Search past events')
         fireEvent.change(input, { target: { value: 'Havana' } })
         const result = await screen.findByText('Havana Rooftop Social')
         // The result card shows the event year (past events span years).
@@ -416,7 +416,7 @@ describe('PassportPage', () => {
         fireEvent.click(screen.getByRole('tab', { name: 'Timeline' }))
         fireEvent.click(await screen.findByRole('button', { name: 'Add a past event' }))
 
-        const input = await screen.findByLabelText('Search past events by title')
+        const input = await screen.findByLabelText('Search past events')
         fireEvent.change(input, { target: { value: 'Havana' } })
 
         // Already-attended event is filtered out, so the empty-state calendar

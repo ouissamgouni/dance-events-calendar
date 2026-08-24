@@ -29,6 +29,8 @@ interface FeatureFlags {
     /** Tribe > Calendars "Your Network" snapshot of upcoming events people
      * you follow are going to. When false, the snapshot is hidden. */
     networkGoingSnapshotEnabled: boolean;
+    /** Show the optional event-size question in the review wizard. */
+    eventReviewSizeStepEnabled: boolean;
     /** When true, tags on event cards render as colored badges (legacy
      * look). When false (default), tags render as inline "Practice · Indoor"
      * text so cards stay quieter. */
@@ -42,9 +44,6 @@ interface FeatureFlags {
     trendingTrailRichEnabled: boolean;
     /** Number of tags to render inline per event card. */
     tagsPerCard: number;
-    /** Experiment: two-line, icon-prefixed filter summary bar with the
-     * Map/Calendar controls pinned to its right. */
-    summaryTwoLineEnabled: boolean;
 }
 
 const defaultFlags: FeatureFlags = {
@@ -66,11 +65,11 @@ const defaultFlags: FeatureFlags = {
     forYouRailEnabled: false,
     yourNextEventsRailEnabled: false,
     networkGoingSnapshotEnabled: true,
+    eventReviewSizeStepEnabled: true,
     tagAsBadge: false,
     tagBadgeColored: false,
     trendingTrailRichEnabled: false,
     tagsPerCard: 3,
-    summaryTwoLineEnabled: false,
 };
 
 const FeatureFlagsContext = createContext<FeatureFlags>(defaultFlags);
@@ -100,11 +99,11 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     forYouRailEnabled: s.for_you_rail_enabled ?? false,
                     yourNextEventsRailEnabled: s.your_next_events_rail_enabled ?? false,
                     networkGoingSnapshotEnabled: s.network_going_snapshot_enabled ?? true,
+                    eventReviewSizeStepEnabled: s.event_review_size_step_enabled ?? true,
                     tagAsBadge: s.tag_as_badge_enabled ?? false,
                     tagBadgeColored: s.tag_badge_colored ?? false,
                     trendingTrailRichEnabled: s.trending_trail_rich_enabled ?? false,
                     tagsPerCard: s.tags_per_card ?? 3,
-                    summaryTwoLineEnabled: s.summary_two_line_enabled ?? false,
                 });
             })
             .catch(() => {

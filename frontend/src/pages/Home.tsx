@@ -20,6 +20,8 @@ import AdminEventDetailPanel from '../components/AdminEventDetailPanel';
 import DateRangePicker from '../components/DateRangePicker';
 import EventListPanel, { EventListCard } from '../components/EventListPanel';
 import SummaryBar from '../components/SummaryBar';
+import ViewSwitcher from '../components/ViewSwitcher';
+import type { ExploreView } from '../components/ViewSwitcher';
 import FilterSheet from '../components/FilterSheet';
 import type { FilterSheetSection } from '../components/FilterSheet';
 import AreaEditor from '../components/AreaEditor';
@@ -34,7 +36,7 @@ import { useInvalidateAttendanceSummaries } from '../context/AttendanceSummaries
 import { useSavedEvents } from '../context/SavedEventsContext';
 
 import { AREA_PRESETS, DEFAULT_AREA_BBOX, DEFAULT_AREA_LABEL, clampArea } from '../constants/area';
-import type { PreferredAreaPayload, InterestProfile } from '../api';
+import type { PreferredAreaPayload, InterestProfile, InterestProfileUpdatePayload } from '../api';
 import SuggestEventModal from '../components/SuggestEventModal';
 import EventAnchoredDetailPanel from '../components/EventAnchoredDetailPanel';
 import { useSeenEvents } from '../hooks/useSeenEvents';
@@ -209,7 +211,7 @@ function eventMatchesBounds(event: CalendarEvent, bounds: MapBounds): boolean {
 
 export default function Home() {
     const { user } = useAuth();
-    const { showPrices, showPopularity, showRatings, popularityThreshold, tagSortMode, unseenStateEnabled, trendingEnabled, trendingBannerEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled, summaryTwoLineEnabled } = useFeatureFlags();
+    const { showPrices, showPopularity, showRatings, popularityThreshold, tagSortMode, unseenStateEnabled, trendingEnabled, trendingBannerEnabled, trendingTopN, trendingTopPercent, followingBadgeEnabled } = useFeatureFlags();
     const { isSaved } = useSavedEvents();
     const [showSuggestModal, setShowSuggestModal] = useState(false);
     const mapFollowingBadgeOverlay = true;
@@ -242,7 +244,7 @@ export default function Home() {
     const [sortBy, setSortBy] = useState<ExplorerSort>(initialExplorerState.sortBy);
     const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
     // The two tag groups that make up the user's default profile (alongside
-    // area): dance styles and event reach ("Event scale").
+    // area): dance styles and event reach ("Event reach").
     const danceGroup = useMemo(() => tagGroups.find((g) => g.slug === 'dance-style') ?? null, [tagGroups]);
     const reachGroup = useMemo(() => tagGroups.find((g) => g.slug === 'reach') ?? null, [tagGroups]);
     // "local" reach tag id, used by the search-profile editor's wide-area hint.
@@ -319,7 +321,13 @@ export default function Home() {
     const { saveDefaults } = useActiveProfile();
     // Full profile list + CRUD for the search-profile picker/editor. Signed-in
     // only; anonymous users keep a single localStorage default (no picker).
-    const { profiles: searchProfiles, createProfile, updateProfile, deleteProfile } = useInterestProfiles();
+    const {
+        profiles: searchProfiles,
+        reload: reloadSearchProfiles,
+        createProfile,
+        updateProfile,
+        deleteProfile,
+    } = useInterestProfiles();
     // Session-only opt-out so the user can browse "worldwide" without
     // touching their saved prefs, OR a one-click switch back to the
     // hardcoded "Europe & nearby" preset. Reload resets it (matches design
@@ -390,8 +398,12 @@ export default function Home() {
     // to <EventMap initialArea=...> so the Leaflet map opens framed on
     // this bbox from the very first render — no two-step (markers fit
     // → area fit) on load. Late prefs hydration is handled by the watcher
-    // above which calls flyToArea explicitly.
+    // above which calls flyToArea explicitly. On mobile, if a pending
+    // flyToAreaBbox exists at the time the map mounts (e.g., user applied
+    // an area in list view then opened Map mode), the pending bbox takes
+    // precedence so the map does not display stale/default bounds.
     const initialAreaRef = useRef<PreferredAreaPayload>(prefs.area ?? DEFAULT_AREA_BBOX);
+    const resolvedInitialArea = flyToAreaBbox ?? initialAreaRef.current;
 
     const effectiveArea: PreferredAreaPayload | null = useMemo(() => {
         if (areaSessionOverride?.kind === 'show-all') return null;
@@ -411,7 +423,8 @@ export default function Home() {
         [reachGroup, activeTagIds],
     );
     // The saved profile whose Area + Dance + Reach exactly match the live
-    // search, or null ("Custom"). Derived — no separate selection state.
+    // search, or null (the user-facing "Current search"). Derived — no
+    // separate selection state.
     const matchedSearchProfile = useMemo(
         () => matchSearchProfile({ area: effectiveArea, danceIds: danceTagIds, reachIds: reachTagIds }, searchProfiles),
         [effectiveArea, danceTagIds, reachTagIds, searchProfiles],
@@ -439,7 +452,7 @@ export default function Home() {
             min_lng: profile.min_lng,
             max_lat: profile.max_lat,
             max_lng: profile.max_lng,
-            label: profile.label,
+            label: profile.area_label,
         };
         if (profile.is_active) {
             // The default profile — clear the session override so it reads as
@@ -453,18 +466,41 @@ export default function Home() {
         }
     }, [danceGroup, reachGroup, flyToArea, prefs.area]);
 
-    // Overwrite the default (active) profile's Area + Dance + Reach with the
-    // live values. The only Explore action that mutates the default profile.
-    const handleUpdateDefaultProfile = useCallback(async () => {
-        const input: { area?: PreferredAreaPayload; danceTagIds?: number[]; reachTagIds?: number[] } = {
-            danceTagIds: danceTagIds,
-            reachTagIds: reachTagIds,
-        };
-        if (effectiveArea) input.area = clampArea(effectiveArea);
-        suppressNextPrefsFitRef.current = true;
-        setAreaSessionOverride(null);
-        await saveDefaults(input);
-    }, [danceTagIds, reachTagIds, effectiveArea, saveDefaults]);
+    // Update the selected profile's Area + Dance + Reach with the live values.
+    // For the active profile, synchronizes preferences and refits the map.
+    // For non-active profiles, updates only the profile fields without activating.
+    const handleUpdateProfile = useCallback(
+        async (profile: InterestProfile) => {
+            const payload: InterestProfileUpdatePayload = {
+                dance_tag_ids: danceTagIds,
+                reach_tag_ids: reachTagIds,
+            };
+            if (effectiveArea) payload.area_label = clampArea(effectiveArea).label;
+            if (effectiveArea) {
+                payload.min_lat = effectiveArea.min_lat;
+                payload.min_lng = effectiveArea.min_lng;
+                payload.max_lat = effectiveArea.max_lat;
+                payload.max_lng = effectiveArea.max_lng;
+            }
+
+            if (profile.is_active) {
+                // Active profile: use saveDefaults to maintain preference sync.
+                const input: { area?: PreferredAreaPayload; danceTagIds?: number[]; reachTagIds?: number[] } = {
+                    danceTagIds: danceTagIds,
+                    reachTagIds: reachTagIds,
+                };
+                if (effectiveArea) input.area = clampArea(effectiveArea);
+                suppressNextPrefsFitRef.current = true;
+                setAreaSessionOverride(null);
+                await saveDefaults(input);
+                await reloadSearchProfiles();
+            } else {
+                // Non-active profile: update directly without activation.
+                await updateProfile(profile.id, payload);
+            }
+        },
+        [danceTagIds, reachTagIds, effectiveArea, saveDefaults, reloadSearchProfiles, updateProfile],
+    );
 
     // Explorer mode fetches the full date/interest event set and filters by
     // the active/default area on the client. The live map viewport is used for
@@ -525,30 +561,6 @@ export default function Home() {
         window.addEventListener('resize', handler);
         return () => window.removeEventListener('resize', handler);
     }, []);
-
-    // Sticky-state detection for the mobile Explore filter bar. When the
-    // sentinel above the bar scrolls out of the scroll container, the bar is
-    // "stuck": it collapses to one line with the Map/Calendar icons reserved
-    // on the right. Desktop keeps the static two-line layout.
-    const stickySentinelRef = useRef<HTMLDivElement>(null);
-    const [barStuck, setBarStuck] = useState(false);
-    useEffect(() => {
-        const el = stickySentinelRef.current;
-        if (!el || typeof IntersectionObserver === 'undefined') return;
-        // root: null (viewport). IntersectionObserver still accounts for the
-        // clipping of the scrollable app <main>, so the sentinel reads as
-        // non-intersecting exactly when the bar sticks under the header.
-        const io = new IntersectionObserver(
-            ([entry]) => setBarStuck(!entry.isIntersecting),
-            { threshold: 0 },
-        );
-        io.observe(el);
-        return () => io.disconnect();
-        // `loading`/`error` are deps because the sentinel is only rendered once
-        // content is ready; without them the observer never attaches on a fresh
-        // Explorer load (sentinel ref is null when the effect first runs).
-    }, [viewMode, loading, error]);
-    const stuckExploreBar = barStuck && !isDesktop;
 
     // Explorer state
     const [startDate, setStartDate] = useState(initialExplorerState.startDate);
@@ -612,6 +624,26 @@ export default function Home() {
     // screen height. Initialised from ``?view=map`` so a shared / reloaded
     // link opens straight into the fullscreen map.
     const [mapFullscreen, setMapFullscreen] = useState(() => searchParams.get('view') === 'map');
+
+    const activeView: ExploreView = viewMode === 'calendar'
+        ? 'calendar'
+        : mapFullscreen
+            ? 'map'
+            : 'list';
+    const handleSelectView = useCallback((nextView: ExploreView) => {
+        const nextParams = new URLSearchParams(searchParams);
+        if (nextView === 'calendar') {
+            nextParams.delete('view');
+            setMapFullscreen(false);
+            navigate({ pathname: '/calendar', search: nextParams.toString() });
+            return;
+        }
+        const openMap = nextView === 'map';
+        if (openMap) nextParams.set('view', 'map');
+        else nextParams.delete('view');
+        setMapFullscreen(openMap);
+        navigate({ pathname: '/', search: nextParams.toString() });
+    }, [navigate, searchParams]);
 
     // Opening the fullscreen map resizes the shared map container; re-fit to
     // markers so it opens centered instead of keeping the miniature's viewport.
@@ -810,10 +842,10 @@ export default function Home() {
         bumpAutoFit();
     }, [bumpAutoFit]);
 
-    // Reset any area session override (returns to saved prefs / default).
+    // Clear area filter and show events from all areas worldwide.
     const handleClearAreaOverride = useCallback(() => {
         setPreserveViewportAfterSearch(false);
-        setAreaSessionOverride(null);
+        setAreaSessionOverride({ kind: 'show-all' });
         bumpAutoFit();
     }, [bumpAutoFit]);
 
@@ -1307,6 +1339,7 @@ export default function Home() {
         <PeopleFilterPanel
             signedIn={!!user}
             followingCount={user?.following_count}
+            friendCount={user?.friend_count}
             interestSource={interestSource}
             interestKind={interestKind}
             interestUserHandles={interestUserHandles}
@@ -1335,7 +1368,7 @@ export default function Home() {
         />
     );
 
-    // Per-group pill editor reused by the Dance / Event scale / Event format /
+    // Per-group pill editor reused by the Dance / Event reach / Event format /
     // More filters sub-editors. Scopes "Clear" to the group's own tags.
     const renderGroupPills = (group: TagGroup) => (
         <TagFilterPills
@@ -1385,16 +1418,26 @@ export default function Home() {
     })();
 
     // Sectioned explorer filters. Grouped per the approved UX: Dates → Search
-    // profile (selector + Area + Dance + Event scale + optional Save) → Other
+    // profile (selector + Area + Dance + Event reach + optional Save) → Other
     // filters (People + Event format + More). Event format + More filters carry
     // the "+N" secondary badge.
     const signedIn = !!user;
+
+    // Icon mapping for "more" filter groups based on their slugs
+    const moreGroupIcons: Record<string, React.ReactNode> = {
+        venue: <img src="/venue.png" alt="" className="h-4 w-4" />,
+        scale: <img src="/size.png" alt="" className="h-4 w-4" />,
+        level: <img src="/speedometer.png" alt="" className="h-4 w-4" />,
+        misc: <img src="/more.png" alt="" className="h-4 w-4" />,
+    };
+
     const explorerFilterSections: FilterSheetSection[] = [
         // Dates are driven by calendar navigation in calendar view, so the
         // Dates section is only offered in the explorer.
         ...(viewMode === 'calendar' ? [] : [{
             id: 'dates',
             label: 'Dates',
+            icon: <img src="/calendar.png" alt="" className="h-4 w-4" />,
             group: 'Dates',
             summary: `${fmtDateShort(startDate)} – ${fmtDateShort(endDate)}`,
             render: () => (
@@ -1404,6 +1447,7 @@ export default function Home() {
         {
             id: 'area',
             label: 'Area',
+            icon: <img src="/map.png" alt="" className="h-4 w-4" />,
             group: 'Search profile',
             groupVariant: 'boxed' as const,
             summary: areaSummary,
@@ -1415,7 +1459,7 @@ export default function Home() {
                     data-testid="search-profile-selector"
                 >
                     <span className="truncate">
-                        {matchedSearchProfile ? matchedSearchProfile.label : 'Custom'}
+                        {matchedSearchProfile ? matchedSearchProfile.label : 'Current search'}
                     </span>
                     <span aria-hidden="true" className="shrink-0">▾</span>
                 </button>
@@ -1425,6 +1469,7 @@ export default function Home() {
                     value={areaChipState.kind === 'show-all' ? null : effectiveArea}
                     myArea={prefs.area ?? DEFAULT_AREA_BBOX}
                     myAreaLabel={prefs.area?.label}
+                    profileAreas={signedIn ? searchProfiles : null}
                     onApply={handleApplyAreaFromSheet}
                     eventCount={explorerMatchingEvents.length}
                 />
@@ -1433,6 +1478,7 @@ export default function Home() {
         ...(danceGroup ? [{
             id: 'dance',
             label: 'Dance styles',
+            icon: <img src="/dance.png" alt="" className="h-4 w-4" />,
             group: 'Search profile',
             groupVariant: 'boxed' as const,
             summary: groupSummary(danceGroup, 'Any'),
@@ -1440,14 +1486,15 @@ export default function Home() {
         }] : []),
         ...(reachGroup ? [{
             id: 'reach',
-            label: 'Event scale',
+            label: 'Event reach',
+            icon: <img src="/scale.png" alt="" className="h-4 w-4" />,
             group: 'Search profile',
             groupVariant: 'boxed' as const,
             summary: groupSummary(reachGroup, 'Any'),
             render: () => renderGroupPills(reachGroup),
         }] : []),
         // Small secondary "Save" text action — shown only while the current
-        // Area + Dance + Reach combination is "Custom" (no saved match).
+        // Area + Dance + Reach combination matches no saved profile.
         ...(signedIn && selectedSearchProfileId === 'custom' ? [{
             id: 'profile-save',
             label: 'Save',
@@ -1470,6 +1517,7 @@ export default function Home() {
         {
             id: 'people',
             label: 'People',
+            icon: <img src="/high-five.png" alt="" className="h-4 w-4" />,
             group: 'Other filters',
             summary: peopleSummary,
             headerAction: (
@@ -1487,6 +1535,7 @@ export default function Home() {
         ...(formatGroup ? [{
             id: 'format',
             label: 'Event format',
+            icon: <img src="/category.png" alt="" className="h-4 w-4" />,
             group: 'Other filters',
             summary: groupSummary(formatGroup, 'Any'),
             badge: groupSelCount(formatGroup) || undefined,
@@ -1495,6 +1544,7 @@ export default function Home() {
         ...(moreGroups.length > 0 ? [{
             id: 'more',
             label: 'More filters',
+            icon: <img src="/more.png" alt="" className="h-4 w-4" />,
             group: 'Other filters',
             summary: (() => {
                 const n = moreGroups.reduce((acc, g) => acc + groupSelCount(g), 0);
@@ -1507,19 +1557,18 @@ export default function Home() {
                     renderGroup={renderGroupPills}
                     selCount={groupSelCount}
                     summary={(g) => groupSummary(g, 'Any')}
+                    groupIcons={moreGroupIcons}
                 />
             ),
         }] : []),
     ];
 
-    const renderFilterSummaryBar = (opts?: { className?: string; rightSlot?: React.ReactNode }) => {
+    const renderFilterSummaryBar = (opts?: { className?: string }) => {
         const isCal = viewMode === 'calendar';
         const count = isCal ? calendarVisibleEvents.length : explorerMatchingEvents.length;
         return (
             <SummaryBar
                 className={opts?.className}
-                rightSlot={opts?.rightSlot}
-                twoLine={summaryTwoLineEnabled}
                 totalCount={count}
                 visibleCount={count}
                 startDate={isCal ? calendarSummaryRange.startDate : startDate}
@@ -1548,112 +1597,6 @@ export default function Home() {
                 loading={loading}
                 onOpenFilters={() => openFilterSheet(null)}
             />
-        );
-    };
-
-    // Explore view controls: icon-only Map + Calendar buttons. Neutral/outline
-    // (never blue-filled). Map opens the fullscreen map surface; Calendar
-    // navigates to the calendar route. Reserved on the right of the sticky
-    // filter bar so they never collapse. (Non-sticky uses the mini-map as the
-    // Map entry with its own Calendar icon, so this row only shows when stuck.)
-    const mapGlyph = (
-        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z" />
-            <path d="M9 4v14M15 6v14" />
-        </svg>
-    );
-    const calendarGlyph = (
-        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="4.5" width="18" height="16" rx="2" />
-            <path d="M3 9h18M8 2.5v4M16 2.5v4" />
-        </svg>
-    );
-    const listGlyph = (
-        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />
-        </svg>
-    );
-    const renderExploreViewIcons = () => (
-        <div className="flex items-center gap-2" data-testid="explorer-view-icons">
-            <button
-                type="button"
-                onClick={() => setMapFullscreen(true)}
-                aria-label="Map"
-                title="Map"
-                className="inline-flex h-10 w-10 items-center justify-center border border-line bg-surface text-ink hover:bg-canvas transition"
-                data-testid="summary-view-map"
-            >
-                {mapGlyph}
-            </button>
-            {viewMode === 'calendar' ? (
-                <Link
-                    to="/"
-                    aria-label="List"
-                    title="List"
-                    className="inline-flex h-10 w-10 items-center justify-center border border-line bg-surface text-ink hover:bg-canvas transition"
-                    data-testid="summary-view-list"
-                >
-                    {listGlyph}
-                </Link>
-            ) : (
-                <Link
-                    to="/calendar"
-                    aria-label="Calendar"
-                    title="Calendar"
-                    className="inline-flex h-10 w-10 items-center justify-center border border-line bg-surface text-ink hover:bg-canvas transition"
-                    data-testid="summary-view-calendar"
-                >
-                    {calendarGlyph}
-                </Link>
-            )}
-        </div>
-    );
-
-    // Explore view mode CTAs: Map and Calendar buttons. Neutral styling
-    // (white bg, subtle border, dark text, no fill or active treatment).
-    // Labeled version includes text; icon-only for sticky mode.
-    const renderExploreViewCtas = (opts?: { labeled?: boolean; className?: string }) => {
-        const { labeled = false, className = '' } = opts ?? {};
-        const mapGlyph = (
-            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z" />
-                <path d="M9 4v14M15 6v14" />
-            </svg>
-        );
-        const calendarGlyph = (
-            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="4.5" width="18" height="16" rx="2" />
-                <path d="M3 9h18M8 2.5v4M16 2.5v4" />
-            </svg>
-        );
-        const buttonBase = labeled
-            ? 'inline-flex flex-1 items-center justify-center gap-2 px-3 h-10 rounded-[10px]'
-            : 'inline-flex items-center justify-center w-10 h-10 rounded-[10px]';
-        const buttonClass = `${buttonBase} border border-line bg-surface text-ink hover:bg-canvas transition`;
-        return (
-            <div className={`flex items-center gap-2 ${className}`} data-testid="explorer-view-ctas">
-                <button
-                    type="button"
-                    onClick={() => setMapFullscreen(true)}
-                    aria-label="Open map"
-                    title="Open map"
-                    className={buttonClass}
-                    data-testid="explorer-cta-map"
-                >
-                    {mapGlyph}
-                    {labeled && <span className="text-sm font-medium">Map</span>}
-                </button>
-                <Link
-                    to="/calendar"
-                    aria-label="Calendar view"
-                    title="Calendar view"
-                    className={buttonClass}
-                    data-testid="explorer-cta-calendar"
-                >
-                    {calendarGlyph}
-                    {labeled && <span className="text-sm font-medium">Calendar</span>}
-                </Link>
-            </div>
         );
     };
 
@@ -1709,24 +1652,8 @@ export default function Home() {
                 )}
                 {(!loading || initialLoadDone.current) && !error && (
                     <>
-                        {/* Sentinel drives sticky detection: once it scrolls out
-                        of the scroll container the bar is "stuck" and collapses
-                        to a single line with the Map/Calendar icons reserved on
-                        the right. Otherwise the icons sit centered on line 2. */}
-                        <div ref={stickySentinelRef} aria-hidden="true" className="h-px w-full" />
-                        <div className="flex flex-col gap-1 sticky top-0 z-40 bg-[#f8fafc] lg:static lg:z-auto lg:bg-transparent">
-                            {(stuckExploreBar || summaryTwoLineEnabled) ? (
-                                renderFilterSummaryBar({ rightSlot: renderExploreViewIcons() })
-                            ) : (
-                                <>
-                                    {renderFilterSummaryBar()}
-                                    {viewMode === 'calendar' && (
-                                        <div className="flex justify-center py-0.5">
-                                            {renderExploreViewIcons()}
-                                        </div>
-                                    )}
-                                </>
-                            )}
+                        <div className="sticky top-0 z-40 bg-canvas">
+                            {renderFilterSummaryBar()}
                         </div>
                     </>
                 )}
@@ -1790,7 +1717,7 @@ export default function Home() {
                                             autoFitToken={mapAutoFitToken}
                                             flyToArea={flyToAreaBbox}
                                             flyToAreaToken={flyToAreaToken}
-                                            initialArea={initialAreaRef.current}
+                                            initialArea={resolvedInitialArea}
                                             preserveViewport={preserveViewportAfterSearch}
                                             newEventIds={newEventIds}
                                             popularityThreshold={popularityThreshold}
@@ -1868,28 +1795,8 @@ export default function Home() {
                                         )}
                                         {mapFullscreen && !isDesktop && (
                                             <div className="absolute top-0 inset-x-0 z-[702] flex items-center bg-surface/95 backdrop-blur" data-testid="map-fullscreen-header">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setMapFullscreen(false)}
-                                                    aria-label="Back to list"
-                                                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center border-y border-l border-line bg-surface text-ink hover:bg-canvas"
-                                                    data-testid="map-fullscreen-back"
-                                                >
-                                                    ←
-                                                </button>
                                                 {renderFilterSummaryBar({ className: 'flex-1 min-w-0' })}
                                             </div>
-                                        )}
-                                        {mapFullscreen && !isDesktop && !selectedExplorerMapEvent && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setMapFullscreen(false)}
-                                                className="absolute bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[702] inline-flex items-center gap-2 border border-blue-500 bg-blue-500 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:bg-blue-600"
-                                                data-testid="map-view-list"
-                                            >
-                                                <span aria-hidden="true">☷</span>
-                                                View list · {explorerMatchingEvents.length}
-                                            </button>
                                         )}
                                     </div>
                                     {/* Map footer: quick area presets + off-map
@@ -1965,14 +1872,6 @@ export default function Home() {
                                             </span>
                                         )}
                                     </div>
-                                </div>
-                            )}
-                            {/* View mode CTAs: Map + Calendar buttons. Mobile only.
-                            Appears between filter bar and event list. Hidden in the
-                            two-line variant, where the summary bar hosts them on its right. */}
-                            {!summaryTwoLineEnabled && (
-                                <div className="order-2.5 lg:hidden px-2 py-1">
-                                    {renderExploreViewCtas({ labeled: true, className: 'w-full' })}
                                 </div>
                             )}
                             {/* Event list on mobile: order-3, hidden on desktop.
@@ -2081,6 +1980,8 @@ export default function Home() {
                 )}
             </main>
 
+            <ViewSwitcher currentView={activeView} onSelect={handleSelectView} />
+
             {/* Overlay modal — calendar mode mobile + explorer (both breakpoints) */}
             {selectedEvent && (viewMode === 'explorer' || (viewMode === 'calendar' && !isDesktop)) && (
                 <EventModal
@@ -2147,7 +2048,7 @@ export default function Home() {
                     reachGroup={reachGroup}
                     localTagId={localReachTagId}
                     onApplyProfile={handleApplySearchProfile}
-                    onUpdateDefault={handleUpdateDefaultProfile}
+                    onUpdateProfile={handleUpdateProfile}
                     createProfile={createProfile}
                     updateProfile={updateProfile}
                     deleteProfile={deleteProfile}

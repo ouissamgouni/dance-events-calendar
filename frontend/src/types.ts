@@ -14,8 +14,8 @@ export interface Tag {
     group_label: string;
     group_color: string | null;
     group_scope?: TagScope;
-    /** For aspect-scoped tags: whether the tag reads as positive or negative. */
-    polarity?: 'positive' | 'negative' | null;
+    /** For aspect-scoped tags: whether the tag reads as positive, negative, or factual. */
+    polarity?: 'positive' | 'negative' | 'neutral' | null;
     event_count?: number;
     enabled: boolean;
     is_hero_filter: boolean;
@@ -541,6 +541,7 @@ export interface EventRatingAggregate {
     sentiment_distribution: Partial<Record<ReviewSentiment, number>>;
     aspects: AspectAggregate[];
     top_positive_tags: TopReviewTag[];
+    top_neutral_tags: TopReviewTag[];
     top_negative_tags: TopReviewTag[];
     top_audience_tags: TopReviewTag[];
     /** Overall-mood figures. Percentages are unrounded 0-100 (round for display). */
@@ -579,6 +580,7 @@ export interface SeriesRatingRollup {
     sentiment_distribution: Partial<Record<ReviewSentiment, number>>;
     aspects: AspectAggregate[];
     top_positive_tags: TopReviewTag[];
+    top_neutral_tags: TopReviewTag[];
     top_negative_tags: TopReviewTag[];
     top_audience_tags: TopReviewTag[];
     editions: SeriesEditionSummary[];

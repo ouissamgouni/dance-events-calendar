@@ -8,7 +8,9 @@ import type { EventRatingAggregate, EventReviewPublic, SeriesRatingRollup, TagGr
 import ExperienceBreakdown from './ExperienceBreakdown';
 import TypicalExperienceCard from './TypicalExperienceCard';
 import { seriesToAggregate } from '../hooks/useCommunityExperience';
+import { useScrollDots } from '../hooks/useScrollDots';
 import { SENTIMENT_META } from '../utils/reviewSentiment';
+import ScrollDotsIndicator from './ScrollDots';
 
 /** Max tags shown on a compact review card before the rest collapse into "+N more". */
 const CARD_TAGS_SHOWN = 5;
@@ -21,7 +23,11 @@ function cardTags(r: EventReviewPublic): CardTag[] {
     const aspect = r.aspect_tags.map((t) => ({
         key: `a-${t.id}`,
         label: t.label,
-        cls: t.polarity === 'negative' ? 'bg-orange-50 text-orange-800' : 'bg-green-50 text-success',
+        cls: t.polarity === 'negative'
+            ? 'bg-orange-50 text-orange-800'
+            : t.polarity === 'positive'
+                ? 'bg-green-50 text-success'
+                : 'bg-slate-100 text-ink-soft',
     }));
     const audience = r.audience_tags.map((t) => ({
         key: `u-${t.id}`,
@@ -130,6 +136,8 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
     const [aspectGroups, setAspectGroups] = useState<TagGroup[]>([]);
     const [series, setSeries] = useState<SeriesRatingRollup | null>(null);
     const [expandedReview, setExpandedReview] = useState<EventReviewPublic | null>(null);
+    const reviewsScrollerRef = useRef<HTMLDivElement>(null);
+    const reviewDots = useScrollDots(reviewsScrollerRef, [reviews.length]);
 
     const loadAggregate = useCallback(() => {
         if (!user) return;
@@ -333,7 +341,7 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
                         </select>
                     </div>
 
-                    <div className="max-w-full overflow-x-auto pb-2 -mx-1 px-1">
+                    <div ref={reviewsScrollerRef} className="max-w-full overflow-x-auto pb-2 -mx-1 px-1">
                         <div className="flex gap-4 divide-x divide-slate-200">
                             {reviews.map((r) => {
                                 const meta = r.overall_sentiment ? SENTIMENT_META[r.overall_sentiment] : null;
@@ -407,6 +415,12 @@ export default function EventReviewsSection({ eventId, isPast = true, onAggregat
                             )}
                         </div>
                     </div>
+                    <ScrollDotsIndicator
+                        count={reviewDots.dotCount}
+                        activeIndex={reviewDots.activeIndex}
+                        onSelect={reviewDots.scrollToIndex}
+                        label="Reviews scroll position"
+                    />
 
                     {expandedReview && (
                         <ReviewDetailModal review={expandedReview} onClose={() => setExpandedReview(null)} />

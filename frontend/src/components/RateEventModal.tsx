@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { EventRating, ReviewSentiment, Tag, TagGroup } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import {
     deleteMyRating,
     fetchAspectTagGroups,
@@ -26,6 +27,7 @@ type Identity = 'name' | 'anonymous';
 const MAX_COMMENT = 300;
 const MAX_TAGS_PER_ASPECT = 5;
 const TAGS_SHOWN_COLLAPSED = 8;
+const EVENT_SIZE_GROUP_SLUG = 'event-size';
 
 /**
  * Order an aspect's tags for display. A clear mood shows the matching polarity
@@ -55,6 +57,11 @@ function aspectTagClasses(polarity: string | null | undefined, selected: boolean
         return selected
             ? 'bg-orange-200 text-orange-900 border-orange-400 ring-1 ring-orange-500'
             : `bg-orange-50 text-orange-800 border-orange-200 ${atCap ? 'opacity-40' : 'hover:border-orange-400'}`;
+    }
+    if (polarity === 'neutral' || polarity == null) {
+        return selected
+            ? 'bg-slate-200 text-ink border-slate-400 ring-1 ring-slate-400'
+            : `bg-slate-50 text-ink-soft border-line ${atCap ? 'opacity-40' : 'hover:border-slate-400'}`;
     }
     return selected
         ? 'bg-green-200 text-green-900 border-green-400 ring-1 ring-green-500'
@@ -147,12 +154,14 @@ function SegmentedMood<T>({
 type WizardStep =
     | { kind: 'intro' }
     | { kind: 'aspect'; slug: string }
+    | { kind: 'event-size' }
     | { kind: 'audience' }
     | { kind: 'comment' }
     | { kind: 'identity' };
 
 export default function RateEventModal({ eventId, initialRating, onClose, onSubmitted, onDeleted }: Props) {
     const { user } = useAuth();
+    const { eventReviewSizeStepEnabled } = useFeatureFlags();
 
     const [sentiment, setSentiment] = useState<ReviewSentiment | null>(
         initialRating?.overall_sentiment ?? null,
@@ -209,6 +218,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
         if (!aspectGroups) return [];
         return aspectGroups
             .filter((g) => g.enabled)
+            .filter((g) => g.slug !== EVENT_SIZE_GROUP_SLUG)
             .filter((g) => {
                 const cond = g.condition_tag_slugs;
                 if (!cond || cond.length === 0) return true;
@@ -216,6 +226,11 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
             })
             .sort((a, b) => a.ordinal - b.ordinal);
     }, [aspectGroups, eventTagKeys]);
+
+    const eventSizeGroup = useMemo(
+        () => (aspectGroups ?? []).find((g) => g.slug === EVENT_SIZE_GROUP_SLUG && g.enabled),
+        [aspectGroups],
+    );
 
     const audienceTags = useMemo(
         () => (audienceGroups ?? []).filter((g) => g.enabled).flatMap((g) => g.tags),
@@ -241,11 +256,14 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
     const steps: WizardStep[] = useMemo(() => {
         const list: WizardStep[] = [{ kind: 'intro' }];
         for (const g of selectedAspectGroups) list.push({ kind: 'aspect', slug: g.slug });
+        if (eventReviewSizeStepEnabled && eventSizeGroup?.tags.some((tag) => tag.enabled)) {
+            list.push({ kind: 'event-size' });
+        }
         if (audienceTags.length > 0) list.push({ kind: 'audience' });
         list.push({ kind: 'comment' });
         list.push({ kind: 'identity' });
         return list;
-    }, [selectedAspectGroups, audienceTags.length]);
+    }, [selectedAspectGroups, eventReviewSizeStepEnabled, eventSizeGroup, audienceTags.length]);
 
     useEffect(() => {
         setStep((cur) => Math.min(cur, steps.length - 1));
@@ -300,6 +318,16 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
             const next = new Set(prev);
             if (next.has(id)) next.delete(id);
             else next.add(id);
+            return next;
+        });
+    };
+
+    const selectEventSize = (id: number | null) => {
+        if (!eventSizeGroup) return;
+        const sizeTagIds = new Set(eventSizeGroup.tags.map((tag) => tag.id));
+        setAspectTagIds((prev) => {
+            const next = new Set([...prev].filter((tagId) => !sizeTagIds.has(tagId)));
+            if (id != null) next.add(id);
             return next;
         });
     };
@@ -402,6 +430,8 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                 return initialRating ? 'Edit your review' : 'How was it?';
             case 'aspect':
                 return offeredAspects.find((x) => x.slug === current.slug)?.label ?? 'Rate';
+            case 'event-size':
+                return 'About how many people attended?';
             case 'audience':
                 return 'Who would you recommend this event for?';
             case 'comment':
@@ -466,7 +496,7 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                                     {viewAspectTags.map((t) => (
                                         <span
                                             key={`a-${t.id}`}
-                                            className={`rounded-full px-2 py-0.5 text-[11px] ${t.polarity === 'negative' ? 'bg-orange-50 text-orange-800' : 'bg-green-50 text-success'}`}
+                                            className={`rounded-full px-2 py-0.5 text-[11px] ${t.polarity === 'negative' ? 'bg-orange-50 text-orange-800' : t.polarity === 'positive' ? 'bg-green-50 text-success' : 'bg-slate-100 text-ink-soft'}`}
                                         >
                                             {t.label}
                                         </span>
@@ -647,6 +677,31 @@ export default function RateEventModal({ eventId, initialRating, onClose, onSubm
                                     </div>
                                 );
                             })()}
+
+                            {/* Event size — optional factual single-choice step */}
+                            {current.kind === 'event-size' && eventSizeGroup && (
+                                <div className="space-y-3">
+                                    <p className="text-xs text-ink-soft">An estimate is fine.</p>
+                                    <div className="flex flex-wrap gap-2.5" role="radiogroup" aria-label="Event size">
+                                        {eventSizeGroup.tags.filter((tag) => tag.enabled).map((tag) => {
+                                            const selected = aspectTagIds.has(tag.id);
+                                            return (
+                                                <button
+                                                    key={tag.id}
+                                                    type="button"
+                                                    role="radio"
+                                                    aria-checked={selected}
+                                                    onClick={() => selectEventSize(selected ? null : tag.id)}
+                                                    className={`${CHIP_BASE} max-w-full whitespace-normal text-center leading-tight ${selected ? 'border-sky-300 bg-sky-100 text-sky-900' : 'border-sky-100 bg-sky-50/40 text-sky-800 hover:border-sky-200 hover:bg-sky-50'}`}
+                                                >
+                                                    {selected && '✓ '}
+                                                    {tag.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Audience */}
                             {current.kind === 'audience' && (

@@ -22,14 +22,15 @@ import { firstNameOf } from '../utils/displayName';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from './Toast';
 import type { InterestFilterChange } from './InterestFilter';
-import BuildYourTribe from './tribe/BuildYourTribe';
-import PeopleSpecificPicker from './tribe/PeopleSpecificPicker';
+import PeoplePanel from './tribe/PeoplePanel';
+import ReferralCard from './ReferralCard';
 
 type Who = 'following' | 'friends' | 'specific';
 
 interface Props {
     signedIn: boolean;
     followingCount?: number;
+    friendCount?: number;
     interestSource: 'follows' | 'friends' | null;
     interestKind: 'any' | 'going' | 'saved';
     interestUserHandles: string[];
@@ -213,6 +214,7 @@ function CheckRow({
 export default function PeopleFilterPanel({
     signedIn,
     followingCount,
+    friendCount,
     interestSource,
     interestKind,
     interestUserHandles,
@@ -221,7 +223,13 @@ export default function PeopleFilterPanel({
 }: Props) {
     const { refreshUser } = useAuth();
     const toast = useToast();
-    const [view, setView] = useState<'main' | 'picker' | 'discover'>('main');
+    // 'build' (empty-network acquisition) is sticky so the viewer can follow
+    // several people before returning; 'find'/'pick'/'invite' are stacked overlays.
+    const [view, setView] = useState<'main' | 'build' | 'find' | 'pick' | 'invite'>(
+        (followingCount ?? 0) > 0 ? 'main' : 'build',
+    );
+    // Draft selection for the Specific-people picker (committed only on Done).
+    const [pickDraft, setPickDraft] = useState<string[]>([]);
     // Handles followed within this sheet session — drives the optimistic
     // empty→populated transition before `refreshUser` lands.
     const [sessionFollows, setSessionFollows] = useState<Set<string>>(new Set());
@@ -246,11 +254,10 @@ export default function PeopleFilterPanel({
             setSessionFollows((prev) => new Set(prev).add(handle));
             toast.push({ title: `✓ ${displayName} added to your tribe`, variant: 'success', duration: 3000 });
             void refreshUser();
-            // First follow from the empty state: reveal the populated filter
-            // with Following auto-selected (the single recommended auto-pick).
+            // First follow from the empty state auto-selects Following in the
+            // background; the surface stays open so more people can be added.
             if (wasEmpty) {
                 onChange({ source: 'follows', kind: 'going', userHandles: [] });
-                setView('main');
             }
         },
         [followingCount, sessionFollows, toast, refreshUser, onChange],
@@ -261,6 +268,19 @@ export default function PeopleFilterPanel({
         const nextSaved = which === 'saved' ? !savedOn : savedOn;
         if (!nextGoing && !nextSaved) return; // at least one must stay on
         onChange({ kind: nextGoing && nextSaved ? 'any' : nextGoing ? 'going' : 'saved' });
+    };
+
+    const openPicker = () => {
+        setPickDraft(interestUserHandles);
+        setView('pick');
+    };
+
+    const openInvite = () => {
+        setView('invite');
+    };
+
+    const togglePick = (handle: string) => {
+        setPickDraft((prev) => (prev.includes(handle) ? prev.filter((h) => h !== handle) : [...prev, handle]));
     };
 
     const commitSpecific = (handles: string[]) => {
@@ -285,41 +305,78 @@ export default function PeopleFilterPanel({
     }
 
     // --- Specific-people picker (overlay) ----------------------------------
-    if (view === 'picker') {
+    if (view === 'pick') {
         return (
             <div className="absolute inset-0 z-[9000] flex flex-col bg-surface" data-testid="people-picker-overlay">
-                <PeopleSpecificPicker
-                    initialSelected={interestUserHandles}
+                <PeoplePanel
+                    mode="select"
+                    variant="overlay"
+                    followedHandles={sessionFollows}
+                    onFollowed={handleFollowed}
+                    selected={pickDraft}
+                    onToggleSelect={togglePick}
                     onDone={commitSpecific}
                     onBack={() => setView('main')}
+                    onOpenInvite={openInvite}
                 />
+            </div>
+        );
+    }
+
+    // --- Find-more-people (overlay from the Tribe row) ---------------------
+    if (view === 'find') {
+        return (
+            <div className="absolute inset-0 z-[9000] flex flex-col bg-surface" data-testid="people-discover-overlay">
+                <PeoplePanel
+                    mode="build"
+                    variant="overlay"
+                    followedHandles={sessionFollows}
+                    onFollowed={handleFollowed}
+                    onBack={() => setView('main')}
+                    onOpenInvite={openInvite}
+                />
+            </div>
+        );
+    }
+
+    // --- Invite sheet (overlay from People panel) --------------------------
+    if (view === 'invite') {
+        return (
+            <div className="absolute inset-0 z-[9000] flex flex-col bg-surface" data-testid="invite-overlay">
+                <div className="flex items-center justify-between border-b border-line px-2 py-2">
+                    <button
+                        type="button"
+                        onClick={() => setView('find')}
+                        className="inline-flex items-center gap-1 text-sm font-medium text-ink-soft hover:text-ink"
+                        aria-label="Back"
+                    >
+                        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 4l-6 6 6 6" />
+                        </svg>
+                        Back
+                    </button>
+                    <span className="text-sm font-semibold text-ink">Invite a friend</span>
+                    <span className="w-12" />
+                </div>
+                <div className="flex-1 overflow-y-auto px-3 py-3">
+                    <ReferralCard />
+                </div>
             </div>
         );
     }
 
     // --- Empty network: acquisition is the primary state -------------------
-    if (!hasNetwork) {
+    if (view === 'build' || !hasNetwork) {
         return (
-            <BuildYourTribe
+            <PeoplePanel
+                mode="build"
+                variant="inline"
                 followedHandles={sessionFollows}
                 onFollowed={handleFollowed}
                 onExploreAll={onExploreAll}
-                variant="inline"
+                onDone={() => setView('main')}
+                onOpenInvite={openInvite}
             />
-        );
-    }
-
-    // --- Find-more-people (overlay from the Tribe row) ---------------------
-    if (view === 'discover') {
-        return (
-            <div className="absolute inset-0 z-[9000] flex flex-col bg-surface p-3" data-testid="people-discover-overlay">
-                <BuildYourTribe
-                    followedHandles={sessionFollows}
-                    onFollowed={handleFollowed}
-                    variant="overlay"
-                    onBack={() => setView('main')}
-                />
-            </div>
         );
     }
 
@@ -334,7 +391,7 @@ export default function PeopleFilterPanel({
             <TribeRow
                 followingCount={followingCount}
                 sessionFollows={sessionFollows.size}
-                onOpen={() => setView('discover')}
+                onOpen={() => setView('find')}
             />
 
             <section className="flex flex-col gap-2">
@@ -360,11 +417,23 @@ export default function PeopleFilterPanel({
                     onClick={() => onChange({ source: 'friends', userHandles: [] })}
                     testId="who-friends"
                 />
+                {whoSelected === 'friends' && friendCount === 0 && (
+                    <p className="px-0.5 text-[11px] text-ink-soft" data-testid="people-zero-friends-hint">
+                        You have no friends yet — friends are people who follow you back.{' '}
+                        <button
+                            type="button"
+                            onClick={() => setView('find')}
+                            className="text-action underline hover:opacity-80"
+                        >
+                            Find people to follow →
+                        </button>
+                    </p>
+                )}
                 <RadioRow
                     label="Specific people"
                     subtitle={specificSubtitle}
                     selected={whoSelected === 'specific'}
-                    onClick={() => setView('picker')}
+                    onClick={openPicker}
                     testId="who-specific"
                 />
             </section>

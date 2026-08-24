@@ -9,9 +9,10 @@ import { server } from '../test/server'
 
 // The redesigned People filter: persistent Tribe row, single-select WHO
 // (Following / Friends / Specific people), multi-select STATUS (Going /
-// Interested, at least one on), an in-sheet Specific-people picker, and an
-// empty-network "Build your tribe" acquisition state that transitions to the
-// populated filter (Following auto-selected) after the first follow.
+// Interested, at least one on), and a unified in-sheet People surface
+// (PeoplePanel) reused for the empty-network "Build your tribe" state, the
+// avatar-stack "Find people" overlay (My network / Discover tabs), and the
+// Specific-people picker (select mode).
 
 function follow(handle: string, displayName: string, isFriend = false) {
     return { handle, display_name: displayName, avatar_url: null, is_verified_organizer: false, is_friend: isFriend }
@@ -35,6 +36,8 @@ function suggestionHandlers(items: unknown[]) {
     ]
 }
 
+const DAN = { handle: 'dan', display_name: 'Dan Poe', avatar_url: null, is_verified_organizer: false, mutual_friend_count: 2, mutual_friends_preview: ['alice'] }
+
 function followActionHandler() {
     return http.post('*/api/social/users/:handle/follow', ({ params }) =>
         HttpResponse.json({
@@ -49,7 +52,15 @@ function followActionHandler() {
 }
 
 /** Controlled harness mirroring how Home lifts the filter state. */
-function Harness({ followingCount, onChange }: { followingCount: number; onChange?: (c: InterestFilterChange) => void }) {
+function Harness({
+    followingCount,
+    friendCount,
+    onChange,
+}: {
+    followingCount: number
+    friendCount?: number
+    onChange?: (c: InterestFilterChange) => void
+}) {
     const [source, setSource] = useState<'follows' | 'friends' | null>(followingCount > 0 ? 'follows' : null)
     const [kind, setKind] = useState<'any' | 'going' | 'saved'>('going')
     const [handles, setHandles] = useState<string[]>([])
@@ -58,6 +69,7 @@ function Harness({ followingCount, onChange }: { followingCount: number; onChang
         <PeopleFilterPanel
             signedIn
             followingCount={followingCount}
+            friendCount={friendCount}
             interestSource={source}
             interestKind={kind}
             interestUserHandles={handles}
@@ -120,6 +132,15 @@ describe('PeopleFilterPanel', () => {
         expect(screen.queryByTestId('status-interested')).not.toBeInTheDocument()
     })
 
+    it('surfaces a hint when Friends is picked with zero friends', async () => {
+        server.use(...followingHandlers())
+        const { user } = renderWithProviders(<Harness followingCount={7} friendCount={0} />)
+
+        expect(screen.queryByTestId('people-zero-friends-hint')).not.toBeInTheDocument()
+        await user.click(screen.getByTestId('who-friends'))
+        expect(await screen.findByTestId('people-zero-friends-hint')).toBeInTheDocument()
+    })
+
     it('opens the Specific-people picker and commits a selection', async () => {
         server.use(...followingHandlers())
         const onChange = vi.fn()
@@ -128,6 +149,7 @@ describe('PeopleFilterPanel', () => {
         await user.click(screen.getByTestId('who-specific'))
         expect(await screen.findByTestId('specific-people-picker')).toBeInTheDocument()
 
+        // Default tab lists the viewer's network — selectable rows.
         await user.click(await screen.findByText('Alice Smith'))
         await user.click(screen.getByTestId('specific-people-done'))
         expect(onChange).toHaveBeenCalledWith(
@@ -135,14 +157,38 @@ describe('PeopleFilterPanel', () => {
         )
     })
 
-    it('shows Build your tribe when the viewer has no network and follows inline', async () => {
-        server.use(
-            ...followingHandlers(0),
-            ...suggestionHandlers([
-                { handle: 'dan', display_name: 'Dan Poe', avatar_url: null, is_verified_organizer: false, mutual_friend_count: 2, mutual_friends_preview: ['alice'] },
-            ]),
-            followActionHandler(),
+    it('follows a Discover suggestion in the picker and auto-selects them', async () => {
+        server.use(...followingHandlers(), ...suggestionHandlers([DAN]), followActionHandler())
+        const onChange = vi.fn()
+        const { user } = renderWithProviders(<Harness followingCount={7} onChange={onChange} />)
+
+        await user.click(screen.getByTestId('who-specific'))
+        await screen.findByTestId('specific-people-picker')
+
+        await user.click(screen.getByTestId('people-tab-discover'))
+        await user.click(await screen.findByText('Dan Poe'))
+        await user.click(screen.getByTestId('specific-people-done'))
+        expect(onChange).toHaveBeenCalledWith(
+            expect.objectContaining({ source: 'follows', userHandles: ['dan'], match: 'any' }),
         )
+    })
+
+    it('opens the Find-people overlay from the Tribe row with network + discover tabs', async () => {
+        server.use(...followingHandlers(), ...suggestionHandlers([DAN]))
+        const { user } = renderWithProviders(<Harness followingCount={7} />)
+
+        await user.click(await screen.findByTestId('tribe-row'))
+        expect(await screen.findByTestId('people-discover-overlay')).toBeInTheDocument()
+        expect(screen.getByTestId('people-tab-network')).toBeInTheDocument()
+        // Network tab lists existing follows.
+        expect(await screen.findByText('Alice Smith')).toBeInTheDocument()
+
+        await user.click(screen.getByTestId('people-tab-discover'))
+        expect(await screen.findByText('Dan Poe')).toBeInTheDocument()
+    })
+
+    it('lets the viewer follow several people before returning from the empty state', async () => {
+        server.use(...followingHandlers(0), ...suggestionHandlers([DAN]), followActionHandler())
         const onChange = vi.fn()
         const { user } = renderWithProviders(<Harness followingCount={0} onChange={onChange} />)
 
@@ -150,7 +196,13 @@ describe('PeopleFilterPanel', () => {
         const followBtn = await screen.findByRole('button', { name: /Follow dan/i })
         await user.click(followBtn)
 
-        // First follow from empty state auto-selects Following + Going.
+        // First follow auto-selects Following + Going in the background…
         expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ source: 'follows', kind: 'going' }))
+        // …but the surface stays open (no snap-back to the main filter).
+        expect(screen.getByTestId('build-your-tribe')).toBeInTheDocument()
+
+        // Done returns to the populated main filter.
+        await user.click(screen.getByTestId('build-tribe-done'))
+        expect(await screen.findByTestId('people-filter-panel')).toBeInTheDocument()
     })
 })

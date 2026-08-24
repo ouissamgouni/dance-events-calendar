@@ -189,7 +189,6 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         network_going_snapshot_enabled=_get_bool_setting(
             session, "network_going_snapshot_enabled", default=True
         ),
-        summary_two_line_enabled=_get_bool_setting(session, "summary_two_line_enabled"),
         suggest_event_required_dance_group_id=_get_optional_int_setting(
             session, "suggest_event_required_dance_group_id"
         ),
@@ -272,6 +271,9 @@ def _build_response(session: Session) -> SiteSettingsResponse:
             "milestone_unlocked", session
         ),
         review_prompt_enabled=app_settings.get_review_prompt_enabled(session),
+        event_review_size_step_enabled=app_settings.get_event_review_size_step_enabled(
+            session
+        ),
         review_prompt_delay_hours=app_settings.get_review_prompt_delay_hours(session),
         review_prompt_lookback_hours=app_settings.get_review_prompt_lookback_hours(
             session
@@ -371,11 +373,6 @@ def update_settings(
 
     if body.unseen_state_enabled is not None:
         _set_bool_setting(session, "unseen_state_enabled", body.unseen_state_enabled)
-
-    if body.summary_two_line_enabled is not None:
-        _set_bool_setting(
-            session, "summary_two_line_enabled", body.summary_two_line_enabled
-        )
 
     if body.trending_enabled is not None:
         _set_bool_setting(session, "trending_enabled", body.trending_enabled)
@@ -601,6 +598,13 @@ def update_settings(
 
     if body.review_prompt_enabled is not None:
         _set_bool_setting(session, "review_prompt_enabled", body.review_prompt_enabled)
+
+    if body.event_review_size_step_enabled is not None:
+        _set_bool_setting(
+            session,
+            "event_review_size_step_enabled",
+            body.event_review_size_step_enabled,
+        )
 
     if body.review_prompt_delay_hours is not None:
         row = session.get(SiteSetting, "review_prompt_delay_hours")

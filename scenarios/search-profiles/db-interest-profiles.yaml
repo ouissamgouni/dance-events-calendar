@@ -12,6 +12,7 @@ interest_profiles:
   # This is the "Default" search profile the picker shows first.
   - user: viewer@example.com
     label: "Default"
+    area_label: "Europe & nearby"
     min_lat: 24
     min_lng: -18
     max_lat: 69
@@ -25,11 +26,26 @@ interest_profiles:
   # Notifications OFF (matches_enabled=false) per the browse-created default.
   - user: viewer@example.com
     label: "Barcelona salsa"
+    area_label: "Barcelona"
     min_lat: 41.30
     min_lng: 2.05
     max_lat: 41.47
     max_lng: 2.25
     dance_tags: ["dance-style:salsa"]
+    reach_tags: ["reach:international"]
+    matches_enabled: false
+    is_active: false
+
+  # Same bounds remain a separate "Your areas" shortcut because profile
+  # context is useful even when geography overlaps.
+  - user: viewer@example.com
+    label: "Barcelona festivals"
+    area_label: "Barcelona metro"
+    min_lat: 41.30
+    min_lng: 2.05
+    max_lat: 41.47
+    max_lng: 2.25
+    dance_tags: []
     reach_tags: ["reach:international"]
     matches_enabled: false
     is_active: false

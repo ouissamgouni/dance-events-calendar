@@ -445,6 +445,10 @@ export default function InterestSection({ eventId, eventTitle, isPast = false }:
     }
     if (!summary) return null;
 
+    // Attendees going with a friends/private audience this viewer can't
+    // see: the header count minus everyone visible (incl. the public tail).
+    const hiddenCount = Math.max(0, summary.total_going - totalShown);
+
     // Collapsible header (reused for anon + authed). The chevron is the
     // only visual cue — clicking the whole strip toggles, matching the
     // pattern used by other collapsible sections in the app.
@@ -520,10 +524,21 @@ export default function InterestSection({ eventId, eventTitle, isPast = false }:
             {!collapsed && (
                 <>
                     {isEmpty ? (
-                        <div className="text-[11px] text-ink-soft">
-                            No one has shared their name yet — be the first by marking
-                            yourself {isPast ? 'attended' : 'going'} publicly.
-                        </div>
+                        hiddenCount > 0 ? (
+                            <div
+                                className="text-[11px] text-ink-soft"
+                                data-testid="interest-hidden"
+                            >
+                                {hiddenCount} {isPast ? 'attended' : 'going'} privately —
+                                be the first to show your name by marking yourself{' '}
+                                {isPast ? 'attended' : 'going'} publicly.
+                            </div>
+                        ) : (
+                            <div className="text-[11px] text-ink-soft">
+                                No one has shared their name yet — be the first by marking
+                                yourself {isPast ? 'attended' : 'going'} publicly.
+                            </div>
+                        )
                     ) : (
                         <>
                             {friends.length > 0 && (
@@ -552,7 +567,15 @@ export default function InterestSection({ eventId, eventTitle, isPast = false }:
                             )}
                             {others.length > 0 && (
                                 <BucketRow
-                                    label={isPast ? '· Also attended' : '· Also going'}
+                                    label={
+                                        friends.length === 0 && fofs.length === 0
+                                            ? isPast
+                                                ? '· Attended'
+                                                : '· Going'
+                                            : isPast
+                                                ? '· Also attended'
+                                                : '· Also going'
+                                    }
                                     testid="interest-others"
                                     count={others.length}
                                 >
@@ -577,6 +600,14 @@ export default function InterestSection({ eventId, eventTitle, isPast = false }:
                                     >
                                         Show all {totalShown} →
                                     </button>
+                                </div>
+                            )}
+                            {hiddenCount > 0 && (
+                                <div
+                                    className="text-[11px] text-ink-soft"
+                                    data-testid="interest-hidden"
+                                >
+                                    {hiddenCount} more {isPast ? 'attended' : 'going'} privately
                                 </div>
                             )}
                         </>

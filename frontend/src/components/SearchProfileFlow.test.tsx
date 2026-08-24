@@ -9,7 +9,9 @@ import type { TagGroup } from '../types';
 // jsdom cannot run. Stub it so the name input + Save/Delete buttons remain
 // testable without the map.
 vi.mock('./ProfileEditor', () => ({
-    default: () => <div data-testid="profile-editor-stub" />,
+    default: ({ areaNameControl }: { areaNameControl?: React.ReactNode }) => (
+        <div data-testid="profile-editor-stub">{areaNameControl}</div>
+    ),
 }));
 
 const danceGroup: TagGroup = {
@@ -33,6 +35,7 @@ function makeProfile(overrides: Partial<InterestProfile> = {}): InterestProfile 
     return {
         id: 1,
         label: 'Barcelona',
+        area_label: 'Barcelona area',
         min_lat: 41,
         min_lng: 2,
         max_lat: 42,
@@ -51,7 +54,7 @@ function baseProps() {
     return {
         open: true as const,
         onClose: vi.fn(),
-        profiles: [makeProfile()],
+        profiles: [makeProfile({ is_active: true }), makeProfile({ id: 2, label: 'Barcelona salsa' })],
         selectedProfileId: 'custom' as number | 'custom',
         current: { area: { min_lat: 41, min_lng: 2, max_lat: 42, max_lng: 3 }, danceIds: [10], reachIds: [20] },
         currentAreaLabel: 'Barcelona',
@@ -59,7 +62,7 @@ function baseProps() {
         reachGroup,
         localTagId: null,
         onApplyProfile: vi.fn(),
-        onUpdateDefault: vi.fn().mockResolvedValue(undefined),
+        onUpdateProfile: vi.fn().mockResolvedValue(undefined),
         createProfile: vi.fn().mockResolvedValue(makeProfile()),
         updateProfile: vi.fn().mockResolvedValue(makeProfile()),
         deleteProfile: vi.fn().mockResolvedValue(undefined),
@@ -74,10 +77,16 @@ describe('SearchProfileFlow', () => {
         expect(container).toBeEmptyDOMElement();
     });
 
-    it('picker lists Custom and saved profiles', () => {
+    it('picker lists Current search for unmatched filters and saved profiles', () => {
         render(<SearchProfileFlow {...baseProps()} initialStep="picker" />);
         expect(screen.getByTestId('search-profile-picker')).toBeInTheDocument();
-        expect(screen.getByText('Custom')).toBeInTheDocument();
+        expect(screen.getByText('Current search')).toBeInTheDocument();
+        expect(screen.getByTestId('search-profile-apply-1')).toBeInTheDocument();
+    });
+
+    it('hides Current search when a saved profile is selected', () => {
+        render(<SearchProfileFlow {...baseProps()} selectedProfileId={1} initialStep="picker" />);
+        expect(screen.queryByText('Current search')).not.toBeInTheDocument();
         expect(screen.getByTestId('search-profile-apply-1')).toBeInTheDocument();
     });
 
@@ -90,13 +99,39 @@ describe('SearchProfileFlow', () => {
         expect(props.onClose).toHaveBeenCalled();
     });
 
-    it('save step "Update default profile" calls onUpdateDefault then onClose', async () => {
+    it('save step preselects active profile and calls onUpdateProfile then onClose', async () => {
         const props = baseProps();
         const user = userEvent.setup();
         render(<SearchProfileFlow {...props} initialStep="save" />);
-        await user.click(screen.getByTestId('search-profile-update-default'));
-        expect(props.onUpdateDefault).toHaveBeenCalled();
+        // The active profile (id=1) should be preselected.
+        expect(screen.getByTestId('search-profile-target-1')).toHaveClass('bg-action');
+        await user.click(screen.getByTestId('search-profile-update'));
+        expect(props.onUpdateProfile).toHaveBeenCalledWith(props.profiles[0]);
         expect(props.onClose).toHaveBeenCalled();
+    });
+
+    it('save step allows selecting a different profile to update', async () => {
+        const props = baseProps();
+        const user = userEvent.setup();
+        render(<SearchProfileFlow {...props} initialStep="save" />);
+        // Initially the active profile is selected.
+        expect(screen.getByTestId('search-profile-target-1')).toHaveClass('bg-action');
+        // Click the non-active profile.
+        await user.click(screen.getByTestId('search-profile-target-2'));
+        expect(screen.getByTestId('search-profile-target-2')).toHaveClass('bg-action');
+        await user.click(screen.getByTestId('search-profile-update'));
+        expect(props.onUpdateProfile).toHaveBeenCalledWith(props.profiles[1]);
+        expect(props.onClose).toHaveBeenCalled();
+    });
+
+    it('save step with no profiles shows only create option', async () => {
+        const props = baseProps();
+        props.profiles = [];
+        render(<SearchProfileFlow {...props} initialStep="save" />);
+        // Profile selector should not be present.
+        expect(screen.queryByText('Profile to update')).not.toBeInTheDocument();
+        // But "Save as new profile" should be available.
+        expect(screen.getByTestId('search-profile-save-new')).toBeInTheDocument();
     });
 
     it('create step saves a new profile via createProfile', async () => {
@@ -105,21 +140,46 @@ describe('SearchProfileFlow', () => {
         render(<SearchProfileFlow {...props} initialStep="picker" />);
         await user.click(screen.getByTestId('search-profile-create'));
         expect(screen.getByTestId('search-profile-editor')).toBeInTheDocument();
+        await user.clear(screen.getByLabelText('Profile name'));
+        await user.type(screen.getByLabelText('Profile name'), 'Weekend salsa');
+        await user.clear(screen.getByLabelText('Area name'));
+        await user.type(screen.getByLabelText('Area name'), 'Greater Barcelona');
         await user.click(screen.getByTestId('search-profile-save-draft'));
         expect(props.createProfile).toHaveBeenCalledTimes(1);
-        // Browse-created profiles default notifications OFF.
-        expect(props.createProfile.mock.calls[0][0]).toMatchObject({ matches_enabled: false });
+        expect(props.createProfile.mock.calls[0][0]).toMatchObject({
+            label: 'Weekend salsa',
+            area_label: 'Greater Barcelona',
+            matches_enabled: false,
+        });
+        expect(props.onApplyProfile).toHaveBeenCalledWith(await props.createProfile.mock.results[0].value);
         expect(props.updateProfile).not.toHaveBeenCalled();
+        expect(props.onClose).toHaveBeenCalled();
     });
 
-    it('edit pencil opens the editor and updates the existing profile', async () => {
+    it('editing a non-selected profile updates it without applying it', async () => {
         const props = baseProps();
         const user = userEvent.setup();
         render(<SearchProfileFlow {...props} initialStep="picker" />);
-        await user.click(screen.getByTestId('search-profile-edit-1'));
+        await user.click(screen.getByTestId('search-profile-edit-2'));
         expect(screen.getByTestId('search-profile-editor')).toBeInTheDocument();
         await user.click(screen.getByTestId('search-profile-save-draft'));
-        expect(props.updateProfile).toHaveBeenCalledWith(1, expect.objectContaining({ label: 'Barcelona' }));
+        expect(props.updateProfile).toHaveBeenCalledWith(2, expect.objectContaining({
+            label: 'Barcelona salsa',
+        }));
+        expect(props.onApplyProfile).not.toHaveBeenCalled();
+    });
+
+    it('editing the selected profile reapplies the updated result', async () => {
+        const props = baseProps();
+        const updated = makeProfile({ label: 'Updated Barcelona' });
+        props.selectedProfileId = 1;
+        props.updateProfile.mockResolvedValue(updated);
+        const user = userEvent.setup();
+        render(<SearchProfileFlow {...props} initialStep="picker" />);
+        await user.click(screen.getByTestId('search-profile-edit-1'));
+        await user.click(screen.getByTestId('search-profile-save-draft'));
+        expect(props.onApplyProfile).toHaveBeenCalledWith(updated);
+        expect(props.onClose).toHaveBeenCalled();
     });
 
     it('deleting from the editor confirms then calls deleteProfile', async () => {

@@ -39,6 +39,9 @@ export interface UserResultCardProps {
     trailing?: React.ReactNode; // Follow CTA, etc.
     onSelect?: (user: UserCardModel) => void;
     href?: string; // when set, the card is a Link instead of a button
+    // Overrides the default "@handle · N subscribers" secondary line
+    // (e.g. "Followed by @alice + 2 others").
+    subtitle?: React.ReactNode;
 }
 
 export default function UserResultCard({
@@ -49,6 +52,7 @@ export default function UserResultCard({
     trailing,
     onSelect,
     href,
+    subtitle,
 }: UserResultCardProps) {
     const isRich = variant === 'rich';
     const baseCls =
@@ -93,21 +97,25 @@ export default function UserResultCard({
                     )}
                 </div>
                 <div className="text-[11px] text-ink-soft truncate">
-                    @{user.handle}
-                    {typeof user.subscribers_count === 'number' && (
+                    {subtitle ?? (
                         <>
-                            {' · '}
-                            {user.subscribers_count} subscriber
-                            {user.subscribers_count === 1 ? '' : 's'}
-                        </>
-                    )}
-                    {isRich && metrics && (
-                        <>
-                            {(metrics.upcoming_going_visible ?? 0) > 0 && (
-                                <> · {metrics.upcoming_going_visible} going</>
+                            @{user.handle}
+                            {typeof user.subscribers_count === 'number' && (
+                                <>
+                                    {' · '}
+                                    {user.subscribers_count} subscriber
+                                    {user.subscribers_count === 1 ? '' : 's'}
+                                </>
                             )}
-                            {(metrics.upcoming_saved_visible ?? 0) > 0 && (
-                                <> · {metrics.upcoming_saved_visible} saved</>
+                            {isRich && metrics && (
+                                <>
+                                    {(metrics.upcoming_going_visible ?? 0) > 0 && (
+                                        <> · {metrics.upcoming_going_visible} going</>
+                                    )}
+                                    {(metrics.upcoming_saved_visible ?? 0) > 0 && (
+                                        <> · {metrics.upcoming_saved_visible} saved</>
+                                    )}
+                                </>
                             )}
                         </>
                     )}
@@ -124,11 +132,16 @@ export default function UserResultCard({
             </Link>
         );
     }
+    // Non-interactive rows (e.g. a Follow button lives in `trailing`) render a
+    // plain div so the button isn't nested inside another button.
+    if (!onSelect) {
+        return <div className={baseCls}>{body}</div>;
+    }
     return (
         <button
             type="button"
             className={baseCls}
-            onClick={() => onSelect?.(user)}
+            onClick={() => onSelect(user)}
         >
             {body}
         </button>

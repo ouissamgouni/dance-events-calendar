@@ -11,10 +11,15 @@ settings:
   trending_banner_enabled: true
   promo_codes_enabled: true
   organizer_claims_enabled: true
+
+  # Pages for viewer
   for_you_rail_enabled: true
+  for_you_page_enabled: true
+  tribe_page_enabled: true
+  passport_page_enabled: true
+
   your_next_events_rail_enabled: true
   tag_as_badge_enabled: true
 
   # Experiment under test: two-line, icon-prefixed filter summary bar with
   # the Map/Calendar controls pinned to its right.
-  summary_two_line_enabled: true

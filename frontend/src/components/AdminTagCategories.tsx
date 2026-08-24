@@ -90,7 +90,12 @@ export default function AdminTagCategories() {
     };
 
     const handleTogglePolarity = async (tag: AdminTag) => {
-        const next: 'positive' | 'negative' = tag.polarity === 'negative' ? 'positive' : 'negative';
+        const next: 'positive' | 'negative' | 'neutral' =
+            tag.polarity === 'positive'
+                ? 'negative'
+                : tag.polarity === 'negative'
+                    ? 'neutral'
+                    : 'positive';
         setGroups((prev) =>
             prev.map((g) => ({
                 ...g,
@@ -512,10 +517,10 @@ export default function AdminTagCategories() {
                                                         <button
                                                             onClick={() => handleTogglePolarity(tag)}
                                                             className="ml-0.5 hover:opacity-80 transition text-[10px] leading-none"
-                                                            title={`Polarity: ${tag.polarity ?? 'positive'} (click to toggle)`}
-                                                            aria-label={`Toggle polarity, currently ${tag.polarity ?? 'positive'}`}
+                                                            title={`Polarity: ${tag.polarity ?? 'neutral'} (click to cycle)`}
+                                                            aria-label={`Cycle polarity, currently ${tag.polarity ?? 'neutral'}`}
                                                         >
-                                                            {tag.polarity === 'negative' ? '−' : '+'}
+                                                            {tag.polarity === 'positive' ? '+' : tag.polarity === 'negative' ? '−' : '•'}
                                                         </button>
                                                     )}
                                                     <button

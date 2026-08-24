@@ -1,4 +1,70 @@
 attendances:
+  # ── Viewer's passport: 12 past events with mixed audiences ────────
+  # Supports the Dance Passport page; audiences (public/friends/private)
+  # are mixed so all count toward the self-only passport view. All events
+  # are in the past (negative week offsets) with geographical data so the
+  # passport can calculate milestones (cities, countries, etc.).
+  - {
+      event_id: evt-passport-01,
+      email: viewer@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-passport-02,
+      email: viewer@example.com,
+      share_audience: friends,
+    }
+  - {
+      event_id: evt-passport-03,
+      email: viewer@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-passport-04,
+      email: viewer@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-passport-05,
+      email: viewer@example.com,
+      share_audience: friends,
+    }
+  - {
+      event_id: evt-passport-06,
+      email: viewer@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-passport-07,
+      email: viewer@example.com,
+      share_audience: friends,
+    }
+  - {
+      event_id: evt-passport-08,
+      email: viewer@example.com,
+      share_audience: private,
+    }
+  - {
+      event_id: evt-passport-09,
+      email: viewer@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-passport-10,
+      email: viewer@example.com,
+      share_audience: friends,
+    }
+  - {
+      event_id: evt-passport-11,
+      email: viewer@example.com,
+      share_audience: public,
+    }
+  - {
+      event_id: evt-passport-12,
+      email: viewer@example.com,
+      share_audience: friends,
+    }
+
   # Hero Paris social: friends + one-way followees + strangers.
   - { event_id: evt-ux-008, email: alice@example.com, share_publicly: true }
   - { event_id: evt-ux-008, email: emma@example.com, share_publicly: true }

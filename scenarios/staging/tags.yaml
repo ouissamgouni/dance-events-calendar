@@ -259,9 +259,9 @@ tag_groups:
   # scenarios/default/tags.yaml so the adaptive review flow works on remote
   # staging. Each group is one aspect surfaced in the review flow: the user
   # picks a headline sentiment, chooses the aspects that drove it, then rates
-  # (1-5 stars) and tags each. Tags carry a `polarity` (positive|negative) so
-  # the public "Community summary" can split "People loved" from
-  # "People mentioned".
+  # (1-5 stars) and tags each. Tags carry a `polarity`
+  # (positive|negative|neutral) so appreciation stays separate from factual
+  # or cautionary mentions in the public community summary.
   #
   # NOTE: the aspect "Venue" group uses slug `venue-quality` (not `venue`)
   # because the event-scope `venue` group above already owns that slug and
@@ -357,8 +357,8 @@ tag_groups:
       - { slug: too-advanced, label: Mostly advanced, polarity: negative }
       - { slug: international-crowd, label: International crowd }
       - { slug: mostly-locals, label: Mostly locals }
-      - { slug: small-event, label: Small event }
-      - { slug: large-event, label: Large event }
+      - { slug: small-event, label: Small event, enabled: false }
+      - { slug: large-event, label: Large event, enabled: false }
       - {
           slug: good-gender-balance,
           label: Good lead/follow balance,
@@ -385,8 +385,8 @@ tag_groups:
       - { slug: good-lighting, label: Good lighting, polarity: positive }
       - { slug: easy-parking, label: Easy parking, polarity: positive }
       - { slug: easy-access, label: Easy to reach, polarity: positive }
-      - { slug: good-food, label: Good food, polarity: positive }
-      - { slug: good-bar, label: Good drinks, polarity: positive }
+      - { slug: good-food, label: Good food, polarity: positive, enabled: false }
+      - { slug: good-bar, label: Good drinks, polarity: positive, enabled: false }
       - { slug: clean, label: Clean facilities, polarity: positive }
       - { slug: too-hot, label: Too hot, polarity: negative }
       - { slug: too-cold, label: Too cold, polarity: negative }
@@ -397,8 +397,8 @@ tag_groups:
       - { slug: poor-lighting, label: Poor lighting, polarity: negative }
       - { slug: poor-parking, label: Hard to park, polarity: negative }
       - { slug: hard-to-find, label: Hard to find, polarity: negative }
-      - { slug: poor-food, label: Poor food, polarity: negative }
-      - { slug: poor-drinks, label: Poor drinks, polarity: negative }
+      - { slug: poor-food, label: Poor food, polarity: negative, enabled: false }
+      - { slug: poor-drinks, label: Poor drinks, polarity: negative, enabled: false }
       - { slug: dirty-bathrooms, label: Dirty facilities, polarity: negative }
 
   - slug: organization
@@ -417,6 +417,7 @@ tag_groups:
       - { slug: good-schedule, label: Good schedule, polarity: positive }
       - { slug: friendly-staff, label: Friendly staff, polarity: positive }
       - { slug: smooth-check-in, label: Smooth check-in, polarity: positive }
+      - { slug: friendly-service, label: Friendly service, polarity: positive }
       - { slug: started-on-time, label: Started on time, polarity: positive }
       - { slug: disorganized, label: Disorganized, polarity: negative }
       - {
@@ -435,11 +436,17 @@ tag_groups:
           polarity: negative,
         }
       - { slug: long-queue, label: Long queue, polarity: negative }
+      - { slug: slow-service, label: Slow service, polarity: negative }
+      - {
+          slug: long-food-drink-queue,
+          label: Long food/drink queue,
+          polarity: negative,
+        }
       - { slug: started-late, label: Started late, polarity: negative }
 
   - slug: value
     label: 💰 Value
-    ordinal: 104
+    ordinal: 105
     allow_multiple: true
     color: "#f59e0b"
     scope: aspect
@@ -453,7 +460,7 @@ tag_groups:
   # or format:class (see condition_tag_slugs).
   - slug: workshop
     label: 🎓 Workshops
-    ordinal: 105
+    ordinal: 106
     allow_multiple: true
     color: "#f59e0b"
     scope: aspect
@@ -488,7 +495,7 @@ tag_groups:
   # (see condition_tag_slugs).
   - slug: shows
     label: 🎭 Shows
-    ordinal: 106
+    ordinal: 107
     allow_multiple: true
     color: "#f59e0b"
     scope: aspect
@@ -512,8 +519,8 @@ tag_groups:
       - { slug: delayed-shows, label: Delayed, polarity: negative }
 
   - slug: refreshments
-    label: 🥤 Refreshments
-    ordinal: 107
+    label: 🍽️ Food & Drink
+    ordinal: 104
     allow_multiple: true
     color: "#f59e0b"
     scope: aspect
@@ -522,8 +529,31 @@ tag_groups:
       - { slug: free-coffee, label: "Free coffee & tea", polarity: positive }
       - { slug: free-snacks, label: Free snacks, polarity: positive }
       - { slug: free-food, label: Free food, polarity: positive }
-      - { slug: food-available, label: Food available }
-      - { slug: drinks-available, label: Drinks available }
+      - { slug: food-available, label: Meals available, polarity: positive }
+      - { slug: snacks-available, label: Snacks available, polarity: positive }
+      - { slug: drinks-available, label: Drinks available, polarity: positive }
+      - { slug: good-food, label: Good food, polarity: positive }
+      - { slug: good-drinks, label: Good drinks, polarity: positive }
+      - { slug: good-variety, label: Good variety, polarity: positive }
+      - { slug: dietary-options, label: Dietary options, polarity: positive }
+      - { slug: poor-food, label: Poor food, polarity: negative }
+      - { slug: poor-drinks, label: Poor drinks, polarity: negative }
+      - { slug: limited-options, label: Limited options, polarity: negative }
+      - { slug: ran-out, label: Food or drinks ran out, polarity: negative }
+      - { slug: no-drinking-water, label: No drinking water, polarity: negative }
+
+  - slug: event-size
+    label: Event size
+    ordinal: 108
+    allow_multiple: false
+    color: "#f59e0b"
+    scope: aspect
+    tags:
+      - { slug: intimate, label: Intimate (<50), polarity: neutral }
+      - { slug: small, label: Small (50-200), polarity: neutral }
+      - { slug: medium, label: Medium (200-500), polarity: neutral }
+      - { slug: large, label: "Large (500-2,000)", polarity: neutral }
+      - { slug: huge, label: "Huge (2,000+)", polarity: neutral }
 
   # ─────────────────────────────────────────────────────────────────────
   # Recommendation audience (scope: audience). Optional, neutral-polarity

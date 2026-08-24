@@ -8,19 +8,20 @@ test_plan:
 
     Core rule under test: filtering is temporary by default. A profile changes
     only when the viewer explicitly saves or edits it. Changing Area/Dance/Reach
-    away from every saved profile surfaces a derived "Custom" state (and a small
-    "Save" action); returning the selection to a saved combination re-selects
-    that profile automatically.
+    away from every saved profile surfaces a derived "Current search" state
+    (and a small "Save" action); returning the selection to a saved combination
+    re-selects that profile automatically.
 
     In this codebase search profiles ARE interest profiles: the `is_active`
     profile is the "Default" search profile. "Update default profile" overwrites
     its Area/Dance/Reach; "Save as new profile" creates another profile with
     notifications OFF by default.
 
-    The viewer is pre-seeded with two profiles (see
+    The viewer is pre-seeded with three profiles (see
     db-interest-profiles.yaml): "Default" (wide Europe bbox, no dance filter,
     International) and "Barcelona salsa" (tight Barcelona bbox, Salsa,
-    International). Events are split into a Barcelona cluster and an
+    International), plus "Barcelona festivals" using the same bounds under
+    the area name "Barcelona metro". Events are split into a Barcelona cluster and an
     elsewhere-in-Europe cluster so profile switches visibly change the list.
 
   preconditions:
@@ -51,7 +52,7 @@ test_plan:
         Read the selector row label.
       expected: >
         Because the effective Area/Dance/Reach equals the seeded is_active
-        "Default" profile, the selector shows "Default" (NOT "Custom").
+        "Default" profile, the selector shows "Default" (NOT "Current search").
 
     - id: 3
       title: "Open the profile picker"
@@ -59,10 +60,10 @@ test_plan:
         Tap the selector row.
       expected: >
         The picker (data-testid `search-profile-picker`) opens above the sheet.
-        It lists a "Custom" row first (radio + one-line Area · Dance · Reach
-        summary, no pencil), then "Default" and "Barcelona salsa" rows (each a
-        radio + name + summary + edit pencil), then a "Create new profile"
-        action. The radio next to "Default" is selected.
+        It lists "Default" and "Barcelona salsa" rows (each a radio + name +
+        summary + edit pencil), then a "Create new profile" action. The radio
+        next to "Default" is selected. No "Current search" row is shown while
+        a saved profile matches the live filters.
 
     - id: 4
       title: "Apply the Barcelona salsa profile"
@@ -80,19 +81,20 @@ test_plan:
         Re-open the Filters sheet and read the selector row.
       expected: >
         The selector shows "Barcelona salsa"; its radio is selected in the
-        picker. No "Custom" is shown.
+        picker. No "Current search" is shown.
 
-    # ── Custom state + Save-as-new ───────────────────────────────────────
+    # ── Current search state + Save-as-new ───────────────────────────────
     - id: 6
-      title: "Changing Dance styles surfaces Custom + a Save action"
+      title: "Changing Dance styles surfaces Current search + a Save action"
       description: >
         In the Dance styles row, ADD Bachata (keep Salsa). Return to the section
         list.
       expected: >
-        The selector row now reads "Custom". A small secondary "Save" text
-        action (data-testid `search-profile-save-action`) appears under the
-        SEARCH PROFILE group. The Berlin Bachata event (evt-sp-eu-002) does NOT
-        appear because the area is still the Barcelona bbox.
+        The selector row now reads "Current search". Its selected summary row
+        appears first in the picker. A small secondary "Save" text action
+        (data-testid `search-profile-save-action`) appears under the SEARCH
+        PROFILE group. The Berlin Bachata event (evt-sp-eu-002) does NOT appear
+        because the area is still the Barcelona bbox.
 
     - id: 7
       title: "Save-as-new keeps notifications OFF by default"
@@ -107,30 +109,48 @@ test_plan:
         "Barcelona salsa+bachata" (the live selection matches the new profile).
         Dates/People/More unchanged.
 
-    # ── Update default ───────────────────────────────────────────────────
+    # ── Update profile via selector ──────────────────────────────────────
     - id: 8
-      title: "Update default profile overwrites the is_active profile"
+      title: "Updating default profile via the selector"
       description: >
         Apply the "Default" profile from the picker, then widen/adjust the Area
-        (e.g. draw a slightly different bbox) so the selector reads "Custom".
-        Tap "Save" → "Update default profile"
-        (data-testid `search-profile-update-default`).
+        (e.g. draw a slightly different bbox) so the selector reads "Current
+        search". Tap "Save" → verify the "Profile to update" selector shows
+        "Default" (with default badge) preselected. Tap "Update selected profile"
+        (data-testid `search-profile-update`).
       expected: >
-        PUT /api/interest-profiles/<active id> is issued overwriting the active
+        PATCH /api/interest-profiles/<active id> is issued overwriting the active
         profile's Area/Dance/Reach with the current values. The flow closes and
         the selector re-reads "Default" (the live selection now matches the
         updated default). Reloading the page preserves the new default.
 
+    - id: 8b
+      title: "Updating a non-active profile via the selector"
+      description: >
+        Tap "Save". In the "Profile to update" selector, click "Barcelona salsa"
+        (the non-active profile). Adjust the Area or Dance styles. Tap
+        "Update selected profile" (data-testid `search-profile-update`).
+      expected: >
+        PATCH /api/interest-profiles/<barcelona-salsa id> is issued overwriting
+        that profile's Area/Dance/Reach. The flow closes. The live selection
+        does NOT change (still "Current search"). "Default" remains active and
+        unchanged. Verify in Settings that "Barcelona salsa" now has the updated
+        area/styles while "Default" is unaffected.
+
     # ── Edit + delete ────────────────────────────────────────────────────
     - id: 9
-      title: "Edit a saved profile via the pencil (without applying it)"
+      title: "Editing applies only when that profile is selected"
       description: >
         Open the picker. Tap the pencil on "Barcelona salsa"
-        (data-testid `search-profile-edit-<id>`).
+        (data-testid `search-profile-edit-<id>`) while Default is selected,
+        rename it to "BCN salsa", and Save. Then apply "BCN salsa", edit its
+        Area/Dance/Reach, and Save again.
       expected: >
         The editor opens pre-filled with that profile's name/Area/Dance/Reach —
-        WITHOUT changing the live search. Rename to "BCN salsa" and Save.
-        The saved profile updates; the live Explore results are unchanged.
+        WITHOUT changing the live search. The first non-selected edit updates
+        the saved profile while leaving Explore on Default. The second edit
+        reapplies the returned profile values, so "BCN salsa" remains selected
+        and Explore immediately reflects its updated Area/Dance/Reach.
 
     - id: 10
       title: "Delete a saved profile"
@@ -154,13 +174,13 @@ test_plan:
         filters remain exactly as set. Only Area/Dance/Reach change.
 
     - id: 12
-      title: "Anonymous users see no selector, Save, or Custom"
+      title: "Anonymous users see no selector, Save, or Current search"
       description: >
         Open a fresh incognito window WITHOUT signing in. Open the Filters sheet.
       expected: >
         The SEARCH PROFILE group shows only the Area / Dance / Reach rows editing
         the single localStorage default — there is NO profile selector row, NO
-        "Save" action, and NO "Custom" label.
+        "Save" action, and NO "Current search" label.
 
     # ── Desktop parity ───────────────────────────────────────────────────
     - id: 13
@@ -171,3 +191,38 @@ test_plan:
       expected: >
         The picker, Save sheet, and editor render as centered cards stacked
         above the Filters modal, with identical behavior to mobile.
+
+    - id: 14
+      title: "Area UI uses area names instead of profile names"
+      description: >
+        Apply "Barcelona salsa", then inspect the Area summary and the sticky
+        filter bar chip.
+      expected: >
+        Both display "Barcelona". Neither displays "Barcelona salsa" nor the
+        prefix "Your profile area"; the profile selector still displays
+        "Barcelona salsa".
+
+    - id: 15
+      title: "Profile area chips apply geography only and keep duplicate bounds"
+      description: >
+        Set Dance styles to Salsa. Open Area and inspect the first chips in the
+        presets line, then choose "Barcelona metro" from the chip sourced from
+        the "Barcelona festivals" profile.
+      expected: >
+        Separate chips exist despite identical bounds. Each shows the area name
+        plus the extra-small source text "From your '<name>' profile", uses a
+        distinct background from generic presets, and appears before My area
+        and continent presets. Selecting "Barcelona metro" changes only the
+        area label/bounds. Salsa remains selected, Reach is unchanged, and no
+        profile becomes active.
+
+    - id: 16
+      title: "Profile and area names edit independently"
+      description: >
+        Edit "Barcelona salsa". Change Profile name to "BCN weekends" and
+        Area name to "Greater Barcelona", then save and reopen the profile.
+      expected: >
+        Both names persist independently. The profile picker shows
+        "BCN weekends"; area chips and summaries show "Greater Barcelona".
+        Moving the map changes only Area name to "Custom area" and never
+        renames the profile.

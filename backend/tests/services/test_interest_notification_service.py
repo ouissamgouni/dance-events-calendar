@@ -154,6 +154,7 @@ def _make_profile(
     reach_tags: list[Tag] = (),
 ) -> UserInterestProfile:
     p = UserInterestProfile(
+        area_label="Test area",
         user_id=user.id,
         label=label,
         min_lat=min_lat,

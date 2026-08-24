@@ -128,7 +128,7 @@ export default function ProfileEditor({
                     </section>
                     <section>
                         <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
-                            Event scale
+                            Event reach
                         </label>
                         {tagsLoading ? (
                             <p className="text-sm text-muted">Loading…</p>

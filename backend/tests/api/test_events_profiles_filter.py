@@ -155,6 +155,7 @@ def world(session):
     session.refresh(user)
 
     profile_a = UserInterestProfile(
+        area_label="Area A",
         user_id=user.id,
         label="Paris salsa local",
         min_lat=48.0,
@@ -165,6 +166,7 @@ def world(session):
         is_active=True,
     )
     profile_b = UserInterestProfile(
+        area_label="Area B",
         user_id=user.id,
         label="Madrid intl",
         min_lat=40.0,

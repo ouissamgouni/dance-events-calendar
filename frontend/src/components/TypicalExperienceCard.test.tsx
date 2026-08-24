@@ -18,6 +18,7 @@ function makeSeries(overrides: Partial<SeriesRatingRollup> = {}): SeriesRatingRo
         sentiment_distribution: {},
         aspects: [],
         top_positive_tags: [],
+        top_neutral_tags: [],
         top_negative_tags: [],
         top_audience_tags: [],
         editions: [],

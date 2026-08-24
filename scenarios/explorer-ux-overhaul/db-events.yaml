@@ -1884,5 +1884,494 @@ events:
         "misc:trip",
       ]
 
+  # ── Past Passport Events for viewer's journey ────────────────────
+  # These 12 PAST events (negative week offsets) power the Dance Passport
+  # page with geographical data (city/country) so the viewer has a
+  # completed journey with milestones like "visited 9 cities" and
+  # "traveled to 5 countries". Each event has mixed audiences so all
+  # count toward the self-only passport view.
+  - id: evt-passport-01
+    calendar_id: salsa-cal-001
+    title: Paris Salsa Night
+    description: Paris salsa social.
+    location: Paris, France
+    latitude: 48.8566
+    longitude: 2.3522
+    city: Paris
+    country: France
+    country_code: FR
+    start: w-2 Fri 21:00
+    end: w-2 Sat 01:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:salsa", "reach:local"]
+
+  - id: evt-passport-02
+    calendar_id: bachata-cal-002
+    title: Barcelona Bachata Festival
+    description: Barcelona bachata festival.
+    location: Barcelona, Spain
+    latitude: 41.3851
+    longitude: 2.1734
+    city: Barcelona
+    country: Spain
+    country_code: ES
+    start: w-3 Sat 19:00
+    end: w-3 Sun 04:00
+    price_is_free: true
+    tags: ["format:festival", "dance-style:bachata", "reach:international"]
+
+  - id: evt-passport-03
+    calendar_id: salsa-cal-001
+    title: Berlin Salsa Marathon
+    description: Berlin salsa marathon.
+    location: Berlin, Germany
+    latitude: 52.5200
+    longitude: 13.4050
+    city: Berlin
+    country: Germany
+    country_code: DE
+    start: w-4 Sat 20:00
+    end: w-4 Sun 02:00
+    price_is_free: true
+    tags: ["format:festival", "dance-style:salsa", "reach:international"]
+
+  - id: evt-passport-04
+    calendar_id: bachata-cal-002
+    title: Milan Bachata Social
+    description: Milan bachata social.
+    location: Milan, Italy
+    latitude: 45.4642
+    longitude: 9.1900
+    city: Milan
+    country: Italy
+    country_code: IT
+    start: w-5 Fri 21:00
+    end: w-5 Sat 01:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:bachata", "reach:local"]
+
+  - id: evt-passport-05
+    calendar_id: salsa-cal-001
+    title: Amsterdam Salsa Practice
+    description: Amsterdam salsa practice.
+    location: Amsterdam, Netherlands
+    latitude: 52.3625
+    longitude: 4.8836
+    city: Amsterdam
+    country: Netherlands
+    country_code: NL
+    start: w-6 Mon 20:00
+    end: w-6 Mon 22:00
+    price_is_free: true
+    tags: ["format:practice", "dance-style:salsa", "reach:local"]
+
+  - id: evt-passport-06
+    calendar_id: bachata-cal-002
+    title: Vienna Bachata Evening
+    description: Vienna bachata evening.
+    location: Vienna, Austria
+    latitude: 48.2082
+    longitude: 16.3669
+    city: Vienna
+    country: Austria
+    country_code: AT
+    start: w-7 Wed 19:30
+    end: w-7 Wed 23:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:bachata", "reach:international"]
+
+  - id: evt-passport-07
+    calendar_id: salsa-cal-001
+    title: Prague Salsa Social
+    description: Prague salsa social.
+    location: Prague, Czechia
+    latitude: 50.0894
+    longitude: 14.4256
+    city: Prague
+    country: Czechia
+    country_code: CZ
+    start: w-8 Fri 21:00
+    end: w-8 Sat 01:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:salsa", "reach:regional"]
+
+  - id: evt-passport-08
+    calendar_id: bachata-cal-002
+    title: London Bachata Night
+    description: London bachata night.
+    location: London, UK
+    latitude: 51.5074
+    longitude: -0.1278
+    city: London
+    country: United Kingdom
+    country_code: GB
+    start: w-9 Sat 21:00
+    end: w-9 Sun 01:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:bachata", "reach:international"]
+
+  - id: evt-passport-09
+    calendar_id: salsa-cal-001
+    title: Lisbon Salsa Festival
+    description: Lisbon salsa festival.
+    location: Lisbon, Portugal
+    latitude: 38.7077
+    longitude: -9.1493
+    city: Lisbon
+    country: Portugal
+    country_code: PT
+    start: w-10 Sat 19:00
+    end: w-10 Sun 04:00
+    price_is_free: true
+    tags: ["format:festival", "dance-style:salsa", "reach:international"]
+
+  - id: evt-passport-10
+    calendar_id: bachata-cal-002
+    title: Rome Bachata Social
+    description: Rome bachata social.
+    location: Rome, Italy
+    latitude: 41.9028
+    longitude: 12.4964
+    city: Rome
+    country: Italy
+    country_code: IT
+    start: w-11 Sun 19:00
+    end: w-11 Sun 23:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:bachata", "reach:local"]
+
+  - id: evt-passport-11
+    calendar_id: salsa-cal-001
+    title: Warsaw Salsa Open Floor
+    description: Warsaw salsa open floor.
+    location: Warsaw, Poland
+    latitude: 52.2297
+    longitude: 21.0122
+    city: Warsaw
+    country: Poland
+    country_code: PL
+    start: w-12 Wed 20:00
+    end: w-12 Wed 23:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:salsa", "reach:regional"]
+
+  - id: evt-passport-12
+    calendar_id: salsa-cal-001
+    title: Stockholm Salsa Summer
+    description: Stockholm salsa summer social.
+    location: Stockholm, Sweden
+    latitude: 59.3293
+    longitude: 18.0686
+    city: Stockholm
+    country: Sweden
+    country_code: SE
+    start: w-13 Sat 21:00
+    end: w-13 Sun 01:00
+    price_is_free: true
+    tags: ["format:social", "dance-style:salsa", "reach:international"]
+
+  # ══ Search test dataset (evt-ux-search-*) ══════════════════════════════
+  # Generic titles with distinct cities, countries, and tags to test search
+  # independently by name, location, and tag filtering.
+  - id: evt-ux-search-001
+    calendar_id: salsa-cal-001
+    title: Evening Social
+    description: A fun evening dance social for all skill levels.
+    location: Shibuya, Tokyo, Japan
+    latitude: 35.6595
+    longitude: 139.7004
+    city: Tokyo
+    country: Japan
+    country_code: JP
+    start: w3 Fri 20:00
+    end: w3 Fri 23:00
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "level:all-levels",
+        "venue:indoor",
+        "reach:local",
+        "scale:medium",
+      ]
+
+  - id: evt-ux-search-002
+    calendar_id: bachata-cal-002
+    title: Morning Workshop
+    description: A beginner-friendly morning dance workshop.
+    location: Palermo, Buenos Aires, Argentina
+    latitude: -34.6037
+    longitude: -58.3816
+    city: Buenos Aires
+    country: Argentina
+    country_code: AR
+    start: w4 Sat 09:00
+    end: w4 Sat 11:30
+    price_is_free: true
+    tags:
+      [
+        "format:workshop",
+        "dance-style:bachata",
+        "level:beginner-friendly",
+        "venue:indoor",
+        "reach:regional",
+        "scale:small",
+      ]
+
+  - id: evt-ux-search-003
+    calendar_id: salsa-cal-001
+    title: Afternoon Class
+    description: Intermediate-level dance class in a local studio.
+    location: Vila Mariana, São Paulo, Brazil
+    latitude: -23.5505
+    longitude: -46.6333
+    city: São Paulo
+    country: Brazil
+    country_code: BR
+    start: w5 Sun 14:00
+    end: w5 Sun 15:30
+    price_is_free: true
+    tags:
+      [
+        "format:class",
+        "dance-style:salsa",
+        "level:intermediate",
+        "venue:indoor",
+        "reach:international",
+        "scale:medium",
+      ]
+
+  - id: evt-ux-search-004
+    calendar_id: bachata-cal-002
+    title: Late Night Dance
+    description: A vibrant late-night dance party.
+    location: Roma, Mexico City, Mexico
+    latitude: 19.4326
+    longitude: -99.1332
+    city: Mexico City
+    country: Mexico
+    country_code: MX
+    start: w6 Fri 22:00
+    end: w6 Sat 03:00
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "dance-style:bachata",
+        "dance-style:kizomba",
+        "level:all-levels",
+        "venue:indoor",
+        "reach:local",
+        "scale:large",
+      ]
+
+  - id: evt-ux-search-005
+    calendar_id: salsa-cal-001
+    title: Weekend Party
+    description: A weekend dance celebration with live music.
+    location: Yorkville, Toronto, Canada
+    latitude: 43.6629
+    longitude: -79.3957
+    city: Toronto
+    country: Canada
+    country_code: CA
+    start: w7 Sat 21:00
+    end: w7 Sun 02:00
+    price_is_free: false
+    price_min: 15
+    price_max: 20
+    price_currency: CAD
+    tags:
+      [
+        "format:social",
+        "format:day-social",
+        "dance-style:salsa",
+        "dance-style:mambo",
+        "level:all-levels",
+        "venue:indoor",
+        "reach:international",
+        "scale:large",
+        "misc:live-band",
+      ]
+
+  - id: evt-ux-search-006
+    calendar_id: bachata-cal-002
+    title: Midweek Practice
+    description: A casual midweek dance practice session.
+    location: Darling Harbour, Sydney, Australia
+    latitude: -33.8688
+    longitude: 151.1957
+    city: Sydney
+    country: Australia
+    country_code: AU
+    start: w8 Wed 19:30
+    end: w8 Wed 21:30
+    price_is_free: true
+    tags:
+      [
+        "format:practice",
+        "dance-style:bachata",
+        "level:intermediate",
+        "venue:indoor",
+        "reach:local",
+        "scale:small",
+      ]
+
+  - id: evt-ux-search-007
+    calendar_id: salsa-cal-001
+    title: Sunday Gathering
+    description: A relaxed Sunday gathering for social dancing.
+    location: Silom, Bangkok, Thailand
+    latitude: 13.7360
+    longitude: 100.5326
+    city: Bangkok
+    country: Thailand
+    country_code: TH
+    start: w9 Sun 18:00
+    end: w9 Sun 22:00
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "dance-style:salsa",
+        "dance-style:cuban",
+        "level:intermediate",
+        "venue:indoor",
+        "reach:regional",
+        "scale:medium",
+      ]
+
+  - id: evt-ux-search-008
+    calendar_id: bachata-cal-002
+    title: Friday Night Event
+    description: A festive Friday night dancing experience.
+    location: Zamalek, Cairo, Egypt
+    latitude: 30.0626
+    longitude: 31.2715
+    city: Cairo
+    country: Egypt
+    country_code: EG
+    start: w10 Fri 20:30
+    end: w10 Sat 01:00
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "dance-style:bachata",
+        "dance-style:zouk",
+        "level:all-levels",
+        "venue:outdoor",
+        "reach:local",
+        "scale:medium",
+        "misc:trip",
+      ]
+
+  - id: evt-ux-search-009
+    calendar_id: salsa-cal-001
+    title: Tuesday Session
+    description: A weekly Tuesday dance class and practice.
+    location: Gangnam, Seoul, South Korea
+    latitude: 37.4979
+    longitude: 127.0276
+    city: Seoul
+    country: South Korea
+    country_code: KR
+    start: w11 Tue 20:00
+    end: w11 Tue 21:30
+    price_is_free: false
+    price_min: 12
+    price_max: 15
+    price_currency: KRW
+    tags:
+      [
+        "format:class",
+        "dance-style:salsa",
+        "dance-style:rueda",
+        "level:intermediate",
+        "venue:indoor",
+        "reach:international",
+        "scale:small",
+      ]
+
+  - id: evt-ux-search-010
+    calendar_id: bachata-cal-002
+    title: Thursday Dance
+    description: A lively Thursday night dance experience.
+    location: Sandton, Johannesburg, South Africa
+    latitude: -26.1090
+    longitude: 28.0550
+    city: Johannesburg
+    country: South Africa
+    country_code: ZA
+    start: w12 Thu 21:00
+    end: w12 Fri 01:00
+    price_is_free: true
+    tags:
+      [
+        "format:social",
+        "dance-style:bachata",
+        "dance-style:semba",
+        "level:all-levels",
+        "venue:indoor",
+        "reach:local",
+        "scale:large",
+        "misc:food",
+      ]
+
+  - id: evt-ux-search-011
+    calendar_id: salsa-cal-001
+    title: Monday Training
+    description: An intensive Monday training session.
+    location: Makati, Manila, Philippines
+    latitude: 14.5586
+    longitude: 121.0228
+    city: Manila
+    country: Philippines
+    country_code: PH
+    start: w13 Mon 18:00
+    end: w13 Mon 20:00
+    price_is_free: true
+    tags:
+      [
+        "format:workshop",
+        "dance-style:salsa",
+        "dance-style:mambo",
+        "level:advanced",
+        "venue:indoor",
+        "reach:regional",
+        "scale:medium",
+        "misc:trip",
+      ]
+
+  - id: evt-ux-search-012
+    calendar_id: bachata-cal-002
+    title: Saturday Special
+    description: A special Saturday dance celebration.
+    location: Phuket Town, Phuket, Thailand
+    latitude: 8.1100
+    longitude: 98.3891
+    city: Phuket
+    country: Thailand
+    country_code: TH
+    start: w14 Sat 20:00
+    end: w14 Sun 01:00
+    price_is_free: false
+    price_min: 10
+    price_max: 15
+    price_currency: THB
+    tags:
+      [
+        "format:social",
+        "format:pool-party",
+        "dance-style:bachata",
+        "dance-style:kizomba",
+        "level:intermediate",
+        "venue:outdoor",
+        "reach:local",
+        "scale:large",
+        "misc:beach-side",
+      ]
+
 # Social proof seeds. Mirrors the map-clustering fixture style so Explorer
 # cards and pins show saved/going counts, following badges, and popularity.

@@ -61,6 +61,7 @@ export default function SeriesPage() {
             sentiment_distribution: series.sentiment_distribution,
             aspects: series.aspects,
             top_positive_tags: series.top_positive_tags,
+            top_neutral_tags: series.top_neutral_tags ?? [],
             top_negative_tags: series.top_negative_tags,
             top_audience_tags: series.top_audience_tags,
             average_mood: series.average_mood,

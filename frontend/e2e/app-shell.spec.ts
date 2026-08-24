@@ -10,6 +10,15 @@ test('home renders the app shell', async ({ page }) => {
     await expect(page.getByRole('link', { name: 'Movida' }).first()).toBeVisible()
 })
 
+test('calendar view switcher leaves map mode on the calendar route', async ({ page }) => {
+    await page.goto('/?view=map')
+
+    await page.getByRole('button', { name: 'Calendar view' }).click()
+
+    await expect(page).toHaveURL(/\/calendar(?:\?|$)/)
+    expect(new URL(page.url()).searchParams.has('view')).toBe(false)
+})
+
 test('privacy page is reachable', async ({ page }) => {
     await page.goto('/privacy')
     await expect(page.getByText(/Movida/i).first()).toBeVisible()

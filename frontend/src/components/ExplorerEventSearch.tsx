@@ -90,7 +90,6 @@ export default function ExplorerEventSearch({
     const [results, setResults] = useState<EventSearchResult[]>([]);
     const [loading, setLoading] = useState(false);
     const [activeIdx, setActiveIdx] = useState(-1);
-    const [compactPanelTop, setCompactPanelTop] = useState(64);
     const [pastChecked, setPastChecked] = useState(false);
     // Passport mode (`includePast`) always includes past + excludes attended;
     // the header checkbox only opts past events in, without hiding attended.
@@ -100,24 +99,6 @@ export default function ExplorerEventSearch({
     const inputRef = useRef<HTMLInputElement>(null);
     const debounced = useDebounced(q, 250);
     const { isAttending } = useAttendingEvents();
-
-    useEffect(() => {
-        if (!open || compact) return;
-        const updateTop = () => {
-            if (compact && triggerRef.current) {
-                const rect = triggerRef.current?.getBoundingClientRect();
-                if (!rect) return;
-                setCompactPanelTop(Math.ceil(rect.bottom + 6));
-            }
-        };
-        updateTop();
-        window.addEventListener('resize', updateTop);
-        window.addEventListener('scroll', updateTop, true);
-        return () => {
-            window.removeEventListener('resize', updateTop);
-            window.removeEventListener('scroll', updateTop, true);
-        };
-    }, [compact, open]);
 
     useEffect(() => {
         if (!open) return;
@@ -214,7 +195,9 @@ export default function ExplorerEventSearch({
     const panelClassName = compact
         ? 'fixed left-3 right-3 z-[8600] border border-line bg-surface shadow-lg'
         : 'absolute right-0 top-full z-[8600] mt-1 w-80 max-w-[calc(100vw-2rem)] border border-line bg-surface shadow-lg';
-    const panelStyle = compact ? { top: compactPanelTop } : undefined;
+    const panelStyle = compact
+        ? { top: 'calc(64px + env(safe-area-inset-top) + 6px)' }
+        : undefined;
 
     // Desktop inline mode: show input directly instead of trigger button
     const isDesktopInline = !compact && !small;
@@ -243,7 +226,7 @@ export default function ExplorerEventSearch({
                         onChange={(event) => setQ(event.target.value)}
                         onKeyDown={onKeyDown}
                         onFocus={() => setOpen(true)}
-                        placeholder={headerInline && effectiveIncludePast ? 'Search past events' : triggerLabel}
+                        placeholder={effectiveIncludePast ? 'Search past events' : 'Search by event, place, or tag'}
                         aria-label={triggerLabel}
                         className="flex-1 bg-transparent text-xs text-ink placeholder:text-muted focus:outline-none"
                     />
@@ -317,8 +300,8 @@ export default function ExplorerEventSearch({
                                         value={q}
                                         onChange={(event) => setQ(event.target.value)}
                                         onKeyDown={onKeyDown}
-                                        placeholder={effectiveIncludePast ? 'Search past events by title' : 'Search upcoming events by title'}
-                                        aria-label={effectiveIncludePast ? 'Search past events by title' : 'Search upcoming events by title'}
+                                        placeholder={effectiveIncludePast ? 'Search past events' : 'Search by event, place, or tag'}
+                                        aria-label={effectiveIncludePast ? 'Search past events' : 'Search by event, place, or tag'}
                                         className="w-full bg-transparent text-sm text-ink placeholder:text-muted focus:outline-none"
                                     />
                                 </div>
@@ -353,6 +336,7 @@ export default function ExplorerEventSearch({
                             </div>
                         )}
                         {visibleResults.map((row, index) => {
+                            const place = [row.city, row.country].filter(Boolean).join(', ');
                             if (effectiveIncludePast) {
                                 const when = formatPastDate(row.start);
                                 return (
@@ -364,9 +348,9 @@ export default function ExplorerEventSearch({
                                         className={`mb-1.5 flex w-full flex-col items-start gap-0.5 border bg-surface px-3 py-2 text-left last:mb-0 hover:bg-canvas ${index === activeIdx ? 'border-blue-300 ring-2 ring-blue-300' : 'border-line'}`}
                                     >
                                         <span className="text-sm font-medium text-ink">{row.title}</span>
-                                        {(when || row.location) && (
+                                        {(when || place || row.location) && (
                                             <span className="text-xs text-ink-soft">
-                                                {[when, row.location].filter(Boolean).join(' · ')}
+                                                {[when, place || row.location].filter(Boolean).join(' · ')}
                                             </span>
                                         )}
                                     </button>

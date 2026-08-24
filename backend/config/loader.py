@@ -251,6 +251,12 @@ def get_review_prompt_enabled() -> bool:
     return True if parsed is None else parsed
 
 
+def get_event_review_size_step_enabled() -> bool:
+    """Show the optional event-size question in the review flow. Default True."""
+    parsed = _parse_bool(os.getenv("EVENT_REVIEW_SIZE_STEP_ENABLED"))
+    return True if parsed is None else parsed
+
+
 def get_review_prompt_delay_hours() -> int:
     """Hours after an event's end to send the review prompt. Default 3."""
     raw = os.getenv("REVIEW_PROMPT_DELAY_HOURS", "3")

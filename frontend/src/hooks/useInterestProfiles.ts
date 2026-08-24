@@ -33,7 +33,7 @@ export function useInterestProfiles() {
                 min_lng: profile.min_lng,
                 max_lat: profile.max_lat,
                 max_lng: profile.max_lng,
-                label: profile.label,
+                label: profile.area_label,
             };
             try {
                 await setPrefs({ tagIds: [...profile.dance_tag_ids, ...profile.reach_tag_ids], area });

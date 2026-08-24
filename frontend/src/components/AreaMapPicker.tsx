@@ -61,6 +61,7 @@ export default function AreaMapPicker({ value, onChange, onUseCurrentView, contr
     // materially differs. Held in a ref so the save/reset handlers can reset
     // it without re-binding the Leaflet listeners.
     const baselineRef = useRef<PreferredAreaPayload | null>(null);
+    const pendingPresetLabelRef = useRef<string | null>(null);
     const valueLabelRef = useRef(value?.label ?? null);
     useEffect(() => { valueLabelRef.current = value?.label ?? null; }, [value?.label]);
     // Read autoCommit/onChange through refs so the Leaflet listener effect
@@ -133,7 +134,7 @@ export default function AreaMapPicker({ value, onChange, onUseCurrentView, contr
 
     // Compute the area from the guide's current on-screen position.
     // Shared by the save handler and the dirty-tracking listener.
-    const computeGuideArea = useCallback((): PreferredAreaPayload | null => {
+    const computeGuideArea = useCallback((label = 'Custom area'): PreferredAreaPayload | null => {
         const map = mapRef.current;
         const guide = guideRef.current;
         if (!map || !guide) return null;
@@ -152,15 +153,16 @@ export default function AreaMapPicker({ value, onChange, onUseCurrentView, contr
             min_lng: southWest.lng,
             max_lat: northEast.lat,
             max_lng: northEast.lng,
-            label: valueLabelRef.current ?? 'Custom area',
+            label,
         });
         if (area.min_lat >= area.max_lat || area.min_lng >= area.max_lng) return null;
         return area;
     }, []);
 
     const handleSave = () => {
-        const area = computeGuideArea();
+        const area = computeGuideArea(pendingPresetLabelRef.current ?? 'Custom area');
         if (!area) return;
+        pendingPresetLabelRef.current = null;
         baselineRef.current = area;
         lastAppliedExternalRef.current = area;
         setDirty(false);
@@ -199,7 +201,8 @@ export default function AreaMapPicker({ value, onChange, onUseCurrentView, contr
                 // sheet's event count tracks the pan/zoom.
                 baselineRef.current = area;
                 lastAppliedExternalRef.current = area;
-                onChangeRef.current(area);
+                onChangeRef.current({ ...area, label: pendingPresetLabelRef.current ?? 'Custom area' });
+                pendingPresetLabelRef.current = null;
                 return;
             }
             setDirty(true);
@@ -226,6 +229,7 @@ export default function AreaMapPicker({ value, onChange, onUseCurrentView, contr
     // existing baseline so the resulting move registers as dirty and the
     // centered "Save area" button appears for the user to confirm.
     const handlePreset = (preset: (typeof AREA_PRESETS)[number]) => {
+        pendingPresetLabelRef.current = preset.label;
         fitAreaInGuide({ ...preset });
     };
 

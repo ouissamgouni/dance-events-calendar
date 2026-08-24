@@ -16,8 +16,11 @@ from backend.db.models import (
     BlockedEvent,
     CachedEvent,
     CalendarSetting,
+    EventTag,
     EventPromoCode,
     SiteSetting,
+    Tag,
+    TagGroup,
     User,
 )
 
@@ -169,6 +172,7 @@ class TestSettingsEndpoint:
         assert body["reminder_lead_hours"] == 24
         assert body["activity_digest_schedule"] == "tue,fri @ 09:00"
         assert body["review_prompt_enabled"] is True
+        assert body["event_review_size_step_enabled"] is True
         assert body["review_prompt_delay_hours"] == 3
         assert body["review_prompt_lookback_hours"] == 24
         assert body["for_you_review_window_days"] == 180
@@ -192,6 +196,7 @@ class TestSettingsEndpoint:
                 "reminder_lead_hours": 6,
                 "activity_digest_schedule": "mon,thu @ 18:30",
                 "review_prompt_enabled": False,
+                "event_review_size_step_enabled": False,
                 "review_prompt_delay_hours": 5,
                 "review_prompt_lookback_hours": 48,
                 "for_you_review_window_days": 365,
@@ -213,6 +218,7 @@ class TestSettingsEndpoint:
         assert body["reminder_lead_hours"] == 6
         assert body["activity_digest_schedule"] == "mon,thu @ 18:30"
         assert body["review_prompt_enabled"] is False
+        assert body["event_review_size_step_enabled"] is False
         assert body["review_prompt_delay_hours"] == 5
         assert body["review_prompt_lookback_hours"] == 48
         assert body["for_you_review_window_days"] == 365
@@ -233,6 +239,10 @@ class TestSettingsEndpoint:
                 == "mon,thu @ 18:30"
             )
             assert session.get(SiteSetting, "review_prompt_enabled").value == "false"
+            assert (
+                session.get(SiteSetting, "event_review_size_step_enabled").value
+                == "false"
+            )
             assert session.get(SiteSetting, "review_prompt_delay_hours").value == "5"
             assert (
                 session.get(SiteSetting, "review_prompt_lookback_hours").value == "48"
@@ -529,6 +539,85 @@ class TestEventsEndpoint:
         resp = client.get("/api/events/search?q=s")
 
         assert resp.status_code == 422
+
+    def test_search_events_matches_places_and_enabled_tags_with_relevance(
+        self, sqlite_client
+    ):
+        client, engine = sqlite_client
+        now = datetime.now(UTC).replace(tzinfo=None)
+
+        with Session(engine) as session:
+            group = TagGroup(slug="features", label="Features", enabled=True)
+            disabled_group = TagGroup(slug="disabled", label="Disabled", enabled=False)
+            session.add_all([group, disabled_group])
+            session.flush()
+            pool = Tag(group_id=group.id, slug="pool", label="Pool", enabled=True)
+            disabled_tag = Tag(
+                group_id=disabled_group.id,
+                slug="rooftop",
+                label="Rooftop",
+                enabled=True,
+            )
+            session.add_all([pool, disabled_tag])
+            session.flush()
+            session.add_all(
+                [
+                    CachedEvent(
+                        event_id="evt-title",
+                        calendar_id="cal-1",
+                        title="Paris Pool Party",
+                        city="Lyon",
+                        country="France",
+                        start=now + timedelta(days=3),
+                        end=now + timedelta(days=3, hours=2),
+                    ),
+                    CachedEvent(
+                        event_id="evt-place-tag",
+                        calendar_id="cal-1",
+                        title="Summer Social",
+                        city="Paris",
+                        country="France",
+                        start=now + timedelta(days=1),
+                        end=now + timedelta(days=1, hours=2),
+                    ),
+                    CachedEvent(
+                        event_id="evt-disabled-tag",
+                        calendar_id="cal-1",
+                        title="Night Social",
+                        city="Berlin",
+                        country="Germany",
+                        start=now + timedelta(days=2),
+                        end=now + timedelta(days=2, hours=2),
+                    ),
+                ]
+            )
+            session.flush()
+            session.add_all(
+                [
+                    EventTag(event_id="evt-place-tag", tag_id=pool.id),
+                    EventTag(event_id="evt-disabled-tag", tag_id=disabled_tag.id),
+                ]
+            )
+            session.commit()
+
+        response = client.get("/api/events/search?q=paris%20pool")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert [row["event_id"] for row in data] == [
+            "evt-title",
+            "evt-place-tag",
+        ]
+        assert data[1]["matched_fields"] == ["city", "tag"]
+        assert data[1]["matched_tags"] == ["Pool"]
+
+        country_response = client.get("/api/events/search?q=germany")
+        assert country_response.status_code == 200
+        assert country_response.json()[0]["matched_fields"] == ["country"]
+
+        disabled_response = client.get("/api/events/search?q=rooftop")
+        assert disabled_response.status_code == 200
+        assert disabled_response.json() == []
 
     def test_get_events_paginates_with_limit_and_offset(self, sqlite_client):
         client, engine = sqlite_client

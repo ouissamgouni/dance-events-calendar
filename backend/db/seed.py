@@ -273,7 +273,7 @@ class DatabaseSeeder:
                 tag_is_hero = tag_data.get("is_hero_filter", False)
                 tag_hero_ordinal = tag_data.get("hero_ordinal", None)
                 tag_polarity = tag_data.get("polarity")
-                if tag_polarity not in (None, "positive", "negative"):
+                if tag_polarity not in (None, "positive", "negative", "neutral"):
                     logger.warning(
                         "Tag %s/%s has invalid polarity %r; ignoring",
                         slug,
@@ -1536,6 +1536,7 @@ class DatabaseSeeder:
             matches_enabled = bool(matches_enabled)
             if existing:
                 profile = existing
+                profile.area_label = str(entry.get("area_label") or label)[:120]
                 profile.min_lat = min_lat
                 profile.min_lng = min_lng
                 profile.max_lat = max_lat
@@ -1553,6 +1554,7 @@ class DatabaseSeeder:
                 profile = UserInterestProfile(
                     user_id=user.id,
                     label=label[:120],
+                    area_label=str(entry.get("area_label") or label)[:120],
                     min_lat=min_lat,
                     min_lng=min_lng,
                     max_lat=max_lat,

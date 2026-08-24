@@ -42,10 +42,6 @@ interface ProfileCardProps {
     reachGroup: TagGroup | null;
     localTagId: number | null;
     defaultExpanded: boolean;
-    /** True for the account's original/default profile (the one seeded at
-     * signup) — its area-drag reset label reads "Default" instead of
-     * "Custom" so the user still recognizes it. */
-    isDefault: boolean;
     onSave: (id: number, payload: InterestProfileUpdatePayload) => Promise<void>;
     onDelete: (id: number) => Promise<void>;
     onToggleNotify: (id: number, value: boolean) => Promise<void>;
@@ -58,7 +54,6 @@ function ProfileCard({
     reachGroup,
     localTagId,
     defaultExpanded,
-    isDefault,
     onSave,
     onDelete,
     onToggleNotify,
@@ -66,6 +61,7 @@ function ProfileCard({
 }: ProfileCardProps) {
     const [expanded, setExpanded] = useState(defaultExpanded);
     const [labelDraft, setLabelDraft] = useState(profile.label);
+    const [areaLabelDraft, setAreaLabelDraft] = useState(profile.area_label);
     const [areaDraft, setAreaDraft] = useState({
         min_lat: profile.min_lat,
         min_lng: profile.min_lng,
@@ -100,6 +96,9 @@ function ProfileCard({
     useEffect(() => {
         setLabelDraft((prev) => (prev === profile.label ? prev : profile.label));
     }, [profile.label]);
+    useEffect(() => {
+        setAreaLabelDraft((prev) => (prev === profile.area_label ? prev : profile.area_label));
+    }, [profile.area_label]);
     useEffect(() => {
         setAreaDraft((prev) =>
             prev.min_lat === profile.min_lat &&
@@ -221,6 +220,7 @@ function ProfileCard({
                     </div>
                     {!expanded && (
                         <p className="mt-0.5 pl-5 text-xs text-ink-soft">
+                            {profile.area_label !== profile.label ? `${profile.area_label} · ` : ''}
                             {danceLabels.length ? danceLabels.join(', ') : 'Any dance style'}
                             {' · '}
                             {reachLabels.length ? reachLabels.join('/') : 'Any scale'}
@@ -266,7 +266,7 @@ function ProfileCard({
                 <div className="mt-3 space-y-3 border-t border-card-line pt-3">
                     <div>
                         <label className="block text-[11px] font-medium uppercase tracking-wide text-ink-soft mb-1">
-                            Label
+                            Profile name
                         </label>
                         <div className="flex items-center gap-2">
                             <input
@@ -274,7 +274,8 @@ function ProfileCard({
                                 type="text"
                                 value={labelDraft}
                                 onChange={(e) => setLabelDraft(e.target.value)}
-                                aria-label="Profile label"
+                                maxLength={120}
+                                aria-label="Profile name"
                                 className="flex-1 border border-line px-2 py-1 text-xs focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
                             />
                             <span
@@ -296,7 +297,7 @@ function ProfileCard({
                             reachValue={reachValue}
                             onDanceChange={handleDanceChange}
                             onReachChange={handleReachChange}
-                            area={{ ...areaDraft, label: labelDraft }}
+                            area={{ ...areaDraft, label: areaLabelDraft }}
                             onAreaChange={(next) => {
                                 setAreaDraft({
                                     min_lat: next.min_lat,
@@ -304,17 +305,11 @@ function ProfileCard({
                                     max_lat: next.max_lat,
                                     max_lng: next.max_lng,
                                 });
-                                // A saved area is no longer the previously
-                                // named place — reset the label (user can
-                                // rename afterwards). The account's default
-                                // profile resets to "Default"; additional
-                                // profiles reset to "Custom".
-                                const resetLabel = isDefault ? 'Default' : 'Custom';
-                                setLabelDraft(resetLabel);
+                                setAreaLabelDraft(next.label);
                                 setSaving(true);
                                 setError(null);
                                 onSave(profile.id, {
-                                    label: resetLabel,
+                                    area_label: next.label,
                                     min_lat: next.min_lat,
                                     min_lng: next.min_lng,
                                     max_lat: next.max_lat,
@@ -331,6 +326,28 @@ function ProfileCard({
                                 }, 0);
                             }}
                             saving={saving}
+                            areaNameControl={(
+                                <div>
+                                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
+                                        Area name
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={areaLabelDraft}
+                                        onChange={(e) => setAreaLabelDraft(e.target.value)}
+                                        onBlur={() => {
+                                            const trimmed = areaLabelDraft.trim();
+                                            if (!trimmed || trimmed === profile.area_label) return;
+                                            void onSave(profile.id, { area_label: trimmed })
+                                                .then(() => flashSaved())
+                                                .catch((e) => setError(e instanceof Error ? e.message : 'Failed to save area name'));
+                                        }}
+                                        maxLength={120}
+                                        aria-label="Area name"
+                                        className="w-full border border-line px-2 py-1 text-xs focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
+                                    />
+                                </div>
+                            )}
                             matchesEnabled={profile.matches_enabled}
                             onMatchesEnabledChange={(v) => onToggleNotify(profile.id, v)}
                         />
@@ -392,7 +409,7 @@ export default function InterestProfilesManager() {
                     min_lng: profile.min_lng,
                     max_lat: profile.max_lat,
                     max_lng: profile.max_lng,
-                    label: profile.label,
+                    label: profile.area_label,
                 },
             };
             try {
@@ -426,6 +443,7 @@ export default function InterestProfilesManager() {
         try {
             await createInterestProfile({
                 label: 'New profile',
+                area_label: DEFAULT_AREA_BBOX.label,
                 min_lat: DEFAULT_AREA_BBOX.min_lat,
                 min_lng: DEFAULT_AREA_BBOX.min_lng,
                 max_lat: DEFAULT_AREA_BBOX.max_lat,
@@ -512,7 +530,6 @@ export default function InterestProfilesManager() {
                             reachGroup={reachGroup}
                             localTagId={localTagId}
                             defaultExpanded={profile.is_active && !isMobile}
-                            isDefault={profile.id === profiles[0].id}
                             onSave={handleSaveProfile}
                             onDelete={handleDeleteProfile}
                             onToggleNotify={handleToggleNotify}

@@ -169,7 +169,7 @@ export default function OnboardingWizard() {
     const handleAreaChange = async (nextArea: PreferredAreaPayload | null) => {
         setSavingArea(true);
         setError(null);
-        const label = 'Default';
+        const label = nextArea?.label ?? 'Custom area';
         const withLabel = nextArea ? { ...nextArea, label } : null;
         if (label !== areaLabelDraft) setAreaLabelDraft(label);
         try {
@@ -445,7 +445,8 @@ export default function OnboardingWizard() {
             ? existing.find((p) => p.is_active) ?? existing[0] ?? null
             : null;
         const payload = {
-            label: area.label,
+            label: target?.label ?? 'Default',
+            area_label: area.label,
             min_lat: area.min_lat,
             min_lng: area.min_lng,
             max_lat: area.max_lat,
@@ -464,7 +465,8 @@ export default function OnboardingWizard() {
         const homePayload: HomeLocationPayload = { lat: pin.lat, lng: pin.lng, label: cityLabel.trim() || 'Local' };
         await setPrefs({ homeLocation: homePayload });
         const created = await createInterestProfile({
-            label: localBboxPreview.label,
+            label: 'Local events',
+            area_label: localBboxPreview.label,
             min_lat: localBboxPreview.min_lat,
             min_lng: localBboxPreview.min_lng,
             max_lat: localBboxPreview.max_lat,
@@ -627,7 +629,7 @@ export default function OnboardingWizard() {
                             </section>
                             <section>
                                 <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
-                                    Event scale
+                                    Event reach
                                 </label>
                                 {tagsLoading ? (
                                     <p className="text-sm text-muted">Loading…</p>
@@ -693,7 +695,7 @@ export default function OnboardingWizard() {
                                         type="text"
                                         value={areaLabelDraft}
                                         onChange={(e) => setAreaLabelDraft(e.target.value)}
-                                        maxLength={10}
+                                        maxLength={120}
                                         placeholder="Area name"
                                         size={10}
                                         className="w-24 border border-line bg-surface px-1.5 py-1 text-[11px] text-ink placeholder:text-muted focus:border-action focus:outline-none focus:ring-1 focus:ring-action"

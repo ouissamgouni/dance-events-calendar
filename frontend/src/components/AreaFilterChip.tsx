@@ -41,13 +41,17 @@ export default function AreaFilterChip({ state }: AreaFilterChipProps) {
                 data-area-state="all"
                 aria-label="Worldwide"
             >
-                <span aria-hidden="true">🌐</span>
-                <span className="truncate" aria-hidden="true">🌐</span>
+                <img
+                    src="/global-location.png"
+                    alt="Worldwide"
+                    className="h-4 w-4"
+                    aria-hidden="true"
+                />
+                <span className="truncate" aria-hidden="true">Worldwide</span>
             </span>
         );
     }
 
-    const prefix = state.kind === 'default' ? '' : 'Your profile area:';
     const icon = state.kind === 'default' ? '🧭' : '📍';
 
     return (
@@ -57,9 +61,7 @@ export default function AreaFilterChip({ state }: AreaFilterChipProps) {
             data-area-state={state.kind}
         >
             <span aria-hidden="true">{icon}</span>
-            <span className="truncate min-w-0">
-                {prefix} <span className="font-medium">{state.label}</span>
-            </span>
+            <span className="truncate min-w-0 font-medium">{state.label}</span>
         </span>
     );
 }

@@ -14,7 +14,7 @@ export interface ActiveProfileSaveInput {
     area?: PreferredAreaPayload | null;
     /** New default dance-style tag ids. Omit to leave unchanged. */
     danceTagIds?: number[];
-    /** New default reach ("event scale") tag ids. Omit to leave unchanged. */
+    /** New default reach ("event reach") tag ids. Omit to leave unchanged. */
     reachTagIds?: number[];
 }
 
@@ -50,7 +50,7 @@ export function useActiveProfile() {
                             min_lng: active.min_lng,
                             max_lat: active.max_lat,
                             max_lng: active.max_lng,
-                            label: active.label,
+                            label: active.area_label,
                         },
                         tagIds: [...active.dance_tag_ids, ...active.reach_tag_ids],
                     });
@@ -72,6 +72,7 @@ export function useActiveProfile() {
             if (user && activeProfile) {
                 const payload: InterestProfileUpdatePayload = {};
                 if (input.area) {
+                    payload.area_label = input.area.label;
                     payload.min_lat = input.area.min_lat;
                     payload.min_lng = input.area.min_lng;
                     payload.max_lat = input.area.max_lat;
@@ -81,8 +82,6 @@ export function useActiveProfile() {
                 if (input.reachTagIds) payload.reach_tag_ids = input.reachTagIds;
                 const updated = await updateInterestProfile(activeProfile.id, payload);
                 setActiveProfile(updated);
-                // Keep the friendly area label the caller supplied; the profile
-                // itself only stores the bbox.
                 applyLocalMirror({
                     ...(input.area !== undefined ? { area: input.area } : {}),
                     tagIds: [...updated.dance_tag_ids, ...updated.reach_tag_ids],

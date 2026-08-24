@@ -232,7 +232,6 @@ export interface SiteSettings {
     network_going_snapshot_enabled?: boolean;
     /** Experiment: two-line, icon-prefixed filter summary bar with the
      * Map/Calendar controls pinned to its right. */
-    summary_two_line_enabled?: boolean;
     suggest_event_required_dance_group_id?: number | null;
     suggest_event_required_reach_group_id?: number | null;
     tag_as_badge_enabled?: boolean;
@@ -301,6 +300,8 @@ export interface SiteSettings {
     /** Master switch for post-event "how was it?" review-prompt
      * notifications (Event Quality Layer Phase 3). */
     review_prompt_enabled?: boolean;
+    /** Show the optional event-size question in the review wizard. */
+    event_review_size_step_enabled?: boolean;
     /** Hours after an event's end before the review prompt fires. 1-720,
      * client default 3. */
     review_prompt_delay_hours?: number;
@@ -981,6 +982,7 @@ export async function geolocateFromIP(): Promise<HomeLocationPayload | null> {
 export interface InterestProfile {
     id: number;
     label: string;
+    area_label: string;
     min_lat: number;
     min_lng: number;
     max_lat: number;
@@ -997,6 +999,7 @@ export interface InterestProfile {
 
 export interface InterestProfilePayload {
     label: string;
+    area_label: string;
     min_lat: number;
     min_lng: number;
     max_lat: number;
@@ -1011,6 +1014,7 @@ export interface InterestProfilePayload {
 
 export interface InterestProfileUpdatePayload {
     label?: string;
+    area_label?: string;
     min_lat?: number;
     min_lng?: number;
     max_lat?: number;
@@ -3465,7 +3469,7 @@ export async function updateTagGroup(groupId: number, data: { label?: string; co
     return res.json();
 }
 
-export async function createTag(data: { group_id: number; label: string; color?: string; polarity?: 'positive' | 'negative' | null }): Promise<Tag> {
+export async function createTag(data: { group_id: number; label: string; color?: string; polarity?: 'positive' | 'negative' | 'neutral' | null }): Promise<Tag> {
     const res = await fetch(`${BASE}/admin/tags`, {
         method: 'POST',
         headers: adminJsonHeaders,
@@ -3476,7 +3480,7 @@ export async function createTag(data: { group_id: number; label: string; color?:
     return res.json();
 }
 
-export async function updateTag(tagId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean; is_hero_filter?: boolean; hero_ordinal?: number | null; group_id?: number; polarity?: 'positive' | 'negative' | null }): Promise<Tag> {
+export async function updateTag(tagId: number, data: { label?: string; color?: string; ordinal?: number; enabled?: boolean; is_hero_filter?: boolean; hero_ordinal?: number | null; group_id?: number; polarity?: 'positive' | 'negative' | 'neutral' | null }): Promise<Tag> {
     const res = await fetch(`${BASE}/admin/tags/${tagId}`, {
         method: 'PATCH',
         headers: adminJsonHeaders,
@@ -3636,6 +3640,7 @@ export async function fetchRatingAggregate(eventId: string): Promise<EventRating
             sentiment_distribution: {},
             aspects: [],
             top_positive_tags: [],
+            top_neutral_tags: [],
             top_negative_tags: [],
             top_audience_tags: [],
             average_mood: 0,
@@ -4112,6 +4117,10 @@ export interface EventSearchResult {
     title: string;
     start: string | null;
     location: string | null;
+    city: string | null;
+    country: string | null;
+    matched_fields: Array<'title' | 'city' | 'country' | 'tag'>;
+    matched_tags: string[];
 }
 
 export async function searchEvents(

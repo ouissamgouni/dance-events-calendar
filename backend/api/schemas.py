@@ -27,6 +27,17 @@ class TagResponse(BaseModel):
     hero_ordinal: Optional[int] = None
 
 
+class EventSearchResponse(BaseModel):
+    event_id: str
+    title: str
+    start: Optional[datetime] = None
+    location: Optional[str] = None
+    city: Optional[str] = None
+    country: Optional[str] = None
+    matched_fields: list[Literal["title", "city", "country", "tag"]] = []
+    matched_tags: list[str] = []
+
+
 class EventResponse(BaseModel):
     event_id: str
     calendar_id: str
@@ -371,9 +382,10 @@ class InterestProfileRequest(BaseModel):
     ``matches_enabled`` for one release (Phase G rollout).
     """
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
     label: str = Field(..., min_length=1, max_length=120)
+    area_label: Optional[str] = Field(default=None, min_length=1, max_length=120)
     min_lat: float = Field(..., ge=-90, le=90)
     min_lng: float = Field(..., ge=-180, le=180)
     max_lat: float = Field(..., ge=-90, le=90)
@@ -396,9 +408,10 @@ class InterestProfileUpdateRequest(BaseModel):
     ``matches_enabled`` for one release.
     """
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(populate_by_name=True, str_strip_whitespace=True)
 
     label: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    area_label: Optional[str] = Field(default=None, min_length=1, max_length=120)
     min_lat: Optional[float] = Field(default=None, ge=-90, le=90)
     min_lng: Optional[float] = Field(default=None, ge=-180, le=180)
     max_lat: Optional[float] = Field(default=None, ge=-90, le=90)
@@ -419,6 +432,7 @@ class InterestProfileUpdateRequest(BaseModel):
 class InterestProfileResponse(BaseModel):
     id: int
     label: str
+    area_label: str
     min_lat: float
     min_lng: float
     max_lat: float
@@ -718,9 +732,6 @@ class SiteSettingsResponse(BaseModel):
     # Tribe > Calendars "Your Network" snapshot of upcoming events people
     # you follow are going to. When False, the snapshot is hidden.
     network_going_snapshot_enabled: bool = True
-    # Experiment: render the filter summary bar as a two-line, icon-prefixed
-    # variant with the Map/Calendar controls pinned to its right.
-    summary_two_line_enabled: bool = False
     # Required tag-group ids used by the event suggestion form.
     suggest_event_required_dance_group_id: Optional[int] = None
     suggest_event_required_reach_group_id: Optional[int] = None
@@ -778,6 +789,8 @@ class SiteSettingsResponse(BaseModel):
     # Master switch for post-event "how was it?" review-prompt notifications
     # (Event Quality Layer Phase 3).
     review_prompt_enabled: bool = True
+    # Show the optional event-size question in the review wizard.
+    event_review_size_step_enabled: bool = True
     # Hours after an event's end before the review prompt fires.
     review_prompt_delay_hours: int = 3
     # How far past the delay window review_prompt_service scans for newly
@@ -986,7 +999,6 @@ class SiteSettingsUpdateRequest(BaseModel):
     for_you_rail_enabled: Optional[bool] = None
     your_next_events_rail_enabled: Optional[bool] = None
     network_going_snapshot_enabled: Optional[bool] = None
-    summary_two_line_enabled: Optional[bool] = None
     suggest_event_required_dance_group_id: Optional[int] = Field(default=None, ge=1)
     suggest_event_required_reach_group_id: Optional[int] = Field(default=None, ge=1)
     # Notification / re-engagement global gates.
@@ -1028,6 +1040,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     milestone_unlocked_email_instant: Optional[bool] = None
     milestone_unlocked_email_digest: Optional[bool] = None
     review_prompt_enabled: Optional[bool] = None
+    event_review_size_step_enabled: Optional[bool] = None
     review_prompt_delay_hours: Optional[int] = Field(default=None, ge=1, le=720)
     review_prompt_lookback_hours: Optional[int] = Field(default=None, ge=1, le=720)
     for_you_review_window_days: Optional[int] = Field(default=None, ge=1, le=3650)
@@ -1234,7 +1247,9 @@ class TagCreate(BaseModel):
     label: str = Field(..., min_length=1, max_length=100)
     slug: Optional[str] = Field(default=None, max_length=100)
     color: Optional[str] = None
-    polarity: Optional[str] = Field(default=None, pattern="^(positive|negative)$")
+    polarity: Optional[str] = Field(
+        default=None, pattern="^(positive|negative|neutral)$"
+    )
 
 
 class TagUpdate(BaseModel):
@@ -1245,7 +1260,9 @@ class TagUpdate(BaseModel):
     is_hero_filter: Optional[bool] = None
     hero_ordinal: Optional[int] = None
     group_id: Optional[int] = None
-    polarity: Optional[str] = Field(default=None, pattern="^(positive|negative)$")
+    polarity: Optional[str] = Field(
+        default=None, pattern="^(positive|negative|neutral)$"
+    )
 
 
 class EventTagAssignment(BaseModel):
@@ -1621,6 +1638,7 @@ class EventRatingAggregate(BaseModel):
     sentiment_distribution: dict[str, int] = Field(default_factory=dict)
     aspects: list[AspectAggregate] = Field(default_factory=list)
     top_positive_tags: list[TopReviewTag] = Field(default_factory=list)
+    top_neutral_tags: list[TopReviewTag] = Field(default_factory=list)
     top_negative_tags: list[TopReviewTag] = Field(default_factory=list)
     top_audience_tags: list[TopReviewTag] = Field(default_factory=list)
     # Overall-mood figures (see services/experience_aspects.compute_mood_metrics).
@@ -1671,6 +1689,7 @@ class SeriesRatingRollup(BaseModel):
     sentiment_distribution: dict[str, int] = Field(default_factory=dict)
     aspects: list[AspectAggregate] = Field(default_factory=list)
     top_positive_tags: list[TopReviewTag] = Field(default_factory=list)
+    top_neutral_tags: list[TopReviewTag] = Field(default_factory=list)
     top_negative_tags: list[TopReviewTag] = Field(default_factory=list)
     top_audience_tags: list[TopReviewTag] = Field(default_factory=list)
     editions: list[SeriesEditionSummary] = Field(default_factory=list)

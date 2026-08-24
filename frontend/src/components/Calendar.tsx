@@ -12,6 +12,7 @@ export type CalendarViewMode = 'month' | '3week';
 interface Props {
     events: CalendarEvent[];
     sinceDate?: string;
+    initialDate?: string;
     onDatesChange?: (start: Date, end: Date) => void;
     onEventClick?: (event: CalendarEvent, clickRect?: DOMRect) => void;
     hoveredEventId?: string | null;
@@ -23,7 +24,7 @@ interface Props {
 const viewToFcView = (v: CalendarViewMode) => (v === '3week' ? 'dayGrid3Week' : 'dayGridMonth');
 
 const Calendar = forwardRef<FullCalendar, Props>(
-    ({ events, sinceDate, onDatesChange, onEventClick, hoveredEventId, onEventHover, offMapEventIds, viewMode = 'month' }, ref) => {
+    ({ events, sinceDate, initialDate, onDatesChange, onEventClick, hoveredEventId, onEventHover, offMapEventIds, viewMode = 'month' }, ref) => {
         const { eventColorBarColor } = useFeatureFlags();
         const [isMobile, setIsMobile] = useState(() => window.innerWidth < 640);
         useEffect(() => {
@@ -119,6 +120,7 @@ const Calendar = forwardRef<FullCalendar, Props>(
                 ref={innerRef}
                 plugins={[dayGridPlugin]}
                 initialView={viewToFcView(viewMode)}
+                initialDate={initialDate}
                 views={{
                     dayGrid3Week: {
                         type: 'dayGrid',

@@ -148,7 +148,7 @@ def test_audience_fallback_to_user_default(session, kind):
 
 
 @pytest.mark.parametrize("kind", ["save", "going"])
-def test_audience_fallback_defaults_to_friends_when_user_has_no_pref(session, kind):
+def test_audience_fallback_defaults_to_public_when_user_has_no_pref(session, kind):
     user = _make_user(session, default_audience=None)
     set_event_engagement(
         session,
@@ -163,7 +163,7 @@ def test_audience_fallback_defaults_to_friends_when_user_has_no_pref(session, ki
     row = session.exec(
         select(model).where(model.user_id == user.id, model.event_id == "evt-3")
     ).first()
-    assert getattr(row, audience_attr) == "friends"
+    assert getattr(row, audience_attr) == "public"
 
 
 @pytest.mark.parametrize("kind", ["save", "going"])

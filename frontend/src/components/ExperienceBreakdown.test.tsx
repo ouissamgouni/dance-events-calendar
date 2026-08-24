@@ -13,6 +13,7 @@ function makeAggregate(overrides: Partial<EventRatingAggregate> = {}): EventRati
             { aspect_slug: 'crowd', average: 4, count: 1 },
         ],
         top_positive_tags: [{ tag_id: 1, slug: 'great-music', label: 'Great music', count: 2, aspect_slug: 'music' }],
+        top_neutral_tags: [{ tag_id: 4, slug: 'large', label: 'Large (500-2,000)', count: 2, aspect_slug: 'event-size' }],
         top_negative_tags: [{ tag_id: 2, slug: 'too-crowded', label: 'Too crowded', count: 1, aspect_slug: 'crowd' }],
         top_audience_tags: [{ tag_id: 3, slug: 'beginners', label: 'Beginners', count: 1, aspect_slug: null }],
         average_mood: 4.5,
@@ -36,6 +37,10 @@ describe('ExperienceBreakdown', () => {
         expect(screen.getByText(/Music/)).toHaveTextContent('Amazing')
         expect(screen.getByText('People appreciated')).toBeInTheDocument()
         expect(screen.getByText('Great music (2)')).toBeInTheDocument()
+        expect(screen.getByText('People mentioned')).toBeInTheDocument()
+        expect(screen.getByText('Large (500-2,000) (2)')).toHaveClass('bg-slate-100')
+        expect(screen.getByText('Too crowded (1)')).toHaveClass('bg-orange-50')
+        expect(screen.queryByText('Good to know')).not.toBeInTheDocument()
         expect(screen.getByText('Best suited for')).toBeInTheDocument()
         expect(screen.getByText('Beginners (1)')).toBeInTheDocument()
     })
@@ -62,6 +67,7 @@ describe('ExperienceBreakdown', () => {
                     sentiment_distribution: {},
                     aspects: [],
                     top_positive_tags: [],
+                    top_neutral_tags: [],
                     top_negative_tags: [],
                     top_audience_tags: [],
                     display_state: 'none',

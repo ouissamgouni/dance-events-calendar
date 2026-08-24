@@ -251,6 +251,7 @@ export default function Admin() {
     const [eventMessageCtaMinGoing, setEventMessageCtaMinGoing] = useState(3);
     const [digestSchedule, setDigestSchedule] = useState('tue,fri @ 09:00');
     const [reviewPromptEnabled, setReviewPromptEnabled] = useState(true);
+    const [eventReviewSizeStepEnabled, setEventReviewSizeStepEnabled] = useState(true);
     const [reviewPromptDelayHours, setReviewPromptDelayHours] = useState(3);
     const [reviewPromptLookbackHours, setReviewPromptLookbackHours] = useState(24);
     const [forYouReviewWindowDays, setForYouReviewWindowDays] = useState(180);
@@ -419,6 +420,7 @@ export default function Admin() {
             setEventMessageCtaMinGoing(s.event_message_cta_min_going ?? 3);
             setDigestSchedule(s.activity_digest_schedule ?? 'tue,fri @ 09:00');
             setReviewPromptEnabled(s.review_prompt_enabled ?? true);
+            setEventReviewSizeStepEnabled(s.event_review_size_step_enabled ?? true);
             setReviewPromptDelayHours(s.review_prompt_delay_hours ?? 3);
             setReviewPromptLookbackHours(s.review_prompt_lookback_hours ?? 24);
             setForYouReviewWindowDays(s.for_you_review_window_days ?? 180);
@@ -1053,6 +1055,18 @@ export default function Admin() {
         } catch {
             setReviewPromptEnabled(!newVal);
             setMessage('Failed to update review prompt toggle.');
+        }
+    };
+
+    const handleToggleEventReviewSizeStep = async () => {
+        const newVal = !eventReviewSizeStepEnabled;
+        setEventReviewSizeStepEnabled(newVal);
+        try {
+            await updateSettings({ event_review_size_step_enabled: newVal });
+            setMessage(`Review size step ${newVal ? 'enabled' : 'disabled'}.`);
+        } catch {
+            setEventReviewSizeStepEnabled(!newVal);
+            setMessage('Failed to update review size step toggle.');
         }
     };
 
@@ -2306,6 +2320,19 @@ export default function Admin() {
                                         </button>
                                     </div>
                                     <p className="text-[10px] text-muted">Post-event "how was it?" nudge (in-app + email) for going users who haven't rated yet</p>
+                                    <div className="flex items-center justify-between border-t border-card-line pt-2.5">
+                                        <div>
+                                            <span className="text-[11px] font-medium text-ink">Event size question</span>
+                                            <p className="text-[10px] text-muted">Ask reviewers for the approximate attendance size</p>
+                                        </div>
+                                        <button
+                                            onClick={handleToggleEventReviewSizeStep}
+                                            aria-label="Toggle event review size step"
+                                            className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${eventReviewSizeStepEnabled ? 'bg-success' : 'bg-gray-300'}`}
+                                        >
+                                            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-surface transition ${eventReviewSizeStepEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                        </button>
+                                    </div>
                                     {toggleCounts && (
                                         <p className="text-[10px] text-ink-soft">
                                             {toggleCounts.review_prompt.email} email · {toggleCounts.review_prompt.push} push enabled

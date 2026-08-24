@@ -1,11 +1,10 @@
 test_plan:
-  name: "Search event - Explorer event-title finder"
+  name: "Search event - Multi-attribute event finder"
   description: >
-    Verify the explorer-local event-title search. The scenario is built to
-    validate that the finder is separate from the global people search, works
-    for signed-out visitors, returns only upcoming visible events, shows useful
-    row metadata, and can find matching future events outside the default
-    explorer date range.
+    Verify the global event finder across title, structured place, and tag
+    attributes, plus the shared responsive presentation of event and people
+    search. The finder works for signed-out visitors and remains independent
+    from the explorer's current filters.
 
   preconditions:
     - "Run with: task start:scenario SCENARIO=search-event"
@@ -17,17 +16,19 @@ test_plan:
     - >
       The seeded data also includes nine visible upcoming "Rooftop" matches so
       the dropdown limit can be checked without changing code or browser state.
+    - >
+      evt-se-014 has structured city/country values and the Pool venue tag, but
+      neither "Pool" nor "France" appears in its title.
 
   steps:
     - id: 1
-      title: "Desktop trigger lives in the explorer controls, not the global header"
+      title: "Desktop header shows aligned event and people inputs"
       description: >
         Open / on a desktop viewport as an anonymous visitor.
       expected: >
-        The global top header still contains the people search, while a
-        separate "Search events" trigger appears in the explorer controls row.
-        The main event list, map, and SummaryBar counts render normally before
-        any event search is opened.
+        At 1024px or wider, the global header shows aligned event and people
+        inputs. The event placeholder reads "Search by event, place, or tag".
+        The main event list, map, and SummaryBar render normally beneath them.
 
     - id: 2
       title: "Moonrise query returns only visible upcoming matches"
@@ -50,15 +51,23 @@ test_plan:
         event list and map do not change while the search popover is open.
 
     - id: 4
+      title: "Place and broad tag queries explain non-title matches"
+      description: >
+        Search for "France", then "Pool", then "Paris Pool".
+      expected: >
+        France finds events through structured country data. Pool finds
+        evt-se-014 even though Pool is absent from its title, and its row shows
+        "Matched: Pool". Paris Pool finds evt-se-014 once with place/tag context.
+
+    - id: 5
       title: "Selecting a search result opens the event detail page"
       description: >
         Click the far-future Moonrise result.
       expected: >
-        The app navigates to /event/evt-se-003 with the source marker
-        `src=explorer-search`. The event detail page loads the Lisbon fixture
-        and shows the same title as the result row.
+        The app navigates to /event/evt-se-003. The event detail page loads the
+        Lisbon fixture and shows the same title as the result row.
 
-    - id: 5
+      - id: 6
       title: "Rooftop query respects the dropdown limit and keyboard controls"
       description: >
         Return to /, reopen the event search, and type "rooftop". Use ArrowDown
@@ -69,16 +78,17 @@ test_plan:
         highlight, Enter opens the active event detail page, and Escape closes
         the popover.
 
-    - id: 6
-      title: "Mobile trigger stays discoverable from the summary strip"
-      description: >
-        Switch to a mobile viewport around 390x844 and reload /.
-      expected: >
-        The mobile SummaryBar above the map/list includes a compact event
-        search trigger next to the Filters affordance. Tapping it opens the
-        same search popover with identical results and selection behavior.
-
     - id: 7
+      title: "Tablet and mobile searches open below the header"
+      description: >
+        Check a 768–1023px viewport and a mobile viewport around 390x844.
+      expected: >
+        Event and people inputs are replaced by icon triggers. Tapping either
+        icon opens a full-width-with-gutters panel directly below the header;
+        the header does not shift or overflow. Event matching is identical,
+        and people results still open their profile pages.
+
+    - id: 8
       title: "Signed-in behavior matches signed-out behavior"
       description: >
         Optionally sign in as Dev User from /login and repeat the Moonrise

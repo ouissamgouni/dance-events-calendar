@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import FullScreenEditor from './FullScreenEditor';
 
 // FilterSheet — the explorer's filter hub. In sectioned mode it renders a
-// list of filter dimensions (Area, Dates, Dance styles, Event scale, Event
+// list of filter dimensions (Area, Dates, Dance styles, Event reach, Event
 // format, People, More filters); tapping a row pushes a full-screen
 // sub-editor over the sheet. All filter state is lifted in the parent
 // (Home); this component owns only the open/close + section-navigation
@@ -259,6 +259,7 @@ export default function FilterSheet({
                                 </div>
                             )}
                             <ul>{grp.sections.map(renderNavRow)}</ul>
+                            {i < grouped.length - 1 && <div className="border-t border-card-line py-2" />}
                         </div>
                     );
                 }

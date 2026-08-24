@@ -1,6 +1,14 @@
 import { useMemo } from 'react';
 import type { TagGroup } from '../types';
 
+// Get the PNG image path for a reach tag based on its label.
+function reachIconSrcFor(tagLabel: string): string {
+    const l = tagLabel.toLowerCase();
+    if (l.includes('local')) return '/local-reach.png';
+    if (l.includes('regional')) return '/regional-reach.png';
+    return '/international-reach.png';
+}
+
 interface Props {
     tagGroups: TagGroup[];
     activeTagIds: Set<number>;
@@ -137,10 +145,12 @@ export default function TagFilterPills({
 
     const showLabels = groupRows.length > 1;
 
-    const renderPill = (tag: EnrichedTag) => {
+    const renderPill = (tag: EnrichedTag, groupKey: string) => {
         const active = activeTagIds.has(tag.id);
         const displayCount = countOverrides?.get(tag.id) ?? tag.event_count ?? null;
         const disabled = !active && displayCount === 0;
+        const isReachGroup = groupKey === 'reach';
+
         return (
             <button
                 key={tag.id}
@@ -152,7 +162,17 @@ export default function TagFilterPills({
                 className={`relative flex w-full items-center justify-between rounded-full border-2 px-3 py-2 text-xs font-medium transition ${active ? 'border-blue-600 bg-blue-50 text-gray-900' : 'border-gray-300 bg-white text-gray-900 hover:bg-gray-50'
                     } ${disabled ? 'cursor-not-allowed opacity-40' : ''}`}
             >
-                <span className="truncate text-center flex-1">{tag.label}</span>
+                <span className="flex items-center gap-2 truncate flex-1">
+                    {isReachGroup && (
+                        <img
+                            src={reachIconSrcFor(tag.label)}
+                            alt={tag.label}
+                            className="h-4 w-4 shrink-0"
+                            aria-hidden="true"
+                        />
+                    )}
+                    <span className="truncate text-center flex-1">{tag.label}</span>
+                </span>
                 {active && (
                     // eslint-disable-next-line no-restricted-syntax -- checkmark badge inside selected pill
                     <span className="ml-2 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600">
@@ -175,7 +195,7 @@ export default function TagFilterPills({
                         </span>
                     )}
                     <div className="grid grid-cols-3 gap-2.5">
-                        {row.tags.map(renderPill)}
+                        {row.tags.map((tag) => renderPill(tag, row.key))}
                     </div>
                 </div>
             ))}

@@ -54,12 +54,14 @@ class User(SQLModel, table=True):
     # / private). Backfilled from ``share_attendance_default`` in migration
     # ``ee50f6a7b8c9``. The boolean field is kept for one release for
     # backwards compatibility; new code should read this field instead.
-    # Default is ``friends`` (privacy-by-default per GDPR Art. 25): only
-    # mutual followers see RSVPs/saves unless the user opts up to ``public``
-    # via the per-event AudiencePicker. New users with no friends yet see
-    # the same effective behaviour as ``private``, failing closed.
+    # Default is ``public`` so attendee lists / the event Interest section
+    # are populated by default. The choice is disclosed and reversible at
+    # the point of action: the post-RSVP popover surfaces the AudiencePicker
+    # so users can drop to ``friends``/``private`` in one tap. Deliberate
+    # choices are protected by ``share_attendance_default_set_by_user``, so
+    # default flips only ever touch users who never set the preference.
     share_attendance_default_audience: str = Field(
-        default="friends", max_length=16, nullable=False
+        default="public", max_length=16, nullable=False
     )
     # Backed-up default for new RSVP/save audience values is computed
     # client-side from a localStorage "last used" hint; this column is
@@ -1004,6 +1006,7 @@ class UserInterestProfile(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: UUID = Field(foreign_key="users.id", index=True)
     label: str = Field(max_length=120)
+    area_label: str = Field(max_length=120)
     min_lat: float = Field(...)
     min_lng: float = Field(...)
     max_lat: float = Field(...)

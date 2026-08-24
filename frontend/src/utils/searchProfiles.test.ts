@@ -13,6 +13,7 @@ function makeProfile(overrides: Partial<InterestProfile> = {}): InterestProfile 
     return {
         id: 1,
         label: 'Barcelona area',
+        area_label: 'Barcelona area',
         min_lat: 41,
         min_lng: 2,
         max_lat: 42,

@@ -427,7 +427,7 @@ body {
 }
 
 .filter-sheet-panel {
-  max-height: min(80dvh, calc(100dvh - 2.75rem));
+  height: min(75dvh, calc(100dvh - 2.75rem));
   padding-bottom: env(safe-area-inset-bottom);
 }
 
@@ -721,11 +721,15 @@ body {
 
 .event-card-highlighted {
   background: var(--color-surface) !important;
-  box-shadow: inset 3px 0 0 var(--color-action);
 }
 
 .event-card-highlighted:hover {
   background: var(--color-surface) !important;
+}
+
+.event-card-highlighted .event-card-date {
+  border-left: 3px solid rgba(37, 99, 235, 0.4);
+  padding-left: 0.5rem;
 }
 
 .event-card-past {
@@ -736,12 +740,14 @@ body {
   background: var(--color-line);
 }
 
-.event-card-user-going {
-  box-shadow: inset 3px 0 0 var(--color-success);
+.event-card-user-going .event-card-date {
+  border-left: 3px solid rgba(7, 148, 85, 0.4);
+  padding-left: 0.5rem;
 }
 
-.event-card-user-saved {
-  box-shadow: inset 3px 0 0 var(--color-muted);
+.event-card-user-saved .event-card-date {
+  border-left: 3px solid rgba(152, 162, 179, 0.4);
+  padding-left: 0.5rem;
 }
 
 .event-card-offmap-badge {
@@ -893,8 +899,8 @@ body {
   box-shadow: none;
 }
 
-.event-card-timeline.event-card-highlighted .event-card-content {
-  box-shadow: inset 3px 0 0 var(--color-brand);
+.event-card-timeline.event-card-highlighted .event-card-rail {
+  border-left: 3px solid rgba(162, 46, 67, 0.4);
 }
 
 .event-card-timeline.event-card-past .event-card-content {

@@ -85,6 +85,7 @@ def _serialize_profile(
     return InterestProfileResponse(
         id=profile.id,
         label=profile.label,
+        area_label=profile.area_label,
         min_lat=profile.min_lat,
         min_lng=profile.min_lng,
         max_lat=profile.max_lat,
@@ -185,6 +186,7 @@ def create_interest_profile(
     profile = UserInterestProfile(
         user_id=user.id,
         label=payload.label,
+        area_label=payload.area_label or payload.label,
         min_lat=payload.min_lat,
         min_lng=payload.min_lng,
         max_lat=payload.max_lat,
@@ -226,6 +228,8 @@ def update_interest_profile(
 
     if "label" in fields_set:
         profile.label = payload.label
+    if "area_label" in fields_set:
+        profile.area_label = payload.area_label
     profile.min_lat = min_lat
     profile.min_lng = min_lng
     profile.max_lat = max_lat

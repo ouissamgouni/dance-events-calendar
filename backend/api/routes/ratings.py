@@ -255,15 +255,16 @@ def _aggregate_core(
     list[TopReviewTag],
     list[TopReviewTag],
     list[TopReviewTag],
+    list[TopReviewTag],
 ]:
     """Pooled structured aggregate over all non-rejected reviews for the given
     events. Returns
-    ``(count, sentiment_distribution, aspects, top_positive, top_negative,
-    top_audience)`` — the mood headline is layered on top by callers.
+    ``(count, sentiment_distribution, aspects, top_positive, top_neutral,
+    top_negative, top_audience)`` — the mood headline is layered on top by callers.
     """
     sentiment_distribution = {s: 0 for s in SENTIMENT_VALUES}
     if not event_ids:
-        return 0, sentiment_distribution, [], [], [], []
+        return 0, sentiment_distribution, [], [], [], [], []
 
     rows = session.exec(
         select(
@@ -309,6 +310,7 @@ def _aggregate_core(
 
     # Aspect-tag counts split by polarity.
     top_positive_tags: list[TopReviewTag] = []
+    top_neutral_tags: list[TopReviewTag] = []
     top_negative_tags: list[TopReviewTag] = []
     if rating_ids:
         tag_rows = session.exec(
@@ -325,13 +327,23 @@ def _aggregate_core(
             tags = session.exec(select(Tag).where(col(Tag.id).in_(counts.keys()))).all()
             tags_by_id = {t.id: t for t in tags}
             pos: list[tuple[int, int]] = []
+            neutral: list[tuple[int, int]] = []
             neg: list[tuple[int, int]] = []
             for tid, count in counts.items():
                 tag = tags_by_id.get(tid)
                 if not tag:
                     continue
-                (neg if tag.polarity == "negative" else pos).append((tid, count))
-            for bucket, dest in ((pos, top_positive_tags), (neg, top_negative_tags)):
+                if tag.polarity == "negative":
+                    neg.append((tid, count))
+                elif tag.polarity in (None, "neutral"):
+                    neutral.append((tid, count))
+                else:
+                    pos.append((tid, count))
+            for bucket, dest in (
+                (pos, top_positive_tags),
+                (neutral, top_neutral_tags),
+                (neg, top_negative_tags),
+            ):
                 for tid, count in sorted(bucket, key=lambda kv: kv[1], reverse=True)[
                     :5
                 ]:
@@ -368,6 +380,7 @@ def _aggregate_core(
         sentiment_distribution,
         aspects,
         top_positive_tags,
+        top_neutral_tags,
         top_negative_tags,
         top_audience_tags,
     )
@@ -380,6 +393,7 @@ def _aggregate_for_event(session: Session, event_id: str) -> EventRatingAggregat
         sentiment_distribution,
         aspects,
         top_positive_tags,
+        top_neutral_tags,
         top_negative_tags,
         top_audience_tags,
     ) = _aggregate_core(session, [event_id])
@@ -393,6 +407,7 @@ def _aggregate_for_event(session: Session, event_id: str) -> EventRatingAggregat
         sentiment_distribution=sentiment_distribution,
         aspects=aspects,
         top_positive_tags=top_positive_tags,
+        top_neutral_tags=top_neutral_tags,
         top_negative_tags=top_negative_tags,
         top_audience_tags=top_audience_tags,
         average_mood=mood.average_mood,
@@ -474,6 +489,7 @@ def _series_rollup(session: Session, series: EventSeries) -> SeriesRatingRollup:
         sentiment_distribution,
         aspects,
         top_positive_tags,
+        top_neutral_tags,
         top_negative_tags,
         top_audience_tags,
     ) = _aggregate_core(session, event_ids)
@@ -495,6 +511,7 @@ def _series_rollup(session: Session, series: EventSeries) -> SeriesRatingRollup:
         sentiment_distribution=sentiment_distribution,
         aspects=aspects,
         top_positive_tags=top_positive_tags,
+        top_neutral_tags=top_neutral_tags,
         top_negative_tags=top_negative_tags,
         top_audience_tags=top_audience_tags,
         editions=editions,

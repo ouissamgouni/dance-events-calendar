@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import { http, HttpResponse } from 'msw'
 import RateEventModal from './RateEventModal'
 import { renderWithProviders } from '../test/render'
 import { server } from '../test/server'
+import { FeatureFlagsProvider } from '../context/FeatureFlagsContext'
 
 function ratingResponse(body: Record<string, unknown>) {
     return {
@@ -165,5 +166,95 @@ describe('RateEventModal', () => {
 
         expect(await screen.findByText('Thanks for your feedback!')).toBeInTheDocument()
         expect(submittedBody).toMatchObject({ aspect_scores: { music: 4 } })
+    })
+
+    it('collects one event-size tag without treating size as a rated aspect', async () => {
+        const eventSizeGroup = {
+            id: 2,
+            slug: 'event-size',
+            label: 'Event size',
+            ordinal: 108,
+            enabled: true,
+            scope: 'aspect',
+            allow_multiple: false,
+            color: '#f59e0b',
+            condition_tag_slugs: [],
+            tags: [
+                { id: 20, group_id: 2, slug: 'small', label: 'Small (50-200)', ordinal: 0, polarity: 'neutral', enabled: true },
+                { id: 21, group_id: 2, slug: 'large', label: 'Large (500-2,000)', ordinal: 1, polarity: 'neutral', enabled: true },
+            ],
+        }
+        let submittedBody: Record<string, unknown> | null = null
+        server.use(
+            http.get('*/api/tags', ({ request }) => {
+                const scope = new URL(request.url).searchParams.get('scope')
+                return HttpResponse.json(scope === 'aspect' ? [eventSizeGroup] : [])
+            }),
+            http.post('*/api/events/:eventId/feedback', async ({ request }) => {
+                submittedBody = (await request.json()) as Record<string, unknown>
+                return HttpResponse.json(ratingResponse(submittedBody), { status: 201 })
+            }),
+        )
+
+        const { user } = renderWithProviders(
+            <RateEventModal eventId="evt-1" initialRating={null} onClose={() => { }} onSubmitted={() => { }} />,
+        )
+
+        await user.click(screen.getByRole('radio', { name: /Amazing/i }))
+        expect(screen.queryByRole('button', { name: 'Event size' })).not.toBeInTheDocument()
+        await user.click(screen.getByRole('button', { name: /Continue/i }))
+        expect(await screen.findByRole('heading', { name: 'About how many people attended?' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Not sure / Skip' })).not.toBeInTheDocument()
+        await user.click(screen.getByRole('radio', { name: 'Large (500-2,000)' }))
+        expect(screen.getByRole('radio', { name: /Large \(500-2,000\)/ })).toHaveAttribute('aria-checked', 'true')
+        await user.click(screen.getByRole('radio', { name: /Large \(500-2,000\)/ }))
+        expect(screen.getByRole('radio', { name: /Large \(500-2,000\)/ })).toHaveAttribute('aria-checked', 'false')
+        await user.click(screen.getByRole('radio', { name: 'Large (500-2,000)' }))
+        await user.click(screen.getByRole('button', { name: /Continue/i }))
+        await user.click(screen.getByRole('button', { name: /Continue/i }))
+        await user.click(screen.getByRole('button', { name: /Submit/i }))
+
+        expect(await screen.findByText('Thanks for your feedback!')).toBeInTheDocument()
+        expect(submittedBody).toMatchObject({ aspect_scores: {}, aspect_tag_ids: [21] })
+    })
+
+    it('omits the event-size step when the review size flag is disabled', async () => {
+        const eventSizeGroup = {
+            id: 2,
+            slug: 'event-size',
+            label: 'Event size',
+            ordinal: 108,
+            enabled: true,
+            scope: 'aspect',
+            allow_multiple: false,
+            color: '#f59e0b',
+            condition_tag_slugs: [],
+            tags: [
+                { id: 20, group_id: 2, slug: 'small', label: 'Small (50-200)', ordinal: 0, polarity: 'neutral', enabled: true },
+            ],
+        }
+        let settingsRequested = false
+        server.use(
+            http.get('*/api/settings', () => {
+                settingsRequested = true
+                return HttpResponse.json({ event_review_size_step_enabled: false })
+            }),
+            http.get('*/api/tags', ({ request }) => {
+                const scope = new URL(request.url).searchParams.get('scope')
+                return HttpResponse.json(scope === 'aspect' ? [eventSizeGroup] : [])
+            }),
+        )
+
+        const { user } = renderWithProviders(
+            <FeatureFlagsProvider>
+                <RateEventModal eventId="evt-1" initialRating={null} onClose={() => { }} onSubmitted={() => { }} />
+            </FeatureFlagsProvider>,
+        )
+        await waitFor(() => expect(settingsRequested).toBe(true))
+        await waitFor(() => expect(screen.queryByText('About how many people attended?')).not.toBeInTheDocument())
+
+        await user.click(screen.getByRole('radio', { name: /Amazing/i }))
+        await user.click(screen.getByRole('button', { name: /Continue/i }))
+        expect(await screen.findByRole('heading', { name: 'You wanna say something?' })).toBeInTheDocument()
     })
 })
