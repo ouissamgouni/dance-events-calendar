@@ -370,13 +370,16 @@ class HandleAvailabilityResponse(BaseModel):
     reason: Optional[str] = None
 
 
+ReachFilter = Literal["any", "regional_plus", "international"]
+
+
 class InterestProfileRequest(BaseModel):
     """Create/replace payload for a ``UserInterestProfile``.
 
-    Geography is always a bounding box (``min_lat``/``min_lng``/
-    ``max_lat``/``max_lng``). ``dance_tag_ids``/``reach_tag_ids`` are full
-    replacements; empty ``reach_tag_ids`` means "match any scale" (no
-    reach filter).
+    Area geography uses the supplied bounding box. Radius geography uses
+    ``center_lat``/``center_lng``/``radius_km`` and has its bounding box
+    computed by the server. ``reach_filter`` is the canonical event reach
+    restriction; ``reach_tag_ids`` is a temporary compatibility input.
 
     Legacy ``notify_enabled`` is accepted as an alias for
     ``matches_enabled`` for one release (Phase G rollout).
@@ -386,11 +389,17 @@ class InterestProfileRequest(BaseModel):
 
     label: str = Field(..., min_length=1, max_length=120)
     area_label: Optional[str] = Field(default=None, min_length=1, max_length=120)
-    min_lat: float = Field(..., ge=-90, le=90)
-    min_lng: float = Field(..., ge=-180, le=180)
-    max_lat: float = Field(..., ge=-90, le=90)
-    max_lng: float = Field(..., ge=-180, le=180)
+    geo_kind: str = Field(default="area", pattern="^(area|radius)$")
+    min_lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    min_lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    max_lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    max_lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    center_lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    center_lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    radius_km: Optional[float] = Field(default=None, gt=0, le=5000)
     dance_tag_ids: list[int] = []
+    reach_filter: Optional[ReachFilter] = None
+    # Legacy input accepted while existing clients migrate to ``reach_filter``.
     reach_tag_ids: list[int] = []
     matches_enabled: bool = Field(default=True, validation_alias="matches_enabled")
     # Legacy alias — remove in the cleanup PR (see PHASE_G §G.9 step 5).
@@ -412,11 +421,17 @@ class InterestProfileUpdateRequest(BaseModel):
 
     label: Optional[str] = Field(default=None, min_length=1, max_length=120)
     area_label: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    geo_kind: Optional[str] = Field(default=None, pattern="^(area|radius)$")
     min_lat: Optional[float] = Field(default=None, ge=-90, le=90)
     min_lng: Optional[float] = Field(default=None, ge=-180, le=180)
     max_lat: Optional[float] = Field(default=None, ge=-90, le=90)
     max_lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    center_lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    center_lng: Optional[float] = Field(default=None, ge=-180, le=180)
+    radius_km: Optional[float] = Field(default=None, gt=0, le=5000)
     dance_tag_ids: Optional[list[int]] = None
+    reach_filter: Optional[ReachFilter] = None
+    # Legacy input accepted while existing clients migrate to ``reach_filter``.
     reach_tag_ids: Optional[list[int]] = None
     matches_enabled: Optional[bool] = None
     # Legacy alias — remove in the cleanup PR.
@@ -433,11 +448,17 @@ class InterestProfileResponse(BaseModel):
     id: int
     label: str
     area_label: str
+    geo_kind: str = "area"
     min_lat: float
     min_lng: float
     max_lat: float
     max_lng: float
+    center_lat: Optional[float] = None
+    center_lng: Optional[float] = None
+    radius_km: Optional[float] = None
     dance_tag_ids: list[int] = []
+    reach_filter: ReachFilter = "any"
+    # Legacy mirror derived from ``reach_filter``.
     reach_tag_ids: list[int] = []
     matches_enabled: bool = True
     # Legacy mirror — remove in the cleanup PR. Always equal to

@@ -5,6 +5,7 @@ import type { TagGroup } from '../types';
 import { DEFAULT_AREA_BBOX, isWideArea } from '../constants/area';
 import { useAreaEventPreview } from '../hooks/useAreaEventPreview';
 import { useScrollDots } from '../hooks/useScrollDots';
+import { REACH_FILTER_ICON_SRC, REACH_FILTER_LABELS } from '../utils/reach';
 import AreaMapPicker from './AreaMapPicker';
 import RailEventCard from './RailEventCard';
 import ScrollDotsIndicator from './ScrollDots';
@@ -84,6 +85,22 @@ export default function ProfileEditor({
 }: Props) {
     const danceIds = danceValue.selectedTagIds;
     const reachIds = reachValue.selectedTagIds;
+    const regionalReachId = reachGroup?.tags.find((tag) => tag.slug === 'regional')?.id;
+    const internationalReachId = reachGroup?.tags.find((tag) => tag.slug === 'international')?.id;
+    const selectedReach = regionalReachId != null && reachIds.includes(regionalReachId)
+        ? 'regional_plus'
+        : internationalReachId != null && reachIds.includes(internationalReachId)
+            ? 'international'
+            : 'any';
+
+    const selectReach = (choice: 'any' | 'regional_plus' | 'international') => {
+        const selectedTagIds = choice === 'any'
+            ? []
+            : choice === 'international'
+                ? [internationalReachId].filter((id): id is number => id != null)
+                : [regionalReachId, internationalReachId].filter((id): id is number => id != null);
+        onReachChange({ selectedTagIds, freeTexts: {} });
+    };
 
     const { previewEvents, previewMarkers, areaTrail } = useAreaEventPreview({
         danceGroup,
@@ -135,14 +152,22 @@ export default function ProfileEditor({
                         ) : !reachGroup ? (
                             <p className="text-sm text-ink-soft">No reach tags are available yet.</p>
                         ) : (
-                            <TagsPicker
-                                tagGroups={[reachGroup]}
-                                value={reachValue}
-                                onChange={onReachChange}
-                                allowFreeText={false}
-                                searchable={false}
-                                hideGroupLabels
-                            />
+                            <div role="group" aria-label="Event reach" className="grid grid-cols-3 border border-line">
+                                {(['any', 'regional_plus', 'international'] as const).map((choice) => (
+                                    <button
+                                        key={choice}
+                                        type="button"
+                                        aria-pressed={selectedReach === choice}
+                                        onClick={() => selectReach(choice)}
+                                        className={selectedReach === choice
+                                            ? 'flex min-h-14 flex-col items-center justify-center gap-1 bg-blue-50 px-2 text-xs font-semibold text-action'
+                                            : 'flex min-h-14 flex-col items-center justify-center gap-1 px-2 text-xs font-semibold text-ink'}
+                                    >
+                                        <img src={REACH_FILTER_ICON_SRC[choice]} alt="" aria-hidden="true" className="h-5 w-5 object-contain" />
+                                        {REACH_FILTER_LABELS[choice]}
+                                    </button>
+                                ))}
+                            </div>
                         )}
                     </section>
                 </>

@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { CalendarEvent, TagGroup } from '../types';
-import { fetchEvents, fetchSettings, fetchTagGroups } from '../api';
+import { fetchEvents, fetchSettings, fetchTagGroups, type ReachFilter } from '../api';
 import PeopleFilterPanel from '../components/PeopleFilterPanel';
 import { trackView } from '../utils/tracking';
 import { filterEventsByTags } from '../utils/tagFilter';
@@ -31,7 +31,8 @@ import SearchProfileFlow from '../components/SearchProfileFlow';
 import { usePreferences } from '../context/PreferencesContext';
 import { useActiveProfile } from '../hooks/useActiveProfile';
 import { useInterestProfiles } from '../hooks/useInterestProfiles';
-import { matchSearchProfile } from '../utils/searchProfiles';
+import { matchSearchProfile, profileContainsCoordinates } from '../utils/searchProfiles';
+import { eventMatchesReach, REACH_FILTER_ICON_SRC, REACH_FILTER_LABELS } from '../utils/reach';
 import { useInvalidateAttendanceSummaries } from '../context/AttendanceSummariesContext';
 import { useSavedEvents } from '../context/SavedEventsContext';
 
@@ -260,6 +261,13 @@ export default function Home() {
         [tagGroups],
     );
     const [activeTagIds, setActiveTagIds] = useState<Set<number>>(() => new Set(parseTagIdsParam(searchParams.get('tag_ids'))));
+    const initialReachFilter = searchParams.get('reach');
+    const [reachFilter, setReachFilter] = useState<ReachFilter>(
+        initialReachFilter === 'regional_plus' || initialReachFilter === 'international'
+            ? initialReachFilter
+            : 'any',
+    );
+    const userTouchedReachRef = useRef(searchParams.has('reach'));
     // Tracks whether the user has manually toggled a tag in this session.
     // While false, we still mirror late-arriving pref changes (e.g. after
     // sign-in hydrates server prefs) into ``activeTagIds`` so the explorer
@@ -318,7 +326,7 @@ export default function Home() {
     // Active interest profile is the source of truth for the user's default
     // area + dance styles + event reach. Explore reads defaults via ``prefs``
     // (kept in sync) and persists new defaults through ``saveDefaults``.
-    const { saveDefaults } = useActiveProfile();
+    const { activeProfile, saveDefaults } = useActiveProfile();
     // Full profile list + CRUD for the search-profile picker/editor. Signed-in
     // only; anonymous users keep a single localStorage default (no picker).
     const {
@@ -328,6 +336,11 @@ export default function Home() {
         updateProfile,
         deleteProfile,
     } = useInterestProfiles();
+
+    useEffect(() => {
+        if (userTouchedReachRef.current || !activeProfile) return;
+        setReachFilter(activeProfile.reach_filter);
+    }, [activeProfile]);
     // Session-only opt-out so the user can browse "worldwide" without
     // touching their saved prefs, OR a one-click switch back to the
     // hardcoded "Europe & nearby" preset. Reload resets it (matches design
@@ -419,15 +432,21 @@ export default function Home() {
         [danceGroup, activeTagIds],
     );
     const reachTagIds = useMemo(
-        () => (reachGroup ? reachGroup.tags.filter((t) => activeTagIds.has(t.id)).map((t) => t.id) : []),
-        [reachGroup, activeTagIds],
+        () => {
+            if (!reachGroup || reachFilter === 'any') return [];
+            const slugs = reachFilter === 'international'
+                ? new Set(['international'])
+                : new Set(['regional', 'international']);
+            return reachGroup.tags.filter((tag) => slugs.has(tag.slug)).map((tag) => tag.id);
+        },
+        [reachGroup, reachFilter],
     );
     // The saved profile whose Area + Dance + Reach exactly match the live
     // search, or null (the user-facing "Current search"). Derived — no
     // separate selection state.
     const matchedSearchProfile = useMemo(
-        () => matchSearchProfile({ area: effectiveArea, danceIds: danceTagIds, reachIds: reachTagIds }, searchProfiles),
-        [effectiveArea, danceTagIds, reachTagIds, searchProfiles],
+        () => matchSearchProfile({ area: effectiveArea, danceIds: danceTagIds, reachFilter, reachIds: reachTagIds }, searchProfiles),
+        [effectiveArea, danceTagIds, reachFilter, reachTagIds, searchProfiles],
     );
     const selectedSearchProfileId: number | 'custom' = matchedSearchProfile ? matchedSearchProfile.id : 'custom';
     // Search-profile flow overlay: null = closed, else the entry step.
@@ -444,9 +463,10 @@ export default function Home() {
             danceGroup?.tags.forEach((t) => next.delete(t.id));
             reachGroup?.tags.forEach((t) => next.delete(t.id));
             profile.dance_tag_ids.forEach((id) => next.add(id));
-            profile.reach_tag_ids.forEach((id) => next.add(id));
             return next;
         });
+        userTouchedReachRef.current = true;
+        setReachFilter(profile.reach_filter);
         const area: PreferredAreaPayload = {
             min_lat: profile.min_lat,
             min_lng: profile.min_lng,
@@ -473,7 +493,7 @@ export default function Home() {
         async (profile: InterestProfile) => {
             const payload: InterestProfileUpdatePayload = {
                 dance_tag_ids: danceTagIds,
-                reach_tag_ids: reachTagIds,
+                reach_filter: reachFilter,
             };
             if (effectiveArea) payload.area_label = clampArea(effectiveArea).label;
             if (effectiveArea) {
@@ -485,9 +505,9 @@ export default function Home() {
 
             if (profile.is_active) {
                 // Active profile: use saveDefaults to maintain preference sync.
-                const input: { area?: PreferredAreaPayload; danceTagIds?: number[]; reachTagIds?: number[] } = {
+                const input: { area?: PreferredAreaPayload; danceTagIds?: number[]; reachFilter?: ReachFilter } = {
                     danceTagIds: danceTagIds,
-                    reachTagIds: reachTagIds,
+                    reachFilter,
                 };
                 if (effectiveArea) input.area = clampArea(effectiveArea);
                 suppressNextPrefsFitRef.current = true;
@@ -499,7 +519,7 @@ export default function Home() {
                 await updateProfile(profile.id, payload);
             }
         },
-        [danceTagIds, reachTagIds, effectiveArea, saveDefaults, reloadSearchProfiles, updateProfile],
+        [danceTagIds, reachFilter, effectiveArea, saveDefaults, reloadSearchProfiles, updateProfile],
     );
 
     // Explorer mode fetches the full date/interest event set and filters by
@@ -669,6 +689,9 @@ export default function Home() {
             interestMatch,
             sortBy,
         });
+        if (reachFilter !== 'any') next.set('reach', reachFilter);
+        else if (userTouchedReachRef.current || searchParams.has('reach')) next.set('reach', 'any');
+        else next.delete('reach');
         // Reflect the fullscreen map view in the URL so it is shareable and
         // survives reload; the back button returns to the list.
         if (mapFullscreen) next.set('view', 'map');
@@ -676,7 +699,7 @@ export default function Home() {
         if (next.toString() !== searchParams.toString()) {
             setSearchParams(next, { replace: true });
         }
-    }, [activeTagIds, endDate, interestKind, interestMatch, interestSource, interestUserHandles, mapFullscreen, searchParams, setSearchParams, sortBy, startDate, viewMode]);
+    }, [activeTagIds, endDate, interestKind, interestMatch, interestSource, interestUserHandles, mapFullscreen, reachFilter, searchParams, setSearchParams, sortBy, startDate, viewMode]);
 
     // Events query source: Explorer pulls the date/interest-filtered set once
     // and applies the active area + tag filters client-side. The live map
@@ -738,6 +761,25 @@ export default function Home() {
                     const defaults = defaultExplorerDateRange(nextDefaultPeriod);
                     setStartDate(defaults.startDate);
                     setEndDate(defaults.endDate);
+                }
+                const loadedReachGroup = groups.find((group) => group.slug === 'reach');
+                const selectedReachTags = loadedReachGroup?.tags.filter((tag) => activeTagIds.has(tag.id)) ?? [];
+                if (selectedReachTags.length > 0) {
+                    if (!userTouchedReachRef.current) {
+                        const slugs = new Set(selectedReachTags.map((tag) => tag.slug));
+                        setReachFilter(
+                            slugs.has('regional')
+                                ? 'regional_plus'
+                                : slugs.has('international')
+                                    ? 'international'
+                                    : 'any',
+                        );
+                    }
+                    setActiveTagIds((current) => {
+                        const next = new Set(current);
+                        selectedReachTags.forEach((tag) => next.delete(tag.id));
+                        return next;
+                    });
                 }
                 setTagGroups(groups);
             })
@@ -823,6 +865,8 @@ export default function Home() {
         userTouchedTagsRef.current = true;
         setPreserveViewportAfterSearch(false);
         setActiveTagIds(new Set());
+        userTouchedReachRef.current = true;
+        setReachFilter('any');
         setInterestSource(null);
         setInterestKind('any');
         setInterestUserHandles([]);
@@ -859,6 +903,8 @@ export default function Home() {
         userTouchedTagsRef.current = true;
         setPreserveViewportAfterSearch(false);
         setActiveTagIds(new Set(prefs.tagIds));
+        userTouchedReachRef.current = true;
+        setReachFilter(activeProfile?.reach_filter ?? 'any');
         setInterestSource(null);
         setInterestKind('going');
         setInterestUserHandles([]);
@@ -866,7 +912,7 @@ export default function Home() {
         setEndDate(defaults.endDate);
         setAreaSessionOverride(null);
         bumpAutoFit();
-    }, [bumpAutoFit, defaultExplorerPeriod, prefs.tagIds]);
+    }, [activeProfile?.reach_filter, bumpAutoFit, defaultExplorerPeriod, prefs.tagIds]);
 
     // People-scoped Clear (sub-editor header action): remove the People filter
     // entirely — no scope, any status, no specific people. Never re-selects a
@@ -980,17 +1026,21 @@ export default function Home() {
     const areaScopedEvents = useMemo(() => {
         if (viewMode !== 'explorer' || !effectiveArea) return events;
         const bounds = areaToMapBounds(effectiveArea);
-        return events.filter((event) => eventMatchesBounds(event, bounds));
-    }, [events, effectiveArea, viewMode]);
+        return events.filter((event) =>
+            eventMatchesBounds(event, bounds)
+            && (!matchedSearchProfile || profileContainsCoordinates(matchedSearchProfile, event.latitude, event.longitude)),
+        );
+    }, [events, effectiveArea, matchedSearchProfile, viewMode]);
 
     const filteredEvents = useMemo(
-        () => filterEventsByTags(events, activeTagIds, tagGroups),
-        [events, activeTagIds, tagGroups],
+        () => filterEventsByTags(events, activeTagIds, tagGroups).filter((event) => eventMatchesReach(event, reachFilter)),
+        [events, activeTagIds, reachFilter, tagGroups],
     );
 
     const explorerMatchingEvents = useMemo(
         () => {
-            const tagFiltered = filterEventsByTags(areaScopedEvents, activeTagIds, tagGroups);
+            const tagFiltered = filterEventsByTags(areaScopedEvents, activeTagIds, tagGroups)
+                .filter((event) => eventMatchesReach(event, reachFilter));
             // Hide events whose end time is already in the past — the
             // backend's ``startDate`` filter can still return an event
             // that started earlier today but wrapped past midnight into
@@ -1000,7 +1050,7 @@ export default function Home() {
             const now = Date.now();
             return tagFiltered.filter((e) => !e.end || new Date(e.end).getTime() >= now);
         },
-        [areaScopedEvents, activeTagIds, tagGroups],
+        [areaScopedEvents, activeTagIds, reachFilter, tagGroups],
     );
 
     // Keep the mobile map miniature always framed on the current results.
@@ -1038,9 +1088,13 @@ export default function Home() {
                 });
                 if (cancelled) return;
                 const areaFiltered = effectiveArea
-                    ? evts.filter((event) => eventMatchesBounds(event, areaToMapBounds(effectiveArea)))
+                    ? evts.filter((event) =>
+                        eventMatchesBounds(event, areaToMapBounds(effectiveArea))
+                        && (!matchedSearchProfile || profileContainsCoordinates(matchedSearchProfile, event.latitude, event.longitude)),
+                    )
                     : evts;
-                const matching = filterEventsByTags(areaFiltered, activeTagIds, tagGroups);
+                const matching = filterEventsByTags(areaFiltered, activeTagIds, tagGroups)
+                    .filter((event) => eventMatchesReach(event, reachFilter));
                 if (matching.length > 0) {
                     setNextAvailableEventBatch({
                         endDate: formatDate(windowEnd),
@@ -1059,7 +1113,7 @@ export default function Home() {
         return () => {
             cancelled = true;
         };
-    }, [viewMode, endDate, interestSource, interestKind, interestUserHandles, interestMatch, effectiveArea, activeTagIds, tagGroups]);
+    }, [viewMode, endDate, interestSource, interestKind, interestUserHandles, interestMatch, effectiveArea, matchedSearchProfile, activeTagIds, reachFilter, tagGroups]);
 
     const selectedExplorerMapEvent = useMemo(
         () => explorerMatchingEvents.find((event) => event.event_id === selectedExplorerMapEventId) ?? null,
@@ -1381,6 +1435,36 @@ export default function Home() {
         />
     );
 
+    const renderReachFilter = () => (
+        <div>
+            <div className="mb-2 flex items-center gap-1 text-xs font-semibold text-ink">
+                <span>Event reach</span>
+                <span title="Any includes events without a reach classification" aria-label="Any includes unclassified events">ⓘ</span>
+            </div>
+            <div role="group" aria-label="Event reach" className="grid grid-cols-3 border border-line">
+                {(['any', 'regional_plus', 'international'] as const).map((choice) => (
+                    <button
+                        key={choice}
+                        type="button"
+                        aria-pressed={reachFilter === choice}
+                        onClick={() => {
+                            userTouchedReachRef.current = true;
+                            setReachFilter(choice);
+                            setPreserveViewportAfterSearch(false);
+                            bumpAutoFit();
+                        }}
+                        className={reachFilter === choice
+                            ? 'flex min-h-14 flex-col items-center justify-center gap-1 bg-blue-50 px-2 text-xs font-semibold text-action'
+                            : 'flex min-h-14 flex-col items-center justify-center gap-1 px-2 text-xs font-semibold text-ink'}
+                    >
+                        <img src={REACH_FILTER_ICON_SRC[choice]} alt="" aria-hidden="true" className="h-5 w-5 object-contain" />
+                        {REACH_FILTER_LABELS[choice]}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+
     // Short summaries shown on each filter-sheet section row.
     const groupSummary = (group: TagGroup | null, placeholder: string): string => {
         if (!group) return placeholder;
@@ -1490,8 +1574,8 @@ export default function Home() {
             icon: <img src="/scale.png" alt="" className="h-4 w-4" />,
             group: 'Search profile',
             groupVariant: 'boxed' as const,
-            summary: groupSummary(reachGroup, 'Any'),
-            render: () => renderGroupPills(reachGroup),
+            summary: REACH_FILTER_LABELS[reachFilter],
+            render: renderReachFilter,
         }] : []),
         // Small secondary "Save" text action — shown only while the current
         // Area + Dance + Reach combination matches no saved profile.
@@ -1588,6 +1672,7 @@ export default function Home() {
                 danceGroup={danceGroup}
                 onEditDance={() => openFilterSheet('dance')}
                 reachGroup={reachGroup}
+                reachFilter={reachFilter}
                 onEditReach={() => openFilterSheet('reach')}
                 interestSource={interestSource}
                 interestKind={interestKind}
@@ -2042,7 +2127,7 @@ export default function Home() {
                     variant={isDesktop ? 'modal' : 'sheet'}
                     profiles={searchProfiles}
                     selectedProfileId={selectedSearchProfileId}
-                    current={{ area: effectiveArea, danceIds: danceTagIds, reachIds: reachTagIds }}
+                    current={{ area: effectiveArea, danceIds: danceTagIds, reachFilter, reachIds: reachTagIds }}
                     currentAreaLabel={areaSummary}
                     danceGroup={danceGroup}
                     reachGroup={reachGroup}
@@ -2052,6 +2137,21 @@ export default function Home() {
                     createProfile={createProfile}
                     updateProfile={updateProfile}
                     deleteProfile={deleteProfile}
+                    onCreateRoute={() => navigate('/mine/profiles/new', {
+                        state: {
+                            returnTo: `${location.pathname}${location.search}`,
+                            initialSearch: {
+                                area: effectiveArea,
+                                areaLabel: areaSummary,
+                                danceIds: danceTagIds,
+                                reachFilter,
+                                reachIds: reachTagIds,
+                            },
+                        },
+                    })}
+                    onEditRoute={(profile) => navigate(`/mine/profiles/${profile.id}/edit`, {
+                        state: { returnTo: `${location.pathname}${location.search}` },
+                    })}
                 />
             )}
         </div>

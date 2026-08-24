@@ -15,6 +15,8 @@ interface Props {
     onBack: () => void;
     onContinue: () => void;
     continueLabel?: string;
+    title?: string;
+    showAlerts?: boolean;
 }
 
 type Corner = 'north-west' | 'north-east' | 'south-west' | 'south-east';
@@ -55,6 +57,8 @@ export default function OnboardingAreaEditor({
     onBack,
     onContinue,
     continueLabel = 'Continue',
+    title = 'International area',
+    showAlerts = true,
 }: Props) {
     const mapRef = useRef<L.Map | null>(null);
     const mapHostRef = useRef<HTMLDivElement | null>(null);
@@ -249,7 +253,7 @@ export default function OnboardingAreaEditor({
         <div className="flex min-h-0 flex-1 flex-col">
             <div className="relative flex min-h-12 items-center justify-center px-14">
                 <button type="button" onClick={onBack} aria-label="Back" className="absolute left-2 top-0 min-h-11 min-w-11 text-2xl text-ink">‹</button>
-                <h1 className="truncate text-base font-bold text-ink">International area</h1>
+                <h1 className="truncate text-base font-bold text-ink">{title}</h1>
             </div>
 
             <div ref={mapHostRef} className="relative h-[46dvh] min-h-72 max-h-[500px] w-full overflow-hidden bg-canvas">
@@ -318,10 +322,10 @@ export default function OnboardingAreaEditor({
                         <span aria-hidden="true" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-action">✎</span>
                     </span>
                 </label>
-                <label className="mt-3 flex min-h-12 items-center justify-between border-t border-line py-3 text-sm font-semibold text-ink">
+                {showAlerts && <label className="mt-3 flex min-h-12 items-center justify-between border-t border-line py-3 text-sm font-semibold text-ink">
                     <span>New event alerts</span>
                     <input type="checkbox" checked={alertsEnabled} onChange={(event) => onAlertsChange(event.target.checked)} className="h-5 w-5 accent-action" />
-                </label>
+                </label>}
             </div>
 
             <div className="sticky bottom-0 z-[700] border-t border-line bg-surface px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-3">

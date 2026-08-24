@@ -109,6 +109,7 @@ def _make_event(
     updated_at: datetime | None = None,
     is_hidden: bool = False,
     deleted_at: datetime | None = None,
+    reach: str | None = None,
 ) -> CachedEvent:
     if session.get(CalendarSetting, "cal") is None:
         session.add(
@@ -124,6 +125,7 @@ def _make_event(
         all_day=False,
         latitude=lat,
         longitude=lng,
+        reach=reach,
         is_hidden=is_hidden,
         deleted_at=deleted_at,
     )
@@ -152,6 +154,7 @@ def _make_profile(
     matches_enabled: bool = True,
     dance_tags: list[Tag] = (),
     reach_tags: list[Tag] = (),
+    reach_filter: str = "any",
 ) -> UserInterestProfile:
     p = UserInterestProfile(
         area_label="Test area",
@@ -161,6 +164,7 @@ def _make_profile(
         min_lng=min_lng,
         max_lat=max_lat,
         max_lng=max_lng,
+        reach_filter=reach_filter,
         matches_enabled=matches_enabled,
     )
     session.add(p)
@@ -187,6 +191,26 @@ def test_geo_match_bbox_inside_and_outside(session):
     )
     assert svc._geo_match(area, 0.5, 0.5) is True
     assert svc._geo_match(area, 1.5, 0.5) is False
+
+
+def test_geo_match_radius_excludes_bbox_corner(session):
+    user = _make_user(session, "radius@example.com", "radius")
+    radius = UserInterestProfile(
+        user_id=user.id,
+        label="Near home",
+        area_label="Paris · 25 km",
+        geo_kind="radius",
+        min_lat=48.63,
+        min_lng=2.01,
+        max_lat=49.08,
+        max_lng=2.69,
+        center_lat=48.8566,
+        center_lng=2.3522,
+        radius_km=25,
+    )
+
+    assert svc._geo_match(radius, 48.8566, 2.5) is True
+    assert svc._geo_match(radius, 49.07, 2.68) is False
 
 
 # --- run_once matching + idempotency ----------------------------------------
@@ -232,38 +256,32 @@ def test_run_once_no_match_without_dance_tag_overlap(session):
     assert stats["created"] == 0
 
 
-def test_run_once_reach_filter_excludes_non_matching_reach(session):
+def test_run_once_regional_plus_excludes_local_reach(session):
     dance_group = _make_tag_group(session, "dance")
     reach_group = _make_tag_group(session, "reach")
     salsa = _make_tag(session, dance_group, "salsa")
     local = _make_tag(session, reach_group, "local")
-    regional = _make_tag(session, reach_group, "regional")
 
     alice = _make_user(session, "alice@example.com", "alice")
-    _make_profile(session, alice, dance_tags=[salsa], reach_tags=[local])
+    _make_profile(session, alice, dance_tags=[salsa], reach_filter="regional_plus")
 
-    event = _make_event(session, "ev-1")
+    event = _make_event(session, "ev-1", reach="local")
     _tag_event(session, event.event_id, salsa)
-    _tag_event(session, event.event_id, regional)  # reach doesn't overlap
+    _tag_event(session, event.event_id, local)
 
     stats = svc.run_once()
     assert stats["created"] == 0
 
 
-def test_run_once_empty_reach_selection_matches_any_reach(session):
+def test_run_once_any_reach_matches_unclassified_event(session):
     dance_group = _make_tag_group(session, "dance")
-    reach_group = _make_tag_group(session, "reach")
     salsa = _make_tag(session, dance_group, "salsa")
-    regional = _make_tag(session, reach_group, "regional")
 
     alice = _make_user(session, "alice@example.com", "alice")
-    # No reach tags selected -> match any reach (including events with no
-    # reach tag at all).
-    _make_profile(session, alice, dance_tags=[salsa], reach_tags=[])
+    _make_profile(session, alice, dance_tags=[salsa], reach_filter="any")
 
     event = _make_event(session, "ev-1")
     _tag_event(session, event.event_id, salsa)
-    _tag_event(session, event.event_id, regional)
 
     stats = svc.run_once()
     assert stats["created"] == 1

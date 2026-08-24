@@ -440,7 +440,7 @@ export function LegacyOnboardingWizard() {
             const inReach = reachGroup?.tags.some((t) => t.id === id) ?? false;
             return !inDance && !inReach;
         });
-        await setPrefs({ area, tagIds: [...otherTagIds, ...danceIds, ...reachIds] });
+        await setPrefs({ area, tagIds: [...otherTagIds, ...danceIds] });
         const existing = await fetchInterestProfiles().catch(() => [] as never);
         const target = Array.isArray(existing)
             ? existing.find((p) => p.is_active) ?? existing[0] ?? null
@@ -453,7 +453,7 @@ export function LegacyOnboardingWizard() {
             max_lat: area.max_lat,
             max_lng: area.max_lng,
             dance_tag_ids: danceIds,
-            reach_tag_ids: reachIds,
+            reach_filter: 'international' as const,
             matches_enabled: matchesEnabled,
             is_active: true,
         };
@@ -473,7 +473,7 @@ export function LegacyOnboardingWizard() {
             max_lat: localBboxPreview.max_lat,
             max_lng: localBboxPreview.max_lng,
             dance_tag_ids: localDanceValue.selectedTagIds,
-            reach_tag_ids: [],
+            reach_filter: 'any',
             matches_enabled: localMatchesEnabled,
             is_active: false,
         });

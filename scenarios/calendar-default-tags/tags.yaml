@@ -21,9 +21,9 @@ tag_groups:
         label: Bootcamp
 
   - slug: reach
-    label: Reach
+    label: Event reach
     ordinal: 2
-    allow_multiple: true
+    allow_multiple: false
     onboarding_eligible: true
     color: "#a78bfa"
     tags:

@@ -50,6 +50,7 @@ const NetworkPage = lazy(() => import('./pages/NetworkPage'));
 const FollowingReviewsPage = lazy(() => import('./pages/FollowingReviewsPage'));
 const MyReviewsPage = lazy(() => import('./pages/MyReviewsPage'));
 const DiscoveryProfilesPage = lazy(() => import('./pages/DiscoveryProfilesPage'));
+const SearchProfileEditorPage = lazy(() => import('./pages/SearchProfileEditorPage'));
 const SectionLayout = lazy(() => import('./components/SectionTabs'));
 import OnboardingGate from './components/OnboardingGate';
 import UserSearchBox from './components/UserSearchBox';
@@ -201,6 +202,8 @@ function AppShell() {
                   />
                   <Route path="reviews" element={<MyReviewsPage />} />
                   <Route path="profiles" element={<DiscoveryProfilesPage />} />
+                  <Route path="profiles/new" element={<SearchProfileEditorPage />} />
+                  <Route path="profiles/:profileId/edit" element={<SearchProfileEditorPage />} />
                 </Route>
                 <Route path="/shared/:token" element={<SharedCalendarPage />} />
                 <Route path="/shared/passport/:token" element={<SharedPassportPage />} />

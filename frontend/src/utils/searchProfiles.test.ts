@@ -4,6 +4,7 @@ import type { TagGroup } from '../types';
 import {
     bboxApproxEquals,
     matchSearchProfile,
+    profileContainsCoordinates,
     sameIdSet,
     summarizeSearchProfile,
     summarizeSelection,
@@ -14,11 +15,16 @@ function makeProfile(overrides: Partial<InterestProfile> = {}): InterestProfile 
         id: 1,
         label: 'Barcelona area',
         area_label: 'Barcelona area',
+        geo_kind: 'area',
         min_lat: 41,
         min_lng: 2,
         max_lat: 42,
         max_lng: 3,
+        center_lat: null,
+        center_lng: null,
+        radius_km: null,
         dance_tag_ids: [10, 11],
+        reach_filter: 'international',
         reach_tag_ids: [20],
         matches_enabled: false,
         notify_enabled: false,
@@ -68,6 +74,24 @@ describe('bboxApproxEquals', () => {
     });
 });
 
+describe('profileContainsCoordinates', () => {
+    it('excludes a point in a radius bounding-box corner', () => {
+        const profile = makeProfile({
+            geo_kind: 'radius',
+            min_lat: 48.63,
+            min_lng: 2.01,
+            max_lat: 49.08,
+            max_lng: 2.69,
+            center_lat: 48.8566,
+            center_lng: 2.3522,
+            radius_km: 25,
+        });
+
+        expect(profileContainsCoordinates(profile, 48.8566, 2.5)).toBe(true);
+        expect(profileContainsCoordinates(profile, 49.07, 2.68)).toBe(false);
+    });
+});
+
 describe('sameIdSet', () => {
     it('is order-independent', () => {
         expect(sameIdSet([1, 2, 3], [3, 2, 1])).toBe(true);
@@ -84,35 +108,35 @@ describe('sameIdSet', () => {
 });
 
 describe('matchSearchProfile', () => {
-    const profiles = [makeProfile({ id: 1 }), makeProfile({ id: 2, label: 'Other', dance_tag_ids: [12], reach_tag_ids: [21] })];
+    const profiles = [makeProfile({ id: 1 }), makeProfile({ id: 2, label: 'Other', dance_tag_ids: [12], reach_filter: 'any', reach_tag_ids: [] })];
 
     it('matches an exact Area + Dance + Reach selection', () => {
         const match = matchSearchProfile(
-            { area: { min_lat: 41, min_lng: 2, max_lat: 42, max_lng: 3 }, danceIds: [11, 10], reachIds: [20] },
+            { area: { min_lat: 41, min_lng: 2, max_lat: 42, max_lng: 3 }, danceIds: [11, 10], reachFilter: 'international', reachIds: [20] },
             profiles,
         );
         expect(match?.id).toBe(1);
     });
 
     it('returns null (Custom) when the area is null', () => {
-        expect(matchSearchProfile({ area: null, danceIds: [10, 11], reachIds: [20] }, profiles)).toBeNull();
+        expect(matchSearchProfile({ area: null, danceIds: [10, 11], reachFilter: 'international', reachIds: [20] }, profiles)).toBeNull();
     });
 
     it('returns null (Custom) when dance tags differ', () => {
         expect(
             matchSearchProfile(
-                { area: { min_lat: 41, min_lng: 2, max_lat: 42, max_lng: 3 }, danceIds: [10], reachIds: [20] },
+                { area: { min_lat: 41, min_lng: 2, max_lat: 42, max_lng: 3 }, danceIds: [10], reachFilter: 'international', reachIds: [20] },
                 profiles,
             ),
         ).toBeNull();
     });
 
     it('returns null when profiles list is null', () => {
-        expect(matchSearchProfile({ area: { min_lat: 41, min_lng: 2, max_lat: 42, max_lng: 3 }, danceIds: [10, 11], reachIds: [20] }, null)).toBeNull();
+        expect(matchSearchProfile({ area: { min_lat: 41, min_lng: 2, max_lat: 42, max_lng: 3 }, danceIds: [10, 11], reachFilter: 'international', reachIds: [20] }, null)).toBeNull();
     });
 
     it('re-matches after the selection returns to a saved combination', () => {
-        const current = { area: { min_lat: 41, min_lng: 2, max_lat: 42, max_lng: 3 }, danceIds: [10, 11], reachIds: [20] };
+        const current = { area: { min_lat: 41, min_lng: 2, max_lat: 42, max_lng: 3 }, danceIds: [10, 11], reachFilter: 'international' as const, reachIds: [20] };
         expect(matchSearchProfile(current, profiles)?.id).toBe(1);
         const changed = { ...current, danceIds: [10] };
         expect(matchSearchProfile(changed, profiles)).toBeNull();
@@ -122,7 +146,7 @@ describe('matchSearchProfile', () => {
     it('returns the first profile on a tie (created order)', () => {
         const dupes = [makeProfile({ id: 1 }), makeProfile({ id: 2 })];
         const match = matchSearchProfile(
-            { area: { min_lat: 41, min_lng: 2, max_lat: 42, max_lng: 3 }, danceIds: [10, 11], reachIds: [20] },
+            { area: { min_lat: 41, min_lng: 2, max_lat: 42, max_lng: 3 }, danceIds: [10, 11], reachFilter: 'international', reachIds: [20] },
             dupes,
         );
         expect(match?.id).toBe(1);
@@ -130,13 +154,13 @@ describe('matchSearchProfile', () => {
 });
 
 describe('summarizeSearchProfile', () => {
-    it('condenses multiple dance tags and joins reach labels', () => {
+    it('condenses multiple dance tags and uses the reach filter label', () => {
         expect(summarizeSearchProfile(makeProfile(), danceGroup, reachGroup)).toBe('Barcelona area · Salsa +1 · International');
     });
 
-    it('falls back to Any style / Any scale when empty', () => {
-        expect(summarizeSearchProfile(makeProfile({ dance_tag_ids: [], reach_tag_ids: [] }), danceGroup, reachGroup)).toBe(
-            'Barcelona area · Any style · Any scale',
+    it('uses Any for an unrestricted profile', () => {
+        expect(summarizeSearchProfile(makeProfile({ dance_tag_ids: [], reach_filter: 'any', reach_tag_ids: [] }), danceGroup, reachGroup)).toBe(
+            'Barcelona area · Any style · Any',
         );
     });
 });
@@ -144,7 +168,7 @@ describe('summarizeSearchProfile', () => {
 describe('summarizeSelection', () => {
     it('uses the supplied area label', () => {
         expect(
-            summarizeSelection({ area: null, danceIds: [10], reachIds: [20, 21] }, 'Anywhere', danceGroup, reachGroup),
-        ).toBe('Anywhere · Salsa · International/Local');
+            summarizeSelection({ area: null, danceIds: [10], reachFilter: 'regional_plus', reachIds: [20, 21] }, 'Anywhere', danceGroup, reachGroup),
+        ).toBe('Anywhere · Salsa · Regional+');
     });
 });

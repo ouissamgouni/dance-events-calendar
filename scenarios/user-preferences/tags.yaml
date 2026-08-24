@@ -19,9 +19,9 @@ tag_groups:
         label: Festival
 
   - slug: reach
-    label: Reach
+    label: Event reach
     ordinal: 30
-    allow_multiple: true
+    allow_multiple: false
     onboarding_eligible: true
     color: "#a78bfa"
     tags:

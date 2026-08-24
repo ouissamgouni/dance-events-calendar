@@ -9,6 +9,35 @@ from geopy.geocoders import Nominatim
 
 logger = logging.getLogger(__name__)
 
+
+def _language_preference_from_header(accept_language: Optional[str]) -> str:
+    """Convert Accept-Language header to Nominatim language preference string.
+
+    Preserves the inbound language order and quality weights, then appends
+    English as a fallback only if no en/en-* range is already present.
+    Returns 'en' if the header is missing.
+
+    Examples:
+    - None → 'en'
+    - 'en-US,en;q=0.9' → 'en-US,en;q=0.9' (unchanged; English already present)
+    - 'el-GR,el;q=0.9' → 'el-GR,el;q=0.9,en;q=0.5' (English appended)
+    - 'fr,de;q=0.8' → 'fr,de;q=0.8,en;q=0.5' (English appended)
+    """
+    if not accept_language or not accept_language.strip():
+        return "en"
+
+    # Check if any en/en-* range is already present
+    has_english = any(
+        part.lower().strip().startswith(("en", "en-"))
+        for part in accept_language.split(",")
+    )
+
+    if has_english:
+        return accept_language
+    # Append English with lower priority (q=0.5 is lower than typical user preferences)
+    return f"{accept_language},en;q=0.5"
+
+
 _geocoder = Nominatim(user_agent="movida", timeout=5)
 
 # Cache only successful geocoding results (failures are retried on next sync)
@@ -135,11 +164,23 @@ def geocode_location(location: str) -> Optional[tuple[float, float]]:
     return result[0] if result else None
 
 
-def search_locations(query: str, limit: int = 5) -> list[dict]:
+def search_locations(
+    query: str, limit: int = 5, language: Optional[str] = None
+) -> list[dict]:
     """Search for address suggestions (used by the admin geocode search UI).
 
     Prefers Google Geocoding API (if ``GOOGLE_GEOCODING_API_KEY`` is set),
-    falls back to Nominatim.
+    falls back to Nominatim with optional language preference.
+
+    Parameters
+    ----------
+    query : str
+        The address or location string to search for.
+    limit : int
+        Maximum number of results to return (default 5).
+    language : str, optional
+        Nominatim language preference string (e.g., 'en-US,en;q=0.9').
+        If None, defaults to 'en'.
 
     Returns
     -------
@@ -161,9 +202,13 @@ def search_locations(query: str, limit: int = 5) -> list[dict]:
         except Exception as exc:
             logger.warning("Google geocode search failed for '%s': %s", query, exc)
 
-    # Fallback: Nominatim
+    # Fallback: Nominatim with language preference
+    if language is None:
+        language = "en"
     try:
-        results = _geocoder.geocode(query, exactly_one=False, limit=limit)
+        results = _geocoder.geocode(
+            query, exactly_one=False, limit=limit, language=language
+        )
         if results:
             return [
                 {
@@ -257,7 +302,9 @@ def _reverse_nominatim(latitude: float, longitude: float) -> Optional[_Place]:
             _reset_circuit_unlocked()
     _throttle()
     try:
-        result = _geocoder.reverse((latitude, longitude), exactly_one=True, language="en")
+        result = _geocoder.reverse(
+            (latitude, longitude), exactly_one=True, language="en"
+        )
         if result and getattr(result, "raw", None):
             place = _parse_nominatim_place(result.raw.get("address") or {})
             _record_success()

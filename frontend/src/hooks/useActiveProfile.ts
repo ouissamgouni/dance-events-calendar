@@ -7,6 +7,7 @@ import {
     type InterestProfile,
     type InterestProfileUpdatePayload,
     type PreferredAreaPayload,
+    type ReachFilter,
 } from '../api';
 
 export interface ActiveProfileSaveInput {
@@ -14,8 +15,8 @@ export interface ActiveProfileSaveInput {
     area?: PreferredAreaPayload | null;
     /** New default dance-style tag ids. Omit to leave unchanged. */
     danceTagIds?: number[];
-    /** New default reach ("event reach") tag ids. Omit to leave unchanged. */
-    reachTagIds?: number[];
+    /** New default event reach filter. Omit to leave unchanged. */
+    reachFilter?: ReachFilter;
 }
 
 /**
@@ -52,7 +53,7 @@ export function useActiveProfile() {
                             max_lng: active.max_lng,
                             label: active.area_label,
                         },
-                        tagIds: [...active.dance_tag_ids, ...active.reach_tag_ids],
+                        tagIds: active.dance_tag_ids,
                     });
                 }
             })
@@ -79,18 +80,18 @@ export function useActiveProfile() {
                     payload.max_lng = input.area.max_lng;
                 }
                 if (input.danceTagIds) payload.dance_tag_ids = input.danceTagIds;
-                if (input.reachTagIds) payload.reach_tag_ids = input.reachTagIds;
+                if (input.reachFilter) payload.reach_filter = input.reachFilter;
                 const updated = await updateInterestProfile(activeProfile.id, payload);
                 setActiveProfile(updated);
                 applyLocalMirror({
                     ...(input.area !== undefined ? { area: input.area } : {}),
-                    tagIds: [...updated.dance_tag_ids, ...updated.reach_tag_ids],
+                    tagIds: updated.dance_tag_ids,
                 });
                 return;
             }
             const nextTags =
-                input.danceTagIds || input.reachTagIds
-                    ? [...(input.danceTagIds ?? []), ...(input.reachTagIds ?? [])]
+                input.danceTagIds
+                    ? input.danceTagIds
                     : undefined;
             await setPrefs({
                 ...(input.area !== undefined ? { area: input.area } : {}),

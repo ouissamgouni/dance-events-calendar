@@ -128,9 +128,9 @@ tag_groups:
         synonyms: ["beach"]
 
   - slug: reach
-    label: Reach
+    label: Event reach
     ordinal: 30
-    allow_multiple: true
+    allow_multiple: false
     onboarding_eligible: true
     color: "#a78bfa"
     tags:
@@ -385,8 +385,18 @@ tag_groups:
       - { slug: good-lighting, label: Good lighting, polarity: positive }
       - { slug: easy-parking, label: Easy parking, polarity: positive }
       - { slug: easy-access, label: Easy to reach, polarity: positive }
-      - { slug: good-food, label: Good food, polarity: positive, enabled: false }
-      - { slug: good-bar, label: Good drinks, polarity: positive, enabled: false }
+      - {
+          slug: good-food,
+          label: Good food,
+          polarity: positive,
+          enabled: false,
+        }
+      - {
+          slug: good-bar,
+          label: Good drinks,
+          polarity: positive,
+          enabled: false,
+        }
       - { slug: clean, label: Clean facilities, polarity: positive }
       - { slug: too-hot, label: Too hot, polarity: negative }
       - { slug: too-cold, label: Too cold, polarity: negative }
@@ -397,8 +407,18 @@ tag_groups:
       - { slug: poor-lighting, label: Poor lighting, polarity: negative }
       - { slug: poor-parking, label: Hard to park, polarity: negative }
       - { slug: hard-to-find, label: Hard to find, polarity: negative }
-      - { slug: poor-food, label: Poor food, polarity: negative, enabled: false }
-      - { slug: poor-drinks, label: Poor drinks, polarity: negative, enabled: false }
+      - {
+          slug: poor-food,
+          label: Poor food,
+          polarity: negative,
+          enabled: false,
+        }
+      - {
+          slug: poor-drinks,
+          label: Poor drinks,
+          polarity: negative,
+          enabled: false,
+        }
       - { slug: dirty-bathrooms, label: Dirty facilities, polarity: negative }
 
   - slug: organization
@@ -540,7 +560,11 @@ tag_groups:
       - { slug: poor-drinks, label: Poor drinks, polarity: negative }
       - { slug: limited-options, label: Limited options, polarity: negative }
       - { slug: ran-out, label: Food or drinks ran out, polarity: negative }
-      - { slug: no-drinking-water, label: No drinking water, polarity: negative }
+      - {
+          slug: no-drinking-water,
+          label: No drinking water,
+          polarity: negative,
+        }
 
   - slug: event-size
     label: Event size

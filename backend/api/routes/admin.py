@@ -83,6 +83,7 @@ from backend.services.geocoding import (
     reverse_geocode,
     search_locations,
 )
+from backend.services.reach import assign_event_tag, sync_event_reach
 from backend.services.sync_job_service import SyncJobStatus, get_sync_job_service
 from backend.services.sync_service import SyncService
 
@@ -1835,6 +1836,10 @@ def update_event(
 
     # Update tags if provided
     if tag_ids is not None:
+        try:
+            sync_event_reach(session, event, tag_ids)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         existing_ets = session.exec(
             select(EventTag).where(EventTag.event_id == event_id)
         ).all()
@@ -1884,11 +1889,16 @@ def update_event(
 
 @router.get("/geocode", response_model=list[GeocodeSuggestion])
 def geocode_search(
+    request: Request,
     q: str = Query(..., min_length=3, max_length=200),
     _admin: dict = Depends(require_admin),
 ):
     """Search for address suggestions. Uses Google Geocoding API if configured, else Nominatim."""
-    results = search_locations(q, limit=5)
+    from backend.services.geocoding import _language_preference_from_header
+
+    accept_language = request.headers.get("accept-language")
+    language_pref = _language_preference_from_header(accept_language)
+    results = search_locations(q, limit=5, language=language_pref)
     return [
         GeocodeSuggestion(
             display_name=r["display_name"],
@@ -2139,15 +2149,8 @@ def bulk_assign_tags(
         event = session.get(CachedEvent, event_id)
         if not event or event.deleted_at:
             continue
-        existing = {
-            et.tag_id
-            for et in session.exec(
-                select(EventTag).where(EventTag.event_id == event_id)
-            ).all()
-        }
-        for tid in valid_tag_ids:
-            if tid not in existing:
-                session.add(EventTag(event_id=event_id, tag_id=tid))
+        for tag in valid_tags:
+            if assign_event_tag(session, event, tag):
                 assigned += 1
     session.commit()
     return {

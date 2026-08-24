@@ -32,6 +32,7 @@ from backend.db.models import (
     UserInterestProfile,
     UserInterestProfileTag,
 )
+from backend.services.reach import reach_matches
 
 
 def _utcnow_naive() -> datetime:
@@ -118,7 +119,7 @@ def main() -> int:
         profiles_no_dance = 0
         for profile, user in profiles:
             per_user_obj[user.id] = user
-            dance_ids, reach_ids = profile_tags.get(profile.id, (set(), set()))
+            dance_ids, _reach_ids = profile_tags.get(profile.id, (set(), set()))
             if not dance_ids:
                 profiles_no_dance += 1
                 continue
@@ -126,7 +127,7 @@ def main() -> int:
                 tags = event_tags.get(event.event_id, set())
                 if not (dance_ids & tags):
                     continue
-                if reach_ids and not (reach_ids & tags):
+                if not reach_matches(profile.reach_filter, event.reach):
                     continue
                 if not _geo_match(profile, event.latitude, event.longitude):
                     continue

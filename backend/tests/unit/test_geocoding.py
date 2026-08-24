@@ -431,6 +431,116 @@ class TestSearchLocations:
         results = search_locations("Paris", limit=3)
         assert len(results) == 3
 
+    @patch("backend.services.geocoding._geocoder")
+    @patch("backend.services.geocoding._get_google_geocoder", return_value=None)
+    def test_forwards_language_parameter_to_nominatim(
+        self, _mock_google, mock_geocoder
+    ):
+        """search_locations forwards language preference to Nominatim."""
+        r1 = MagicMock()
+        r1.address = "Athina, Ellada"
+        r1.latitude = 37.9838
+        r1.longitude = 23.7275
+        mock_geocoder.geocode.return_value = [r1]
+
+        from backend.services.geocoding import search_locations
+
+        results = search_locations("Athens", language="el-GR,el;q=0.9,en;q=0.5")
+
+        assert len(results) == 1
+        # Verify language parameter was passed to geocode call
+        mock_geocoder.geocode.assert_called_once_with(
+            "Athens", exactly_one=False, limit=5, language="el-GR,el;q=0.9,en;q=0.5"
+        )
+
+    @patch("backend.services.geocoding._geocoder")
+    @patch("backend.services.geocoding._get_google_geocoder", return_value=None)
+    def test_defaults_to_english_when_language_not_provided(
+        self, _mock_google, mock_geocoder
+    ):
+        """search_locations defaults to English when language is None."""
+        r1 = MagicMock()
+        r1.address = "Paris, France"
+        r1.latitude = 48.86
+        r1.longitude = 2.35
+        mock_geocoder.geocode.return_value = [r1]
+
+        from backend.services.geocoding import search_locations
+
+        results = search_locations("Paris", language=None)
+
+        assert len(results) == 1
+        # Verify default 'en' language was passed
+        mock_geocoder.geocode.assert_called_once_with(
+            "Paris", exactly_one=False, limit=5, language="en"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Tests for _language_preference_from_header
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestLanguagePreferenceFromHeader:
+    def test_returns_english_when_header_missing(self):
+        from backend.services.geocoding import _language_preference_from_header
+
+        assert _language_preference_from_header(None) == "en"
+
+    def test_returns_english_when_header_empty(self):
+        from backend.services.geocoding import _language_preference_from_header
+
+        assert _language_preference_from_header("") == "en"
+        assert _language_preference_from_header("   ") == "en"
+
+    def test_preserves_english_when_already_present(self):
+        from backend.services.geocoding import _language_preference_from_header
+
+        # English already in preference order
+        result = _language_preference_from_header("en-US,en;q=0.9")
+        assert result == "en-US,en;q=0.9"
+
+    def test_preserves_english_variant_when_present(self):
+        from backend.services.geocoding import _language_preference_from_header
+
+        # English variant already in preference
+        result = _language_preference_from_header("en-GB,de;q=0.8")
+        assert result == "en-GB,de;q=0.8"
+
+    def test_appends_english_when_missing(self):
+        from backend.services.geocoding import _language_preference_from_header
+
+        # Greek preference without English
+        result = _language_preference_from_header("el-GR,el;q=0.9")
+        assert result == "el-GR,el;q=0.9,en;q=0.5"
+
+    def test_appends_english_for_single_language(self):
+        from backend.services.geocoding import _language_preference_from_header
+
+        result = _language_preference_from_header("fr")
+        assert result == "fr,en;q=0.5"
+
+    def test_appends_english_with_quality_weights(self):
+        from backend.services.geocoding import _language_preference_from_header
+
+        result = _language_preference_from_header("de-DE,de;q=0.8,fr;q=0.5")
+        assert result == "de-DE,de;q=0.8,fr;q=0.5,en;q=0.5"
+
+    def test_case_insensitive_english_detection(self):
+        from backend.services.geocoding import _language_preference_from_header
+
+        # Mixed case 'EN' should still be detected
+        result = _language_preference_from_header("EN-us,de;q=0.8")
+        assert result == "EN-us,de;q=0.8"
+
+    def test_handles_whitespace_in_header(self):
+        from backend.services.geocoding import _language_preference_from_header
+
+        result = _language_preference_from_header("  el-GR , el ; q=0.9  ")
+        # The exact whitespace preservation depends on input; should append English
+        assert "en;q=0.5" in result or "en;q=0.5" in result.replace(" ", "")
+
 
 # ---------------------------------------------------------------------------
 # Tests for reverse_geocode (coordinates -> city / country)

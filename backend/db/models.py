@@ -2,7 +2,15 @@ from datetime import date, datetime
 from typing import List, Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import Column, Index, JSON, Text, UniqueConstraint, text
+from sqlalchemy import (
+    CheckConstraint,
+    Column,
+    Index,
+    JSON,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -370,6 +378,10 @@ class CachedEvent(SQLModel, table=True):
         # active + upcoming events within a date window) to an index-only
         # scan before the Python-side fuzzy title match runs.
         Index("ix_cached_events_active_start", "deleted_at", "start"),
+        CheckConstraint(
+            "reach IS NULL OR reach IN ('local', 'regional', 'international')",
+            name="ck_cached_events_reach",
+        ),
     )
 
     event_id: str = Field(primary_key=True)
@@ -382,6 +394,7 @@ class CachedEvent(SQLModel, table=True):
     all_day: bool = Field(default=False)
     latitude: Optional[float] = Field(default=None)
     longitude: Optional[float] = Field(default=None)
+    reach: Optional[str] = Field(default=None, max_length=16, index=True)
     geocode_query: Optional[str] = Field(default=None)
     geocode_provider: Optional[str] = Field(default=None)
     # Structured place, derived from reverse-geocoding lat/lng (see
@@ -997,20 +1010,31 @@ class UserInterestProfile(SQLModel, table=True):
     Users may define multiple profiles (e.g. "home city" + "upcoming trip").
     A newly-ingested event that matches an enabled profile's tags and
     geography triggers an ``interest_event`` notification (see
-    backend/services/interest_notification_service.py). Geography is a
-    bounding box (``min_lat``/``min_lng``/``max_lat``/``max_lng``).
+    backend/services/interest_notification_service.py). The bounding box is
+    retained for both geography modes as a common query envelope.
     """
 
     __tablename__ = "user_interest_profiles"
+    __table_args__ = (
+        CheckConstraint(
+            "reach_filter IN ('any', 'regional_plus', 'international')",
+            name="ck_interest_profiles_reach_filter",
+        ),
+    )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: UUID = Field(foreign_key="users.id", index=True)
     label: str = Field(max_length=120)
     area_label: str = Field(max_length=120)
+    geo_kind: str = Field(default="area", max_length=16)
     min_lat: float = Field(...)
     min_lng: float = Field(...)
     max_lat: float = Field(...)
     max_lng: float = Field(...)
+    center_lat: Optional[float] = Field(default=None)
+    center_lng: Optional[float] = Field(default=None)
+    radius_km: Optional[float] = Field(default=None)
+    reach_filter: str = Field(default="any", max_length=16, nullable=False)
     matches_enabled: bool = Field(default=True, nullable=False)
     # Explorer/For-You default filters follow the single active profile per
     # user. Enforced by application code, not a DB constraint (SQLite-friendly).
@@ -1019,13 +1043,13 @@ class UserInterestProfile(SQLModel, table=True):
 
 
 class UserInterestProfileTag(SQLModel, table=True):
-    """Dance-style and reach tags attached to a ``UserInterestProfile``.
+    """Dance-style tags and legacy reach mirrors for a profile.
 
     Mirrors ``UserPreferredTag``/``EventTag``: composite primary key, no
     relationship navigation. Holds both dance-style and reach tag ids; the
-    tag's group (via ``Tag.group_id``) determines which PRD matching rule
-    applies (OR-within-group). ``ON DELETE CASCADE`` is enforced via the
-    migration so deleting a profile or a tag tidies up the join rows.
+    New reach matching uses ``UserInterestProfile.reach_filter``; reach rows
+    remain temporarily for older clients. ``ON DELETE CASCADE`` is enforced
+    via the migration so deleting a profile or a tag tidies up the join rows.
     """
 
     __tablename__ = "user_interest_profile_tags"

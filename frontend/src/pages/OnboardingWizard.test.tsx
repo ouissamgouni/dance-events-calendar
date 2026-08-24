@@ -173,7 +173,7 @@ describe('OnboardingWizard', () => {
         await user.click(screen.getByRole('button', { name: 'Start exploring' }))
         await waitFor(() => expect(completed).toBe(true))
         expect(created).toHaveLength(1)
-        expect(created[0]).toMatchObject({ area_label: 'Europe', dance_tag_ids: [10, 11], reach_tag_ids: [20], matches_enabled: true, is_active: true })
+        expect(created[0]).toMatchObject({ area_label: 'Europe', dance_tag_ids: [10, 11], reach_filter: 'international', matches_enabled: true, is_active: true })
         expect(await screen.findByText('home page')).toBeInTheDocument()
     })
 })

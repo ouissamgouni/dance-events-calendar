@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SearchProfileFlow from './SearchProfileFlow';
 import type { InterestProfile } from '../api';
@@ -36,11 +36,16 @@ function makeProfile(overrides: Partial<InterestProfile> = {}): InterestProfile 
         id: 1,
         label: 'Barcelona',
         area_label: 'Barcelona area',
+        geo_kind: 'area',
         min_lat: 41,
         min_lng: 2,
         max_lat: 42,
         max_lng: 3,
+        center_lat: null,
+        center_lng: null,
+        radius_km: null,
         dance_tag_ids: [10, 11],
+        reach_filter: 'international',
         reach_tag_ids: [20],
         matches_enabled: false,
         notify_enabled: false,
@@ -56,7 +61,7 @@ function baseProps() {
         onClose: vi.fn(),
         profiles: [makeProfile({ is_active: true }), makeProfile({ id: 2, label: 'Barcelona salsa' })],
         selectedProfileId: 'custom' as number | 'custom',
-        current: { area: { min_lat: 41, min_lng: 2, max_lat: 42, max_lng: 3 }, danceIds: [10], reachIds: [20] },
+        current: { area: { min_lat: 41, min_lng: 2, max_lat: 42, max_lng: 3 }, danceIds: [10], reachFilter: 'international' as const, reachIds: [20] },
         currentAreaLabel: 'Barcelona',
         danceGroup,
         reachGroup,
@@ -104,7 +109,7 @@ describe('SearchProfileFlow', () => {
         const user = userEvent.setup();
         render(<SearchProfileFlow {...props} initialStep="save" />);
         // The active profile (id=1) should be preselected.
-        expect(screen.getByTestId('search-profile-target-1')).toHaveClass('bg-action');
+        await waitFor(() => expect(screen.getByTestId('search-profile-target-1')).toHaveAttribute('aria-pressed', 'true'));
         await user.click(screen.getByTestId('search-profile-update'));
         expect(props.onUpdateProfile).toHaveBeenCalledWith(props.profiles[0]);
         expect(props.onClose).toHaveBeenCalled();
@@ -115,10 +120,10 @@ describe('SearchProfileFlow', () => {
         const user = userEvent.setup();
         render(<SearchProfileFlow {...props} initialStep="save" />);
         // Initially the active profile is selected.
-        expect(screen.getByTestId('search-profile-target-1')).toHaveClass('bg-action');
+        await waitFor(() => expect(screen.getByTestId('search-profile-target-1')).toHaveAttribute('aria-pressed', 'true'));
         // Click the non-active profile.
         await user.click(screen.getByTestId('search-profile-target-2'));
-        expect(screen.getByTestId('search-profile-target-2')).toHaveClass('bg-action');
+        expect(screen.getByTestId('search-profile-target-2')).toHaveAttribute('aria-pressed', 'true');
         await user.click(screen.getByTestId('search-profile-update'));
         expect(props.onUpdateProfile).toHaveBeenCalledWith(props.profiles[1]);
         expect(props.onClose).toHaveBeenCalled();

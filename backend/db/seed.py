@@ -737,6 +737,18 @@ class DatabaseSeeder:
             if not tag_slugs:
                 continue
             evt_id = evt_data["id"]
+            reach_slugs = {
+                slug.split(":", 1)[1] for slug in tag_slugs if slug.startswith("reach:")
+            }
+            if len(reach_slugs) > 1:
+                raise ValueError(
+                    f"Event {evt_id} has multiple reach classifications: "
+                    f"{sorted(reach_slugs)}"
+                )
+            event = self.session.get(CachedEvent, evt_id)
+            if event is not None:
+                event.reach = next(iter(reach_slugs), None)
+                self.session.add(event)
             for slug in tag_slugs:
                 tag_id = tag_lookup.get(slug)
                 if not tag_id:
@@ -1445,7 +1457,7 @@ class DatabaseSeeder:
         """Seed UserInterestProfile rows from db-interest-profiles.yaml.
 
         Lets scenarios pre-build the notification matcher's inputs
-        (geography bbox + dance/reach tags + per-profile notify toggle)
+        (geography + dance tags + scalar reach + per-profile notify toggle)
         without having to walk each user through the onboarding UI.
         Idempotent on (user_id, label).
 
@@ -1534,6 +1546,17 @@ class DatabaseSeeder:
             if matches_enabled is None:
                 matches_enabled = True
             matches_enabled = bool(matches_enabled)
+            reach_filter = entry.get("reach_filter")
+            if reach_filter not in {"any", "regional_plus", "international"}:
+                reach_refs = {str(ref) for ref in entry.get("reach_tags") or []}
+                if any(ref.endswith(":local") for ref in reach_refs):
+                    reach_filter = "any"
+                elif any(ref.endswith(":regional") for ref in reach_refs):
+                    reach_filter = "regional_plus"
+                elif any(ref.endswith(":international") for ref in reach_refs):
+                    reach_filter = "international"
+                else:
+                    reach_filter = "any"
             if existing:
                 profile = existing
                 profile.area_label = str(entry.get("area_label") or label)[:120]
@@ -1541,6 +1564,7 @@ class DatabaseSeeder:
                 profile.min_lng = min_lng
                 profile.max_lat = max_lat
                 profile.max_lng = max_lng
+                profile.reach_filter = reach_filter
                 profile.matches_enabled = matches_enabled
                 profile.is_active = bool(entry.get("is_active", False))
                 self.session.add(profile)
@@ -1559,6 +1583,7 @@ class DatabaseSeeder:
                     min_lng=min_lng,
                     max_lat=max_lat,
                     max_lng=max_lng,
+                    reach_filter=reach_filter,
                     matches_enabled=matches_enabled,
                     is_active=bool(entry.get("is_active", False)),
                 )

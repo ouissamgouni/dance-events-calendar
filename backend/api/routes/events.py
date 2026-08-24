@@ -39,6 +39,7 @@ from backend.db.models import (
     UserSavedEvent,
 )
 from backend.services.popularity import compute_popularity_scores, get_saved_counts
+from backend.services.profile_geography import profile_contains_point
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 
@@ -308,7 +309,11 @@ def _profiles_filtered_event_ids(
     matched: set[str] = set()
     for profile in profiles:
         dance_ids, reach_ids = per_profile_tags[profile.id]
-        q = select(CachedEvent.event_id).where(
+        q = select(
+            CachedEvent.event_id,
+            CachedEvent.latitude,
+            CachedEvent.longitude,
+        ).where(
             CachedEvent.latitude.is_not(None),
             CachedEvent.longitude.is_not(None),
             CachedEvent.latitude >= profile.min_lat,
@@ -322,15 +327,13 @@ def _profiles_filtered_event_ids(
                     select(EventTag.event_id).where(EventTag.tag_id.in_(dance_ids))
                 )
             )
-        if reach_ids:
-            q = q.where(
-                CachedEvent.event_id.in_(
-                    select(EventTag.event_id).where(EventTag.tag_id.in_(reach_ids))
-                )
-            )
-        for row in session.exec(q).all():
-            if row:
-                matched.add(row)
+        if profile.reach_filter == "regional_plus":
+            q = q.where(CachedEvent.reach.in_(("regional", "international")))
+        elif profile.reach_filter == "international":
+            q = q.where(CachedEvent.reach == "international")
+        for event_id, latitude, longitude in session.exec(q).all():
+            if profile_contains_point(profile, latitude, longitude):
+                matched.add(event_id)
 
     return list(matched)
 

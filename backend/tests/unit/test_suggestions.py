@@ -685,3 +685,59 @@ class TestGeolocatePrivateIp:
 
         result = await geolocate_ip("192.168.1.1")
         assert result is None
+
+
+@pytest.mark.unit
+class TestPublicGeocodeEndpoint:
+    def test_suggestion_geocode_forwards_language_preference(self):
+        """Public /api/suggestions/geocode should forward Accept-Language header to Nominatim."""
+        with patch("geopy.geocoders.Nominatim") as MockNominatim:
+            mock_geocoder = MagicMock()
+            MockNominatim.return_value = mock_geocoder
+
+            result = MagicMock()
+            result.address = "Athina, Ellada"
+            result.latitude = 37.9838
+            result.longitude = 23.7275
+            mock_geocoder.geocode.return_value = [result]
+
+            client = TestClient(app)
+            resp = client.get(
+                "/api/suggestions/geocode?q=athens",
+                headers={"Accept-Language": "el-GR,el;q=0.9"},
+            )
+
+            assert resp.status_code == 200
+            data = resp.json()
+            assert len(data) == 1
+            assert data[0]["display_name"] == "Athina, Ellada"
+
+            # Verify language preference was forwarded to geocode
+            mock_geocoder.geocode.assert_called_once()
+            call_kwargs = mock_geocoder.geocode.call_args[1]
+            assert "language" in call_kwargs
+            # Should have Greek with English fallback
+            assert "el-GR" in call_kwargs["language"] or "el" in call_kwargs["language"]
+            assert "en" in call_kwargs["language"]
+
+    def test_suggestion_geocode_defaults_to_english_when_no_header(self):
+        """Public geocode should default to English when Accept-Language is missing."""
+        with patch("geopy.geocoders.Nominatim") as MockNominatim:
+            mock_geocoder = MagicMock()
+            MockNominatim.return_value = mock_geocoder
+
+            result = MagicMock()
+            result.address = "Paris, France"
+            result.latitude = 48.86
+            result.longitude = 2.35
+            mock_geocoder.geocode.return_value = [result]
+
+            client = TestClient(app)
+            resp = client.get("/api/suggestions/geocode?q=paris")
+
+            assert resp.status_code == 200
+
+            # Verify default 'en' language was used
+            mock_geocoder.geocode.assert_called_once()
+            call_kwargs = mock_geocoder.geocode.call_args[1]
+            assert call_kwargs["language"] == "en"

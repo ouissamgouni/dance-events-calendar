@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { TagGroup } from '../types';
+import { REACH_FILTER_ICON_SRC, REACH_FILTER_LABELS, type ReachFilter } from '../utils/reach';
 
 // SummaryBar — single-line filter summary with deterministic, width-based
 // priority collapse. Fixed semantic priority (left→right):
@@ -46,6 +47,7 @@ export interface SummaryBarProps {
     danceGroup?: TagGroup | null;
     onEditDance?: () => void;
     reachGroup?: TagGroup | null;
+    reachFilter: ReachFilter;
     onEditReach?: () => void;
 
     // People pill (people icon + count of explicitly-selected handles).
@@ -163,47 +165,6 @@ const peopleIcon = (
     </svg>
 );
 
-// Get the PNG image path for a reach tag based on its label.
-function reachIconSrcFor(tagLabel: string): string {
-    const l = tagLabel.toLowerCase();
-    if (l.includes('local')) return '/local-reach.png';
-    if (l.includes('regional')) return '/regional-reach.png';
-    return '/international-reach.png';
-}
-
-function reachIconFor(group: TagGroup, activeTagIds: Set<number>): React.ReactNode {
-    // Pick the narrowest (most specific) selected tag: Local < Regional < International.
-    const selected = group.tags.filter((t) => activeTagIds.has(t.id));
-    if (selected.length === 0) {
-        return (
-            <img
-                src="/international-reach.png"
-                alt="International reach"
-                className={ICON_CLS}
-                aria-hidden="true"
-            />
-        );
-    }
-    const rank = (label: string) => {
-        const l = label.toLowerCase();
-        if (l.includes('local')) return 1;
-        if (l.includes('regional')) return 2;
-        if (l.includes('international')) return 3;
-        return 4;
-    };
-    const top = selected.reduce((best, t) => (rank(t.label) < rank(best.label) ? t : best), selected[0]);
-    const src = reachIconSrcFor(top.label);
-    const altText = `${top.label} reach`;
-    return (
-        <img
-            src={src}
-            alt={altText}
-            className={ICON_CLS}
-            aria-hidden="true"
-        />
-    );
-}
-
 type CandidateKey = 'period' | 'area' | 'dance' | 'reach' | 'people';
 
 export default function SummaryBar(props: SummaryBarProps) {
@@ -221,6 +182,7 @@ export default function SummaryBar(props: SummaryBarProps) {
         danceGroup,
         onEditDance,
         reachGroup,
+        reachFilter,
         onEditReach,
         interestSource,
         interestKind,
@@ -236,16 +198,6 @@ export default function SummaryBar(props: SummaryBarProps) {
         const first = selected[0].label;
         return { label: selected.length > 1 ? `${first} +${selected.length - 1}` : first, count: selected.length };
     }, [danceGroup, activeTagIds]);
-
-    const reachActive = useMemo(
-        () => !!reachGroup && reachGroup.tags.some((t) => activeTagIds.has(t.id)),
-        [reachGroup, activeTagIds],
-    );
-
-    const reachSelCount = useMemo(
-        () => (reachGroup ? reachGroup.tags.filter((t) => activeTagIds.has(t.id)).length : 0),
-        [reachGroup, activeTagIds],
-    );
 
     // Opt-in: a status-only selection (kind alone) never surfaces a chip.
     const peopleActive = interestSource !== null || interestUserHandles.length > 0;
@@ -277,15 +229,15 @@ export default function SummaryBar(props: SummaryBarProps) {
         return n;
     }, [tagGroups, activeTagIds, danceGroup, reachGroup]);
 
-    // Ordered active candidate pills. Date + Area are always present; Dance /
-    // Reach / People only when they carry a selection.
+    // Ordered candidate pills. Date, Area, and Reach are always present;
+    // Dance and People appear when they carry a selection.
     const candidates = useMemo(() => {
         const list: CandidateKey[] = ['period', 'area'];
         if (danceGroup && danceSel.count > 0) list.push('dance');
-        if (reachActive) list.push('reach');
+        if (reachGroup) list.push('reach');
         if (peopleActive && onEditPeople) list.push('people');
         return list;
-    }, [danceGroup, danceSel.count, reachActive, peopleActive, onEditPeople]);
+    }, [danceGroup, danceSel.count, reachGroup, peopleActive, onEditPeople]);
 
     // ---- Measurement-based collapse -----------------------------------
     const containerRef = useRef<HTMLDivElement>(null);
@@ -327,7 +279,7 @@ export default function SummaryBar(props: SummaryBarProps) {
             count += 1;
         }
         setVisibleCount(count);
-    }, [candidates, containerWidth, foldedRemainingCount, danceSel.label, areaLabel, startDate, endDate, peopleLabel, reachSelCount]);
+    }, [candidates, containerWidth, foldedRemainingCount, danceSel.label, areaLabel, startDate, endDate, peopleLabel, reachFilter]);
 
     const hiddenActivePrimaries = Math.max(0, candidates.length - visibleCount);
     const extraCount = foldedRemainingCount + hiddenActivePrimaries;
@@ -372,10 +324,9 @@ export default function SummaryBar(props: SummaryBarProps) {
                 return (
                     <Pill
                         key="reach"
-                        icon={reachGroup ? reachIconFor(reachGroup, activeTagIds) : reachInternationalIcon}
-                        label={reachSelCount > 1 ? `+${reachSelCount - 1}` : undefined}
-                        ariaLabel="Reach"
-                        title="Reach"
+                        icon={<img src={REACH_FILTER_ICON_SRC[reachFilter]} alt="" className={ICON_CLS} aria-hidden="true" />}
+                        ariaLabel={`Event reach: ${REACH_FILTER_LABELS[reachFilter]}`}
+                        title={`Event reach: ${REACH_FILTER_LABELS[reachFilter]}`}
                         onClick={onEditReach}
                         testId={tid('summary-chip-reach')}
                     />

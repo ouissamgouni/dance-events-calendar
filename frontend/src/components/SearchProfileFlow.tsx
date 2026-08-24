@@ -43,6 +43,8 @@ export interface SearchProfileFlowProps {
     createProfile: (payload: InterestProfilePayload) => Promise<InterestProfile>;
     updateProfile: (id: number, payload: InterestProfileUpdatePayload) => Promise<InterestProfile>;
     deleteProfile: (id: number) => Promise<void>;
+    onCreateRoute?: () => void;
+    onEditRoute?: (profile: InterestProfile) => void;
 }
 
 const backIcon = (
@@ -118,7 +120,6 @@ export default function SearchProfileFlow({
     open,
     initialStep,
     onClose,
-    variant: _unused,
     profiles,
     selectedProfileId,
     current,
@@ -131,6 +132,8 @@ export default function SearchProfileFlow({
     createProfile,
     updateProfile,
     deleteProfile,
+    onCreateRoute,
+    onEditRoute,
 }: SearchProfileFlowProps) {
     const [step, setStep] = useState<Step>(initialStep);
     const [editingId, setEditingId] = useState<number | null>(null);
@@ -142,7 +145,10 @@ export default function SearchProfileFlow({
 
     // Reset to the requested entry step each time the flow opens.
     useEffect(() => {
-        if (open) {
+        if (!open) return;
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (cancelled) return;
             setStep(initialStep);
             setEditingId(null);
             setDraft(null);
@@ -154,7 +160,8 @@ export default function SearchProfileFlow({
             } else {
                 setTargetProfileId(null);
             }
-        }
+        });
+        return () => { cancelled = true; };
     }, [open, initialStep, profiles]);
 
     if (!open) return null;
@@ -168,6 +175,10 @@ export default function SearchProfileFlow({
     });
 
     const openCreate = (fromCurrent: boolean) => {
+        if (fromCurrent && onCreateRoute) {
+            onCreateRoute();
+            return;
+        }
         setEditingId(null);
         setError(null);
         setDraft(fromCurrent ? draftFromCurrent('New profile') : {
@@ -181,6 +192,10 @@ export default function SearchProfileFlow({
     };
 
     const openEdit = (profile: InterestProfile) => {
+        if (onEditRoute) {
+            onEditRoute(profile);
+            return;
+        }
         setEditingId(profile.id);
         setError(null);
         setDraft({
@@ -210,6 +225,12 @@ export default function SearchProfileFlow({
         setBusy(true);
         setError(null);
         try {
+            const regionalId = reachGroup?.tags.find((tag) => tag.slug === 'regional')?.id;
+            const reachFilter = regionalId != null && draft.reach.selectedTagIds.includes(regionalId)
+                ? 'regional_plus' as const
+                : draft.reach.selectedTagIds.length > 0
+                    ? 'international' as const
+                    : 'any' as const;
             const base = {
                 label: name,
                 area_label: areaName,
@@ -218,7 +239,7 @@ export default function SearchProfileFlow({
                 max_lat: draft.area.max_lat,
                 max_lng: draft.area.max_lng,
                 dance_tag_ids: draft.dance.selectedTagIds,
-                reach_tag_ids: draft.reach.selectedTagIds,
+                reach_filter: reachFilter,
                 matches_enabled: draft.matchesEnabled,
             };
             if (editingId != null) {
@@ -346,6 +367,7 @@ export default function SearchProfileFlow({
                                             key={profile.id}
                                             type="button"
                                             onClick={() => setTargetProfileId(profile.id)}
+                                            aria-pressed={targetProfileId === profile.id}
                                             className="flex items-center gap-3 px-2 py-2.5 text-left text-ink hover:bg-canvas transition-colors"
                                             data-testid={`search-profile-target-${profile.id}`}
                                         >

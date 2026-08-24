@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine, delete
 
 os.environ.setdefault("SESSION_SECRET", "test-secret-profiles-filter")
 os.environ.setdefault("ADMIN_EMAIL", "admin@example.com")
@@ -78,8 +78,8 @@ def _login(client: TestClient, email: str) -> None:
 def world(session):
     """Seeded tags, events, and a signed-in user with two profiles.
 
-    Profile A: Paris bbox, dance=[salsa], reach=[local].
-    Profile B: Madrid bbox, dance=[], reach=[international] (no dance
+    Profile A: Paris bbox, dance=[salsa], reach=any.
+    Profile B: Madrid bbox, dance=[], reach=international (no dance
     filter = matches any dance for the bbox).
 
     Events:
@@ -88,6 +88,8 @@ def world(session):
       - evt-berlin-salsa-intl: matches NEITHER (outside both bboxes)
       - evt-paris-bachata-local: OUTSIDE profile A (dance mismatch),
         outside profile B (bbox mismatch) — not returned
+            - evt-paris-salsa-unclassified: matches profile A because Any does not
+                restrict reach
       - evt-nogeo:             excluded (no lat/lng)
     """
     session.add(SiteSetting(key="cutoff_date", value="2020-01-01"))
@@ -115,7 +117,13 @@ def world(session):
 
     base = datetime(2030, 1, 1, 20, 0, 0)
 
-    def _add_event(eid: str, lat: float | None, lng: float | None, tags: list[Tag]):
+    def _add_event(
+        eid: str,
+        lat: float | None,
+        lng: float | None,
+        tags: list[Tag],
+        reach: str | None,
+    ):
         session.add(
             CachedEvent(
                 event_id=eid,
@@ -128,6 +136,7 @@ def world(session):
                 all_day=False,
                 latitude=lat,
                 longitude=lng,
+                reach=reach,
             )
         )
         session.commit()
@@ -135,11 +144,12 @@ def world(session):
             session.add(EventTag(event_id=eid, tag_id=t.id))
         session.commit()
 
-    _add_event("evt-paris-salsa-local", 48.85, 2.35, [salsa, local])
-    _add_event("evt-madrid-any-intl", 40.42, -3.70, [bachata, intl])
-    _add_event("evt-berlin-salsa-intl", 52.52, 13.40, [salsa, intl])
-    _add_event("evt-paris-bachata-local", 48.85, 2.35, [bachata, local])
-    _add_event("evt-nogeo", None, None, [salsa, intl])
+    _add_event("evt-paris-salsa-local", 48.85, 2.35, [salsa, local], "local")
+    _add_event("evt-madrid-any-intl", 40.42, -3.70, [bachata, intl], "international")
+    _add_event("evt-berlin-salsa-intl", 52.52, 13.40, [salsa, intl], "international")
+    _add_event("evt-paris-bachata-local", 48.85, 2.35, [bachata, local], "local")
+    _add_event("evt-paris-salsa-unclassified", 48.85, 2.35, [salsa], None)
+    _add_event("evt-nogeo", None, None, [salsa, intl], "international")
 
     # Create the user directly (bypassing the signup route so we skip
     # the default-profile side-effect and can seed profiles exactly).
@@ -162,6 +172,7 @@ def world(session):
         min_lng=2.0,
         max_lat=49.0,
         max_lng=3.0,
+        reach_filter="any",
         matches_enabled=True,
         is_active=True,
     )
@@ -173,6 +184,7 @@ def world(session):
         min_lng=-4.0,
         max_lat=41.0,
         max_lng=-3.0,
+        reach_filter="international",
         matches_enabled=True,
         is_active=False,
     )
@@ -183,7 +195,6 @@ def world(session):
     session.refresh(profile_b)
 
     session.add(UserInterestProfileTag(profile_id=profile_a.id, tag_id=salsa.id))
-    session.add(UserInterestProfileTag(profile_id=profile_a.id, tag_id=local.id))
     session.add(UserInterestProfileTag(profile_id=profile_b.id, tag_id=intl.id))
     session.commit()
 
@@ -195,7 +206,11 @@ def test_profiles_me_returns_union_across_profiles(client, world):
     r = client.get("/api/events", params={"profiles": "me"})
     assert r.status_code == 200, r.text
     returned = {e["event_id"] for e in r.json()}
-    assert returned == {"evt-paris-salsa-local", "evt-madrid-any-intl"}
+    assert returned == {
+        "evt-paris-salsa-local",
+        "evt-paris-salsa-unclassified",
+        "evt-madrid-any-intl",
+    }
 
 
 def test_profiles_me_anonymous_returns_empty(client, world):
@@ -216,10 +231,27 @@ def test_profiles_me_with_no_profiles_returns_empty(client, session):
     session.add(CalendarSetting(calendar_id="cal-1", name="Salsa", enabled=True))
     session.commit()
     _login(client, "empty@example.com")
-    # Drop the auto-seeded default.
-    listing = client.get("/api/interest-profiles").json()
-    for row in listing:
-        client.delete(f"/api/interest-profiles/{row['id']}")
+    session.exec(delete(UserInterestProfileTag))
+    session.exec(delete(UserInterestProfile))
+    session.commit()
     r = client.get("/api/events", params={"profiles": "me"})
     assert r.status_code == 200
     assert r.json() == []
+
+
+def test_profiles_me_radius_excludes_bbox_corner(client, session, world):
+    profile = world["profile_a"]
+    profile.geo_kind = "radius"
+    profile.center_lat = 48.5
+    profile.center_lng = 2.5
+    profile.radius_km = 30
+    session.add(profile)
+    session.commit()
+
+    _login(client, "nora@example.com")
+    r = client.get("/api/events", params={"profiles": "me"})
+
+    assert r.status_code == 200, r.text
+    returned = {event["event_id"] for event in r.json()}
+    assert "evt-paris-salsa-local" not in returned
+    assert "evt-madrid-any-intl" in returned

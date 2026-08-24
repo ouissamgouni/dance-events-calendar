@@ -979,15 +979,23 @@ export async function geolocateFromIP(): Promise<HomeLocationPayload | null> {
     }
 }
 
+export type ReachFilter = 'any' | 'regional_plus' | 'international';
+
 export interface InterestProfile {
     id: number;
     label: string;
     area_label: string;
+    geo_kind: 'area' | 'radius';
     min_lat: number;
     min_lng: number;
     max_lat: number;
     max_lng: number;
+    center_lat: number | null;
+    center_lng: number | null;
+    radius_km: number | null;
     dance_tag_ids: number[];
+    reach_filter: ReachFilter;
+    /** Legacy mirror derived from `reach_filter`. */
     reach_tag_ids: number[];
     matches_enabled: boolean;
     /** Legacy alias mirror, removed in cleanup PR. Always equal to
@@ -1000,11 +1008,17 @@ export interface InterestProfile {
 export interface InterestProfilePayload {
     label: string;
     area_label: string;
-    min_lat: number;
-    min_lng: number;
-    max_lat: number;
-    max_lng: number;
+    geo_kind?: 'area' | 'radius';
+    min_lat?: number;
+    min_lng?: number;
+    max_lat?: number;
+    max_lng?: number;
+    center_lat?: number | null;
+    center_lng?: number | null;
+    radius_km?: number | null;
     dance_tag_ids?: number[];
+    reach_filter?: ReachFilter;
+    /** Legacy compatibility input. */
     reach_tag_ids?: number[];
     matches_enabled?: boolean;
     /** Legacy alias — accepted for one release. */
@@ -1015,11 +1029,17 @@ export interface InterestProfilePayload {
 export interface InterestProfileUpdatePayload {
     label?: string;
     area_label?: string;
+    geo_kind?: 'area' | 'radius';
     min_lat?: number;
     min_lng?: number;
     max_lat?: number;
     max_lng?: number;
+    center_lat?: number | null;
+    center_lng?: number | null;
+    radius_km?: number | null;
     dance_tag_ids?: number[];
+    reach_filter?: ReachFilter;
+    /** Legacy compatibility input. */
     reach_tag_ids?: number[];
     matches_enabled?: boolean;
     /** Legacy alias — accepted for one release. */

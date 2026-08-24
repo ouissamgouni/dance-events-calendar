@@ -1,21 +1,17 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Circle, CircleMarker, MapContainer, TileLayer, useMap } from 'react-leaflet';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
     completeOnboarding,
     createInterestProfile,
     deleteInterestProfile,
     fetchInterestProfiles,
-    fetchPopularCities,
     fetchTagGroups,
-    searchSuggestionAddress,
     updateInterestProfile,
-    type GeocodeSuggestion,
     type HomeLocationPayload,
     type InterestProfile,
-    type PopularCity,
     type PreferredAreaPayload,
 } from '../../api';
+import CityRadiusEditor from '../CityRadiusEditor';
 import { AREA_PRESETS, DEFAULT_AREA_BBOX } from '../../constants/area';
 import { useAuth } from '../../context/AuthContext';
 import { usePreferences } from '../../context/PreferencesContext';
@@ -28,7 +24,6 @@ type InternationalView = 'presets' | 'editor';
 type HomeView = 'choice' | 'editor';
 
 const STEPS: Step[] = ['dances', 'international', 'home', 'review'];
-const RADIUS_VALUES = [5, 10, 25, 50, 100] as const;
 const PRIMARY_DANCE_SLUGS = ['salsa', 'bachata', 'kizomba', 'zouk', 'mambo-on2', 'cha-cha', 'semba', 'rueda', 'son'];
 const LATIN_AMERICA: PreferredAreaPayload = { label: 'Latin America', min_lat: -56, min_lng: -118, max_lat: 33, max_lng: -34 };
 const CUSTOM_AREA: PreferredAreaPayload = { label: 'Custom', min_lat: -55, min_lng: -70, max_lat: 55, max_lng: 70 };
@@ -68,10 +63,7 @@ export default function OnboardingFlow() {
     const initialPrefsRef = useRef(prefs);
 
     const danceGroup = useMemo(() => tagGroups.find((group) => group.slug === 'dance-style' && group.enabled !== false) ?? null, [tagGroups]);
-    const reachGroup = useMemo(() => tagGroups.find((group) => group.slug === 'reach' && group.enabled !== false) ?? null, [tagGroups]);
     const activeProfile = profiles.find((profile) => profile.is_active) ?? profiles[0] ?? null;
-    const localReachId = reachGroup?.tags.find((tag) => tag.slug === 'local')?.id;
-    const internationalReachId = reachGroup?.tags.find((tag) => tag.slug === 'international')?.id;
 
     useEffect(() => {
         let cancelled = false;
@@ -126,12 +118,13 @@ export default function OnboardingFlow() {
             const internationalPayload = {
                 label: activeProfile?.label ?? 'International area',
                 area_label: area.label,
+                geo_kind: 'area' as const,
                 min_lat: area.min_lat,
                 min_lng: area.min_lng,
                 max_lat: area.max_lat,
                 max_lng: area.max_lng,
                 dance_tag_ids: danceIds,
-                reach_tag_ids: internationalReachId == null ? [] : [internationalReachId],
+                reach_filter: 'international' as const,
                 matches_enabled: internationalAlerts,
                 is_active: true,
             };
@@ -142,10 +135,12 @@ export default function OnboardingFlow() {
             if (home) {
                 const homeArea = bboxFromPinRadius(home.location, home.radiusKm, home.location.label);
                 const homePayload = {
-                    label: 'Near home', area_label: home.location.label,
+                    label: 'Near home', area_label: `${home.location.label.split(',')[0]} · ${home.radiusKm} km`,
+                    geo_kind: 'radius' as const,
                     min_lat: homeArea.min_lat, min_lng: homeArea.min_lng, max_lat: homeArea.max_lat, max_lng: homeArea.max_lng,
+                    center_lat: home.location.lat, center_lng: home.location.lng, radius_km: home.radiusKm,
                     dance_tag_ids: danceIds,
-                    reach_tag_ids: localReachId == null ? [] : [localReachId],
+                    reach_filter: 'any' as const,
                     matches_enabled: home.alertsEnabled,
                     is_active: false,
                 };
@@ -292,39 +287,15 @@ function HomeChoice({ onYes, onNo }: { onYes: () => void; onNo: () => void }) {
 }
 
 function HomeEditor({ value, onChange }: { value: HomeDraft | null; onChange: (value: HomeDraft | null) => void }) {
-    const [query, setQuery] = useState(value?.location.label ?? '');
-    const [suggestions, setSuggestions] = useState<GeocodeSuggestion[]>([]);
-    const [popularCities, setPopularCities] = useState<PopularCity[]>([]);
-    const [locating, setLocating] = useState(false);
-    useEffect(() => { void fetchPopularCities(5).then(setPopularCities).catch(() => undefined); }, []);
-    useEffect(() => {
-        if (query.trim().length < 3 || query === value?.location.label) return;
-        const timer = window.setTimeout(() => { void searchSuggestionAddress(query.trim()).then(setSuggestions).catch(() => setSuggestions([])); }, 300);
-        return () => window.clearTimeout(timer);
-    }, [query, value?.location.label]);
-    const chooseLocation = (location: HomeLocationPayload) => { setQuery(location.label); setSuggestions([]); onChange({ location, radiusKm: value?.radiusKm ?? 25, alertsEnabled: value?.alertsEnabled ?? true }); };
-    const useCurrentLocation = () => {
-        if (!navigator.geolocation) return;
-        setLocating(true);
-        navigator.geolocation.getCurrentPosition((position) => { chooseLocation({ lat: position.coords.latitude, lng: position.coords.longitude, label: 'Current location' }); setLocating(false); }, () => setLocating(false));
-    };
     return (
-        <div className="space-y-5">
-            <section><label htmlFor="onboarding-city" className="mb-2 block text-sm font-semibold text-ink">City</label><div className="relative"><input id="onboarding-city" type="search" value={query} onChange={(event) => { setQuery(event.target.value); setSuggestions([]); }} placeholder="Search a city" className="min-h-11 w-full border border-line bg-surface px-3 pr-20 text-sm text-ink focus:border-action focus:outline-none" /><button type="button" onClick={useCurrentLocation} disabled={locating} className="absolute right-2 top-0 min-h-11 text-xs font-semibold text-action disabled:opacity-50">{locating ? 'Locating…' : 'Locate'}</button>{suggestions.length > 0 && query !== value?.location.label && <ul className="absolute z-[800] mt-1 max-h-52 w-full overflow-y-auto border border-line bg-surface shadow-lg">{suggestions.map((suggestion) => <li key={`${suggestion.latitude}-${suggestion.longitude}`}><button type="button" onClick={() => chooseLocation({ lat: suggestion.latitude, lng: suggestion.longitude, label: suggestion.display_name })} className="min-h-11 w-full px-3 text-left text-sm text-ink hover:bg-canvas">{suggestion.display_name}</button></li>)}</ul>}</div>
-                {!value && popularCities.length > 0 && <div className="mt-3 flex gap-2 overflow-x-auto pb-1 scrollbar-hide">{popularCities.map((city) => <button key={`${city.city}-${city.country ?? ''}`} type="button" onClick={() => chooseLocation({ lat: city.lat, lng: city.lng, label: [city.city, city.country].filter(Boolean).join(', ') })} className="min-h-11 shrink-0 border border-line bg-surface px-3 text-xs font-semibold text-ink">{city.city}</button>)}</div>}</section>
-            {value && <><HomeMap value={value} /><section><div className="mb-2 flex items-center justify-between"><span className="text-sm font-semibold text-ink">Radius</span><span className="text-sm font-semibold text-action">{value.radiusKm} km</span></div><div className="grid grid-cols-5 gap-1">{RADIUS_VALUES.map((radius) => <button key={radius} type="button" onClick={() => onChange({ ...value, radiusKm: radius })} className={radius === value.radiusKm ? 'min-h-11 bg-action text-xs font-semibold text-white' : 'min-h-11 border border-line bg-surface text-xs font-semibold text-ink'}>{radius}{radius === 100 ? ' km' : ''}</button>)}</div></section><label className="flex min-h-12 items-center justify-between border-t border-line py-3 text-sm font-semibold text-ink"><span>New event alerts</span><input type="checkbox" checked={value.alertsEnabled} onChange={(event) => onChange({ ...value, alertsEnabled: event.target.checked })} className="h-5 w-5 accent-action" /></label></>}
+        <div className="space-y-4">
+            <CityRadiusEditor
+                value={value ? { location: value.location, radiusKm: value.radiusKm } : null}
+                onChange={(next) => onChange({ ...next, alertsEnabled: value?.alertsEnabled ?? true })}
+            />
+            {value && <label className="flex min-h-12 items-center justify-between border-t border-line py-3 text-sm font-semibold text-ink"><span>New event alerts</span><input type="checkbox" checked={value.alertsEnabled} onChange={(event) => onChange({ ...value, alertsEnabled: event.target.checked })} className="h-5 w-5 accent-action" /></label>}
         </div>
     );
-}
-
-function HomeMap({ value }: { value: HomeDraft }) {
-    return <div className="relative h-44 overflow-hidden border border-line"><MapContainer center={[value.location.lat, value.location.lng]} zoom={10} scrollWheelZoom={false} zoomControl={false} style={{ height: '100%', width: '100%' }}><TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" /><HomeMapRecenter value={value} /><Circle center={[value.location.lat, value.location.lng]} radius={value.radiusKm * 1000} pathOptions={{ color: '#2563eb', weight: 2, fillColor: '#2563eb', fillOpacity: 0.14 }} /><CircleMarker center={[value.location.lat, value.location.lng]} radius={6} pathOptions={{ color: '#2563eb', fillColor: '#2563eb', fillOpacity: 1 }} /></MapContainer><span className="pointer-events-none absolute left-1/2 top-1/2 z-[500] -translate-x-1/2 translate-y-3 bg-surface/90 px-2 py-1 text-xs font-semibold text-ink">{value.location.label.split(',')[0]}</span></div>;
-}
-
-function HomeMapRecenter({ value }: { value: HomeDraft }) {
-    const map = useMap();
-    useEffect(() => { const bounds = bboxFromPinRadius(value.location, value.radiusKm, value.location.label); map.fitBounds([[bounds.min_lat, bounds.min_lng], [bounds.max_lat, bounds.max_lng]], { padding: [16, 16], animate: false }); }, [map, value]);
-    return null;
 }
 
 function ReviewStep({ dances, area, home, onEdit }: { dances: Tag[]; area: PreferredAreaPayload; home: HomeDraft | null; onEdit: (step: Step) => void }) {

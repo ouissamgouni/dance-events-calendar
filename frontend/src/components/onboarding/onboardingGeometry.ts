@@ -1,5 +1,18 @@
-import type { PreferredAreaPayload } from '../../api';
+import type { HomeLocationPayload, PreferredAreaPayload } from '../../api';
 import { clampArea } from '../../constants/area';
+
+export interface CityRadiusValue {
+    location: HomeLocationPayload;
+    radiusKm: number;
+}
+
+export function cityRadiusArea(value: CityRadiusValue): PreferredAreaPayload {
+    return bboxFromPinRadius(
+        value.location,
+        value.radiusKm,
+        `${value.location.label.split(',')[0]} · ${value.radiusKm} km`,
+    );
+}
 
 export function bboxFromPinRadius(pin: { lat: number; lng: number }, radiusKm: number, label: string): PreferredAreaPayload {
     const latitudeRadians = (pin.lat * Math.PI) / 180;

@@ -26,6 +26,7 @@ from backend.db.models import CachedEvent, EventCalendarSource, EventTag
 from backend.services.calendar.base import CalendarEvent
 from backend.services.duplicate_detection import maybe_detect_duplicates_for_event
 from backend.services.series_detection import maybe_detect_series_for_event
+from backend.services.reach import assign_event_tag, sync_event_reach
 from backend.services.pipeline.base import EnrichmentPipeline
 from backend.services.sync_service import compute_content_hash
 
@@ -858,6 +859,7 @@ class EventPipelineProcessor:
 
         # Genuinely new event — buffer is already a CachedEvent with all enriched fields.
         session.add(buffer)
+        sync_event_reach(session, buffer, task.default_tag_ids)
         for tag_id in task.default_tag_ids:
             session.add(EventTag(event_id=buffer.event_id, tag_id=tag_id))
         _upsert_calendar_source(session, buffer.event_id, task.calendar_id)
@@ -881,11 +883,7 @@ def _upsert_calendar_source(session: Session, event_id: str, calendar_id: str) -
 
 
 def _upsert_event_tag(session: Session, event_id: str, tag_id: int) -> None:
-    existing = session.exec(
-        select(EventTag).where(
-            EventTag.event_id == event_id,
-            EventTag.tag_id == tag_id,
-        )
-    ).first()
-    if not existing:
-        session.add(EventTag(event_id=event_id, tag_id=tag_id))
+    event = session.get(CachedEvent, event_id)
+    tag = session.get(Tag, tag_id)
+    if event and tag:
+        assign_event_tag(session, event, tag)

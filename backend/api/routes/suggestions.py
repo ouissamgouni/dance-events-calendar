@@ -35,6 +35,7 @@ from backend.db.models import (
 from backend.services.email import send_suggestion_notification
 from backend.services.geocoding import geocode_location
 from backend.services.ip_geolocation import geolocate_ip
+from backend.services.reach import sync_event_reach
 from backend.services import activity_instant
 from backend.services.notifications import fan_out_going, fan_out_suggested
 
@@ -116,6 +117,9 @@ def _upsert_live_event_from_suggestion(
 def _apply_suggestion_tags(
     session: Session, event_id: str, suggested_tag_ids: list[int]
 ) -> None:
+    event = session.get(CachedEvent, event_id)
+    if event is not None:
+        sync_event_reach(session, event, suggested_tag_ids)
     for tag_id in suggested_tag_ids:
         tag = session.get(Tag, tag_id)
         if not tag:
@@ -311,10 +315,15 @@ def suggestion_geocode(
     """Public geocode search for the suggestion form address autocomplete."""
     from geopy.exc import GeocoderServiceError, GeocoderTimedOut
     from geopy.geocoders import Nominatim
+    from backend.services.geocoding import _language_preference_from_header
 
     geocoder = Nominatim(user_agent="movida", timeout=5)
+    accept_language = request.headers.get("accept-language")
+    language_pref = _language_preference_from_header(accept_language)
     try:
-        results = geocoder.geocode(q, exactly_one=False, limit=5)
+        results = geocoder.geocode(
+            q, exactly_one=False, limit=5, language=language_pref
+        )
     except (GeocoderTimedOut, GeocoderServiceError) as e:
         logger.warning("Geocode search failed: %s", e)
         return []

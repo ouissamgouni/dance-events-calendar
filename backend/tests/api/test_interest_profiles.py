@@ -7,7 +7,7 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine, delete
 
 os.environ.setdefault("SESSION_SECRET", "test-secret-for-interest-profiles")
 os.environ.setdefault("ADMIN_EMAIL", "admin@example.com")
@@ -16,7 +16,12 @@ os.environ["DEV_AUTH"] = "true"
 from backend.api.main import app  # noqa: E402
 from backend.api.routes import auth as auth_module  # noqa: E402
 from backend.db.database import get_session  # noqa: E402
-from backend.db.models import Tag, TagGroup  # noqa: E402
+from backend.db.models import (  # noqa: E402
+    Tag,
+    TagGroup,
+    UserInterestProfile,
+    UserInterestProfileTag,
+)
 
 
 @pytest.fixture
@@ -45,8 +50,10 @@ def client(engine):
 
     app.dependency_overrides[get_session] = _override
     auth_module.limiter.reset()
+    test_client = TestClient(app)
+    test_client.test_engine = engine
     try:
-        yield TestClient(app)
+        yield test_client
     finally:
         app.dependency_overrides.clear()
 
@@ -59,10 +66,10 @@ def _login(client: TestClient, *, email: str):
     # is_active=true) so the Explorer/For You/alerts surfaces always have a row
     # to filter against. Clear it so these tests continue to assert against a
     # clean slate.
-    listing = client.get("/api/interest-profiles").json()
-    if isinstance(listing, list):
-        for row in listing:
-            client.delete(f"/api/interest-profiles/{row['id']}")
+    with Session(client.test_engine) as cleanup_session:
+        cleanup_session.exec(delete(UserInterestProfileTag))
+        cleanup_session.exec(delete(UserInterestProfile))
+        cleanup_session.commit()
     return resp
 
 
@@ -106,7 +113,7 @@ def test_create_interest_profile_area(client, tags):
         "max_lat": 45.0,
         "max_lng": 5.0,
         "dance_tag_ids": [salsa.id],
-        "reach_tag_ids": [regional.id],
+        "reach_filter": "regional_plus",
         "matches_enabled": True,
     }
     resp = client.post("/api/interest-profiles", json=payload)
@@ -114,8 +121,11 @@ def test_create_interest_profile_area(client, tags):
     data = resp.json()
     assert data["label"] == "Local salsa"
     assert data["area_label"] == "Lisbon"
+    assert data["geo_kind"] == "area"
+    assert data["center_lat"] is None
     assert data["dance_tag_ids"] == [salsa.id]
-    assert data["reach_tag_ids"] == [regional.id]
+    assert data["reach_filter"] == "regional_plus"
+    assert regional.id in data["reach_tag_ids"]
     assert data["matches_enabled"] is True
     # Legacy mirror kept for one release.
     assert data["notify_enabled"] is True
@@ -158,6 +168,34 @@ def test_create_interest_profile_rejects_invalid_area(client):
     assert resp.status_code == 400
 
 
+@pytest.mark.unit
+def test_create_interest_profile_radius_computes_bbox(client, tags):
+    salsa, _forro, _regional = tags
+    _login(client, email="alice@example.com")
+
+    resp = client.post(
+        "/api/interest-profiles",
+        json={
+            "label": "Near home",
+            "area_label": "Paris · 25 km",
+            "geo_kind": "radius",
+            "center_lat": 48.8566,
+            "center_lng": 2.3522,
+            "radius_km": 25,
+            "dance_tag_ids": [salsa.id],
+        },
+    )
+
+    assert resp.status_code == 201, resp.text
+    data = resp.json()
+    assert data["geo_kind"] == "radius"
+    assert data["center_lat"] == 48.8566
+    assert data["center_lng"] == 2.3522
+    assert data["radius_km"] == 25
+    assert data["min_lat"] < data["center_lat"] < data["max_lat"]
+    assert data["min_lng"] < data["center_lng"] < data["max_lng"]
+
+
 # --- PATCH /api/interest-profiles/{id} --------------------------------------
 
 
@@ -181,14 +219,15 @@ def test_patch_interest_profile_partial_update(client, tags):
 
     patch_resp = client.patch(
         f"/api/interest-profiles/{profile_id}",
-        json={"label": "Renamed", "reach_tag_ids": [regional.id]},
+        json={"label": "Renamed", "reach_filter": "regional_plus"},
     )
     assert patch_resp.status_code == 200, patch_resp.text
     data = patch_resp.json()
     assert data["label"] == "Renamed"
     assert data["area_label"] == "Original"
     assert data["dance_tag_ids"] == [salsa.id]
-    assert data["reach_tag_ids"] == [regional.id]
+    assert data["reach_filter"] == "regional_plus"
+    assert regional.id in data["reach_tag_ids"]
     # Untouched geo fields preserved.
     assert data["max_lat"] == 45.0
 
@@ -222,7 +261,7 @@ def test_patch_area_label_does_not_rename_profile(client):
 
 
 @pytest.mark.unit
-def test_delete_interest_profile(client, tags):
+def test_delete_non_default_interest_profile(client, tags):
     salsa, _forro, _regional = tags
     _login(client, email="alice@example.com")
 
@@ -238,12 +277,17 @@ def test_delete_interest_profile(client, tags):
         },
     )
     profile_id = create_resp.json()["id"]
+    replacement = client.post(
+        "/api/interest-profiles",
+        json=_minimal_area_payload(label="Default replacement", is_active=True),
+    )
+    assert replacement.status_code == 201
 
     del_resp = client.delete(f"/api/interest-profiles/{profile_id}")
     assert del_resp.status_code == 204
 
     list_resp = client.get("/api/interest-profiles")
-    assert list_resp.json() == []
+    assert [row["id"] for row in list_resp.json()] == [replacement.json()["id"]]
 
 
 @pytest.mark.unit
@@ -337,7 +381,7 @@ def test_patch_cannot_deactivate_active_directly(client):
 
 
 @pytest.mark.unit
-def test_deleting_active_profile_promotes_next_oldest(client):
+def test_deleting_active_profile_requires_another_default_first(client):
     _login(client, email="alice@example.com")
     a_id = client.post(
         "/api/interest-profiles", json=_minimal_area_payload(label="A")
@@ -346,11 +390,18 @@ def test_deleting_active_profile_promotes_next_oldest(client):
         "/api/interest-profiles", json=_minimal_area_payload(label="B")
     ).json()["id"]
     del_r = client.delete(f"/api/interest-profiles/{a_id}")
-    assert del_r.status_code == 204
-    lst = client.get("/api/interest-profiles").json()
-    assert len(lst) == 1
-    assert lst[0]["id"] == b_id
-    assert lst[0]["is_active"] is True
+    assert del_r.status_code == 400
+    assert del_r.json()["detail"] == (
+        "To delete the default profile, set another profile as default first."
+    )
+
+    assert (
+        client.patch(
+            f"/api/interest-profiles/{b_id}", json={"is_active": True}
+        ).status_code
+        == 200
+    )
+    assert client.delete(f"/api/interest-profiles/{a_id}").status_code == 204
 
 
 # --- Signup bootstrap: default profile is seeded exactly once ---------------

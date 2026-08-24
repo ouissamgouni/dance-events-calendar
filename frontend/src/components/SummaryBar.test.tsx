@@ -81,6 +81,7 @@ function baseProps(overrides: Partial<SummaryBarProps> = {}): SummaryBarProps {
         tagGroups: TAG_GROUPS,
         danceGroup: DANCE_GROUP,
         reachGroup: REACH_GROUP,
+        reachFilter: 'any',
         interestSource: null,
         interestKind: 'any',
         interestUserHandles: [],
@@ -159,23 +160,20 @@ describe('SummaryBar', () => {
         expect(screen.getByTestId('summary-chip-dance')).toHaveTextContent('Salsa +1');
     });
 
-    it('renders the Reach pill (icon-only) when a reach tag is selected and deep-links', async () => {
+    it('renders the scalar Reach pill icon-only and deep-links', async () => {
         const onEditReach = vi.fn();
-        const { rerender } = render(<SummaryBar {...baseProps({ onEditReach })} />);
-        // No reach selection → no reach pill.
-        expect(screen.queryByTestId('summary-chip-reach')).toBeNull();
-
-        rerender(<SummaryBar {...baseProps({ activeTagIds: new Set([21]), onEditReach })} />);
+        const { rerender } = render(<SummaryBar {...baseProps({ reachFilter: 'any', onEditReach })} />);
         const reach = screen.getByTestId('summary-chip-reach');
-        // Icon-only: no text label.
         expect(reach).toHaveTextContent('');
+        expect(reach.querySelector('img[src="/reach.png"]')).toBeInTheDocument();
         await userEvent.click(reach);
         expect(onEditReach).toHaveBeenCalledTimes(1);
-    });
 
-    it('still renders the Reach pill when MULTIPLE reach tags are selected', () => {
-        render(<SummaryBar {...baseProps({ activeTagIds: new Set([20, 21]), onEditReach: vi.fn() })} />);
-        expect(screen.getByTestId('summary-chip-reach')).toBeInTheDocument();
+        rerender(<SummaryBar {...baseProps({ reachFilter: 'regional_plus', onEditReach })} />);
+        expect(screen.getByTestId('summary-chip-reach').querySelector('img[src="/nearby-reach.png"]')).toBeInTheDocument();
+
+        rerender(<SummaryBar {...baseProps({ reachFilter: 'international', onEditReach })} />);
+        expect(screen.getByTestId('summary-chip-reach').querySelector('img[src="/international-reach.png"]')).toBeInTheDocument();
     });
 
     it('renders the People pill as WHO · STATUS and deep-links', async () => {
@@ -203,7 +201,7 @@ describe('SummaryBar', () => {
 
     it('folds selected non-primary groups into the "+X ⚙" control and opens the sheet', async () => {
         const onOpenFilters = vi.fn();
-        // Dance (10) + Reach (20) are their own pills; Format (30) folds → +1.
+        // Dance is tag-backed, Reach is scalar, and Format folds → +1.
         render(
             <SummaryBar {...baseProps({ activeTagIds: new Set([10, 20, 30]), onOpenFilters })} />,
         );
@@ -227,7 +225,7 @@ describe('SummaryBar', () => {
         render(
             <SummaryBar
                 {...baseProps({
-                    // Dance(10) + Reach(20) + People + Format(30 → folds).
+                    // Dance + scalar Reach + People + Format (folded).
                     activeTagIds: new Set([10, 20, 30]),
                     onEditPeople,
                     interestSource: 'follows',
