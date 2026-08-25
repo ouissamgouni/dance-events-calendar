@@ -135,13 +135,14 @@ def _following_friend_signals(
     event_ids: list[str],
     *,
     preview_limit: int = 5,
+    include_saved: bool = True,
 ) -> tuple[dict[str, int], dict[str, list[dict]]]:
     """Return ``(counts, previews)`` for the viewer's mutual friends who
-    are going to or have saved each event.
+    are going to, and optionally have saved, each event.
 
     ``counts`` maps event_id → total friend count.
     ``previews`` maps event_id → up to ``preview_limit`` friend mini
-    dicts ``{user_id, display_name, avatar_url}``, sorted alphabetically
+    dicts ``{user_id, handle, display_name, avatar_url}``, sorted alphabetically
     by display_name for stable rendering. Audience-gated via
     ``_audience_passes`` and deduplicated per (event, friend) so a
     friend who both saved and is going still counts once.
@@ -173,21 +174,22 @@ def _following_friend_signals(
         if _audience_passes(session, viewer, owner, share_audience or "private"):
             pairs.add((event_id, owner_id))
 
-    saved_rows = session.exec(
-        select(
-            UserSavedEvent.event_id,
-            UserSavedEvent.user_id,
-            UserSavedEvent.audience,
-        )
-        .where(UserSavedEvent.user_id.in_(friend_ids))
-        .where(UserSavedEvent.event_id.in_(event_ids))
-    ).all()
-    for event_id, owner_id, audience in saved_rows:
-        owner = friend_by_id.get(owner_id)
-        if owner is None or not event_id:
-            continue
-        if _audience_passes(session, viewer, owner, audience or "private"):
-            pairs.add((event_id, owner_id))
+    if include_saved:
+        saved_rows = session.exec(
+            select(
+                UserSavedEvent.event_id,
+                UserSavedEvent.user_id,
+                UserSavedEvent.audience,
+            )
+            .where(UserSavedEvent.user_id.in_(friend_ids))
+            .where(UserSavedEvent.event_id.in_(event_ids))
+        ).all()
+        for event_id, owner_id, audience in saved_rows:
+            owner = friend_by_id.get(owner_id)
+            if owner is None or not event_id:
+                continue
+            if _audience_passes(session, viewer, owner, audience or "private"):
+                pairs.add((event_id, owner_id))
 
     by_event: dict[str, list] = {}
     for event_id, owner_id in pairs:
@@ -201,6 +203,7 @@ def _following_friend_signals(
         previews[eid] = [
             {
                 "user_id": u.id,
+                "handle": u.handle,
                 "display_name": u.display_name,
                 "avatar_url": u.avatar_url,
             }
@@ -794,10 +797,21 @@ def get_events(
     # bounded by the page's event_ids and the viewer's friend set.
     following_counts: dict[str, int] = {}
     following_previews: dict[str, list[dict]] = {}
+    friends_going_counts: dict[str, int] = {}
+    friends_going_previews: dict[str, list[dict]] = {}
     following_on = feature_settings.get("following_badge_enabled", "").lower() == "true"
     if event_ids and current_user is not None and following_on:
         following_counts, following_previews = _following_friend_signals(
             session, current_user, event_ids
+        )
+    if (
+        event_ids
+        and current_user is not None
+        and interest_source == "friends"
+        and interest_kind == "going"
+    ):
+        friends_going_counts, friends_going_previews = _following_friend_signals(
+            session, current_user, event_ids, include_saved=False
         )
     # Batch-fetch tags
     tags_map = get_event_tags(session, event_ids)
@@ -828,6 +842,7 @@ def get_events(
             calendar_id=e.calendar_id,
             title=e.title,
             description=e.description,
+            image_url=e.image_url,
             location=e.location,
             start=e.start,
             end=e.end,
@@ -841,6 +856,8 @@ def get_events(
             popularity_score=scores.get(e.event_id, 0.0),
             following_friend_count=following_counts.get(e.event_id, 0),
             following_friends_preview=following_previews.get(e.event_id, []),
+            friends_going_count=friends_going_counts.get(e.event_id, 0),
+            friends_going_preview=friends_going_previews.get(e.event_id, []),
             price_min=e.price_min,
             price_max=e.price_max,
             price_currency=e.price_currency,
@@ -1119,9 +1136,15 @@ def get_events_by_ids(
 
     following_counts: dict[str, int] = {}
     following_previews: dict[str, list[dict]] = {}
+    friends_going_counts: dict[str, int] = {}
+    friends_going_previews: dict[str, list[dict]] = {}
     if event_ids and current_user is not None and _following_badge_enabled(session):
         following_counts, following_previews = _following_friend_signals(
             session, current_user, event_ids
+        )
+    if event_ids and current_user is not None:
+        friends_going_counts, friends_going_previews = _following_friend_signals(
+            session, current_user, event_ids, include_saved=False
         )
 
     tags_map = get_event_tags(session, event_ids)
@@ -1152,6 +1175,7 @@ def get_events_by_ids(
             calendar_id=e.calendar_id,
             title=e.title,
             description=e.description,
+            image_url=e.image_url,
             location=e.location,
             start=e.start,
             end=e.end,
@@ -1165,6 +1189,8 @@ def get_events_by_ids(
             popularity_score=scores.get(e.event_id, 0.0),
             following_friend_count=following_counts.get(e.event_id, 0),
             following_friends_preview=following_previews.get(e.event_id, []),
+            friends_going_count=friends_going_counts.get(e.event_id, 0),
+            friends_going_preview=friends_going_previews.get(e.event_id, []),
             price_min=e.price_min,
             price_max=e.price_max,
             price_currency=e.price_currency,
@@ -1244,6 +1270,7 @@ def get_event(
         calendar_id=event.calendar_id,
         title=event.title,
         description=event.description,
+        image_url=event.image_url,
         location=event.location,
         start=event.start,
         end=event.end,

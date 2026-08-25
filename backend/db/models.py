@@ -388,6 +388,7 @@ class CachedEvent(SQLModel, table=True):
     calendar_id: str = Field(index=True)
     title: str = Field(default="")
     description: Optional[str] = Field(default=None, sa_column=Column(Text))
+    image_url: Optional[str] = Field(default=None)
     location: Optional[str] = Field(default=None)
     start: datetime
     end: datetime

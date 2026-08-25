@@ -15,6 +15,7 @@ from backend.db.models import (
     TagGroup,
     User,
     UserEventAttendance,
+    UserInterestProfile,
     UserSavedEvent,
 )
 from backend.db.seed import DatabaseSeeder, _seed_device_id, resolve_relative_dt
@@ -485,6 +486,52 @@ class TestDatabaseSeeder:
             assert event is not None
             assert event.show_price_override is True
             assert event.show_promo_override is False
+
+    def test_seed_interest_profile_allows_explicit_area_name(
+        self, tmp_path, monkeypatch
+    ):
+        scenario_dir = tmp_path / "scenario"
+        scenario_dir.mkdir(parents=True)
+        (scenario_dir / "mock-users.yaml").write_text(
+            "users:\n"
+            "  - email: viewer@example.com\n"
+            "    name: Viewer\n"
+            "    handle: viewer\n"
+        )
+        (scenario_dir / "db-interest-profiles.yaml").write_text(
+            "interest_profiles:\n"
+            "  - user: viewer@example.com\n"
+            '    label: "Salsa + Bachata"\n'
+            '    area_name: "Europe & nearby"\n'
+            "    min_lat: 24\n"
+            "    min_lng: -18\n"
+            "    max_lat: 69\n"
+            "    max_lng: 50\n"
+            '    dance_tags: ["dance-style:salsa"]\n'
+            "    reach_tags: []\n"
+            "    matches_enabled: false\n"
+            "    is_active: true\n"
+        )
+        monkeypatch.setattr(
+            "backend.config.loader.get_calendar_service_type", lambda: "mock"
+        )
+
+        engine = create_engine("sqlite://")
+        SQLModel.metadata.create_all(engine)
+        with Session(engine) as session:
+            DatabaseSeeder(session).seed(scenario_dir)
+            user = session.exec(
+                select(User).where(User.email == "viewer@example.com")
+            ).first()
+            profile = session.exec(
+                select(UserInterestProfile).where(
+                    UserInterestProfile.user_id == user.id
+                )
+            ).first()
+
+        assert profile is not None
+        assert profile.label == "Salsa + Bachata"
+        assert profile.area_label == "Europe & nearby"
 
     def test_seed_approved_follows_create_calendar_subscriptions(
         self, tmp_path, monkeypatch

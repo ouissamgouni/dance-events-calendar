@@ -10,7 +10,8 @@
 # default "Europe & nearby" bbox with no reach restriction.
 interest_profiles:
   - user: viewer@example.com
-    label: "Salsa + Bachata (Europe & nearby)"
+    label: "Salsa + Bachata"
+    area_name: "Europe +"
     min_lat: 24
     min_lng: -18
     max_lat: 69

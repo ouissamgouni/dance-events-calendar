@@ -34,8 +34,9 @@ function nextMilestone(milestones: PassportMilestone[]): PassportMilestone | nul
 export default function MineHub() {
     const { user } = useAuth();
     const { savedEventIds } = useSavedEvents();
-    const { attendingEventIds } = useAttendingEvents();
+    const { attendingEventIds, loading: attendingEventsLoading } = useAttendingEvents();
     const [myEvents, setMyEvents] = useState<CalendarEvent[]>([]);
+    const [myEventsLoading, setMyEventsLoading] = useState(true);
     const [passport, setPassport] = useState<PassportResponse | null>(null);
     const [pending, setPending] = useState<PendingReview[]>([]);
     const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
@@ -48,9 +49,11 @@ export default function MineHub() {
     useEffect(() => {
         if (allEventIds.length === 0) {
             setMyEvents([]);
+            setMyEventsLoading(false);
             return;
         }
         let cancelled = false;
+        setMyEventsLoading(true);
         fetchEventsByIds(allEventIds)
             .then((evts) => {
                 if (cancelled) return;
@@ -67,8 +70,14 @@ export default function MineHub() {
                             return new Date(a.start).getTime() - new Date(b.start).getTime();
                         }),
                 );
+                setMyEventsLoading(false);
             })
-            .catch(() => { if (!cancelled) setMyEvents([]); });
+            .catch(() => {
+                if (!cancelled) {
+                    setMyEvents([]);
+                    setMyEventsLoading(false);
+                }
+            });
         return () => { cancelled = true; };
     }, [allEventIds, attendingEventIds]);
 
@@ -99,6 +108,12 @@ export default function MineHub() {
     const stats = passport?.stats;
     const milestone = passport ? nextMilestone(passport.milestones) : null;
     const upcomingCount = myEvents.length;
+    const goingEvents = useMemo(() => {
+        const attendingSet = new Set(attendingEventIds);
+        return myEvents
+            .filter((event) => attendingSet.has(event.event_id))
+            .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+    }, [myEvents, attendingEventIds]);
     const nextGoingStart = useMemo(() => {
         const attendingSet = new Set(attendingEventIds);
         return myEvents
@@ -150,15 +165,9 @@ export default function MineHub() {
 
                 {/* Your next events */}
                 <YourNextEventsRail
-                    events={myEvents}
+                    events={goingEvents}
                     onEventClick={handleEventClick}
-                    emptyState={(
-                        <>
-                            No upcoming events yet.{' '}
-                            <Link to="/" className="font-semibold text-action hover:text-action">Browse events</Link>{' '}
-                            and save or mark “I’m going” to build your calendar.
-                        </>
-                    )}
+                    loading={attendingEventsLoading || (attendingEventIds.length > 0 && myEventsLoading)}
                 />
 
                 {/* Your dancer passport */}

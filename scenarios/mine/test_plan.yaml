@@ -30,9 +30,12 @@ test_plan:
       title: "Overview surfaces next events, activity, passport and reviews"
       description: "Inspect the Overview sections."
       expected: >
-        "Your next events" rail lists the upcoming saved + going events
-        (going first), with a "See more" link only when more than 5
-        exist. A "Friendship activity" section (when present) links to
+        "Your next event" shows the earliest of the 4 upcoming Going events
+        in one compact card, without Save/Going actions or a placeholder image.
+        A right-aligned "View 3 more upcoming events →" link opens My Events
+        with Going selected. The 4 saved-only events remain included in the
+        profile's "8 events planned" statistic but not this section. A
+        "Friendship activity" section (when present) links to
         /tribe/activity. A "Your dancer passport" section shows the next
         milestone card. A "Share your experience" trail prompts reviews
         for the unrated attended events. Quick links jump to each

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
 import { fetchTagGroups, type InterestProfile, type InterestProfilePayload } from '../api';
+import { DEFAULT_AREA_BBOX } from '../constants/area';
 import { useInterestProfiles } from '../hooks/useInterestProfiles';
 import type { TagGroup } from '../types';
 import { REACH_FILTER_LABELS } from '../utils/reach';
+import { bboxSearchArea, searchAreaFromProfile } from '../utils/searchArea';
+import ProfileDraftEditor from './ProfileDraftEditor';
 import { useToast } from './Toast';
 
 type Confirmation =
@@ -78,10 +80,10 @@ function ProfileCard({
     );
 }
 
-function Sheet({ children, onClose, label }: { children: ReactNode; onClose: () => void; label: string }) {
+function Sheet({ children, onClose, label, wide = false }: { children: ReactNode; onClose: () => void; label: string; wide?: boolean }) {
     return createPortal(
         <div className="fixed inset-0 z-[11000] flex items-end bg-slate-900/40 sm:items-center sm:justify-center sm:p-4" onClick={onClose}>
-            <div role="dialog" aria-modal="true" aria-label={label} onClick={(event) => event.stopPropagation()} className="w-full rounded-t-card bg-surface p-3 shadow-xl sm:max-w-sm sm:rounded-card">
+            <div role="dialog" aria-modal="true" aria-label={label} onClick={(event) => event.stopPropagation()} className={`max-h-[92dvh] w-full overflow-y-auto rounded-t-card bg-surface p-3 shadow-xl sm:rounded-card ${wide ? 'sm:max-w-lg' : 'sm:max-w-sm'}`}>
                 {children}
             </div>
         </div>,
@@ -90,12 +92,12 @@ function Sheet({ children, onClose, label }: { children: ReactNode; onClose: () 
 }
 
 export default function InterestProfilesManager() {
-    const navigate = useNavigate();
     const toast = useToast();
-    const { profiles, error, setError, createProfile, deleteProfile, activateProfile } = useInterestProfiles();
+    const { profiles, error, setError, createProfile, updateProfile, deleteProfile, activateProfile } = useInterestProfiles();
     const [tagGroups, setTagGroups] = useState<TagGroup[]>([]);
     const [menuProfile, setMenuProfile] = useState<InterestProfile | null>(null);
     const [confirmation, setConfirmation] = useState<Confirmation>(null);
+    const [editorProfile, setEditorProfile] = useState<InterestProfile | 'new' | null>(null);
     const [busy, setBusy] = useState(false);
 
     useEffect(() => {
@@ -164,7 +166,7 @@ export default function InterestProfilesManager() {
             profile={profile}
             danceGroup={danceGroup}
             reachGroup={reachGroup}
-            onEdit={() => navigate(`/mine/profiles/${profile.id}/edit`)}
+            onEdit={() => setEditorProfile(profile)}
             onMenu={() => setMenuProfile(profile)}
         />
     );
@@ -183,10 +185,44 @@ export default function InterestProfilesManager() {
                 </div>
             )}
 
-            <button type="button" onClick={() => navigate('/mine/profiles/new')} className="sticky bottom-4 mt-6 min-h-12 w-full border border-action bg-surface px-4 text-sm font-semibold text-action shadow-sm hover:bg-blue-50">
+            <button type="button" onClick={() => setEditorProfile('new')} className="sticky bottom-4 mt-6 min-h-12 w-full border border-action bg-surface px-4 text-sm font-semibold text-action shadow-sm hover:bg-blue-50">
                 + Create search profile
             </button>
             {error && <p role="alert" className="mt-3 text-sm text-danger">{error}</p>}
+
+            {editorProfile && <Sheet wide label={editorProfile === 'new' ? 'Create search profile' : `Edit ${editorProfile.label}`} onClose={() => setEditorProfile(null)}>
+                <div className="mb-3 flex items-center justify-between">
+                    <h2 className="text-lg font-bold text-ink">{editorProfile === 'new' ? 'New profile' : editorProfile.label}</h2>
+                    <button type="button" aria-label="Close profile editor" onClick={() => setEditorProfile(null)} className="h-10 w-10 text-xl text-ink-soft hover:text-ink">×</button>
+                </div>
+                <ProfileDraftEditor
+                    key={editorProfile === 'new' ? 'new' : editorProfile.id}
+                    mode={editorProfile === 'new' ? 'create' : 'edit'}
+                    danceGroup={danceGroup}
+                    initialValue={editorProfile === 'new' ? {
+                        area: bboxSearchArea(DEFAULT_AREA_BBOX, 'preset'),
+                        danceIds: [],
+                        reachFilter: 'international',
+                        matchesEnabled: true,
+                    } : {
+                        label: editorProfile.label,
+                        area: searchAreaFromProfile(editorProfile),
+                        danceIds: editorProfile.dance_tag_ids,
+                        reachFilter: editorProfile.reach_filter,
+                        matchesEnabled: editorProfile.matches_enabled,
+                        nameEdited: true,
+                    }}
+                    onSave={async (payload) => {
+                        if (editorProfile === 'new') await createProfile(payload);
+                        else await updateProfile(editorProfile.id, payload);
+                        setEditorProfile(null);
+                    }}
+                    onDelete={editorProfile === 'new' ? undefined : () => {
+                        setConfirmation({ kind: editorProfile.is_active ? 'blocked' : 'delete', profile: editorProfile });
+                        setEditorProfile(null);
+                    }}
+                />
+            </Sheet>}
 
             {menuProfile && <Sheet label={`Manage ${menuProfile.label}`} onClose={() => setMenuProfile(null)}>
                 <div className="divide-y divide-card-line">

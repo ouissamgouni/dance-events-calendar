@@ -128,6 +128,7 @@ def world(session):
                 calendar_id="cal-1",
                 title=eid,
                 description="",
+                image_url="/friends-going-event.jpg" if eid == "evt-going" else None,
                 location="",
                 start=base + timedelta(days=offset),
                 end=base + timedelta(days=offset, hours=2),
@@ -214,8 +215,36 @@ def test_friends_going_returns_only_friend_attendance(client, world):
         params={"interest_source": "friends", "interest_kind": "going"},
     )
     assert r.status_code == 200
-    ids = {e["event_id"] for e in r.json()}
-    assert ids == {"evt-going"}
+    assert len(r.json()) == 1
+    event = r.json()[0]
+    assert event["event_id"] == "evt-going"
+    assert event["image_url"] == "/friends-going-event.jpg"
+    assert event["friends_going_count"] == 1
+    assert event["friends_going_preview"] == [
+        {
+            "user_id": str(world["bob"].id),
+            "handle": "bob",
+            "display_name": "Bob",
+            "avatar_url": None,
+        }
+    ]
+    assert event["following_friend_count"] == 0
+
+
+def test_events_by_ids_includes_going_friend_signal(client, world):
+    _login(client, "alice@example.com")
+    r = client.post("/api/events/by-ids", json={"event_ids": ["evt-going"]})
+    assert r.status_code == 200
+    event = r.json()[0]
+    assert event["friends_going_count"] == 1
+    assert event["friends_going_preview"] == [
+        {
+            "user_id": str(world["bob"].id),
+            "handle": "bob",
+            "display_name": "Bob",
+            "avatar_url": None,
+        }
+    ]
 
 
 def test_friends_saved_returns_only_friend_saves(client, world):

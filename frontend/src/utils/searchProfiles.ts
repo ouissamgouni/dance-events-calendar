@@ -1,6 +1,13 @@
 import type { InterestProfile, ReachFilter } from '../api';
 import type { TagGroup } from '../types';
 import { REACH_FILTER_LABELS } from './reach';
+import {
+    bboxSearchArea,
+    searchAreaContainsCoordinates,
+    searchAreaFromProfile,
+    searchAreasEqual,
+    type SearchArea,
+} from './searchArea';
 
 // Bounding boxes are floats round-tripped through the server; compare with a
 // small epsilon so a re-applied profile still matches its stored bbox.
@@ -38,27 +45,12 @@ export function profileContainsCoordinates(
     latitude: number | null | undefined,
     longitude: number | null | undefined,
 ): boolean {
-    if (latitude == null || longitude == null) return true;
-    if (
-        latitude < profile.min_lat || latitude > profile.max_lat ||
-        longitude < profile.min_lng || longitude > profile.max_lng
-    ) return false;
-    if (profile.geo_kind !== 'radius') return true;
-    if (profile.center_lat == null || profile.center_lng == null || profile.radius_km == null) return false;
-    const earthRadiusKm = 6371;
-    const latitudeDelta = (latitude - profile.center_lat) * Math.PI / 180;
-    const longitudeDelta = (longitude - profile.center_lng) * Math.PI / 180;
-    const startLatitude = profile.center_lat * Math.PI / 180;
-    const endLatitude = latitude * Math.PI / 180;
-    const haversine = Math.sin(latitudeDelta / 2) ** 2
-        + Math.cos(startLatitude) * Math.cos(endLatitude) * Math.sin(longitudeDelta / 2) ** 2;
-    const distanceKm = earthRadiusKm * 2 * Math.asin(Math.min(1, Math.sqrt(haversine)));
-    return distanceKm <= profile.radius_km;
+    return searchAreaContainsCoordinates(searchAreaFromProfile(profile), latitude, longitude);
 }
 
 export interface CurrentSearchSelection {
-    /** Current effective area bbox, or ``null`` when browsing worldwide. */
-    area: SearchProfileArea | null;
+    /** Current effective geography, or ``null`` when browsing worldwide. */
+    area: SearchArea | SearchProfileArea | null;
     danceIds: number[];
     reachFilter: ReachFilter;
     /** Legacy picker state retained during the profile-flow transition. */
@@ -75,9 +67,12 @@ export function matchSearchProfile(
     profiles: InterestProfile[] | null | undefined,
 ): InterestProfile | null {
     if (!profiles || current.area == null) return null;
+    const currentArea = 'kind' in current.area
+        ? current.area
+        : bboxSearchArea({ label: '', ...current.area });
     for (const profile of profiles) {
         if (
-            bboxApproxEquals(current.area, profile) &&
+            searchAreasEqual(currentArea, searchAreaFromProfile(profile)) &&
             sameIdSet(current.danceIds, profile.dance_tag_ids) &&
             current.reachFilter === profile.reach_filter
         ) {
@@ -97,6 +92,24 @@ function condense(labels: string[], emptyLabel: string): string {
     if (labels.length === 0) return emptyLabel;
     if (labels.length === 1) return labels[0];
     return `${labels[0]} +${labels.length - 1}`;
+}
+
+export function generateProfileName({
+    danceIds,
+    danceGroup,
+    areaLabel,
+    reachFilter,
+}: {
+    danceIds: number[];
+    danceGroup: TagGroup | null | undefined;
+    areaLabel: string;
+    reachFilter: InterestProfile['reach_filter'];
+}): string {
+    return [
+        condense(tagLabels(danceIds, danceGroup), 'Any style'),
+        areaLabel.trim() || 'Anywhere',
+        REACH_FILTER_LABELS[reachFilter],
+    ].join(' · ').slice(0, 120);
 }
 
 /** "Barcelona area · Salsa +2 · International" one-line summary for a profile. */

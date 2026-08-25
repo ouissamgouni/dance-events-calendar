@@ -9,6 +9,153 @@ from geopy.geocoders import Nominatim
 
 logger = logging.getLogger(__name__)
 
+_PLACE_KIND_LABELS = {
+    "country": "Country",
+    "region": "Region",
+    "county": "County",
+    "city": "City",
+    "town": "Town",
+    "district": "District",
+    "locality": "Locality",
+    "address": "Address",
+    "poi": "Place",
+    "unknown": "Place",
+}
+
+_PLACE_KIND_BY_TYPE = {
+    "country": "country",
+    "state": "region",
+    "region": "region",
+    "province": "region",
+    "county": "county",
+    "municipality": "county",
+    "city": "city",
+    "town": "town",
+    "borough": "district",
+    "city_district": "district",
+    "district": "district",
+    "suburb": "locality",
+    "quarter": "locality",
+    "neighbourhood": "locality",
+    "neighborhood": "locality",
+    "village": "locality",
+    "hamlet": "locality",
+    "locality": "locality",
+    "road": "address",
+    "street": "address",
+    "house": "address",
+    "house_number": "address",
+}
+
+_POI_CLASSES = {
+    "aeroway",
+    "amenity",
+    "building",
+    "historic",
+    "leisure",
+    "man_made",
+    "office",
+    "railway",
+    "shop",
+    "tourism",
+}
+
+
+def _nominatim_place_kind(raw: dict) -> str:
+    address_type = str(raw.get("addresstype") or "").lower()
+    result_type = str(raw.get("type") or "").lower()
+    result_class = str(raw.get("class") or raw.get("category") or "").lower()
+    for candidate in (address_type, result_type):
+        if candidate in _PLACE_KIND_BY_TYPE:
+            return _PLACE_KIND_BY_TYPE[candidate]
+    if result_class in _POI_CLASSES:
+        return "poi"
+    if result_class == "highway":
+        return "address"
+    if result_class == "boundary" and result_type == "administrative":
+        try:
+            admin_level = int(raw.get("admin_level"))
+        except (TypeError, ValueError):
+            return "unknown"
+        if admin_level <= 4:
+            return "region"
+        if admin_level <= 6:
+            return "county"
+        return "district"
+    return "unknown"
+
+
+def _nominatim_bounding_box(raw: dict) -> Optional[dict[str, float]]:
+    values = raw.get("boundingbox")
+    if not isinstance(values, (list, tuple)) or len(values) != 4:
+        return None
+    try:
+        south, north, west, east = (float(value) for value in values)
+    except (TypeError, ValueError):
+        return None
+    if south >= north or west >= east:
+        return None
+    return {
+        "min_lat": south,
+        "min_lng": west,
+        "max_lat": north,
+        "max_lng": east,
+    }
+
+
+def nominatim_suggestion(location) -> dict:
+    raw_value = getattr(location, "raw", None)
+    raw = raw_value if isinstance(raw_value, dict) else {}
+    address_value = raw.get("address")
+    address = address_value if isinstance(address_value, dict) else {}
+    namedetails_value = raw.get("namedetails")
+    namedetails = namedetails_value if isinstance(namedetails_value, dict) else {}
+    place_kind = _nominatim_place_kind(raw)
+    address_type = str(raw.get("addresstype") or "")
+    name = raw.get("name") or namedetails.get("name") or address.get(address_type)
+    if not isinstance(name, str) or not name.strip():
+        name = location.address
+
+    country = address.get("country")
+    region = address.get("state") or address.get("region") or address.get("province")
+    parents: list[str] = []
+    if place_kind in {
+        "city",
+        "town",
+        "county",
+        "district",
+        "locality",
+        "address",
+        "poi",
+    }:
+        local_parent = (
+            address.get("city") or address.get("town") or address.get("municipality")
+        )
+        if place_kind in {"district", "locality", "address", "poi"} and local_parent:
+            parents.append(local_parent)
+        if region:
+            parents.append(region)
+    if place_kind != "country" and country:
+        parents.append(country)
+    context_parts = [
+        value
+        for index, value in enumerate(parents)
+        if isinstance(value, str) and value != name and value not in parents[:index]
+    ]
+
+    return {
+        "display_name": location.address,
+        "latitude": location.latitude,
+        "longitude": location.longitude,
+        "name": name,
+        "context": ", ".join(context_parts) or None,
+        "country": country if isinstance(country, str) else None,
+        "region": region if isinstance(region, str) else None,
+        "place_kind": place_kind,
+        "type_label": _PLACE_KIND_LABELS[place_kind],
+        "bounding_box": _nominatim_bounding_box(raw),
+    }
+
 
 def _language_preference_from_header(accept_language: Optional[str]) -> str:
     """Convert Accept-Language header to Nominatim language preference string.

@@ -93,6 +93,7 @@ export interface CalendarEvent {
     calendar_id: string;
     title: string;
     description: string | null;
+    image_url?: string | null;
     location: string | null;
     latitude: number | null;
     longitude: number | null;
@@ -122,6 +123,8 @@ export interface CalendarEvent {
      * the card's combined avatar track to render *who* — friends first.
      */
     following_friends_preview?: FriendMini[];
+    friends_going_count?: number;
+    friends_going_preview?: FriendMini[];
     price_min: number | null;
     price_max: number | null;
     price_currency: string | null;
@@ -345,6 +348,7 @@ export interface Attendee {
 
 export interface FriendMini {
     user_id: string;
+    handle?: string | null;
     display_name: string | null;
     avatar_url: string | null;
 }

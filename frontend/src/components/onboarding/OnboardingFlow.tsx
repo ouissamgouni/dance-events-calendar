@@ -12,12 +12,15 @@ import {
     type PreferredAreaPayload,
 } from '../../api';
 import CityRadiusEditor from '../CityRadiusEditor';
+import AreaMapPreview from '../AreaMapPreview';
 import { AREA_PRESETS, DEFAULT_AREA_BBOX } from '../../constants/area';
 import { useAuth } from '../../context/AuthContext';
 import { usePreferences } from '../../context/PreferencesContext';
 import type { Tag, TagGroup } from '../../types';
 import OnboardingAreaEditor from './OnboardingAreaEditor';
 import { bboxFromPinRadius } from './onboardingGeometry';
+import { bboxSearchArea, radiusSearchArea } from '../../utils/searchArea';
+import { generateProfileName } from '../../utils/searchProfiles';
 
 type Step = 'dances' | 'international' | 'home' | 'review';
 type InternationalView = 'presets' | 'editor';
@@ -116,7 +119,7 @@ export default function OnboardingFlow() {
         try {
             await setPrefs({ area, tagIds: danceIds, homeLocation: home?.location ?? null });
             const internationalPayload = {
-                label: activeProfile?.label ?? 'International area',
+                label: generateProfileName({ danceIds, danceGroup, areaLabel: area.label, reachFilter: 'international' }),
                 area_label: area.label,
                 geo_kind: 'area' as const,
                 min_lat: area.min_lat,
@@ -299,11 +302,11 @@ function HomeEditor({ value, onChange }: { value: HomeDraft | null; onChange: (v
 }
 
 function ReviewStep({ dances, area, home, onEdit }: { dances: Tag[]; area: PreferredAreaPayload; home: HomeDraft | null; onEdit: (step: Step) => void }) {
-    return <div className="space-y-3"><ReviewCard icon="♪" title="Dance styles" value={dances.map((tag) => tag.label).join(', ')} onClick={() => onEdit('dances')} /><ReviewCard icon="◎" title="International area" value={area.label} onClick={() => onEdit('international')} /><ReviewCard icon="⌂" title="Near home" value={home ? `${home.location.label} · ${home.radiusKm} km` : 'Not set'} onClick={() => onEdit('home')} /></div>;
+    return <div className="space-y-3"><ReviewCard icon="♪" title="Dance styles" value={dances.map((tag) => tag.label).join(', ')} onClick={() => onEdit('dances')} /><ReviewCard icon="◎" title="International area" value={area.label} preview={<AreaMapPreview area={bboxSearchArea(area, 'preference')} className="h-12 w-16" />} onClick={() => onEdit('international')} /><ReviewCard icon="⌂" title="Near home" value={home ? `${home.location.label} · ${home.radiusKm} km` : 'Not set'} preview={home ? <AreaMapPreview area={radiusSearchArea(home.location.label, home.location, home.radiusKm, 'preference')} className="h-12 w-16" /> : undefined} onClick={() => onEdit('home')} /></div>;
 }
 
-function ReviewCard({ icon, title, value, onClick }: { icon: string; title: string; value: string; onClick: () => void }) {
-    return <button type="button" onClick={onClick} className="flex min-h-20 w-full items-center gap-3 rounded-card border border-card-line bg-surface p-4 text-left hover:bg-canvas"><span className="text-xl text-action" aria-hidden="true">{icon}</span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-ink">{title}</span><span className="mt-1 block truncate text-sm text-ink-soft">{value}</span></span><span aria-hidden="true" className="text-xl text-ink-soft">›</span></button>;
+function ReviewCard({ icon, title, value, preview, onClick }: { icon: string; title: string; value: string; preview?: ReactNode; onClick: () => void }) {
+    return <button type="button" onClick={onClick} className="flex min-h-20 w-full items-center gap-3 rounded-card border border-card-line bg-surface p-4 text-left hover:bg-canvas"><span className="text-xl text-action" aria-hidden="true">{icon}</span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-ink">{title}</span><span className="mt-1 block truncate text-sm text-ink-soft">{value}</span></span>{preview}<span aria-hidden="true" className="text-xl text-ink-soft">›</span></button>;
 }
 
 function StickyFooter({ children }: { children: ReactNode }) {

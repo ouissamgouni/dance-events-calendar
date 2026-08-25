@@ -9,10 +9,16 @@ import {
     type PreferredAreaPayload,
     type ReachFilter,
 } from '../api';
+import {
+    bboxSearchArea,
+    toPreferredArea,
+    toProfileGeometry,
+    type SearchArea,
+} from '../utils/searchArea';
 
 export interface ActiveProfileSaveInput {
     /** New default area. Omit the key to leave the area unchanged. */
-    area?: PreferredAreaPayload | null;
+    area?: SearchArea | PreferredAreaPayload | null;
     /** New default dance-style tag ids. Omit to leave unchanged. */
     danceTagIds?: number[];
     /** New default event reach filter. Omit to leave unchanged. */
@@ -73,18 +79,23 @@ export function useActiveProfile() {
             if (user && activeProfile) {
                 const payload: InterestProfileUpdatePayload = {};
                 if (input.area) {
-                    payload.area_label = input.area.label;
-                    payload.min_lat = input.area.min_lat;
-                    payload.min_lng = input.area.min_lng;
-                    payload.max_lat = input.area.max_lat;
-                    payload.max_lng = input.area.max_lng;
+                    const searchArea = 'kind' in input.area
+                        ? input.area
+                        : bboxSearchArea(input.area, 'preference');
+                    Object.assign(payload, toProfileGeometry(searchArea));
                 }
                 if (input.danceTagIds) payload.dance_tag_ids = input.danceTagIds;
                 if (input.reachFilter) payload.reach_filter = input.reachFilter;
                 const updated = await updateInterestProfile(activeProfile.id, payload);
                 setActiveProfile(updated);
                 applyLocalMirror({
-                    ...(input.area !== undefined ? { area: input.area } : {}),
+                    ...(input.area !== undefined
+                        ? {
+                            area: input.area
+                                ? toPreferredArea('kind' in input.area ? input.area : bboxSearchArea(input.area, 'preference'))
+                                : null,
+                        }
+                        : {}),
                     tagIds: updated.dance_tag_ids,
                 });
                 return;
@@ -94,7 +105,13 @@ export function useActiveProfile() {
                     ? input.danceTagIds
                     : undefined;
             await setPrefs({
-                ...(input.area !== undefined ? { area: input.area } : {}),
+                ...(input.area !== undefined
+                    ? {
+                        area: input.area
+                            ? toPreferredArea('kind' in input.area ? input.area : bboxSearchArea(input.area, 'preference'))
+                            : null,
+                    }
+                    : {}),
                 ...(nextTags !== undefined ? { tagIds: nextTags } : {}),
             });
         },

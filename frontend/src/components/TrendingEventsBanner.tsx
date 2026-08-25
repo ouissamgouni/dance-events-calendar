@@ -77,6 +77,7 @@ export default function TrendingEventsBanner({
                                 onHover={onEventHover}
                                 highlighted={hoveredEventId === event.event_id}
                                 variant="compact"
+                                dateRail
                                 compactShowExtras={trendingTrailRichEnabled}
                                 followingBadgeEnabled={followingBadgeEnabled}
                                 contextLabel="trending event"

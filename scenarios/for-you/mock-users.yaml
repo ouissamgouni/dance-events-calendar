@@ -31,12 +31,33 @@ users:
   - email: friend@example.com
     name: Friend Rivera
     handle: friend
+    avatar_url: https://api.dicebear.com/9.x/avataaars/svg?seed=Friend%20Rivera
   # Mutual friends of viewer (used for the Friends lens + baseline hero
   # popularity).
-  - { email: emma@example.com, name: Emma Larsen, handle: emma }
-  - { email: frank@example.com, name: Frank Dubois, handle: frank }
-  - { email: gina@example.com, name: Gina Costa, handle: gina }
-  - { email: hugo@example.com, name: Hugo Schmidt, handle: hugo }
+  - {
+      email: emma@example.com,
+      name: Emma Larsen,
+      handle: emma,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Emma%20Larsen",
+    }
+  - {
+      email: frank@example.com,
+      name: Frank Dubois,
+      handle: frank,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Frank%20Dubois",
+    }
+  - {
+      email: gina@example.com,
+      name: Gina Costa,
+      handle: gina,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Gina%20Costa",
+    }
+  - {
+      email: hugo@example.com,
+      name: Hugo Schmidt,
+      handle: hugo,
+      avatar_url: "https://api.dicebear.com/9.x/avataaars/svg?seed=Hugo%20Schmidt",
+    }
   # One-way followees (viewer follows, no follow-back). Popularity fuel
   # without leaking into Friends lens.
   - { email: pablo@example.com, name: Pablo Ortega, handle: pablo }

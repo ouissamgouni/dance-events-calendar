@@ -32,6 +32,21 @@ type InterestSource = 'follows' | 'friends' | null;
 type InterestKind = 'any' | 'going' | 'saved';
 type InterestMatch = 'any' | 'all';
 
+export function initialEventFilter(search: string): Filter {
+    const value = new URLSearchParams(search).get('filter');
+    return value === 'saved' || value === 'going' ? value : 'all';
+}
+
+export function initialInterestSource(search: string): InterestSource {
+    const value = new URLSearchParams(search).get('interest_source');
+    return value === 'follows' || value === 'friends' ? value : null;
+}
+
+export function initialInterestKind(search: string): InterestKind {
+    const value = new URLSearchParams(search).get('interest_kind');
+    return value === 'any' || value === 'going' || value === 'saved' ? value : 'going';
+}
+
 /** Relative countdown — "now", "in 1 day", "in 3 days", "in a week", "in 2 weeks". */
 function formatRelativeWhen(startIso: string): string {
     const diffDays = Math.round((new Date(startIso).getTime() - Date.now()) / 86_400_000);
@@ -73,13 +88,13 @@ export default function MyCalendar() {
     const [subscribeOpen, setSubscribeOpen] = useState(false);
     const [feedUrl, setFeedUrl] = useState('');
     const [feedStatus, setFeedStatus] = useState<'idle' | 'loading' | 'copied'>('idle');
-    const [activeFilter, setActiveFilter] = useState<Filter>('all');
+    const [activeFilter, setActiveFilter] = useState<Filter>(() => initialEventFilter(location.search));
     const [showPastEvents, setShowPastEvents] = useState(false);
     const [subsEvents, setSubsEvents] = useState<CalendarEvent[]>([]);
     const [subsLoading, setSubsLoading] = useState(false);
     const [subsCalendars, setSubsCalendars] = useState<SubscribedUser[]>([]);
-    const [interestSource, setInterestSource] = useState<InterestSource>(null);
-    const [interestKind, setInterestKind] = useState<InterestKind>('going');
+    const [interestSource, setInterestSource] = useState<InterestSource>(() => initialInterestSource(location.search));
+    const [interestKind, setInterestKind] = useState<InterestKind>(() => initialInterestKind(location.search));
     const [interestUserHandles, setInterestUserHandles] = useState<string[]>([]);
     const [interestMatch, setInterestMatch] = useState<InterestMatch>('any');
     const [friendHandles, setFriendHandles] = useState<string[]>([]);

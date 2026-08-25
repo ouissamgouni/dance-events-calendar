@@ -1,7 +1,5 @@
-# Enables the explorer's "Your next events" rail. The rail lists the
-# viewer's own saved + attending events, sorted by start date ascending.
-# `for_you_rail_enabled` is intentionally OFF here so this scenario tests
-# the Your-next-events rail in isolation.
+# Enables friend previews for the shared compact next-event section.
 settings:
   your_next_events_rail_enabled: true
   for_you_rail_enabled: false
+  following_badge_enabled: true

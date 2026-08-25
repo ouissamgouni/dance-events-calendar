@@ -43,6 +43,7 @@ class EventResponse(BaseModel):
     calendar_id: str
     title: str
     description: Optional[str] = None
+    image_url: Optional[str] = None
     location: Optional[str] = None
     start: datetime
     end: datetime
@@ -72,6 +73,8 @@ class EventResponse(BaseModel):
     # the rest of the going set. Empty when the feature flag is off or
     # the viewer is anonymous.
     following_friends_preview: list["FriendMini"] = []
+    friends_going_count: int = 0
+    friends_going_preview: list["FriendMini"] = []
     price_min: Optional[float] = None
     price_max: Optional[float] = None
     price_currency: Optional[str] = None
@@ -106,6 +109,7 @@ class EventOrganizerMini(BaseModel):
 
 class FriendMini(BaseModel):
     user_id: UUID
+    handle: Optional[str] = None
     display_name: Optional[str] = None
     avatar_url: Optional[str] = None
 
@@ -1093,10 +1097,35 @@ class EventUpdateRequest(BaseModel):
     show_promo_override: Optional[bool] = None
 
 
+class GeocodeBoundingBox(BaseModel):
+    min_lat: float
+    min_lng: float
+    max_lat: float
+    max_lng: float
+
+
 class GeocodeSuggestion(BaseModel):
     display_name: str
     latitude: float
     longitude: float
+    name: Optional[str] = None
+    context: Optional[str] = None
+    country: Optional[str] = None
+    region: Optional[str] = None
+    place_kind: Literal[
+        "country",
+        "region",
+        "county",
+        "city",
+        "town",
+        "district",
+        "locality",
+        "address",
+        "poi",
+        "unknown",
+    ] = "unknown"
+    type_label: str = "Place"
+    bounding_box: Optional[GeocodeBoundingBox] = None
 
 
 class AppInfoResponse(BaseModel):

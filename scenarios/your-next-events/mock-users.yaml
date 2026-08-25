@@ -2,6 +2,18 @@ users:
   - email: viewer@example.com
     name: Scenario Viewer
     handle: viewer
+  - email: paul@example.com
+    name: Paul Martin
+    handle: paul
+  - email: mia@example.com
+    name: Mia Rossi
+    handle: mia
+  - email: ana@example.com
+    name: Ana Diaz
+    handle: ana
+  - email: lea@example.com
+    name: Léa Bernard
+    handle: lea
   - email: admin@example.com
     name: Dev Admin
     handle: admin

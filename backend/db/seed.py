@@ -571,6 +571,7 @@ class DatabaseSeeder:
             if existing:
                 existing.title = evt_data["title"]
                 existing.description = evt_data.get("description")
+                existing.image_url = evt_data.get("image_url", existing.image_url)
                 existing.location = evt_data.get("location")
                 existing.latitude = evt_data.get("latitude", existing.latitude)
                 existing.longitude = evt_data.get("longitude", existing.longitude)
@@ -609,6 +610,7 @@ class DatabaseSeeder:
                         calendar_id=evt_data["calendar_id"],
                         title=evt_data["title"],
                         description=evt_data.get("description"),
+                        image_url=evt_data.get("image_url"),
                         location=evt_data.get("location"),
                         latitude=evt_data.get("latitude"),
                         longitude=evt_data.get("longitude"),
@@ -1517,6 +1519,11 @@ class DatabaseSeeder:
             if not label:
                 logger.warning("Skipping interest profile (missing label): %r", entry)
                 continue
+            area_name = (
+                entry.get("area_name") or entry.get("area_label") or label
+            ).strip()
+            if not area_name:
+                area_name = label
             try:
                 min_lat = float(entry["min_lat"])
                 min_lng = float(entry["min_lng"])
@@ -1559,7 +1566,7 @@ class DatabaseSeeder:
                     reach_filter = "any"
             if existing:
                 profile = existing
-                profile.area_label = str(entry.get("area_label") or label)[:120]
+                profile.area_label = area_name[:120]
                 profile.min_lat = min_lat
                 profile.min_lng = min_lng
                 profile.max_lat = max_lat
@@ -1578,7 +1585,7 @@ class DatabaseSeeder:
                 profile = UserInterestProfile(
                     user_id=user.id,
                     label=label[:120],
-                    area_label=str(entry.get("area_label") or label)[:120],
+                    area_label=area_name[:120],
                     min_lat=min_lat,
                     min_lng=min_lng,
                     max_lat=max_lat,

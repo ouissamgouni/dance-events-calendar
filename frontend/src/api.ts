@@ -2888,6 +2888,18 @@ export interface GeocodeSuggestion {
     display_name: string;
     latitude: number;
     longitude: number;
+    name?: string | null;
+    context?: string | null;
+    country?: string | null;
+    region?: string | null;
+    place_kind?: 'country' | 'region' | 'county' | 'city' | 'town' | 'district' | 'locality' | 'address' | 'poi' | 'unknown';
+    type_label?: string;
+    bounding_box?: {
+        min_lat: number;
+        min_lng: number;
+        max_lat: number;
+        max_lng: number;
+    } | null;
 }
 
 export async function searchAddress(query: string): Promise<GeocodeSuggestion[]> {

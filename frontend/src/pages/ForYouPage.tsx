@@ -4,22 +4,29 @@ import type { CalendarEvent, PendingReview } from '../types';
 import { fetchEventsByIds, fetchMyPendingReviews } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { usePreferences } from '../context/PreferencesContext';
-import { useSavedEvents } from '../context/SavedEventsContext';
 import { useAttendingEvents } from '../context/AttendingEventsContext';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 import { useForYouLens } from '../hooks/useForYouLens';
 import { useSeenEvents } from '../hooks/useSeenEvents';
 import { DEFAULT_AREA_BBOX } from '../constants/area';
+import { firstNameOf } from '../utils/displayName';
 import { trackView } from '../utils/tracking';
 import { isTrendingScore } from '../utils/trending';
 import YourNextEventsRail from '../components/YourNextEventsRail';
 import RailEventCard from '../components/RailEventCard';
+import FriendsAreGoingCard from '../components/FriendsAreGoingCard';
 import ShareExperienceCard from '../components/ShareExperienceCard';
 import PeopleYouMayKnowCard from '../components/PeopleYouMayKnowCard';
 import ScrollDotsIndicator from '../components/ScrollDots';
 import { useScrollDots } from '../hooks/useScrollDots';
 
 const DISPLAY_CAP = 5;
+
+export function timeOfDayGreeting(hour: number): string {
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+}
 
 function toApiDate(date: Date): string {
     const y = date.getFullYear();
@@ -48,15 +55,18 @@ interface LensTrailProps {
     contextLabel: string;
     testId: string;
     headerRight?: ReactNode;
+    cardVariant?: 'default' | 'friends-going';
 }
 
-function LensTrail(props: LensTrailProps) {
+export function LensTrail(props: LensTrailProps) {
     const {
         title, events, hasMore, loading, onLoadMore, onEventClick,
         hoveredEventId, onEventHover, trendingEnabled, popularityThreshold,
         trendingTopN, trendingTopPercent, newEventIds, unseenStateEnabled,
         followingBadgeEnabled, emptyContent, contextLabel, testId, headerRight,
+        cardVariant = 'default',
     } = props;
+    const friendsGoing = cardVariant === 'friends-going';
     const [displayCap, setDisplayCap] = useState(DISPLAY_CAP);
     const visibleEvents = events.slice(0, displayCap);
     const hasLocalMore = events.length > visibleEvents.length;
@@ -75,7 +85,7 @@ function LensTrail(props: LensTrailProps) {
 
     return (
         <section data-testid={testId}>
-            <div className="flex w-full items-center justify-between border-b border-line px-2.5 py-1 text-sm font-semibold text-ink">
+            <div className="flex w-full items-center justify-between py-1 text-base font-semibold text-ink">
                 <span>{title}</span>
                 {headerRight}
             </div>
@@ -84,8 +94,21 @@ function LensTrail(props: LensTrailProps) {
                     {emptyContent ?? 'Nothing here yet.'}
                 </div>
             ) : (
-                <div ref={scrollerRef} className="flex gap-2 overflow-x-auto scrollbar-hide px-2 py-2" aria-label={title}>
+                <div
+                    ref={scrollerRef}
+                    className={`flex overflow-x-auto scrollbar-hide py-2 ${friendsGoing ? 'snap-x snap-mandatory gap-3' : 'gap-2'}`}
+                    aria-label={title}
+                >
                     {visibleEvents.map((event) => {
+                        if (friendsGoing) {
+                            return (
+                                <FriendsAreGoingCard
+                                    key={event.event_id}
+                                    event={event}
+                                    onClick={onEventClick}
+                                />
+                            );
+                        }
                         const isNew = unseenStateEnabled && newEventIds.has(event.event_id);
                         const isTrending = trendingEnabled
                             && isTrendingScore(event.popularity_score ?? 0, allScores, popularityThreshold, trendingTopN, trendingTopPercent);
@@ -130,15 +153,14 @@ function LensTrail(props: LensTrailProps) {
 /**
  * "For you" surface: personalised event shortcuts for a signed-in viewer.
  * Renders five horizontal trails — Your next events, You might like,
- * Following & friends going, Build your tribe, New — each independently
+ * Friends are going, Build your tribe, New — each independently
  * paginated / scoped so a slow lens never blocks the others.
  */
 export default function ForYouPage() {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { prefs } = usePreferences();
-    const { savedEventIds } = useSavedEvents();
-    const { attendingEventIds } = useAttendingEvents();
+    const { attendingEventIds, loading: attendingEventsLoading } = useAttendingEvents();
     const {
         unseenStateEnabled,
         trendingEnabled,
@@ -172,13 +194,13 @@ export default function ForYouPage() {
         fetchArgs: { startDate: forYouStartDate, profiles: 'me' },
         resetKey: forYouResetKey,
     });
-    const followingLens = useForYouLens({
+    const friendsGoingLens = useForYouLens({
         enabled: !!user,
         fetchArgs: {
             startDate: forYouStartDate,
             area: forYouArea,
-            interestSource: 'follows',
-            interestKind: 'any',
+            interestSource: 'friends',
+            interestKind: 'going',
         },
         resetKey: forYouResetKey,
     });
@@ -197,22 +219,23 @@ export default function ForYouPage() {
             .filter((event) => new Date(event.end).getTime() >= now)
             .sort((a, b) => (b.popularity_score ?? 0) - (a.popularity_score ?? 0));
     }, [youMightLikeLens.events]);
-    const followingGoingEvents = useMemo(() => {
+    const friendsGoingEvents = useMemo(() => {
         // eslint-disable-next-line react-hooks/purity -- render-time clock snapshot for past-event filter
         const now = Date.now();
-        return followingLens.events
+        return friendsGoingLens.events
             .filter((event) => new Date(event.end).getTime() >= now)
             .sort(
-                (a, b) => (b.going_count ?? 0) + (b.saved_count ?? 0) - ((a.going_count ?? 0) + (a.saved_count ?? 0)),
+                (a, b) => (b.friends_going_count ?? 0) - (a.friends_going_count ?? 0)
+                    || new Date(a.start).getTime() - new Date(b.start).getTime(),
             );
-    }, [followingLens.events]);
+    }, [friendsGoingLens.events]);
 
     const seenScopeIds = useMemo(
         () => [
             ...youMightLikeLens.events.map((event) => event.event_id),
-            ...followingLens.events.map((event) => event.event_id),
+            ...friendsGoingLens.events.map((event) => event.event_id),
         ],
-        [youMightLikeLens.events, followingLens.events],
+        [youMightLikeLens.events, friendsGoingLens.events],
     );
     const { newEventIds, markSeen } = useSeenEvents(seenScopeIds);
     const newEvents = useMemo(
@@ -220,15 +243,26 @@ export default function ForYouPage() {
         [youMightLikeEvents, newEventIds],
     );
 
-    const yourNextEventIds = useMemo(
-        () => [...new Set([...savedEventIds, ...attendingEventIds])],
-        [savedEventIds, attendingEventIds],
-    );
     const [rawYourNextEvents, setRawYourNextEvents] = useState<CalendarEvent[]>([]);
+    const [yourNextEventsLoading, setYourNextEventsLoading] = useState(true);
     useEffect(() => {
-        if (!user || yourNextEventIds.length === 0) return;
+        if (!user) {
+            setRawYourNextEvents([]);
+            setYourNextEventsLoading(false);
+            return;
+        }
+        if (attendingEventsLoading) {
+            setYourNextEventsLoading(true);
+            return;
+        }
+        if (attendingEventIds.length === 0) {
+            setRawYourNextEvents([]);
+            setYourNextEventsLoading(false);
+            return;
+        }
         let cancelled = false;
-        fetchEventsByIds(yourNextEventIds)
+        setYourNextEventsLoading(true);
+        fetchEventsByIds(attendingEventIds)
             .then((evts) => {
                 if (cancelled) return;
                 const now = Date.now();
@@ -237,30 +271,23 @@ export default function ForYouPage() {
                         .filter((e) => new Date(e.end).getTime() >= now)
                         .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()),
                 );
+                setYourNextEventsLoading(false);
             })
             .catch(() => {
-                /* keep previous list on fetch error */
+                if (!cancelled) setYourNextEventsLoading(false);
             });
         return () => {
             cancelled = true;
         };
-    }, [user, yourNextEventIds]);
-    // Derive the visible list from the current id set so it collapses instantly
-    // when the user unsaves/removes going, without a stale-state reset in the effect.
+    }, [user, attendingEventIds, attendingEventsLoading]);
+    // Derive from the live Going IDs so removing an RSVP updates immediately.
     const yourNextEvents = useMemo(() => {
-        if (!user || yourNextEventIds.length === 0) return [];
-        const ids = new Set(yourNextEventIds);
-        const attendingSet = new Set(attendingEventIds);
+        if (!user || attendingEventIds.length === 0) return [];
+        const ids = new Set(attendingEventIds);
         return rawYourNextEvents
             .filter((e) => ids.has(e.event_id))
-            // Events the viewer is going to lead the rail; saved-only trail after.
-            .sort((a, b) => {
-                const aGoing = attendingSet.has(a.event_id);
-                const bGoing = attendingSet.has(b.event_id);
-                if (aGoing !== bGoing) return aGoing ? -1 : 1;
-                return new Date(a.start).getTime() - new Date(b.start).getTime();
-            });
-    }, [user, yourNextEventIds, rawYourNextEvents, attendingEventIds]);
+            .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+    }, [user, attendingEventIds, rawYourNextEvents]);
 
     // "Share your experience": past events the viewer attended but hasn't
     // reviewed yet (server applies the admin-configurable recency window).
@@ -293,11 +320,18 @@ export default function ForYouPage() {
     }, [markSeen, navigate]);
 
     const trendingDecoration = trendingEnabled && showPopularity;
+    const firstName = firstNameOf(user?.name, user?.handle);
+    const greeting = timeOfDayGreeting(new Date().getHours());
 
     return (
         <div className="min-h-screen bg-[#f8fafc]">
             <main className="mx-auto max-w-7xl px-4 py-4 sm:py-6">
-                <h1 className="mb-3 text-xl font-semibold text-ink">For You</h1>
+                <header className="mb-4">
+                    <h1 className="text-2xl font-bold text-ink">
+                        {greeting}{firstName ? `, ${firstName}` : ''} 👋
+                    </h1>
+                    <p className="mt-1 text-[12px] text-ink-soft">Your picks for today.</p>
+                </header>
                 {!user ? (
                     <div className="bg-blue-50 border border-blue-100 p-4 text-sm text-ink">
                         <p className="mb-2 font-medium text-ink">Personalised events for you</p>
@@ -314,10 +348,7 @@ export default function ForYouPage() {
                         <YourNextEventsRail
                             events={yourNextEvents}
                             onEventClick={handleEventClick}
-                            hoveredEventId={hoveredEventId}
-                            onEventHover={onEventHover}
-                            newEventIds={newEventIds}
-                            unseenStateEnabled={unseenStateEnabled}
+                            loading={attendingEventsLoading || yourNextEventsLoading}
                         />
                         <LensTrail
                             title="You might like"
@@ -347,15 +378,16 @@ export default function ForYouPage() {
                             followingBadgeEnabled={followingBadgeEnabled}
                         />
                         <LensTrail
-                            title="Following & Friends going"
+                            title="Friends are going"
                             testId="for-you-following-friends-going"
-                            contextLabel="following & friends going event"
+                            contextLabel="friends going event"
+                            cardVariant="friends-going"
                             headerRight={(
                                 <Link
-                                    to="/tribe/calendars"
-                                    className="text-[11px] font-semibold text-action hover:text-action"
+                                    to="/tribe/calendars?interest_source=friends&interest_kind=going"
+                                    className="text-sm font-semibold text-action hover:text-action-strong"
                                 >
-                                    See in explorer
+                                    See all
                                 </Link>
                             )}
                             emptyContent={(
@@ -369,12 +401,12 @@ export default function ForYouPage() {
                                             Build your tribe
                                         </Link>
                                     </>
-                                ) : 'No one you follow is going to anything upcoming yet.'
+                                ) : 'No friends are going to anything upcoming yet.'
                             )}
-                            events={followingGoingEvents}
-                            hasMore={followingLens.hasMore}
-                            loading={followingLens.loading}
-                            onLoadMore={followingLens.loadMore}
+                            events={friendsGoingEvents}
+                            hasMore={friendsGoingLens.hasMore}
+                            loading={friendsGoingLens.loading}
+                            onLoadMore={friendsGoingLens.loadMore}
                             onEventClick={handleEventClick}
                             hoveredEventId={hoveredEventId}
                             onEventHover={onEventHover}
@@ -388,7 +420,7 @@ export default function ForYouPage() {
                         />
                         {pendingReviews.length > 0 && (
                             <section data-testid="for-you-share-your-experience">
-                                <div className="flex w-full items-center justify-between border-b border-line px-2.5 py-1 text-sm font-semibold text-ink">
+                                <div className="flex w-full items-center justify-between py-1 text-base font-semibold text-ink">
                                     <span>Share your experience</span>
                                 </div>
                                 <div ref={shareScrollerRef} className="flex gap-2 overflow-x-auto scrollbar-hide px-2 py-2" aria-label="Share your experience">

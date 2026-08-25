@@ -25,18 +25,19 @@ import type { ExploreView } from '../components/ViewSwitcher';
 import FilterSheet from '../components/FilterSheet';
 import type { FilterSheetSection } from '../components/FilterSheet';
 import AreaEditor from '../components/AreaEditor';
+import AreaMapPreview from '../components/AreaMapPreview';
 import TagFilterPills from '../components/TagFilterPills';
 import MoreFiltersEditor from '../components/MoreFiltersEditor';
 import SearchProfileFlow from '../components/SearchProfileFlow';
 import { usePreferences } from '../context/PreferencesContext';
 import { useActiveProfile } from '../hooks/useActiveProfile';
 import { useInterestProfiles } from '../hooks/useInterestProfiles';
-import { matchSearchProfile, profileContainsCoordinates } from '../utils/searchProfiles';
+import { matchSearchProfile } from '../utils/searchProfiles';
 import { eventMatchesReach, REACH_FILTER_ICON_SRC, REACH_FILTER_LABELS } from '../utils/reach';
 import { useInvalidateAttendanceSummaries } from '../context/AttendanceSummariesContext';
 import { useSavedEvents } from '../context/SavedEventsContext';
 
-import { AREA_PRESETS, DEFAULT_AREA_BBOX, DEFAULT_AREA_LABEL, clampArea } from '../constants/area';
+import { AREA_PRESETS, DEFAULT_AREA_BBOX, DEFAULT_AREA_LABEL } from '../constants/area';
 import type { PreferredAreaPayload, InterestProfile, InterestProfileUpdatePayload } from '../api';
 import SuggestEventModal from '../components/SuggestEventModal';
 import EventAnchoredDetailPanel from '../components/EventAnchoredDetailPanel';
@@ -44,6 +45,15 @@ import { useSeenEvents } from '../hooks/useSeenEvents';
 import TrendingEventsBanner from '../components/TrendingEventsBanner';
 import { DEFAULT_EXPLORER_PERIOD, getDateRangeForPreset } from '../utils/dateRangePresets';
 import type { DateRangePresetKey } from '../utils/dateRangePresets';
+import {
+    bboxSearchArea,
+    customAreaFromBounds,
+    searchAreaContainsCoordinates,
+    searchAreaFromProfile,
+    toPreferredArea,
+    toProfileGeometry,
+    type SearchArea,
+} from '../utils/searchArea';
 
 // Worldwide bbox shortcut reused by the area sheet's "Anywhere" apply path.
 const WORLDWIDE_AREA: PreferredAreaPayload =
@@ -188,25 +198,6 @@ function writeExplorerStateToSearchParams(
     else next.delete('sort_by');
 }
 
-function areaToMapBounds(area: PreferredAreaPayload): MapBounds {
-    return {
-        south: area.min_lat,
-        north: area.max_lat,
-        west: area.min_lng,
-        east: area.max_lng,
-    };
-}
-
-function eventMatchesBounds(event: CalendarEvent, bounds: MapBounds): boolean {
-    if (event.latitude == null || event.longitude == null) return true;
-    return (
-        event.latitude >= bounds.south &&
-        event.latitude <= bounds.north &&
-        event.longitude >= bounds.west &&
-        event.longitude <= bounds.east
-    );
-}
-
 // Loose OR match used previously by the "For you" rail's Recommended lens
 // lives on the /for-you page now.
 
@@ -248,11 +239,6 @@ export default function Home() {
     // area): dance styles and event reach ("Event reach").
     const danceGroup = useMemo(() => tagGroups.find((g) => g.slug === 'dance-style') ?? null, [tagGroups]);
     const reachGroup = useMemo(() => tagGroups.find((g) => g.slug === 'reach') ?? null, [tagGroups]);
-    // "local" reach tag id, used by the search-profile editor's wide-area hint.
-    const localReachTagId = useMemo(
-        () => reachGroup?.tags.find((t) => t.slug === 'local')?.id ?? null,
-        [reachGroup],
-    );
     // "Event format" is a session-only tag group; everything else (excluding
     // the three primary dimensions) falls under "More filters".
     const formatGroup = useMemo(() => tagGroups.find((g) => g.slug === 'format') ?? null, [tagGroups]);
@@ -347,7 +333,7 @@ export default function Home() {
     // doc).
     const [areaSessionOverride, setAreaSessionOverride] = useState<
         | { kind: 'show-all' }
-        | { kind: 'preset'; area: typeof DEFAULT_AREA_BBOX }
+        | { kind: 'preset'; area: SearchArea }
         | null
     >(null);
 
@@ -418,12 +404,13 @@ export default function Home() {
     const initialAreaRef = useRef<PreferredAreaPayload>(prefs.area ?? DEFAULT_AREA_BBOX);
     const resolvedInitialArea = flyToAreaBbox ?? initialAreaRef.current;
 
-    const effectiveArea: PreferredAreaPayload | null = useMemo(() => {
+    const effectiveArea: SearchArea | null = useMemo(() => {
         if (areaSessionOverride?.kind === 'show-all') return null;
         if (areaSessionOverride?.kind === 'preset') return areaSessionOverride.area;
-        if (prefs.area) return prefs.area;
-        return DEFAULT_AREA_BBOX;
-    }, [areaSessionOverride, prefs.area]);
+        if (activeProfile) return searchAreaFromProfile(activeProfile);
+        if (prefs.area) return bboxSearchArea(prefs.area, 'preference');
+        return bboxSearchArea(DEFAULT_AREA_BBOX, 'preset');
+    }, [activeProfile, areaSessionOverride, prefs.area]);
 
     // Dance + reach tag ids currently active — the two tag dimensions that,
     // together with the effective area, make up a "search profile".
@@ -467,24 +454,17 @@ export default function Home() {
         });
         userTouchedReachRef.current = true;
         setReachFilter(profile.reach_filter);
-        const area: PreferredAreaPayload = {
-            min_lat: profile.min_lat,
-            min_lng: profile.min_lng,
-            max_lat: profile.max_lat,
-            max_lng: profile.max_lng,
-            label: profile.area_label,
-        };
+        const area = searchAreaFromProfile(profile);
         if (profile.is_active) {
             // The default profile — clear the session override so it reads as
             // the clean saved default rather than a one-off preset.
             setAreaSessionOverride(null);
-            flyToArea(prefs.area ?? area);
+            flyToArea(toPreferredArea(area));
         } else {
-            const clamped = clampArea(area);
-            setAreaSessionOverride({ kind: 'preset', area: clamped });
-            flyToArea(clamped);
+            setAreaSessionOverride({ kind: 'preset', area });
+            flyToArea(toPreferredArea(area));
         }
-    }, [danceGroup, reachGroup, flyToArea, prefs.area]);
+    }, [danceGroup, reachGroup, flyToArea]);
 
     // Update the selected profile's Area + Dance + Reach with the live values.
     // For the active profile, synchronizes preferences and refits the map.
@@ -495,21 +475,15 @@ export default function Home() {
                 dance_tag_ids: danceTagIds,
                 reach_filter: reachFilter,
             };
-            if (effectiveArea) payload.area_label = clampArea(effectiveArea).label;
-            if (effectiveArea) {
-                payload.min_lat = effectiveArea.min_lat;
-                payload.min_lng = effectiveArea.min_lng;
-                payload.max_lat = effectiveArea.max_lat;
-                payload.max_lng = effectiveArea.max_lng;
-            }
+            if (effectiveArea) Object.assign(payload, toProfileGeometry(effectiveArea));
 
             if (profile.is_active) {
                 // Active profile: use saveDefaults to maintain preference sync.
-                const input: { area?: PreferredAreaPayload; danceTagIds?: number[]; reachFilter?: ReachFilter } = {
+                const input: { area?: SearchArea; danceTagIds?: number[]; reachFilter?: ReachFilter } = {
                     danceTagIds: danceTagIds,
                     reachFilter,
                 };
-                if (effectiveArea) input.area = clampArea(effectiveArea);
+                if (effectiveArea) input.area = effectiveArea;
                 suppressNextPrefsFitRef.current = true;
                 setAreaSessionOverride(null);
                 await saveDefaults(input);
@@ -929,18 +903,27 @@ export default function Home() {
     // fullscreen map header, and desktop) is now the FilterSheet's "Area"
     // section. Apply = session override only; "Set as my default area"
     // persists to the profile via the active profile.
-    const handleApplyAreaFromSheet = useCallback((area: PreferredAreaPayload | null) => {
+    const handleApplyAreaFromSheet = useCallback((area: SearchArea | null) => {
         setPreserveViewportAfterSearch(true);
         setUserMapBounds(null);
         if (!area) {
             setAreaSessionOverride({ kind: 'show-all' });
             flyToArea({ ...WORLDWIDE_AREA });
-            return;
+        } else {
+            setAreaSessionOverride({ kind: 'preset', area });
+            flyToArea(toPreferredArea(area));
         }
-        const clamped = clampArea(area);
-        setAreaSessionOverride({ kind: 'preset', area: clamped });
-        flyToArea(clamped);
     }, [flyToArea]);
+
+    const handleExploreAreaFromSheet = useCallback((area: SearchArea) => {
+        setPreserveViewportAfterSearch(true);
+        setUserMapBounds(null);
+        setAreaSessionOverride({ kind: 'preset', area });
+        flyToArea(toPreferredArea(area));
+        setFilterSheetSection(null);
+        setFilterSheetOpen(false);
+        handleSelectView('map');
+    }, [flyToArea, handleSelectView]);
 
     // Mobile-only FilterSheet open state. The sheet wraps the same controls
     // rendered inline on desktop so the landing page isn't crushed by a
@@ -980,15 +963,14 @@ export default function Home() {
     // lose their sense of orientation. The current zoom/pan is kept as-is.
     const handleSearchThisArea = useCallback(() => {
         if (!userMapBounds) return;
-        const area: PreferredAreaPayload = {
-            label: 'Map view',
+        const area = customAreaFromBounds({
             min_lat: userMapBounds.south,
             max_lat: userMapBounds.north,
             min_lng: userMapBounds.west,
             max_lng: userMapBounds.east,
-        };
+        });
         setPreserveViewportAfterSearch(true);
-        setAreaSessionOverride({ kind: 'preset', area: clampArea(area) });
+        setAreaSessionOverride({ kind: 'preset', area });
         setUserMapBounds(null);
     }, [userMapBounds]);
 
@@ -996,7 +978,7 @@ export default function Home() {
     // current zoom/pan (no marker-tightening refit).
     const applyPresetAreaInPlace = useCallback((preset: (typeof AREA_PRESETS)[number]) => {
         setPreserveViewportAfterSearch(true);
-        setAreaSessionOverride({ kind: 'preset', area: preset });
+        setAreaSessionOverride({ kind: 'preset', area: bboxSearchArea(preset, 'preset') });
         setUserMapBounds(null);
         flyToArea({ ...preset });
     }, [flyToArea]);
@@ -1025,12 +1007,10 @@ export default function Home() {
 
     const areaScopedEvents = useMemo(() => {
         if (viewMode !== 'explorer' || !effectiveArea) return events;
-        const bounds = areaToMapBounds(effectiveArea);
         return events.filter((event) =>
-            eventMatchesBounds(event, bounds)
-            && (!matchedSearchProfile || profileContainsCoordinates(matchedSearchProfile, event.latitude, event.longitude)),
+            searchAreaContainsCoordinates(effectiveArea, event.latitude, event.longitude),
         );
-    }, [events, effectiveArea, matchedSearchProfile, viewMode]);
+    }, [events, effectiveArea, viewMode]);
 
     const filteredEvents = useMemo(
         () => filterEventsByTags(events, activeTagIds, tagGroups).filter((event) => eventMatchesReach(event, reachFilter)),
@@ -1089,8 +1069,7 @@ export default function Home() {
                 if (cancelled) return;
                 const areaFiltered = effectiveArea
                     ? evts.filter((event) =>
-                        eventMatchesBounds(event, areaToMapBounds(effectiveArea))
-                        && (!matchedSearchProfile || profileContainsCoordinates(matchedSearchProfile, event.latitude, event.longitude)),
+                        searchAreaContainsCoordinates(effectiveArea, event.latitude, event.longitude),
                     )
                     : evts;
                 const matching = filterEventsByTags(areaFiltered, activeTagIds, tagGroups)
@@ -1535,6 +1514,9 @@ export default function Home() {
             group: 'Search profile',
             groupVariant: 'boxed' as const,
             summary: areaSummary,
+            preview: effectiveArea && areaChipState.kind !== 'show-all'
+                ? <AreaMapPreview area={effectiveArea} className="h-10 w-14" />
+                : undefined,
             groupHeaderAction: signedIn ? (
                 <button
                     type="button"
@@ -1554,7 +1536,8 @@ export default function Home() {
                     myArea={prefs.area ?? DEFAULT_AREA_BBOX}
                     myAreaLabel={prefs.area?.label}
                     profileAreas={signedIn ? searchProfiles : null}
-                    onApply={handleApplyAreaFromSheet}
+                    onUseArea={handleApplyAreaFromSheet}
+                    onExploreMap={handleExploreAreaFromSheet}
                     eventCount={explorerMatchingEvents.length}
                 />
             ),
@@ -2131,27 +2114,11 @@ export default function Home() {
                     currentAreaLabel={areaSummary}
                     danceGroup={danceGroup}
                     reachGroup={reachGroup}
-                    localTagId={localReachTagId}
                     onApplyProfile={handleApplySearchProfile}
                     onUpdateProfile={handleUpdateProfile}
                     createProfile={createProfile}
                     updateProfile={updateProfile}
                     deleteProfile={deleteProfile}
-                    onCreateRoute={() => navigate('/mine/profiles/new', {
-                        state: {
-                            returnTo: `${location.pathname}${location.search}`,
-                            initialSearch: {
-                                area: effectiveArea,
-                                areaLabel: areaSummary,
-                                danceIds: danceTagIds,
-                                reachFilter,
-                                reachIds: reachTagIds,
-                            },
-                        },
-                    })}
-                    onEditRoute={(profile) => navigate(`/mine/profiles/${profile.id}/edit`, {
-                        state: { returnTo: `${location.pathname}${location.search}` },
-                    })}
                 />
             )}
         </div>

@@ -20,8 +20,8 @@ export default function RegionPill({ label, isActive, onClick, testId }: RegionP
             type="button"
             onClick={onClick}
             className={`rounded-lg border px-3 py-1.5 text-xs font-medium whitespace-nowrap transition ${isActive
-                ? 'border-action bg-surface text-action'
-                : 'border-line bg-surface text-ink hover:border-ink/40'}`}
+                ? 'border-action bg-blue-50 text-action'
+                : 'border-line bg-canvas text-ink hover:border-action/40'}`}
             aria-pressed={isActive}
             data-testid={testId}
         >

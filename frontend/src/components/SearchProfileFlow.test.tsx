@@ -5,14 +5,8 @@ import SearchProfileFlow from './SearchProfileFlow';
 import type { InterestProfile } from '../api';
 import type { TagGroup } from '../types';
 
-// The editor step renders <ProfileEditor>, which mounts a Leaflet map that
-// jsdom cannot run. Stub it so the name input + Save/Delete buttons remain
-// testable without the map.
-vi.mock('./ProfileEditor', () => ({
-    default: ({ areaNameControl }: { areaNameControl?: React.ReactNode }) => (
-        <div data-testid="profile-editor-stub">{areaNameControl}</div>
-    ),
-}));
+vi.mock('./AreaMapPreview', () => ({ default: () => <div data-testid="area-preview" /> }));
+vi.mock('./AreaEditor', () => ({ default: () => <div data-testid="area-editor" /> }));
 
 const danceGroup: TagGroup = {
     id: 1,
@@ -145,15 +139,14 @@ describe('SearchProfileFlow', () => {
         render(<SearchProfileFlow {...props} initialStep="picker" />);
         await user.click(screen.getByTestId('search-profile-create'));
         expect(screen.getByTestId('search-profile-editor')).toBeInTheDocument();
+        expect(screen.getByLabelText('Profile name')).toHaveValue('Salsa · Barcelona · International');
         await user.clear(screen.getByLabelText('Profile name'));
         await user.type(screen.getByLabelText('Profile name'), 'Weekend salsa');
-        await user.clear(screen.getByLabelText('Area name'));
-        await user.type(screen.getByLabelText('Area name'), 'Greater Barcelona');
-        await user.click(screen.getByTestId('search-profile-save-draft'));
+        await user.click(screen.getByTestId('profile-draft-save'));
         expect(props.createProfile).toHaveBeenCalledTimes(1);
         expect(props.createProfile.mock.calls[0][0]).toMatchObject({
             label: 'Weekend salsa',
-            area_label: 'Greater Barcelona',
+            area_label: 'Barcelona',
             matches_enabled: false,
         });
         expect(props.onApplyProfile).toHaveBeenCalledWith(await props.createProfile.mock.results[0].value);
@@ -167,7 +160,7 @@ describe('SearchProfileFlow', () => {
         render(<SearchProfileFlow {...props} initialStep="picker" />);
         await user.click(screen.getByTestId('search-profile-edit-2'));
         expect(screen.getByTestId('search-profile-editor')).toBeInTheDocument();
-        await user.click(screen.getByTestId('search-profile-save-draft'));
+        await user.click(screen.getByTestId('profile-draft-save'));
         expect(props.updateProfile).toHaveBeenCalledWith(2, expect.objectContaining({
             label: 'Barcelona salsa',
         }));
@@ -182,7 +175,7 @@ describe('SearchProfileFlow', () => {
         const user = userEvent.setup();
         render(<SearchProfileFlow {...props} initialStep="picker" />);
         await user.click(screen.getByTestId('search-profile-edit-1'));
-        await user.click(screen.getByTestId('search-profile-save-draft'));
+        await user.click(screen.getByTestId('profile-draft-save'));
         expect(props.onApplyProfile).toHaveBeenCalledWith(updated);
         expect(props.onClose).toHaveBeenCalled();
     });
@@ -192,9 +185,9 @@ describe('SearchProfileFlow', () => {
         const user = userEvent.setup();
         render(<SearchProfileFlow {...props} initialStep="picker" />);
         await user.click(screen.getByTestId('search-profile-edit-1'));
-        await user.click(screen.getByTestId('search-profile-delete'));
+        await user.click(screen.getByTestId('profile-draft-delete'));
         // Confirm dialog appears; click its Delete action.
-        await user.click(screen.getByRole('button', { name: 'Delete' }));
+        await user.click(screen.getAllByRole('button', { name: 'Delete' }).at(-1)!);
         expect(props.deleteProfile).toHaveBeenCalledWith(1);
     });
 });

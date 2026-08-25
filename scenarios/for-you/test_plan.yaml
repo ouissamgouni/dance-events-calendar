@@ -3,13 +3,12 @@ test_plan:
   description: >
     /for-you is a dedicated page (not part of the Explorer map) with
     four always-visible sections, top to bottom:
-      1. Your next events — events you've saved or are going to.
+      1. Your next event — the viewer's earliest upcoming Going event, or a compact empty state.
       2. You might like — upcoming events matching your Interest
          Profile (dance styles + area, set in Settings → Preferences),
          ranked by popularity.
-      3. Following & friends going — upcoming events anyone you follow
-         (one-way or mutual) has RSVP'd to, ranked by combined
-         going+saved commitment.
+      3. Friends are going — upcoming events mutual friends are attending,
+        ranked by the number of friends going.
       4. Build your tribe — friend-of-friend suggestions to follow,
          shown only when there's at least one suggestion.
       5. New — the unseen subset of "You might like".
@@ -22,7 +21,7 @@ test_plan:
     - "task start:scenario SCENARIO=for-you"
     - "viewer@example.com has a seeded Interest Profile (db-interest-profiles.yaml): Salsa + Bachata, default 'Europe & nearby' area."
     - "Follows (db-follows.yaml): viewer <-> friend/emma/frank/gina/hugo (mutual); viewer -> pablo/quinn/rita (one-way, no follow-back); emma+gina -> iris and frank -> jonas (friend-of-friend candidates, NOT followed by viewer); s01..s10 + stranger + admin have no follow relationship with viewer at all."
-    - "Attendances/saves (db-attendances.yaml / db-saves.yaml) give evt-fy-bulk-20 the top popularity score and make evt-fy-bulk-15 the top 'Following & friends going' card."
+    - "Attendances/saves (db-attendances.yaml / db-saves.yaml) give evt-fy-bulk-20 the top popularity score; the Friends carousel has deterministic 1, 2, 3, and 4-friend cards."
 
   steps:
     - id: 1
@@ -33,8 +32,10 @@ test_plan:
         No cold-start screen — every signed-in user has an Interest
         Profile (one is auto-created on first sign-in if none exists),
         so "You might like" already has cards. All four sections render
-        in order: "You might like", "Following & friends going", "Build
-        your tribe", "New" (plus "Your next events" above them). A
+        in order: "You might like", "Friends are going", "Build
+        your tribe", "New" (plus "Your next event" above them). The
+        seeded viewer has no Going events, so that first section shows the
+        compact "No upcoming events" state with an Explore link. A
         section's row is empty only if it genuinely has no matches.
 
     - id: 2
@@ -59,9 +60,10 @@ test_plan:
         On the first "You might like" card, click the Save icon, then
         reload /for-you.
       expected: >
-        The event no longer appears in "You might like" (it moved to
-        "Your next events"). Repeat with the Going icon on a different
-        card — same result.
+        The saved event no longer appears in "You might like", but it does
+        not enter "Your next event" because that section is Going-only.
+        Repeat with the Going icon on a different card: it becomes the compact
+        next-event card after the Going context updates.
 
     - id: 4
       title: "'+ more' reveals cards, then paginates"
@@ -77,17 +79,22 @@ test_plan:
         reports no more pages.
 
     - id: 5
-      title: "'Following & friends going' includes ALL followees, not just mutual friends"
+      title: "'Friends are going' is a social-first snap carousel"
       description: >
-        Inspect the "Following & friends going" row
-        (`data-testid="for-you-following-friends-going"`).
+        At a 400px viewport, inspect the "Friends are going" row
+        (`data-testid="for-you-following-friends-going"`) and scroll it.
       expected: >
-        evt-fy-bulk-15 ("Trocadéro Salsa Sunday") is FIRST (highest
-        going+saved commitment). evt-fy-004 ("Zouk Friends Meetup")
-        also appears. Because one-way followees now count, evt-fy-001
-        and evt-fy-002 (public RSVPs from pablo/quinn/rita) also
-        appear. evt-fy-005 (RSVP'd only by `stranger`, whom viewer
-        doesn't follow at all) never appears.
+        Each card is 288px wide and about 150px high, with a 12px gap,
+        horizontal snap, and roughly 68px of the next card visible. The
+        cards show friend avatars and names before event information and
+        have no Save/Going controls. evt-fy-bulk-02 has four mutual friends,
+        a +1 badge, a local nightlife image, and a deliberately long title
+        that truncates without changing card height. evt-fy-bulk-15 has
+        three friends and no image; evt-fy-001 has two; evt-fy-004 has one.
+        Public activity from one-way followees or strangers never appears.
+        Avatar taps open `/u/{handle}`, +N opens the event attendees, card
+        taps open Event Details, and See all opens Tribe / Calendars with
+        Friends + Going selected.
 
     - id: 6
       title: "'Build your tribe' suggests friend-of-friend accounts, ranked by mutual friends"
@@ -120,7 +127,7 @@ test_plan:
         stranger@example.com or s01@example.com — neither follows nor
         is followed by anyone) and open /for-you.
       expected: >
-        "Following & friends going" shows "You're not following anyone
+        "Friends are going" shows "You're not following anyone
         yet." with a "Build your tribe" button linking to /discover
         (instead of a generic empty message). To see the "You might
         like" empty state (a prompt linking to Settings →

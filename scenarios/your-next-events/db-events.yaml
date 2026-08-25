@@ -30,6 +30,7 @@ events:
   - id: evt-yne-002
     calendar_id: salsa-cal-001
     title: Bachata Studio Class
+    image_url: /friends-going-dance-floor.jpg
     description: |
       Next-week commitment used to prove the countdown pill renders
       "in X weeks" for mid-range dates. viewer is going.
@@ -134,6 +135,19 @@ attendances:
     share_audience: public
   - event_id: evt-yne-003
     email: viewer@example.com
+    share_audience: public
+  # Mutual-friend context for the first Going event.
+  - event_id: evt-yne-002
+    email: paul@example.com
+    share_audience: public
+  - event_id: evt-yne-002
+    email: ana@example.com
+    share_audience: public
+  - event_id: evt-yne-002
+    email: lea@example.com
+    share_audience: public
+  - event_id: evt-yne-002
+    email: mia@example.com
     share_audience: public
   - event_id: evt-yne-005
     email: viewer@example.com

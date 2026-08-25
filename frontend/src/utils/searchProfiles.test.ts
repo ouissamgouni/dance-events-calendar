@@ -3,12 +3,14 @@ import type { InterestProfile } from '../api';
 import type { TagGroup } from '../types';
 import {
     bboxApproxEquals,
+    generateProfileName,
     matchSearchProfile,
     profileContainsCoordinates,
     sameIdSet,
     summarizeSearchProfile,
     summarizeSelection,
 } from './searchProfiles';
+import { radiusSearchArea } from './searchArea';
 
 function makeProfile(overrides: Partial<InterestProfile> = {}): InterestProfile {
     return {
@@ -54,6 +56,26 @@ const reachGroup: TagGroup = {
         { id: 21, slug: 'local', label: 'Local' },
     ],
 } as TagGroup;
+
+describe('generateProfileName', () => {
+    it('combines condensed dances, area, and reach', () => {
+        expect(generateProfileName({
+            danceIds: [10, 11],
+            danceGroup,
+            areaLabel: 'Europe',
+            reachFilter: 'international',
+        })).toBe('Salsa +1 · Europe · International');
+    });
+
+    it('falls back for empty dances and area', () => {
+        expect(generateProfileName({
+            danceIds: [],
+            danceGroup,
+            areaLabel: ' ',
+            reachFilter: 'any',
+        })).toBe('Any style · Anywhere · Any');
+    });
+});
 
 describe('bboxApproxEquals', () => {
     it('returns true within epsilon', () => {
@@ -150,6 +172,31 @@ describe('matchSearchProfile', () => {
             dupes,
         );
         expect(match?.id).toBe(1);
+    });
+
+    it('matches radius geometry instead of a bbox with the same envelope', () => {
+        const area = radiusSearchArea('Paris', { lat: 48.8566, lng: 2.3522 }, 25);
+        const shared = {
+            min_lat: area.min_lat,
+            min_lng: area.min_lng,
+            max_lat: area.max_lat,
+            max_lng: area.max_lng,
+        };
+        const radiusProfile = makeProfile({
+            id: 2,
+            geo_kind: 'radius',
+            ...shared,
+            center_lat: area.center_lat,
+            center_lng: area.center_lng,
+            radius_km: area.radius_km,
+        });
+
+        const match = matchSearchProfile(
+            { area, danceIds: [10, 11], reachFilter: 'international', reachIds: [20] },
+            [makeProfile({ id: 1, ...shared }), radiusProfile],
+        );
+
+        expect(match?.id).toBe(2);
     });
 });
 

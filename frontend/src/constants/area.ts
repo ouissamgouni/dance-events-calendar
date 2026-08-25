@@ -42,7 +42,7 @@ export const AREA_PRESETS: readonly AreaBbox[] = [
     },
     { label: 'Asia', min_lat: -11, min_lng: 60, max_lat: 60, max_lng: 150 },
     { label: 'North America', min_lat: 7, min_lng: -168, max_lat: 72, max_lng: -52 },
-    { label: 'South America', min_lat: -56, min_lng: -82, max_lat: 13, max_lng: -34 },
+    { label: 'Latin America', min_lat: -56, min_lng: -118, max_lat: 33, max_lng: -34 },
     { label: 'Africa', min_lat: -35, min_lng: -18, max_lat: 38, max_lng: 52 },
     { label: 'Oceania', min_lat: -50, min_lng: 110, max_lat: 0, max_lng: 180 },
 ];

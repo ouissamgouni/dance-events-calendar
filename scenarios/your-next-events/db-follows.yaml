@@ -1,0 +1,9 @@
+follows:
+  - { follower: viewer, followee: paul }
+  - { follower: paul, followee: viewer }
+  - { follower: viewer, followee: ana }
+  - { follower: ana, followee: viewer }
+  - { follower: viewer, followee: lea }
+  - { follower: lea, followee: viewer }
+  - { follower: viewer, followee: mia }
+  - { follower: mia, followee: viewer }

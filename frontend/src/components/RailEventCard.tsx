@@ -4,6 +4,7 @@ import TagBadges from './TagBadges';
 import SaveEventButton from './SaveEventButton';
 import GoingButton from './GoingButton';
 import AttendeeAvatarStack from './AttendeeAvatarStack';
+import EventDateRail from './EventDateRail';
 import { shortLocation } from '../utils/locationShort';
 import { useFeatureFlags } from '../context/FeatureFlagsContext';
 
@@ -38,6 +39,8 @@ interface RailEventCardProps {
     accent?: boolean;
     /** Overrides the default card width utility class. */
     widthClass?: string;
+    /** Shows an event-list-style date column on the left. */
+    dateRail?: boolean;
     /** Keeps tag badges on a single line, clipping overflow to a "+x". */
     tagSingleLine?: boolean;
     /** Group slugs whose tags sort first in the badge row. */
@@ -84,18 +87,20 @@ export default function RailEventCard({
     forceTagBadge = false,
     accent = false,
     widthClass,
+    dateRail = false,
     tagSingleLine = false,
     tagPriorityGroups,
     forceTagColored = false,
 }: RailEventCardProps) {
     const { tagsPerCard } = useFeatureFlags();
+    const start = new Date(event.start);
     const startLabel = formatRailDate(event.start);
     const label = `Open ${event.title}, ${contextLabel} on ${startLabel}`;
     const title = truncateText(event.title);
     const location = shortLocation(event.location);
     const compact = variant === 'compact';
     const showExtras = !compact || compactShowExtras;
-    const cardSize = widthClass ?? (compact ? 'w-[208px]' : 'w-[224px]');
+    const cardSize = widthClass ?? (dateRail ? 'w-[224px]' : compact ? 'w-[208px]' : 'w-[224px]');
     const surface = accent
         ? 'border-blue-200 bg-blue-50 hover:bg-blue-100'
         : 'border-card-line bg-surface hover:bg-canvas';
@@ -105,7 +110,7 @@ export default function RailEventCard({
 
     return (
         <div
-            className={`group relative flex ${cardSize} shrink-0 flex-col rounded-card border ${surface} px-2.5 py-2.5 text-left transition ${highlighted ? 'ring-1 ring-action' : ''}`}
+            className={`group relative flex ${cardSize} shrink-0 flex-col border ${surface} text-left transition ${dateRail ? 'rounded-r-card' : 'rounded-card px-2.5 py-2.5'} ${highlighted ? 'ring-1 ring-action' : ''}`}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
         >
@@ -125,56 +130,77 @@ export default function RailEventCard({
                 onClick={() => onClick(event)}
                 onFocus={handleMouseEnter}
                 onBlur={handleMouseLeave}
-                className="flex flex-1 flex-col text-left focus:outline-none focus:ring-2 focus:ring-action"
+                className={`flex flex-1 text-left focus:outline-none focus:ring-2 focus:ring-action ${dateRail ? 'flex-row' : 'flex-col'}`}
             >
-                <h3 className={`min-w-0 truncate text-sm font-semibold leading-snug text-ink group-hover:text-action ${compact ? '' : 'pr-16'}`} title={event.title}>
-                    {isNew && (
-                        <span
-                            // eslint-disable-next-line no-restricted-syntax -- small status dot (new event indicator) — allowed exception per frontend rules
-                            className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-action align-middle"
-                            aria-label="New"
-                            data-testid={newDotTestId}
-                        />
+                {dateRail && (
+                    <EventDateRail start={start} />
+                )}
+                <div className={`flex min-w-0 flex-1 flex-col ${dateRail ? 'px-2.5 py-2.5' : ''}`}>
+                    <h3 className={`min-w-0 truncate text-sm font-semibold leading-snug text-ink group-hover:text-action ${compact ? '' : 'pr-16'}`} title={event.title}>
+                        {isNew && (
+                            <span
+                                // eslint-disable-next-line no-restricted-syntax -- small status dot (new event indicator) — allowed exception per frontend rules
+                                className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-action align-middle"
+                                aria-label="New"
+                                data-testid={newDotTestId}
+                            />
+                        )}
+                        {title}
+                    </h3>
+                    {isTrending && (
+                        <div className="mt-1">
+                            <span
+                                className="inline-flex items-center bg-orange-50 px-1.5 py-px text-[11px] font-medium text-orange-400"
+                                data-testid="trending-badge"
+                                title="Trending"
+                            >
+                                Trending
+                            </span>
+                        </div>
                     )}
-                    {title}
-                </h3>
-                {isTrending && (
-                    <div className="mt-1">
-                        <span
-                            className="inline-flex items-center bg-orange-50 px-1.5 py-px text-[11px] font-medium text-orange-400"
-                            data-testid="trending-badge"
-                            title="Trending"
+                    {!dateRail && (
+                        <div className="mt-1 flex items-center gap-3">
+                            <span className="truncate text-xs font-medium text-ink-soft">{startLabel}</span>
+                            {extraBadge}
+                            <AttendeeAvatarStack
+                                eventId={event.event_id}
+                                size="sm"
+                                friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
+                            />
+                        </div>
+                    )}
+                    {location && (
+                        <p
+                            className="mt-1 truncate text-[11px] text-ink-soft"
+                            title={event.location ?? undefined}
+                            data-testid="rail-card-location"
                         >
-                            Trending
-                        </span>
-                    </div>
-                )}
-                <div className="mt-1 flex items-center gap-3">
-                    <span className="truncate text-xs font-medium text-ink-soft">{startLabel}</span>
-                    {extraBadge}
-                    <AttendeeAvatarStack
-                        eventId={event.event_id}
-                        size="sm"
-                        friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
-                    />
+                            {location}
+                        </p>
+                    )}
+                    {dateRail && (
+                        <div className="mt-1 flex min-w-0 items-center gap-3" data-testid="rail-card-attendees">
+                            {extraBadge}
+                            <AttendeeAvatarStack
+                                eventId={event.event_id}
+                                size="sm"
+                                friendsPreview={followingBadgeEnabled ? event.following_friends_preview : undefined}
+                            />
+                        </div>
+                    )}
+                    {showExtras && event.tags && event.tags.length > 0 && (
+                        <div className="mt-1.5">
+                            <TagBadges
+                                tags={event.tags}
+                                maxVisible={maxTags ?? tagsPerCard}
+                                forceBadge={forceTagBadge}
+                                forceColored={forceTagColored}
+                                singleLine={tagSingleLine}
+                                priorityGroups={tagPriorityGroups}
+                            />
+                        </div>
+                    )}
                 </div>
-                {location && (
-                    <p className="mt-1 truncate text-[11px] text-ink-soft" title={event.location ?? undefined}>
-                        {location}
-                    </p>
-                )}
-                {showExtras && event.tags && event.tags.length > 0 && (
-                    <div className="mt-1.5">
-                        <TagBadges
-                            tags={event.tags}
-                            maxVisible={maxTags ?? tagsPerCard}
-                            forceBadge={forceTagBadge}
-                            forceColored={forceTagColored}
-                            singleLine={tagSingleLine}
-                            priorityGroups={tagPriorityGroups}
-                        />
-                    </div>
-                )}
             </button>
         </div>
     );

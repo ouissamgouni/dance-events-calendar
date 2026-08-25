@@ -8,6 +8,7 @@ import InterestProfilesManager from './InterestProfilesManager';
 const activateProfile = vi.fn().mockResolvedValue(undefined);
 const deleteProfile = vi.fn().mockResolvedValue(undefined);
 const createProfile = vi.fn().mockResolvedValue(undefined);
+const updateProfile = vi.fn().mockResolvedValue(undefined);
 
 const profiles: InterestProfile[] = [
     {
@@ -58,6 +59,7 @@ vi.mock('../hooks/useInterestProfiles', () => ({
         error: null,
         setError: vi.fn(),
         createProfile,
+        updateProfile,
         deleteProfile,
         activateProfile,
     }),
@@ -98,6 +100,18 @@ describe('InterestProfilesManager', () => {
         await user.click(screen.getByRole('button', { name: 'Manage Near home' }));
         expect(screen.getByRole('button', { name: 'Set as default' })).toBeInTheDocument();
         expect(screen.queryByText('Edit route')).not.toBeInTheDocument();
+    });
+
+    it('opens a profile summary when the profile card is clicked', async () => {
+        const user = userEvent.setup();
+        renderManager();
+
+        await user.click(await screen.findByRole('button', { name: /summer europe.*salsa.*international/i }));
+
+        expect(screen.getByTestId('profile-draft-summary')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /dance styles.*salsa/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /area.*europe/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /reach.*international/i })).toBeInTheDocument();
     });
 
     it('confirms setting a non-default profile as default', async () => {

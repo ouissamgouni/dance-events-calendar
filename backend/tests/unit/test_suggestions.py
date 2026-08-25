@@ -689,6 +689,54 @@ class TestGeolocatePrivateIp:
 
 @pytest.mark.unit
 class TestPublicGeocodeEndpoint:
+    def test_suggestion_geocode_returns_structured_city_and_country_kinds(self):
+        with patch("geopy.geocoders.Nominatim") as MockNominatim:
+            mock_geocoder = MagicMock()
+            MockNominatim.return_value = mock_geocoder
+
+            paris = MagicMock()
+            paris.address = "Paris, Ile-de-France, France"
+            paris.latitude = 48.8566
+            paris.longitude = 2.3522
+            paris.raw = {
+                "name": "Paris",
+                "class": "boundary",
+                "type": "administrative",
+                "addresstype": "city",
+                "boundingbox": ["48.815", "48.902", "2.224", "2.470"],
+                "address": {
+                    "city": "Paris",
+                    "state": "Ile-de-France",
+                    "country": "France",
+                },
+            }
+            france = MagicMock()
+            france.address = "France"
+            france.latitude = 46.6034
+            france.longitude = 1.8883
+            france.raw = {
+                "name": "France",
+                "class": "boundary",
+                "type": "administrative",
+                "addresstype": "country",
+                "boundingbox": ["41.263", "51.269", "-5.453", "9.868"],
+                "address": {"country": "France"},
+            }
+            mock_geocoder.geocode.return_value = [paris, france]
+
+            response = TestClient(app).get("/api/suggestions/geocode?q=france")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data[0]["name"] == "Paris"
+            assert data[0]["context"] == "Ile-de-France, France"
+            assert data[0]["place_kind"] == "city"
+            assert data[0]["type_label"] == "City"
+            assert data[0]["bounding_box"]["min_lat"] == 48.815
+            assert data[1]["name"] == "France"
+            assert data[1]["context"] is None
+            assert data[1]["place_kind"] == "country"
+
     def test_suggestion_geocode_forwards_language_preference(self):
         """Public /api/suggestions/geocode should forward Accept-Language header to Nominatim."""
         with patch("geopy.geocoders.Nominatim") as MockNominatim:

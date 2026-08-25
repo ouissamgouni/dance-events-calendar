@@ -22,6 +22,8 @@ export interface FilterSheetSection {
     icon?: React.ReactNode;
     /** Short summary of the current value, shown on the row. */
     summary: React.ReactNode;
+    /** Optional compact visual shown beside the row summary. */
+    preview?: React.ReactNode;
     /** Count contributed to the "+N" secondary badge, if any. */
     badge?: number;
     /** Renders the sub-editor body for this section. Omit for ``customRow``. */
@@ -223,6 +225,7 @@ export default function FilterSheet({
                     >
                         {section.summary}
                     </span>
+                    {section.preview}
                     {chevron}
                 </button>
             </li>

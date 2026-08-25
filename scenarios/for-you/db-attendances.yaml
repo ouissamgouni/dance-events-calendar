@@ -35,6 +35,30 @@ attendances:
     email: frank@example.com
     share_audience: public
 
+  # Dedicated carousel coverage: two mutual friends on evt-fy-001 and
+  # four on the image-backed, long-title evt-fy-bulk-02. Together with
+  # evt-fy-004 (one) and evt-fy-bulk-15 (three), the row exercises every
+  # avatar-stack state including the 3 + N overflow badge.
+  - event_id: evt-fy-001
+    email: friend@example.com
+    share_audience: friends
+  - event_id: evt-fy-001
+    email: emma@example.com
+    share_audience: public
+
+  - event_id: evt-fy-bulk-02
+    email: friend@example.com
+    share_audience: friends
+  - event_id: evt-fy-bulk-02
+    email: emma@example.com
+    share_audience: public
+  - event_id: evt-fy-bulk-02
+    email: frank@example.com
+    share_audience: public
+  - event_id: evt-fy-bulk-02
+    email: gina@example.com
+    share_audience: public
+
   # stranger RSVPs publicly to evt-fy-005 (Salsa — DOES match the viewer's
   # preferred tags, so it appears under Recommended) — proves a non-friend's
   # attendance never leaks into the Friends lens.

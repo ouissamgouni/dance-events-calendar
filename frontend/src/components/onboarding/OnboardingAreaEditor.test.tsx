@@ -82,7 +82,7 @@ describe('OnboardingAreaEditor', () => {
 
         mapHarness.setCoordinateOffset(3);
         act(() => mapHarness.handlers.get('moveend')?.());
-        expect(input).toHaveValue('Custom');
+        expect(input).toHaveValue('Custom area');
 
         await user.clear(input);
         await user.type(input, 'Summer Europe');

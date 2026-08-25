@@ -3,7 +3,6 @@ import type {
     InterestProfile,
     InterestProfilePayload,
     InterestProfileUpdatePayload,
-    PreferredAreaPayload,
 } from '../api';
 import type { TagGroup } from '../types';
 import { DEFAULT_AREA_BBOX } from '../constants/area';
@@ -12,9 +11,12 @@ import {
     summarizeSelection,
     type CurrentSearchSelection,
 } from '../utils/searchProfiles';
-import ProfileEditor from './ProfileEditor';
-import type { TagsPickerValue } from './TagsPicker';
+import ProfileDraftEditor, { type ProfileDraftInitialValue } from './ProfileDraftEditor';
 import { ConfirmDialog } from './AppDialog';
+import {
+    bboxSearchArea,
+    searchAreaFromProfile,
+} from '../utils/searchArea';
 
 type Step = 'picker' | 'save' | 'edit' | 'create';
 
@@ -34,7 +36,6 @@ export interface SearchProfileFlowProps {
     currentAreaLabel: string;
     danceGroup: TagGroup | null;
     reachGroup: TagGroup | null;
-    localTagId: number | null;
 
     /** Apply a saved profile's Area + Dance + Reach to the live search. */
     onApplyProfile: (profile: InterestProfile) => void;
@@ -43,8 +44,6 @@ export interface SearchProfileFlowProps {
     createProfile: (payload: InterestProfilePayload) => Promise<InterestProfile>;
     updateProfile: (id: number, payload: InterestProfileUpdatePayload) => Promise<InterestProfile>;
     deleteProfile: (id: number) => Promise<void>;
-    onCreateRoute?: () => void;
-    onEditRoute?: (profile: InterestProfile) => void;
 }
 
 const backIcon = (
@@ -108,14 +107,6 @@ function FlowShell({
     );
 }
 
-interface EditDraft {
-    label: string;
-    area: PreferredAreaPayload;
-    dance: TagsPickerValue;
-    reach: TagsPickerValue;
-    matchesEnabled: boolean;
-}
-
 export default function SearchProfileFlow({
     open,
     initialStep,
@@ -126,18 +117,15 @@ export default function SearchProfileFlow({
     currentAreaLabel,
     danceGroup,
     reachGroup,
-    localTagId,
     onApplyProfile,
     onUpdateProfile,
     createProfile,
     updateProfile,
     deleteProfile,
-    onCreateRoute,
-    onEditRoute,
 }: SearchProfileFlowProps) {
     const [step, setStep] = useState<Step>(initialStep);
     const [editingId, setEditingId] = useState<number | null>(null);
-    const [draft, setDraft] = useState<EditDraft | null>(null);
+    const [draft, setDraft] = useState<ProfileDraftInitialValue | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [confirmDelete, setConfirmDelete] = useState(false);
@@ -166,82 +154,44 @@ export default function SearchProfileFlow({
 
     if (!open) return null;
 
-    const draftFromCurrent = (label: string): EditDraft => ({
-        label,
-        area: { ...(current.area ?? DEFAULT_AREA_BBOX), label: currentAreaLabel },
-        dance: { selectedTagIds: [...current.danceIds], freeTexts: {} },
-        reach: { selectedTagIds: [...current.reachIds], freeTexts: {} },
+    const draftFromCurrent = (): ProfileDraftInitialValue => ({
+        area: current.area
+            ? { ...('kind' in current.area ? current.area : bboxSearchArea({ ...current.area, label: currentAreaLabel })), label: currentAreaLabel }
+            : bboxSearchArea({ ...DEFAULT_AREA_BBOX, label: currentAreaLabel }, 'preset'),
+        danceIds: [...current.danceIds],
+        reachFilter: current.reachFilter,
         matchesEnabled: false,
     });
 
     const openCreate = (fromCurrent: boolean) => {
-        if (fromCurrent && onCreateRoute) {
-            onCreateRoute();
-            return;
-        }
         setEditingId(null);
         setError(null);
-        setDraft(fromCurrent ? draftFromCurrent('New profile') : {
-            label: 'New profile',
-            area: { ...DEFAULT_AREA_BBOX },
-            dance: { selectedTagIds: [], freeTexts: {} },
-            reach: { selectedTagIds: [], freeTexts: {} },
+        setDraft(fromCurrent ? draftFromCurrent() : {
+            area: bboxSearchArea(DEFAULT_AREA_BBOX, 'preset'),
+            danceIds: [],
+            reachFilter: 'international',
             matchesEnabled: false,
         });
         setStep('create');
     };
 
     const openEdit = (profile: InterestProfile) => {
-        if (onEditRoute) {
-            onEditRoute(profile);
-            return;
-        }
         setEditingId(profile.id);
         setError(null);
         setDraft({
             label: profile.label,
-            area: {
-                min_lat: profile.min_lat,
-                min_lng: profile.min_lng,
-                max_lat: profile.max_lat,
-                max_lng: profile.max_lng,
-                label: profile.area_label,
-            },
-            dance: { selectedTagIds: [...profile.dance_tag_ids], freeTexts: {} },
-            reach: { selectedTagIds: [...profile.reach_tag_ids], freeTexts: {} },
+            area: searchAreaFromProfile(profile),
+            danceIds: [...profile.dance_tag_ids],
+            reachFilter: profile.reach_filter,
             matchesEnabled: profile.matches_enabled,
+            nameEdited: true,
         });
         setStep('edit');
     };
 
-    const handleSaveDraft = async () => {
-        if (!draft) return;
-        const name = draft.label.trim();
-        const areaName = draft.area.label.trim();
-        if (!name || !areaName) {
-            setError('Profile name and area name are required.');
-            return;
-        }
-        setBusy(true);
+    const handleSaveDraft = async (base: InterestProfilePayload) => {
         setError(null);
         try {
-            const regionalId = reachGroup?.tags.find((tag) => tag.slug === 'regional')?.id;
-            const reachFilter = regionalId != null && draft.reach.selectedTagIds.includes(regionalId)
-                ? 'regional_plus' as const
-                : draft.reach.selectedTagIds.length > 0
-                    ? 'international' as const
-                    : 'any' as const;
-            const base = {
-                label: name,
-                area_label: areaName,
-                min_lat: draft.area.min_lat,
-                min_lng: draft.area.min_lng,
-                max_lat: draft.area.max_lat,
-                max_lng: draft.area.max_lng,
-                dance_tag_ids: draft.dance.selectedTagIds,
-                reach_filter: reachFilter,
-                matches_enabled: draft.matchesEnabled,
-            };
             if (editingId != null) {
                 const updated = await updateProfile(editingId, base);
                 if (selectedProfileId === editingId) onApplyProfile(updated);
@@ -252,8 +202,6 @@ export default function SearchProfileFlow({
             onClose();
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Failed to save profile');
-        } finally {
-            setBusy(false);
         }
     };
 
@@ -428,86 +376,16 @@ export default function SearchProfileFlow({
     return (
         <FlowShell title={isEdit ? 'Edit profile' : 'New profile'} onBack={backTo}>
             {draft && (
-                <div className="flex flex-col gap-3" data-testid="search-profile-editor">
-                    <div>
-                        <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
-                            Profile name
-                        </label>
-                        <input
-                            type="text"
-                            value={draft.label}
-                            onChange={(e) => setDraft({ ...draft, label: e.target.value })}
-                            maxLength={120}
-                            aria-label="Profile name"
-                            className="w-full border border-line px-2 py-2 text-sm focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
-                        />
-                    </div>
-                    <ProfileEditor
+                <div data-testid="search-profile-editor">
+                    <ProfileDraftEditor
+                        key={`${step}-${editingId ?? 'new'}`}
+                        mode={isEdit ? 'edit' : 'create'}
                         danceGroup={danceGroup}
-                        reachGroup={reachGroup}
-                        localTagId={localTagId}
-                        danceValue={draft.dance}
-                        reachValue={draft.reach}
-                        onDanceChange={(v) => setDraft({ ...draft, dance: v })}
-                        onReachChange={(v) => setDraft({ ...draft, reach: v })}
-                        area={draft.area}
-                        onAreaChange={(next) =>
-                            setDraft({
-                                ...draft,
-                                area: {
-                                    min_lat: next.min_lat,
-                                    min_lng: next.min_lng,
-                                    max_lat: next.max_lat,
-                                    max_lng: next.max_lng,
-                                    label: next.label,
-                                },
-                            })
-                        }
-                        areaNameControl={(
-                            <div>
-                                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
-                                    Area name
-                                </label>
-                                <input
-                                    type="text"
-                                    value={draft.area.label}
-                                    onChange={(e) => setDraft({
-                                        ...draft,
-                                        area: { ...draft.area, label: e.target.value },
-                                    })}
-                                    maxLength={120}
-                                    aria-label="Area name"
-                                    className="w-full border border-line px-2 py-2 text-sm focus:border-action focus:outline-none focus:ring-1 focus:ring-action"
-                                />
-                            </div>
-                        )}
-                        matchesEnabled={draft.matchesEnabled}
-                        onMatchesEnabledChange={(v) => setDraft({ ...draft, matchesEnabled: v })}
-                        matchesHint="Get an email when a new event matches this profile. You can change this anytime."
+                        initialValue={draft}
+                        onSave={handleSaveDraft}
+                        onDelete={isEdit ? () => setConfirmDelete(true) : undefined}
                     />
-                    {error && <p className="text-xs text-danger">{error}</p>}
-                    <div className="flex items-center gap-2 pb-2">
-                        <button
-                            type="button"
-                            onClick={handleSaveDraft}
-                            disabled={busy}
-                            className="inline-flex flex-1 items-center justify-center bg-action px-3 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
-                            data-testid="search-profile-save-draft"
-                        >
-                            {busy ? 'Saving…' : 'Save'}
-                        </button>
-                        {isEdit && (
-                            <button
-                                type="button"
-                                onClick={() => setConfirmDelete(true)}
-                                disabled={busy}
-                                className="inline-flex items-center justify-center border border-line px-3 py-2.5 text-sm font-medium text-danger hover:bg-canvas disabled:opacity-50"
-                                data-testid="search-profile-delete"
-                            >
-                                Delete profile
-                            </button>
-                        )}
-                    </div>
+                    {error && <p className="mt-2 text-xs text-danger">{error}</p>}
                 </div>
             )}
             <ConfirmDialog

@@ -315,14 +315,22 @@ def suggestion_geocode(
     """Public geocode search for the suggestion form address autocomplete."""
     from geopy.exc import GeocoderServiceError, GeocoderTimedOut
     from geopy.geocoders import Nominatim
-    from backend.services.geocoding import _language_preference_from_header
+    from backend.services.geocoding import (
+        _language_preference_from_header,
+        nominatim_suggestion,
+    )
 
     geocoder = Nominatim(user_agent="movida", timeout=5)
     accept_language = request.headers.get("accept-language")
     language_pref = _language_preference_from_header(accept_language)
     try:
         results = geocoder.geocode(
-            q, exactly_one=False, limit=5, language=language_pref
+            q,
+            exactly_one=False,
+            limit=5,
+            language=language_pref,
+            addressdetails=True,
+            namedetails=True,
         )
     except (GeocoderTimedOut, GeocoderServiceError) as e:
         logger.warning("Geocode search failed: %s", e)
@@ -334,14 +342,7 @@ def suggestion_geocode(
     if not results:
         return []
 
-    return [
-        GeocodeSuggestion(
-            display_name=r.address,
-            latitude=r.latitude,
-            longitude=r.longitude,
-        )
-        for r in results
-    ]
+    return [GeocodeSuggestion(**nominatim_suggestion(result)) for result in results]
 
 
 # --- Admin endpoints ---

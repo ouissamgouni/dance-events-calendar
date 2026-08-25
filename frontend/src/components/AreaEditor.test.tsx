@@ -48,16 +48,19 @@ describe('AreaEditor profile areas', () => {
             />,
         );
 
+        await userEvent.click(screen.getByRole('button', { name: /your areas/i }));
         const firstProfileChip = screen.getByTestId('area-editor-profile-area-1');
         const secondProfileChip = screen.getByTestId('area-editor-profile-area-2');
 
-        expect(firstProfileChip).toHaveTextContent("BarcelonaFrom your 'Local salsa' profile");
-        expect(secondProfileChip).toHaveTextContent("CataloniaFrom your 'Festival trips' profile");
+        expect(firstProfileChip).toHaveTextContent('BarcelonaFrom profile Local salsa');
+        expect(secondProfileChip).toHaveTextContent('CataloniaFrom profile Festival trips');
         expect(screen.queryByTestId('area-editor-my-area')).not.toBeInTheDocument();
         expect(firstProfileChip).toHaveAttribute('aria-pressed', 'true');
         expect(secondProfileChip).toHaveAttribute('aria-pressed', 'false');
 
         await userEvent.click(secondProfileChip);
+        expect(firstProfileChip).toHaveAttribute('aria-pressed', 'false');
+        expect(secondProfileChip).toHaveAttribute('aria-pressed', 'true');
         expect(onApply).toHaveBeenCalledWith({
             label: 'Catalonia',
             min_lat: 40,
@@ -67,7 +70,7 @@ describe('AreaEditor profile areas', () => {
         });
     });
 
-    it('keeps the generic my-area chip when it is distinct from all profile areas', () => {
+    it('keeps the generic my-area chip when it is distinct from all profile areas', async () => {
         const onApply = vi.fn();
         const profiles = [profile(1, 'Local salsa', 'Barcelona')];
 
@@ -80,7 +83,8 @@ describe('AreaEditor profile areas', () => {
             />,
         );
 
+        await userEvent.click(screen.getByRole('button', { name: /your areas/i }));
         expect(screen.getByTestId('area-editor-profile-area-1')).toBeInTheDocument();
-        expect(screen.getByTestId('area-editor-my-area')).toHaveTextContent('My area');
+        expect(screen.getByTestId('area-editor-my-area')).toHaveTextContent('Paris');
     });
 });

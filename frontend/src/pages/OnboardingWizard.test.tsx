@@ -17,6 +17,7 @@ import type { TagGroup } from '../types'
 vi.mock('react-leaflet', () => ({
     MapContainer: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
     TileLayer: () => null,
+    Rectangle: () => null,
     Circle: () => null,
     CircleMarker: () => null,
     useMap: () => ({ fitBounds: vi.fn() }),
@@ -139,9 +140,9 @@ describe('OnboardingWizard', () => {
         expect(screen.queryByLabelText('City')).not.toBeInTheDocument()
         await user.click(screen.getByRole('button', { name: /Yes, find events near home/i }))
         expect(await screen.findByLabelText('City')).toBeInTheDocument()
-        expect(screen.queryByText('Radius')).not.toBeInTheDocument()
+        expect(screen.queryByText('Distance')).not.toBeInTheDocument()
         await user.click(await screen.findByRole('button', { name: 'Paris' }))
-        expect(await screen.findByText('Radius')).toBeInTheDocument()
+        expect(await screen.findByText('Distance')).toBeInTheDocument()
         expect(screen.getByText('25 km')).toBeInTheDocument()
     })
 
