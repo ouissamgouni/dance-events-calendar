@@ -116,6 +116,7 @@ class TestSettingsEndpoint:
         assert resp.status_code == 200
         assert resp.json()["trending_banner_enabled"] is True
         assert resp.json()["default_explorer_period"] == "next_3_months"
+        assert resp.json()["going_button_icon_variant"] == "hand"
 
     def test_admin_can_update_trending_banner_flag(self, sqlite_client):
         client, engine = sqlite_client
@@ -157,6 +158,28 @@ class TestSettingsEndpoint:
         resp = client.put(
             "/api/settings", json={"default_explorer_period": "next_12_months"}
         )
+        assert resp.status_code == 422
+
+    def test_admin_can_update_going_button_icon_variant(self, sqlite_client):
+        client, engine = sqlite_client
+
+        resp = client.put("/api/settings", json={"going_button_icon_variant": "person"})
+        assert resp.status_code == 200
+        assert resp.json()["going_button_icon_variant"] == "person"
+
+        with Session(engine) as session:
+            row = session.get(SiteSetting, "going_button_icon_variant")
+            assert row is not None
+            assert row.value == "person"
+
+        resp = client.get("/api/settings")
+        assert resp.status_code == 200
+        assert resp.json()["going_button_icon_variant"] == "person"
+
+    def test_admin_cannot_update_invalid_going_button_icon_variant(self, sqlite_client):
+        client, _engine = sqlite_client
+
+        resp = client.put("/api/settings", json={"going_button_icon_variant": "wave"})
         assert resp.status_code == 422
 
     def test_settings_default_notification_flags(self, sqlite_client):

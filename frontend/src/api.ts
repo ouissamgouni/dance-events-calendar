@@ -224,6 +224,7 @@ export interface SiteSettings {
     event_color_bar_color: string;
     tag_sort_mode: 'group' | 'event_count';
     default_explorer_period?: DateRangePresetKey;
+    going_button_icon_variant?: 'hand' | 'person';
     promo_codes_enabled?: boolean;
     organizer_claims_enabled?: boolean;
     duplicate_auto_detect_enabled?: boolean;

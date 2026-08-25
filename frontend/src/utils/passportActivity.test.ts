@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { activityLevel, buildYearGrid, takeLastYears } from './passportActivity'
+import { activityLevel, buildYearGrid, rollingTwelveMonths, takeLastYears } from './passportActivity'
 
 describe('activityLevel', () => {
     it('maps event counts to five fixed buckets', () => {
@@ -66,5 +66,40 @@ describe('takeLastYears', () => {
     it('returns all rows when n exceeds the row count', () => {
         const rows = buildYearGrid([{ month: '2026-01', count: 1 }])
         expect(takeLastYears(rows, 2)).toHaveLength(1)
+    })
+})
+
+describe('rollingTwelveMonths', () => {
+    it('returns the current month and previous eleven with missing months filled', () => {
+        const months = rollingTwelveMonths(
+            [
+                { month: '2025-09', count: 2 },
+                { month: '2026-08', count: 3 },
+            ],
+            new Date(2026, 7, 25),
+        )
+
+        expect(months).toHaveLength(12)
+        expect(months[0]).toEqual({ month: '2025-09', initial: 'S', count: 2 })
+        expect(months[1]).toEqual({ month: '2025-10', initial: 'O', count: 0 })
+        expect(months[11]).toEqual({ month: '2026-08', initial: 'A', count: 3 })
+    })
+
+    it('crosses calendar years and ignores activity outside the window', () => {
+        const months = rollingTwelveMonths(
+            [
+                { month: '2024-12', count: 9 },
+                { month: '2025-02', count: 1 },
+                { month: '2026-01', count: 4 },
+            ],
+            new Date(2026, 0, 10),
+        )
+
+        expect(months.map((month) => month.month)).toEqual([
+            '2025-02', '2025-03', '2025-04', '2025-05', '2025-06', '2025-07',
+            '2025-08', '2025-09', '2025-10', '2025-11', '2025-12', '2026-01',
+        ])
+        expect(months[0].count).toBe(1)
+        expect(months[11].count).toBe(4)
     })
 })

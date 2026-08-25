@@ -17,6 +17,7 @@ import RailEventCard from '../components/RailEventCard';
 import FriendsAreGoingCard from '../components/FriendsAreGoingCard';
 import ShareExperienceCard from '../components/ShareExperienceCard';
 import PeopleYouMayKnowCard from '../components/PeopleYouMayKnowCard';
+import SectionHeading, { type SectionHeadingAction } from '../components/SectionHeading';
 import ScrollDotsIndicator from '../components/ScrollDots';
 import { useScrollDots } from '../hooks/useScrollDots';
 
@@ -54,7 +55,7 @@ interface LensTrailProps {
     emptyContent?: ReactNode;
     contextLabel: string;
     testId: string;
-    headerRight?: ReactNode;
+    headerAction?: SectionHeadingAction;
     cardVariant?: 'default' | 'friends-going';
 }
 
@@ -63,7 +64,7 @@ export function LensTrail(props: LensTrailProps) {
         title, events, hasMore, loading, onLoadMore, onEventClick,
         hoveredEventId, onEventHover, trendingEnabled, popularityThreshold,
         trendingTopN, trendingTopPercent, newEventIds, unseenStateEnabled,
-        followingBadgeEnabled, emptyContent, contextLabel, testId, headerRight,
+        followingBadgeEnabled, emptyContent, contextLabel, testId, headerAction,
         cardVariant = 'default',
     } = props;
     const friendsGoing = cardVariant === 'friends-going';
@@ -85,10 +86,7 @@ export function LensTrail(props: LensTrailProps) {
 
     return (
         <section data-testid={testId}>
-            <div className="flex w-full items-center justify-between py-1 text-base font-semibold text-ink">
-                <span>{title}</span>
-                {headerRight}
-            </div>
+            <SectionHeading title={title} action={headerAction} />
             {events.length === 0 ? (
                 <div className="px-2.5 py-3 text-xs text-ink-soft">
                     {emptyContent ?? 'Nothing here yet.'}
@@ -382,14 +380,10 @@ export default function ForYouPage() {
                             testId="for-you-following-friends-going"
                             contextLabel="friends going event"
                             cardVariant="friends-going"
-                            headerRight={(
-                                <Link
-                                    to="/tribe/calendars?interest_source=friends&interest_kind=going"
-                                    className="text-sm font-semibold text-action hover:text-action-strong"
-                                >
-                                    See all
-                                </Link>
-                            )}
+                            headerAction={{
+                                label: 'See all',
+                                to: '/tribe/calendars?interest_source=friends&interest_kind=going',
+                            }}
                             emptyContent={(
                                 (user?.following_count ?? 0) === 0 ? (
                                     <>
@@ -420,9 +414,7 @@ export default function ForYouPage() {
                         />
                         {pendingReviews.length > 0 && (
                             <section data-testid="for-you-share-your-experience">
-                                <div className="flex w-full items-center justify-between py-1 text-base font-semibold text-ink">
-                                    <span>Share your experience</span>
-                                </div>
+                                <SectionHeading title="Share your experience" />
                                 <div ref={shareScrollerRef} className="flex gap-2 overflow-x-auto scrollbar-hide px-2 py-2" aria-label="Share your experience">
                                     {pendingReviews.map((review) => (
                                         <ShareExperienceCard

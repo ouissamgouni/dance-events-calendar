@@ -82,7 +82,7 @@ function FlowShell({
 }) {
     const panel = (
         <div
-            className="w-full max-w-md max-h-[min(85dvh,calc(100dvh-4rem))] bg-surface border border-line shadow-xl flex flex-col rounded-card overflow-hidden"
+            className="w-full max-w-sm max-h-[min(85dvh,calc(100dvh-4rem))] bg-surface border border-line shadow-xl flex flex-col rounded-card overflow-hidden"
             data-testid="search-profile-flow"
         >
             <div className="flex items-center justify-between gap-2 border-b border-line px-2 py-2">
@@ -102,7 +102,7 @@ function FlowShell({
 
     return (
         <div className="fixed inset-0 z-[8600] flex items-center justify-center bg-slate-900/50 p-4" role="dialog" aria-modal="true" aria-label={title}>
-            <div className="w-full max-w-md">{panel}</div>
+            <div className="w-full max-w-sm">{panel}</div>
         </div>
     );
 }
@@ -141,13 +141,8 @@ export default function SearchProfileFlow({
             setEditingId(null);
             setDraft(null);
             setError(null);
-            // When opening the save step, preselect the active profile (default).
-            if (initialStep === 'save') {
-                const activeProfile = (profiles ?? []).find((p) => p.is_active);
-                setTargetProfileId(activeProfile?.id ?? null);
-            } else {
-                setTargetProfileId(null);
-            }
+            // No profile is selected by default.
+            setTargetProfileId(null);
         });
         return () => { cancelled = true; };
     }, [open, initialStep, profiles]);
@@ -302,65 +297,63 @@ export default function SearchProfileFlow({
         const profileList = profiles ?? [];
         return (
             <FlowShell title="Save search profile" onBack={onClose}>
-                <div className="flex flex-col gap-3" data-testid="search-profile-save">
+                <div className="flex flex-col gap-6" data-testid="search-profile-save">
                     {profileList.length > 0 && (
-                        <>
-                            <div>
-                                <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-ink-soft">
-                                    Profile to update
-                                </label>
-                                <div className="flex flex-col gap-1 rounded-card border border-line bg-surface p-2">
-                                    {profileList.map((profile) => (
-                                        <button
-                                            key={profile.id}
-                                            type="button"
-                                            onClick={() => setTargetProfileId(profile.id)}
-                                            aria-pressed={targetProfileId === profile.id}
-                                            className="flex items-center gap-3 px-2 py-2.5 text-left text-ink hover:bg-canvas transition-colors"
-                                            data-testid={`search-profile-target-${profile.id}`}
-                                        >
-                                            <span className="h-4 w-4 shrink-0 rounded border-2 border-current flex items-center justify-center">
-                                                {targetProfileId === profile.id && (
-                                                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                                                )}
-                                            </span>
-                                            <div className="min-w-0 flex-1">
-                                                <p className="truncate text-xs font-medium">{profile.label}</p>
-                                                {profile.is_active && (
-                                                    <p className="text-xs opacity-75">Default</p>
-                                                )}
-                                            </div>
-                                        </button>
-                                    ))}
-                                </div>
+                        <div>
+                            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-soft">
+                                Update profile
+                            </h3>
+                            <div className="flex flex-col gap-2">
+                                {profileList.map((profile) => (
+                                    <button
+                                        key={profile.id}
+                                        type="button"
+                                        onClick={() => setTargetProfileId(profile.id)}
+                                        aria-pressed={targetProfileId === profile.id}
+                                        className="flex items-start gap-3 rounded-lg border border-line bg-surface px-3 py-3 text-left transition-colors hover:bg-canvas"
+                                        data-testid={`search-profile-target-${profile.id}`}
+                                    >
+                                        <Radio checked={targetProfileId === profile.id} />
+                                        <div className="min-w-0 flex-1">
+                                            <p className="truncate text-sm font-semibold text-ink">{profile.label}</p>
+                                            <p className="mt-1 truncate text-xs text-ink-soft">
+                                                {summarizeSearchProfile(profile, danceGroup, reachGroup)}
+                                            </p>
+                                        </div>
+                                    </button>
+                                ))}
                             </div>
                             <button
                                 type="button"
                                 onClick={handleUpdateProfile}
                                 disabled={busy || targetProfileId === null}
-                                className="rounded-card border border-line bg-surface px-3 py-2.5 text-sm font-medium text-ink hover:bg-canvas disabled:opacity-50"
+                                className={`mt-3 w-full rounded-lg px-3 py-2.5 text-center text-sm font-medium transition-colors ${targetProfileId === null
+                                    ? 'bg-surface text-ink-soft hover:bg-canvas'
+                                    : 'bg-action text-white hover:opacity-90'
+                                    } disabled:cursor-not-allowed disabled:opacity-50`}
                                 data-testid="search-profile-update"
                             >
                                 {busy ? 'Updating…' : 'Update selected profile'}
                             </button>
-                        </>
+                        </div>
                     )}
-                    <button
-                        type="button"
-                        onClick={() => openCreate(true)}
-                        disabled={busy}
-                        className="rounded-card border border-line bg-surface px-3 py-2.5 text-left hover:bg-canvas disabled:opacity-50"
-                        data-testid="search-profile-save-new"
-                    >
-                        <p className="text-sm font-medium text-ink">Save as new profile</p>
-                        <p className="mt-1 text-xs text-ink-soft">
-                            Create a new search profile with the current settings.
-                        </p>
-                    </button>
+
+                    <div>
+                        <button
+                            type="button"
+                            onClick={() => openCreate(true)}
+                            disabled={busy}
+                            className="w-full rounded-lg bg-action px-4 py-3 text-center text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                            data-testid="search-profile-save-new"
+                        >
+                            Create new profile
+                        </button>
+                    </div>
+
                     <button
                         type="button"
                         onClick={onClose}
-                        className="mt-1 inline-flex w-full items-center justify-center border border-line bg-surface px-3 py-2.5 text-sm font-medium text-ink hover:bg-canvas"
+                        className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-center text-sm font-medium text-ink hover:bg-canvas"
                     >
                         Cancel
                     </button>

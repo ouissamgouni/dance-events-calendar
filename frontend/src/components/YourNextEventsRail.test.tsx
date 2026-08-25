@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -19,10 +19,12 @@ const event: CalendarEvent = {
     all_day: false,
     color: null,
     view_count: 0,
-    friends_going_count: 4,
+    friends_going_count: 5,
     friends_going_preview: [
         { user_id: 'friend-1', display_name: 'Paul Martin', avatar_url: null, handle: 'paul' },
         { user_id: 'friend-2', display_name: 'Ana Diaz', avatar_url: '/ana.jpg', handle: 'ana' },
+        { user_id: 'friend-3', display_name: 'Mia Chen', avatar_url: '/mia.jpg', handle: 'mia' },
+        { user_id: 'friend-4', display_name: 'Luis Costa', avatar_url: '/luis.jpg', handle: 'luis' },
     ],
     price_min: null,
     price_max: null,
@@ -51,11 +53,32 @@ describe('YourNextEventsRail', () => {
 
         expect(screen.getByText(event.title)).toBeInTheDocument();
         expect(screen.queryByText(second.title)).not.toBeInTheDocument();
-        expect(screen.getByTestId('your-next-event-image')).toHaveAttribute('src', '/event.jpg');
-        expect(screen.getByText('Paul +3 friends going')).toBeInTheDocument();
+        expect(screen.queryByTestId('your-next-event-image')).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Paul')).toHaveTextContent('P');
+        expect(screen.getByRole('img', { name: 'Ana' })).toHaveAttribute('src', '/ana.jpg');
+        expect(screen.getByRole('img', { name: 'Mia' })).toHaveAttribute('src', '/mia.jpg');
+        expect(screen.queryByRole('img', { name: 'Luis' })).not.toBeInTheDocument();
+        expect(screen.getByText('+2 friends going')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Next up' })).toHaveClass('text-lg', 'font-bold', 'text-ink');
+        expect(screen.getByRole('link', { name: '2 upcoming' })).toHaveClass('text-sm', 'font-semibold', 'text-action');
+
+        const countdown = screen.getByTestId('next-up-countdown');
+        const avatarStack = screen.getByTestId('next-up-avatar-stack');
+        expect(screen.getByLabelText('Paul')).toHaveClass('h-5', 'w-5');
+        expect(countdown.compareDocumentPosition(avatarStack) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
         await user.click(screen.getByRole('button', { name: /Open Batignolles Bachata/ }));
         expect(onEventClick).toHaveBeenCalledWith(event);
+    });
+
+    it('links directly to the event when no click override is provided', () => {
+        render(
+            <MemoryRouter>
+                <YourNextEventsRail events={[event]} />
+            </MemoryRouter>,
+        );
+
+        expect(screen.getByTestId('your-next-event-card')).toHaveAttribute('href', '/event/evt-next-1');
     });
 
     it.each([
@@ -70,11 +93,10 @@ describe('YourNextEventsRail', () => {
         expect(screen.getByRole('link', { name: copy })).toHaveAttribute('href', '/mine/calendar?filter=going');
     });
 
-    it('removes a failed image without rendering a placeholder', () => {
+    it('uses the shared image-free Next Up card style', () => {
         renderRail([event]);
-        fireEvent.error(screen.getByTestId('your-next-event-image'));
         expect(screen.queryByTestId('your-next-event-image')).not.toBeInTheDocument();
-        expect(screen.getByTestId('your-next-event-card')).toHaveClass('bg-brand');
+        expect(screen.getByTestId('your-next-event-card')).toHaveClass('bg-brand/10');
     });
 
     it('renders the compact empty state after loading', () => {

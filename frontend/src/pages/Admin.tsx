@@ -291,6 +291,7 @@ export default function Admin() {
     const [eventColorBarColor, setEventColorBarColor] = useState('#64748b');
     const [tagSortMode, setTagSortMode] = useState<'group' | 'event_count'>('group');
     const [defaultExplorerPeriod, setDefaultExplorerPeriod] = useState<DateRangePresetKey>(DEFAULT_EXPLORER_PERIOD);
+    const [goingButtonIconVariant, setGoingButtonIconVariant] = useState<'hand' | 'person'>('hand');
     const [editingCalId, setEditingCalId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
     const [showSyncProgress, setShowSyncProgress] = useState(false);
@@ -447,6 +448,7 @@ export default function Admin() {
             setEventColorBarColor(s.event_color_bar_color || '#64748b');
             setTagSortMode(s.tag_sort_mode === 'event_count' ? 'event_count' : 'group');
             setDefaultExplorerPeriod(s.default_explorer_period ?? DEFAULT_EXPLORER_PERIOD);
+            setGoingButtonIconVariant(s.going_button_icon_variant === 'person' ? 'person' : 'hand');
         }).catch(() => { });
         fetchSuggestions().then(setSuggestions).catch(() => { });
         fetchMostSavedEvents().then(setMostSaved).catch(() => { });
@@ -873,6 +875,18 @@ export default function Admin() {
         } catch {
             setDefaultExplorerPeriod(prev);
             setMessage('Failed to update Explorer default period.');
+        }
+    };
+
+    const handleGoingButtonIconVariantChange = async (variant: 'hand' | 'person') => {
+        const prev = goingButtonIconVariant;
+        setGoingButtonIconVariant(variant);
+        try {
+            await updateSettings({ going_button_icon_variant: variant });
+            setMessage(`Going button icon: ${variant}.`);
+        } catch {
+            setGoingButtonIconVariant(prev);
+            setMessage('Failed to update Going button icon.');
         }
     };
 
@@ -1826,6 +1840,20 @@ export default function Admin() {
                                         {DATE_RANGE_PRESET_CHOICES.map((choice) => (
                                             <option key={choice.key} value={choice.key}>{choice.label}</option>
                                         ))}
+                                    </select>
+                                </div>
+                                <div className="flex items-center justify-between pt-2 border-t border-card-line">
+                                    <div>
+                                        <span className="text-[11px] font-medium text-ink">Going button icon</span>
+                                        <p className="text-[10px] text-muted">Used on event cards, modals, and pages</p>
+                                    </div>
+                                    <select
+                                        value={goingButtonIconVariant}
+                                        onChange={(e) => handleGoingButtonIconVariantChange(e.target.value as 'hand' | 'person')}
+                                        className="text-[11px] border border-line px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-action"
+                                    >
+                                        <option value="hand">Hand</option>
+                                        <option value="person">Person</option>
                                     </select>
                                 </div>
                                 <div className="flex items-center justify-between pt-2 border-t border-card-line">

@@ -17,7 +17,7 @@ Reference: [frontend/src/pages/MyCalendar.tsx](frontend/src/pages/MyCalendar.tsx
 
 ## Design tokens (Light theme)
 Semantic Tailwind v4 tokens live in [frontend/src/index.css](frontend/src/index.css) (`@theme`). Prefer these over raw palette steps:
-- Brand (Movida): `brand` (`#A22E43`) — logo wordmark, profile/passport hero headers.
+- Brand (Movida): `brand` (`#A22E43`) — logo wordmark and accents; `brand-strong` (`#7F1D35`) — high-emphasis profile/passport hero surfaces.
 - Action / selected / link: `action` (`#2563EB`) — primary CTAs, active nav, links.
 - Text: `text-ink` (`#172033` main), `text-ink-soft` (`#667085` secondary), `text-muted` (`#98A2B3`).
 - Surfaces: `bg-canvas` (`#F7F9FC` app background), `bg-surface` (`#FFFFFF` cards).

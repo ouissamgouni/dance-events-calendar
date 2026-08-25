@@ -4,6 +4,15 @@ import { http, HttpResponse } from 'msw'
 import GoingButton from './GoingButton'
 import { renderWithProviders } from '../test/render'
 import { server } from '../test/server'
+import { FeatureFlagsProvider } from '../context/FeatureFlagsContext'
+
+function renderGoingButton(eventId: string) {
+    return renderWithProviders(
+        <FeatureFlagsProvider>
+            <GoingButton eventId={eventId} />
+        </FeatureFlagsProvider>,
+    )
+}
 
 // GoingButton drives the AttendingEventsContext optimistic RSVP flow. The
 // trigger's accessible name toggles between "I'm going" (not going) and
@@ -11,14 +20,39 @@ import { server } from '../test/server'
 
 describe('GoingButton (anonymous)', () => {
     it('optimistically marks the user as going on a successful write', async () => {
-        const { user } = renderWithProviders(<GoingButton eventId="evt-1" />)
+        const { user } = renderGoingButton('evt-1')
 
         const button = await screen.findByRole('button', { name: "I'm going" })
+        expect(button.querySelector('[data-icon-family="hand"][data-icon-state="default"]')).toBeInTheDocument()
         await user.click(button)
 
-        await waitFor(() =>
-            expect(screen.getByRole('button', { name: 'Not going' })).toBeInTheDocument(),
+        await waitFor(() => {
+            const goingButton = screen.getByRole('button', { name: 'Not going' })
+            expect(goingButton).toHaveClass('text-action')
+            expect(goingButton.querySelector('[data-icon-family="hand"][data-icon-state="going"]')).toBeInTheDocument()
+        })
+    })
+
+    it('uses the person-plus and person-check states when configured', async () => {
+        server.use(
+            http.get('*/api/settings', () =>
+                HttpResponse.json({ going_button_icon_variant: 'person' }),
+            ),
         )
+
+        const { user } = renderGoingButton('evt-person')
+
+        const button = await screen.findByRole('button', { name: "I'm going" })
+        await waitFor(() =>
+            expect(button.querySelector('[data-icon-family="person"][data-icon-state="default"]')).toBeInTheDocument(),
+        )
+        await user.click(button)
+
+        await waitFor(() => {
+            const goingButton = screen.getByRole('button', { name: 'Not going' })
+            expect(goingButton).toHaveClass('text-action')
+            expect(goingButton.querySelector('[data-icon-family="person"][data-icon-state="going"]')).toBeInTheDocument()
+        })
     })
 
     it('rolls back the optimistic RSVP when the write fails', async () => {
@@ -28,7 +62,7 @@ describe('GoingButton (anonymous)', () => {
             ),
         )
 
-        const { user } = renderWithProviders(<GoingButton eventId="evt-1" />)
+        const { user } = renderGoingButton('evt-1')
 
         const button = await screen.findByRole('button', { name: "I'm going" })
         await user.click(button)

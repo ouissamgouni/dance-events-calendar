@@ -49,6 +49,34 @@ export interface YearRow {
     cells: number[];
 }
 
+export interface RollingMonth {
+    month: string;
+    initial: string;
+    count: number;
+}
+
+/** Current calendar month plus the previous 11, oldest first. */
+export function rollingTwelveMonths(
+    months: MonthlyActivity[],
+    now = new Date(),
+): RollingMonth[] {
+    const counts = new Map<string, number>();
+    for (const entry of months) {
+        counts.set(entry.month, (counts.get(entry.month) ?? 0) + entry.count);
+    }
+
+    return Array.from({ length: 12 }, (_, index) => {
+        const date = new Date(now.getFullYear(), now.getMonth() - (11 - index), 1);
+        const monthNumber = date.getMonth();
+        const month = `${date.getFullYear()}-${String(monthNumber + 1).padStart(2, '0')}`;
+        return {
+            month,
+            initial: MONTH_INITIALS[monthNumber],
+            count: counts.get(month) ?? 0,
+        };
+    });
+}
+
 /**
  * Turn a flat `MonthlyActivity[]` ("YYYY-MM" + count) into contiguous year rows
  * (Jan..Dec), oldest first. Years with no activity between the first and last

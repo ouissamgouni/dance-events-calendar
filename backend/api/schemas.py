@@ -700,6 +700,8 @@ DefaultExplorerPeriod = Literal[
     "next_season_3",
 ]
 
+GoingButtonIconVariant = Literal["hand", "person"]
+
 
 class SiteSettingsResponse(BaseModel):
     since_date: str
@@ -740,6 +742,7 @@ class SiteSettingsResponse(BaseModel):
     event_color_bar_color: str = "#64748b"
     tag_sort_mode: str = "group"  # "group" | "event_count"
     default_explorer_period: DefaultExplorerPeriod = "next_3_months"
+    going_button_icon_variant: GoingButtonIconVariant = "hand"
     # User-submitted promo codes per event (admin-moderated). When False,
     # public + user-facing promo endpoints return 404 and the event
     # section / card badge are hidden.
@@ -1019,6 +1022,7 @@ class SiteSettingsUpdateRequest(BaseModel):
     )
     tag_sort_mode: Optional[str] = Field(default=None, pattern="^(group|event_count)$")
     default_explorer_period: Optional[DefaultExplorerPeriod] = None
+    going_button_icon_variant: Optional[GoingButtonIconVariant] = None
     promo_codes_enabled: Optional[bool] = None
     organizer_claims_enabled: Optional[bool] = None
     for_you_rail_enabled: Optional[bool] = None

@@ -875,7 +875,7 @@ function ActionCountCluster({ eventId, isSavedFlag, isPast = false }: { eventId:
                     isPast={isPast}
                 />
                 {goingCount > 0 && (
-                    <span className="text-[11px] text-success -ml-0.5 mr-1 tabular-nums" aria-label={`${goingCount} ${isPast ? 'attended' : 'going'}`}>
+                    <span className="text-[11px] text-action ml-0.5 mr-1 tabular-nums" aria-label={`${goingCount} ${isPast ? 'attended' : 'going'}`}>
                         {goingCount}
                     </span>
                 )}

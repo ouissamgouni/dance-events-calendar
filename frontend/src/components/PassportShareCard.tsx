@@ -19,6 +19,7 @@ import {
     takeLastYears,
 } from '../utils/passportActivity';
 import { WORLD_LAND } from '../data/worldLand';
+import { journeyBounds, journeyProjector, journeyRingIntersects } from '../utils/journeyMap';
 
 interface PassportShareCardProps {
     displayName: string;
@@ -41,62 +42,6 @@ interface PassportShareCardProps {
 
 const MAP_W = 312;
 const MAP_H = 130;
-
-interface GeoBounds {
-    minLng: number;
-    maxLng: number;
-    minLat: number;
-    maxLat: number;
-}
-
-// Padded bounding box of the event dots, mirroring Leaflet's fitBounds so a
-// cluster of activity in one region fills the frame instead of floating on a
-// tiny slice of the whole world. A minimum span keeps a single city from
-// over-zooming.
-function boundsFor(coords: { lat: number; lng: number }[]): GeoBounds {
-    const lats = coords.map((c) => c.lat);
-    const lngs = coords.map((c) => c.lng);
-    const midLat = (Math.min(...lats) + Math.max(...lats)) / 2;
-    const midLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
-    const latSpan = Math.max(Math.max(...lats) - Math.min(...lats), 6) * 1.6;
-    const lngSpan = Math.max(Math.max(...lngs) - Math.min(...lngs), 6) * 1.6;
-    return {
-        minLat: Math.max(midLat - latSpan / 2, -84),
-        maxLat: Math.min(midLat + latSpan / 2, 84),
-        minLng: Math.max(midLng - lngSpan / 2, -180),
-        maxLng: Math.min(midLng + lngSpan / 2, 180),
-    };
-}
-
-// Equirectangular projection scaled by cos(midLat) so regional views aren't
-// stretched east-west, then uniformly fit (letterboxed) into MAP_W×MAP_H.
-function projectorFor(b: GeoBounds): (lat: number, lng: number) => { x: number; y: number } {
-    const midLat = (b.minLat + b.maxLat) / 2;
-    const cosLat = Math.max(Math.cos((midLat * Math.PI) / 180), 0.2);
-    const mxMin = b.minLng * cosLat;
-    const myMin = -b.maxLat;
-    const scale = Math.min(MAP_W / ((b.maxLng - b.minLng) * cosLat), MAP_H / (b.maxLat - b.minLat));
-    const offX = (MAP_W - (b.maxLng - b.minLng) * cosLat * scale) / 2;
-    const offY = (MAP_H - (b.maxLat - b.minLat) * scale) / 2;
-    return (lat, lng) => ({
-        x: (lng * cosLat - mxMin) * scale + offX,
-        y: (-lat - myMin) * scale + offY,
-    });
-}
-
-function ringInBounds(ring: [number, number][], b: GeoBounds): boolean {
-    let minLng = Infinity;
-    let maxLng = -Infinity;
-    let minLat = Infinity;
-    let maxLat = -Infinity;
-    for (const [lng, lat] of ring) {
-        if (lng < minLng) minLng = lng;
-        if (lng > maxLng) maxLng = lng;
-        if (lat < minLat) minLat = lat;
-        if (lat > maxLat) maxLat = lat;
-    }
-    return !(maxLng < b.minLng || minLng > b.maxLng || maxLat < b.minLat || minLat > b.maxLat);
-}
 
 function monthYear(iso: string): string {
     try {
@@ -123,9 +68,9 @@ function linkLabel(profileUrl: string, handle: string | null): string {
 }
 
 function WorldMap({ coords }: { coords: { lat: number; lng: number }[] }) {
-    const bounds = boundsFor(coords);
-    const project = projectorFor(bounds);
-    const land = WORLD_LAND.filter((ring) => ringInBounds(ring, bounds));
+    const bounds = journeyBounds(coords);
+    const project = journeyProjector(bounds, MAP_W, MAP_H);
+    const land = WORLD_LAND.filter((ring) => journeyRingIntersects(ring, bounds));
     return (
         <svg
             width={MAP_W}

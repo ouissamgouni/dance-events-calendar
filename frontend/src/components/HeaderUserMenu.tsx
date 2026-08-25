@@ -8,7 +8,13 @@ import MenuDrawer from './MenuDrawer';
  * top-right in the global header; shows the signed-in user's avatar beside the
  * burger. The drawer holds account identity + secondary destinations.
  */
-export default function HeaderUserMenu({ className }: { className?: string }) {
+export default function HeaderUserMenu({
+    className,
+    avatarOnly = false,
+}: {
+    className?: string;
+    avatarOnly?: boolean;
+}) {
     const { user } = useAuth();
     const [open, setOpen] = useState(false);
     const firstName = firstNameOf(user?.name);
@@ -38,7 +44,7 @@ export default function HeaderUserMenu({ className }: { className?: string }) {
                         </span>
                     )
                 )}
-                <img src="/menu.png" alt="" aria-hidden="true" className="h-6 w-6 object-contain" />
+                {!avatarOnly && <img src="/menu.png" alt="" aria-hidden="true" className="h-6 w-6 object-contain" />}
             </button>
             <MenuDrawer open={open} onClose={() => setOpen(false)} />
         </div>

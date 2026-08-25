@@ -74,6 +74,8 @@
 @theme {
   --color-brand: #a22e43;
   /* Movida / brand */
+  --color-brand-strong: #7f1d35;
+  /* deep brand surface */
   --color-action: #2563eb;
   /* action / selected / link */
   --color-action-strong: #1d4ed8;

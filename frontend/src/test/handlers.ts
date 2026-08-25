@@ -204,6 +204,7 @@ export const handlers = [
             event_color_bar_color: '#64748b',
             tag_sort_mode: 'group',
             default_explorer_period: 'next_3_months',
+            going_button_icon_variant: 'hand',
             promo_codes_enabled: false,
             organizer_claims_enabled: false,
             for_you_rail_enabled: false,

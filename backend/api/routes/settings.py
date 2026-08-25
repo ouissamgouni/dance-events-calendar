@@ -14,6 +14,7 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 DEFAULT_SINCE_DAYS = 183  # ~6 months
 DEFAULT_EXPLORER_PERIOD = "next_3_months"
+DEFAULT_GOING_BUTTON_ICON_VARIANT = "hand"
 ALLOWED_DEFAULT_EXPLORER_PERIODS = {
     "this_weekend",
     "next_weekend",
@@ -26,6 +27,7 @@ ALLOWED_DEFAULT_EXPLORER_PERIODS = {
     "next_season_2",
     "next_season_3",
 }
+ALLOWED_GOING_BUTTON_ICON_VARIANTS = {"hand", "person"}
 
 
 def _default_since_date() -> str:
@@ -143,6 +145,15 @@ def _get_default_explorer_period(session: Session) -> str:
     return DEFAULT_EXPLORER_PERIOD
 
 
+def _get_going_button_icon_variant(session: Session) -> str:
+    value = _get_str_setting(
+        session, "going_button_icon_variant", DEFAULT_GOING_BUTTON_ICON_VARIANT
+    )
+    if value in ALLOWED_GOING_BUTTON_ICON_VARIANTS:
+        return value
+    return DEFAULT_GOING_BUTTON_ICON_VARIANT
+
+
 def _set_bool_setting(session: Session, key: str, value: bool) -> None:
     """Set a boolean setting in the DB."""
     row = session.get(SiteSetting, key)
@@ -180,6 +191,7 @@ def _build_response(session: Session) -> SiteSettingsResponse:
         ),
         tag_sort_mode=_get_str_setting(session, "tag_sort_mode", "group"),
         default_explorer_period=_get_default_explorer_period(session),
+        going_button_icon_variant=_get_going_button_icon_variant(session),
         promo_codes_enabled=_get_bool_setting(session, "promo_codes_enabled"),
         organizer_claims_enabled=_get_bool_setting(session, "organizer_claims_enabled"),
         for_you_rail_enabled=_get_bool_setting(session, "for_you_rail_enabled"),
@@ -445,6 +457,17 @@ def update_settings(
         else:
             row = SiteSetting(
                 key="default_explorer_period", value=body.default_explorer_period
+            )
+        session.add(row)
+
+    if body.going_button_icon_variant is not None:
+        row = session.get(SiteSetting, "going_button_icon_variant")
+        if row:
+            row.value = body.going_button_icon_variant
+        else:
+            row = SiteSetting(
+                key="going_button_icon_variant",
+                value=body.going_button_icon_variant,
             )
         session.add(row)
 

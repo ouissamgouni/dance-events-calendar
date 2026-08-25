@@ -55,6 +55,7 @@ const SectionLayout = lazy(() => import('./components/SectionTabs'));
 import OnboardingGate from './components/OnboardingGate';
 import UserSearchBox from './components/UserSearchBox';
 import ExplorerEventSearch from './components/ExplorerEventSearch';
+import MyDanceHeader from './components/MyDanceHeader';
 import { useConsent } from './context/ConsentContext';
 import { umamiPageView } from './utils/umami';
 
@@ -94,6 +95,7 @@ function AppShell() {
   const navigate = useNavigate();
   const qaPinnedWidth = useQaPinnedWidth();
   const mainRef = useRef<HTMLElement | null>(null);
+  const isMineDashboard = location.pathname === '/mine';
 
   // Full-screen flows (auth, onboarding) and leaf detail pages (event/series,
   // admin, notifications, shared views) suppress the primary bottom nav.
@@ -123,39 +125,43 @@ function AppShell() {
           className="flex flex-col h-full"
           style={qaPinnedWidth ? { marginRight: qaPinnedWidth, transition: 'margin-right 0.2s ease' } : { transition: 'margin-right 0.2s ease' }}
         >
-          <header
-            className="flex items-center justify-between gap-2 bg-surface border-b border-line px-3 sm:px-4"
-            style={{ height: 'calc(64px + env(safe-area-inset-top))', paddingTop: 'env(safe-area-inset-top)' }}
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <Link to="/" reloadDocument className="flex items-center gap-2 shrink-0">
-                <img src="/movida.png" alt="Movida" className="h-9 w-9 object-contain shrink-0" />
-                <span className="text-[21px] font-bold leading-none tracking-tight">Movida</span>
-              </Link>
-              <DesktopNav />
-            </div>
-            <div className="flex items-center gap-1 sm:gap-2">
-              {/* Desktop: inline event search, mirroring the people search box */}
-              <ExplorerEventSearch
-                className="hidden lg:block w-64"
-                pastToggle
-                headerInline
-                onSelectEvent={(eventId) => navigate(`/event/${eventId}`)}
-                triggerLabel="Search events"
-              />
-              {/* Mobile: compact icon trigger opening a panel */}
-              <ExplorerEventSearch
-                className="lg:hidden"
-                compact
-                pastToggle
-                onSelectEvent={(eventId) => navigate(`/event/${eventId}`)}
-                triggerLabel="Search events"
-              />
-              <UserSearchBox />
-              <NotificationBell />
-              <HeaderUserMenu />
-            </div>
-          </header>
+          {isMineDashboard ? (
+            <MyDanceHeader />
+          ) : (
+            <header
+              className="flex items-center justify-between gap-2 bg-surface border-b border-line px-3 sm:px-4"
+              style={{ height: 'calc(64px + env(safe-area-inset-top))', paddingTop: 'env(safe-area-inset-top)' }}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <Link to="/" reloadDocument className="flex items-center gap-2 shrink-0">
+                  <img src="/movida.png" alt="Movida" className="h-9 w-9 object-contain shrink-0" />
+                  <span className="text-[21px] font-bold leading-none tracking-tight">Movida</span>
+                </Link>
+                <DesktopNav />
+              </div>
+              <div className="flex items-center gap-1 sm:gap-2">
+                {/* Desktop: inline event search, mirroring the people search box */}
+                <ExplorerEventSearch
+                  className="hidden lg:block w-64"
+                  pastToggle
+                  headerInline
+                  onSelectEvent={(eventId) => navigate(`/event/${eventId}`)}
+                  triggerLabel="Search events"
+                />
+                {/* Mobile: compact icon trigger opening a panel */}
+                <ExplorerEventSearch
+                  className="lg:hidden"
+                  compact
+                  pastToggle
+                  onSelectEvent={(eventId) => navigate(`/event/${eventId}`)}
+                  triggerLabel="Search events"
+                />
+                <UserSearchBox />
+                <NotificationBell />
+                <HeaderUserMenu />
+              </div>
+            </header>
+          )}
           <SignUpBanner />
           <ShareReferralBanner />
           <OnboardingGate />
@@ -239,18 +245,20 @@ function AppShell() {
                 />
               </Routes>
             </Suspense>
-            <footer className="py-3 text-center flex items-center justify-center gap-3">
-              <Link to="/privacy" className="text-[11px] text-muted hover:text-ink-soft transition">
-                Privacy Policy
-              </Link>
-              <span className="text-[11px] text-gray-300" aria-hidden="true">·</span>
-              <a
-                href="mailto:support@joinmovida.com?subject=Movida%20feedback"
-                className="text-[11px] text-muted hover:text-ink-soft transition"
-              >
-                Send feedback
-              </a>
-            </footer>
+            {!isMineDashboard && (
+              <footer className="py-3 text-center flex items-center justify-center gap-3">
+                <Link to="/privacy" className="text-[11px] text-muted hover:text-ink-soft transition">
+                  Privacy Policy
+                </Link>
+                <span className="text-[11px] text-gray-300" aria-hidden="true">·</span>
+                <a
+                  href="mailto:support@joinmovida.com?subject=Movida%20feedback"
+                  className="text-[11px] text-muted hover:text-ink-soft transition"
+                >
+                  Send feedback
+                </a>
+              </footer>
+            )}
           </main>
           {!hideBottomNav && <BottomNav />}
           <StatusBar />

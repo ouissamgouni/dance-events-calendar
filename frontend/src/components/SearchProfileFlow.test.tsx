@@ -102,8 +102,11 @@ describe('SearchProfileFlow', () => {
         const props = baseProps();
         const user = userEvent.setup();
         render(<SearchProfileFlow {...props} initialStep="save" />);
-        // The active profile (id=1) should be preselected.
-        await waitFor(() => expect(screen.getByTestId('search-profile-target-1')).toHaveAttribute('aria-pressed', 'true'));
+        // No profile is preselected.
+        expect(screen.getByTestId('search-profile-target-1')).toHaveAttribute('aria-pressed', 'false');
+        // Select the active profile.
+        await user.click(screen.getByTestId('search-profile-target-1'));
+        expect(screen.getByTestId('search-profile-target-1')).toHaveAttribute('aria-pressed', 'true');
         await user.click(screen.getByTestId('search-profile-update'));
         expect(props.onUpdateProfile).toHaveBeenCalledWith(props.profiles[0]);
         expect(props.onClose).toHaveBeenCalled();
@@ -113,8 +116,8 @@ describe('SearchProfileFlow', () => {
         const props = baseProps();
         const user = userEvent.setup();
         render(<SearchProfileFlow {...props} initialStep="save" />);
-        // Initially the active profile is selected.
-        await waitFor(() => expect(screen.getByTestId('search-profile-target-1')).toHaveAttribute('aria-pressed', 'true'));
+        // Initially no profile is selected.
+        expect(screen.getByTestId('search-profile-target-1')).toHaveAttribute('aria-pressed', 'false');
         // Click the non-active profile.
         await user.click(screen.getByTestId('search-profile-target-2'));
         expect(screen.getByTestId('search-profile-target-2')).toHaveAttribute('aria-pressed', 'true');

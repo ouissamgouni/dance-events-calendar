@@ -104,10 +104,12 @@ export default function SectionLayout({ section }: { section: SectionKey }) {
 
     return (
         <div className="min-h-full bg-[#f8fafc]">
-            <div className="border-b border-line bg-surface px-4 pt-1">
-                {title && <h1 className="px-1 pb-1 pt-1 text-xl font-semibold text-ink">{title}</h1>}
-                <SectionTabs tabs={tabs} pathname={pathname} hub={hub} />
-            </div>
+            {(section !== 'mine' || pathname !== hub) && (
+                <div className="border-b border-line bg-surface px-4 pt-1">
+                    {title && <h1 className="px-1 pb-1 pt-1 text-xl font-semibold text-ink">{title}</h1>}
+                    <SectionTabs tabs={tabs} pathname={pathname} hub={hub} />
+                </div>
+            )}
             <Outlet />
         </div>
     );

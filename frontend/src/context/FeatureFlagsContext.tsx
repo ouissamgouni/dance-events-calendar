@@ -22,6 +22,7 @@ interface FeatureFlags {
     trendingTopPercent: number;
     eventColorBarColor: string;
     tagSortMode: 'group' | 'event_count';
+    goingButtonIconVariant: 'hand' | 'person';
     promoCodesEnabled: boolean;
     organizerClaimsEnabled: boolean;
     forYouRailEnabled: boolean;
@@ -60,6 +61,7 @@ const defaultFlags: FeatureFlags = {
     trendingTopPercent: 100,
     eventColorBarColor: DEFAULT_EVENT_COLOR_BAR_COLOR,
     tagSortMode: 'group',
+    goingButtonIconVariant: 'hand',
     promoCodesEnabled: false,
     organizerClaimsEnabled: false,
     forYouRailEnabled: false,
@@ -94,6 +96,7 @@ export function FeatureFlagsProvider({ children }: { children: ReactNode }) {
                     trendingTopPercent: s.trending_top_percent ?? 100,
                     eventColorBarColor: s.event_color_bar_color || DEFAULT_EVENT_COLOR_BAR_COLOR,
                     tagSortMode: s.tag_sort_mode === 'event_count' ? 'event_count' : 'group',
+                    goingButtonIconVariant: s.going_button_icon_variant === 'person' ? 'person' : 'hand',
                     promoCodesEnabled: s.promo_codes_enabled ?? false,
                     organizerClaimsEnabled: s.organizer_claims_enabled ?? false,
                     forYouRailEnabled: s.for_you_rail_enabled ?? false,
